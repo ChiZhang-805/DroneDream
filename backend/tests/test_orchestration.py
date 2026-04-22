@@ -356,3 +356,148 @@ def test_cancelled_queued_job_is_not_started(orchestration_ctx):
         assert job.status == "CANCELLED"
         assert len(list(job.trials)) == 0
         assert job.baseline_candidate_id is None
+
+
+# --- Phase 7 acceptance coverage ------------------------------------------
+
+
+def test_real_stub_backend_marks_job_failed_with_readable_error(
+    orchestration_ctx, monkeypatch
+):
+    """Phase 7 acceptance: the failed-flow demo must surface a user-readable
+    failure summary on the job. Driving the worker with ``SIMULATOR_BACKEND=
+    real_stub`` fails every trial with ``ADAPTER_UNAVAILABLE`` and the job
+    manager must then mark the job ``FAILED`` with ``ALL_TRIALS_FAILED``.
+    """
+
+    ctx = orchestration_ctx
+    monkeypatch.setenv("SIMULATOR_BACKEND", "real_stub")
+    job_id = _create_queued_job(ctx)
+
+    runner = ctx["runner"]
+    for _ in range(60):
+        runner.tick("test-worker")
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            if job.status in {"COMPLETED", "FAILED", "CANCELLED"}:
+                break
+    else:  # pragma: no cover
+        pytest.fail("worker loop did not finalize job within iteration budget")
+
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.status == "FAILED"
+        assert job.latest_error_code == "ALL_TRIALS_FAILED"
+        assert job.latest_error_message
+        # Every trial must be terminal and failed with ADAPTER_UNAVAILABLE.
+        assert len(job.trials) == job.progress_total_trials
+        assert all(t.status == "FAILED" for t in job.trials)
+        assert all(t.failure_code == "ADAPTER_UNAVAILABLE" for t in job.trials)
+        # No report should be produced for an all-failed job.
+        assert job.report is None
+
+
+def test_terminal_job_rejects_further_cancellation(orchestration_ctx):
+    """Phase 7 acceptance: terminal jobs must not be cancellable again.
+
+    Drive a job to COMPLETED and verify the job service raises a structured
+    ``JOB_ALREADY_COMPLETED`` error rather than toggling state back.
+    """
+
+    ctx = orchestration_ctx
+    job_id = _create_queued_job(ctx)
+
+    runner = ctx["runner"]
+    for _ in range(60):
+        runner.tick("test-worker")
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            if job.status == "COMPLETED":
+                break
+    else:  # pragma: no cover
+        pytest.fail("worker loop did not complete job within iteration budget")
+
+    jobs_service = ctx["jobs_service"]
+    with (
+        ctx["db_module"].SessionLocal() as db,
+        pytest.raises(jobs_service.JobServiceError) as excinfo,
+    ):
+        jobs_service.cancel_job(db, job_id)
+    assert excinfo.value.code == "JOB_ALREADY_COMPLETED"
+    assert excinfo.value.http_status == 409
+
+
+def test_report_for_failed_job_returns_structured_failure(
+    orchestration_ctx, monkeypatch
+):
+    """Phase 7 acceptance: when a job fails, ``GET /jobs/{id}/report`` must
+    return a structured error with ``code=JOB_FAILED`` (not 200, not 500).
+    """
+
+    ctx = orchestration_ctx
+    monkeypatch.setenv("SIMULATOR_BACKEND", "real_stub")
+    job_id = _create_queued_job(ctx)
+
+    runner = ctx["runner"]
+    for _ in range(60):
+        runner.tick("test-worker")
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            if job.status in {"FAILED", "COMPLETED"}:
+                break
+
+    # Drive the HTTP layer directly so we cover the router error envelope.
+    import app.main as main_module
+    import app.routers.jobs as jobs_router
+    import app.routers.trials as trials_router
+
+    importlib.reload(jobs_router)
+    importlib.reload(trials_router)
+    importlib.reload(main_module)
+
+    from fastapi.testclient import TestClient
+
+    with TestClient(main_module.app) as client:
+        resp = client.get(f"/api/v1/jobs/{job_id}/report")
+        assert resp.status_code == 409
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "JOB_FAILED"
+        assert body["error"]["message"]
+        # Details must carry the failure code so the UI can render it.
+        assert body["error"]["details"]["failure_code"] == "ALL_TRIALS_FAILED"
+
+
+def test_list_jobs_filters_by_status(orchestration_ctx):
+    """Phase 7 acceptance: the ``?status=`` query param must filter results."""
+
+    ctx = orchestration_ctx
+    queued_id = _create_queued_job(ctx)
+
+    # Create a second job and cancel it so we have two distinct statuses.
+    schemas = ctx["schemas"]
+    jobs_service = ctx["jobs_service"]
+    with ctx["db_module"].SessionLocal() as db:
+        cancelled_job = jobs_service.create_job(db, schemas.JobCreateRequest())
+        cancelled_id = cancelled_job.id
+    with ctx["db_module"].SessionLocal() as db:
+        jobs_service.cancel_job(db, cancelled_id)
+
+    import app.main as main_module
+    import app.routers.jobs as jobs_router
+    import app.routers.trials as trials_router
+
+    importlib.reload(jobs_router)
+    importlib.reload(trials_router)
+    importlib.reload(main_module)
+
+    from fastapi.testclient import TestClient
+
+    with TestClient(main_module.app) as client:
+        queued = client.get("/api/v1/jobs?status=QUEUED").json()["data"]
+        cancelled = client.get("/api/v1/jobs?status=CANCELLED").json()["data"]
+
+    assert [j["id"] for j in queued["items"]] == [queued_id]
+    assert queued["total"] == 1
+    assert [j["id"] for j in cancelled["items"]] == [cancelled_id]
+    assert cancelled["total"] == 1

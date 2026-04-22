@@ -34,11 +34,11 @@ else
 fi
 
 # ---- Worker ----
-if [[ -x worker/.venv/bin/python ]]; then
+if [[ -x worker/.venv/bin/ruff ]]; then
   section "Worker: ruff"
-  run_or_skip "ruff" worker/.venv/bin/ruff check worker || true
+  run_or_skip "ruff" worker/.venv/bin/ruff check worker
 else
-  echo "[check] worker venv not found — skipping worker checks"
+  echo "[check] worker ruff not installed — skipping worker lint (run 'pip install -e worker[dev]')"
 fi
 
 # ---- Frontend ----
