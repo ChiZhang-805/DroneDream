@@ -12,9 +12,9 @@ import { DataTable, type Column } from "../components/DataTable";
 import { Loading, ErrorState, Empty } from "../components/States";
 import { ComparisonChart } from "../components/ComparisonChart";
 
-// Polling interval used only by the mock client so the UI can demonstrate
-// "live" active states without faking backend state anywhere else. See
-// docs/04_API_SPEC.md §12 — active jobs are expected to be polled.
+// Polling interval for active jobs. The frontend only polls; all state
+// transitions are driven by the backend worker process (Phase 3+). See
+// docs/04_API_SPEC.md §12.
 const ACTIVE_POLL_INTERVAL_MS = 4000;
 
 const TRIAL_COLUMNS: Column<TrialSummary>[] = [
@@ -362,8 +362,8 @@ function StatusSpecificTop({
   if (job.status === "RUNNING") {
     return (
       <Alert tone="info" title="Job running">
-        Baseline and optimizer trials are being dispatched. Mock polling is
-        simulated in the frontend only.
+        Baseline trials are being dispatched and executed by the worker. This
+        page auto-refreshes while the job is active.
       </Alert>
     );
   }
@@ -497,7 +497,7 @@ function DiagnosticsPanel({ job }: { job: Job }) {
   return (
     <SectionCard
       title="Diagnostics / logs"
-      description="Structured job events. In Phase 2 this will stream from the backend."
+      description="Structured job events derived from the backend job state."
     >
       <pre className="log-panel">{lines.join("\n")}</pre>
     </SectionCard>

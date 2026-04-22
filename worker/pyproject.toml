@@ -5,10 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "drone-dream-worker"
 version = "0.1.0"
-description = "DroneDream background worker (trial executor stub)"
+description = "DroneDream background worker (trial executor)"
 readme = "README.md"
 requires-python = ">=3.11"
+# The worker re-uses the backend's ORM models and orchestration code so that
+# there is a single source of truth for the job/trial state machine. The
+# backend package is installed editable alongside this one (see env setup).
 dependencies = [
+    "drone-dream-backend",
     "pydantic>=2.6,<3.0",
     "pydantic-settings>=2.2,<3.0",
     "sqlalchemy>=2.0,<3.0",
@@ -22,11 +26,11 @@ dev = [
 ]
 
 [project.scripts]
-drone-dream-worker = "app.main:main"
+drone-dream-worker = "drone_dream_worker.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["app*"]
+include = ["drone_dream_worker*"]
 
 [tool.ruff]
 line-length = 100
