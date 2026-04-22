@@ -2,13 +2,17 @@
 
 The worker process calls :func:`run_forever`, which repeatedly:
 
-1. Claims any newly-QUEUED jobs and dispatches their baseline trials.
-2. Runs at most one PENDING trial per iteration (deterministic mock work).
-3. Finalizes any RUNNING/AGGREGATING jobs whose trials are all terminal.
+1. Claims any newly-QUEUED jobs and dispatches their baseline + optimizer
+   trials (see :mod:`app.orchestration.job_manager`).
+2. Runs at most one PENDING trial per iteration via the configured
+   :class:`app.simulator.base.SimulatorAdapter` (deterministic mock by
+   default).
+3. Finalizes any RUNNING/AGGREGATING jobs whose trials are all terminal
+   (aggregate per-candidate scores, select the winner, persist the
+   ``JobReport``, transition the job to ``COMPLETED`` or ``FAILED``).
 
 Each step uses its own short-lived SQLAlchemy session so API traffic is never
-blocked waiting for a worker transaction. The loop is intentionally simple —
-Phase 5 will add an optimizer step between (1) and (3).
+blocked waiting for a worker transaction.
 """
 
 from __future__ import annotations

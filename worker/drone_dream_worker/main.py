@@ -1,11 +1,13 @@
 """DroneDream worker entrypoint.
 
-Phase 3 scope: poll the database for QUEUED jobs and PENDING trials, run
-deterministic mock trials, roll baseline metrics up into the candidate,
-produce a READY JobReport, and drive the job state machine to a terminal
-state. The actual orchestration logic lives in ``app.orchestration`` (the
-backend package), which this worker imports after installing the backend
-editable into its venv.
+Thin wrapper around :func:`app.orchestration.runner.run_forever`. The worker
+process polls the database for QUEUED jobs and PENDING trials, dispatches
+baseline + optimizer candidates, executes each trial through the configured
+:class:`app.simulator.base.SimulatorAdapter` (deterministic mock by default),
+aggregates per-candidate metrics into a ``JobReport``, and drives the job
+state machine to a terminal state. The orchestration logic itself lives in
+``app.orchestration`` (the backend package), which this worker imports after
+installing the backend editable into its venv.
 """
 
 from __future__ import annotations

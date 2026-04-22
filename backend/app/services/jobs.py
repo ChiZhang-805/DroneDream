@@ -1,7 +1,9 @@
 """Job service — creation, listing, rerun, cancel, serialization.
 
-Only state transitions that are safe in Phase 2 live here. Worker execution
-and optimizer orchestration belong to a later phase (Phase 3+).
+All state transitions that the HTTP layer can perform live here. Trial
+execution, baseline + optimizer dispatch, aggregation, and report
+generation live in :mod:`app.orchestration` and run inside the worker
+process — never inside a request handler.
 """
 
 from __future__ import annotations

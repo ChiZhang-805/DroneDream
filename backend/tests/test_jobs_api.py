@@ -1,4 +1,4 @@
-"""Integration tests for /api/v1 job and trial endpoints (Phase 2)."""
+"""Integration tests for /api/v1 job and trial endpoints."""
 
 from __future__ import annotations
 
@@ -26,6 +26,9 @@ def test_create_job_returns_queued(client: TestClient) -> None:
     job = body["data"]
     assert job["status"] == "QUEUED"
     assert job["id"].startswith("job_")
+    # Backward-compatible alias for clients that expected the original
+    # ``{job_id, status}`` wording in ``docs/04_API_SPEC.md``.
+    assert job["job_id"] == job["id"]
     assert job["queued_at"] is not None
     assert job["started_at"] is None
     assert job["progress"]["completed_trials"] == 0
@@ -33,6 +36,35 @@ def test_create_job_returns_queued(client: TestClient) -> None:
     assert job["sensor_noise_level"] == "medium"
     assert job["objective_profile"] == "robust"
     assert job["source_job_id"] is None
+
+
+def test_create_job_exposes_job_id_alias(client: TestClient) -> None:
+    """The create response must include ``job_id`` (alias of ``id``)."""
+
+    body = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()
+    job = body["data"]
+    assert body["success"] is True
+    assert "id" in job
+    assert "job_id" in job
+    assert job["id"] == job["job_id"]
+    assert job["status"] == "QUEUED"
+
+
+def test_list_and_detail_do_not_add_job_id_alias(client: TestClient) -> None:
+    """Only create/rerun advertise ``job_id``; list/detail stick to ``id``.
+
+    This keeps the canonical ``id`` schema unchanged on the read endpoints
+    while preserving the alias where the original spec promised it.
+    """
+
+    created = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    detail = client.get(f"/api/v1/jobs/{created['id']}").json()["data"]
+    assert detail["id"] == created["id"]
+    assert "job_id" not in detail
+    listing = client.get("/api/v1/jobs").json()["data"]
+    for row in listing["items"]:
+        assert "id" in row
+        assert "job_id" not in row
 
 
 def test_create_job_rejects_invalid_altitude(client: TestClient) -> None:
@@ -138,6 +170,9 @@ def test_rerun_creates_new_job_preserving_original(client: TestClient) -> None:
     assert resp.status_code == 200
     new_job = resp.json()["data"]
     assert new_job["id"] != original["id"]
+    # Rerun response also advertises the ``job_id`` alias (see
+    # docs/04_API_SPEC.md §7.4).
+    assert new_job["job_id"] == new_job["id"]
     assert new_job["status"] == "QUEUED"
     assert new_job["source_job_id"] == original["id"]
     assert new_job["track_type"] == original["track_type"]
