@@ -117,6 +117,39 @@ def get_job_report(
     except job_service.JobServiceError as err:
         _raise(err)
 
+    # Surface user-readable failure context when the job did not produce a
+    # report. These are all 409 (the job exists, the report simply isn't and
+    # will never be available in this form). See docs/04_API_SPEC.md.
+    if job.status == "FAILED":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "JOB_FAILED",
+                "message": (
+                    job.latest_error_message
+                    or f"Job {job.id} failed before a report could be generated."
+                ),
+                "details": {
+                    "failure_code": job.latest_error_code,
+                    "failure_message": job.latest_error_message,
+                    "failed_at": job.failed_at.isoformat() if job.failed_at else None,
+                },
+            },
+        )
+    if job.status == "CANCELLED":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "JOB_CANCELLED",
+                "message": f"Job {job.id} was cancelled; no report was generated.",
+                "details": {
+                    "cancelled_at": (
+                        job.cancelled_at.isoformat() if job.cancelled_at else None
+                    ),
+                },
+            },
+        )
+
     report = job.report
     if report is None or report.report_status != "READY":
         raise HTTPException(
@@ -124,6 +157,7 @@ def get_job_report(
             detail={
                 "code": "REPORT_NOT_READY",
                 "message": f"Report for job {job.id} is not ready yet.",
+                "details": {"job_status": job.status},
             },
         )
 

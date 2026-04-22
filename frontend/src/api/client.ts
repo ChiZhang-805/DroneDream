@@ -4,6 +4,7 @@
 
 import type {
   ApiEnvelope,
+  Artifact,
   Job,
   JobCreateRequest,
   JobReport,
@@ -135,6 +136,12 @@ export const apiClient = {
   async getJobReport(jobId: string): Promise<JobReport> {
     return request<JobReport>(
       `/jobs/${encodeURIComponent(jobId)}/report`,
+    );
+  },
+
+  async listJobArtifacts(jobId: string): Promise<Artifact[]> {
+    return request<Artifact[]>(
+      `/jobs/${encodeURIComponent(jobId)}/artifacts`,
     );
   },
 

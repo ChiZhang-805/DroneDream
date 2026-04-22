@@ -176,6 +176,32 @@ def cancel_job(db: Session, job_id: str) -> models.Job:
 # --- Serialization ----------------------------------------------------------
 
 
+# Cap on how many JobEvent rows we embed on the Job detail response. Keeps
+# the payload bounded even after many optimizer+trial events accumulate.
+_RECENT_EVENTS_LIMIT = 25
+
+
+def _recent_events(job: models.Job) -> list[schemas.JobEventInfo]:
+    """Return the newest ``_RECENT_EVENTS_LIMIT`` events for a job.
+
+    SQLAlchemy loads ``job.events`` in insertion order; we sort defensively
+    and truncate to the limit so callers get a stable, bounded list.
+    """
+
+    events = sorted(
+        list(job.events), key=lambda e: (e.created_at, e.id), reverse=True
+    )[:_RECENT_EVENTS_LIMIT]
+    return [
+        schemas.JobEventInfo(
+            id=e.id,
+            event_type=e.event_type,
+            payload=e.payload_json,
+            created_at=e.created_at,
+        )
+        for e in events
+    ]
+
+
 def to_job_schema(job: models.Job) -> schemas.Job:
     latest_error = None
     if job.latest_error_code is not None:
@@ -213,6 +239,7 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         completed_at=job.completed_at,
         cancelled_at=job.cancelled_at,
         failed_at=job.failed_at,
+        recent_events=_recent_events(job),
     )
 
 

@@ -818,3 +818,12 @@ code {
   color: var(--color-muted, #6b7280);
   font-size: 0.78rem;
 }
+
+/* Phase 6: best-parameters section header with winner tag + candidate id. */
+.best-parameters-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}

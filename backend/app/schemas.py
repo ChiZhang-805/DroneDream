@@ -67,6 +67,19 @@ class JobErrorInfo(BaseModel):
     message: str
 
 
+class JobEventInfo(BaseModel):
+    """Single JobEvent row exposed on job detail for diagnostics.
+
+    The payload is whatever was recorded at event time (may be ``None``).
+    The frontend treats it as opaque JSON.
+    """
+
+    id: str
+    event_type: str
+    payload: dict[str, Any] | None = None
+    created_at: datetime
+
+
 # --- Requests ---------------------------------------------------------------
 
 
@@ -105,6 +118,10 @@ class Job(BaseModel):
     completed_at: datetime | None = None
     cancelled_at: datetime | None = None
     failed_at: datetime | None = None
+    # Phase 6: recent JobEvent rows (capped, newest first) so the diagnostics
+    # panel can render without a separate request. Empty list for jobs that
+    # have not emitted any events yet.
+    recent_events: list[JobEventInfo] = Field(default_factory=list)
 
 
 class PaginatedJobs(BaseModel):
@@ -212,6 +229,7 @@ __all__ = [
     "Job",
     "JobCreateRequest",
     "JobErrorInfo",
+    "JobEventInfo",
     "JobProgress",
     "JobReport",
     "ObjectiveProfile",

@@ -2,7 +2,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, ApiClientError } from "../api/client";
-import type { Job, JobReport, TrialSummary } from "../types/api";
+import type {
+  Artifact,
+  Job,
+  JobEventInfo,
+  JobReport,
+  TrialSummary,
+} from "../types/api";
 import { isActiveJobStatus, formatDateTime, formatNumber } from "../utils/format";
 import { SectionCard } from "../components/SectionCard";
 import { MetricCard } from "../components/MetricCard";
@@ -117,11 +123,22 @@ export function JobDetail() {
 
   const job = jobQuery.data;
   const reportEnabled = job?.status === "COMPLETED";
+  const artifactsEnabled =
+    job?.status === "COMPLETED" ||
+    job?.status === "FAILED" ||
+    job?.status === "CANCELLED";
 
   const reportQuery = useQuery({
     queryKey: ["job-report", safeId],
     queryFn: () => apiClient.getJobReport(safeId),
     enabled: reportEnabled,
+    retry: false,
+  });
+
+  const artifactsQuery = useQuery({
+    queryKey: ["job-artifacts", safeId],
+    queryFn: () => apiClient.listJobArtifacts(safeId),
+    enabled: artifactsEnabled,
     retry: false,
   });
 
@@ -144,6 +161,7 @@ export function JobDetail() {
 
   const trials = trialsQuery.data ?? [];
   const report = reportQuery.data;
+  const artifacts = artifactsQuery.data ?? [];
 
   const isTerminal =
     job.status === "COMPLETED" ||
@@ -190,24 +208,23 @@ export function JobDetail() {
             <ComparisonChart data={report.comparison} />
           </SectionCard>
 
-          <SectionCard
-            title="Best parameters"
-            description={`From candidate ${report.best_candidate_id}`}
-          >
-            <ul className="kv-list">
-              {Object.entries(report.best_parameters).map(([k, v]) => (
-                <li key={k}>
-                  <span className="kv-key">{k}</span>
-                  <span className="kv-value">{String(v)}</span>
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
+          <BestParametersSection job={job} report={report} />
 
-          <SectionCard title="Summary">
+          <SectionCard
+            title="Summary"
+            description="Deterministic local summary — no external LLM call."
+          >
             <p style={{ margin: 0 }}>{report.summary_text}</p>
           </SectionCard>
         </>
+      ) : null}
+
+      {job.status === "COMPLETED" && reportQuery.isError ? (
+        <Alert tone="danger" title="Report unavailable">
+          {reportQuery.error instanceof ApiClientError
+            ? reportQuery.error.message
+            : "Could not load the job report."}
+        </Alert>
       ) : null}
 
       <SectionCard
@@ -238,6 +255,12 @@ export function JobDetail() {
           />
         )}
       </SectionCard>
+
+      <ArtifactsPanel
+        artifacts={artifacts}
+        visible={artifactsEnabled}
+        isLoading={artifactsQuery.isLoading}
+      />
 
       <DiagnosticsPanel job={job} />
     </section>
@@ -492,7 +515,92 @@ function MetricsCards({
   );
 }
 
-function DiagnosticsPanel({ job }: { job: Job }) {
+function BestParametersSection({
+  job,
+  report,
+}: {
+  job: Job;
+  report: JobReport;
+}) {
+  const baselineWon = report.best_candidate_id === job.baseline_candidate_id;
+  return (
+    <SectionCard
+      title="Best parameters"
+      description={
+        baselineWon
+          ? "Baseline outperformed every optimizer candidate — baseline parameters are the recommended result."
+          : "Parameters from the winning optimizer candidate. Baseline shown for comparison."
+      }
+    >
+      <div className="best-parameters-head">
+        <span
+          className={`candidate-tag ${
+            baselineWon ? "candidate-tag-baseline" : "candidate-tag-optimizer"
+          }`}
+        >
+          {baselineWon ? "Baseline winner" : "Optimizer winner"}
+        </span>
+        <code className="candidate-id">{report.best_candidate_id}</code>
+      </div>
+      <ul className="kv-list">
+        {Object.entries(report.best_parameters).map(([k, v]) => (
+          <li key={k}>
+            <span className="kv-key">{k}</span>
+            <span className="kv-value">{String(v)}</span>
+          </li>
+        ))}
+      </ul>
+    </SectionCard>
+  );
+}
+
+function ArtifactsPanel({
+  artifacts,
+  visible,
+  isLoading,
+}: {
+  artifacts: Artifact[];
+  visible: boolean;
+  isLoading: boolean;
+}) {
+  if (!visible) return null;
+  return (
+    <SectionCard
+      title="Artifacts"
+      description="Metadata for report assets produced by the worker. Mock entries in the MVP — no underlying files yet."
+    >
+      {isLoading ? (
+        <Loading label="Loading artifacts…" />
+      ) : artifacts.length === 0 ? (
+        <Empty
+          title="No artifacts yet"
+          description="Artifacts will appear once a completed job has generated its report."
+        />
+      ) : (
+        <ul className="kv-list">
+          {artifacts.map((a) => (
+            <li key={a.id}>
+              <span className="kv-key">
+                {a.display_name ?? a.artifact_type}
+              </span>
+              <span className="kv-value">
+                <code>{a.storage_path}</code>
+                {a.mime_type ? (
+                  <span className="form-hint"> · {a.mime_type}</span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </SectionCard>
+  );
+}
+
+/** Build the fallback diagnostic lines from the job's timestamp columns. Used
+ *  when the backend has not yet populated `recent_events` (e.g. a stale job
+ *  record from before Phase 6). */
+function synthesizeDiagnosticLines(job: Job): string[] {
   const lines: string[] = [
     `[${formatDateTime(job.created_at)}] job_created id=${job.id}`,
   ];
@@ -514,11 +622,40 @@ function DiagnosticsPanel({ job }: { job: Job }) {
     );
   if (job.cancelled_at)
     lines.push(`[${formatDateTime(job.cancelled_at)}] job_cancelled`);
+  return lines;
+}
+
+function formatEventLine(e: JobEventInfo): string {
+  const payloadKeys = e.payload ? Object.keys(e.payload) : [];
+  const payloadBits = payloadKeys
+    .slice(0, 3)
+    .map((k) => {
+      const raw = e.payload?.[k];
+      const value =
+        typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean"
+          ? String(raw)
+          : JSON.stringify(raw);
+      return `${k}=${value}`;
+    })
+    .join(" ");
+  return `[${formatDateTime(e.created_at)}] ${e.event_type}${payloadBits ? " " + payloadBits : ""}`;
+}
+
+function DiagnosticsPanel({ job }: { job: Job }) {
+  const events = job.recent_events ?? [];
+  // `recent_events` is returned newest-first by the backend. The log panel
+  // reads naturally oldest-first, so reverse before formatting.
+  const eventLines = [...events].reverse().map(formatEventLine);
+  const lines = eventLines.length > 0 ? eventLines : synthesizeDiagnosticLines(job);
 
   return (
     <SectionCard
       title="Diagnostics / logs"
-      description="Structured job events derived from the backend job state."
+      description={
+        eventLines.length > 0
+          ? `Last ${events.length} structured job events from the backend.`
+          : "Structured job events derived from the backend job state."
+      }
     >
       <pre className="log-panel">{lines.join("\n")}</pre>
     </SectionCard>

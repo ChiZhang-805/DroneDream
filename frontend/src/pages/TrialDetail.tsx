@@ -6,8 +6,8 @@ import { SectionCard } from "../components/SectionCard";
 import { MetricCard } from "../components/MetricCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Alert } from "../components/Alert";
-import { Loading, ErrorState } from "../components/States";
-import type { Trial } from "../types/api";
+import { Loading, ErrorState, Empty } from "../components/States";
+import type { Artifact, Trial } from "../types/api";
 import { formatDateTime, formatNumber } from "../utils/format";
 
 export function TrialDetail() {
@@ -18,6 +18,14 @@ export function TrialDetail() {
     queryKey: ["trial", safeId],
     queryFn: () => apiClient.getTrial(safeId),
     enabled: !!safeId,
+    retry: false,
+  });
+
+  const parentJobId = trialQuery.data?.job_id;
+  const artifactsQuery = useQuery({
+    queryKey: ["job-artifacts", parentJobId ?? ""],
+    queryFn: () => apiClient.listJobArtifacts(parentJobId ?? ""),
+    enabled: !!parentJobId,
     retry: false,
   });
 
@@ -41,13 +49,18 @@ export function TrialDetail() {
   }
 
   const trial = trialQuery.data;
+  const artifacts = artifactsQuery.data ?? [];
 
   return (
     <section className="stack-md">
       <TrialHeader trial={trial} />
       <TrialMetadata trial={trial} />
       <TrialMetricsSection trial={trial} />
-      <TrialPlotPlaceholder trial={trial} />
+      <TrialArtifactsSection
+        trial={trial}
+        artifacts={artifacts}
+        isLoading={artifactsQuery.isLoading}
+      />
       <FailureDetails trial={trial} />
     </section>
   );
@@ -162,21 +175,47 @@ function TrialMetricsSection({ trial }: { trial: Trial }) {
   );
 }
 
-function TrialPlotPlaceholder({ trial }: { trial: Trial }) {
+function TrialArtifactsSection({
+  trial,
+  artifacts,
+  isLoading,
+}: {
+  trial: Trial;
+  artifacts: Artifact[];
+  isLoading: boolean;
+}) {
   return (
     <SectionCard
-      title="Trajectory / visualization"
-      description="A plot will render here in Phase 6 once artifacts are available."
+      title="Artifacts"
+      description={
+        `Metadata for the parent job's artifacts. Trial-level files are` +
+        ` mock-only in the MVP (scenario ${trial.scenario_type}, seed ${trial.seed}).`
+      }
     >
-      <div
-        className="state-block"
-        style={{ minHeight: 160, justifyContent: "center" }}
-      >
-        <div className="state-title">Plot placeholder</div>
-        <div className="state-description">
-          Scenario: <code>{trial.scenario_type}</code> · Seed: {trial.seed}
-        </div>
-      </div>
+      {isLoading ? (
+        <Loading label="Loading artifacts…" />
+      ) : artifacts.length === 0 ? (
+        <Empty
+          title="No artifacts yet"
+          description="Artifacts become available after the parent job completes."
+        />
+      ) : (
+        <ul className="kv-list">
+          {artifacts.map((a) => (
+            <li key={a.id}>
+              <span className="kv-key">
+                {a.display_name ?? a.artifact_type}
+              </span>
+              <span className="kv-value">
+                <code>{a.storage_path}</code>
+                {a.mime_type ? (
+                  <span className="form-hint"> · {a.mime_type}</span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </SectionCard>
   );
 }

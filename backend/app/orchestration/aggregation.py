@@ -32,7 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models
-from app.orchestration import constants
+from app.orchestration import constants, report_generator
 from app.orchestration.events import record_event
 
 logger = logging.getLogger("drone_dream.orchestration.aggregation")
@@ -207,91 +207,6 @@ def _rank_and_select_best(
     return best
 
 
-# --- Report ----------------------------------------------------------------
-
-
-def _build_report(
-    baseline_agg: dict[str, Any],
-    best: models.CandidateParameterSet,
-    best_agg: dict[str, Any],
-) -> dict[str, Any]:
-    """Construct the JobReport JSON comparing baseline vs best candidate."""
-
-    def _point(
-        key: str, label: str, unit: str | None, *, lower_is_better: bool
-    ) -> dict[str, Any]:
-        return {
-            "metric": key,
-            "label": label,
-            "baseline": baseline_agg[key],
-            "optimized": best_agg[key],
-            "lower_is_better": lower_is_better,
-            "unit": unit,
-        }
-
-    comparison = [
-        _point("rmse", "RMSE", "m", lower_is_better=True),
-        _point("max_error", "Max error", "m", lower_is_better=True),
-        _point("overshoot_count", "Overshoot", None, lower_is_better=True),
-        _point("completion_time", "Completion time", "s", lower_is_better=True),
-        _point("score", "Score", None, lower_is_better=False),
-    ]
-
-    if best.is_baseline:
-        summary_text = (
-            "Baseline outperformed every optimizer candidate on this job's "
-            "trials — the baseline parameters are the current best."
-        )
-    else:
-        summary_text = (
-            f"Optimizer candidate '{best.label}' (generation "
-            f"{best.generation_index}) beat the baseline: aggregated score "
-            f"{best.aggregated_score:.4f} vs baseline "
-            f"{baseline_agg['aggregated_score']:.4f} (lower is better)."
-        )
-
-    return {
-        "baseline": _report_metrics(baseline_agg),
-        "optimized": _report_metrics(best_agg),
-        "comparison": comparison,
-        "best_parameters": dict(best.parameter_json or {}),
-        "summary_text": summary_text,
-    }
-
-
-def _report_metrics(agg: dict[str, Any]) -> dict[str, Any]:
-    """Narrow an aggregate dict down to the AggregatedMetrics schema shape."""
-
-    return {
-        "rmse": agg["rmse"],
-        "max_error": agg["max_error"],
-        "overshoot_count": agg["overshoot_count"],
-        "completion_time": agg["completion_time"],
-        "score": agg["score"],
-    }
-
-
-def _write_report(
-    db: Session,
-    job: models.Job,
-    best: models.CandidateParameterSet,
-    report_body: dict[str, Any],
-) -> None:
-    existing = db.scalars(
-        select(models.JobReport).where(models.JobReport.job_id == job.id)
-    ).first()
-    if existing is None:
-        existing = models.JobReport(job_id=job.id)
-        db.add(existing)
-    existing.best_candidate_id = best.id
-    existing.summary_text = report_body["summary_text"]
-    existing.baseline_metric_json = report_body["baseline"]
-    existing.optimized_metric_json = report_body["optimized"]
-    existing.comparison_metric_json = report_body["comparison"]
-    existing.best_parameter_json = report_body["best_parameters"]
-    existing.report_status = "READY"
-
-
 # --- Finalization ----------------------------------------------------------
 
 
@@ -361,8 +276,13 @@ def finalize_job_if_ready(db: Session, job: models.Job) -> bool:
 
     job.best_candidate_id = best.id
 
-    report_body = _build_report(baseline_agg, best, best.aggregated_metric_json)
-    _write_report(db, job, best, report_body)
+    report_generator.generate_and_persist_report(
+        db,
+        job=job,
+        best=best,
+        baseline_agg=baseline_agg,
+        best_agg=best.aggregated_metric_json,
+    )
 
     now = _now()
     job.status = "COMPLETED"
