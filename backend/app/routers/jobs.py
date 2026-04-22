@@ -26,13 +26,27 @@ def _raise(err: job_service.JobServiceError) -> None:
     )
 
 
+def _job_payload_with_alias(job_schema: schemas.Job) -> dict[str, object]:
+    """Serialize a Job and include a ``job_id`` alias equal to ``id``.
+
+    The canonical field is ``id`` (matches the rest of the API surface and
+    what the frontend reads). The ``job_id`` alias is preserved on
+    create/rerun responses for backward compatibility with older clients
+    that expected the original ``04_API_SPEC.md`` wording.
+    """
+
+    payload = job_schema.model_dump(mode="json")
+    payload["job_id"] = payload["id"]
+    return payload
+
+
 @router.post("/jobs")
 def create_job(
     req: schemas.JobCreateRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, object]:
     job = job_service.create_job(db, req)
-    return ok(job_service.to_job_schema(job).model_dump(mode="json"))
+    return ok(_job_payload_with_alias(job_service.to_job_schema(job)))
 
 
 @router.get("/jobs")
@@ -79,7 +93,7 @@ def rerun_job(
         job = job_service.rerun_job(db, job_id)
     except job_service.JobServiceError as err:
         _raise(err)
-    return ok(job_service.to_job_schema(job).model_dump(mode="json"))
+    return ok(_job_payload_with_alias(job_service.to_job_schema(job)))
 
 
 @router.post("/jobs/{job_id}/cancel")

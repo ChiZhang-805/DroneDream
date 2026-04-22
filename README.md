@@ -21,9 +21,16 @@ charts, summary text, failure details, rerun, and job history in the UI.
 
 ```
 DroneDream/
-  frontend/     # React + TypeScript + Vite app shell
-  backend/      # FastAPI app (health endpoint + response envelope)
-  worker/       # Python worker entrypoint (logs start/stop only)
+  frontend/     # React + TypeScript + Vite app — Dashboard, New Job,
+                #   Job Detail, Trial Detail, History / Reports, all
+                #   wired to the real backend via TanStack Query.
+  backend/      # FastAPI /api/v1 job/trial/report/artifact APIs backed
+                #   by SQLAlchemy persistence + standard response
+                #   envelope + orchestration package used by the worker.
+  worker/       # Database-backed polling worker. Dispatches baseline
+                #   and optimizer trials through the SimulatorAdapter
+                #   layer; drives the job state machine to COMPLETED
+                #   (or FAILED) and writes the JobReport.
   docs/         # Product and engineering documentation
   scripts/      # Dev / check helper scripts
   .env.example  # Environment template
@@ -142,17 +149,26 @@ cd frontend && npm run dev
 ## Quality checks
 
 ```bash
-# Frontend: type-check + build + lint
-cd frontend && npm run typecheck && npm run lint && npm run build
+# Frontend: type-check + lint + build + Vitest regression suite
+cd frontend && npm run typecheck && npm run lint && npm run build && npm test
 
 # Backend: lint + type-check + tests
 backend/.venv/bin/ruff check backend
 backend/.venv/bin/mypy backend/app
 backend/.venv/bin/pytest backend
 
-# Aggregate check (runs the above when tools are available):
+# Worker: lint
+worker/.venv/bin/ruff check worker
+
+# Aggregate check (runs the above when tools are available). Local mode
+# silently skips checks whose toolchain isn't installed; CI mode treats
+# missing toolchains as hard failures:
 ./scripts/check.sh
+CHECK_STRICT=1 ./scripts/check.sh      # or: ./scripts/check.sh --strict
 ```
+
+GitHub Actions runs the same commands on every PR and push to `main`
+(`.github/workflows/ci.yml`).
 
 ## API conventions
 

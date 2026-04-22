@@ -12,15 +12,26 @@ engineering stack, local commands, and phase plan.
 | Database  | SQLite (local MVP), structured for Postgres later                      | Zero-config for MVP; switch via `DATABASE_URL`.                           |
 | Worker    | Plain Python process polling a DB-backed queue                         | Simple, avoids Redis/Celery in MVP; replaceable later.                    |
 | Charts    | Recharts                                                               | Simple React chart primitives, good DX.                                   |
-| Tests     | `pytest` (backend), Vite build + `tsc --noEmit` + ESLint (frontend)    | Focused, fast feedback; more coverage added per phase.                    |
+| Tests     | `pytest` (backend), Vitest + React Testing Library + `tsc --noEmit` + ESLint (frontend), `ruff` (backend + worker), `mypy` (backend) | Focused, fast feedback; each layer has its own gate. |
+| CI        | GitHub Actions (`.github/workflows/ci.yml`)                            | Runs backend ruff/mypy/pytest, worker ruff, and frontend typecheck/lint/build/test on every PR and push to `main`. |
 
 ## Monorepo layout
 
 ```
 DroneDream/
-  frontend/     # React + TS + Vite app shell, router stubs for all required pages
-  backend/      # FastAPI app; /health endpoint and response envelope helper
-  worker/       # Python worker entrypoint (logs start/stop; no trial execution yet)
+  frontend/     # React + TS + Vite app. Renders Dashboard, New Job,
+                #   Job Detail, Trial Detail, History / Reports against
+                #   the real backend via TanStack Query. Vitest + RTL
+                #   regression tests under src/__tests__/.
+  backend/      # FastAPI /api/v1 APIs (jobs, trials, report, artifacts),
+                #   SQLAlchemy models, response envelope helpers, and the
+                #   orchestration package (job manager, trial executor,
+                #   aggregator, optimizer, report generator) shared with
+                #   the worker process.
+  worker/       # Database-backed polling worker. Dispatches baseline +
+                #   optimizer trials via the SimulatorAdapter, aggregates
+                #   per-candidate scores, writes the JobReport, and drives
+                #   the job state machine to COMPLETED or FAILED.
   docs/         # Product docs + this file
   scripts/      # Dev/check helper scripts
   .env.example  # Environment variable template
@@ -46,10 +57,13 @@ backend/.venv/bin/pytest backend
 backend/.venv/bin/ruff check backend
 backend/.venv/bin/mypy backend/app
 
-# Worker
+# Worker (installs the backend editable into the worker venv first,
+# because the worker reuses the backend ORM + orchestration packages).
 python3 -m venv worker/.venv
-worker/.venv/bin/pip install -e worker
-worker/.venv/bin/python -m app.main
+worker/.venv/bin/pip install -e backend
+worker/.venv/bin/pip install -e 'worker[dev]'
+worker/.venv/bin/python -m drone_dream_worker.main
+worker/.venv/bin/ruff check worker
 ```
 
 Helper scripts in [`scripts/`](../scripts/) wrap these commands.
@@ -80,19 +94,23 @@ probes and future dashboards can share parsing logic.
 - **Sensor noise:** `low | medium | high`
 - **Objective profile:** `stable | fast | smooth | robust | custom`
 
-These will be introduced as typed enums in a later phase (when the backend
-requires them); they are listed here so reviewers see the full vocabulary up
-front.
+These are now live as Pydantic `Literal` types in
+[`backend/app/schemas.py`](../backend/app/schemas.py) and the matching
+TypeScript unions in [`frontend/src/types/`](../frontend/src/types). Do
+not rename them casually — downstream tests, docs, and the UI assume the
+exact spelling above.
 
-## Phase plan
+## Phase history (historical — all phases complete)
 
-This plan follows the canonical execution plan in
+The MVP followed the canonical execution plan in
 [`docs/07_EXECUTION_PLAN.md`](./07_EXECUTION_PLAN.md) (§3.2). The ordering —
 frontend skeleton first, then real backend, then async worker framework, then
-simulator adapter, then optimization loop — is the product's "close the loop
-first, replace mocks later" strategy and must not be reshuffled.
+simulator adapter, then optimization loop — was the product's "close the loop
+first, replace mocks later" strategy and is preserved here so future
+maintainers can locate when each behavior landed. **All phases below are
+complete; current state lives in the sections above this one.**
 
-- **Phase 0 — Repo Bootstrap (this PR).**
+- **Phase 0 — Repo Bootstrap.**
   Monorepo skeleton, runnable frontend/backend/worker, docs, env template,
   quality-gate scripts. No domain logic, no data model, no API beyond
   `/health`.
@@ -143,26 +161,35 @@ first, replace mocks later" strategy and must not be reshuffled.
   `PENDING → READY` with not-ready surfaced as a structured error. History /
   Reports page reads the same real data.
 - **Phase 7 — Hardening and Acceptance Pass.**
-  Drive every acceptance rule green: failed jobs show user-readable failure
+  Drove every acceptance rule green: failed jobs show user-readable failure
   info, rerun creates a new job and preserves the original, invalid input is
   rejected on both frontend and backend, terminal jobs are not cancellable
-  again, charts render from persisted metrics (no mock fallback). Add CI
-  workflow, tighten error codes, and close out the MVP against
-  [`docs/06_ACCEPTANCE_CRITERIA.md`](./06_ACCEPTANCE_CRITERIA.md).
+  again, charts render from persisted metrics (no mock fallback).
+  Shipped [`docs/ACCEPTANCE_REPORT.md`](./ACCEPTANCE_REPORT.md).
+- **Post-Phase-7 hardening.**
+  Documentation drift corrected, `POST /api/v1/jobs` response contract
+  clarified (full `Job` object plus a backward-compatible `job_id` alias),
+  GitHub Actions CI wired up, and a minimal Vitest + React Testing Library
+  regression suite added on the frontend.
 
-Later phases preserve the API contract (constraint #10). No real PX4/Gazebo
-integration in the MVP (constraint #1). Optional LLM result-summary text, if
-added, is a post-Phase-7 enhancement and is limited to explanation only —
-it must not generate flight control commands or bypass the optimizer /
-simulator boundaries (constraint #9).
+The API contract is preserved across all phases (constraint #10). Real
+PX4/Gazebo integration remains out of scope for the MVP (constraint #1).
+Optional LLM result-summary text, if added later, is limited to explanation
+only — it must not generate flight control commands or bypass the optimizer
+/ simulator boundaries (constraint #9).
 
-## Known limitations at Phase 0
+## Current limitations (by design)
 
-- No database, no models, no migrations (land in Phase 2).
-- No `/api/v1/*` routes beyond what `/health` demonstrates (land in Phase 2).
-- Frontend pages are empty placeholders under React Router (fleshed out with
-  mock data in Phase 1).
-- Worker does not consume or produce any work — it only logs start/stop
-  (trial execution lands in Phase 3, routed through the adapter in Phase 4).
-- No authentication layer.
-- No CI workflow yet (added in Phase 7).
+- No real PX4/Gazebo — a `RealSimulatorAdapterStub` always returns
+  `ADAPTER_UNAVAILABLE` when `SIMULATOR_BACKEND=real_stub`.
+- No auth layer — every request runs as the default seeded user.
+- No PDF export; the report is rendered from the JSON payload.
+- No advanced track editor — `track_type` is a flat enum.
+- Artifact rows are metadata-only with `mock://` storage paths; no bytes
+  are written or served.
+- SQLite only. Models are structured for Postgres but no migration is
+  wired up.
+- Single worker process. Trial claim is only safe for one worker; a
+  leased-claim upgrade would be needed for horizontal scaling.
+- No external LLM calls. Summary text is produced locally from the
+  structured aggregates.

@@ -33,7 +33,11 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="DroneDream API",
         version=__version__,
-        description="DroneDream backend — Phase 2.",
+        description=(
+            "DroneDream backend — /api/v1 job, trial, report, and artifact "
+            "APIs backed by SQLAlchemy persistence and the standard "
+            "response envelope."
+        ),
     )
 
     app.add_middleware(

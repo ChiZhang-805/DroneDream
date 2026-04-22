@@ -275,3 +275,47 @@ Phase 7 hardening is complete. The MVP runs end-to-end in mock simulator
 mode, the failed-flow demo is reproducible via `SIMULATOR_BACKEND=
 real_stub`, all backend + worker + frontend checks pass, and the
 acceptance report documents the passing surface and the limitations.
+
+## 7. Post-Phase-7 hardening
+
+After Phase 7 shipped, the following hardening landed in a follow-up PR.
+No product behavior changed; no new features were added.
+
+- **Documentation drift corrected.** Root, backend, and frontend READMEs,
+  `docs/IMPLEMENTATION_NOTES.md`, and Python docstrings on
+  `backend/app/main.py`, `backend/app/services/jobs.py`,
+  `backend/app/orchestration/runner.py`, and
+  `worker/drone_dream_worker/main.py` no longer reference obsolete
+  Phase 0 / 2 / 3 / 5 scope; they describe the current Phase 7 behavior.
+  `docs/04_API_SPEC.md` and `docs/06_ACCEPTANCE_CRITERIA.md` were
+  rewritten in readable Markdown to replace the previously-committed
+  files that had UTF-8 encoding artifacts and collapsed lines.
+- **API create/rerun response contract clarified.** `POST /api/v1/jobs`
+  and `POST /api/v1/jobs/{job_id}/rerun` continue to return the full
+  `Job` object (so the frontend, which reads `data.id`, is unchanged).
+  Both responses now additionally carry a backward-compatible `job_id`
+  alias equal to `id` so older clients that expected the original spec
+  wording keep working. `GET /api/v1/jobs` / `GET /jobs/{id}` continue
+  to expose only `id`, keeping the canonical schema unchanged on the
+  read endpoints. Tests:
+  `test_create_job_exposes_job_id_alias`,
+  `test_list_and_detail_do_not_add_job_id_alias`, and the rerun coverage
+  in `test_rerun_creates_new_job_preserving_original`.
+- **CI added.** `.github/workflows/ci.yml` runs backend
+  `ruff` + `mypy` + `pytest`, worker `ruff`, and frontend
+  `typecheck` + `lint` + `build` + `test` on every PR and push to
+  `main`. `scripts/check.sh` gained a strict mode
+  (`CHECK_STRICT=1` or `--strict`) so missing toolchains fail loudly in
+  CI while local runs remain developer-friendly.
+- **Minimal frontend regression tests added.** Vitest + React Testing
+  Library under `frontend/src/__tests__/`: documented New Job defaults
+  (`track_type=circle`, `altitude_m=3.0`, zero wind,
+  `sensor_noise_level=medium`, `objective_profile=robust`), client-side
+  validation (altitude below 1.0 / above 20.0, wind outside `[-10, 10]`,
+  non-numeric required values), failure preserves user input and shows
+  the structured API error, and the `apiClient` envelope unwrap /
+  `ApiClientError` behavior.
+
+Remaining limitations are unchanged from §5: no real PX4/Gazebo, no
+auth, no PDF export, metadata-only artifacts, SQLite-only, single-worker
+local mode, no external LLM.
