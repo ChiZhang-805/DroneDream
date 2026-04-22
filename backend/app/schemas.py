@@ -127,6 +127,9 @@ class TrialMetrics(BaseModel):
     instability_flag: bool
 
 
+CandidateSourceType = Literal["baseline", "optimizer"]
+
+
 class TrialSummary(BaseModel):
     id: str
     candidate_id: str
@@ -134,6 +137,14 @@ class TrialSummary(BaseModel):
     scenario_type: ScenarioType
     status: TrialStatus
     score: float | None = None
+    # Phase 5: candidate metadata surfaced so the frontend can distinguish
+    # baseline vs optimizer rows and highlight the best candidate without
+    # needing a second API call.
+    candidate_label: str | None = None
+    candidate_source_type: CandidateSourceType | None = None
+    candidate_is_baseline: bool = False
+    candidate_is_best: bool = False
+    candidate_generation_index: int = 0
 
 
 class Trial(TrialSummary):

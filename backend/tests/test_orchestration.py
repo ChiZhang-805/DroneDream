@@ -41,12 +41,16 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     # Reload orchestration submodules so they pick up the freshly-reloaded
     # models/db (they otherwise cache Base/metadata from the previous import).
     import app.orchestration.aggregation as aggregation_module
+    import app.orchestration.constants as constants_module
     import app.orchestration.events as events_module
     import app.orchestration.job_manager as job_manager_module
     import app.orchestration.metrics as metrics_module  # noqa: F401
+    import app.orchestration.optimizer as optimizer_module
     import app.orchestration.runner as runner_module
     import app.orchestration.trial_executor as trial_executor_module
 
+    importlib.reload(constants_module)
+    importlib.reload(optimizer_module)
     importlib.reload(events_module)
     importlib.reload(job_manager_module)
     importlib.reload(trial_executor_module)
@@ -99,12 +103,14 @@ def test_start_queued_jobs_creates_baseline_and_trials(orchestration_ctx):
         assert job.started_at is not None
         assert job.current_phase == "baseline"
         assert job.baseline_candidate_id is not None
-        assert job.progress_total_trials == 4
+        # Phase 5: baseline (4 scenarios) + 3 optimizer candidates × 3 scenarios.
+        assert job.progress_total_trials == 4 + 3 * 3
         assert job.progress_completed_trials == 0
 
         candidates = list(job.candidates)
-        assert len(candidates) == 1
-        baseline = candidates[0]
+        # Phase 5: one baseline plus the optimizer proposals.
+        assert len(candidates) == 1 + 3
+        baseline = next(c for c in candidates if c.is_baseline)
         assert baseline.source_type == "baseline"
         assert baseline.is_baseline is True
         assert set(baseline.parameter_json.keys()) >= {
@@ -116,20 +122,37 @@ def test_start_queued_jobs_creates_baseline_and_trials(orchestration_ctx):
             "disturbance_rejection",
         }
 
+        optimizer_candidates = [c for c in candidates if not c.is_baseline]
+        assert len(optimizer_candidates) == 3
+        assert all(c.source_type == "optimizer" for c in optimizer_candidates)
+        assert {c.generation_index for c in optimizer_candidates} == {1, 2, 3}
+
         trials = list(job.trials)
-        assert len(trials) == 4
-        assert {t.scenario_type for t in trials} == {
+        assert len(trials) == job.progress_total_trials
+        baseline_trials = [t for t in trials if t.candidate_id == baseline.id]
+        assert {t.scenario_type for t in baseline_trials} == {
             "nominal",
             "noise_perturbed",
             "wind_perturbed",
             "combined_perturbed",
         }
+        optimizer_trials = [t for t in trials if t.candidate_id != baseline.id]
+        assert len(optimizer_trials) == 3 * 3
         assert all(t.status == "PENDING" for t in trials)
-        assert all(t.candidate_id == baseline.id for t in trials)
+
+        # Seeds must actually vary within each optimizer candidate and between
+        # candidates — the spec requires trials to vary seed and scenario.
+        for c in optimizer_candidates:
+            seeds = {t.seed for t in optimizer_trials if t.candidate_id == c.id}
+            assert len(seeds) == len(
+                [t for t in optimizer_trials if t.candidate_id == c.id]
+            )
 
         events = {e.event_type for e in job.events}
         assert "job_started" in events
         assert "baseline_started" in events
+        assert "optimizer_started" in events
+        assert "optimizer_candidate_created" in events
         assert "trial_dispatched" in events
 
 
@@ -147,9 +170,9 @@ def test_start_queued_jobs_skips_non_queued(orchestration_ctx):
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         assert job.status == "RUNNING"
-        # Still exactly one baseline candidate and 4 trials.
-        assert len(list(job.candidates)) == 1
-        assert len(list(job.trials)) == 4
+        # Still exactly one baseline + optimizer candidates and all trials.
+        assert len(list(job.candidates)) == 1 + 3
+        assert len(list(job.trials)) == 4 + 3 * 3
 
 
 # --- Trial executor --------------------------------------------------------
@@ -198,9 +221,11 @@ def test_runner_drives_job_to_completed(orchestration_ctx):
     ctx = orchestration_ctx
     job_id = _create_queued_job(ctx)
 
-    # Drive the runner synchronously until the job is terminal.
+    # Drive the runner synchronously until the job is terminal. Phase 5
+    # dispatches 13 trials per job (4 baseline + 3×3 optimizer), so the
+    # iteration budget has to accommodate all of them.
     runner = ctx["runner"]
-    for _ in range(20):
+    for _ in range(60):
         runner.tick("test-worker")
         with ctx["db_module"].SessionLocal() as db:
             job = db.get(ctx["models"].Job, job_id)
@@ -214,24 +239,41 @@ def test_runner_drives_job_to_completed(orchestration_ctx):
         assert job.status == "COMPLETED"
         assert job.completed_at is not None
         assert job.best_candidate_id is not None
-        assert job.best_candidate_id == job.baseline_candidate_id
-        assert job.progress_completed_trials == job.progress_total_trials == 4
+        # Phase 5: all 13 trials must have completed for the job to finalise.
+        assert job.progress_completed_trials == job.progress_total_trials == 4 + 3 * 3
         assert job.current_phase == "completed"
         assert job.latest_error_code is None
 
         baseline = db.get(ctx["models"].CandidateParameterSet, job.baseline_candidate_id)
         assert baseline is not None
-        assert baseline.is_best is True
-        assert baseline.rank_in_job == 1
         assert baseline.aggregated_score is not None
         assert baseline.aggregated_metric_json is not None
         assert baseline.completed_trial_count == 4
         assert baseline.failed_trial_count == 0
+        assert baseline.rank_in_job is not None
+
+        # Every optimizer candidate must have its own aggregate + rank.
+        optimizer_candidates = [c for c in job.candidates if not c.is_baseline]
+        assert len(optimizer_candidates) == 3
+        for c in optimizer_candidates:
+            assert c.aggregated_score is not None
+            assert c.aggregated_metric_json is not None
+            assert c.completed_trial_count == 3
+            assert c.rank_in_job is not None
+
+        # Exactly one winner.
+        winners = [c for c in job.candidates if c.is_best]
+        assert len(winners) == 1
+        assert winners[0].id == job.best_candidate_id
+
+        # Ranks are 1..N and distinct.
+        ranks = sorted(c.rank_in_job for c in job.candidates)
+        assert ranks == list(range(1, len(job.candidates) + 1))
 
         report = job.report
         assert report is not None
         assert report.report_status == "READY"
-        assert report.best_candidate_id == baseline.id
+        assert report.best_candidate_id == job.best_candidate_id
         assert report.baseline_metric_json is not None
         assert report.optimized_metric_json is not None
         assert report.best_parameter_json is not None
@@ -239,6 +281,7 @@ def test_runner_drives_job_to_completed(orchestration_ctx):
 
         event_types = [e.event_type for e in job.events]
         assert "aggregation_started" in event_types
+        assert "best_candidate_selected" in event_types
         assert "job_completed" in event_types
 
 
@@ -280,7 +323,7 @@ def test_api_report_endpoint_returns_ready_after_worker_runs(
         assert resp.json()["error"]["code"] == "REPORT_NOT_READY"
 
         runner = ctx["runner"]
-        for _ in range(20):
+        for _ in range(60):
             runner.tick("test-worker")
             body = client.get(f"/api/v1/jobs/{job_id}").json()["data"]
             if body["status"] == "COMPLETED":

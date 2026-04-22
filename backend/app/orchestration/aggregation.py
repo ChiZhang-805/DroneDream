@@ -1,11 +1,25 @@
-"""Minimal Phase 3 aggregation.
+"""Job aggregation + best-candidate selection (Phase 5).
 
-Once all of a job's trials are terminal, this module moves the job into
-``AGGREGATING``, rolls up the baseline candidate's trial metrics into
-``aggregated_metric_json``/``aggregated_score``, produces a READY JobReport
-that uses the baseline as both baseline and optimized (the real optimizer
-comes in Phase 5), and sets the job to ``COMPLETED`` (or ``FAILED`` if every
-trial failed).
+Once every trial for a job is terminal, this module:
+
+1. Moves the job to ``AGGREGATING``.
+2. For each ``CandidateParameterSet`` (baseline and every optimizer
+   candidate), rolls up the candidate's completed trials into
+   ``aggregated_metric_json`` / ``aggregated_score``, and persists trial
+   counts. See :func:`_aggregate_candidate`.
+3. Selects the best candidate by lowest ``aggregated_score`` among
+   "eligible" candidates (candidates with enough completed trials — see
+   :data:`constants.MIN_COMPLETED_TRIAL_RATIO`). Baseline is always eligible
+   if it has any completed trials so we can always produce a report.
+4. Ranks every candidate (``rank_in_job``, 1-indexed) and marks ``is_best``
+   on the winner.
+5. Writes the ``JobReport`` using the baseline's aggregate as the baseline
+   and the winner's aggregate as the optimized comparison.
+6. Sets the job ``COMPLETED`` (or ``FAILED`` only when no candidate produced
+   a usable aggregate).
+
+The scoring formula is deterministic and documented in
+:func:`_score_candidate`. Lower is better.
 """
 
 from __future__ import annotations
@@ -18,6 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models
+from app.orchestration import constants
 from app.orchestration.events import record_event
 
 logger = logging.getLogger("drone_dream.orchestration.aggregation")
@@ -29,119 +44,237 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+# --- Scoring ---------------------------------------------------------------
+
+
+def _score_candidate(metrics: list[models.TrialMetric], trial_count: int, failed: int) -> float:
+    """Compute the deterministic aggregated_score for a candidate.
+
+    Formula (lower is better)::
+
+        score = w_rmse           * mean(rmse)
+              + w_max_error      * mean(max_error)
+              + w_completion     * mean(completion_time)
+              + w_crash          * crash_rate
+              + w_timeout        * timeout_rate
+              + w_instability    * instability_rate
+              + w_failed_trial   * failed_rate
+
+    * ``*_rate`` denominators use ``trial_count`` (dispatched trials), so a
+      candidate with many failed trials is penalised correctly even though
+      only completed-trial metrics contribute to the mean error terms.
+    * All weights live in :data:`constants.SCORE_WEIGHTS` so tests can pin
+      the exact values without importing private state.
+    """
+
+    w = constants.SCORE_WEIGHTS
+    n = max(1, len(metrics))
+    denom = max(1, trial_count)
+
+    mean_rmse = sum(m.rmse or 0.0 for m in metrics) / n
+    mean_max_error = sum(m.max_error or 0.0 for m in metrics) / n
+    mean_completion = sum(m.completion_time or 0.0 for m in metrics) / n
+    crash_rate = sum(1 for m in metrics if m.crash_flag) / denom
+    timeout_rate = sum(1 for m in metrics if m.timeout_flag) / denom
+    instability_rate = sum(1 for m in metrics if m.instability_flag) / denom
+    failed_rate = failed / denom
+
+    score = (
+        w["rmse"] * mean_rmse
+        + w["max_error"] * mean_max_error
+        + w["completion_time"] * mean_completion
+        + w["crash"] * crash_rate
+        + w["timeout"] * timeout_rate
+        + w["instability"] * instability_rate
+        + w["failed_trial"] * failed_rate
+    )
+    return round(score, 4)
+
+
 def _aggregate_candidate(
     candidate: models.CandidateParameterSet,
     trials: list[models.Trial],
 ) -> dict[str, Any] | None:
-    """Roll up COMPLETED trial metrics into the candidate.
+    """Roll up this candidate's trial metrics, update counts + aggregated_score.
 
-    Returns the aggregated metric dict (also assigned onto the candidate), or
-    ``None`` if no completed trials exist.
+    Returns the aggregated metric dict (also written onto the candidate), or
+    ``None`` if no completed trials exist — in which case the candidate is
+    ineligible to win.
     """
 
-    completed_trials = [
-        t for t in trials if t.status == "COMPLETED" and t.metric is not None
-    ]
+    completed_trials = [t for t in trials if t.status == "COMPLETED" and t.metric is not None]
+    metrics = [t.metric for t in completed_trials if t.metric is not None]
+
     candidate.trial_count = len(trials)
     candidate.completed_trial_count = len(completed_trials)
     candidate.failed_trial_count = sum(1 for t in trials if t.status == "FAILED")
 
-    if not completed_trials:
+    if not metrics:
         candidate.aggregated_metric_json = None
         candidate.aggregated_score = None
         return None
-
-    # Narrow the optional metric for mypy — filtered above.
-    metrics = [t.metric for t in completed_trials if t.metric is not None]
 
     def _avg(values: list[float]) -> float:
         return round(sum(values) / len(values), 4)
 
     rmse = _avg([m.rmse or 0.0 for m in metrics])
     max_error = _avg([m.max_error or 0.0 for m in metrics])
-    overshoot = int(round(sum((m.overshoot_count or 0) for m in metrics) / len(metrics)))
+    overshoot = int(round(sum(m.overshoot_count or 0 for m in metrics) / len(metrics)))
     completion_time = _avg([m.completion_time or 0.0 for m in metrics])
-    score = _avg([m.score or 0.0 for m in metrics])
+    trial_score_mean = _avg([m.score or 0.0 for m in metrics])
+
+    aggregated_score = _score_candidate(
+        metrics, trial_count=len(trials), failed=candidate.failed_trial_count
+    )
 
     agg: dict[str, Any] = {
         "rmse": rmse,
         "max_error": max_error,
         "overshoot_count": overshoot,
         "completion_time": completion_time,
-        "score": score,
+        "score": trial_score_mean,
+        "aggregated_score": aggregated_score,
+        "trial_count": len(trials),
+        "completed_trial_count": len(completed_trials),
+        "failed_trial_count": candidate.failed_trial_count,
     }
     candidate.aggregated_metric_json = agg
-    candidate.aggregated_score = score
+    candidate.aggregated_score = aggregated_score
     return agg
 
 
+# --- Best selection --------------------------------------------------------
+
+
+def _is_eligible(candidate: models.CandidateParameterSet) -> bool:
+    """A candidate is eligible to win only if it has enough completed trials.
+
+    Baseline is always eligible when it has at least one completed trial so
+    we can produce *some* report; optimizer candidates need at least
+    :data:`constants.MIN_COMPLETED_TRIAL_RATIO` of their dispatched trials
+    completed.
+    """
+
+    if candidate.aggregated_score is None:
+        return False
+    if candidate.is_baseline:
+        return candidate.completed_trial_count > 0
+    if candidate.trial_count <= 0:
+        return False
+    ratio = candidate.completed_trial_count / candidate.trial_count
+    return ratio >= constants.MIN_COMPLETED_TRIAL_RATIO
+
+
+def _rank_and_select_best(
+    candidates: list[models.CandidateParameterSet],
+) -> models.CandidateParameterSet | None:
+    """Assign ``rank_in_job`` to every scorable candidate, mark best, return it.
+
+    Sorting key: aggregated_score ascending, with baseline tie-broken last so
+    a tied optimizer candidate wins (the report is more useful when the
+    optimized column differs from the baseline column).
+    """
+
+    scorable = [c for c in candidates if c.aggregated_score is not None]
+    if not scorable:
+        return None
+
+    scorable.sort(
+        key=lambda c: (
+            c.aggregated_score if c.aggregated_score is not None else float("inf"),
+            0 if not c.is_baseline else 1,
+            c.generation_index,
+        )
+    )
+
+    best: models.CandidateParameterSet | None = None
+    for rank, candidate in enumerate(scorable, start=1):
+        candidate.rank_in_job = rank
+        candidate.is_best = False
+    # Pick the first eligible candidate in score order. If none are eligible,
+    # we fall back to the baseline if it scored at all.
+    for candidate in scorable:
+        if _is_eligible(candidate):
+            best = candidate
+            break
+    if best is None:
+        for candidate in scorable:
+            if candidate.is_baseline:
+                best = candidate
+                break
+    if best is not None:
+        best.is_best = True
+    return best
+
+
+# --- Report ----------------------------------------------------------------
+
+
 def _build_report(
-    job: models.Job,
-    baseline: models.CandidateParameterSet,
-    agg: dict[str, Any],
+    baseline_agg: dict[str, Any],
+    best: models.CandidateParameterSet,
+    best_agg: dict[str, Any],
 ) -> dict[str, Any]:
-    """Construct the JobReport JSON. Phase 3 has no optimizer, so optimized
-    metrics match baseline metrics and ``comparison`` shows a flat delta."""
+    """Construct the JobReport JSON comparing baseline vs best candidate."""
+
+    def _point(
+        key: str, label: str, unit: str | None, *, lower_is_better: bool
+    ) -> dict[str, Any]:
+        return {
+            "metric": key,
+            "label": label,
+            "baseline": baseline_agg[key],
+            "optimized": best_agg[key],
+            "lower_is_better": lower_is_better,
+            "unit": unit,
+        }
 
     comparison = [
-        {
-            "metric": "rmse",
-            "label": "RMSE",
-            "baseline": agg["rmse"],
-            "optimized": agg["rmse"],
-            "lower_is_better": True,
-            "unit": "m",
-        },
-        {
-            "metric": "max_error",
-            "label": "Max error",
-            "baseline": agg["max_error"],
-            "optimized": agg["max_error"],
-            "lower_is_better": True,
-            "unit": "m",
-        },
-        {
-            "metric": "overshoot_count",
-            "label": "Overshoot",
-            "baseline": agg["overshoot_count"],
-            "optimized": agg["overshoot_count"],
-            "lower_is_better": True,
-            "unit": None,
-        },
-        {
-            "metric": "completion_time",
-            "label": "Completion time",
-            "baseline": agg["completion_time"],
-            "optimized": agg["completion_time"],
-            "lower_is_better": True,
-            "unit": "s",
-        },
-        {
-            "metric": "score",
-            "label": "Score",
-            "baseline": agg["score"],
-            "optimized": agg["score"],
-            "lower_is_better": False,
-            "unit": None,
-        },
+        _point("rmse", "RMSE", "m", lower_is_better=True),
+        _point("max_error", "Max error", "m", lower_is_better=True),
+        _point("overshoot_count", "Overshoot", None, lower_is_better=True),
+        _point("completion_time", "Completion time", "s", lower_is_better=True),
+        _point("score", "Score", None, lower_is_better=False),
     ]
+
+    if best.is_baseline:
+        summary_text = (
+            "Baseline outperformed every optimizer candidate on this job's "
+            "trials — the baseline parameters are the current best."
+        )
+    else:
+        summary_text = (
+            f"Optimizer candidate '{best.label}' (generation "
+            f"{best.generation_index}) beat the baseline: aggregated score "
+            f"{best.aggregated_score:.4f} vs baseline "
+            f"{baseline_agg['aggregated_score']:.4f} (lower is better)."
+        )
+
     return {
-        "baseline": agg,
-        "optimized": agg,
+        "baseline": _report_metrics(baseline_agg),
+        "optimized": _report_metrics(best_agg),
         "comparison": comparison,
-        "best_parameters": dict(baseline.parameter_json or {}),
-        "summary_text": (
-            "Baseline-only run (Phase 3). Optimizer candidates will be added in "
-            "Phase 5, at which point the optimized metrics here will diverge "
-            "from the baseline."
-        ),
+        "best_parameters": dict(best.parameter_json or {}),
+        "summary_text": summary_text,
+    }
+
+
+def _report_metrics(agg: dict[str, Any]) -> dict[str, Any]:
+    """Narrow an aggregate dict down to the AggregatedMetrics schema shape."""
+
+    return {
+        "rmse": agg["rmse"],
+        "max_error": agg["max_error"],
+        "overshoot_count": agg["overshoot_count"],
+        "completion_time": agg["completion_time"],
+        "score": agg["score"],
     }
 
 
 def _write_report(
     db: Session,
     job: models.Job,
-    baseline: models.CandidateParameterSet,
+    best: models.CandidateParameterSet,
     report_body: dict[str, Any],
 ) -> None:
     existing = db.scalars(
@@ -150,7 +283,7 @@ def _write_report(
     if existing is None:
         existing = models.JobReport(job_id=job.id)
         db.add(existing)
-    existing.best_candidate_id = baseline.id
+    existing.best_candidate_id = best.id
     existing.summary_text = report_body["summary_text"]
     existing.baseline_metric_json = report_body["baseline"]
     existing.optimized_metric_json = report_body["optimized"]
@@ -159,10 +292,11 @@ def _write_report(
     existing.report_status = "READY"
 
 
+# --- Finalization ----------------------------------------------------------
+
+
 def finalize_job_if_ready(db: Session, job: models.Job) -> bool:
-    """If every trial for ``job`` is terminal, drive the job to its terminal
-    state. Returns True if anything changed.
-    """
+    """If every trial is terminal, aggregate candidates and finalize the job."""
 
     if job.status not in {"RUNNING", "AGGREGATING"}:
         return False
@@ -173,47 +307,62 @@ def finalize_job_if_ready(db: Session, job: models.Job) -> bool:
     if not all(t.status in _TERMINAL_TRIAL for t in trials):
         return False
 
-    changed = False
-
-    # Transition RUNNING -> AGGREGATING first so the frontend sees the phase.
+    # RUNNING -> AGGREGATING transition so the frontend can display the phase.
     if job.status == "RUNNING":
         job.status = "AGGREGATING"
         job.current_phase = "aggregating"
         record_event(db, job.id, "aggregation_started", None)
         db.commit()
         db.refresh(job)
-        changed = True
 
     baseline_id = job.baseline_candidate_id
     if baseline_id is None:
         _fail_job(db, job, code="BASELINE_MISSING", message="No baseline candidate was created.")
         return True
-
     baseline = db.get(models.CandidateParameterSet, baseline_id)
     if baseline is None:
         _fail_job(db, job, code="BASELINE_MISSING", message="Baseline candidate row missing.")
         return True
 
-    baseline_trials = [t for t in trials if t.candidate_id == baseline.id]
-    agg = _aggregate_candidate(baseline, baseline_trials)
+    # Aggregate every candidate (baseline first so the baseline_agg variable
+    # is available for the report builder).
+    candidates = list(job.candidates)
+    trials_by_candidate: dict[str, list[models.Trial]] = {}
+    for t in trials:
+        trials_by_candidate.setdefault(t.candidate_id, []).append(t)
 
-    total_failed = sum(1 for t in trials if t.status == "FAILED")
-    # If every baseline trial failed there is nothing to aggregate; mark FAILED.
-    if agg is None or total_failed == len(baseline_trials):
+    baseline_agg = _aggregate_candidate(baseline, trials_by_candidate.get(baseline.id, []))
+    for candidate in candidates:
+        if candidate.id == baseline.id:
+            continue
+        _aggregate_candidate(candidate, trials_by_candidate.get(candidate.id, []))
+
+    if baseline_agg is None:
         _fail_job(
             db,
             job,
             code="ALL_TRIALS_FAILED",
-            message="All baseline trials failed; cannot produce a report.",
+            message=(
+                "All baseline trials failed; cannot produce a report. "
+                "Inspect trial failures on the job detail page."
+            ),
         )
         return True
 
-    baseline.is_best = True
-    baseline.rank_in_job = 1
-    job.best_candidate_id = baseline.id
+    best = _rank_and_select_best(candidates)
+    if best is None or best.aggregated_metric_json is None:
+        _fail_job(
+            db,
+            job,
+            code="NO_BEST_CANDIDATE",
+            message="No candidate produced a usable aggregate.",
+        )
+        return True
 
-    report_body = _build_report(job, baseline, agg)
-    _write_report(db, job, baseline, report_body)
+    job.best_candidate_id = best.id
+
+    report_body = _build_report(baseline_agg, best, best.aggregated_metric_json)
+    _write_report(db, job, best, report_body)
 
     now = _now()
     job.status = "COMPLETED"
@@ -222,15 +371,32 @@ def finalize_job_if_ready(db: Session, job: models.Job) -> bool:
     record_event(
         db,
         job.id,
+        "best_candidate_selected",
+        {
+            "best_candidate_id": best.id,
+            "baseline_candidate_id": baseline.id,
+            "best_source_type": best.source_type,
+            "best_score": best.aggregated_score,
+            "baseline_score": baseline.aggregated_score,
+        },
+    )
+    record_event(
+        db,
+        job.id,
         "job_completed",
         {
-            "best_candidate_id": baseline.id,
-            "aggregated_score": agg["score"],
+            "best_candidate_id": best.id,
+            "aggregated_score": best.aggregated_score,
         },
     )
     db.commit()
-    logger.info("job %s COMPLETED (score=%s)", job.id, agg["score"])
-    del changed  # Any path reaching here mutated the job.
+    logger.info(
+        "job %s COMPLETED (best=%s score=%s baseline_score=%s)",
+        job.id,
+        best.id,
+        best.aggregated_score,
+        baseline.aggregated_score,
+    )
     return True
 
 
