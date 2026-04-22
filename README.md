@@ -7,9 +7,11 @@ baseline and optimizer candidate trials, aggregates results, selects the best
 parameter set, and surfaces baseline-vs-optimized metrics, best parameters,
 charts, summary text, failure details, rerun, and job history in the UI.
 
-> **Status:** Phase 0 — repo bootstrap only. Frontend, backend, and worker are
-> runnable skeletons. Real job creation, simulator logic, and optimization are
-> not yet implemented.
+> **Status:** Phase 3 — async job execution. Creating a job persists a `QUEUED`
+> record; a separate worker process picks it up, dispatches baseline trials,
+> runs deterministic mock simulations, aggregates metrics into a `READY`
+> `JobReport`, and moves the job to `COMPLETED` (or `FAILED`). Real
+> PX4/Gazebo simulation and the optimizer arrive in later phases.
 
 ## Repo layout
 
@@ -47,9 +49,11 @@ cd frontend && npm install && cd ..
 python3 -m venv backend/.venv
 backend/.venv/bin/pip install -e backend[dev]
 
-# Worker deps (separate venv keeps worker deployable independently)
+# Worker deps. The worker re-uses the backend's ORM models and orchestration
+# package, so both are installed editable into the worker venv.
 python3 -m venv worker/.venv
-worker/.venv/bin/pip install -e worker
+worker/.venv/bin/pip install -e backend
+worker/.venv/bin/pip install -e 'worker[dev]'
 ```
 
 ## Running locally
@@ -71,13 +75,37 @@ curl http://127.0.0.1:8000/health
 # {"success":true,"data":{"status":"ok",...},"error":null}
 ```
 
-**Worker** — polling stub, logs startup/shutdown only:
+**Worker** — polls the DB, runs baseline trials, drives job state machine:
 
 ```bash
 ./scripts/dev-worker.sh
 # or:
-worker/.venv/bin/python -m app.main
+cd worker && ../worker/.venv/bin/python -m drone_dream_worker.main
 ```
+
+### End-to-end demo (Phase 3)
+
+With the backend and worker running in separate terminals:
+
+```bash
+# Create a job — returns immediately with status=QUEUED.
+curl -sS -X POST http://127.0.0.1:8000/api/v1/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"track_type":"circle","altitude_m":5,"sensor_noise_level":"medium","objective_profile":"robust","start_point":{"x":0,"y":0},"wind":{"north":0,"east":0,"south":0,"west":0}}' \
+  | tee /tmp/job.json
+
+JOB_ID=$(python3 -c "import json; print(json.load(open('/tmp/job.json'))['data']['id'])")
+
+# Watch progress — transitions QUEUED -> RUNNING -> AGGREGATING -> COMPLETED.
+watch -n 1 "curl -sS http://127.0.0.1:8000/api/v1/jobs/$JOB_ID | python3 -m json.tool | grep -E 'status|completed_trials|total_trials'"
+
+# After COMPLETED, the report is ready:
+curl -sS http://127.0.0.1:8000/api/v1/jobs/$JOB_ID/report | python3 -m json.tool
+```
+
+Or open the frontend at http://localhost:5173 and use the **New Job** form —
+the Job Detail page polls every 4 s while the job is active and renders the
+baseline metrics + comparison chart once it reaches `COMPLETED`.
 
 **Frontend** — Vite dev server on `http://localhost:5173`:
 
