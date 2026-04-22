@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     backend_port: int = Field(default=8000)
     log_level: str = Field(default="info")
     database_url: str = Field(default="sqlite:///./drone_dream.db")
-    cors_origins: str = Field(default="http://localhost:5173")
+    cors_origins: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173"
+    )
 
     @property
     def cors_origin_list(self) -> list[str]:

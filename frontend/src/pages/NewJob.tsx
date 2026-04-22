@@ -160,7 +160,8 @@ export function NewJob() {
           <h1>New Job</h1>
           <p className="page-header-subtitle">
             Configure the track, environment, and optimization objective for a
-            new run. Submission goes through the mock API in Phase 1.
+            new run. The job is persisted by the backend and picked up by the
+            worker.
           </p>
         </div>
       </header>
@@ -389,8 +390,8 @@ export function NewJob() {
             Reset to defaults
           </button>
           <span className="form-hint">
-            Phase 1: submission uses the mock client and routes to a mock job
-            detail page.
+            Submission hits POST /api/v1/jobs and redirects to the live Job
+            Detail page.
           </span>
         </div>
       </form>

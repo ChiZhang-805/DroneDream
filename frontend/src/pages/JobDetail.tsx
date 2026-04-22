@@ -446,7 +446,7 @@ function StatusSpecificTop({
   if (job.status === "COMPLETED" && !report) {
     return (
       <Alert tone="info" title="Loading report…">
-        Fetching final report from the mock API.
+        Fetching the final report.
       </Alert>
     );
   }
