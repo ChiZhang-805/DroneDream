@@ -139,7 +139,22 @@ def claim_and_run_one_pending_trial(
     if trial is None:
         return None
 
-    sim = adapter or get_simulator_adapter()
+    # Backend selection precedence:
+    #   1) explicit SIMULATOR_BACKEND env var (back-compat with Phase 7 tests)
+    #   2) per-job backend_requested column (Phase 8)
+    #   3) factory default
+    backend_override: str | None = None
+    if adapter is None:
+        import os
+
+        env_backend = os.environ.get("SIMULATOR_BACKEND", "").strip()
+        if env_backend:
+            backend_override = env_backend
+        else:
+            job_row = db.get(models.Job, trial.job_id)
+            if job_row is not None and job_row.simulator_backend_requested:
+                backend_override = str(job_row.simulator_backend_requested)
+    sim = adapter or get_simulator_adapter(backend_override)
 
     # --- Claim ----------------------------------------------------------
     now = _now()

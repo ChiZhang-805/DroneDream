@@ -14,6 +14,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import models, schemas
+from app import secrets as job_secrets
+from app.orchestration.events import record_event
 
 
 class JobServiceError(Exception):
@@ -37,6 +39,26 @@ def _get_or_create_default_user(db: Session) -> models.User:
         db.add(user)
         db.flush()
     return user
+
+
+def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
+    if req.optimizer_strategy != "gpt":
+        return
+    if req.openai is None or not req.openai.api_key:
+        raise JobServiceError(
+            "INVALID_INPUT",
+            "openai.api_key is required when optimizer_strategy=gpt.",
+            http_status=422,
+        )
+    if not job_secrets.is_configured():
+        raise JobServiceError(
+            "CONFIGURATION_ERROR",
+            (
+                "Server-side secret key is not configured. Set APP_SECRET_KEY "
+                "or DRONEDREAM_SECRET_KEY before submitting a GPT-tuned job."
+            ),
+            http_status=500,
+        )
 
 
 def _create_job_from_config(
@@ -65,14 +87,39 @@ def _create_job_from_config(
         progress_total_trials=0,
         source_job_id=source_job_id,
         queued_at=now,
+        simulator_backend_requested=req.simulator_backend,
+        optimizer_strategy=req.optimizer_strategy,
+        max_iterations=req.max_iterations,
+        trials_per_candidate=req.trials_per_candidate,
+        max_total_trials=req.max_total_trials,
+        target_rmse=req.acceptance_criteria.target_rmse,
+        target_max_error=req.acceptance_criteria.target_max_error,
+        min_pass_rate=req.acceptance_criteria.min_pass_rate,
+        current_generation=0,
+        optimization_outcome=None,
+        openai_model=(req.openai.model if req.openai is not None else None),
     )
     db.add(job)
     db.flush()
+    if req.openai is not None and req.openai.api_key:
+        db.add(
+            models.JobSecret(
+                job_id=job.id,
+                provider="openai",
+                encrypted_api_key=job_secrets.encrypt_secret(req.openai.api_key),
+            )
+        )
     db.add(
         models.JobEvent(
             job_id=job.id,
             event_type="job_created",
-            payload_json={"source_job_id": source_job_id},
+            payload_json={
+                "source_job_id": source_job_id,
+                "simulator_backend": req.simulator_backend,
+                "optimizer_strategy": req.optimizer_strategy,
+                "max_iterations": req.max_iterations,
+                "trials_per_candidate": req.trials_per_candidate,
+            },
         )
     )
     db.add(
@@ -86,10 +133,30 @@ def _create_job_from_config(
 
 
 def create_job(db: Session, req: schemas.JobCreateRequest) -> models.Job:
+    _validate_gpt_request(req)
     job = _create_job_from_config(db, req=req, source_job_id=None)
     db.commit()
     db.refresh(job)
     return job
+
+
+def purge_job_secrets(db: Session, job: models.Job, *, reason: str = "job_terminal") -> int:
+    """Soft-delete any JobSecret rows attached to a terminal job.
+
+    Returns the number of secrets purged. Safe to call multiple times.
+    """
+
+    now = _now()
+    deleted = 0
+    for secret in list(job.secrets):
+        if secret.deleted_at is not None:
+            continue
+        secret.deleted_at = now
+        secret.encrypted_api_key = ""
+        deleted += 1
+    if deleted:
+        record_event(db, job.id, "job_secrets_purged", {"reason": reason, "count": deleted})
+    return deleted
 
 
 def list_jobs(
@@ -129,6 +196,11 @@ def get_job(db: Session, job_id: str) -> models.Job:
 
 def rerun_job(db: Session, job_id: str) -> models.Job:
     source = get_job(db, job_id)
+    strategy: schemas.OptimizerStrategy = (
+        "heuristic"
+        if source.optimizer_strategy == "gpt"
+        else source.optimizer_strategy  # type: ignore[assignment]
+    )
     req = schemas.JobCreateRequest(
         track_type=source.track_type,  # type: ignore[arg-type]
         start_point=schemas.StartPoint(x=source.start_point_x, y=source.start_point_y),
@@ -141,6 +213,16 @@ def rerun_job(db: Session, job_id: str) -> models.Job:
         ),
         sensor_noise_level=source.sensor_noise_level,  # type: ignore[arg-type]
         objective_profile=source.objective_profile,  # type: ignore[arg-type]
+        simulator_backend=source.simulator_backend_requested,  # type: ignore[arg-type]
+        optimizer_strategy=strategy,
+        max_iterations=source.max_iterations,
+        trials_per_candidate=source.trials_per_candidate,
+        max_total_trials=source.max_total_trials,
+        acceptance_criteria=schemas.AcceptanceCriteria(
+            target_rmse=source.target_rmse,
+            target_max_error=source.target_max_error,
+            min_pass_rate=source.min_pass_rate,
+        ),
     )
     new_job = _create_job_from_config(db, req=req, source_job_id=source.id)
     db.commit()
@@ -242,13 +324,30 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         cancelled_at=job.cancelled_at,
         failed_at=job.failed_at,
         recent_events=_recent_events(job),
+        simulator_backend_requested=job.simulator_backend_requested,  # type: ignore[arg-type]
+        optimizer_strategy=job.optimizer_strategy,  # type: ignore[arg-type]
+        max_iterations=job.max_iterations,
+        trials_per_candidate=job.trials_per_candidate,
+        max_total_trials=job.max_total_trials,
+        acceptance_criteria=schemas.AcceptanceCriteria(
+            target_rmse=job.target_rmse,
+            target_max_error=job.target_max_error,
+            min_pass_rate=job.min_pass_rate,
+        ),
+        current_generation=job.current_generation,
+        optimization_outcome=job.optimization_outcome,  # type: ignore[arg-type]
+        openai_model=job.openai_model,
     )
 
 
 def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
     candidate = trial.candidate
     source_type: schemas.CandidateSourceType | None = None
-    if candidate is not None and candidate.source_type in {"baseline", "optimizer"}:
+    if candidate is not None and candidate.source_type in {
+        "baseline",
+        "optimizer",
+        "llm_optimizer",
+    }:
         source_type = candidate.source_type  # type: ignore[assignment]
     return schemas.TrialSummary(
         id=trial.id,

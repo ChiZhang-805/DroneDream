@@ -193,6 +193,7 @@ export function JobDetail() {
         </Alert>
       ) : null}
       <JobSummaryCard job={job} />
+      <ExecutionBackendCard job={job} />
       <ProgressSection job={job} />
 
       <StatusSpecificTop job={job} report={report} />
@@ -354,6 +355,64 @@ function JobSummaryCard({ job }: { job: Job }) {
             {job.wind.west}
           </span>
         </li>
+      </ul>
+    </SectionCard>
+  );
+}
+
+function ExecutionBackendCard({ job }: { job: Job }) {
+  const ac = job.acceptance_criteria;
+  return (
+    <SectionCard
+      title="Execution Backend & Auto-Tuning"
+      description="Simulator backend, optimizer strategy, and acceptance criteria for this job."
+    >
+      <ul className="kv-list">
+        <li>
+          <span className="kv-key">Simulator backend</span>
+          <span className="kv-value">
+            <code>{job.simulator_backend_requested}</code>
+          </span>
+        </li>
+        <li>
+          <span className="kv-key">Optimizer strategy</span>
+          <span className="kv-value">
+            <code>{job.optimizer_strategy}</code>
+            {job.openai_model ? (
+              <span className="form-hint"> · model {job.openai_model}</span>
+            ) : null}
+          </span>
+        </li>
+        <li>
+          <span className="kv-key">Current generation</span>
+          <span className="kv-value">
+            {job.current_generation} of max {job.max_iterations}
+          </span>
+        </li>
+        <li>
+          <span className="kv-key">Trials per candidate</span>
+          <span className="kv-value">{job.trials_per_candidate}</span>
+        </li>
+        <li>
+          <span className="kv-key">Acceptance criteria</span>
+          <span className="kv-value">
+            {ac.target_rmse !== null ? (
+              <>RMSE ≤ {formatNumber(ac.target_rmse)} m · </>
+            ) : null}
+            {ac.target_max_error !== null ? (
+              <>max error ≤ {formatNumber(ac.target_max_error)} m · </>
+            ) : null}
+            pass rate ≥ {Math.round(ac.min_pass_rate * 100)}%
+          </span>
+        </li>
+        {job.optimization_outcome ? (
+          <li>
+            <span className="kv-key">Outcome</span>
+            <span className="kv-value">
+              <code>{job.optimization_outcome}</code>
+            </span>
+          </li>
+        ) : null}
       </ul>
     </SectionCard>
   );

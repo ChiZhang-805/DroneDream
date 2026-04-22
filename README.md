@@ -7,15 +7,19 @@ baseline and optimizer candidate trials, aggregates results, selects the best
 parameter set, and surfaces baseline-vs-optimized metrics, best parameters,
 charts, summary text, failure details, rerun, and job history in the UI.
 
-> **Status:** Phase 7 — MVP acceptance ready. Creating a job persists a
-> `QUEUED` record; a separate worker process picks it up, dispatches baseline
-> + optimizer trials, runs deterministic mock simulations, aggregates
-> metrics into a `READY` `JobReport` with baseline-vs-optimized comparison
-> + summary text, and moves the job to `COMPLETED` (or `FAILED`). The
-> frontend renders the full flow end-to-end against the real backend. Real
-> PX4/Gazebo integration remains out of scope — see
-> [`docs/ACCEPTANCE_REPORT.md`](docs/ACCEPTANCE_REPORT.md) for the full
-> acceptance coverage and demo walkthrough.
+> **Status:** Phase 8 — real simulator adapter + iterative GPT parameter
+> tuning, layered on top of the Phase 7 MVP. Phase 7 behaviour is
+> unchanged: mock + heuristic jobs still run baseline + optimizer trials
+> end-to-end and emit a READY `JobReport`. New in Phase 8: per-job
+> `simulator_backend` (`mock` or `real_cli`), per-job `optimizer_strategy`
+> (`heuristic` or `gpt`), acceptance criteria, an iterative
+> simulate-analyze-retune loop, and an OpenAI-backed parameter proposer
+> whose API key is stored encrypted and used **server-side only**. See
+> [`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md)
+> for the full Phase 8 spec (adapter protocol, acceptance logic, env vars,
+> demos) and [`docs/ACCEPTANCE_REPORT.md`](docs/ACCEPTANCE_REPORT.md) for
+> the Phase 7 acceptance coverage. Real PX4/Gazebo, auth, PDF export, and
+> the advanced track editor remain explicitly out of scope.
 
 ## Repo layout
 
@@ -137,6 +141,32 @@ SIMULATOR_BACKEND=real_stub ./scripts/dev-worker.sh
 `GET /api/v1/jobs/{job_id}/report` returns a 409 with `error.code=JOB_FAILED`
 and `details.failure_code=ALL_TRIALS_FAILED` for failed jobs, so the
 frontend never renders a half-filled report.
+
+### End-to-end demo (Phase 8: real_cli + heuristic)
+
+```bash
+export REAL_SIMULATOR_COMMAND="$(which python) $(pwd)/scripts/simulators/example_real_simulator.py"
+export REAL_SIMULATOR_ARTIFACT_ROOT="$(pwd)/.artifacts"
+./scripts/dev-worker.sh
+```
+
+Then in the **New Job** form pick `Simulator Backend = real_cli` (default
+optimizer strategy is `heuristic`). The iterative loop runs baseline, then
+heuristic generations, until acceptance or `max_iterations`.
+
+### End-to-end demo (Phase 8: GPT parameter tuning)
+
+```bash
+export APP_SECRET_KEY="$(backend/.venv/bin/python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+./scripts/dev-worker.sh
+```
+
+In the **New Job** form pick `Optimizer Strategy = gpt` and paste your
+OpenAI API key into the auto-tuning section. The key is encrypted with
+`APP_SECRET_KEY`, used server-side only, and soft-deleted when the job
+terminates. See
+[`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md)
+for the full protocol, env vars, and `real_cli + gpt` combined demo.
 
 **Frontend** — Vite dev server on `http://localhost:5173`:
 

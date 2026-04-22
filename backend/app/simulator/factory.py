@@ -16,6 +16,7 @@ import os
 
 from app.simulator.base import SimulatorAdapter
 from app.simulator.mock import MockSimulatorAdapter
+from app.simulator.real_cli import RealCliSimulatorAdapter
 from app.simulator.real_stub import RealSimulatorAdapterStub
 
 DEFAULT_BACKEND = "mock"
@@ -23,6 +24,7 @@ DEFAULT_BACKEND = "mock"
 _REGISTRY: dict[str, type[SimulatorAdapter]] = {
     "mock": MockSimulatorAdapter,
     "real_stub": RealSimulatorAdapterStub,
+    "real_cli": RealCliSimulatorAdapter,
 }
 
 

@@ -116,6 +116,72 @@ describe("NewJob — client-side validation", () => {
   });
 });
 
+describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
+  it("renders defaults for simulator_backend and optimizer_strategy", () => {
+    renderPage();
+    expect(screen.getByLabelText(/Simulator backend/i)).toHaveValue("mock");
+    expect(screen.getByLabelText(/Optimizer strategy/i)).toHaveValue(
+      "heuristic",
+    );
+    expect(screen.getByLabelText(/Max iterations/i)).toHaveValue(5);
+    expect(screen.getByLabelText(/Trials per candidate/i)).toHaveValue(3);
+    expect(screen.getByLabelText(/Min pass rate/i)).toHaveValue(0.8);
+  });
+
+  it("shows the OpenAI API key field only when strategy is gpt", () => {
+    renderPage();
+    expect(screen.queryByLabelText(/OpenAI API key/i)).toBeNull();
+    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
+      target: { value: "gpt" },
+    });
+    expect(screen.getByLabelText(/OpenAI API key/i)).toBeVisible();
+    expect(screen.getByLabelText(/OpenAI model/i)).toBeVisible();
+  });
+
+  it("blocks submission when strategy=gpt and api key is blank", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "job_unused" } as unknown as Job);
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
+      target: { value: "gpt" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
+    expect(
+      await screen.findByText(/API key required when strategy is gpt/i),
+    ).toBeVisible();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it("submits the full Phase 8 payload when gpt fields are filled", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "job_created" } as unknown as Job);
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
+      target: { value: "gpt" },
+    });
+    fireEvent.change(screen.getByLabelText(/Simulator backend/i), {
+      target: { value: "real_cli" },
+    });
+    fireEvent.change(screen.getByLabelText(/OpenAI API key/i), {
+      target: { value: "sk-testing" },
+    });
+    fireEvent.change(screen.getByLabelText(/OpenAI model/i), {
+      target: { value: "gpt-4.1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
+
+    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
+    const payload = createSpy.mock.calls[0][0];
+    expect(payload.simulator_backend).toBe("real_cli");
+    expect(payload.optimizer_strategy).toBe("gpt");
+    expect(payload.openai?.api_key).toBe("sk-testing");
+    expect(payload.openai?.model).toBe("gpt-4.1");
+    expect(payload.acceptance_criteria?.min_pass_rate).toBe(0.8);
+  });
+});
+
 describe("NewJob — failed submission", () => {
   it("preserves user input and surfaces a structured API error", async () => {
     vi.spyOn(apiClient, "createJob").mockRejectedValue(

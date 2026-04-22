@@ -29,6 +29,15 @@ JobStatus = Literal[
 TrialStatus = Literal["PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"]
 ScenarioType = Literal["nominal", "noise_perturbed", "wind_perturbed", "combined_perturbed"]
 ReportStatus = Literal["PENDING", "READY", "FAILED"]
+SimulatorBackend = Literal["mock", "real_cli"]
+OptimizerStrategy = Literal["heuristic", "gpt"]
+OptimizationOutcome = Literal[
+    "success",
+    "max_iterations_reached",
+    "no_usable_candidate",
+    "simulator_unavailable",
+    "llm_failed",
+]
 
 
 JOB_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
@@ -83,6 +92,17 @@ class JobEventInfo(BaseModel):
 # --- Requests ---------------------------------------------------------------
 
 
+class AcceptanceCriteria(_Strict):
+    target_rmse: Annotated[float, Field(ge=0.0, le=100.0)] | None = None
+    target_max_error: Annotated[float, Field(ge=0.0, le=100.0)] | None = None
+    min_pass_rate: Annotated[float, Field(ge=0.0, le=1.0)] = 0.8
+
+
+class OpenAIConfig(_Strict):
+    api_key: str = Field(min_length=1, max_length=512)
+    model: str | None = Field(default=None, max_length=128)
+
+
 class JobCreateRequest(_Strict):
     """POST /api/v1/jobs body."""
 
@@ -92,6 +112,14 @@ class JobCreateRequest(_Strict):
     wind: WindVector = Field(default_factory=WindVector)
     sensor_noise_level: SensorNoiseLevel = "medium"
     objective_profile: ObjectiveProfile = "robust"
+
+    simulator_backend: SimulatorBackend = "mock"
+    optimizer_strategy: OptimizerStrategy = "heuristic"
+    max_iterations: Annotated[int, Field(ge=1, le=20)] = 5
+    trials_per_candidate: Annotated[int, Field(ge=1, le=10)] = 3
+    max_total_trials: Annotated[int, Field(ge=1, le=1000)] = 100
+    acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
+    openai: OpenAIConfig | None = None
 
 
 # --- Responses --------------------------------------------------------------
@@ -122,6 +150,16 @@ class Job(BaseModel):
     # panel can render without a separate request. Empty list for jobs that
     # have not emitted any events yet.
     recent_events: list[JobEventInfo] = Field(default_factory=list)
+    # Phase 8: auto-tuning configuration + progress.
+    simulator_backend_requested: SimulatorBackend = "mock"
+    optimizer_strategy: OptimizerStrategy = "heuristic"
+    max_iterations: int = 5
+    trials_per_candidate: int = 3
+    max_total_trials: int = 100
+    acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
+    current_generation: int = 0
+    optimization_outcome: OptimizationOutcome | None = None
+    openai_model: str | None = None
 
 
 class PaginatedJobs(BaseModel):
@@ -144,7 +182,7 @@ class TrialMetrics(BaseModel):
     instability_flag: bool
 
 
-CandidateSourceType = Literal["baseline", "optimizer"]
+CandidateSourceType = Literal["baseline", "optimizer", "llm_optimizer"]
 
 
 class TrialSummary(BaseModel):
@@ -221,6 +259,7 @@ class Artifact(BaseModel):
 
 
 __all__ = [
+    "AcceptanceCriteria",
     "AggregatedMetrics",
     "Artifact",
     "ComparisonPoint",
@@ -233,8 +272,12 @@ __all__ = [
     "JobProgress",
     "JobReport",
     "ObjectiveProfile",
+    "OpenAIConfig",
+    "OptimizationOutcome",
+    "OptimizerStrategy",
     "PaginatedJobs",
     "SensorNoiseLevel",
+    "SimulatorBackend",
     "StartPoint",
     "TrackType",
     "Trial",
