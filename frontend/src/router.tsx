@@ -1,0 +1,22 @@
+import { createBrowserRouter } from "react-router-dom";
+
+import { AppShell } from "./AppShell";
+import { Dashboard } from "./pages/Dashboard";
+import { NewJob } from "./pages/NewJob";
+import { JobDetail } from "./pages/JobDetail";
+import { TrialDetail } from "./pages/TrialDetail";
+import { History } from "./pages/History";
+
+export const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <AppShell />,
+    children: [
+      { index: true, element: <Dashboard /> },
+      { path: "jobs/new", element: <NewJob /> },
+      { path: "jobs/:jobId", element: <JobDetail /> },
+      { path: "trials/:trialId", element: <TrialDetail /> },
+      { path: "history", element: <History /> },
+    ],
+  },
+]);

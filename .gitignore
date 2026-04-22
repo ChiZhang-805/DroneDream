@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# SQLite
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Build artifacts / data
+artifacts/
+tmp/
