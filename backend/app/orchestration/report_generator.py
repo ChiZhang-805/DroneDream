@@ -1,0 +1,373 @@
+"""JobReport generation + supporting mock artifact metadata (Phase 6).
+
+The report generator turns the aggregated candidate data persisted by
+``app.orchestration.aggregation`` into a user-readable
+:class:`~app.models.JobReport` row. All summary text is generated locally
+from structured metrics — there is no external LLM call, per the Phase 6
+constraints.
+
+The module also writes mock :class:`~app.models.Artifact` metadata rows
+describing the report's comparison plot, trajectory plot, worker log, and
+telemetry JSON. The artifacts are metadata-only (no underlying files);
+frontends should treat them as references for later phases when a real
+simulator produces real files.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app import models
+
+# --- Comparison point helpers ---------------------------------------------
+
+
+def _comparison_points(
+    baseline_agg: dict[str, Any], best_agg: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Build the baseline-vs-optimized comparison list used by the frontend."""
+
+    def _point(
+        key: str, label: str, unit: str | None, *, lower_is_better: bool
+    ) -> dict[str, Any]:
+        return {
+            "metric": key,
+            "label": label,
+            "baseline": baseline_agg[key],
+            "optimized": best_agg[key],
+            "lower_is_better": lower_is_better,
+            "unit": unit,
+        }
+
+    return [
+        _point("rmse", "RMSE", "m", lower_is_better=True),
+        _point("max_error", "Max error", "m", lower_is_better=True),
+        _point("overshoot_count", "Overshoot", None, lower_is_better=True),
+        _point("completion_time", "Completion time", "s", lower_is_better=True),
+        _point("score", "Score", None, lower_is_better=False),
+    ]
+
+
+def _report_metrics(agg: dict[str, Any]) -> dict[str, Any]:
+    """Narrow an aggregate dict to the :class:`AggregatedMetrics` schema shape."""
+
+    return {
+        "rmse": agg["rmse"],
+        "max_error": agg["max_error"],
+        "overshoot_count": agg["overshoot_count"],
+        "completion_time": agg["completion_time"],
+        "score": agg["score"],
+    }
+
+
+# --- Summary text ----------------------------------------------------------
+
+
+def _pct_delta(baseline: float, optimized: float) -> float | None:
+    """Return optimized-vs-baseline improvement as a percent (lower is better).
+
+    Positive means "optimized is lower than baseline" (improvement on
+    lower-is-better metrics). ``None`` when the baseline is zero and a
+    percent is not meaningful.
+    """
+
+    if baseline == 0:
+        return None
+    return ((baseline - optimized) / baseline) * 100.0
+
+
+def _pass_rate(trials: list[models.Trial]) -> float | None:
+    """Return the pass_flag rate across this candidate's completed trials."""
+
+    completed = [t for t in trials if t.status == "COMPLETED" and t.metric is not None]
+    if not completed:
+        return None
+    passed = sum(1 for t in completed if t.metric is not None and t.metric.pass_flag)
+    return passed / len(completed)
+
+
+def _instability_rate(trials: list[models.Trial]) -> float:
+    """Fraction of trials that finished with the instability flag set."""
+
+    if not trials:
+        return 0.0
+    unstable = sum(
+        1
+        for t in trials
+        if t.metric is not None and t.metric.instability_flag
+    )
+    return unstable / len(trials)
+
+
+def generate_summary_text(
+    *,
+    best: models.CandidateParameterSet,
+    baseline_agg: dict[str, Any],
+    best_agg: dict[str, Any],
+    baseline_trials: list[models.Trial],
+    best_trials: list[models.Trial],
+) -> str:
+    """Produce a deterministic, local-only summary of the job's outcome.
+
+    The text covers four beats required by the Phase 6 directive:
+
+    1. Baseline performance (score + core error).
+    2. Optimized performance (score + core error).
+    3. Key improvement or tradeoff vs baseline.
+    4. Any failure / instability notes the user should be aware of.
+    """
+
+    b_score = baseline_agg["aggregated_score"]
+    o_score = best_agg["aggregated_score"]
+    b_rmse = baseline_agg["rmse"]
+    o_rmse = best_agg["rmse"]
+    b_completion = baseline_agg["completion_time"]
+    o_completion = best_agg["completion_time"]
+
+    lines: list[str] = []
+
+    # (1) Baseline
+    lines.append(
+        f"Baseline achieved aggregated score {b_score:.4f} "
+        f"(RMSE {b_rmse:.3f} m, completion {b_completion:.2f} s) "
+        f"over {len(baseline_trials)} trials."
+    )
+
+    # (2) Optimized — when the baseline wins, make that explicit.
+    if best.is_baseline:
+        lines.append(
+            "No optimizer candidate beat the baseline on aggregated score; "
+            "baseline parameters are therefore the recommended result."
+        )
+    else:
+        lines.append(
+            f"Optimizer candidate '{best.label}' (generation "
+            f"{best.generation_index}) achieved aggregated score {o_score:.4f} "
+            f"(RMSE {o_rmse:.3f} m, completion {o_completion:.2f} s) "
+            f"over {len(best_trials)} trials."
+        )
+
+        # (3) Key improvement or tradeoff
+        score_delta_pct = _pct_delta(b_score, o_score)
+        rmse_delta_pct = _pct_delta(b_rmse, o_rmse)
+        completion_delta_pct = _pct_delta(b_completion, o_completion)
+
+        improvement_bits: list[str] = []
+        if rmse_delta_pct is not None and rmse_delta_pct > 0.5:
+            improvement_bits.append(f"{rmse_delta_pct:.1f}% lower tracking RMSE")
+        if score_delta_pct is not None and score_delta_pct > 0.5:
+            improvement_bits.append(f"{score_delta_pct:.1f}% lower aggregated score")
+
+        tradeoff_bit: str | None = None
+        if completion_delta_pct is not None and completion_delta_pct < -1.0:
+            # Optimized is SLOWER than baseline.
+            tradeoff_bit = (
+                f"completion time increased by {-completion_delta_pct:.1f}% "
+                f"(now {o_completion:.2f} s vs {b_completion:.2f} s baseline)"
+            )
+
+        if improvement_bits:
+            lines.append(
+                "Key improvement: "
+                + ", ".join(improvement_bits)
+                + "."
+                + (f" Tradeoff: {tradeoff_bit}." if tradeoff_bit else "")
+            )
+        elif tradeoff_bit:
+            lines.append(f"Tradeoff: {tradeoff_bit}.")
+
+    # (4) Failure / instability notes
+    best_failed = sum(1 for t in best_trials if t.status == "FAILED")
+    best_instability = _instability_rate(best_trials)
+    best_pass = _pass_rate(best_trials)
+
+    notes: list[str] = []
+    if best_failed > 0 and best_trials:
+        notes.append(
+            f"{best_failed} of {len(best_trials)} best-candidate trials failed"
+        )
+    if best_instability >= 0.25:
+        notes.append(
+            f"{best_instability * 100:.0f}% of best-candidate trials "
+            f"flagged instability"
+        )
+    if best_pass is not None and best_pass < 0.75:
+        notes.append(f"pass rate only {best_pass * 100:.0f}%")
+
+    if notes:
+        lines.append("Watch-outs: " + "; ".join(notes) + ".")
+    else:
+        lines.append(
+            "No failure or instability flags on best-candidate trials."
+        )
+
+    return " ".join(lines)
+
+
+# --- Report body ----------------------------------------------------------
+
+
+def build_report_body(
+    *,
+    best: models.CandidateParameterSet,
+    baseline_agg: dict[str, Any],
+    best_agg: dict[str, Any],
+    baseline_trials: list[models.Trial],
+    best_trials: list[models.Trial],
+) -> dict[str, Any]:
+    """Compose the JobReport row payload (without persisting).
+
+    Returns a dict with the five fields that map directly onto
+    :class:`~app.models.JobReport` columns. Callers pass it to
+    :func:`persist_report` to actually upsert the row.
+    """
+
+    return {
+        "baseline_metric_json": _report_metrics(baseline_agg),
+        "optimized_metric_json": _report_metrics(best_agg),
+        "comparison_metric_json": _comparison_points(baseline_agg, best_agg),
+        "best_parameter_json": dict(best.parameter_json or {}),
+        "summary_text": generate_summary_text(
+            best=best,
+            baseline_agg=baseline_agg,
+            best_agg=best_agg,
+            baseline_trials=baseline_trials,
+            best_trials=best_trials,
+        ),
+    }
+
+
+def persist_report(
+    db: Session,
+    *,
+    job: models.Job,
+    best: models.CandidateParameterSet,
+    report_body: dict[str, Any],
+) -> models.JobReport:
+    """Upsert the JobReport row for ``job`` and mark it READY."""
+
+    existing = db.scalars(
+        select(models.JobReport).where(models.JobReport.job_id == job.id)
+    ).first()
+    if existing is None:
+        existing = models.JobReport(job_id=job.id)
+        db.add(existing)
+    existing.best_candidate_id = best.id
+    existing.summary_text = report_body["summary_text"]
+    existing.baseline_metric_json = report_body["baseline_metric_json"]
+    existing.optimized_metric_json = report_body["optimized_metric_json"]
+    existing.comparison_metric_json = report_body["comparison_metric_json"]
+    existing.best_parameter_json = report_body["best_parameter_json"]
+    existing.report_status = "READY"
+    return existing
+
+
+# --- Mock artifact metadata -----------------------------------------------
+
+
+# Artifact types surfaced by `GET /api/v1/jobs/{job_id}/artifacts`. The MVP
+# persists only metadata (no underlying files) — see docstring at the top of
+# this module.
+_JOB_ARTIFACT_TEMPLATES: tuple[dict[str, Any], ...] = (
+    {
+        "artifact_type": "comparison_plot",
+        "display_name": "Baseline vs optimized comparison",
+        "storage_path": "mock://jobs/{job_id}/comparison_plot.json",
+        "mime_type": "application/json",
+    },
+    {
+        "artifact_type": "trajectory_plot",
+        "display_name": "Best-candidate trajectory",
+        "storage_path": "mock://jobs/{job_id}/trajectory_plot.json",
+        "mime_type": "application/json",
+    },
+    {
+        "artifact_type": "worker_log",
+        "display_name": "Worker execution log",
+        "storage_path": "mock://jobs/{job_id}/worker.log",
+        "mime_type": "text/plain",
+    },
+    {
+        "artifact_type": "telemetry_json",
+        "display_name": "Aggregate telemetry",
+        "storage_path": "mock://jobs/{job_id}/telemetry.json",
+        "mime_type": "application/json",
+    },
+)
+
+
+def ensure_job_artifacts(db: Session, job: models.Job) -> list[models.Artifact]:
+    """Create the standard job-level artifact metadata rows if missing.
+
+    Idempotent per ``(owner_id, artifact_type)`` — calling this twice for the
+    same job does not create duplicate rows.
+    """
+
+    existing = db.scalars(
+        select(models.Artifact)
+        .where(models.Artifact.owner_type == "job")
+        .where(models.Artifact.owner_id == job.id)
+    ).all()
+    existing_by_type = {a.artifact_type: a for a in existing}
+
+    created: list[models.Artifact] = []
+    for template in _JOB_ARTIFACT_TEMPLATES:
+        if template["artifact_type"] in existing_by_type:
+            continue
+        artifact = models.Artifact(
+            owner_type="job",
+            owner_id=job.id,
+            artifact_type=template["artifact_type"],
+            display_name=template["display_name"],
+            storage_path=template["storage_path"].format(job_id=job.id),
+            mime_type=template["mime_type"],
+            file_size_bytes=None,
+        )
+        db.add(artifact)
+        created.append(artifact)
+    return created
+
+
+# --- Top-level entrypoint -------------------------------------------------
+
+
+def generate_and_persist_report(
+    db: Session,
+    *,
+    job: models.Job,
+    best: models.CandidateParameterSet,
+    baseline_agg: dict[str, Any],
+    best_agg: dict[str, Any],
+) -> models.JobReport:
+    """Build the JobReport payload, persist it, and create mock artifacts.
+
+    Called by :mod:`app.orchestration.aggregation` once the best candidate
+    has been selected. Extracted to its own module so the summary/artifact
+    logic is easy to reason about in isolation.
+    """
+
+    baseline_trials = [t for t in job.trials if t.candidate_id == (job.baseline_candidate_id or "")]
+    best_trials = [t for t in job.trials if t.candidate_id == best.id]
+
+    body = build_report_body(
+        best=best,
+        baseline_agg=baseline_agg,
+        best_agg=best_agg,
+        baseline_trials=baseline_trials,
+        best_trials=best_trials,
+    )
+    report = persist_report(db, job=job, best=best, report_body=body)
+    ensure_job_artifacts(db, job)
+    return report
+
+
+__all__ = [
+    "build_report_body",
+    "ensure_job_artifacts",
+    "generate_and_persist_report",
+    "generate_summary_text",
+    "persist_report",
+]

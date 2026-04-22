@@ -61,6 +61,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: EARLIER,
     cancelled_at: null,
     failed_at: null,
+    recent_events: [],
   },
   {
     id: "job_running_002",
@@ -87,6 +88,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: null,
     cancelled_at: null,
     failed_at: null,
+    recent_events: [],
   },
   {
     id: "job_queued_003",
@@ -113,6 +115,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: null,
     cancelled_at: null,
     failed_at: null,
+    recent_events: [],
   },
   {
     id: "job_aggregating_004",
@@ -139,6 +142,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: null,
     cancelled_at: null,
     failed_at: null,
+    recent_events: [],
   },
   {
     id: "job_failed_005",
@@ -169,6 +173,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: null,
     cancelled_at: null,
     failed_at: EARLIER,
+    recent_events: [],
   },
   {
     id: "job_cancelled_006",
@@ -195,6 +200,7 @@ export const MOCK_JOBS: Job[] = [
     completed_at: null,
     cancelled_at: EARLIER,
     failed_at: null,
+    recent_events: [],
   },
 ];
 

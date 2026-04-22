@@ -85,6 +85,31 @@ export interface JobError {
   message: string;
 }
 
+// Phase 6: JobEvent rows embedded on job detail so the diagnostics panel
+// can render without a second request. Payload shape varies by event_type
+// and is treated as opaque JSON by the frontend.
+export interface JobEventInfo {
+  id: string;
+  event_type: string;
+  payload: Record<string, unknown> | null;
+  created_at: string;
+}
+
+// Phase 6: mock artifact metadata returned by
+// `GET /api/v1/jobs/{job_id}/artifacts`. No underlying files exist in the
+// MVP — `storage_path` uses a `mock://` URI scheme.
+export interface Artifact {
+  id: string;
+  owner_type: string;
+  owner_id: string;
+  artifact_type: string;
+  display_name: string | null;
+  storage_path: string;
+  mime_type: string | null;
+  file_size_bytes: number | null;
+  created_at: string;
+}
+
 export interface JobCreateRequest {
   track_type: TrackType;
   start_point: StartPoint;
@@ -115,6 +140,7 @@ export interface Job {
   completed_at: string | null;
   cancelled_at: string | null;
   failed_at: string | null;
+  recent_events: JobEventInfo[];
 }
 
 export interface TrialMetrics {

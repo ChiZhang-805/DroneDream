@@ -136,6 +136,7 @@ export const mockApi = {
       completed_at: null,
       cancelled_at: null,
       failed_at: null,
+      recent_events: [],
     };
     jobStore.unshift(created);
     return unwrap(envelopeSuccess(created));
