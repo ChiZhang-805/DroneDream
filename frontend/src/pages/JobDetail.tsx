@@ -1,7 +1,7 @@
-import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { mockApi, MockApiError } from "../mock/client";
+import { apiClient, ApiClientError } from "../api/client";
 import type { Job, JobReport, TrialSummary } from "../types/api";
 import { isActiveJobStatus, formatDateTime, formatNumber } from "../utils/format";
 import { SectionCard } from "../components/SectionCard";
@@ -51,11 +51,31 @@ const TRIAL_COLUMNS: Column<TrialSummary>[] = [
 
 export function JobDetail() {
   const { jobId } = useParams<{ jobId: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const safeId = jobId ?? "";
+
+  const rerunMutation = useMutation({
+    mutationFn: (id: string) => apiClient.rerunJob(id),
+    onSuccess: (newJob) => {
+      queryClient.invalidateQueries({ queryKey: ["jobs", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs", "history"] });
+      navigate(`/jobs/${newJob.id}`);
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => apiClient.cancelJob(id),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["job", updated.id], updated);
+      queryClient.invalidateQueries({ queryKey: ["jobs", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs", "history"] });
+    },
+  });
 
   const jobQuery = useQuery({
     queryKey: ["job", safeId],
-    queryFn: () => mockApi.getJob(safeId),
+    queryFn: () => apiClient.getJob(safeId),
     enabled: !!safeId,
     refetchInterval: (q) => {
       const j = q.state.data as Job | undefined;
@@ -66,7 +86,7 @@ export function JobDetail() {
   const jobStatus = jobQuery.data?.status;
   const trialsQuery = useQuery({
     queryKey: ["job-trials", safeId],
-    queryFn: () => mockApi.listJobTrials(safeId),
+    queryFn: () => apiClient.listJobTrials(safeId),
     enabled: !!safeId,
     refetchInterval:
       jobStatus && isActiveJobStatus(jobStatus)
@@ -79,7 +99,7 @@ export function JobDetail() {
 
   const reportQuery = useQuery({
     queryKey: ["job-report", safeId],
-    queryFn: () => mockApi.getJobReport(safeId),
+    queryFn: () => apiClient.getJobReport(safeId),
     enabled: reportEnabled,
     retry: false,
   });
@@ -92,7 +112,7 @@ export function JobDetail() {
       <ErrorState
         title="Unable to load job"
         description={
-          jobQuery.error instanceof MockApiError
+          jobQuery.error instanceof ApiClientError
             ? jobQuery.error.message
             : "Job not found."
         }
@@ -104,9 +124,35 @@ export function JobDetail() {
   const trials = trialsQuery.data ?? [];
   const report = reportQuery.data;
 
+  const isTerminal =
+    job.status === "COMPLETED" ||
+    job.status === "FAILED" ||
+    job.status === "CANCELLED";
+
   return (
     <section className="stack-md">
-      <JobHeader job={job} />
+      <JobHeader
+        job={job}
+        onRerun={() => rerunMutation.mutate(job.id)}
+        onCancel={() => cancelMutation.mutate(job.id)}
+        rerunPending={rerunMutation.isPending}
+        cancelPending={cancelMutation.isPending}
+        canCancel={!isTerminal}
+      />
+      {rerunMutation.isError ? (
+        <Alert tone="danger" title="Rerun failed">
+          {rerunMutation.error instanceof ApiClientError
+            ? rerunMutation.error.message
+            : "Could not rerun this job."}
+        </Alert>
+      ) : null}
+      {cancelMutation.isError ? (
+        <Alert tone="danger" title="Cancel failed">
+          {cancelMutation.error instanceof ApiClientError
+            ? cancelMutation.error.message
+            : "Could not cancel this job."}
+        </Alert>
+      ) : null}
       <JobSummaryCard job={job} />
       <ProgressSection job={job} />
 
@@ -152,7 +198,7 @@ export function JobDetail() {
         ) : trialsQuery.isError ? (
           <ErrorState
             description={
-              trialsQuery.error instanceof MockApiError
+              trialsQuery.error instanceof ApiClientError
                 ? trialsQuery.error.message
                 : "Failed to load trials."
             }
@@ -177,7 +223,21 @@ export function JobDetail() {
   );
 }
 
-function JobHeader({ job }: { job: Job }) {
+function JobHeader({
+  job,
+  onRerun,
+  onCancel,
+  rerunPending,
+  cancelPending,
+  canCancel,
+}: {
+  job: Job;
+  onRerun: () => void;
+  onCancel: () => void;
+  rerunPending: boolean;
+  cancelPending: boolean;
+  canCancel: boolean;
+}) {
   return (
     <header className="page-header">
       <div>
@@ -194,6 +254,24 @@ function JobHeader({ job }: { job: Job }) {
         {isActiveJobStatus(job.status) ? (
           <span className="form-hint">Polling every {ACTIVE_POLL_INTERVAL_MS / 1000}s…</span>
         ) : null}
+        {canCancel ? (
+          <button
+            type="button"
+            className="btn"
+            onClick={onCancel}
+            disabled={cancelPending}
+          >
+            {cancelPending ? "Cancelling…" : "Cancel"}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onRerun}
+          disabled={rerunPending}
+        >
+          {rerunPending ? "Rerunning…" : "Rerun"}
+        </button>
       </div>
     </header>
   );
@@ -313,11 +391,7 @@ function StatusSpecificTop({
             <div>
               <strong>{err.code}</strong>: {err.message}
             </div>
-            <div style={{ marginTop: "0.5rem" }}>
-              <button className="btn btn-ghost" type="button" disabled>
-                Rerun (Phase 2)
-              </button>
-            </div>
+
           </>
         ) : (
           "Failed with no detailed error reported."

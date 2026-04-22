@@ -1,0 +1,278 @@
+"""Job service — creation, listing, rerun, cancel, serialization.
+
+Only state transitions that are safe in Phase 2 live here. Worker execution
+and optimizer orchestration belong to a later phase (Phase 3+).
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app import models, schemas
+
+
+class JobServiceError(Exception):
+    """Structured error surfaced by the HTTP layer as an error envelope."""
+
+    def __init__(self, code: str, message: str, http_status: int = 400) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.http_status = http_status
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _get_or_create_default_user(db: Session) -> models.User:
+    user = db.scalars(select(models.User).limit(1)).first()
+    if user is None:
+        user = models.User(display_name="Default User")
+        db.add(user)
+        db.flush()
+    return user
+
+
+def _create_job_from_config(
+    db: Session,
+    *,
+    req: schemas.JobCreateRequest,
+    source_job_id: str | None = None,
+) -> models.Job:
+    user = _get_or_create_default_user(db)
+    now = _now()
+    job = models.Job(
+        user_id=user.id,
+        track_type=req.track_type,
+        start_point_x=req.start_point.x,
+        start_point_y=req.start_point.y,
+        altitude_m=req.altitude_m,
+        wind_north=req.wind.north,
+        wind_east=req.wind.east,
+        wind_south=req.wind.south,
+        wind_west=req.wind.west,
+        sensor_noise_level=req.sensor_noise_level,
+        objective_profile=req.objective_profile,
+        status="QUEUED",
+        current_phase="queued",
+        progress_completed_trials=0,
+        progress_total_trials=0,
+        source_job_id=source_job_id,
+        queued_at=now,
+    )
+    db.add(job)
+    db.flush()
+    db.add(
+        models.JobEvent(
+            job_id=job.id,
+            event_type="job_created",
+            payload_json={"source_job_id": source_job_id},
+        )
+    )
+    db.add(
+        models.JobEvent(
+            job_id=job.id,
+            event_type="job_queued",
+            payload_json=None,
+        )
+    )
+    return job
+
+
+def create_job(db: Session, req: schemas.JobCreateRequest) -> models.Job:
+    job = _create_job_from_config(db, req=req, source_job_id=None)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def list_jobs(
+    db: Session,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+    status: str | None = None,
+) -> tuple[list[models.Job], int]:
+    if page < 1:
+        raise JobServiceError("INVALID_INPUT", "page must be >= 1", http_status=422)
+    if page_size < 1 or page_size > 200:
+        raise JobServiceError("INVALID_INPUT", "page_size must be in [1, 200]", http_status=422)
+
+    stmt = select(models.Job)
+    count_stmt = select(func.count(models.Job.id))
+    if status is not None:
+        stmt = stmt.where(models.Job.status == status)
+        count_stmt = count_stmt.where(models.Job.status == status)
+
+    total = int(db.scalar(count_stmt) or 0)
+    stmt = (
+        stmt.order_by(models.Job.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    items = list(db.scalars(stmt))
+    return items, total
+
+
+def get_job(db: Session, job_id: str) -> models.Job:
+    job = db.get(models.Job, job_id)
+    if job is None:
+        raise JobServiceError("JOB_NOT_FOUND", f"Job {job_id} was not found.", http_status=404)
+    return job
+
+
+def rerun_job(db: Session, job_id: str) -> models.Job:
+    source = get_job(db, job_id)
+    req = schemas.JobCreateRequest(
+        track_type=source.track_type,  # type: ignore[arg-type]
+        start_point=schemas.StartPoint(x=source.start_point_x, y=source.start_point_y),
+        altitude_m=source.altitude_m,
+        wind=schemas.WindVector(
+            north=source.wind_north,
+            east=source.wind_east,
+            south=source.wind_south,
+            west=source.wind_west,
+        ),
+        sensor_noise_level=source.sensor_noise_level,  # type: ignore[arg-type]
+        objective_profile=source.objective_profile,  # type: ignore[arg-type]
+    )
+    new_job = _create_job_from_config(db, req=req, source_job_id=source.id)
+    db.commit()
+    db.refresh(new_job)
+    return new_job
+
+
+def cancel_job(db: Session, job_id: str) -> models.Job:
+    job = get_job(db, job_id)
+    if job.status in schemas.JOB_TERMINAL_STATUSES:
+        code = (
+            "JOB_ALREADY_CANCELLED" if job.status == "CANCELLED" else "JOB_ALREADY_COMPLETED"
+        )
+        raise JobServiceError(
+            code,
+            f"Job {job.id} is already in terminal state {job.status}.",
+            http_status=409,
+        )
+    if job.status not in schemas.JOB_CANCELLABLE_STATUSES:
+        raise JobServiceError(
+            "JOB_NOT_RUNNABLE",
+            f"Job {job.id} in status {job.status} cannot be cancelled.",
+            http_status=409,
+        )
+    now = _now()
+    job.status = "CANCELLED"
+    job.cancelled_at = now
+    job.current_phase = None
+    db.add(models.JobEvent(job_id=job.id, event_type="job_cancelled", payload_json=None))
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+# --- Serialization ----------------------------------------------------------
+
+
+def to_job_schema(job: models.Job) -> schemas.Job:
+    latest_error = None
+    if job.latest_error_code is not None:
+        latest_error = schemas.JobErrorInfo(
+            code=job.latest_error_code,
+            message=job.latest_error_message or "",
+        )
+    return schemas.Job(
+        id=job.id,
+        track_type=job.track_type,  # type: ignore[arg-type]
+        start_point=schemas.StartPoint(x=job.start_point_x, y=job.start_point_y),
+        altitude_m=job.altitude_m,
+        wind=schemas.WindVector(
+            north=job.wind_north,
+            east=job.wind_east,
+            south=job.wind_south,
+            west=job.wind_west,
+        ),
+        sensor_noise_level=job.sensor_noise_level,  # type: ignore[arg-type]
+        objective_profile=job.objective_profile,  # type: ignore[arg-type]
+        status=job.status,  # type: ignore[arg-type]
+        progress=schemas.JobProgress(
+            completed_trials=job.progress_completed_trials,
+            total_trials=job.progress_total_trials,
+            current_phase=job.current_phase,
+        ),
+        baseline_candidate_id=job.baseline_candidate_id,
+        best_candidate_id=job.best_candidate_id,
+        source_job_id=job.source_job_id,
+        latest_error=latest_error,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        queued_at=job.queued_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+        cancelled_at=job.cancelled_at,
+        failed_at=job.failed_at,
+    )
+
+
+def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
+    return schemas.TrialSummary(
+        id=trial.id,
+        candidate_id=trial.candidate_id,
+        seed=trial.seed,
+        scenario_type=trial.scenario_type,  # type: ignore[arg-type]
+        status=trial.status,  # type: ignore[arg-type]
+        score=trial.metric.score if trial.metric is not None else None,
+    )
+
+
+def to_trial_schema(trial: models.Trial) -> schemas.Trial:
+    metrics: schemas.TrialMetrics | None = None
+    m = trial.metric
+    if m is not None and m.rmse is not None and m.score is not None:
+        metrics = schemas.TrialMetrics(
+            rmse=m.rmse,
+            max_error=m.max_error or 0.0,
+            overshoot_count=m.overshoot_count or 0,
+            completion_time=m.completion_time or 0.0,
+            crash_flag=m.crash_flag,
+            timeout_flag=m.timeout_flag,
+            score=m.score,
+            final_error=m.final_error or 0.0,
+            pass_flag=m.pass_flag,
+            instability_flag=m.instability_flag,
+        )
+    return schemas.Trial(
+        id=trial.id,
+        job_id=trial.job_id,
+        candidate_id=trial.candidate_id,
+        seed=trial.seed,
+        scenario_type=trial.scenario_type,  # type: ignore[arg-type]
+        status=trial.status,  # type: ignore[arg-type]
+        score=m.score if m is not None else None,
+        attempt_count=trial.attempt_count,
+        worker_id=trial.worker_id,
+        simulator_backend=trial.simulator_backend,
+        failure_code=trial.failure_code,
+        failure_reason=trial.failure_reason,
+        log_excerpt=trial.log_excerpt,
+        metrics=metrics,
+        queued_at=trial.queued_at,
+        started_at=trial.started_at,
+        finished_at=trial.finished_at,
+    )
+
+
+def to_artifact_schema(artifact: models.Artifact) -> schemas.Artifact:
+    return schemas.Artifact(
+        id=artifact.id,
+        owner_type=artifact.owner_type,
+        owner_id=artifact.owner_id,
+        artifact_type=artifact.artifact_type,
+        display_name=artifact.display_name,
+        storage_path=artifact.storage_path,
+        mime_type=artifact.mime_type,
+        file_size_bytes=artifact.file_size_bytes,
+        created_at=artifact.created_at,
+    )

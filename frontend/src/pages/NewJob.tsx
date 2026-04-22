@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { SectionCard } from "../components/SectionCard";
 import { Alert } from "../components/Alert";
-import { mockApi, MockApiError } from "../mock/client";
+import { apiClient, ApiClientError } from "../api/client";
 import {
   OBJECTIVE_PROFILES,
   SENSOR_NOISE_LEVELS,
@@ -134,10 +134,10 @@ export function NewJob() {
     }
     setSubmitting(true);
     try {
-      const created = await mockApi.createJob(formToRequest(form));
+      const created = await apiClient.createJob(formToRequest(form));
       navigate(`/jobs/${created.id}`, { replace: false });
     } catch (err) {
-      if (err instanceof MockApiError) {
+      if (err instanceof ApiClientError) {
         setSubmitError(err.message);
       } else {
         setSubmitError("Failed to submit job. Please try again.");

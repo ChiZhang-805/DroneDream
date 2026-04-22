@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
-import { mockApi, MockApiError } from "../mock/client";
+import { apiClient, ApiClientError } from "../api/client";
 import type { Job, JobStatus, ObjectiveProfile, TrackType } from "../types/api";
 import {
   JOB_STATUSES,
@@ -63,7 +63,7 @@ export function History() {
 
   const query = useQuery({
     queryKey: ["jobs", "history"],
-    queryFn: () => mockApi.listJobs({ page: 1, page_size: 100 }),
+    queryFn: () => apiClient.listJobs({ page: 1, page_size: 100 }),
   });
 
   const allJobs = useMemo(() => query.data?.items ?? [], [query.data]);
@@ -166,7 +166,7 @@ export function History() {
         ) : query.isError ? (
           <ErrorState
             description={
-              query.error instanceof MockApiError
+              query.error instanceof ApiClientError
                 ? query.error.message
                 : "Failed to load jobs."
             }

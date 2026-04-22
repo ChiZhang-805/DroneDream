@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
-import { mockApi, MockApiError } from "../mock/client";
+import { apiClient, ApiClientError } from "../api/client";
 import { JOB_STATUSES } from "../types/api";
 import type { JobStatus } from "../types/api";
 import { MetricCard } from "../components/MetricCard";
@@ -54,7 +54,7 @@ const JOB_COLUMNS: Column<Job>[] = [
 export function Dashboard() {
   const jobsQuery = useQuery({
     queryKey: ["jobs", "dashboard"],
-    queryFn: () => mockApi.listJobs({ page: 1, page_size: 10 }),
+    queryFn: () => apiClient.listJobs({ page: 1, page_size: 10 }),
   });
 
   return (
@@ -78,7 +78,7 @@ export function Dashboard() {
       ) : jobsQuery.isError ? (
         <ErrorState
           description={
-            jobsQuery.error instanceof MockApiError
+            jobsQuery.error instanceof ApiClientError
               ? jobsQuery.error.message
               : "Failed to load jobs."
           }
