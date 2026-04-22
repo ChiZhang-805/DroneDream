@@ -776,3 +776,45 @@ code {
 .stack-md > * + * {
   margin-top: 1rem;
 }
+
+/* ---------- Candidate tags (Phase 5) ---------- */
+
+.candidate-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.candidate-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.candidate-tag-baseline {
+  background: #eef2f7;
+  color: #4b5563;
+  border: 1px solid #d7dce4;
+}
+
+.candidate-tag-optimizer {
+  background: #eef5ff;
+  color: #1d4ed8;
+  border: 1px solid #c9dcff;
+}
+
+.candidate-tag-best {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #bbf7d0;
+}
+
+.candidate-id {
+  color: var(--color-muted, #6b7280);
+  font-size: 0.78rem;
+}

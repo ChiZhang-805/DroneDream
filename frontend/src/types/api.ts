@@ -130,6 +130,8 @@ export interface TrialMetrics {
   instability_flag: boolean;
 }
 
+export type CandidateSourceType = "baseline" | "optimizer";
+
 export interface TrialSummary {
   id: string;
   candidate_id: string;
@@ -137,6 +139,13 @@ export interface TrialSummary {
   scenario_type: ScenarioType;
   status: TrialStatus;
   score: number | null;
+  // Phase 5: candidate metadata exposed so the trial table can distinguish
+  // baseline from optimizer rows and highlight the best candidate.
+  candidate_label: string | null;
+  candidate_source_type: CandidateSourceType | null;
+  candidate_is_baseline: boolean;
+  candidate_is_best: boolean;
+  candidate_generation_index: number;
 }
 
 export interface Trial extends TrialSummary {

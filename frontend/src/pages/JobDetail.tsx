@@ -17,6 +17,23 @@ import { ComparisonChart } from "../components/ComparisonChart";
 // docs/04_API_SPEC.md §12.
 const ACTIVE_POLL_INTERVAL_MS = 4000;
 
+function CandidateCell({ t }: { t: TrialSummary }) {
+  const label = t.candidate_label ?? (t.candidate_is_baseline ? "baseline" : "—");
+  const tone =
+    t.candidate_source_type === "optimizer" ? "optimizer" : "baseline";
+  return (
+    <span className="candidate-cell">
+      <span className={`candidate-tag candidate-tag-${tone}`}>
+        {tone === "baseline" ? "Baseline" : `Optimizer #${t.candidate_generation_index}`}
+      </span>
+      {t.candidate_is_best ? (
+        <span className="candidate-tag candidate-tag-best">Best</span>
+      ) : null}
+      <code className="candidate-id">{label}</code>
+    </span>
+  );
+}
+
 const TRIAL_COLUMNS: Column<TrialSummary>[] = [
   {
     key: "id",
@@ -27,7 +44,11 @@ const TRIAL_COLUMNS: Column<TrialSummary>[] = [
       </Link>
     ),
   },
-  { key: "candidate_id", header: "Candidate", render: (t) => <code>{t.candidate_id}</code> },
+  {
+    key: "candidate",
+    header: "Candidate",
+    render: (t) => <CandidateCell t={t} />,
+  },
   { key: "seed", header: "Seed", render: (t) => t.seed },
   { key: "scenario_type", header: "Scenario", render: (t) => t.scenario_type },
   {

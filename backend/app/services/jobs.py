@@ -217,6 +217,10 @@ def to_job_schema(job: models.Job) -> schemas.Job:
 
 
 def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
+    candidate = trial.candidate
+    source_type: schemas.CandidateSourceType | None = None
+    if candidate is not None and candidate.source_type in {"baseline", "optimizer"}:
+        source_type = candidate.source_type  # type: ignore[assignment]
     return schemas.TrialSummary(
         id=trial.id,
         candidate_id=trial.candidate_id,
@@ -224,6 +228,13 @@ def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
         scenario_type=trial.scenario_type,  # type: ignore[arg-type]
         status=trial.status,  # type: ignore[arg-type]
         score=trial.metric.score if trial.metric is not None else None,
+        candidate_label=candidate.label if candidate is not None else None,
+        candidate_source_type=source_type,
+        candidate_is_baseline=bool(candidate.is_baseline) if candidate is not None else False,
+        candidate_is_best=bool(candidate.is_best) if candidate is not None else False,
+        candidate_generation_index=(
+            candidate.generation_index if candidate is not None else 0
+        ),
     )
 
 
