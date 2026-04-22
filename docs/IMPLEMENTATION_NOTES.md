@@ -80,53 +80,89 @@ probes and future dashboards can share parsing logic.
 - **Sensor noise:** `low | medium | high`
 - **Objective profile:** `stable | fast | smooth | robust | custom`
 
-These will be introduced as typed enums in Phase 1; they are listed here so
-reviewers see the full vocabulary up front.
+These will be introduced as typed enums in a later phase (when the backend
+requires them); they are listed here so reviewers see the full vocabulary up
+front.
 
 ## Phase plan
 
+This plan follows the canonical execution plan in
+[`docs/07_EXECUTION_PLAN.md`](./07_EXECUTION_PLAN.md) (§3.2). The ordering —
+frontend skeleton first, then real backend, then async worker framework, then
+simulator adapter, then optimization loop — is the product's "close the loop
+first, replace mocks later" strategy and must not be reshuffled.
+
 - **Phase 0 — Repo Bootstrap (this PR).**
   Monorepo skeleton, runnable frontend/backend/worker, docs, env template,
-  quality-gate scripts. No domain logic.
-- **Phase 1 — Data model & migrations.**
-  SQLAlchemy models for `User`, `Job`, `CandidateParameterSet`, `Trial`,
-  `TrialMetric`, `JobReport`, `Artifact`, `JobEvent`. Kept as separate tables
-  per constraint #5; candidate ≠ trial (constraint #6).
-- **Phase 2 — Job lifecycle API.**
+  quality-gate scripts. No domain logic, no data model, no API beyond
+  `/health`.
+- **Phase 1 — Frontend Skeleton + Mock Data.**
+  Build out all five required pages (Dashboard, New Job, Job Detail, Trial
+  Detail, History) and the shared component kit (Status Badge, Metric Card,
+  Section Card, Data Table, Alert/Notice, Loading/Empty/Error) driven by
+  **mock data only**. Page routes, form validation, loading/empty/error
+  states, and the New Job form defaults must all be complete; the backend is
+  not required to be real yet. Mock field names and status enums must match
+  the locked API/enum contract so there is nothing to rename in Phase 2.
+- **Phase 2 — Real Backend + Persistence.**
+  Land the full `/api/v1` surface (`POST /jobs`, `GET /jobs`,
+  `GET /jobs/{id}`, `POST /jobs/{id}/rerun`, `POST /jobs/{id}/cancel`,
+  `GET /jobs/{id}/trials`, `GET /trials/{id}`, `GET /jobs/{id}/report`,
+  `GET /jobs/{id}/artifacts`) on SQLAlchemy models for `User`, `Job`,
+  `CandidateParameterSet`, `Trial`, `TrialMetric`, `JobReport`, `Artifact`
+  (and ideally `JobEvent`) — all persisted as separate tables per constraints
+  #5 and #6. Switch the frontend from mock data to the real API. Endpoints
+  may return empty lists or `REPORT_NOT_READY`, but the response shape is
+  authoritative.
+- **Phase 3 — Async Job / Queue / Worker Framework.**
   `POST /api/v1/jobs` returns immediately with `{job_id, status: QUEUED}`
-  (constraint #3). `GET /api/v1/jobs`, `GET /api/v1/jobs/{id}`,
-  `POST /api/v1/jobs/{id}/rerun`, `POST /api/v1/jobs/{id}/cancel`. Strict
-  Pydantic validation of the New Job input (ranges, enums, defaults).
-- **Phase 3 — Worker & orchestration.**
-  Worker polls DB queue and executes trial-level work only (constraint #8);
-  job manager handles job state transitions
-  `CREATED → QUEUED → RUNNING → AGGREGATING → COMPLETED`, baseline vs.
-  optimizer candidate selection, and aggregation. Mock simulator.
-- **Phase 4 — Reports, trials, artifacts.**
-  `GET /api/v1/jobs/{id}/trials`, `GET /api/v1/trials/{id}`,
-  `GET /api/v1/jobs/{id}/report`, `GET /api/v1/jobs/{id}/artifacts`. Report
-  state machine `PENDING → READY`. Not-ready → structured error.
-- **Phase 5 — Frontend integration.**
-  Dashboard, New Job, Job Detail, Trial Detail, History pages wired to the
-  real API via TanStack Query. Shared components: Status Badge, Metric Card,
-  Section Card, Data Table, Alert/Notice, Loading/Empty/Error states. No
-  simulator or optimizer logic runs on the frontend (constraint #7).
-- **Phase 6 — Acceptance hardening.**
-  Failure surfaces, rerun creates a new job and preserves the original, invalid
-  input rejected on both ends, terminal jobs not cancellable again, charts
-  rendered from persisted metrics (not mocked).
-- **Phase 7 — Optional LLM summary.**
-  Result explanation / summary text only (constraint #9). Never issues flight
-  control commands or bypasses optimizer/simulator boundaries.
+  (constraint #3); job manager drives
+  `CREATED → QUEUED → RUNNING → AGGREGATING → COMPLETED` from the backend,
+  never from the frontend (constraints #4, #7). Worker consumes trial rows
+  only (constraint #8), updates status, and writes back mock metrics.
+  Baseline candidate is auto-created per job. Minimum closed loop: user
+  creates job → baseline trials run → job reaches `COMPLETED` or `FAILED`.
+- **Phase 4 — Simulator Adapter Layer.**
+  Introduce a `SimulatorAdapter` abstraction with a `MockSimulatorAdapter`
+  (primary MVP path, supports baseline / optimized / nominal / perturbed
+  scenarios and failure injection) and a `RealSimulatorAdapterStub`
+  interface shell for future PX4/Gazebo work. Worker routes all trial
+  execution through the adapter — no simulation logic baked into worker code.
+  Real PX4/Gazebo integration stays out of the MVP (constraint #1).
+- **Phase 5 — Optimization Loop.**
+  Generate optimizer candidates in addition to baseline, evaluate each across
+  multiple trials (different seeds/scenarios), aggregate trial metrics into a
+  candidate score, and select the best candidate. Write best params into the
+  job/report. Keep the optimizer simple (e.g. perturbation sampling + sort)
+  for MVP; advanced BO/CMA-ES and LLM-driven parameter search are out of
+  scope (constraint #9 limits LLM use to result explanation text).
+- **Phase 6 — Results / Reporting / Visualization.**
+  Turn persisted trial metrics into the Job Detail experience: baseline vs.
+  optimized metric cards, comparison charts (Recharts), best params panel,
+  trial summary table, failure diagnostics, report state machine
+  `PENDING → READY` with not-ready surfaced as a structured error. History /
+  Reports page reads the same real data.
+- **Phase 7 — Hardening and Acceptance Pass.**
+  Drive every acceptance rule green: failed jobs show user-readable failure
+  info, rerun creates a new job and preserves the original, invalid input is
+  rejected on both frontend and backend, terminal jobs are not cancellable
+  again, charts render from persisted metrics (no mock fallback). Add CI
+  workflow, tighten error codes, and close out the MVP against
+  [`docs/06_ACCEPTANCE_CRITERIA.md`](./06_ACCEPTANCE_CRITERIA.md).
 
 Later phases preserve the API contract (constraint #10). No real PX4/Gazebo
-integration in the MVP (constraint #1).
+integration in the MVP (constraint #1). Optional LLM result-summary text, if
+added, is a post-Phase-7 enhancement and is limited to explanation only —
+it must not generate flight control commands or bypass the optimizer /
+simulator boundaries (constraint #9).
 
 ## Known limitations at Phase 0
 
-- No database, no models, no migrations.
-- No `/api/v1/*` routes beyond what `/health` demonstrates.
-- Frontend pages are empty placeholders under React Router.
-- Worker does not consume or produce any work — it only logs start/stop.
+- No database, no models, no migrations (land in Phase 2).
+- No `/api/v1/*` routes beyond what `/health` demonstrates (land in Phase 2).
+- Frontend pages are empty placeholders under React Router (fleshed out with
+  mock data in Phase 1).
+- Worker does not consume or produce any work — it only logs start/stop
+  (trial execution lands in Phase 3, routed through the adapter in Phase 4).
 - No authentication layer.
-- No CI workflow yet (added in a later phase).
+- No CI workflow yet (added in Phase 7).
