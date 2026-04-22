@@ -12,8 +12,11 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
 from app.config import get_settings
+from app.db import init_db
 from app.response import err
 from app.routers import health
+from app.routers import jobs as jobs_router
+from app.routers import trials as trials_router
 
 logger = logging.getLogger("drone_dream.backend")
 
@@ -24,10 +27,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
 
+    # Initialize the database tables. Safe to call repeatedly.
+    init_db()
+
     app = FastAPI(
         title="DroneDream API",
         version=__version__,
-        description="DroneDream backend — Phase 0 skeleton.",
+        description="DroneDream backend — Phase 2.",
     )
 
     app.add_middleware(
@@ -41,21 +47,40 @@ def create_app() -> FastAPI:
     # Health endpoint lives outside /api/v1 by design.
     app.include_router(health.router)
 
-    # /api/v1 namespace is reserved for the real domain routes (added in later phases).
-    # We mount the router so the prefix is stable from day one.
+    # /api/v1 namespace for the real domain routes.
     api_v1 = FastAPI(title="DroneDream API v1", version=__version__)
+    api_v1.include_router(jobs_router.router)
+    api_v1.include_router(trials_router.router)
+
+    _register_exception_handlers(api_v1)
     app.mount("/api/v1", api_v1)
 
-    @app.exception_handler(StarletteHTTPException)
+    _register_exception_handlers(app)
+
+    return app
+
+
+def _register_exception_handlers(target: FastAPI) -> None:
+    @target.exception_handler(StarletteHTTPException)
     async def http_exception_handler(
         _request: Request, exc: StarletteHTTPException
     ) -> JSONResponse:
+        detail = exc.detail
+        if isinstance(detail, dict) and "code" in detail and "message" in detail:
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=err(
+                    code=str(detail["code"]),
+                    message=str(detail["message"]),
+                    details=detail.get("details"),
+                ),
+            )
         return JSONResponse(
             status_code=exc.status_code,
-            content=err(code=_http_code_label(exc.status_code), message=str(exc.detail)),
+            content=err(code=_http_code_label(exc.status_code), message=str(detail)),
         )
 
-    @app.exception_handler(RequestValidationError)
+    @target.exception_handler(RequestValidationError)
     async def validation_exception_handler(
         _request: Request, exc: RequestValidationError
     ) -> JSONResponse:
@@ -67,8 +92,6 @@ def create_app() -> FastAPI:
                 details=exc.errors(),
             ),
         )
-
-    return app
 
 
 def _http_code_label(status_code: int) -> str:

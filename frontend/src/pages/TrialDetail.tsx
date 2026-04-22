@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
-import { mockApi, MockApiError } from "../mock/client";
+import { apiClient, ApiClientError } from "../api/client";
 import { SectionCard } from "../components/SectionCard";
 import { MetricCard } from "../components/MetricCard";
 import { StatusBadge } from "../components/StatusBadge";
@@ -16,7 +16,7 @@ export function TrialDetail() {
 
   const trialQuery = useQuery({
     queryKey: ["trial", safeId],
-    queryFn: () => mockApi.getTrial(safeId),
+    queryFn: () => apiClient.getTrial(safeId),
     enabled: !!safeId,
     retry: false,
   });
@@ -27,7 +27,7 @@ export function TrialDetail() {
       <ErrorState
         title="Trial not found"
         description={
-          trialQuery.error instanceof MockApiError
+          trialQuery.error instanceof ApiClientError
             ? trialQuery.error.message
             : "We couldn't find that trial."
         }

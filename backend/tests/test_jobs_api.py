@@ -1,0 +1,211 @@
+"""Integration tests for /api/v1 job and trial endpoints (Phase 2)."""
+
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+
+VALID_JOB_PAYLOAD: dict = {
+    "track_type": "circle",
+    "start_point": {"x": 0, "y": 0},
+    "altitude_m": 5.0,
+    "wind": {"north": 0, "east": 0, "south": 0, "west": 0},
+    "sensor_noise_level": "medium",
+    "objective_profile": "robust",
+}
+
+
+# --- Create ----------------------------------------------------------------
+
+
+def test_create_job_returns_queued(client: TestClient) -> None:
+    resp = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True
+    assert body["error"] is None
+    job = body["data"]
+    assert job["status"] == "QUEUED"
+    assert job["id"].startswith("job_")
+    assert job["queued_at"] is not None
+    assert job["started_at"] is None
+    assert job["progress"]["completed_trials"] == 0
+    assert job["track_type"] == "circle"
+    assert job["sensor_noise_level"] == "medium"
+    assert job["objective_profile"] == "robust"
+    assert job["source_job_id"] is None
+
+
+def test_create_job_rejects_invalid_altitude(client: TestClient) -> None:
+    bad = {**VALID_JOB_PAYLOAD, "altitude_m": 25.0}
+    resp = client.post("/api/v1/jobs", json=bad)
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "INVALID_INPUT"
+
+
+def test_create_job_rejects_invalid_wind(client: TestClient) -> None:
+    bad = {**VALID_JOB_PAYLOAD, "wind": {"north": 20, "east": 0, "south": 0, "west": 0}}
+    resp = client.post("/api/v1/jobs", json=bad)
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "INVALID_INPUT"
+
+
+def test_create_job_rejects_invalid_track_type(client: TestClient) -> None:
+    bad = {**VALID_JOB_PAYLOAD, "track_type": "zigzag"}
+    resp = client.post("/api/v1/jobs", json=bad)
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "INVALID_INPUT"
+
+
+def test_create_job_rejects_invalid_sensor_noise(client: TestClient) -> None:
+    bad = {**VALID_JOB_PAYLOAD, "sensor_noise_level": "extreme"}
+    resp = client.post("/api/v1/jobs", json=bad)
+    assert resp.status_code == 422
+
+
+def test_create_job_rejects_invalid_objective(client: TestClient) -> None:
+    bad = {**VALID_JOB_PAYLOAD, "objective_profile": "fun"}
+    resp = client.post("/api/v1/jobs", json=bad)
+    assert resp.status_code == 422
+
+
+def test_create_job_rejects_unknown_fields(client: TestClient) -> None:
+    bad = {**VALID_JOB_PAYLOAD, "rogue_field": 1}
+    resp = client.post("/api/v1/jobs", json=bad)
+    assert resp.status_code == 422
+
+
+# --- List / Detail ---------------------------------------------------------
+
+
+def test_list_jobs_paginates(client: TestClient) -> None:
+    for _ in range(3):
+        r = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD)
+        assert r.status_code == 200
+
+    resp = client.get("/api/v1/jobs")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    data = body["data"]
+    assert data["total"] == 3
+    assert data["page"] == 1
+    assert data["page_size"] == 20
+    assert len(data["items"]) == 3
+    assert all(item["status"] == "QUEUED" for item in data["items"])
+
+
+def test_get_job_detail(client: TestClient) -> None:
+    created = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    resp = client.get(f"/api/v1/jobs/{created['id']}")
+    assert resp.status_code == 200
+    fetched = resp.json()["data"]
+    assert fetched["id"] == created["id"]
+    assert fetched["status"] == "QUEUED"
+
+
+def test_get_job_not_found(client: TestClient) -> None:
+    resp = client.get("/api/v1/jobs/job_does_not_exist")
+    assert resp.status_code == 404
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "JOB_NOT_FOUND"
+
+
+# --- Trials ----------------------------------------------------------------
+
+
+def test_list_trials_for_job_is_empty(client: TestClient) -> None:
+    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    resp = client.get(f"/api/v1/jobs/{job['id']}/trials")
+    assert resp.status_code == 200
+    assert resp.json() == {"success": True, "data": [], "error": None}
+
+
+def test_trial_not_found(client: TestClient) -> None:
+    resp = client.get("/api/v1/trials/tri_missing")
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "TRIAL_NOT_FOUND"
+
+
+# --- Rerun -----------------------------------------------------------------
+
+
+def test_rerun_creates_new_job_preserving_original(client: TestClient) -> None:
+    original = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    resp = client.post(f"/api/v1/jobs/{original['id']}/rerun")
+    assert resp.status_code == 200
+    new_job = resp.json()["data"]
+    assert new_job["id"] != original["id"]
+    assert new_job["status"] == "QUEUED"
+    assert new_job["source_job_id"] == original["id"]
+    assert new_job["track_type"] == original["track_type"]
+    assert new_job["altitude_m"] == original["altitude_m"]
+
+    # Original still exists unchanged.
+    again = client.get(f"/api/v1/jobs/{original['id']}").json()["data"]
+    assert again["id"] == original["id"]
+    assert again["source_job_id"] is None
+
+
+def test_rerun_not_found(client: TestClient) -> None:
+    resp = client.post("/api/v1/jobs/job_missing/rerun")
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "JOB_NOT_FOUND"
+
+
+# --- Cancel ----------------------------------------------------------------
+
+
+def test_cancel_queued_job(client: TestClient) -> None:
+    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    resp = client.post(f"/api/v1/jobs/{job['id']}/cancel")
+    assert resp.status_code == 200
+    cancelled = resp.json()["data"]
+    assert cancelled["status"] == "CANCELLED"
+    assert cancelled["cancelled_at"] is not None
+
+
+def test_cancel_twice_rejects(client: TestClient) -> None:
+    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    assert client.post(f"/api/v1/jobs/{job['id']}/cancel").status_code == 200
+    resp = client.post(f"/api/v1/jobs/{job['id']}/cancel")
+    assert resp.status_code == 409
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "JOB_ALREADY_CANCELLED"
+
+
+def test_cancel_not_found(client: TestClient) -> None:
+    resp = client.post("/api/v1/jobs/job_missing/cancel")
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "JOB_NOT_FOUND"
+
+
+# --- Report ----------------------------------------------------------------
+
+
+def test_report_not_ready(client: TestClient) -> None:
+    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    resp = client.get(f"/api/v1/jobs/{job['id']}/report")
+    assert resp.status_code == 409
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "REPORT_NOT_READY"
+
+
+def test_report_for_missing_job_returns_job_not_found(client: TestClient) -> None:
+    resp = client.get("/api/v1/jobs/job_missing/report")
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "JOB_NOT_FOUND"
+
+
+# --- Artifacts -------------------------------------------------------------
+
+
+def test_artifacts_empty(client: TestClient) -> None:
+    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    resp = client.get(f"/api/v1/jobs/{job['id']}/artifacts")
+    assert resp.status_code == 200
+    assert resp.json() == {"success": True, "data": [], "error": None}
