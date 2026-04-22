@@ -7,11 +7,15 @@ baseline and optimizer candidate trials, aggregates results, selects the best
 parameter set, and surfaces baseline-vs-optimized metrics, best parameters,
 charts, summary text, failure details, rerun, and job history in the UI.
 
-> **Status:** Phase 3 — async job execution. Creating a job persists a `QUEUED`
-> record; a separate worker process picks it up, dispatches baseline trials,
-> runs deterministic mock simulations, aggregates metrics into a `READY`
-> `JobReport`, and moves the job to `COMPLETED` (or `FAILED`). Real
-> PX4/Gazebo simulation and the optimizer arrive in later phases.
+> **Status:** Phase 7 — MVP acceptance ready. Creating a job persists a
+> `QUEUED` record; a separate worker process picks it up, dispatches baseline
+> + optimizer trials, runs deterministic mock simulations, aggregates
+> metrics into a `READY` `JobReport` with baseline-vs-optimized comparison
+> + summary text, and moves the job to `COMPLETED` (or `FAILED`). The
+> frontend renders the full flow end-to-end against the real backend. Real
+> PX4/Gazebo integration remains out of scope — see
+> [`docs/ACCEPTANCE_REPORT.md`](docs/ACCEPTANCE_REPORT.md) for the full
+> acceptance coverage and demo walkthrough.
 
 ## Repo layout
 
@@ -83,9 +87,10 @@ curl http://127.0.0.1:8000/health
 cd worker && ../worker/.venv/bin/python -m drone_dream_worker.main
 ```
 
-### End-to-end demo (Phase 3)
+### End-to-end demo (happy path)
 
-With the backend and worker running in separate terminals:
+With the backend and worker running in separate terminals (mock simulator is
+the default):
 
 ```bash
 # Create a job — returns immediately with status=QUEUED.
@@ -99,13 +104,32 @@ JOB_ID=$(python3 -c "import json; print(json.load(open('/tmp/job.json'))['data']
 # Watch progress — transitions QUEUED -> RUNNING -> AGGREGATING -> COMPLETED.
 watch -n 1 "curl -sS http://127.0.0.1:8000/api/v1/jobs/$JOB_ID | python3 -m json.tool | grep -E 'status|completed_trials|total_trials'"
 
-# After COMPLETED, the report is ready:
+# After COMPLETED, the report is ready — baseline vs optimized metrics,
+# comparison points, best parameters, and a human-readable summary.
 curl -sS http://127.0.0.1:8000/api/v1/jobs/$JOB_ID/report | python3 -m json.tool
 ```
 
 Or open the frontend at http://localhost:5173 and use the **New Job** form —
 the Job Detail page polls every 4 s while the job is active and renders the
-baseline metrics + comparison chart once it reaches `COMPLETED`.
+baseline metrics, optimized metrics, comparison chart, best parameters, and
+summary text once it reaches `COMPLETED`.
+
+### End-to-end demo (failed path)
+
+Restart the worker with the real-simulator stub backend to force every trial
+to fail with `ADAPTER_UNAVAILABLE`. The job manager then transitions the job
+to `FAILED` with `latest_error.code=ALL_TRIALS_FAILED` and the frontend
+renders the structured failure summary on Job Detail.
+
+```bash
+SIMULATOR_BACKEND=real_stub ./scripts/dev-worker.sh
+# Create a job exactly as above; the Job Detail page shows FAILED with
+# per-trial ADAPTER_UNAVAILABLE failure rows.
+```
+
+`GET /api/v1/jobs/{job_id}/report` returns a 409 with `error.code=JOB_FAILED`
+and `details.failure_code=ALL_TRIALS_FAILED` for failed jobs, so the
+frontend never renders a half-filled report.
 
 **Frontend** — Vite dev server on `http://localhost:5173`:
 
