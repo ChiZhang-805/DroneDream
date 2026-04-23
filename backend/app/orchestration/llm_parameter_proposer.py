@@ -31,8 +31,18 @@ logger = logging.getLogger("drone_dream.orchestration.llm")
 
 _PARAMETER_KEYS: tuple[str, ...] = tuple(constants.PARAMETER_SAFE_RANGES.keys())
 _DEFAULT_MODEL = "gpt-4.1"
-_MAX_PROPOSALS = 5
+# Phase 8 product alignment: the GPT loop is "one tune → one simulation
+# round". The proposer is now expected to emit exactly one candidate per
+# generation so the acceptance evaluator has a single, clean unit to judge.
+# A single proposal can still be evaluated over multiple seeds/scenarios
+# via ``trials_per_candidate``.
+_MAX_PROPOSALS = 1
 _MIN_PROPOSALS = 1
+# Maximum number of per-trial "feedback" rows we inline into the GPT prompt
+# for the most recent generation so the model can reason about which
+# scenarios caused failure without receiving unbounded telemetry.
+_MAX_TRIAL_FEEDBACK_ROWS = 8
+_MAX_FEEDBACK_TEXT = 400
 
 
 # --- Public data classes -------------------------------------------------
@@ -185,6 +195,84 @@ def _load_api_key(db: Session, job: models.Job) -> str | None:
         return None
 
 
+def _trim(text: str | None, limit: int = _MAX_FEEDBACK_TEXT) -> str | None:
+    if text is None:
+        return None
+    clean = text.strip()
+    if not clean:
+        return None
+    if len(clean) <= limit:
+        return clean
+    return clean[: limit - 1] + "…"
+
+
+def _trial_feedback_row(trial: models.Trial) -> dict[str, Any]:
+    """Compact per-trial feedback block for the proposer prompt.
+
+    We deliberately do NOT include raw telemetry blobs — only the signals the
+    model needs to understand which scenarios caused a failure: scenario,
+    pass_flag, key error metrics, failure code + reason, and a bounded log
+    excerpt.
+    """
+
+    metric = trial.metric
+    return {
+        "trial_id": trial.id,
+        "scenario_type": trial.scenario_type,
+        "status": trial.status,
+        "pass_flag": (metric.pass_flag if metric is not None else None),
+        "rmse": (metric.rmse if metric is not None else None),
+        "max_error": (metric.max_error if metric is not None else None),
+        "completion_time": (metric.completion_time if metric is not None else None),
+        "final_error": (metric.final_error if metric is not None else None),
+        "failure_code": trial.failure_code,
+        "failure_reason": _trim(trial.failure_reason),
+        "log_excerpt": _trim(trial.log_excerpt),
+    }
+
+
+def _candidate_feedback_block(
+    candidate: models.CandidateParameterSet,
+    *,
+    include_trial_rows: bool,
+) -> dict[str, Any]:
+    """Structured per-candidate feedback exposed to the proposer.
+
+    Includes aggregate pass/completion rates, the raw parameter set, and —
+    for the most recent generation only — the compact per-trial rows so the
+    model can reason about which scenario(s) caused failure.
+    """
+
+    trial_count = max(0, candidate.trial_count or 0)
+    completed = candidate.completed_trial_count or 0
+    metrics = candidate.aggregated_metric_json or {}
+    passing = int(metrics.get("passing_trial_count") or 0)
+    denom = trial_count or 1
+    block: dict[str, Any] = {
+        "candidate_id": candidate.id,
+        "label": candidate.label,
+        "source_type": candidate.source_type,
+        "generation_index": candidate.generation_index,
+        "is_baseline": bool(candidate.is_baseline),
+        "parameters": dict(candidate.parameter_json or {}),
+        "aggregated_metrics": candidate.aggregated_metric_json,
+        "aggregated_score": candidate.aggregated_score,
+        "trial_count": trial_count,
+        "completed_trial_count": completed,
+        "failed_trial_count": candidate.failed_trial_count,
+        "passing_trial_count": passing,
+        "pass_rate": round(passing / denom, 4) if trial_count else 0.0,
+        "completion_rate": round(completed / denom, 4) if trial_count else 0.0,
+    }
+    if include_trial_rows:
+        trials = sorted(
+            list(candidate.trials),
+            key=lambda t: (t.scenario_type or "", t.seed or 0),
+        )[:_MAX_TRIAL_FEEDBACK_ROWS]
+        block["trials"] = [_trial_feedback_row(t) for t in trials]
+    return block
+
+
 def _build_prompt(
     job: models.Job,
     criteria: AcceptanceCriteria,
@@ -192,31 +280,38 @@ def _build_prompt(
 ) -> tuple[str, str]:
     system = (
         "You are an expert drone-control tuning assistant. Your job is to "
-        "propose candidate PID + velocity/acceleration limit + disturbance "
-        "rejection parameters that improve simulator metrics under the given "
-        "scenarios. You must return only structured JSON conforming to the "
-        "provided schema — no free-form text."
+        "propose ONE next candidate PID + velocity/acceptance limit + "
+        "disturbance rejection parameter set that is likely to improve "
+        "simulator metrics under the given scenarios. You must return only "
+        "structured JSON conforming to the provided schema — no free-form "
+        "text. You will see per-trial feedback for the latest generation "
+        "(scenario, pass_flag, errors, failure codes). Use it to diagnose "
+        "which scenario(s) failed and adjust accordingly."
     )
     safe_ranges = {key: list(value) for key, value in constants.PARAMETER_SAFE_RANGES.items()}
 
-    prior: list[dict[str, Any]] = []
-    for cand in sorted(
+    sorted_candidates = sorted(
         candidates,
-        key=lambda c: (c.generation_index, c.is_baseline),
-    ):
-        prior.append(
-            {
-                "label": cand.label,
-                "source_type": cand.source_type,
-                "generation_index": cand.generation_index,
-                "parameters": dict(cand.parameter_json or {}),
-                "aggregated_metrics": cand.aggregated_metric_json,
-                "aggregated_score": cand.aggregated_score,
-                "trial_count": cand.trial_count,
-                "completed_trial_count": cand.completed_trial_count,
-                "failed_trial_count": cand.failed_trial_count,
-            }
-        )
+        key=lambda c: (c.generation_index, 0 if c.is_baseline else 1),
+    )
+    latest_generation = (
+        max((c.generation_index for c in sorted_candidates), default=0)
+    )
+    baseline_block: dict[str, Any] | None = None
+    latest_blocks: list[dict[str, Any]] = []
+    history_blocks: list[dict[str, Any]] = []
+    for cand in sorted_candidates:
+        include_trials = cand.is_baseline or cand.generation_index == latest_generation
+        block = _candidate_feedback_block(cand, include_trial_rows=include_trials)
+        if cand.is_baseline:
+            baseline_block = block
+        elif cand.generation_index == latest_generation:
+            latest_blocks.append(block)
+        else:
+            # Previous generations: keep aggregates only, drop per-trial rows
+            history_blocks.append(
+                _candidate_feedback_block(cand, include_trial_rows=False)
+            )
 
     user_payload = {
         "objective_profile": job.objective_profile,
@@ -237,14 +332,18 @@ def _build_prompt(
         },
         "parameter_safe_ranges": safe_ranges,
         "baseline_parameters": dict(constants.BASELINE_PARAMETERS),
-        "previous_candidates": prior,
+        "baseline_feedback": baseline_block,
+        "latest_generation_feedback": latest_blocks,
+        "previous_generation_history": history_blocks,
         "current_generation": job.current_generation,
         "max_iterations": job.max_iterations,
         "instructions": (
-            f"Propose between 1 and {_MAX_PROPOSALS} next-generation candidate "
-            "parameter sets. Every proposal must include all required keys and "
-            "every numeric value must lie strictly inside the safe range. Do not "
-            "include any other keys. Be explicit about the rationale."
+            "Propose exactly ONE next candidate parameter set. Every numeric "
+            "value must lie strictly inside the safe range; include all "
+            "required keys and no others. Analyze latest_generation_feedback "
+            "and baseline_feedback to identify which scenario(s) failed and "
+            "adjust your parameters accordingly. Be explicit about the "
+            "rationale in 1–3 sentences."
         ),
     }
     return system, json.dumps(user_payload, sort_keys=True, indent=2, default=str)

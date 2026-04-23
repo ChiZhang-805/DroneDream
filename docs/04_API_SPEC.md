@@ -181,8 +181,8 @@ full details):
 ```json
 {
   "simulator_backend": "mock",
-  "optimizer_strategy": "heuristic",
-  "max_iterations": 5,
+  "optimizer_strategy": "gpt",
+  "max_iterations": 20,
   "trials_per_candidate": 3,
   "acceptance_criteria": {
     "target_rmse": 0.5,
@@ -197,7 +197,12 @@ full details):
 ```
 
 - `simulator_backend`: `"mock"` (default) or `"real_cli"`.
-- `optimizer_strategy`: `"heuristic"` (default) or `"gpt"`.
+- `optimizer_strategy`: `"gpt"` (default) or `"heuristic"`. GPT is the
+  default because the product flow is "paste an OpenAI key, baseline
+  simulation, then let GPT iteratively propose new parameters". Select
+  `"heuristic"` explicitly to keep the Phase 7 batch behaviour.
+- `max_iterations`: int 1–20, default `20`. Upper bound on the number of
+  generations after baseline that the GPT loop will run.
 - `openai.api_key` is required **only** when `optimizer_strategy == "gpt"`;
   the server stores it encrypted (Fernet via `APP_SECRET_KEY`) and never
   returns it in any response.
@@ -276,6 +281,35 @@ Returns the full `Job` object including:
 Creates a new job by cloning the source job's configuration. Response
 matches `POST /api/v1/jobs` exactly: the full new `Job` object plus the
 `job_id` alias. The new job's `source_job_id` references the original.
+
+**Optional request body** (Phase 8 product alignment):
+
+```json
+{
+  "openai": { "api_key": "sk-...", "model": "gpt-4.1" }
+}
+```
+
+- If the source job used `optimizer_strategy = "gpt"`, the rerun **keeps
+  `optimizer_strategy = "gpt"`** — it is *not* silently downgraded to
+  heuristic. Because the source job's encrypted OpenAI key is purged on
+  termination, the rerun request **must include a fresh `openai.api_key`**;
+  omitting it returns `OPENAI_KEY_REQUIRED` (HTTP 422). The frontend
+  collects this via a "Rerun with new API key" confirmation flow.
+- If the source job used `optimizer_strategy = "heuristic"`, the body is
+  optional and `openai` is ignored.
+
+Terminal-state semantics (new in the product-alignment update):
+
+- A GPT search that exhausts `max_iterations` or `max_total_trials`
+  without a fully-passing candidate returns `status = COMPLETED` with
+  `optimization_outcome = "max_iterations_reached"` (or
+  `"no_usable_candidate"`). The report is still READY with best-so-far
+  metrics and parameters.
+- `FAILED` is reserved for genuine execution failures (simulator
+  unavailable, unrecoverable LLM failure, malformed results, etc.) —
+  `optimization_outcome` may be `"simulator_unavailable"` or
+  `"llm_failed"` in those cases.
 
 ### 7.5 `POST /api/v1/jobs/{job_id}/cancel`
 

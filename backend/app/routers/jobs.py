@@ -4,13 +4,27 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app import schemas
 from app.db import get_db
 from app.response import ok
 from app.services import jobs as job_service
+
+
+class RerunJobRequest(BaseModel):
+    """Optional body for POST /api/v1/jobs/{job_id}/rerun.
+
+    GPT reruns must include a fresh ``openai.api_key`` because the source
+    job's encrypted key is purged once the job becomes terminal. Heuristic
+    reruns ignore this field.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    openai: schemas.OpenAIConfig | None = None
 
 router = APIRouter(tags=["jobs"])
 
@@ -45,7 +59,10 @@ def create_job(
     req: schemas.JobCreateRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, object]:
-    job = job_service.create_job(db, req)
+    try:
+        job = job_service.create_job(db, req)
+    except job_service.JobServiceError as err:
+        _raise(err)
     return ok(_job_payload_with_alias(job_service.to_job_schema(job)))
 
 
@@ -88,9 +105,11 @@ def get_job(
 def rerun_job(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
+    body: Annotated[RerunJobRequest | None, Body()] = None,
 ) -> dict[str, object]:
+    openai_cfg = body.openai if body is not None else None
     try:
-        job = job_service.rerun_job(db, job_id)
+        job = job_service.rerun_job(db, job_id, openai=openai_cfg)
     except job_service.JobServiceError as err:
         _raise(err)
     return ok(_job_payload_with_alias(job_service.to_job_schema(job)))

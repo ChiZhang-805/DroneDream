@@ -117,25 +117,28 @@ describe("NewJob — client-side validation", () => {
 });
 
 describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
-  it("renders defaults for simulator_backend and optimizer_strategy", () => {
+  it("defaults to GPT + 20 iterations (Phase 8 product alignment)", () => {
+    // The New Job form is the user's main entry point into the tune →
+    // simulate loop. These defaults must match the backend schema defaults
+    // so a user can hit "Create" after only entering an API key.
     renderPage();
     expect(screen.getByLabelText(/Simulator backend/i)).toHaveValue("mock");
-    expect(screen.getByLabelText(/Optimizer strategy/i)).toHaveValue(
-      "heuristic",
-    );
-    expect(screen.getByLabelText(/Max iterations/i)).toHaveValue(5);
+    expect(screen.getByLabelText(/Optimizer strategy/i)).toHaveValue("gpt");
+    expect(screen.getByLabelText(/Max iterations/i)).toHaveValue(20);
     expect(screen.getByLabelText(/Trials per candidate/i)).toHaveValue(3);
     expect(screen.getByLabelText(/Min pass rate/i)).toHaveValue(0.8);
+    // OpenAI API Key field is visible by default because the default
+    // strategy is gpt.
+    expect(screen.getByLabelText(/OpenAI API key/i)).toBeVisible();
   });
 
-  it("shows the OpenAI API key field only when strategy is gpt", () => {
+  it("hides the OpenAI API key field when user selects heuristic", () => {
     renderPage();
-    expect(screen.queryByLabelText(/OpenAI API key/i)).toBeNull();
-    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
-      target: { value: "gpt" },
-    });
     expect(screen.getByLabelText(/OpenAI API key/i)).toBeVisible();
-    expect(screen.getByLabelText(/OpenAI model/i)).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
+      target: { value: "heuristic" },
+    });
+    expect(screen.queryByLabelText(/OpenAI API key/i)).toBeNull();
   });
 
   it("blocks submission when strategy=gpt and api key is blank", async () => {
@@ -143,9 +146,7 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_unused" } as unknown as Job);
     renderPage();
-    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
-      target: { value: "gpt" },
-    });
+    // default strategy is now gpt — just click submit.
     fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
     expect(
       await screen.findByText(/API key required when strategy is gpt/i),
@@ -158,9 +159,6 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_created" } as unknown as Job);
     renderPage();
-    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
-      target: { value: "gpt" },
-    });
     fireEvent.change(screen.getByLabelText(/Simulator backend/i), {
       target: { value: "real_cli" },
     });
@@ -176,6 +174,7 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
     const payload = createSpy.mock.calls[0][0];
     expect(payload.simulator_backend).toBe("real_cli");
     expect(payload.optimizer_strategy).toBe("gpt");
+    expect(payload.max_iterations).toBe(20);
     expect(payload.openai?.api_key).toBe("sk-testing");
     expect(payload.openai?.model).toBe("gpt-4.1");
     expect(payload.acceptance_criteria?.min_pass_rate).toBe(0.8);
@@ -196,6 +195,12 @@ describe("NewJob — failed submission", () => {
 
     // Change a field away from defaults so we can assert it is preserved.
     setNumeric(/Altitude/i, "5.5");
+    // Default strategy is gpt post-Phase-8-alignment; satisfy the
+    // client-side "API key required when strategy is gpt" guard so the
+    // submission actually hits the (mocked) backend.
+    fireEvent.change(screen.getByLabelText(/OpenAI API key/i), {
+      target: { value: "sk-test-for-failure" },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
 

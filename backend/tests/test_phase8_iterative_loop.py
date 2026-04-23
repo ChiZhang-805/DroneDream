@@ -149,25 +149,35 @@ def test_gpt_loop_dispatches_generation_after_baseline(gpt_ctx):
 
 
 def test_gpt_max_iterations_reached_yields_best_so_far(gpt_ctx):
+    # Phase 8 product alignment: a cleanly-completed GPT search that exhausts
+    # the iteration budget returns COMPLETED with the best-so-far report and
+    # an ``optimization_outcome=max_iterations_reached`` marker. FAILED is
+    # reserved for genuine execution failures.
     ctx = gpt_ctx
     job_id = _create_job(ctx, strategy="gpt", target_rmse=0.001, max_iterations=1)
     client = FakeOpenAIClient([_gpt_proposal(1.5), _gpt_proposal(1.8)])
     status = _drive(ctx, job_id, client=client, max_ticks=60)
-    assert status == "FAILED"
+    assert status == "COMPLETED"
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         assert job.optimization_outcome == "max_iterations_reached"
-        assert job.latest_error_code == "MAX_ITERATIONS_REACHED"
+        # No terminal error code is recorded for a clean budget exhaustion —
+        # the UI reads the ``optimization_outcome`` marker instead.
+        assert job.latest_error_code is None
         assert job.best_candidate_id is not None
         assert job.report is not None
 
 
 def test_gpt_failure_falls_through_to_best_so_far(gpt_ctx):
+    # Phase 8 product alignment: an unrecoverable LLM failure with a valid
+    # baseline still produces a best-so-far report; we keep the job COMPLETED
+    # (so the UI surfaces best-so-far) but record ``llm_failed`` so the banner
+    # can explain why no further generations ran.
     ctx = gpt_ctx
     job_id = _create_job(ctx, strategy="gpt", target_rmse=0.001, max_iterations=3)
     client = FakeOpenAIClient([RuntimeError("openai is down")])
     status = _drive(ctx, job_id, client=client, max_ticks=60)
-    assert status == "FAILED"
+    assert status == "COMPLETED"
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         assert job.optimization_outcome in {

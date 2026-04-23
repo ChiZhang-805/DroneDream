@@ -114,8 +114,13 @@ class JobCreateRequest(_Strict):
     objective_profile: ObjectiveProfile = "robust"
 
     simulator_backend: SimulatorBackend = "mock"
-    optimizer_strategy: OptimizerStrategy = "heuristic"
-    max_iterations: Annotated[int, Field(ge=1, le=20)] = 5
+    # Phase 8 product alignment: the default user-facing experience is the
+    # GPT-driven tune→simulate loop. ``heuristic`` is still supported but must
+    # be selected explicitly.
+    optimizer_strategy: OptimizerStrategy = "gpt"
+    # Default budget matches the product story "repeat the loop until a
+    # suitable result is found, or until 20 iterations have been used".
+    max_iterations: Annotated[int, Field(ge=1, le=20)] = 20
     trials_per_candidate: Annotated[int, Field(ge=1, le=10)] = 3
     max_total_trials: Annotated[int, Field(ge=1, le=1000)] = 100
     acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)

@@ -11,6 +11,10 @@ VALID_JOB_PAYLOAD: dict = {
     "wind": {"north": 0, "east": 0, "south": 0, "west": 0},
     "sensor_noise_level": "medium",
     "objective_profile": "robust",
+    # Phase 8 product alignment: the backend default is now GPT + 20
+    # iterations. These integration tests exercise the CRUD/API surface and
+    # do not need an OpenAI key, so they opt into heuristic explicitly.
+    "optimizer_strategy": "heuristic",
 }
 
 
@@ -182,6 +186,79 @@ def test_rerun_creates_new_job_preserving_original(client: TestClient) -> None:
     again = client.get(f"/api/v1/jobs/{original['id']}").json()["data"]
     assert again["id"] == original["id"]
     assert again["source_job_id"] is None
+
+
+def test_create_job_default_optimizer_strategy_is_gpt(
+    client: TestClient, monkeypatch
+) -> None:
+    """Phase 8 product alignment: the backend default is GPT + 20 iterations.
+
+    Because the default now requires an OpenAI key, omitting both
+    ``optimizer_strategy`` and ``openai`` must be rejected with INVALID_INPUT
+    — the schema's defaults are what pushes the job into GPT territory.
+    """
+
+    monkeypatch.setenv("APP_SECRET_KEY", "dev-unit-key")
+    minimal = {
+        "track_type": "circle",
+        "start_point": {"x": 0, "y": 0},
+        "altitude_m": 5.0,
+        "wind": {"north": 0, "east": 0, "south": 0, "west": 0},
+        "sensor_noise_level": "medium",
+        "objective_profile": "robust",
+    }
+    resp = client.post("/api/v1/jobs", json=minimal)
+    assert resp.status_code == 422, resp.text
+    body = resp.json()
+    assert body["error"]["code"] == "INVALID_INPUT"
+    assert "openai.api_key" in body["error"]["message"]
+
+
+def test_create_job_schema_default_max_iterations_is_twenty() -> None:
+    """Unit-level guard: JobCreateRequest default max_iterations is 20."""
+
+    from app import schemas
+
+    req = schemas.JobCreateRequest()
+    assert req.optimizer_strategy == "gpt"
+    assert req.max_iterations == 20
+
+
+def test_rerun_preserves_gpt_strategy_when_new_api_key_supplied(
+    client: TestClient, monkeypatch
+) -> None:
+    """Rerun of a GPT job stays GPT; a fresh OpenAI key must be supplied."""
+
+    monkeypatch.setenv("APP_SECRET_KEY", "dev-unit-key")
+    from app import config as cfg
+
+    cfg.get_settings.cache_clear()
+
+    gpt_payload = {
+        **VALID_JOB_PAYLOAD,
+        "optimizer_strategy": "gpt",
+        "max_iterations": 3,
+        "openai": {"api_key": "sk-original"},
+    }
+    original = client.post("/api/v1/jobs", json=gpt_payload)
+    assert original.status_code == 200, original.text
+    original_job = original.json()["data"]
+
+    # Rerun without a key must fail cleanly.
+    resp_no_key = client.post(f"/api/v1/jobs/{original_job['id']}/rerun", json={})
+    assert resp_no_key.status_code == 422, resp_no_key.text
+    err = resp_no_key.json()["error"]
+    assert err["code"] == "OPENAI_KEY_REQUIRED"
+
+    # Rerun with a fresh key succeeds and keeps optimizer_strategy=gpt.
+    resp = client.post(
+        f"/api/v1/jobs/{original_job['id']}/rerun",
+        json={"openai": {"api_key": "sk-fresh"}},
+    )
+    assert resp.status_code == 200, resp.text
+    new_job = resp.json()["data"]
+    assert new_job["optimizer_strategy"] == "gpt"
+    assert new_job["source_job_id"] == original_job["id"]
 
 
 def test_rerun_not_found(client: TestClient) -> None:

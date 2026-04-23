@@ -82,7 +82,7 @@ def _run_job_to_completion(ctx: dict[str, object]) -> str:
     models = ctx["models"]
     runner = ctx["runner"]
 
-    req = schemas.JobCreateRequest()
+    req = schemas.JobCreateRequest(optimizer_strategy="heuristic")
     with db_module.SessionLocal() as db:
         job_id = jobs_service.create_job(db, req).id
 
@@ -270,7 +270,7 @@ def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
     models = ctx["models"]
 
     with db_module.SessionLocal() as db:
-        job = jobs_service.create_job(db, schemas.JobCreateRequest())
+        job = jobs_service.create_job(db, schemas.JobCreateRequest(optimizer_strategy="heuristic"))
         job_id = job.id
         job_ref = db.get(models.Job, job_id)
         job_ref.status = "FAILED"
@@ -305,7 +305,7 @@ def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
     db_module = ctx["db_module"]
 
     with db_module.SessionLocal() as db:
-        job = jobs_service.create_job(db, schemas.JobCreateRequest())
+        job = jobs_service.create_job(db, schemas.JobCreateRequest(optimizer_strategy="heuristic"))
         job_id = job.id
         jobs_service.cancel_job(db, job_id)
 

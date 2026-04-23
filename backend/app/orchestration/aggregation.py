@@ -317,6 +317,16 @@ def finalize_job_if_ready(
     outcome, terminal_status, terminal_error = _determine_terminal_state(
         job, best, criteria
     )
+    # The iterative GPT loop may have pre-recorded ``llm_failed`` on the job
+    # when the proposer raised an unrecoverable error; preserve that signal
+    # over the generic "no_usable_candidate" the terminal-state helper
+    # returns. ``success`` always wins because the last generation may have
+    # recovered from an earlier transient failure.
+    if (
+        job.optimization_outcome == "llm_failed"
+        and outcome != "success"
+    ):
+        outcome = "llm_failed"
     now = _now()
     job.status = terminal_status
     job.current_phase = "completed" if terminal_status == "COMPLETED" else None
@@ -385,9 +395,14 @@ def _determine_terminal_state(
 ) -> tuple[str, str, tuple[str, str] | None]:
     """Return ``(optimization_outcome, job_status, optional_error)``.
 
-    Heuristic jobs are kept on the Phase 7 happy path (COMPLETED) but are now
-    annotated with an ``optimization_outcome`` so the UI can surface whether
-    the best candidate actually met the user's acceptance criteria.
+    Phase 8 product alignment: a cleanly-finished search — whether heuristic
+    or GPT — is always COMPLETED. ``FAILED`` is reserved for genuine
+    execution/system problems (no baseline, simulator unavailable,
+    unrecoverable LLM failure, …). When the search budget is exhausted
+    without satisfying the acceptance criteria we surface that via
+    ``optimization_outcome`` (``max_iterations_reached`` or
+    ``no_usable_candidate``) and return the best-so-far report as the
+    result.
     """
 
     result = evaluate_candidate(best, criteria)
@@ -400,26 +415,10 @@ def _determine_terminal_state(
         return "success", "COMPLETED", None
     if job.optimizer_strategy == "gpt":
         # GPT exhausted its iteration/trial budget without finding a passing
-        # candidate — report best-so-far via the report but fail the job.
+        # candidate — COMPLETED with best-so-far attached.
         if job.current_generation >= job.max_iterations:
-            return (
-                "max_iterations_reached",
-                "FAILED",
-                (
-                    "MAX_ITERATIONS_REACHED",
-                    "GPT tuning ran the maximum number of iterations without "
-                    "a passing candidate; best-so-far parameters are attached.",
-                ),
-            )
-        return (
-            "no_usable_candidate",
-            "FAILED",
-            (
-                "NO_PASSING_CANDIDATE",
-                "No candidate satisfied the acceptance criteria. "
-                "Best-so-far parameters are attached.",
-            ),
-        )
+            return "max_iterations_reached", "COMPLETED", None
+        return "no_usable_candidate", "COMPLETED", None
     # Heuristic: stay COMPLETED (Phase 7 contract) but flag the outcome.
     return "no_usable_candidate", "COMPLETED", None
 

@@ -31,8 +31,8 @@ Phase 7 behaviour, so existing clients keep working):
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `simulator_backend` | `"mock" \| "real_cli"` | `"mock"` | Which adapter to run trials against. |
-| `optimizer_strategy` | `"heuristic" \| "gpt"` | `"heuristic"` | Source of candidate proposals. |
-| `max_iterations` | int 1–20 | `5` | Max generations after baseline. |
+| `optimizer_strategy` | `"heuristic" \| "gpt"` | `"gpt"` | Source of candidate proposals. The default is GPT to match the "tune → simulate → tune → simulate" product flow. |
+| `max_iterations` | int 1–20 | `20` | Max generations after baseline. Matches the product story "repeat the loop until a suitable result is found, or until 20 iterations have been used". |
 | `trials_per_candidate` | int 1–10 | `3` | Scenarios evaluated per candidate. |
 | `acceptance_criteria.target_rmse` | float \| null | `null` | Skip if `null`. |
 | `acceptance_criteria.target_max_error` | float \| null | `null` | Skip if `null`. |
@@ -199,15 +199,28 @@ controlled failure testing — **it is not** the mock adapter.
      increment `current_generation`.
 3. Each subsequent generation repeats step 2. If the best candidate so far
    still fails after `current_generation == max_iterations` or after
-   `total_trials >= max_total_trials`, the job terminates with:
-   - `optimization_outcome = "max_iterations_reached"` and
-     `latest_error_code = "MAX_ITERATIONS_REACHED"` (or
-     `"NO_PASSING_CANDIDATE"` when no candidate completed any trial).
+   `total_trials >= max_total_trials`, the job terminates **cleanly**:
+   - `status = COMPLETED` (Phase 8 product alignment — budget exhaustion
+     is not a hard failure; the UI shows the best-so-far parameters).
+   - `optimization_outcome = "max_iterations_reached"` when at least one
+     candidate produced usable metrics, or `"no_usable_candidate"` when
+     no candidate completed any trial.
+   - `latest_error_code` / `latest_error` are not set — `FAILED` is reserved
+     for genuine execution failures (simulator unavailable, unrecoverable
+     LLM failure without fallback, malformed result handling, etc.).
    - A best-so-far report is still generated whenever at least one candidate
-     produced usable metrics, and the UI renders it.
-4. If the GPT proposer fails, the job transitions to
-   `optimization_outcome="llm_failed"` with an `llm_proposal_failed` event on
-   the timeline.
+     produced usable metrics, and the UI renders it with a
+     "Search budget exhausted — showing best-so-far parameters" banner.
+4. If the GPT proposer fails in a way that prevents any further progress,
+   the job transitions to `status = FAILED`,
+   `optimization_outcome = "llm_failed"`, with an `llm_proposal_failed`
+   event on the timeline.
+
+**One proposal per generation (Phase 8 product alignment).** The GPT
+proposer emits exactly one candidate per generation after baseline so the
+loop reads as "analyze the last simulation, adjust parameters, simulate
+again". A single proposal is still evaluated over multiple
+seeds / scenarios via `trials_per_candidate`.
 
 **Heuristic mode retains Phase 7 batch semantics** — when
 `optimizer_strategy="heuristic"`, `start_job()` dispatches the baseline
@@ -247,7 +260,7 @@ the LLM, dispatch, repeat until pass / `max_iterations` / `max_total_trials`.
   "type": "object",
   "properties": {
     "proposals": {
-      "type": "array", "minItems": 1, "maxItems": 5,
+      "type": "array", "minItems": 1, "maxItems": 1,
       "items": {
         "type": "object",
         "properties": {
@@ -298,8 +311,9 @@ the LLM, dispatch, repeat until pass / `max_iterations` / `max_total_trials`.
 cd frontend && npm run dev
 ```
 
-Create a job in the UI with the defaults (`simulator_backend=mock`,
-`optimizer_strategy=heuristic`).
+Create a job in the UI with `simulator_backend=mock` and
+`optimizer_strategy=heuristic` (the default strategy is GPT — select
+`heuristic` explicitly for this demo).
 
 ### 5.2 real_cli + heuristic
 

@@ -121,8 +121,12 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
         criteria = ctx["acceptance"].criteria_for_job(job)
         result = ctx["proposer"].propose_candidates(db, job, criteria, client=fake)
         db.commit()
+        # Phase 8 product alignment: the proposer now emits exactly one
+        # candidate per generation (one tune → one simulation round). Even
+        # if the client returns more than one, only the first is kept and
+        # clamped into the safe range.
         assert result.error is None
-        assert len(result.proposals) == 2
+        assert len(result.proposals) == 1
         first = result.proposals[0]
         assert first.parameters["kp_xy"] == 2.5
         assert first.parameters["kd_xy"] == 0.05
@@ -228,6 +232,82 @@ def test_secret_is_never_returned_in_job_response(llm_ctx):
         resp = jobs_service.to_job_schema(job).model_dump()
     flat = repr(resp)
     assert "sk-test-unit" not in flat
+
+
+def test_proposer_prompt_includes_per_trial_feedback(llm_ctx):
+    """Phase 8 product alignment: the proposer prompt must surface compact
+    per-trial feedback (scenario, pass_flag, failure_code, …) for the latest
+    generation so the model can diagnose which scenario(s) failed.
+
+    We drive one generation via the real aggregation pipeline so the DB has
+    a baseline candidate with trial rows, then inspect what the proposer
+    sent to ``client.generate(user=...)``.
+    """
+
+    import json as _json
+    import sys as _sys
+
+    ctx = llm_ctx
+    # Import the runner lazily to share the fresh DB created in the fixture.
+    runner = _sys.modules.get("app.orchestration.runner")
+    if runner is None:
+        import app.orchestration.runner as runner  # type: ignore[import-not-found]
+
+    job_id = _create_gpt_job(ctx)
+    # Advance the baseline generation so candidates have trial rows.
+    for _ in range(15):
+        runner.tick("proposer-feedback-worker")
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            if (job.current_generation or 0) >= 0 and any(
+                c.trial_count > 0 for c in job.candidates
+            ):
+                break
+
+    fake = FakeOpenAIClient(
+        {
+            "proposals": [
+                {
+                    "label": "fb_probe",
+                    "rationale": "test",
+                    "parameters": {
+                        "kp_xy": 1.0,
+                        "kd_xy": 0.2,
+                        "ki_xy": 0.05,
+                        "vel_limit": 5.0,
+                        "accel_limit": 4.0,
+                        "disturbance_rejection": 0.5,
+                    },
+                }
+            ]
+        }
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        criteria = ctx["acceptance"].criteria_for_job(job)
+        ctx["proposer"].propose_candidates(db, job, criteria, client=fake)
+        db.commit()
+
+    assert fake.calls, "proposer must have invoked the fake client"
+    payload = _json.loads(fake.calls[-1]["user"])
+    assert payload["current_generation"] is not None
+    assert "baseline_feedback" in payload
+    assert "latest_generation_feedback" in payload
+    # Per-trial rows must expose the fields the product spec calls out.
+    baseline = payload["baseline_feedback"]
+    assert baseline is not None and "trials" in baseline
+    if baseline["trials"]:
+        row = baseline["trials"][0]
+        for key in (
+            "scenario_type",
+            "pass_flag",
+            "rmse",
+            "max_error",
+            "completion_time",
+            "final_error",
+            "failure_code",
+        ):
+            assert key in row, f"per-trial feedback must include '{key}'"
 
 
 def test_job_response_exposes_phase8_fields(llm_ctx):

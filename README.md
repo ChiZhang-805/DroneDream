@@ -8,18 +8,34 @@ parameter set, and surfaces baseline-vs-optimized metrics, best parameters,
 charts, summary text, failure details, rerun, and job history in the UI.
 
 > **Status:** Phase 8 — real simulator adapter + iterative GPT parameter
-> tuning, layered on top of the Phase 7 MVP. Phase 7 behaviour is
-> unchanged: mock + heuristic jobs still run baseline + optimizer trials
-> end-to-end and emit a READY `JobReport`. New in Phase 8: per-job
-> `simulator_backend` (`mock` or `real_cli`), per-job `optimizer_strategy`
-> (`heuristic` or `gpt`), acceptance criteria, an iterative
-> simulate-analyze-retune loop, and an OpenAI-backed parameter proposer
-> whose API key is stored encrypted and used **server-side only**. See
+> tuning, layered on top of the Phase 7 MVP. The default user flow is now
+> **GPT-first**: users paste their own OpenAI API key, the backend runs a
+> baseline simulation, and if acceptance criteria are not met the server
+> calls GPT again with per-trial feedback, GPT proposes one new candidate,
+> the worker re-simulates, and the `tune → simulate → tune → simulate`
+> loop repeats until either the criteria are met or the 20-iteration
+> budget is exhausted. Heuristic jobs (`optimizer_strategy=heuristic`)
+> remain available — they preserve the Phase 7 batch behaviour. New in
+> Phase 8: per-job `simulator_backend` (`mock` or `real_cli`), per-job
+> `optimizer_strategy` (`gpt` default or `heuristic`), acceptance
+> criteria, an iterative simulate-analyze-retune loop, and an
+> OpenAI-backed parameter proposer whose API key is stored encrypted and
+> used **server-side only**. See
 > [`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md)
 > for the full Phase 8 spec (adapter protocol, acceptance logic, env vars,
 > demos) and [`docs/ACCEPTANCE_REPORT.md`](docs/ACCEPTANCE_REPORT.md) for
 > the Phase 7 acceptance coverage. Real PX4/Gazebo, auth, PDF export, and
 > the advanced track editor remain explicitly out of scope.
+>
+> **Defaults after Phase 8 product alignment:** `optimizer_strategy=gpt`,
+> `max_iterations=20`. Budget-exhausted searches return **`COMPLETED`** with
+> `optimization_outcome=max_iterations_reached` (or `no_usable_candidate`)
+> and a best-so-far report; `FAILED` is reserved for genuine execution
+> failures (simulator unavailable, unrecoverable LLM failure, etc.).
+> Rerunning a GPT job keeps `optimizer_strategy=gpt` and requires a fresh
+> OpenAI API key — the original encrypted key is purged on termination.
+> `APP_SECRET_KEY` is the **server-side** encryption key for per-job
+> OpenAI keys; it is **not** the user's OpenAI API key.
 
 ## Repo layout
 
@@ -196,12 +212,12 @@ export REAL_SIMULATOR_ARTIFACT_ROOT="$(pwd)/.artifacts"
 ./scripts/dev-worker.sh
 ```
 
-Then in the **New Job** form pick `Simulator Backend = real_cli` (default
-optimizer strategy is `heuristic`). Heuristic jobs keep the Phase 7 batch
-behaviour — baseline and all heuristic optimizer candidates are dispatched
-up front, then acceptance criteria annotate `optimization_outcome`. Only
-GPT jobs (`optimizer_strategy=gpt`) use the iterative generation-by-
-generation loop described in
+Then in the **New Job** form pick `Simulator Backend = real_cli` and
+`Optimizer Strategy = heuristic` (the default is GPT). Heuristic jobs
+keep the Phase 7 batch behaviour — baseline and all heuristic optimizer
+candidates are dispatched up front, then acceptance criteria annotate
+`optimization_outcome`. GPT jobs (`optimizer_strategy=gpt`, the default)
+use the iterative one-proposal-per-generation loop described in
 [`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md).
 
 ### End-to-end demo (Phase 8: GPT parameter tuning)

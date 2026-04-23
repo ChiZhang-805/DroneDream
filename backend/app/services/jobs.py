@@ -194,13 +194,42 @@ def get_job(db: Session, job_id: str) -> models.Job:
     return job
 
 
-def rerun_job(db: Session, job_id: str) -> models.Job:
+def rerun_job(
+    db: Session,
+    job_id: str,
+    *,
+    openai: schemas.OpenAIConfig | None = None,
+) -> models.Job:
+    """Create a new QUEUED job cloning the source job's configuration.
+
+    Phase 8 product alignment: GPT-tuned jobs are **not** silently downgraded
+    to heuristic. Since terminal jobs purge their stored OpenAI API key, the
+    caller must supply a fresh ``openai.api_key`` via the ``rerun`` payload
+    (see :func:`app.routers.jobs.rerun_job`) to rerun a GPT job. Heuristic
+    jobs remain heuristic with no extra input.
+    """
+
     source = get_job(db, job_id)
-    strategy: schemas.OptimizerStrategy = (
-        "heuristic"
-        if source.optimizer_strategy == "gpt"
-        else source.optimizer_strategy  # type: ignore[assignment]
-    )
+    strategy: schemas.OptimizerStrategy = source.optimizer_strategy  # type: ignore[assignment]
+    effective_openai = openai
+    if effective_openai is not None and effective_openai.model is None and source.openai_model:
+        effective_openai = schemas.OpenAIConfig(
+            api_key=effective_openai.api_key,
+            model=source.openai_model,
+        )
+    if strategy == "gpt" and (
+        effective_openai is None or not effective_openai.api_key
+    ):
+        raise JobServiceError(
+            "OPENAI_KEY_REQUIRED",
+            (
+                "This job was run with optimizer_strategy=gpt. Re-submit "
+                "the rerun request with a fresh openai.api_key — stored "
+                "keys are wiped when the source job reaches a terminal "
+                "state."
+            ),
+            http_status=422,
+        )
     req = schemas.JobCreateRequest(
         track_type=source.track_type,  # type: ignore[arg-type]
         start_point=schemas.StartPoint(x=source.start_point_x, y=source.start_point_y),
@@ -223,7 +252,9 @@ def rerun_job(db: Session, job_id: str) -> models.Job:
             target_max_error=source.target_max_error,
             min_pass_rate=source.min_pass_rate,
         ),
+        openai=effective_openai,
     )
+    _validate_gpt_request(req)
     new_job = _create_job_from_config(db, req=req, source_job_id=source.id)
     db.commit()
     db.refresh(new_job)

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -261,6 +261,119 @@ describe("JobDetail — Phase 8 best-so-far rendering for FAILED jobs", () => {
     expect(screen.getByText("FAIL")).toBeInTheDocument();
     // Trials with no metric render a dash in the Pass column.
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+
+  it("shows a 'search budget exhausted' banner for COMPLETED + max_iterations_reached", async () => {
+    // Phase 8 product alignment: a cleanly-completed GPT search that
+    // exhausted its iteration budget returns COMPLETED (not FAILED) and the
+    // UI must explain that best-so-far parameters are shown.
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "gpt",
+      max_iterations: 20,
+      optimization_outcome: "max_iterations_reached",
+      best_candidate_id: "cand_best",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(
+      await screen.findByText(/Search budget exhausted — showing best-so-far/i),
+    ).toBeInTheDocument();
+    // Baseline-vs-optimized comparison still renders.
+    expect(
+      screen.getByText(/Best-so-far: Baseline vs Optimized comparison/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows an 'Acceptance criteria satisfied' banner for COMPLETED + success", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "gpt",
+      optimization_outcome: "success",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(
+      await screen.findByText(/Acceptance criteria satisfied/i),
+    ).toBeInTheDocument();
+  });
+
+  it("rerunning a GPT job prompts for a fresh OpenAI key and forwards it", async () => {
+    // Phase 8 product alignment: GPT reruns must not silently reuse the old
+    // encrypted key (which was purged when the job terminated) nor silently
+    // downgrade to heuristic.
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "gpt",
+      optimization_outcome: "max_iterations_reached",
+      openai_model: "gpt-4.1",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+    const rerunSpy = vi
+      .spyOn(apiClient, "rerunJob")
+      .mockResolvedValue({ ...job, id: "job_rerun" });
+
+    renderWithJob(job.id);
+
+    // Step 1: header button is labelled for GPT reruns.
+    const openBtn = await screen.findByRole("button", {
+      name: /Rerun with new API key/i,
+    });
+    fireEvent.click(openBtn);
+
+    // Step 2: submitting without a key surfaces the error, not a network call.
+    const confirmBtn = await screen.findByRole("button", {
+      name: /Confirm GPT rerun/i,
+    });
+    fireEvent.click(confirmBtn);
+    expect(
+      await screen.findByText(/Please enter a fresh OpenAI API key/i),
+    ).toBeInTheDocument();
+    expect(rerunSpy).not.toHaveBeenCalled();
+
+    // Step 3: with a key, we POST the new key and stay on optimizer=gpt.
+    fireEvent.change(screen.getByLabelText(/OpenAI API Key/i), {
+      target: { value: "sk-fresh" },
+    });
+    fireEvent.click(confirmBtn);
+    await waitFor(() => expect(rerunSpy).toHaveBeenCalledTimes(1));
+    expect(rerunSpy).toHaveBeenCalledWith(job.id, {
+      openai: { api_key: "sk-fresh", model: null },
+    });
+  });
+
+  it("rerunning a heuristic job does not prompt and just POSTs rerun", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "heuristic",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+    const rerunSpy = vi
+      .spyOn(apiClient, "rerunJob")
+      .mockResolvedValue({ ...job, id: "job_rerun" });
+
+    renderWithJob(job.id);
+
+    const rerunBtn = await screen.findByRole("button", { name: /^Rerun$/ });
+    fireEvent.click(rerunBtn);
+    await waitFor(() => expect(rerunSpy).toHaveBeenCalledTimes(1));
+    expect(rerunSpy).toHaveBeenCalledWith(job.id, undefined);
   });
 
   it("shows the classic failure banner when FAILED job has no report", async () => {

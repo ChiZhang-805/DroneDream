@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -7,6 +8,7 @@ import type {
   Job,
   JobEventInfo,
   JobReport,
+  OpenAIConfig,
   TrialSummary,
 } from "../types/api";
 import { isActiveJobStatus, formatDateTime, formatNumber } from "../utils/format";
@@ -121,7 +123,11 @@ export function JobDetail() {
   const safeId = jobId ?? "";
 
   const rerunMutation = useMutation({
-    mutationFn: (id: string) => apiClient.rerunJob(id),
+    mutationFn: (args: { id: string; openai?: OpenAIConfig | null }) =>
+      apiClient.rerunJob(
+        args.id,
+        args.openai !== undefined ? { openai: args.openai } : undefined,
+      ),
     onSuccess: (newJob) => {
       queryClient.invalidateQueries({ queryKey: ["jobs", "dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["jobs", "history"] });
@@ -213,7 +219,7 @@ export function JobDetail() {
     <section className="stack-md">
       <JobHeader
         job={job}
-        onRerun={() => rerunMutation.mutate(job.id)}
+        onRerun={(openai) => rerunMutation.mutate({ id: job.id, openai })}
         onCancel={() => cancelMutation.mutate(job.id)}
         rerunPending={rerunMutation.isPending}
         cancelPending={cancelMutation.isPending}
@@ -245,7 +251,12 @@ export function JobDetail() {
         <>
           <SectionCard
             title={
-              job.status === "FAILED"
+              // Phase 8 product alignment: budget-exhausted jobs are now
+              // COMPLETED (not FAILED) but still show best-so-far results,
+              // so surface the "Best-so-far" label for those too.
+              job.status === "FAILED" ||
+              job.optimization_outcome === "max_iterations_reached" ||
+              job.optimization_outcome === "no_usable_candidate"
                 ? "Best-so-far: Baseline vs Optimized comparison"
                 : "Baseline vs Optimized comparison"
             }
@@ -322,12 +333,39 @@ function JobHeader({
   canCancel,
 }: {
   job: Job;
-  onRerun: () => void;
+  onRerun: (openai: OpenAIConfig | null | undefined) => void;
   onCancel: () => void;
   rerunPending: boolean;
   cancelPending: boolean;
   canCancel: boolean;
 }) {
+  const isGpt = job.optimizer_strategy === "gpt";
+  const [rerunOpen, setRerunOpen] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [modelOverride, setModelOverride] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  function handleRerunClick() {
+    if (isGpt) {
+      setRerunOpen((prev) => !prev);
+      setFormError(null);
+      return;
+    }
+    onRerun(undefined);
+  }
+
+  function handleConfirmGptRerun() {
+    const trimmed = apiKey.trim();
+    if (trimmed === "") {
+      setFormError(
+        "Please enter a fresh OpenAI API key. The key from the original job is wiped once it finishes.",
+      );
+      return;
+    }
+    const modelTrim = modelOverride.trim();
+    onRerun({ api_key: trimmed, model: modelTrim === "" ? null : modelTrim });
+  }
+
   return (
     <header className="page-header">
       <div>
@@ -357,12 +395,92 @@ function JobHeader({
         <button
           type="button"
           className="btn btn-primary"
-          onClick={onRerun}
+          onClick={handleRerunClick}
           disabled={rerunPending}
+          aria-expanded={isGpt ? rerunOpen : undefined}
         >
-          {rerunPending ? "Rerunning…" : "Rerun"}
+          {rerunPending
+            ? "Rerunning…"
+            : isGpt
+              ? rerunOpen
+                ? "Cancel rerun"
+                : "Rerun with new API key"
+              : "Rerun"}
         </button>
       </div>
+      {isGpt && rerunOpen ? (
+        <div
+          className="stack-md"
+          style={{ gridColumn: "1 / -1", width: "100%" }}
+          aria-label="Rerun GPT job"
+        >
+          <SectionCard
+            title="Rerun this GPT job"
+            description="GPT jobs keep their optimizer strategy on rerun. Please provide a fresh OpenAI API key — the original job's encrypted key was wiped when it finished."
+          >
+            <div className="form-grid">
+              <div className="form-field">
+                <label htmlFor="rerun_api_key" className="form-field-required">
+                  OpenAI API Key
+                </label>
+                <input
+                  id="rerun_api_key"
+                  type="password"
+                  autoComplete="off"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <span className="form-hint">
+                  Sent to the backend over HTTPS, stored encrypted for the
+                  duration of the new job, and purged on completion.
+                </span>
+              </div>
+              <div className="form-field">
+                <label htmlFor="rerun_model">OpenAI Model (optional)</label>
+                <input
+                  id="rerun_model"
+                  type="text"
+                  value={modelOverride}
+                  onChange={(e) => setModelOverride(e.target.value)}
+                  placeholder={job.openai_model ?? ""}
+                />
+                <span className="form-hint">
+                  Leave blank to reuse{" "}
+                  <code>{job.openai_model ?? "the backend default"}</code>.
+                </span>
+              </div>
+            </div>
+            {formError ? (
+              <Alert tone="danger" title="Cannot rerun yet">
+                {formError}
+              </Alert>
+            ) : null}
+            <div className="form-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleConfirmGptRerun}
+                disabled={rerunPending}
+              >
+                {rerunPending ? "Submitting…" : "Confirm GPT rerun"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setRerunOpen(false);
+                  setApiKey("");
+                  setModelOverride("");
+                  setFormError(null);
+                }}
+                disabled={rerunPending}
+              >
+                Cancel
+              </button>
+            </div>
+          </SectionCard>
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -569,12 +687,47 @@ function StatusSpecificTop({
       </Alert>
     );
   }
-  if (job.status === "COMPLETED" && !report) {
-    return (
-      <Alert tone="info" title="Loading report…">
-        Fetching the final report.
-      </Alert>
-    );
+  if (job.status === "COMPLETED") {
+    if (!report) {
+      return (
+        <Alert tone="info" title="Loading report…">
+          Fetching the final report.
+        </Alert>
+      );
+    }
+    const outcome = job.optimization_outcome;
+    if (outcome === "max_iterations_reached" || outcome === "no_usable_candidate") {
+      const reason =
+        outcome === "max_iterations_reached"
+          ? `the ${job.max_iterations}-iteration tuning budget was exhausted`
+          : "no candidate produced usable metrics";
+      return (
+        <Alert
+          tone="warning"
+          title="Search budget exhausted — showing best-so-far parameters"
+        >
+          The optimizer stopped because {reason}. The best-so-far parameters
+          and their baseline-vs-optimized metrics are shown below — they are
+          the best candidate observed, not a fully accepted solution.
+        </Alert>
+      );
+    }
+    if (outcome === "llm_failed") {
+      return (
+        <Alert tone="warning" title="GPT proposer failed — best-so-far shown">
+          The GPT parameter proposer failed and the job fell back to the
+          best-so-far candidate. See the diagnostics log for the raw error.
+        </Alert>
+      );
+    }
+    if (outcome === "success") {
+      return (
+        <Alert tone="success" title="Acceptance criteria satisfied">
+          A candidate met all configured acceptance criteria.
+        </Alert>
+      );
+    }
+    return null;
   }
   return null;
 }

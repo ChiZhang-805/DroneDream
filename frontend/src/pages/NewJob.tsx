@@ -44,6 +44,10 @@ interface FormState {
   openai_model: string;
 }
 
+// Phase 8 product alignment: the default new-job flow is GPT-driven with a
+// 20-iteration tuning budget. Heuristic remains available but must be
+// selected explicitly. The OpenAI API key is still required only when
+// strategy = gpt.
 const DEFAULTS: FormState = {
   track_type: "circle",
   start_x: "0",
@@ -56,8 +60,8 @@ const DEFAULTS: FormState = {
   sensor_noise_level: "medium",
   objective_profile: "robust",
   simulator_backend: "mock",
-  optimizer_strategy: "heuristic",
-  max_iterations: "5",
+  optimizer_strategy: "gpt",
+  max_iterations: "20",
   trials_per_candidate: "3",
   target_rmse: "0.5",
   target_max_error: "",

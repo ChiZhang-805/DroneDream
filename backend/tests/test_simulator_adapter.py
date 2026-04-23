@@ -308,7 +308,9 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
 def _create_queued_job(ctx):
     with ctx["db_module"].SessionLocal() as db:
-        job = ctx["jobs_service"].create_job(db, ctx["schemas"].JobCreateRequest())
+        job = ctx["jobs_service"].create_job(
+            db, ctx["schemas"].JobCreateRequest(optimizer_strategy="heuristic")
+        )
         return job.id
 
 

@@ -9,6 +9,7 @@ import type {
   JobCreateRequest,
   JobReport,
   JobStatus,
+  OpenAIConfig,
   PaginatedJobs,
   Trial,
   TrialSummary,
@@ -151,9 +152,17 @@ export const apiClient = {
     });
   },
 
-  async rerunJob(jobId: string): Promise<Job> {
+  async rerunJob(
+    jobId: string,
+    body?: { openai?: OpenAIConfig | null },
+  ): Promise<Job> {
+    const payload: Record<string, unknown> = {};
+    if (body?.openai !== undefined) {
+      payload.openai = body.openai;
+    }
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/rerun`, {
       method: "POST",
+      body: Object.keys(payload).length > 0 ? JSON.stringify(payload) : "{}",
     });
   },
 };
