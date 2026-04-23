@@ -114,6 +114,7 @@ def _aggregate_candidate(
     candidate.trial_count = len(trials)
     candidate.completed_trial_count = len(completed_trials)
     candidate.failed_trial_count = sum(1 for t in trials if t.status == "FAILED")
+    passing_trial_count = sum(1 for m in metrics if m.pass_flag)
 
     if not metrics:
         candidate.aggregated_metric_json = None
@@ -143,6 +144,11 @@ def _aggregate_candidate(
         "trial_count": len(trials),
         "completed_trial_count": len(completed_trials),
         "failed_trial_count": candidate.failed_trial_count,
+        # Phase 8 polish: the "pass rate" that drives the acceptance check is
+        # the fraction of dispatched trials whose per-trial pass_flag is true,
+        # NOT the execution-completion ratio. Persisting it here keeps
+        # acceptance.evaluate_candidate and the UI in sync.
+        "passing_trial_count": passing_trial_count,
     }
     candidate.aggregated_metric_json = agg
     candidate.aggregated_score = aggregated_score

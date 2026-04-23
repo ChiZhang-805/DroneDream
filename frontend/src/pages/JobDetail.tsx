@@ -55,6 +55,24 @@ function CandidateCell({ t }: { t: TrialSummary }) {
   );
 }
 
+// Phase 8 polish: a trial's `status` (COMPLETED / FAILED / ...) only says
+// whether the trial executed; `pass_flag` says whether it met per-trial
+// acceptance (within error envelopes, no instability/crash/timeout). We
+// render both so users can see at a glance which completed trials actually
+// passed. ``null`` means the trial has no metric yet (queued/running or a
+// hard failure without metrics) and is rendered as "—".
+function PassBadge({ pass_flag }: { pass_flag: boolean | null }) {
+  if (pass_flag === null) return <span className="form-hint">—</span>;
+  return (
+    <span
+      className={`candidate-tag candidate-tag-${pass_flag ? "best" : "baseline"}`}
+      aria-label={pass_flag ? "Trial passed" : "Trial failed"}
+    >
+      {pass_flag ? "PASS" : "FAIL"}
+    </span>
+  );
+}
+
 const TRIAL_COLUMNS: Column<TrialSummary>[] = [
   {
     key: "id",
@@ -76,6 +94,11 @@ const TRIAL_COLUMNS: Column<TrialSummary>[] = [
     key: "status",
     header: "Status",
     render: (t) => <StatusBadge status={t.status} />,
+  },
+  {
+    key: "pass",
+    header: "Pass",
+    render: (t) => <PassBadge pass_flag={t.pass_flag} />,
   },
   {
     key: "score",
@@ -424,7 +447,11 @@ function ExecutionBackendCard({ job }: { job: Job }) {
             {ac.target_max_error !== null ? (
               <>max error ≤ {formatNumber(ac.target_max_error)} m · </>
             ) : null}
-            pass rate ≥ {Math.round(ac.min_pass_rate * 100)}%
+            {/* Phase 8 polish: "pass rate" means the per-trial pass_flag rate
+                (fraction of dispatched trials whose pass_flag is true), NOT
+                the execution-completion ratio. The outcome only reports
+                "success" when this rate meets the threshold. */}
+            trial pass rate ≥ {Math.round(ac.min_pass_rate * 100)}%
           </span>
         </li>
         {job.optimization_outcome ? (

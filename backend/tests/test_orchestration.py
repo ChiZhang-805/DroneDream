@@ -251,6 +251,11 @@ def test_runner_drives_job_to_completed(orchestration_ctx):
         assert baseline.completed_trial_count == 4
         assert baseline.failed_trial_count == 0
         assert baseline.rank_in_job is not None
+        # Phase 8 polish: aggregation must surface the per-trial pass_flag
+        # count so the acceptance evaluator can judge "did the candidate
+        # actually pass" separately from "did the candidate's trials run".
+        assert "passing_trial_count" in baseline.aggregated_metric_json
+        assert isinstance(baseline.aggregated_metric_json["passing_trial_count"], int)
 
         # Every optimizer candidate must have its own aggregate + rank.
         optimizer_candidates = [c for c in job.candidates if not c.is_baseline]
