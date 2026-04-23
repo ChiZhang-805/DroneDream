@@ -583,7 +583,7 @@ export function NewJob() {
               required
               error={errors.min_pass_rate}
               htmlFor="min_pass_rate"
-              hint="Fraction of trials that must complete for a candidate to be accepted."
+              hint="Fraction of trials that must pass (pass_flag=true) for a candidate to be accepted."
             >
               <input
                 id="min_pass_rate"

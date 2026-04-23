@@ -164,6 +164,7 @@ describe("JobDetail — Phase 8 best-so-far rendering for FAILED jobs", () => {
         scenario_type: "nominal",
         status: "COMPLETED",
         score: 0.9,
+        pass_flag: true,
         candidate_label: "llm_v1",
         candidate_source_type: "llm_optimizer",
         candidate_is_baseline: false,
@@ -177,6 +178,7 @@ describe("JobDetail — Phase 8 best-so-far rendering for FAILED jobs", () => {
         scenario_type: "nominal",
         status: "COMPLETED",
         score: 1.1,
+        pass_flag: true,
         candidate_label: "heur_v1",
         candidate_source_type: "optimizer",
         candidate_is_baseline: false,
@@ -197,6 +199,68 @@ describe("JobDetail — Phase 8 best-so-far rendering for FAILED jobs", () => {
     expect(screen.getByText("Best")).toBeInTheDocument();
     // The llm_optimizer row is NOT mislabeled as Baseline.
     expect(screen.queryByText(/Baseline$/)).toBeNull();
+  });
+
+  it("renders a PASS/FAIL badge per completed trial based on pass_flag", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    const trials: TrialSummary[] = [
+      {
+        id: "tri_pass",
+        candidate_id: "cand_base",
+        seed: 1,
+        scenario_type: "nominal",
+        status: "COMPLETED",
+        score: 0.4,
+        pass_flag: true,
+        candidate_label: "baseline",
+        candidate_source_type: "baseline",
+        candidate_is_baseline: true,
+        candidate_is_best: false,
+        candidate_generation_index: 0,
+      },
+      {
+        id: "tri_fail",
+        candidate_id: "cand_opt",
+        seed: 2,
+        scenario_type: "wind_perturbed",
+        status: "COMPLETED",
+        score: 0.7,
+        // Phase 8 polish: trial executed successfully (status=COMPLETED) but
+        // did not satisfy per-trial acceptance (pass_flag=false). The PASS
+        // column must surface this without opening Trial Detail.
+        pass_flag: false,
+        candidate_label: "opt_v1",
+        candidate_source_type: "optimizer",
+        candidate_is_baseline: false,
+        candidate_is_best: true,
+        candidate_generation_index: 1,
+      },
+      {
+        id: "tri_nometric",
+        candidate_id: "cand_opt",
+        seed: 3,
+        scenario_type: "nominal",
+        status: "FAILED",
+        score: null,
+        pass_flag: null,
+        candidate_label: "opt_v1",
+        candidate_source_type: "optimizer",
+        candidate_is_baseline: false,
+        candidate_is_best: false,
+        candidate_generation_index: 1,
+      },
+    ];
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue(trials);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByText("PASS")).toBeInTheDocument();
+    expect(screen.getByText("FAIL")).toBeInTheDocument();
+    // Trials with no metric render a dash in the Pass column.
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
   });
 
   it("shows the classic failure banner when FAILED job has no report", async () => {

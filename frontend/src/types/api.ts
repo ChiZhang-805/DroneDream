@@ -214,6 +214,10 @@ export interface TrialSummary {
   scenario_type: ScenarioType;
   status: TrialStatus;
   score: number | null;
+  // Phase 8 polish: per-trial pass/fail exposed so the Job Detail trial
+  // table can render PASS / FAIL in addition to COMPLETED. ``null`` means
+  // "no metric yet" (queued/running/failed-without-metrics).
+  pass_flag: boolean | null;
   // Phase 5: candidate metadata exposed so the trial table can distinguish
   // baseline from optimizer rows and highlight the best candidate.
   candidate_label: string | null;

@@ -184,21 +184,69 @@ function TrialArtifactsSection({
   artifacts: Artifact[];
   isLoading: boolean;
 }) {
+  // Phase 8 polish: the job artifacts endpoint returns both job-scoped and
+  // trial-scoped artifacts with ``owner_type`` preserved. For real_cli jobs
+  // the worker persists trajectory_plot / telemetry_json / worker_log under
+  // owner_type="trial", owner_id=<trial.id>. We surface those here so the
+  // Trial Detail page shows real artifact metadata instead of mock-only
+  // placeholders. Job-scoped artifacts are still listed below so users can
+  // reach the job report from the trial page.
+  const trialArtifacts = artifacts.filter(
+    (a) => a.owner_type === "trial" && a.owner_id === trial.id,
+  );
+  const jobArtifacts = artifacts.filter((a) => a.owner_type === "job");
+  const total = trialArtifacts.length + jobArtifacts.length;
   return (
     <SectionCard
       title="Artifacts"
       description={
-        `Metadata for the parent job's artifacts. Trial-level files are` +
-        ` mock-only in the MVP (scenario ${trial.scenario_type}, seed ${trial.seed}).`
+        `Artifacts for this trial (scenario ${trial.scenario_type}, seed ${trial.seed})` +
+        ` and for its parent job.`
       }
     >
       {isLoading ? (
         <Loading label="Loading artifacts…" />
-      ) : artifacts.length === 0 ? (
+      ) : total === 0 ? (
         <Empty
           title="No artifacts yet"
           description="Artifacts become available after the parent job completes."
         />
+      ) : (
+        <div className="stack-md">
+          <ArtifactList
+            heading={`Trial artifacts (${trialArtifacts.length})`}
+            artifacts={trialArtifacts}
+            emptyNote={
+              trial.simulator_backend === "mock"
+                ? "The mock simulator does not produce per-trial artifact files."
+                : "No trial-level artifacts were recorded for this trial."
+            }
+          />
+          <ArtifactList
+            heading={`Job artifacts (${jobArtifacts.length})`}
+            artifacts={jobArtifacts}
+            emptyNote="The job has not produced shared artifacts yet."
+          />
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function ArtifactList({
+  heading,
+  artifacts,
+  emptyNote,
+}: {
+  heading: string;
+  artifacts: Artifact[];
+  emptyNote: string;
+}) {
+  return (
+    <div>
+      <h3 className="section-subheading">{heading}</h3>
+      {artifacts.length === 0 ? (
+        <p className="form-hint">{emptyNote}</p>
       ) : (
         <ul className="kv-list">
           {artifacts.map((a) => (
@@ -216,7 +264,7 @@ function TrialArtifactsSection({
           ))}
         </ul>
       )}
-    </SectionCard>
+    </div>
   );
 }
 

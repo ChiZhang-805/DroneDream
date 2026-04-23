@@ -95,6 +95,22 @@ def test_real_cli_succeeds_against_example_simulator(monkeypatch, tmp_path):
     assert payload["wind"] == payload["job_config"]["wind"]
     assert payload["sensor_noise_level"] == payload["job_config"]["sensor_noise_level"]
     assert payload["objective_profile"] == payload["job_config"]["objective_profile"]
+    # Phase 8 polish: the example simulator emits real per-trial artifact
+    # files alongside trial_result.json, so the adapter must surface them in
+    # TrialResult.artifacts. The trial_executor persists these with
+    # owner_type="trial" so the UI can show real artifact metadata instead
+    # of mock-only placeholders.
+    assert (run_dir / "trajectory.json").exists()
+    assert (run_dir / "telemetry.json").exists()
+    assert (run_dir / "worker.log").exists()
+    assert {a.artifact_type for a in result.artifacts} == {
+        "trajectory_plot",
+        "telemetry_json",
+        "worker_log",
+    }
+    for a in result.artifacts:
+        assert Path(a.storage_path).exists()
+        assert a.file_size_bytes is None or a.file_size_bytes > 0
 
 
 def test_real_cli_maps_timeout(monkeypatch, tmp_path):

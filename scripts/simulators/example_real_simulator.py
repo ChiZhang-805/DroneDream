@@ -44,6 +44,79 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _emit_artifacts(
+    payload: dict[str, Any],
+    run_dir: Path,
+    metrics: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Write per-trial artifact files next to ``trial_result.json``.
+
+    These are the files the DroneDream UI surfaces on Trial Detail as real
+    trial-level artifacts (owner_type="trial"). Writing them here proves the
+    subprocess path persists real files, not mock placeholders.
+    """
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    trial_id = str(payload.get("trial_id", "unknown_trial"))
+    scenario = payload.get("scenario_type", "nominal")
+
+    telem_path = run_dir / "telemetry.json"
+    with telem_path.open("w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "trial_id": trial_id,
+                "scenario": scenario,
+                "metrics": metrics,
+                "parameters": payload.get("parameters", {}),
+            },
+            f,
+            indent=2,
+            sort_keys=True,
+        )
+
+    traj_path = run_dir / "trajectory.json"
+    # Minimal deterministic trajectory — enough to prove the file exists.
+    # A real wrapper would write a real trajectory file / PNG.
+    samples = [
+        {"t": round(i * 0.1, 2), "x": round(i * 0.05, 3), "y": round(i * 0.05, 3)}
+        for i in range(0, 20)
+    ]
+    with traj_path.open("w", encoding="utf-8") as f:
+        json.dump({"trial_id": trial_id, "samples": samples}, f, indent=2, sort_keys=True)
+
+    log_path = run_dir / "worker.log"
+    with log_path.open("w", encoding="utf-8") as f:
+        f.write(
+            f"[example_real_simulator] trial={trial_id} scenario={scenario}\n"
+            f"rmse={metrics.get('rmse')} score={metrics.get('score')} "
+            f"pass_flag={metrics.get('pass_flag')}\n"
+        )
+
+    return [
+        {
+            "artifact_type": "trajectory_plot",
+            "display_name": "Trajectory (samples)",
+            "storage_path": str(traj_path),
+            "mime_type": "application/json",
+            "file_size_bytes": traj_path.stat().st_size,
+        },
+        {
+            "artifact_type": "telemetry_json",
+            "display_name": "Telemetry",
+            "storage_path": str(telem_path),
+            "mime_type": "application/json",
+            "file_size_bytes": telem_path.stat().st_size,
+        },
+        {
+            "artifact_type": "worker_log",
+            "display_name": "Worker log",
+            "storage_path": str(log_path),
+            "mime_type": "text/plain",
+            "file_size_bytes": log_path.stat().st_size,
+        },
+    ]
+
+
 def _compute_metrics(payload: dict[str, Any]) -> dict[str, Any]:
     params = payload.get("parameters", {}) or {}
     # The canonical grouped object is ``job_config``; top-level aliases
@@ -152,6 +225,13 @@ def main() -> int:
         return 2
     result = _compute_metrics(payload)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    # Emit per-trial artifact files for successful trials. Failure paths
+    # (``success=False``) intentionally skip this so the adapter's error
+    # reporting stays the salient signal.
+    if result.get("success") and isinstance(result.get("metrics"), dict):
+        result["artifacts"] = _emit_artifacts(
+            payload, args.output.parent, result["metrics"]
+        )
     with args.output.open("w", encoding="utf-8") as f:
         json.dump(result, f, indent=2, sort_keys=True)
     return 0 if os.environ.get("EXAMPLE_SIM_EXIT_NONZERO") != "1" else 3

@@ -192,6 +192,10 @@ class TrialSummary(BaseModel):
     scenario_type: ScenarioType
     status: TrialStatus
     score: float | None = None
+    # Phase 8 polish: per-trial pass/fail surfaced on the trial list so the
+    # Job Detail table can render PASS / FAIL alongside the COMPLETED status.
+    # ``None`` means "no metric yet" (queued/running/failed-without-metrics).
+    pass_flag: bool | None = None
     # Phase 5: candidate metadata surfaced so the frontend can distinguish
     # baseline vs optimizer rows and highlight the best candidate without
     # needing a second API call.

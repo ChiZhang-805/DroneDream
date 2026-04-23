@@ -212,13 +212,40 @@ def test_acceptance_evaluator_checks_thresholds(gpt_ctx):
         trial_count=4,
         completed_trial_count=4,
         failed_trial_count=0,
-        aggregated_metric_json={"rmse": 0.3, "max_error": 1.0},
+        # Phase 8 polish: pass_rate is driven by passing_trial_count (trials
+        # with per-trial pass_flag=true), not the execution-completion ratio.
+        # All 4 trials pass_flag=true -> pass_rate=1.0 ≥ 0.8.
+        aggregated_metric_json={
+            "rmse": 0.3,
+            "max_error": 1.0,
+            "passing_trial_count": 4,
+        },
     )
     assert acceptance.evaluate_candidate(candidate, criteria).passed
-    candidate.aggregated_metric_json = {"rmse": 0.9, "max_error": 1.0}
+    candidate.aggregated_metric_json = {
+        "rmse": 0.9,
+        "max_error": 1.0,
+        "passing_trial_count": 4,
+    }
     assert not acceptance.evaluate_candidate(candidate, criteria).passed
-    candidate.aggregated_metric_json = {"rmse": 0.3, "max_error": 2.0}
+    candidate.aggregated_metric_json = {
+        "rmse": 0.3,
+        "max_error": 2.0,
+        "passing_trial_count": 4,
+    }
     assert not acceptance.evaluate_candidate(candidate, criteria).passed
+    # Phase 8 polish: thresholds all satisfied but only 2/4 trials actually
+    # passed (pass_flag=true), so pass_rate=0.5 < min_pass_rate=0.8 -> reject.
+    candidate.aggregated_metric_json = {
+        "rmse": 0.3,
+        "max_error": 1.0,
+        "passing_trial_count": 2,
+    }
+    failed = acceptance.evaluate_candidate(candidate, criteria)
+    assert not failed.passed
+    assert failed.reason == "pass_rate_too_low"
+    assert failed.pass_rate == 0.5
+    assert failed.completion_rate == 1.0
     assert schemas.AcceptanceCriteria(
         target_rmse=0.5, target_max_error=1.5, min_pass_rate=0.8
     )

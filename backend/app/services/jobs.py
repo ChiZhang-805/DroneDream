@@ -356,6 +356,7 @@ def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
         scenario_type=trial.scenario_type,  # type: ignore[arg-type]
         status=trial.status,  # type: ignore[arg-type]
         score=trial.metric.score if trial.metric is not None else None,
+        pass_flag=(trial.metric.pass_flag if trial.metric is not None else None),
         candidate_label=candidate.label if candidate is not None else None,
         candidate_source_type=source_type,
         candidate_is_baseline=bool(candidate.is_baseline) if candidate is not None else False,
