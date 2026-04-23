@@ -309,38 +309,34 @@ def dispatch_next_llm_generation(
 
     generation_index = job.current_generation + 1
     trials_per_candidate = max(1, job.trials_per_candidate)
-    total_added = 0
-    for proposal in result.proposals:
-        if total_added and job.progress_total_trials + trials_per_candidate > job.max_total_trials:
-            break
-        candidate = _create_llm_candidate(
-            db,
-            job,
-            proposal,
-            generation_index=generation_index,
-            trials_per_candidate=trials_per_candidate,
-            raw_response=result.raw_response,
-        )
-        _dispatch_llm_candidate_trials(db, job, candidate, trials_per_candidate)
-        total_added += trials_per_candidate
-    if total_added == 0:
+    if job.progress_total_trials + trials_per_candidate > job.max_total_trials:
         return 0
+    proposal = result.proposals[0]
+    candidate = _create_llm_candidate(
+        db,
+        job,
+        proposal,
+        generation_index=generation_index,
+        trials_per_candidate=trials_per_candidate,
+        raw_response=result.raw_response,
+    )
+    _dispatch_llm_candidate_trials(db, job, candidate, trials_per_candidate)
 
     job.current_generation = generation_index
     job.current_phase = f"candidate_generation_{generation_index}"
-    job.progress_total_trials += total_added
+    job.progress_total_trials += trials_per_candidate
     record_event(
         db,
         job.id,
         "generation_dispatched",
         {
             "generation_index": generation_index,
-            "candidate_count": len(result.proposals),
+            "candidate_count": 1,
             "trials_per_candidate": trials_per_candidate,
             "model": result.model,
         },
     )
-    return len(result.proposals)
+    return 1
 
 
 def start_queued_jobs(db: Session, *, limit: int = 10) -> list[str]:

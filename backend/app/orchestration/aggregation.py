@@ -400,26 +400,10 @@ def _determine_terminal_state(
         return "success", "COMPLETED", None
     if job.optimizer_strategy == "gpt":
         # GPT exhausted its iteration/trial budget without finding a passing
-        # candidate — report best-so-far via the report but fail the job.
+        # candidate — report best-so-far as a completed run.
         if job.current_generation >= job.max_iterations:
-            return (
-                "max_iterations_reached",
-                "FAILED",
-                (
-                    "MAX_ITERATIONS_REACHED",
-                    "GPT tuning ran the maximum number of iterations without "
-                    "a passing candidate; best-so-far parameters are attached.",
-                ),
-            )
-        return (
-            "no_usable_candidate",
-            "FAILED",
-            (
-                "NO_PASSING_CANDIDATE",
-                "No candidate satisfied the acceptance criteria. "
-                "Best-so-far parameters are attached.",
-            ),
-        )
+            return ("max_iterations_reached", "COMPLETED", None)
+        return ("no_usable_candidate", "COMPLETED", None)
     # Heuristic: stay COMPLETED (Phase 7 contract) but flag the outcome.
     return "no_usable_candidate", "COMPLETED", None
 
@@ -499,13 +483,22 @@ def _finalize_without_usable_candidate(
             baseline_agg=baseline_agg,
             best_agg=baseline_agg,
         )
-    _fail_job(
+    now = _now()
+    job.status = "COMPLETED"
+    job.completed_at = now
+    job.current_phase = "completed"
+    job.optimization_outcome = "no_usable_candidate"
+    record_event(
         db,
-        job,
-        code="NO_BEST_CANDIDATE",
-        message="No candidate produced a usable aggregate.",
-        outcome="no_usable_candidate",
+        job.id,
+        "job_completed",
+        {
+            "best_candidate_id": job.best_candidate_id,
+            "optimization_outcome": "no_usable_candidate",
+        },
     )
+    _purge_secrets_on_terminal(db, job)
+    db.commit()
 
 
 def _purge_secrets_on_terminal(db: Session, job: models.Job) -> None:

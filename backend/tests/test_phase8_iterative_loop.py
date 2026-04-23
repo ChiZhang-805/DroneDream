@@ -136,12 +136,13 @@ def test_gpt_loop_dispatches_generation_after_baseline(gpt_ctx):
         [_gpt_proposal(1.5), _gpt_proposal(0.9), RuntimeError("not needed")]
     )
     status = _drive(ctx, job_id, client=client, max_ticks=80)
-    assert status in {"COMPLETED", "FAILED"}
+    assert status == "COMPLETED"
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         assert job.current_generation >= 1
         llm_candidates = [c for c in job.candidates if c.source_type == "llm_optimizer"]
         assert len(llm_candidates) >= 1
+        assert all(c.trial_count == job.trials_per_candidate for c in llm_candidates)
         event_types = [e.event_type for e in job.events]
         assert "llm_proposal_started" in event_types
         assert "generation_dispatched" in event_types
@@ -153,11 +154,11 @@ def test_gpt_max_iterations_reached_yields_best_so_far(gpt_ctx):
     job_id = _create_job(ctx, strategy="gpt", target_rmse=0.001, max_iterations=1)
     client = FakeOpenAIClient([_gpt_proposal(1.5), _gpt_proposal(1.8)])
     status = _drive(ctx, job_id, client=client, max_ticks=60)
-    assert status == "FAILED"
+    assert status == "COMPLETED"
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         assert job.optimization_outcome == "max_iterations_reached"
-        assert job.latest_error_code == "MAX_ITERATIONS_REACHED"
+        assert job.latest_error_code is None
         assert job.best_candidate_id is not None
         assert job.report is not None
 

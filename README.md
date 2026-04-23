@@ -197,10 +197,10 @@ export REAL_SIMULATOR_ARTIFACT_ROOT="$(pwd)/.artifacts"
 ```
 
 Then in the **New Job** form pick `Simulator Backend = real_cli` (default
-optimizer strategy is `heuristic`). Heuristic jobs keep the Phase 7 batch
+optimizer strategy is `gpt` with default `max_iterations=20`). Heuristic jobs keep the Phase 7 batch
 behaviour — baseline and all heuristic optimizer candidates are dispatched
 up front, then acceptance criteria annotate `optimization_outcome`. Only
-GPT jobs (`optimizer_strategy=gpt`) use the iterative generation-by-
+GPT jobs (`optimizer_strategy=gpt`) use the iterative one-proposal-per-
 generation loop described in
 [`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md).
 
@@ -234,6 +234,10 @@ OpenAI API key into the auto-tuning section. The key is encrypted with
 terminates. See
 [`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md)
 for the full protocol, env vars, and `real_cli + gpt` combined demo.
+
+When GPT search budget is exhausted, the job now completes with a best-so-far
+report (`optimization_outcome=max_iterations_reached` or
+`no_usable_candidate`) instead of being marked as a system failure.
 
 **Frontend** — Vite dev server on `http://localhost:5173`:
 

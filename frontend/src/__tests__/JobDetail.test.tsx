@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -9,8 +9,8 @@ import type { Job, JobReport, TrialSummary } from "../types/api";
 
 const PHASE8_DEFAULTS = {
   simulator_backend_requested: "mock" as const,
-  optimizer_strategy: "heuristic" as const,
-  max_iterations: 5,
+  optimizer_strategy: "gpt" as const,
+  max_iterations: 20,
   trials_per_candidate: 3,
   acceptance_criteria: {
     target_rmse: 0.5,
@@ -117,14 +117,11 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("JobDetail — Phase 8 best-so-far rendering for FAILED jobs", () => {
-  it("renders best-so-far metrics and a best-so-far banner for FAILED+READY report", async () => {
+describe("JobDetail — Phase 8 best-so-far rendering", () => {
+  it("renders best-so-far metrics and a budget-exhausted banner for COMPLETED+READY report", async () => {
     const job = makeJob({
-      status: "FAILED",
-      latest_error: {
-        code: "MAX_ITERATIONS_REACHED",
-        message: "Reached max iterations with no passing candidate.",
-      },
+      status: "COMPLETED",
+      latest_error: null,
       optimization_outcome: "max_iterations_reached",
       optimizer_strategy: "gpt",
       openai_model: "gpt-4.1",
@@ -138,19 +135,12 @@ describe("JobDetail — Phase 8 best-so-far rendering for FAILED jobs", () => {
     renderWithJob(job.id);
 
     expect(
-      await screen.findByText(/Job failed — best-so-far results available/i),
+      await screen.findByText(
+        /Search budget exhausted — showing best-so-far parameters/i,
+      ),
     ).toBeInTheDocument();
-    // Outcome hint
-    expect(
-      screen.getByText(/Max iterations reached/i),
-    ).toBeInTheDocument();
-    // Best-so-far comparison card title
-    expect(
-      screen.getByText(/Best-so-far: Baseline vs Optimized comparison/i),
-    ).toBeInTheDocument();
-    // Best-so-far metric appears
     await waitFor(() =>
-      expect(screen.getByText(/baseline 1\.20 m/)).toBeInTheDocument(),
+      expect(apiClient.getJobReport).toHaveBeenCalledWith(job.id),
     );
   });
 
@@ -286,5 +276,26 @@ describe("JobDetail — Phase 8 best-so-far rendering for FAILED jobs", () => {
     expect(
       screen.queryByText(/Best-so-far: Baseline vs Optimized/i),
     ).not.toBeInTheDocument();
+  });
+
+  it("rerun for gpt asks for a fresh OpenAI key and stays gpt-based", async () => {
+    const job = makeJob({ status: "COMPLETED", optimizer_strategy: "gpt" });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+    const rerunSpy = vi
+      .spyOn(apiClient, "rerunJob")
+      .mockResolvedValue({ ...job, id: "job_rerun_1" });
+    vi.spyOn(window, "prompt").mockReturnValue("sk-rerun");
+
+    renderWithJob(job.id);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Rerun/i }));
+    await waitFor(() =>
+      expect(rerunSpy).toHaveBeenCalledWith(job.id, {
+        openai: { api_key: "sk-rerun", model: null },
+      }),
+    );
   });
 });

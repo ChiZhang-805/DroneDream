@@ -7,6 +7,7 @@ import type {
   Artifact,
   Job,
   JobCreateRequest,
+  JobRerunRequest,
   JobReport,
   JobStatus,
   PaginatedJobs,
@@ -151,9 +152,10 @@ export const apiClient = {
     });
   },
 
-  async rerunJob(jobId: string): Promise<Job> {
+  async rerunJob(jobId: string, req?: JobRerunRequest): Promise<Job> {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/rerun`, {
       method: "POST",
+      body: JSON.stringify(req ?? {}),
     });
   },
 };

@@ -11,6 +11,7 @@ VALID_JOB_PAYLOAD: dict = {
     "wind": {"north": 0, "east": 0, "south": 0, "west": 0},
     "sensor_noise_level": "medium",
     "objective_profile": "robust",
+    "optimizer_strategy": "heuristic",
 }
 
 
@@ -188,6 +189,34 @@ def test_rerun_not_found(client: TestClient) -> None:
     resp = client.post("/api/v1/jobs/job_missing/rerun")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "JOB_NOT_FOUND"
+
+
+def test_rerun_gpt_requires_fresh_openai_api_key(client: TestClient) -> None:
+    payload = {
+        **VALID_JOB_PAYLOAD,
+        "optimizer_strategy": "gpt",
+        "openai": {"api_key": "sk-source"},
+    }
+    original = client.post("/api/v1/jobs", json=payload).json()["data"]
+    resp = client.post(f"/api/v1/jobs/{original['id']}/rerun")
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "INVALID_INPUT"
+
+
+def test_rerun_gpt_stays_gpt_with_new_openai_key(client: TestClient) -> None:
+    payload = {
+        **VALID_JOB_PAYLOAD,
+        "optimizer_strategy": "gpt",
+        "openai": {"api_key": "sk-source", "model": "gpt-4.1"},
+    }
+    original = client.post("/api/v1/jobs", json=payload).json()["data"]
+    resp = client.post(
+        f"/api/v1/jobs/{original['id']}/rerun",
+        json={"openai": {"api_key": "sk-rerun"}},
+    )
+    assert resp.status_code == 200
+    rerun = resp.json()["data"]
+    assert rerun["optimizer_strategy"] == "gpt"
 
 
 # --- Cancel ----------------------------------------------------------------

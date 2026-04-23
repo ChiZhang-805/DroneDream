@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from collections.abc import Iterator
 from typing import Any
@@ -122,7 +123,7 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
         result = ctx["proposer"].propose_candidates(db, job, criteria, client=fake)
         db.commit()
         assert result.error is None
-        assert len(result.proposals) == 2
+        assert len(result.proposals) == 1
         first = result.proposals[0]
         assert first.parameters["kp_xy"] == 2.5
         assert first.parameters["kd_xy"] == 0.05
@@ -136,6 +137,9 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
         ]
         assert "llm_proposal_started" in events
         assert "llm_proposal_completed" in events
+        payload = json.loads(fake.calls[0]["user"])
+        assert payload["previous_candidates"][0]["candidate_id"].startswith("cand_")
+        assert "trials" in payload["previous_candidates"][0]
 
 
 def test_proposer_rejects_invalid_response(llm_ctx):
@@ -215,6 +219,13 @@ def test_create_job_rejects_gpt_without_api_key(llm_ctx):
         with pytest.raises(jobs_service.JobServiceError) as exc:
             jobs_service.create_job(db, req)
         assert exc.value.code == "INVALID_INPUT"
+
+
+def test_job_create_request_defaults_are_gpt_and_20(llm_ctx):
+    schemas = llm_ctx["schemas"]
+    req = schemas.JobCreateRequest()
+    assert req.optimizer_strategy == "gpt"
+    assert req.max_iterations == 20
 
 
 def test_secret_is_never_returned_in_job_response(llm_ctx):
