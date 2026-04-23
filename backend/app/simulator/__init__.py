@@ -28,12 +28,14 @@ from app.simulator.base import (
 )
 from app.simulator.factory import get_simulator_adapter
 from app.simulator.mock import MockSimulatorAdapter
+from app.simulator.real_cli import RealCliSimulatorAdapter
 from app.simulator.real_stub import RealSimulatorAdapterStub
 
 __all__ = [
     "ArtifactMetadata",
     "JobConfig",
     "MockSimulatorAdapter",
+    "RealCliSimulatorAdapter",
     "RealSimulatorAdapterStub",
     "SimulatorAdapter",
     "TrialContext",

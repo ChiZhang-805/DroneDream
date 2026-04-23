@@ -117,6 +117,14 @@ export interface JobCreateRequest {
   wind: WindVector;
   sensor_noise_level: SensorNoiseLevel;
   objective_profile: ObjectiveProfile;
+  // Phase 8 optional execution-backend & auto-tuning fields. Omitting them
+  // preserves the Phase 7 mock + heuristic behaviour.
+  simulator_backend?: SimulatorBackend;
+  optimizer_strategy?: OptimizerStrategy;
+  max_iterations?: number;
+  trials_per_candidate?: number;
+  acceptance_criteria?: AcceptanceCriteria | null;
+  openai?: OpenAIConfig | null;
 }
 
 export interface Job {
@@ -141,6 +149,18 @@ export interface Job {
   cancelled_at: string | null;
   failed_at: string | null;
   recent_events: JobEventInfo[];
+  // Phase 8 — echoed back from the server so the UI can render the execution
+  // backend and auto-tuning status. ``current_generation`` is 0 during the
+  // baseline generation and increments as each LLM/heuristic generation
+  // is dispatched.
+  simulator_backend_requested: SimulatorBackend;
+  optimizer_strategy: OptimizerStrategy;
+  max_iterations: number;
+  trials_per_candidate: number;
+  acceptance_criteria: AcceptanceCriteria;
+  current_generation: number;
+  optimization_outcome: OptimizationOutcome | null;
+  openai_model: string | null;
 }
 
 export interface TrialMetrics {
@@ -156,7 +176,36 @@ export interface TrialMetrics {
   instability_flag: boolean;
 }
 
-export type CandidateSourceType = "baseline" | "optimizer";
+export type CandidateSourceType = "baseline" | "optimizer" | "llm_optimizer";
+
+// Phase 8: per-job execution backend and optimizer strategy selection.
+export type SimulatorBackend = "mock" | "real_cli";
+export const SIMULATOR_BACKENDS: readonly SimulatorBackend[] = ["mock", "real_cli"];
+
+export type OptimizerStrategy = "heuristic" | "gpt";
+export const OPTIMIZER_STRATEGIES: readonly OptimizerStrategy[] = [
+  "heuristic",
+  "gpt",
+];
+
+export type OptimizationOutcome =
+  | "success"
+  | "max_iterations_reached"
+  | "no_usable_candidate"
+  | "simulator_unavailable"
+  | "llm_failed";
+
+export interface AcceptanceCriteria {
+  target_rmse: number | null;
+  target_max_error: number | null;
+  min_pass_rate: number;
+}
+
+export interface OpenAIConfig {
+  // NEVER surfaced by API responses. Present only on create-job requests.
+  api_key: string;
+  model?: string | null;
+}
 
 export interface TrialSummary {
   id: string;

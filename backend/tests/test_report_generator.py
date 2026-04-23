@@ -364,9 +364,23 @@ def test_artifacts_endpoint_exposes_job_artifacts(ctx):
         body = client.get(f"/api/v1/jobs/{job_id}/artifacts").json()["data"]
 
     assert isinstance(body, list)
-    assert len(body) == 4
+    # Phase 8: /api/v1/jobs/{id}/artifacts now returns both job-scoped
+    # artifacts (the 4 aggregate report artifacts seeded by
+    # _run_job_to_completion) AND trial-scoped artifacts (per-trial
+    # trajectory_plot / telemetry_json / worker_log). The exact trial count
+    # depends on BASELINE_SCENARIOS, so assert the aggregate surface and let
+    # the owner_type field distinguish job vs trial rows.
     types = {a["artifact_type"] for a in body}
-    assert types == {
+    assert {
+        "comparison_plot",
+        "trajectory_plot",
+        "worker_log",
+        "telemetry_json",
+    }.issubset(types)
+    owner_types = {a["owner_type"] for a in body}
+    assert "job" in owner_types
+    job_rows = [a for a in body if a["owner_type"] == "job"]
+    assert {a["artifact_type"] for a in job_rows} == {
         "comparison_plot",
         "trajectory_plot",
         "worker_log",

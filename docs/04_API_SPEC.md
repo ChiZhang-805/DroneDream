@@ -161,7 +161,7 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 
 ### 7.1 `POST /api/v1/jobs`
 
-Request body:
+Request body (Phase 7 baseline — all Phase 8 fields below are optional):
 
 ```json
 {
@@ -173,6 +173,47 @@ Request body:
   "objective_profile": "robust"
 }
 ```
+
+**Phase 8 optional fields** (see
+[`PHASE8_REAL_SIM_AND_GPT_TUNING.md`](PHASE8_REAL_SIM_AND_GPT_TUNING.md) for
+full details):
+
+```json
+{
+  "simulator_backend": "mock",
+  "optimizer_strategy": "heuristic",
+  "max_iterations": 5,
+  "trials_per_candidate": 3,
+  "acceptance_criteria": {
+    "target_rmse": 0.5,
+    "target_max_error": 1.5,
+    "min_pass_rate": 0.8
+  },
+  "openai": {
+    "api_key": "sk-...",
+    "model": "gpt-4.1"
+  }
+}
+```
+
+- `simulator_backend`: `"mock"` (default) or `"real_cli"`.
+- `optimizer_strategy`: `"heuristic"` (default) or `"gpt"`.
+- `openai.api_key` is required **only** when `optimizer_strategy == "gpt"`;
+  the server stores it encrypted (Fernet via `APP_SECRET_KEY`) and never
+  returns it in any response.
+- Acceptance criteria fields are all optional; `null` disables that check.
+
+The job response echoes these Phase 8 fields (with the key redacted):
+`simulator_backend_requested`, `optimizer_strategy`, `max_iterations`,
+`trials_per_candidate`, `acceptance_criteria`, `current_generation`,
+`optimization_outcome`, `openai_model`.
+
+Validation errors:
+
+- `optimizer_strategy == "gpt"` without `openai.api_key` →
+  `INVALID_INPUT`.
+- `optimizer_strategy == "gpt"` without server-side `APP_SECRET_KEY` →
+  `INVALID_INPUT` (`details.reason = "server_secret_key_not_configured"`).
 
 Success response — the full `Job` object with a backward-compatible
 `job_id` alias (equal to `id`):

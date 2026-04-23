@@ -22,6 +22,7 @@ complexity in the MVP. A TODO marker is left at the claim site.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -39,6 +40,40 @@ from app.simulator import (
     get_simulator_adapter,
 )
 from app.simulator.base import FAILURE_SIM_ERROR
+
+
+def _env_simulator_backend() -> str | None:
+    """Read ``SIMULATOR_BACKEND`` from the environment, treating blank as unset."""
+
+    raw = os.environ.get("SIMULATOR_BACKEND", "").strip()
+    return raw or None
+
+
+def _resolve_backend_override(
+    *,
+    env_backend: str | None,
+    job_backend_requested: str | None,
+) -> str | None:
+    """Resolve which simulator backend to use for a trial.
+
+    Precedence (highest first):
+
+    1. ``SIMULATOR_BACKEND`` env var — back-compat with Phase 7 deployments
+       and a global override for debugging. Blank/empty is treated as unset
+       (see :func:`_env_simulator_backend`) so leaving it unset in ``.env``
+       lets per-job UI selection take effect.
+    2. The job's ``simulator_backend_requested`` column — Phase 8 per-job
+       UI selection.
+    3. ``None`` — the :func:`~app.simulator.factory.get_simulator_adapter`
+       default (``mock``).
+    """
+
+    if env_backend:
+        return env_backend
+    if job_backend_requested:
+        return job_backend_requested
+    return None
+
 
 logger = logging.getLogger("drone_dream.orchestration.trial")
 
@@ -139,7 +174,18 @@ def claim_and_run_one_pending_trial(
     if trial is None:
         return None
 
-    sim = adapter or get_simulator_adapter()
+    backend_override: str | None = None
+    if adapter is None:
+        job_row = db.get(models.Job, trial.job_id)
+        backend_override = _resolve_backend_override(
+            env_backend=_env_simulator_backend(),
+            job_backend_requested=(
+                str(job_row.simulator_backend_requested)
+                if job_row is not None and job_row.simulator_backend_requested
+                else None
+            ),
+        )
+    sim = adapter or get_simulator_adapter(backend_override)
 
     # --- Claim ----------------------------------------------------------
     now = _now()

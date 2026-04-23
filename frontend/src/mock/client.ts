@@ -137,6 +137,18 @@ export const mockApi = {
       cancelled_at: null,
       failed_at: null,
       recent_events: [],
+      simulator_backend_requested: req.simulator_backend ?? "mock",
+      optimizer_strategy: req.optimizer_strategy ?? "heuristic",
+      max_iterations: req.max_iterations ?? 5,
+      trials_per_candidate: req.trials_per_candidate ?? 3,
+      acceptance_criteria: req.acceptance_criteria ?? {
+        target_rmse: 0.5,
+        target_max_error: null,
+        min_pass_rate: 0.8,
+      },
+      current_generation: 0,
+      optimization_outcome: null,
+      openai_model: req.openai?.model ?? null,
     };
     jobStore.unshift(created);
     return unwrap(envelopeSuccess(created));

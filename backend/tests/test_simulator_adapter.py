@@ -445,3 +445,62 @@ def test_worker_marks_trial_failed_when_adapter_raises(orchestration_ctx):
         assert trial.status == "FAILED"
         assert trial.failure_code == FAILURE_SIM_ERROR
         assert "boom" in (trial.failure_reason or "")
+
+
+# --- Phase 8: backend precedence helper --------------------------------------
+
+
+def test_resolve_backend_override_env_wins(monkeypatch):
+    """SIMULATOR_BACKEND env var overrides the per-job column."""
+
+    from app.orchestration.trial_executor import _resolve_backend_override
+
+    assert (
+        _resolve_backend_override(
+            env_backend="mock", job_backend_requested="real_cli"
+        )
+        == "mock"
+    )
+
+
+def test_resolve_backend_override_falls_back_to_job_column():
+    """With env var blank/unset, the job's simulator_backend_requested is used."""
+
+    from app.orchestration.trial_executor import _resolve_backend_override
+
+    assert (
+        _resolve_backend_override(
+            env_backend=None, job_backend_requested="real_cli"
+        )
+        == "real_cli"
+    )
+
+
+def test_resolve_backend_override_returns_none_when_neither_set():
+    """With neither source set, return None so the factory default applies."""
+
+    from app.orchestration.trial_executor import _resolve_backend_override
+
+    assert (
+        _resolve_backend_override(env_backend=None, job_backend_requested=None)
+        is None
+    )
+
+
+def test_env_simulator_backend_treats_blank_as_unset(monkeypatch):
+    """.env.example ships SIMULATOR_BACKEND= (empty). This must behave like unset
+    so per-job UI selection from the New Job form takes effect by default."""
+
+    from app.orchestration.trial_executor import _env_simulator_backend
+
+    monkeypatch.setenv("SIMULATOR_BACKEND", "")
+    assert _env_simulator_backend() is None
+
+    monkeypatch.setenv("SIMULATOR_BACKEND", "   ")
+    assert _env_simulator_backend() is None
+
+    monkeypatch.setenv("SIMULATOR_BACKEND", "real_cli")
+    assert _env_simulator_backend() == "real_cli"
+
+    monkeypatch.delenv("SIMULATOR_BACKEND", raising=False)
+    assert _env_simulator_backend() is None

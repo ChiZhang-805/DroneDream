@@ -752,3 +752,55 @@ MVP 的正确架构路径应是：
 - 展示结果
 - 处理失败
 - 保留历史
+
+---
+
+## Phase 8 addendum — real simulator adapter + iterative GPT tuning
+
+Phase 8 extends this architecture without changing the existing layering.
+All Phase 7 flows (mock simulator, heuristic optimizer, baseline + optimizer
+dispatch, aggregation, report generation) remain intact.
+
+**New modules**
+
+| Layer | Module | Role |
+|---|---|---|
+| Simulator Execution | `backend/app/simulator/real_cli.py` | `RealCliSimulatorAdapter` — subprocess adapter that speaks the JSON file protocol defined in `PHASE8_REAL_SIM_AND_GPT_TUNING.md`. Registered in `simulator/factory.py` as `real_cli`. |
+| Simulator Execution | `scripts/simulators/example_real_simulator.py` | Reference external simulator used by tests and by the `real_cli` demo. |
+| Orchestration | `backend/app/orchestration/acceptance.py` | `evaluate_candidate()` — deterministic acceptance check (pass-rate, RMSE, max-error). |
+| Optimization Strategy | `backend/app/orchestration/llm_parameter_proposer.py` | Server-side OpenAI client; validates + clamps + dedups proposals. Emits `llm_proposal_{started,completed,failed}` `JobEvent`s. |
+| Secrets | `backend/app/secrets.py` | Fernet-based encryption for the per-job OpenAI API key. |
+| Persistence | `backend/app/models.py` (extended) | New `JobSecret` table, Phase 8 `Job` columns, `CandidateParameterSet.source_type="llm_optimizer"`. |
+
+**Iterative loop**
+
+`job_manager.start_job` now dispatches only the baseline. When a generation
+finishes, `aggregation.finalize_job_if_ready` calls the acceptance evaluator:
+
+- pass → mark best, generate report, `status=COMPLETED`,
+  `optimization_outcome="success"`;
+- fail & more budget → dispatch the next generation via heuristic optimizer
+  or GPT proposer;
+- fail & budget exhausted → finalize with a best-so-far report and
+  `optimization_outcome` ∈ {`max_iterations_reached`, `no_usable_candidate`,
+  `llm_failed`}.
+
+Per-job simulator backend selection lives in `trial_executor`; the legacy
+`SIMULATOR_BACKEND` env var still wins when set (Phase 7 backward
+compatibility), otherwise the per-job `simulator_backend_requested` column
+is used.
+
+**Security boundary**
+
+- OpenAI calls are **server-side only**; the frontend never contacts OpenAI.
+- The API key is stored encrypted (`JobSecret.encrypted_api_key`) with
+  `APP_SECRET_KEY` and is soft-deleted on terminal state. It is never
+  echoed by any API response and never logged.
+- GPT can **only** emit structured JSON proposals that match the
+  `PARAMETER_SAFE_RANGES` schema; the backend clamps and validates before
+  persisting a new `CandidateParameterSet`. GPT cannot control the worker
+  or execute simulations directly.
+
+See [`PHASE8_REAL_SIM_AND_GPT_TUNING.md`](PHASE8_REAL_SIM_AND_GPT_TUNING.md)
+for the adapter protocol, prompt/response schemas, env vars, and
+verification commands.

@@ -33,6 +33,12 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.orchestration import constants, report_generator
+from app.orchestration.acceptance import (
+    AcceptanceCriteria,
+    any_criterion_set,
+    criteria_for_job,
+    evaluate_candidate,
+)
 from app.orchestration.events import record_event
 
 logger = logging.getLogger("drone_dream.orchestration.aggregation")
@@ -210,8 +216,21 @@ def _rank_and_select_best(
 # --- Finalization ----------------------------------------------------------
 
 
-def finalize_job_if_ready(db: Session, job: models.Job) -> bool:
-    """If every trial is terminal, aggregate candidates and finalize the job."""
+def finalize_job_if_ready(
+    db: Session,
+    job: models.Job,
+    *,
+    llm_client: object | None = None,
+) -> bool:
+    """If every trial is terminal, aggregate candidates and finalize the job.
+
+    For GPT jobs this method implements the iterative loop: after aggregating
+    the current generation it evaluates acceptance and, if neither accepted
+    nor budget-exhausted, dispatches the next LLM-proposed generation instead
+    of finalizing. The job is only marked terminal when either a candidate
+    passes acceptance, the acceptance criteria are not configured, or the
+    iteration/trial budget is exhausted.
+    """
 
     if job.status not in {"RUNNING", "AGGREGATING"}:
         return False
@@ -229,6 +248,7 @@ def finalize_job_if_ready(db: Session, job: models.Job) -> bool:
         record_event(db, job.id, "aggregation_started", None)
         db.commit()
         db.refresh(job)
+        trials = list(job.trials)
 
     baseline_id = job.baseline_candidate_id
     if baseline_id is None:
@@ -264,14 +284,18 @@ def finalize_job_if_ready(db: Session, job: models.Job) -> bool:
         )
         return True
 
+    criteria = criteria_for_job(job)
+
+    # GPT iterative loop: possibly dispatch another generation instead of
+    # finalizing.
+    if job.optimizer_strategy == "gpt" and _try_continue_gpt_loop(
+        db, job, baseline, candidates, criteria, llm_client=llm_client
+    ):
+        return False
+
     best = _rank_and_select_best(candidates)
     if best is None or best.aggregated_metric_json is None:
-        _fail_job(
-            db,
-            job,
-            code="NO_BEST_CANDIDATE",
-            message="No candidate produced a usable aggregate.",
-        )
+        _finalize_without_usable_candidate(db, job, baseline_agg=baseline_agg, baseline=baseline)
         return True
 
     job.best_candidate_id = best.id
@@ -284,10 +308,20 @@ def finalize_job_if_ready(db: Session, job: models.Job) -> bool:
         best_agg=best.aggregated_metric_json,
     )
 
+    outcome, terminal_status, terminal_error = _determine_terminal_state(
+        job, best, criteria
+    )
     now = _now()
-    job.status = "COMPLETED"
-    job.completed_at = now
-    job.current_phase = "completed"
+    job.status = terminal_status
+    job.current_phase = "completed" if terminal_status == "COMPLETED" else None
+    job.optimization_outcome = outcome
+    if terminal_status == "COMPLETED":
+        job.completed_at = now
+    else:
+        job.failed_at = now
+        if terminal_error is not None:
+            job.latest_error_code, job.latest_error_message = terminal_error
+
     record_event(
         db,
         job.id,
@@ -298,38 +332,217 @@ def finalize_job_if_ready(db: Session, job: models.Job) -> bool:
             "best_source_type": best.source_type,
             "best_score": best.aggregated_score,
             "baseline_score": baseline.aggregated_score,
+            "optimization_outcome": outcome,
         },
     )
-    record_event(
-        db,
-        job.id,
-        "job_completed",
-        {
-            "best_candidate_id": best.id,
-            "aggregated_score": best.aggregated_score,
-        },
-    )
+    if terminal_status == "COMPLETED":
+        record_event(
+            db,
+            job.id,
+            "job_completed",
+            {
+                "best_candidate_id": best.id,
+                "aggregated_score": best.aggregated_score,
+                "optimization_outcome": outcome,
+            },
+        )
+    else:
+        record_event(
+            db,
+            job.id,
+            "job_failed",
+            {
+                "code": (terminal_error[0] if terminal_error else "UNKNOWN"),
+                "message": (terminal_error[1] if terminal_error else ""),
+                "best_candidate_id": best.id,
+                "optimization_outcome": outcome,
+            },
+        )
+    _purge_secrets_on_terminal(db, job)
     db.commit()
     logger.info(
-        "job %s COMPLETED (best=%s score=%s baseline_score=%s)",
+        "job %s %s (best=%s score=%s baseline_score=%s outcome=%s)",
         job.id,
+        terminal_status,
         best.id,
         best.aggregated_score,
         baseline.aggregated_score,
+        outcome,
     )
     return True
 
 
-def _fail_job(db: Session, job: models.Job, *, code: str, message: str) -> None:
+def _determine_terminal_state(
+    job: models.Job,
+    best: models.CandidateParameterSet,
+    criteria: AcceptanceCriteria,
+) -> tuple[str, str, tuple[str, str] | None]:
+    """Return ``(optimization_outcome, job_status, optional_error)``.
+
+    Heuristic jobs are kept on the Phase 7 happy path (COMPLETED) but are now
+    annotated with an ``optimization_outcome`` so the UI can surface whether
+    the best candidate actually met the user's acceptance criteria.
+    """
+
+    result = evaluate_candidate(best, criteria)
+    if result.passed:
+        return "success", "COMPLETED", None
+    # No criteria set → treat completion as success by convention.
+    if not any_criterion_set(criteria) and criteria.min_pass_rate <= (
+        result.pass_rate + 1e-9
+    ):
+        return "success", "COMPLETED", None
+    if job.optimizer_strategy == "gpt":
+        # GPT exhausted its iteration/trial budget without finding a passing
+        # candidate — report best-so-far via the report but fail the job.
+        if job.current_generation >= job.max_iterations:
+            return (
+                "max_iterations_reached",
+                "FAILED",
+                (
+                    "MAX_ITERATIONS_REACHED",
+                    "GPT tuning ran the maximum number of iterations without "
+                    "a passing candidate; best-so-far parameters are attached.",
+                ),
+            )
+        return (
+            "no_usable_candidate",
+            "FAILED",
+            (
+                "NO_PASSING_CANDIDATE",
+                "No candidate satisfied the acceptance criteria. "
+                "Best-so-far parameters are attached.",
+            ),
+        )
+    # Heuristic: stay COMPLETED (Phase 7 contract) but flag the outcome.
+    return "no_usable_candidate", "COMPLETED", None
+
+
+def _try_continue_gpt_loop(
+    db: Session,
+    job: models.Job,
+    baseline: models.CandidateParameterSet,
+    candidates: list[models.CandidateParameterSet],
+    criteria: AcceptanceCriteria,
+    *,
+    llm_client: object | None,
+) -> bool:
+    """If the GPT loop should run another generation, dispatch it and return True.
+
+    Guarantees of the loop:
+
+    * If any scored candidate (including baseline) passes acceptance, we stop
+      and let the caller finalize as COMPLETED.
+    * If acceptance criteria are not configured, we don't proceed past the
+      baseline generation — the baseline is implicitly accepted.
+    * Respects ``max_iterations`` and ``max_total_trials``.
+    """
+
+    if not any_criterion_set(criteria):
+        return False
+
+    scored = [c for c in candidates if c.aggregated_score is not None]
+    passed = any(evaluate_candidate(c, criteria).passed for c in scored)
+    if passed:
+        return False
+    if job.current_generation >= job.max_iterations:
+        return False
+    next_generation_trials = max(1, job.trials_per_candidate)
+    if job.progress_total_trials + next_generation_trials > job.max_total_trials:
+        return False
+
+    from app.orchestration.job_manager import dispatch_next_llm_generation
+    from app.orchestration.llm_parameter_proposer import OpenAIClientLike
+
+    client_cast: OpenAIClientLike | None = None
+    if llm_client is not None:
+        client_cast = llm_client  # type: ignore[assignment]
+
+    added = dispatch_next_llm_generation(db, job, client=client_cast)
+    if added == 0:
+        # Proposer failed — mark outcome accordingly but still let caller fall
+        # through to standard finalization with whatever best-so-far exists.
+        job.optimization_outcome = "llm_failed"
+        db.commit()
+        return False
+
+    # Return to RUNNING so the worker keeps draining trials.
+    job.status = "RUNNING"
+    db.commit()
+    db.refresh(job)
+    return True
+
+
+def _finalize_without_usable_candidate(
+    db: Session,
+    job: models.Job,
+    *,
+    baseline_agg: dict[str, Any] | None,
+    baseline: models.CandidateParameterSet,
+) -> None:
+    """Terminal state when no candidate produced a usable aggregate."""
+
+    if baseline_agg is not None:
+        # Treat baseline as best-so-far.
+        job.best_candidate_id = baseline.id
+        baseline.is_best = True
+        report_generator.generate_and_persist_report(
+            db,
+            job=job,
+            best=baseline,
+            baseline_agg=baseline_agg,
+            best_agg=baseline_agg,
+        )
+    _fail_job(
+        db,
+        job,
+        code="NO_BEST_CANDIDATE",
+        message="No candidate produced a usable aggregate.",
+        outcome="no_usable_candidate",
+    )
+
+
+def _purge_secrets_on_terminal(db: Session, job: models.Job) -> None:
+    """Best-effort wipe of stored secrets once the job is about to become terminal."""
+
+    from app.services.jobs import purge_job_secrets
+
+    purge_job_secrets(db, job, reason="job_terminal")
+
+
+def _fail_job(
+    db: Session,
+    job: models.Job,
+    *,
+    code: str,
+    message: str,
+    outcome: str | None = None,
+) -> None:
     now = _now()
     job.status = "FAILED"
     job.failed_at = now
     job.current_phase = None
     job.latest_error_code = code
     job.latest_error_message = message
+    if outcome is not None:
+        job.optimization_outcome = outcome
     record_event(db, job.id, "job_failed", {"code": code, "message": message})
+    _purge_secrets_on_terminal(db, job)
     db.commit()
     logger.warning("job %s FAILED code=%s", job.id, code)
+
+
+# Module-level LLM-client override so tests (and potential future operator
+# tooling) can substitute a deterministic :class:`OpenAIClientLike` for the
+# real OpenAI SDK call without monkey-patching every entry point.
+_llm_client_override: object | None = None
+
+
+def set_llm_client_override(client: object | None) -> None:
+    """Install or clear a process-wide fake OpenAI client for GPT tuning."""
+
+    global _llm_client_override
+    _llm_client_override = client
 
 
 def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
@@ -342,6 +555,6 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
     )
     finalized: list[str] = []
     for job in list(db.scalars(stmt)):
-        if finalize_job_if_ready(db, job):
+        if finalize_job_if_ready(db, job, llm_client=_llm_client_override):
             finalized.append(job.id)
     return finalized

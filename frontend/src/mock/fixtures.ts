@@ -15,6 +15,24 @@ const NOW = "2026-04-22T09:00:00Z";
 const EARLIER = "2026-04-22T08:00:00Z";
 const LONG_AGO = "2026-04-21T10:00:00Z";
 
+// Phase 8 defaults applied to every mock Job so the fixtures typecheck
+// against the extended Job shape. Callers can still override individual
+// fields per fixture if a story needs the GPT / real_cli variant.
+const PHASE8_DEFAULTS = {
+  simulator_backend_requested: "mock" as const,
+  optimizer_strategy: "heuristic" as const,
+  max_iterations: 5,
+  trials_per_candidate: 3,
+  acceptance_criteria: {
+    target_rmse: 0.5,
+    target_max_error: null,
+    min_pass_rate: 0.8,
+  },
+  current_generation: 0,
+  optimization_outcome: null,
+  openai_model: null,
+};
+
 function baselineMetrics() {
   return {
     rmse: 0.42,
@@ -62,6 +80,7 @@ export const MOCK_JOBS: Job[] = [
     cancelled_at: null,
     failed_at: null,
     recent_events: [],
+    ...PHASE8_DEFAULTS,
   },
   {
     id: "job_running_002",
@@ -89,6 +108,7 @@ export const MOCK_JOBS: Job[] = [
     cancelled_at: null,
     failed_at: null,
     recent_events: [],
+    ...PHASE8_DEFAULTS,
   },
   {
     id: "job_queued_003",
@@ -116,6 +136,7 @@ export const MOCK_JOBS: Job[] = [
     cancelled_at: null,
     failed_at: null,
     recent_events: [],
+    ...PHASE8_DEFAULTS,
   },
   {
     id: "job_aggregating_004",
@@ -143,6 +164,7 @@ export const MOCK_JOBS: Job[] = [
     cancelled_at: null,
     failed_at: null,
     recent_events: [],
+    ...PHASE8_DEFAULTS,
   },
   {
     id: "job_failed_005",
@@ -174,6 +196,7 @@ export const MOCK_JOBS: Job[] = [
     cancelled_at: null,
     failed_at: EARLIER,
     recent_events: [],
+    ...PHASE8_DEFAULTS,
   },
   {
     id: "job_cancelled_006",
@@ -201,6 +224,7 @@ export const MOCK_JOBS: Job[] = [
     cancelled_at: EARLIER,
     failed_at: null,
     recent_events: [],
+    ...PHASE8_DEFAULTS,
   },
 ];
 

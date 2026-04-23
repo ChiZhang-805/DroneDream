@@ -9,6 +9,7 @@ from a separate transaction.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -16,6 +17,11 @@ from sqlalchemy.orm import Session
 from app import models
 from app.orchestration import constants
 from app.orchestration.events import record_event
+from app.orchestration.llm_parameter_proposer import (
+    LlmProposal,
+    OpenAIClientLike,
+    propose_candidates,
+)
 from app.orchestration.optimizer import CandidateProposal, generate_candidates
 
 
@@ -45,6 +51,88 @@ def _create_baseline_candidate(db: Session, job: models.Job) -> models.Candidate
         {"candidate_id": candidate.id, "scenario_count": len(constants.BASELINE_SCENARIOS)},
     )
     return candidate
+
+
+def _create_llm_candidate(
+    db: Session,
+    job: models.Job,
+    proposal: LlmProposal,
+    *,
+    generation_index: int,
+    trials_per_candidate: int,
+    raw_response: dict[str, Any] | None,
+) -> models.CandidateParameterSet:
+    parameter_json = {**proposal.parameters, "_rationale": proposal.rationale}
+    candidate = models.CandidateParameterSet(
+        job_id=job.id,
+        generation_index=generation_index,
+        source_type="llm_optimizer",
+        label=proposal.label,
+        parameter_json=parameter_json,
+        is_baseline=False,
+        trial_count=trials_per_candidate,
+        proposal_reason=proposal.rationale,
+        llm_response_json=raw_response,
+    )
+    db.add(candidate)
+    db.flush()
+    record_event(
+        db,
+        job.id,
+        "candidate_generated_from_llm",
+        {
+            "candidate_id": candidate.id,
+            "label": proposal.label,
+            "generation_index": generation_index,
+            "parameters": proposal.parameters,
+        },
+    )
+    return candidate
+
+
+def _dispatch_llm_candidate_trials(
+    db: Session,
+    job: models.Job,
+    candidate: models.CandidateParameterSet,
+    trials_per_candidate: int,
+) -> list[models.Trial]:
+    trials: list[models.Trial] = []
+    now = _now()
+    scenarios = constants.OPTIMIZER_SCENARIOS
+    for idx in range(trials_per_candidate):
+        scenario = scenarios[idx % len(scenarios)]
+        seed = constants.optimizer_seed_for(
+            candidate.generation_index * 10 + idx, scenario
+        )
+        trial = models.Trial(
+            job_id=job.id,
+            candidate_id=candidate.id,
+            seed=seed,
+            scenario_type=scenario,
+            scenario_config_json=constants.optimizer_scenario_config(
+                scenario,
+                candidate_index=candidate.generation_index,
+                seed=seed,
+            ),
+            status="PENDING",
+            queued_at=now,
+        )
+        db.add(trial)
+        db.flush()
+        trials.append(trial)
+        record_event(
+            db,
+            job.id,
+            "trial_dispatched",
+            {
+                "trial_id": trial.id,
+                "candidate_id": candidate.id,
+                "candidate_source": "llm_optimizer",
+                "scenario": scenario,
+                "generation_index": candidate.generation_index,
+            },
+        )
+    return trials
 
 
 def _dispatch_baseline_trials(
@@ -156,11 +244,13 @@ def _dispatch_optimizer_trials(
 
 
 def start_job(db: Session, job: models.Job) -> models.Job:
-    """Move a QUEUED job to RUNNING and dispatch baseline + optimizer work.
+    """Move a QUEUED job to RUNNING and dispatch the first generation of work.
 
-    Every job creates exactly one baseline candidate plus the optimizer's
-    proposals. Trials for all candidates are enqueued up-front as PENDING so
-    the worker can drain them in a single loop without any scheduling logic.
+    For heuristic jobs this dispatches the baseline plus all heuristic
+    optimizer candidates up front (same behaviour as Phase 7). For GPT jobs
+    only the baseline is dispatched initially; subsequent generations are
+    created by :func:`dispatch_next_llm_generation` as the iterative loop
+    decides more candidates are needed.
     """
 
     if job.status != "QUEUED":
@@ -170,29 +260,87 @@ def start_job(db: Session, job: models.Job) -> models.Job:
     job.status = "RUNNING"
     job.started_at = now
     job.current_phase = "baseline"
+    job.current_generation = 0
 
     record_event(db, job.id, "job_started", None)
 
     baseline = _create_baseline_candidate(db, job)
     _dispatch_baseline_trials(db, job, baseline)
 
-    proposals = generate_candidates(dict(constants.BASELINE_PARAMETERS))
+    total_trials = len(constants.BASELINE_SCENARIOS)
+
+    if job.optimizer_strategy == "heuristic":
+        proposals = generate_candidates(dict(constants.BASELINE_PARAMETERS))
+        record_event(
+            db,
+            job.id,
+            "optimizer_started",
+            {"candidate_count": len(proposals), "strategy": "heuristic"},
+        )
+        for proposal in proposals:
+            opt_candidate = _create_optimizer_candidate(db, job, proposal)
+            _dispatch_optimizer_trials(db, job, opt_candidate)
+        total_trials += len(proposals) * len(constants.OPTIMIZER_SCENARIOS)
+
+    job.progress_completed_trials = 0
+    job.progress_total_trials = total_trials
+    return job
+
+
+def dispatch_next_llm_generation(
+    db: Session,
+    job: models.Job,
+    *,
+    client: OpenAIClientLike | None = None,
+) -> int:
+    """Ask the LLM proposer for the next generation and dispatch its trials.
+
+    Returns the number of candidates dispatched (0 when no usable proposals
+    came back or the proposer failed). Caller is responsible for the DB
+    commit lifecycle.
+    """
+
+    from app.orchestration.acceptance import criteria_for_job
+
+    criteria = criteria_for_job(job)
+    result = propose_candidates(db, job, criteria, client=client)
+    if result.error or not result.proposals:
+        return 0
+
+    generation_index = job.current_generation + 1
+    trials_per_candidate = max(1, job.trials_per_candidate)
+    total_added = 0
+    for proposal in result.proposals:
+        if total_added and job.progress_total_trials + trials_per_candidate > job.max_total_trials:
+            break
+        candidate = _create_llm_candidate(
+            db,
+            job,
+            proposal,
+            generation_index=generation_index,
+            trials_per_candidate=trials_per_candidate,
+            raw_response=result.raw_response,
+        )
+        _dispatch_llm_candidate_trials(db, job, candidate, trials_per_candidate)
+        total_added += trials_per_candidate
+    if total_added == 0:
+        return 0
+
+    job.current_generation = generation_index
+    job.current_phase = f"candidate_generation_{generation_index}"
+    job.progress_total_trials += total_added
     record_event(
         db,
         job.id,
-        "optimizer_started",
-        {"candidate_count": len(proposals)},
+        "generation_dispatched",
+        {
+            "generation_index": generation_index,
+            "candidate_count": len(result.proposals),
+            "trials_per_candidate": trials_per_candidate,
+            "model": result.model,
+        },
     )
-    for proposal in proposals:
-        opt_candidate = _create_optimizer_candidate(db, job, proposal)
-        _dispatch_optimizer_trials(db, job, opt_candidate)
-
-    # progress_total_trials counts baseline + all optimizer trials.
-    job.progress_completed_trials = 0
-    job.progress_total_trials = len(constants.BASELINE_SCENARIOS) + len(proposals) * len(
-        constants.OPTIMIZER_SCENARIOS
-    )
-    return job
+    return len(result.proposals)
 
 
 def start_queued_jobs(db: Session, *, limit: int = 10) -> list[str]:

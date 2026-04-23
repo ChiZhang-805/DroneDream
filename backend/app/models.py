@@ -78,6 +78,23 @@ class Job(Base):
     latest_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     latest_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Phase 8: backend/auto-tuning configuration.
+    simulator_backend_requested: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="mock"
+    )
+    optimizer_strategy: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="heuristic"
+    )
+    max_iterations: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    trials_per_candidate: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    target_rmse: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_max_error: Mapped[float | None] = mapped_column(Float, nullable=True)
+    min_pass_rate: Mapped[float] = mapped_column(Float, nullable=False, default=0.8)
+    max_total_trials: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    current_generation: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    optimization_outcome: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    openai_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
     # Relational pointers.
     best_candidate_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     baseline_candidate_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -109,6 +126,9 @@ class Job(Base):
     events: Mapped[list[JobEvent]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
+    secrets: Mapped[list[JobSecret]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
 
 
 class CandidateParameterSet(Base):
@@ -124,6 +144,9 @@ class CandidateParameterSet(Base):
     parameter_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     aggregated_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     aggregated_metric_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    proposal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_candidate_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    llm_response_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     trial_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completed_trial_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     failed_trial_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -262,12 +285,33 @@ class JobEvent(Base):
     job: Mapped[Job] = relationship(back_populates="events")
 
 
+class JobSecret(Base):
+    """Per-job encrypted secret (currently only OpenAI API keys)."""
+
+    __tablename__ = "job_secrets"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("sec"))
+    job_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("jobs.id"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False, default="openai")
+    encrypted_api_key: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    job: Mapped[Job] = relationship(back_populates="secrets")
+
+
 __all__ = [
     "Artifact",
     "CandidateParameterSet",
     "Job",
     "JobEvent",
     "JobReport",
+    "JobSecret",
     "Trial",
     "TrialMetric",
     "User",

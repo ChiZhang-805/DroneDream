@@ -7,15 +7,19 @@ baseline and optimizer candidate trials, aggregates results, selects the best
 parameter set, and surfaces baseline-vs-optimized metrics, best parameters,
 charts, summary text, failure details, rerun, and job history in the UI.
 
-> **Status:** Phase 7 — MVP acceptance ready. Creating a job persists a
-> `QUEUED` record; a separate worker process picks it up, dispatches baseline
-> + optimizer trials, runs deterministic mock simulations, aggregates
-> metrics into a `READY` `JobReport` with baseline-vs-optimized comparison
-> + summary text, and moves the job to `COMPLETED` (or `FAILED`). The
-> frontend renders the full flow end-to-end against the real backend. Real
-> PX4/Gazebo integration remains out of scope — see
-> [`docs/ACCEPTANCE_REPORT.md`](docs/ACCEPTANCE_REPORT.md) for the full
-> acceptance coverage and demo walkthrough.
+> **Status:** Phase 8 — real simulator adapter + iterative GPT parameter
+> tuning, layered on top of the Phase 7 MVP. Phase 7 behaviour is
+> unchanged: mock + heuristic jobs still run baseline + optimizer trials
+> end-to-end and emit a READY `JobReport`. New in Phase 8: per-job
+> `simulator_backend` (`mock` or `real_cli`), per-job `optimizer_strategy`
+> (`heuristic` or `gpt`), acceptance criteria, an iterative
+> simulate-analyze-retune loop, and an OpenAI-backed parameter proposer
+> whose API key is stored encrypted and used **server-side only**. See
+> [`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md)
+> for the full Phase 8 spec (adapter protocol, acceptance logic, env vars,
+> demos) and [`docs/ACCEPTANCE_REPORT.md`](docs/ACCEPTANCE_REPORT.md) for
+> the Phase 7 acceptance coverage. Real PX4/Gazebo, auth, PDF export, and
+> the advanced track editor remain explicitly out of scope.
 
 ## Repo layout
 
@@ -94,6 +98,43 @@ curl http://127.0.0.1:8000/health
 cd worker && ../worker/.venv/bin/python -m drone_dream_worker.main
 ```
 
+### Shared local database
+
+The backend and the worker must point at the **same** SQLite DB or the
+worker will never see jobs that the backend creates. Both read
+`DATABASE_URL` from the environment; when unset, both
+`scripts/dev-backend.sh` and `scripts/dev-worker.sh` pin it to an absolute
+path under the repo root:
+
+```
+DATABASE_URL=sqlite:///<repo-root>/drone_dream.db
+```
+
+Both scripts also auto-source the repo-root `.env`, so any `DATABASE_URL=`
+you put there is honoured by both processes. The worker no longer
+`cd`s into `worker/` before launch, so the default relative SQLite path
+also resolves to the same file.
+
+**Smoke check** — after starting both scripts in separate terminals:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/api/v1/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"track_type":"circle","altitude_m":5,"sensor_noise_level":"medium","objective_profile":"robust","start_point":{"x":0,"y":0},"wind":{"north":0,"east":0,"south":0,"west":0}}' \
+  | tee /tmp/job.json
+JOB_ID=$(python3 -c "import json; print(json.load(open('/tmp/job.json'))['data']['id'])")
+# Within a few seconds you should see RUNNING (worker picked it up) then
+# AGGREGATING -> COMPLETED.
+for _ in $(seq 1 30); do
+  curl -sS http://127.0.0.1:8000/api/v1/jobs/$JOB_ID | python3 -c \
+    'import json,sys;d=json.load(sys.stdin)["data"];print(d["status"],d.get("completed_trial_count"))'
+  sleep 1
+done
+```
+
+If the worker never logs `start_job`, check `DATABASE_URL` in both
+terminals — they must match.
+
 ### End-to-end demo (happy path)
 
 With the backend and worker running in separate terminals (mock simulator is
@@ -137,6 +178,62 @@ SIMULATOR_BACKEND=real_stub ./scripts/dev-worker.sh
 `GET /api/v1/jobs/{job_id}/report` returns a 409 with `error.code=JOB_FAILED`
 and `details.failure_code=ALL_TRIALS_FAILED` for failed jobs, so the
 frontend never renders a half-filled report.
+
+### End-to-end demo (Phase 8: real_cli + heuristic)
+
+For normal use, leave `SIMULATOR_BACKEND` **unset** (the default in the
+shipped `.env.example`) so the per-job selection from the New Job UI is
+respected. Only set `REAL_SIMULATOR_COMMAND` / `REAL_SIMULATOR_ARTIFACT_ROOT`
+so the `real_cli` adapter has a simulator to invoke:
+
+```bash
+export REAL_SIMULATOR_COMMAND="$(which python) $(pwd)/scripts/simulators/example_real_simulator.py"
+export REAL_SIMULATOR_ARTIFACT_ROOT="$(pwd)/.artifacts"
+# Do NOT export SIMULATOR_BACKEND — that would globally override the UI
+# selection. Only set it (e.g. SIMULATOR_BACKEND=real_cli) when you
+# intentionally want every job to use a specific backend regardless of
+# what the New Job form specifies.
+./scripts/dev-worker.sh
+```
+
+Then in the **New Job** form pick `Simulator Backend = real_cli` (default
+optimizer strategy is `heuristic`). Heuristic jobs keep the Phase 7 batch
+behaviour — baseline and all heuristic optimizer candidates are dispatched
+up front, then acceptance criteria annotate `optimization_outcome`. Only
+GPT jobs (`optimizer_strategy=gpt`) use the iterative generation-by-
+generation loop described in
+[`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md).
+
+### End-to-end demo (Phase 8: GPT parameter tuning)
+
+`APP_SECRET_KEY` (or `DRONEDREAM_SECRET_KEY`) is used by the **backend** to
+encrypt the per-job OpenAI API key at submission time, and by the
+**worker** to decrypt it when calling OpenAI. Both processes must see the
+same value — otherwise job creation fails with
+`details.reason = "server_secret_key_not_configured"`, or the worker can't
+decrypt an already-submitted key. Recommended local setup: put it in the
+root-level `.env` (both dev scripts source it), or export it in each
+terminal before launching `./scripts/dev-backend.sh` and
+`./scripts/dev-worker.sh`.
+
+```bash
+# One-time: generate and stash in root-level .env so both scripts see it.
+echo "APP_SECRET_KEY=$(backend/.venv/bin/python -c \
+  'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" \
+  >> .env
+
+# Terminal A
+./scripts/dev-backend.sh
+# Terminal B
+./scripts/dev-worker.sh
+```
+
+In the **New Job** form pick `Optimizer Strategy = gpt` and paste your
+OpenAI API key into the auto-tuning section. The key is encrypted with
+`APP_SECRET_KEY`, used server-side only, and soft-deleted when the job
+terminates. See
+[`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md)
+for the full protocol, env vars, and `real_cli + gpt` combined demo.
 
 **Frontend** — Vite dev server on `http://localhost:5173`:
 
