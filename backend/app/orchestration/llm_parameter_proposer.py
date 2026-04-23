@@ -1,8 +1,9 @@
 """GPT-backed candidate parameter proposer (Phase 8).
 
 Given the job configuration, acceptance criteria, baseline parameters, and a
-summary of prior candidate attempts, this module calls OpenAI's Responses API
-with a strict JSON schema and returns a list of validated
+summary of prior candidate attempts, this module calls OpenAI's
+``chat.completions`` API with a ``response_format={"type": "json_schema"}``
+structured-output constraint and returns a list of validated
 :class:`LlmProposal` objects that the job manager can persist as
 :class:`CandidateParameterSet` rows and dispatch as trials.
 
@@ -67,7 +68,13 @@ class OpenAIClientLike(Protocol):
 
 
 class _DefaultOpenAIClient:
-    """Adapter over the official ``openai`` Python SDK using the Responses API."""
+    """Adapter over the official ``openai`` Python SDK.
+
+    Uses ``client.chat.completions.create`` with
+    ``response_format={"type": "json_schema", ...}`` to get structured JSON
+    output that matches :data:`_STRICT_SCHEMA`. If a future switch to the
+    newer Responses API is desired, only this class needs to change.
+    """
 
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key

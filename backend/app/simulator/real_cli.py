@@ -67,7 +67,31 @@ def _build_command(
 
 
 def _trial_input_payload(ctx: TrialContext, output_path: Path) -> dict[str, Any]:
+    """Build the ``trial_input.json`` payload for the external simulator.
+
+    The canonical grouping for track/configuration fields is ``job_config``.
+    The same fields are additionally mirrored as top-level aliases so
+    wrapper authors can read either shape without reaching into the nested
+    object. See ``docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`` for the
+    normative schema.
+    """
+
     jc = ctx.job_config
+    start_point = {"x": jc.start_point_x, "y": jc.start_point_y}
+    wind = {
+        "north": jc.wind_north,
+        "east": jc.wind_east,
+        "south": jc.wind_south,
+        "west": jc.wind_west,
+    }
+    job_config = {
+        "track_type": jc.track_type,
+        "start_point": start_point,
+        "altitude_m": jc.altitude_m,
+        "wind": wind,
+        "sensor_noise_level": jc.sensor_noise_level,
+        "objective_profile": jc.objective_profile,
+    }
     return {
         "trial_id": ctx.trial_id,
         "job_id": ctx.job_id,
@@ -75,19 +99,15 @@ def _trial_input_payload(ctx: TrialContext, output_path: Path) -> dict[str, Any]
         "seed": ctx.seed,
         "scenario_type": ctx.scenario_type,
         "scenario_config": ctx.scenario_config or {},
-        "job_config": {
-            "track_type": jc.track_type,
-            "start_point": {"x": jc.start_point_x, "y": jc.start_point_y},
-            "altitude_m": jc.altitude_m,
-            "wind": {
-                "north": jc.wind_north,
-                "east": jc.wind_east,
-                "south": jc.wind_south,
-                "west": jc.wind_west,
-            },
-            "sensor_noise_level": jc.sensor_noise_level,
-            "objective_profile": jc.objective_profile,
-        },
+        # Canonical grouped object.
+        "job_config": job_config,
+        # Top-level convenience aliases (identical values).
+        "track_type": jc.track_type,
+        "start_point": start_point,
+        "altitude_m": jc.altitude_m,
+        "wind": wind,
+        "sensor_noise_level": jc.sensor_noise_level,
+        "objective_profile": jc.objective_profile,
         "parameters": dict(ctx.parameters),
         "output_path": str(output_path),
     }

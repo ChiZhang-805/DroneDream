@@ -98,6 +98,43 @@ curl http://127.0.0.1:8000/health
 cd worker && ../worker/.venv/bin/python -m drone_dream_worker.main
 ```
 
+### Shared local database
+
+The backend and the worker must point at the **same** SQLite DB or the
+worker will never see jobs that the backend creates. Both read
+`DATABASE_URL` from the environment; when unset, both
+`scripts/dev-backend.sh` and `scripts/dev-worker.sh` pin it to an absolute
+path under the repo root:
+
+```
+DATABASE_URL=sqlite:///<repo-root>/drone_dream.db
+```
+
+Both scripts also auto-source the repo-root `.env`, so any `DATABASE_URL=`
+you put there is honoured by both processes. The worker no longer
+`cd`s into `worker/` before launch, so the default relative SQLite path
+also resolves to the same file.
+
+**Smoke check** — after starting both scripts in separate terminals:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/api/v1/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"track_type":"circle","altitude_m":5,"sensor_noise_level":"medium","objective_profile":"robust","start_point":{"x":0,"y":0},"wind":{"north":0,"east":0,"south":0,"west":0}}' \
+  | tee /tmp/job.json
+JOB_ID=$(python3 -c "import json; print(json.load(open('/tmp/job.json'))['data']['id'])")
+# Within a few seconds you should see RUNNING (worker picked it up) then
+# AGGREGATING -> COMPLETED.
+for _ in $(seq 1 30); do
+  curl -sS http://127.0.0.1:8000/api/v1/jobs/$JOB_ID | python3 -c \
+    'import json,sys;d=json.load(sys.stdin)["data"];print(d["status"],d.get("completed_trial_count"))'
+  sleep 1
+done
+```
+
+If the worker never logs `start_job`, check `DATABASE_URL` in both
+terminals — they must match.
+
 ### End-to-end demo (happy path)
 
 With the backend and worker running in separate terminals (mock simulator is
@@ -151,13 +188,34 @@ export REAL_SIMULATOR_ARTIFACT_ROOT="$(pwd)/.artifacts"
 ```
 
 Then in the **New Job** form pick `Simulator Backend = real_cli` (default
-optimizer strategy is `heuristic`). The iterative loop runs baseline, then
-heuristic generations, until acceptance or `max_iterations`.
+optimizer strategy is `heuristic`). Heuristic jobs keep the Phase 7 batch
+behaviour — baseline and all heuristic optimizer candidates are dispatched
+up front, then acceptance criteria annotate `optimization_outcome`. Only
+GPT jobs (`optimizer_strategy=gpt`) use the iterative generation-by-
+generation loop described in
+[`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md).
 
 ### End-to-end demo (Phase 8: GPT parameter tuning)
 
+`APP_SECRET_KEY` (or `DRONEDREAM_SECRET_KEY`) is used by the **backend** to
+encrypt the per-job OpenAI API key at submission time, and by the
+**worker** to decrypt it when calling OpenAI. Both processes must see the
+same value — otherwise job creation fails with
+`details.reason = "server_secret_key_not_configured"`, or the worker can't
+decrypt an already-submitted key. Recommended local setup: put it in the
+root-level `.env` (both dev scripts source it), or export it in each
+terminal before launching `./scripts/dev-backend.sh` and
+`./scripts/dev-worker.sh`.
+
 ```bash
-export APP_SECRET_KEY="$(backend/.venv/bin/python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+# One-time: generate and stash in root-level .env so both scripts see it.
+echo "APP_SECRET_KEY=$(backend/.venv/bin/python -c \
+  'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" \
+  >> .env
+
+# Terminal A
+./scripts/dev-backend.sh
+# Terminal B
 ./scripts/dev-worker.sh
 ```
 

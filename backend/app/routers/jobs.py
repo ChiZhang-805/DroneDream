@@ -134,7 +134,15 @@ def get_job_report(
     # Surface user-readable failure context when the job did not produce a
     # report. These are all 409 (the job exists, the report simply isn't and
     # will never be available in this form). See docs/04_API_SPEC.md.
-    if job.status == "FAILED":
+    #
+    # Phase 8: FAILED GPT jobs can still have a best-so-far READY report
+    # (e.g. MAX_ITERATIONS_REACHED). Prefer returning that report over
+    # JOB_FAILED when it exists so the UI can render best-so-far metrics
+    # alongside the failure banner.
+    report = job.report
+    has_ready_report = report is not None and report.report_status == "READY"
+
+    if job.status == "FAILED" and not has_ready_report:
         raise HTTPException(
             status_code=409,
             detail={
@@ -164,7 +172,6 @@ def get_job_report(
             },
         )
 
-    report = job.report
     if report is None or report.report_status != "READY":
         raise HTTPException(
             status_code=409,
@@ -204,9 +211,24 @@ def list_job_artifacts(
 
     from app import models
 
+    # Phase 8: surface both job-scoped artifacts (report/global) AND
+    # trial-scoped artifacts (e.g. trajectory_plot / telemetry_json / worker_log
+    # written by the real_cli simulator adapter). ``owner_type`` and
+    # ``owner_id`` are preserved on the payload so callers can still scope
+    # per-trial. See docs/04_API_SPEC.md §7.5.
+    trial_ids = [t.id for t in job.trials]
     artifacts = (
         db.query(models.Artifact)
-        .filter(models.Artifact.owner_type == "job", models.Artifact.owner_id == job.id)
+        .filter(
+            (
+                (models.Artifact.owner_type == "job")
+                & (models.Artifact.owner_id == job.id)
+            )
+            | (
+                (models.Artifact.owner_type == "trial")
+                & (models.Artifact.owner_id.in_(trial_ids) if trial_ids else False)
+            )
+        )
         .order_by(models.Artifact.created_at.desc())
         .all()
     )

@@ -5,10 +5,14 @@ Phase 8 extends the Phase 7 MVP with two coordinated capabilities:
 1. A **real external simulator adapter** (`real_cli`) that shells out to any
    external drone simulator binary over a small, well-defined JSON CLI
    protocol. The built-in `mock` adapter is unchanged.
-2. An **iterative simulate-analyze-retune loop** driven either by the
-   existing deterministic heuristic optimizer or by a new **GPT parameter
-   proposer** that calls OpenAI server-side to suggest the next generation of
-   candidates.
+2. A **simulate-analyze-retune loop** driven by a new server-side **GPT
+   parameter proposer** that calls OpenAI to suggest the next generation of
+   candidates. The existing deterministic heuristic optimizer is still
+   supported (and is the default), but in this release it continues to use
+   the Phase 7 **batch** dispatch — baseline + all heuristic candidates up
+   front, one generation only. Iterative generation-by-generation dispatch
+   applies to `optimizer_strategy="gpt"` jobs only. See
+   §3. Iterative job flow for the exact semantics.
 
 The loop repeats until a candidate passes the configured acceptance criteria
 or until `max_iterations` / `max_total_trials` is reached.
@@ -41,8 +45,19 @@ The API **never** returns `openai.api_key`. The key is encrypted via
 `JobSecret` row scoped to the job. When the job reaches a terminal state the
 row is soft-deleted (`deleted_at` is set).
 
-If `optimizer_strategy = "gpt"` and no `APP_SECRET_KEY` is configured in the
-environment, job creation fails with `INVALID_INPUT`.
+**`APP_SECRET_KEY` (or `DRONEDREAM_SECRET_KEY`) must be visible to both the
+backend process and the worker process.** The backend uses it at job
+creation to encrypt the submitted key; the worker uses it later to decrypt
+the key before calling OpenAI. Recommended local setup: put it in the
+root-level `.env` (both `scripts/dev-backend.sh` and `scripts/dev-worker.sh`
+source it automatically), or export it in each terminal before launching
+the backend and the worker.
+
+If `optimizer_strategy = "gpt"` and no `APP_SECRET_KEY` is configured on the
+**backend** process, job creation fails with `INVALID_INPUT`
+(`details.reason = "server_secret_key_not_configured"`). If the worker does
+not see the same `APP_SECRET_KEY`, an already-submitted GPT job transitions
+to `FAILED` with `optimization_outcome = "llm_failed"`.
 
 The job response additionally echoes `simulator_backend_requested`,
 `optimizer_strategy`, `max_iterations`, `trials_per_candidate`,
@@ -76,6 +91,13 @@ respectively. Otherwise, the adapter appends
 
 ### 2.2 `trial_input.json` (written by the adapter)
 
+The track / scenario fields are emitted **twice**: once as the grouped
+`job_config` object (canonical) and once as top-level aliases (convenience
+for wrapper authors who prefer a flat shape). The two forms always hold
+identical values — wrapper authors may read either. Only `job_config` is
+guaranteed to exist in future protocol revisions; the top-level aliases are
+an additive convenience.
+
 ```json
 {
   "trial_id": "trial_...",
@@ -84,12 +106,23 @@ respectively. Otherwise, the adapter appends
   "seed": 42,
   "scenario_type": "nominal",
   "scenario_config": {},
+
+  "job_config": {
+    "track_type": "circle",
+    "start_point": {"x": 0.0, "y": 0.0},
+    "altitude_m": 3.0,
+    "wind": {"north": 0, "east": 0, "south": 0, "west": 0},
+    "sensor_noise_level": "medium",
+    "objective_profile": "robust"
+  },
+
   "track_type": "circle",
   "start_point": {"x": 0.0, "y": 0.0},
   "altitude_m": 3.0,
   "wind": {"north": 0, "east": 0, "south": 0, "west": 0},
   "sensor_noise_level": "medium",
   "objective_profile": "robust",
+
   "parameters": {
     "kp_xy": 1.0, "kd_xy": 0.2, "ki_xy": 0.05,
     "vel_limit": 5.0, "accel_limit": 4.0, "disturbance_rejection": 0.5
@@ -176,9 +209,18 @@ controlled failure testing — **it is not** the mock adapter.
    `optimization_outcome="llm_failed"` with an `llm_proposal_failed` event on
    the timeline.
 
-Heuristic mode preserves the Phase 7 deterministic optimizer but now also
-flows through the iterative dispatcher so both strategies share the same
-aggregation / acceptance logic.
+**Heuristic mode retains Phase 7 batch semantics** — when
+`optimizer_strategy="heuristic"`, `start_job()` dispatches the baseline
+**and all heuristic optimizer candidates** up front in a single batch, the
+worker processes them, and aggregation emits a READY report. The acceptance
+evaluator still annotates `optimization_outcome` (`success` vs
+`no_usable_candidate`) on the job, but heuristic jobs **do not generate
+later generations after failure** — there is only one generation of
+candidates beyond the baseline.
+
+**Only GPT jobs** use the iterative generation-by-generation dispatcher
+described above: baseline first, evaluate, propose a new generation from
+the LLM, dispatch, repeat until pass / `max_iterations` / `max_total_trials`.
 
 ---
 

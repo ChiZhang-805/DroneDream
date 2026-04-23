@@ -83,6 +83,18 @@ def test_real_cli_succeeds_against_example_simulator(monkeypatch, tmp_path):
     payload = json.loads((run_dir / "trial_input.json").read_text())
     assert payload["parameters"]["kp_xy"] == 1.0
     assert payload["scenario_type"] == "nominal"
+    # job_config is the canonical grouped object.
+    assert payload["job_config"]["track_type"] == "circle"
+    assert payload["job_config"]["altitude_m"] == 3.0
+    assert payload["job_config"]["start_point"] == {"x": 0.0, "y": 0.0}
+    # Top-level aliases mirror the same values for wrapper authors who
+    # prefer to read them without reaching into job_config.
+    assert payload["track_type"] == payload["job_config"]["track_type"]
+    assert payload["altitude_m"] == payload["job_config"]["altitude_m"]
+    assert payload["start_point"] == payload["job_config"]["start_point"]
+    assert payload["wind"] == payload["job_config"]["wind"]
+    assert payload["sensor_noise_level"] == payload["job_config"]["sensor_noise_level"]
+    assert payload["objective_profile"] == payload["job_config"]["objective_profile"]
 
 
 def test_real_cli_maps_timeout(monkeypatch, tmp_path):

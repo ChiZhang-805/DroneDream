@@ -46,7 +46,23 @@ def _parse_args() -> argparse.Namespace:
 
 def _compute_metrics(payload: dict[str, Any]) -> dict[str, Any]:
     params = payload.get("parameters", {}) or {}
-    job = payload.get("job_config", {}) or {}
+    # The canonical grouped object is ``job_config``; top-level aliases
+    # (``track_type``, ``altitude_m``, ``wind``, ``start_point``,
+    # ``sensor_noise_level``, ``objective_profile``) mirror the same values
+    # for wrapper authors who prefer the flat shape. This reference
+    # implementation prefers ``job_config`` and falls back to top-level.
+    job = payload.get("job_config") or {
+        k: payload[k]
+        for k in (
+            "track_type",
+            "altitude_m",
+            "wind",
+            "start_point",
+            "sensor_noise_level",
+            "objective_profile",
+        )
+        if k in payload
+    }
     scenario = payload.get("scenario_type", "nominal")
     scenario_config = payload.get("scenario_config") or {}
 

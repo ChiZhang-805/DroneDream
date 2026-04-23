@@ -236,6 +236,103 @@ def test_report_for_missing_job_returns_job_not_found(client: TestClient) -> Non
     assert resp.json()["error"]["code"] == "JOB_NOT_FOUND"
 
 
+def _seed_job_with_report(
+    *,
+    status: str,
+    report_status: str,
+    latest_error_code: str | None = None,
+) -> str:
+    """Seed a job row (optionally with a JobReport) via a direct DB session.
+
+    Returns the job_id. Requires that the shared test ``client`` fixture has
+    already initialised the database.
+    """
+
+    from app import db as db_module
+    from app import models
+
+    baseline = {
+        "rmse": 1.2, "max_error": 2.0, "overshoot_count": 3,
+        "completion_time": 9.0, "score": 4.2,
+    }
+    optimized = {
+        "rmse": 0.9, "max_error": 1.5, "overshoot_count": 2,
+        "completion_time": 8.0, "score": 3.0,
+    }
+    comparison = [
+        {"metric": "rmse", "label": "RMSE", "baseline": 1.2,
+         "optimized": 0.9, "lower_is_better": True, "unit": "m"}
+    ]
+    best_params = {
+        "kp_xy": 1.1, "kd_xy": 0.21, "ki_xy": 0.05,
+        "vel_limit": 5.0, "accel_limit": 4.0, "disturbance_rejection": 0.5,
+    }
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            user_id=None,
+            track_type="circle",
+            start_point_x=0.0,
+            start_point_y=0.0,
+            altitude_m=3.0,
+            wind_north=0.0, wind_east=0.0, wind_south=0.0, wind_west=0.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status=status,
+            current_phase="failed" if status == "FAILED" else "completed",
+            latest_error_code=latest_error_code,
+            latest_error_message="seeded",
+        )
+        db.add(job)
+        db.flush()
+        db.add(
+            models.JobReport(
+                job_id=job.id,
+                best_candidate_id="cand_seed",
+                summary_text="best-so-far seeded",
+                baseline_metric_json=baseline,
+                optimized_metric_json=optimized,
+                comparison_metric_json=comparison,
+                best_parameter_json=best_params,
+                report_status=report_status,
+            )
+        )
+        db.commit()
+        return str(job.id)
+
+
+def test_failed_job_with_ready_report_returns_report(client: TestClient) -> None:
+    """Phase 8: a FAILED GPT job with a best-so-far READY report returns it."""
+
+    job_id = _seed_job_with_report(
+        status="FAILED",
+        report_status="READY",
+        latest_error_code="MAX_ITERATIONS_REACHED",
+    )
+    resp = client.get(f"/api/v1/jobs/{job_id}/report")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["best_candidate_id"] == "cand_seed"
+    assert body["data"]["summary_text"] == "best-so-far seeded"
+    assert body["data"]["optimized_metrics"]["rmse"] == 0.9
+
+
+def test_failed_job_without_ready_report_still_returns_job_failed(
+    client: TestClient,
+) -> None:
+    job_id = _seed_job_with_report(
+        status="FAILED",
+        report_status="FAILED",
+        latest_error_code="ALL_TRIALS_FAILED",
+    )
+    resp = client.get(f"/api/v1/jobs/{job_id}/report")
+    assert resp.status_code == 409
+    body = resp.json()
+    assert body["error"]["code"] == "JOB_FAILED"
+    assert body["error"]["details"]["failure_code"] == "ALL_TRIALS_FAILED"
+
+
 # --- Artifacts -------------------------------------------------------------
 
 
@@ -244,3 +341,60 @@ def test_artifacts_empty(client: TestClient) -> None:
     resp = client.get(f"/api/v1/jobs/{job['id']}/artifacts")
     assert resp.status_code == 200
     assert resp.json() == {"success": True, "data": [], "error": None}
+
+
+def test_artifacts_includes_trial_scoped_artifacts(client: TestClient) -> None:
+    """Phase 8: trial-level artifacts (e.g. real_cli trajectory plots) are
+    returned from the job artifacts endpoint alongside job-level artifacts."""
+
+    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    job_id = job["id"]
+
+    from app import db as db_module
+    from app import models
+
+    with db_module.SessionLocal() as db:
+        # Seed a trial row bound to this job.
+        trial = models.Trial(
+            job_id=job_id,
+            candidate_id="cand_seed",
+            seed=7,
+            scenario_type="nominal",
+            status="COMPLETED",
+            attempt_count=1,
+        )
+        db.add(trial)
+        db.flush()
+        # Trial-scoped artifact (what real_cli writes).
+        db.add(
+            models.Artifact(
+                owner_type="trial",
+                owner_id=trial.id,
+                artifact_type="trajectory_plot",
+                display_name="Trajectory",
+                storage_path="/tmp/trajectory.png",
+                mime_type="image/png",
+                file_size_bytes=1234,
+            )
+        )
+        # Job-scoped artifact (what the report writer produces).
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=job_id,
+                artifact_type="report_summary",
+                display_name="Report",
+                storage_path="/tmp/report.json",
+                mime_type="application/json",
+                file_size_bytes=56,
+            )
+        )
+        db.commit()
+
+    resp = client.get(f"/api/v1/jobs/{job_id}/artifacts")
+    assert resp.status_code == 200, resp.text
+    items = resp.json()["data"]
+    owner_types = {a["owner_type"] for a in items}
+    kinds = {a["artifact_type"] for a in items}
+    assert "trial" in owner_types and "job" in owner_types
+    assert "trajectory_plot" in kinds and "report_summary" in kinds

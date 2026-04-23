@@ -7,7 +7,15 @@ trial, so operators can switch backends without code changes.
 Supported values:
 
 * ``mock`` → :class:`MockSimulatorAdapter` (default; MVP)
-* ``real_stub`` → :class:`RealSimulatorAdapterStub`
+* ``real_stub`` → :class:`RealSimulatorAdapterStub` (placeholder that always
+  returns ``ADAPTER_UNAVAILABLE``)
+* ``real_cli`` → :class:`RealCliSimulatorAdapter` (Phase 8; subprocess
+  adapter driven by ``REAL_SIMULATOR_COMMAND`` and the JSON file protocol
+  documented in ``docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md``)
+
+Phase 8 note: the ``SIMULATOR_BACKEND`` env var, when set, still overrides
+every job's ``simulator_backend`` column. Leave it unset to let per-job UI
+selection take effect.
 """
 
 from __future__ import annotations

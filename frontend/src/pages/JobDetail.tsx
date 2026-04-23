@@ -25,12 +25,27 @@ const ACTIVE_POLL_INTERVAL_MS = 4000;
 
 function CandidateCell({ t }: { t: TrialSummary }) {
   const label = t.candidate_label ?? (t.candidate_is_baseline ? "baseline" : "—");
-  const tone =
-    t.candidate_source_type === "optimizer" ? "optimizer" : "baseline";
+  // Phase 8: "llm_optimizer" rows must render as GPT Gen N, not collapse into
+  // "Baseline". Tone classes fall through to "optimizer" for the LLM variant
+  // so the existing CSS (orange/heuristic) still applies.
+  const source = t.candidate_source_type;
+  const tone: "baseline" | "optimizer" | "llm_optimizer" =
+    source === "optimizer"
+      ? "optimizer"
+      : source === "llm_optimizer"
+        ? "llm_optimizer"
+        : "baseline";
+  const toneClass = tone === "llm_optimizer" ? "optimizer" : tone;
+  const tagText =
+    tone === "baseline"
+      ? "Baseline"
+      : tone === "optimizer"
+        ? `Heuristic #${t.candidate_generation_index}`
+        : `GPT Gen ${t.candidate_generation_index}`;
   return (
     <span className="candidate-cell">
-      <span className={`candidate-tag candidate-tag-${tone}`}>
-        {tone === "baseline" ? "Baseline" : `Optimizer #${t.candidate_generation_index}`}
+      <span className={`candidate-tag candidate-tag-${toneClass}`}>
+        {tagText}
       </span>
       {t.candidate_is_best ? (
         <span className="candidate-tag candidate-tag-best">Best</span>
@@ -122,7 +137,10 @@ export function JobDetail() {
   });
 
   const job = jobQuery.data;
-  const reportEnabled = job?.status === "COMPLETED";
+  // Phase 8: FAILED jobs (e.g. MAX_ITERATIONS_REACHED) may still have a
+  // best-so-far READY report; the backend returns it if available and
+  // otherwise returns JOB_FAILED, which we handle as a reportQuery error.
+  const reportEnabled = job?.status === "COMPLETED" || job?.status === "FAILED";
   const artifactsEnabled =
     job?.status === "COMPLETED" ||
     job?.status === "FAILED" ||
@@ -200,10 +218,14 @@ export function JobDetail() {
 
       <MetricsCards job={job} report={report} />
 
-      {job.status === "COMPLETED" && report ? (
+      {report ? (
         <>
           <SectionCard
-            title="Baseline vs Optimized comparison"
+            title={
+              job.status === "FAILED"
+                ? "Best-so-far: Baseline vs Optimized comparison"
+                : "Baseline vs Optimized comparison"
+            }
             description="Optimized candidate vs. baseline across the core metrics."
           >
             <ComparisonChart data={report.comparison} />
@@ -220,7 +242,7 @@ export function JobDetail() {
         </>
       ) : null}
 
-      {job.status === "COMPLETED" && reportQuery.isError ? (
+      {reportEnabled && reportQuery.isError && job.status === "COMPLETED" ? (
         <Alert tone="danger" title="Report unavailable">
           {reportQuery.error instanceof ApiClientError
             ? reportQuery.error.message
@@ -487,18 +509,36 @@ function StatusSpecificTop({
   }
   if (job.status === "FAILED") {
     const err = job.latest_error;
+    const outcome = job.optimization_outcome;
+    const hasBestSoFar = Boolean(report);
+    const title = hasBestSoFar
+      ? "Job failed — best-so-far results available"
+      : "Job failed";
+    const outcomeLabel =
+      outcome === "max_iterations_reached"
+        ? "Max iterations reached before any candidate passed the acceptance criteria."
+        : outcome === "no_usable_candidate"
+          ? "No candidate produced usable metrics."
+          : outcome === "llm_failed"
+            ? "GPT parameter proposer failed; see the job event log."
+            : outcome === "simulator_unavailable"
+              ? "Simulator adapter was unavailable."
+              : null;
     return (
-      <Alert tone="danger" title="Job failed">
+      <Alert tone={hasBestSoFar ? "warning" : "danger"} title={title}>
         {err ? (
-          <>
-            <div>
-              <strong>{err.code}</strong>: {err.message}
-            </div>
-
-          </>
+          <div>
+            <strong>{err.code}</strong>: {err.message}
+          </div>
         ) : (
-          "Failed with no detailed error reported."
+          <div>Failed with no detailed error reported.</div>
         )}
+        {outcomeLabel ? <div style={{ marginTop: 4 }}>{outcomeLabel}</div> : null}
+        {hasBestSoFar ? (
+          <div style={{ marginTop: 4 }}>
+            Best-so-far parameters and baseline-vs-optimized metrics are shown below.
+          </div>
+        ) : null}
       </Alert>
     );
   }
@@ -519,7 +559,10 @@ function MetricsCards({
   job: Job;
   report: JobReport | undefined;
 }) {
-  if (job.status === "COMPLETED" && report) {
+  if (
+    (job.status === "COMPLETED" || job.status === "FAILED") &&
+    report
+  ) {
     const { baseline_metrics: b, optimized_metrics: o } = report;
     return (
       <SectionCard title="Headline metrics">
