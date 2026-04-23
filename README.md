@@ -181,9 +181,18 @@ frontend never renders a half-filled report.
 
 ### End-to-end demo (Phase 8: real_cli + heuristic)
 
+For normal use, leave `SIMULATOR_BACKEND` **unset** (the default in the
+shipped `.env.example`) so the per-job selection from the New Job UI is
+respected. Only set `REAL_SIMULATOR_COMMAND` / `REAL_SIMULATOR_ARTIFACT_ROOT`
+so the `real_cli` adapter has a simulator to invoke:
+
 ```bash
 export REAL_SIMULATOR_COMMAND="$(which python) $(pwd)/scripts/simulators/example_real_simulator.py"
 export REAL_SIMULATOR_ARTIFACT_ROOT="$(pwd)/.artifacts"
+# Do NOT export SIMULATOR_BACKEND — that would globally override the UI
+# selection. Only set it (e.g. SIMULATOR_BACKEND=real_cli) when you
+# intentionally want every job to use a specific backend regardless of
+# what the New Job form specifies.
 ./scripts/dev-worker.sh
 ```
 

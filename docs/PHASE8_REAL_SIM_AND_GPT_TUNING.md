@@ -343,9 +343,21 @@ and `optimizer_strategy` flipped.
 | `REAL_SIMULATOR_KEEP_RUN_DIRS` | `real_cli` adapter | `true` |
 | `SIMULATOR_BACKEND` | Legacy override (tests) | unset (per-job setting used) |
 
-`SIMULATOR_BACKEND` still works as a global override for backward
-compatibility; if set, it takes precedence over the per-job
-`simulator_backend_requested` column.
+**Leave `SIMULATOR_BACKEND` unset (blank) for normal use.** The shipped
+`.env.example` ships it as `SIMULATOR_BACKEND=` (empty) so the per-job
+`simulator_backend` selection from the New Job form is respected. When the
+variable is non-empty, it acts as a **global override** — every job uses
+that backend regardless of what the UI selected. This is intentional for
+Phase 7 back-compat and for debugging (e.g. forcing all jobs to `real_stub`
+to exercise the failure path). Precedence, highest first:
+
+1. `SIMULATOR_BACKEND` env var (if non-empty)
+2. Job's `simulator_backend_requested` column (Phase 8, UI selection)
+3. Factory default (`mock`)
+
+See `backend/tests/test_simulator_adapter.py::test_resolve_backend_override_*`
+and `::test_env_simulator_backend_treats_blank_as_unset` for the exact
+behaviour.
 
 ---
 
