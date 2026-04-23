@@ -121,21 +121,21 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
     renderPage();
     expect(screen.getByLabelText(/Simulator backend/i)).toHaveValue("mock");
     expect(screen.getByLabelText(/Optimizer strategy/i)).toHaveValue(
-      "heuristic",
+      "gpt",
     );
-    expect(screen.getByLabelText(/Max iterations/i)).toHaveValue(5);
+    expect(screen.getByLabelText(/Max iterations/i)).toHaveValue(20);
     expect(screen.getByLabelText(/Trials per candidate/i)).toHaveValue(3);
     expect(screen.getByLabelText(/Min pass rate/i)).toHaveValue(0.8);
   });
 
   it("shows the OpenAI API key field only when strategy is gpt", () => {
     renderPage();
-    expect(screen.queryByLabelText(/OpenAI API key/i)).toBeNull();
-    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
-      target: { value: "gpt" },
-    });
     expect(screen.getByLabelText(/OpenAI API key/i)).toBeVisible();
-    expect(screen.getByLabelText(/OpenAI model/i)).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
+      target: { value: "heuristic" },
+    });
+    expect(screen.queryByLabelText(/OpenAI API key/i)).toBeNull();
+    expect(screen.queryByLabelText(/OpenAI model/i)).toBeNull();
   });
 
   it("blocks submission when strategy=gpt and api key is blank", async () => {
@@ -143,9 +143,6 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_unused" } as unknown as Job);
     renderPage();
-    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
-      target: { value: "gpt" },
-    });
     fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
     expect(
       await screen.findByText(/API key required when strategy is gpt/i),
@@ -196,6 +193,9 @@ describe("NewJob — failed submission", () => {
 
     // Change a field away from defaults so we can assert it is preserved.
     setNumeric(/Altitude/i, "5.5");
+    fireEvent.change(screen.getByLabelText(/Optimizer strategy/i), {
+      target: { value: "heuristic" },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
 

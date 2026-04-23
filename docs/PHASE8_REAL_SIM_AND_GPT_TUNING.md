@@ -8,7 +8,7 @@ Phase 8 extends the Phase 7 MVP with two coordinated capabilities:
 2. A **simulate-analyze-retune loop** driven by a new server-side **GPT
    parameter proposer** that calls OpenAI to suggest the next generation of
    candidates. The existing deterministic heuristic optimizer is still
-   supported (and is the default), but in this release it continues to use
+   supported (but is not the default UX), and it continues to use
    the Phase 7 **batch** dispatch — baseline + all heuristic candidates up
    front, one generation only. Iterative generation-by-generation dispatch
    applies to `optimizer_strategy="gpt"` jobs only. See
@@ -25,14 +25,13 @@ client-side call to OpenAI. Only the server ever sees the OpenAI API key.
 
 ## 1. Per-job configuration
 
-`POST /api/v1/jobs` accepts these new optional fields (defaults preserve the
-Phase 7 behaviour, so existing clients keep working):
+`POST /api/v1/jobs` accepts these new optional fields:
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `simulator_backend` | `"mock" \| "real_cli"` | `"mock"` | Which adapter to run trials against. |
-| `optimizer_strategy` | `"heuristic" \| "gpt"` | `"heuristic"` | Source of candidate proposals. |
-| `max_iterations` | int 1–20 | `5` | Max generations after baseline. |
+| `optimizer_strategy` | `"heuristic" \| "gpt"` | `"gpt"` | Source of candidate proposals. |
+| `max_iterations` | int 1–20 | `20` | Max generations after baseline. |
 | `trials_per_candidate` | int 1–10 | `3` | Scenarios evaluated per candidate. |
 | `acceptance_criteria.target_rmse` | float \| null | `null` | Skip if `null`. |
 | `acceptance_criteria.target_max_error` | float \| null | `null` | Skip if `null`. |
@@ -44,6 +43,9 @@ The API **never** returns `openai.api_key`. The key is encrypted via
 `cryptography.fernet.Fernet` using `APP_SECRET_KEY` and stored in a
 `JobSecret` row scoped to the job. When the job reaches a terminal state the
 row is soft-deleted (`deleted_at` is set).
+
+`APP_SECRET_KEY` / `DRONEDREAM_SECRET_KEY` is the server-side encryption key;
+it is **not** the user's OpenAI API key.
 
 **`APP_SECRET_KEY` (or `DRONEDREAM_SECRET_KEY`) must be visible to both the
 backend process and the worker process.** The backend uses it at job
@@ -201,8 +203,7 @@ controlled failure testing — **it is not** the mock adapter.
    still fails after `current_generation == max_iterations` or after
    `total_trials >= max_total_trials`, the job terminates with:
    - `optimization_outcome = "max_iterations_reached"` and
-     `latest_error_code = "MAX_ITERATIONS_REACHED"` (or
-     `"NO_PASSING_CANDIDATE"` when no candidate completed any trial).
+     `status = COMPLETED` (or `optimization_outcome = "no_usable_candidate"`).
    - A best-so-far report is still generated whenever at least one candidate
      produced usable metrics, and the UI renders it.
 4. If the GPT proposer fails, the job transitions to
@@ -219,8 +220,8 @@ later generations after failure** — there is only one generation of
 candidates beyond the baseline.
 
 **Only GPT jobs** use the iterative generation-by-generation dispatcher
-described above: baseline first, evaluate, propose a new generation from
-the LLM, dispatch, repeat until pass / `max_iterations` / `max_total_trials`.
+described above: baseline first, evaluate, propose exactly one new generation
+candidate from the LLM, dispatch, repeat until pass / `max_iterations` / `max_total_trials`.
 
 ---
 
@@ -247,7 +248,7 @@ the LLM, dispatch, repeat until pass / `max_iterations` / `max_total_trials`.
   "type": "object",
   "properties": {
     "proposals": {
-      "type": "array", "minItems": 1, "maxItems": 5,
+      "type": "array", "minItems": 1, "maxItems": 1,
       "items": {
         "type": "object",
         "properties": {
@@ -327,6 +328,11 @@ until the job is terminal, then the `JobSecret` row is soft-deleted.
 
 Combine §5.2 and §5.3 — same job creation flow with both `simulator_backend`
 and `optimizer_strategy` flipped.
+
+### 5.5 Rerun behavior for GPT jobs
+
+Rerunning a GPT job stays GPT-based. The rerun request must include a **fresh**
+`openai.api_key`; previously stored encrypted keys are not reused.
 
 ---
 

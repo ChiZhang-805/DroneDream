@@ -121,7 +121,23 @@ export function JobDetail() {
   const safeId = jobId ?? "";
 
   const rerunMutation = useMutation({
-    mutationFn: (id: string) => apiClient.rerunJob(id),
+    mutationFn: ({
+      id,
+      openaiApiKey,
+      openaiModel,
+    }: {
+      id: string;
+      openaiApiKey?: string;
+      openaiModel?: string | null;
+    }) =>
+      apiClient.rerunJob(id, {
+        openai: openaiApiKey
+          ? {
+              api_key: openaiApiKey,
+              model: openaiModel ?? null,
+            }
+          : undefined,
+      }),
     onSuccess: (newJob) => {
       queryClient.invalidateQueries({ queryKey: ["jobs", "dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["jobs", "history"] });
@@ -209,11 +225,27 @@ export function JobDetail() {
     job.status === "FAILED" ||
     job.status === "CANCELLED";
 
+  const handleRerun = () => {
+    if (job.optimizer_strategy === "gpt") {
+      const freshKey = window.prompt(
+        "Enter a fresh OpenAI API key for this GPT rerun:",
+      );
+      if (!freshKey || freshKey.trim() === "") return;
+      rerunMutation.mutate({
+        id: job.id,
+        openaiApiKey: freshKey.trim(),
+        openaiModel: job.openai_model,
+      });
+      return;
+    }
+    rerunMutation.mutate({ id: job.id });
+  };
+
   return (
     <section className="stack-md">
       <JobHeader
         job={job}
-        onRerun={() => rerunMutation.mutate(job.id)}
+        onRerun={handleRerun}
         onCancel={() => cancelMutation.mutate(job.id)}
         rerunPending={rerunMutation.isPending}
         cancelPending={cancelMutation.isPending}
@@ -568,6 +600,30 @@ function StatusSpecificTop({
         ) : null}
       </Alert>
     );
+  }
+  if (job.status === "COMPLETED") {
+    if (job.optimization_outcome === "success") {
+      return (
+        <Alert tone="success" title="Acceptance criteria satisfied">
+          The tuning loop found a candidate that meets the configured acceptance
+          criteria.
+        </Alert>
+      );
+    }
+    if (
+      job.optimization_outcome === "max_iterations_reached" ||
+      job.optimization_outcome === "no_usable_candidate"
+    ) {
+      return (
+        <Alert
+          tone="warning"
+          title="Search budget exhausted — showing best-so-far parameters"
+        >
+          No candidate fully satisfied acceptance before the search budget was
+          exhausted.
+        </Alert>
+      );
+    }
   }
   if (job.status === "COMPLETED" && !report) {
     return (

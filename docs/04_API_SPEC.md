@@ -181,8 +181,8 @@ full details):
 ```json
 {
   "simulator_backend": "mock",
-  "optimizer_strategy": "heuristic",
-  "max_iterations": 5,
+  "optimizer_strategy": "gpt",
+  "max_iterations": 20,
   "trials_per_candidate": 3,
   "acceptance_criteria": {
     "target_rmse": 0.5,
@@ -197,7 +197,7 @@ full details):
 ```
 
 - `simulator_backend`: `"mock"` (default) or `"real_cli"`.
-- `optimizer_strategy`: `"heuristic"` (default) or `"gpt"`.
+- `optimizer_strategy`: `"gpt"` (default) or `"heuristic"`.
 - `openai.api_key` is required **only** when `optimizer_strategy == "gpt"`;
   the server stores it encrypted (Fernet via `APP_SECRET_KEY`) and never
   returns it in any response.
@@ -276,6 +276,20 @@ Returns the full `Job` object including:
 Creates a new job by cloning the source job's configuration. Response
 matches `POST /api/v1/jobs` exactly: the full new `Job` object plus the
 `job_id` alias. The new job's `source_job_id` references the original.
+
+For source jobs with `optimizer_strategy="gpt"`, the rerun request must
+include a fresh key:
+
+```json
+{
+  "openai": {
+    "api_key": "sk-..."
+  }
+}
+```
+
+GPT reruns remain GPT-based; the previously stored encrypted job key is not
+reused.
 
 ### 7.5 `POST /api/v1/jobs/{job_id}/cancel`
 

@@ -138,8 +138,8 @@ export const mockApi = {
       failed_at: null,
       recent_events: [],
       simulator_backend_requested: req.simulator_backend ?? "mock",
-      optimizer_strategy: req.optimizer_strategy ?? "heuristic",
-      max_iterations: req.max_iterations ?? 5,
+      optimizer_strategy: req.optimizer_strategy ?? "gpt",
+      max_iterations: req.max_iterations ?? 20,
       trials_per_candidate: req.trials_per_candidate ?? 3,
       acceptance_criteria: req.acceptance_criteria ?? {
         target_rmse: 0.5,

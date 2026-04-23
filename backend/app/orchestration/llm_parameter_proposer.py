@@ -31,7 +31,7 @@ logger = logging.getLogger("drone_dream.orchestration.llm")
 
 _PARAMETER_KEYS: tuple[str, ...] = tuple(constants.PARAMETER_SAFE_RANGES.keys())
 _DEFAULT_MODEL = "gpt-4.1"
-_MAX_PROPOSALS = 5
+_MAX_PROPOSALS = 1
 _MIN_PROPOSALS = 1
 
 
@@ -204,17 +204,41 @@ def _build_prompt(
         candidates,
         key=lambda c: (c.generation_index, c.is_baseline),
     ):
+        agg = cand.aggregated_metric_json or {}
+        trial_count = cand.trial_count or 0
+        passing_trial_count = int(agg.get("passing_trial_count", 0) or 0)
+        completion_rate = (
+            (cand.completed_trial_count / trial_count) if trial_count > 0 else 0.0
+        )
+        trial_feedback: list[dict[str, Any]] = []
+        for trial in sorted(cand.trials, key=lambda t: (t.created_at, t.id)):
+            metric = trial.metric
+            trial_feedback.append(
+                {
+                    "scenario_type": trial.scenario_type,
+                    "pass_flag": metric.pass_flag if metric is not None else None,
+                    "rmse": metric.rmse if metric is not None else None,
+                    "max_error": metric.max_error if metric is not None else None,
+                    "completion_time": metric.completion_time if metric is not None else None,
+                    "final_error": metric.final_error if metric is not None else None,
+                    "failure_code": trial.failure_code,
+                    "failure_reason": (trial.failure_reason or "")[:200] or None,
+                    "log_excerpt": (trial.log_excerpt or "")[:200] or None,
+                }
+            )
         prior.append(
             {
+                "candidate_id": cand.id,
                 "label": cand.label,
-                "source_type": cand.source_type,
                 "generation_index": cand.generation_index,
                 "parameters": dict(cand.parameter_json or {}),
-                "aggregated_metrics": cand.aggregated_metric_json,
+                "aggregated_metrics": agg,
                 "aggregated_score": cand.aggregated_score,
+                "pass_rate": round((passing_trial_count / trial_count), 4) if trial_count > 0 else 0.0,
+                "completion_rate": round(completion_rate, 4),
+                "passing_trial_count": passing_trial_count,
                 "trial_count": cand.trial_count,
-                "completed_trial_count": cand.completed_trial_count,
-                "failed_trial_count": cand.failed_trial_count,
+                "trials": trial_feedback,
             }
         )
 
@@ -241,8 +265,8 @@ def _build_prompt(
         "current_generation": job.current_generation,
         "max_iterations": job.max_iterations,
         "instructions": (
-            f"Propose between 1 and {_MAX_PROPOSALS} next-generation candidate "
-            "parameter sets. Every proposal must include all required keys and "
+            "Propose exactly 1 next-generation candidate parameter set. "
+            "The proposal must include all required keys and "
             "every numeric value must lie strictly inside the safe range. Do not "
             "include any other keys. Be explicit about the rationale."
         ),

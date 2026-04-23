@@ -114,8 +114,8 @@ class JobCreateRequest(_Strict):
     objective_profile: ObjectiveProfile = "robust"
 
     simulator_backend: SimulatorBackend = "mock"
-    optimizer_strategy: OptimizerStrategy = "heuristic"
-    max_iterations: Annotated[int, Field(ge=1, le=20)] = 5
+    optimizer_strategy: OptimizerStrategy = "gpt"
+    max_iterations: Annotated[int, Field(ge=1, le=20)] = 20
     trials_per_candidate: Annotated[int, Field(ge=1, le=10)] = 3
     max_total_trials: Annotated[int, Field(ge=1, le=1000)] = 100
     acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
@@ -152,8 +152,8 @@ class Job(BaseModel):
     recent_events: list[JobEventInfo] = Field(default_factory=list)
     # Phase 8: auto-tuning configuration + progress.
     simulator_backend_requested: SimulatorBackend = "mock"
-    optimizer_strategy: OptimizerStrategy = "heuristic"
-    max_iterations: int = 5
+    optimizer_strategy: OptimizerStrategy = "gpt"
+    max_iterations: int = 20
     trials_per_candidate: int = 3
     max_total_trials: int = 100
     acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
@@ -260,6 +260,12 @@ class Artifact(BaseModel):
     mime_type: str | None = None
     file_size_bytes: int | None = None
     created_at: datetime
+
+
+class JobRerunRequest(_Strict):
+    """POST /api/v1/jobs/{job_id}/rerun body."""
+
+    openai: OpenAIConfig | None = None
 
 
 __all__ = [

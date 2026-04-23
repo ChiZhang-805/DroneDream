@@ -127,6 +127,10 @@ export interface JobCreateRequest {
   openai?: OpenAIConfig | null;
 }
 
+export interface JobRerunRequest {
+  openai?: OpenAIConfig | null;
+}
+
 export interface Job {
   id: string;
   track_type: TrackType;

@@ -194,13 +194,26 @@ def get_job(db: Session, job_id: str) -> models.Job:
     return job
 
 
-def rerun_job(db: Session, job_id: str) -> models.Job:
+def rerun_job(
+    db: Session,
+    job_id: str,
+    *,
+    openai: schemas.OpenAIConfig | None = None,
+) -> models.Job:
     source = get_job(db, job_id)
-    strategy: schemas.OptimizerStrategy = (
-        "heuristic"
-        if source.optimizer_strategy == "gpt"
-        else source.optimizer_strategy  # type: ignore[assignment]
-    )
+    strategy: schemas.OptimizerStrategy = source.optimizer_strategy  # type: ignore[assignment]
+    rerun_openai: schemas.OpenAIConfig | None = None
+    if strategy == "gpt":
+        if openai is None or not openai.api_key:
+            raise JobServiceError(
+                "INVALID_INPUT",
+                "openai.api_key is required when rerunning a gpt job.",
+                http_status=422,
+            )
+        rerun_openai = schemas.OpenAIConfig(
+            api_key=openai.api_key,
+            model=openai.model if openai.model is not None else source.openai_model,
+        )
     req = schemas.JobCreateRequest(
         track_type=source.track_type,  # type: ignore[arg-type]
         start_point=schemas.StartPoint(x=source.start_point_x, y=source.start_point_y),
@@ -223,6 +236,7 @@ def rerun_job(db: Session, job_id: str) -> models.Job:
             target_max_error=source.target_max_error,
             min_pass_rate=source.min_pass_rate,
         ),
+        openai=rerun_openai,
     )
     new_job = _create_job_from_config(db, req=req, source_job_id=source.id)
     db.commit()
