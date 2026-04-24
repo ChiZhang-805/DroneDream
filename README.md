@@ -258,6 +258,40 @@ defaults to `$PX4_AUTOPILOT_DIR/build/px4_sitl_default/rootfs/log`). This enable
 metrics from actual PX4 logs, though full track-following quality still depends on
 your offboard controller/mission layer being active.
 
+The repo now includes `scripts/simulators/px4_offboard_track_executor.py` and
+`local_px4_launch_wrapper.py` can run it while PX4 SITL is alive. Enable with:
+
+- `PX4_ENABLE_OFFBOARD_EXECUTOR=true` (default in wrapper)
+- `PX4_OFFBOARD_CONNECTION=udp://:14540`
+- `PX4_OFFBOARD_SETPOINT_RATE_HZ=10`
+- `PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS=30`
+- `PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS=120`
+- `PX4_OFFBOARD_LAND_AFTER=true`
+- optional `PX4_OFFBOARD_EXECUTOR_COMMAND` override
+
+The executor reads `reference_track.json` and `controller_params.json`,
+builds a vel/accel-limited setpoint stream, performs takeoff-hold + track
+following, and sends MAVSDK offboard position setpoints. `controller_params`
+are applied in this executor schedule logic (not by writing PX4 internal params).
+Current mapping assumption is DroneDream x/y/z (z positive-up) → PX4 local NED
+north/east/down via `(north=x, east=y, down=-z)`.
+
+Example `.env` excerpt for real PX4/Gazebo path:
+
+```bash
+REAL_SIMULATOR_COMMAND="python3 /home/chi/DroneDream/scripts/simulators/px4_gazebo_runner.py"
+PX4_GAZEBO_DRY_RUN=false
+PX4_GAZEBO_LAUNCH_COMMAND="/home/chi/PX4-Autopilot/.venv/bin/python /home/chi/DroneDream/scripts/simulators/local_px4_launch_wrapper.py --run-dir {run_dir} --input {trial_input} --params {params_json} --track {track_json} --telemetry {telemetry_json} --stdout-log {stdout_log} --stderr-log {stderr_log} --vehicle {vehicle} --world {world} --headless {headless}"
+PX4_SITE_DRY_RUN=false
+PX4_AUTOPILOT_DIR=/home/chi/PX4-Autopilot
+PX4_SETUP_COMMANDS="source /home/chi/PX4-Autopilot/.venv/bin/activate"
+PX4_MAKE_TARGET=gz_x500
+PX4_TELEMETRY_MODE=ulog
+PX4_ULOG_ROOT=/home/chi/PX4-Autopilot/build/px4_sitl_default/rootfs/log
+PX4_ENABLE_OFFBOARD_EXECUTOR=true
+PX4_OFFBOARD_CONNECTION=udp://:14540
+```
+
 ### End-to-end demo (Phase 8: GPT parameter tuning)
 
 `APP_SECRET_KEY` (or `DRONEDREAM_SECRET_KEY`) is used by the **backend** to

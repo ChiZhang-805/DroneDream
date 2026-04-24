@@ -263,6 +263,7 @@ def test_wrapper_real_mode_ulog_uses_px4_ulog_path(tmp_path: Path):
     env["PX4_TELEMETRY_MODE"] = "ulog"
     env["PX4_ULOG_PATH"] = str(ulog_path)
     env["PYTHONPATH"] = str(tmp_path)
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
 
     fake_pyulog = tmp_path / "pyulog.py"
     fake_pyulog.write_text(
@@ -306,6 +307,7 @@ def test_wrapper_real_mode_ulog_missing_log_fails_with_clear_message(tmp_path: P
     env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
     env["PX4_TELEMETRY_MODE"] = "ulog"
     env["PX4_ULOG_ROOT"] = str(tmp_path / "missing_root")
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
 
     proc = subprocess.run(
         [sys.executable, str(WRAPPER), *_make_args(tmp_path)],
@@ -372,3 +374,178 @@ def test_px4_runner_can_call_local_wrapper_in_site_dry_run(tmp_path: Path):
     result = json.loads(output_path.read_text(encoding="utf-8"))
     assert result["success"] is True
     assert result["metrics"]["raw_metric_json"]["mode"] == "real"
+
+
+def test_wrapper_real_mode_without_offboard_executor_preserves_behavior(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\nprint('launched')\ntime.sleep(0.2)\n", encoding="utf-8")
+    telemetry_src = _write_json(
+        tmp_path / "source_telemetry.json",
+        {
+            "samples": [
+                {
+                    "t": 0.0,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 3.0,
+                    "vx": 0.0,
+                    "vy": 0.0,
+                    "vz": 0.0,
+                    "yaw": 0.0,
+                    "armed": True,
+                    "mode": "offboard",
+                    "crashed": False,
+                }
+            ]
+        },
+    )
+
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
+    env["PX4_RUN_SECONDS"] = "1"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "1"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *_make_args(tmp_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert (tmp_path / "run" / "telemetry.json").exists()
+
+
+def test_wrapper_offboard_executor_invoked_while_px4_running(tmp_path: Path):
+    pid_file = tmp_path / "px4.pid"
+    marker_file = tmp_path / "run" / "executor_ok.txt"
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text(
+        "import pathlib,time,os\n"
+        f"pathlib.Path({str(pid_file)!r}).write_text(str(os.getpid()), encoding='utf-8')\n"
+        "time.sleep(30)\n",
+        encoding="utf-8",
+    )
+    executor_script = tmp_path / "executor.py"
+    executor_script.write_text(
+        "import os,sys,pathlib,time\n"
+        f"pid_path=pathlib.Path({str(pid_file)!r})\n"
+        "for _ in range(50):\n"
+        "    if pid_path.exists():\n"
+        "        break\n"
+        "    time.sleep(0.05)\n"
+        "if not pid_path.exists():\n"
+        "    sys.exit(4)\n"
+        "pid=int(pid_path.read_text(encoding='utf-8').strip())\n"
+        "alive=True\n"
+        "try:\n"
+        "    os.kill(pid, 0)\n"
+        "except OSError:\n"
+        "    alive=False\n"
+        "marker=pathlib.Path(sys.argv[sys.argv.index('--log')+1]).with_name('executor_ok.txt')\n"
+        "marker.write_text('alive' if alive else 'dead', encoding='utf-8')\n"
+        "log_path = pathlib.Path(sys.argv[sys.argv.index('--log')+1])\n"
+        "log_path.write_text('executor ran\\n', encoding='utf-8')\n"
+        "sys.exit(0 if alive else 3)\n",
+        encoding="utf-8",
+    )
+    telemetry_src = _write_json(
+        tmp_path / "source_telemetry.json",
+        {
+            "samples": [
+                {
+                    "t": 0.0,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 3.0,
+                    "vx": 0.0,
+                    "vy": 0.0,
+                    "vz": 0.0,
+                    "yaw": 0.0,
+                    "armed": True,
+                    "mode": "offboard",
+                    "crashed": False,
+                }
+            ]
+        },
+    )
+
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "true"
+    env["PX4_OFFBOARD_EXECUTOR_COMMAND"] = f"{sys.executable} {executor_script}"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "1"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *_make_args(tmp_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert marker_file.read_text(encoding="utf-8") == "alive"
+    assert (tmp_path / "run" / "offboard_executor.log").exists()
+
+
+def test_wrapper_offboard_executor_failure_exits_non_zero(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\nprint('launched')\ntime.sleep(30)\n", encoding="utf-8")
+    bad_executor = tmp_path / "bad_executor.py"
+    bad_executor.write_text(
+        "import sys\nprint('boom', file=sys.stderr)\nsys.exit(9)\n",
+        encoding="utf-8",
+    )
+    telemetry_src = _write_json(
+        tmp_path / "source_telemetry.json",
+        {
+            "samples": [
+                {
+                    "t": 0.0,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 3.0,
+                    "vx": 0.0,
+                    "vy": 0.0,
+                    "vz": 0.0,
+                    "yaw": 0.0,
+                    "armed": True,
+                    "mode": "offboard",
+                    "crashed": False,
+                }
+            ]
+        },
+    )
+
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "true"
+    env["PX4_OFFBOARD_EXECUTOR_COMMAND"] = f"{sys.executable} {bad_executor}"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "1"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *_make_args(tmp_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode != 0
+    stderr_text = (tmp_path / "run" / "stderr.log").read_text(encoding="utf-8")
+    assert "offboard executor failed" in stderr_text
