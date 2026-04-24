@@ -187,6 +187,24 @@ reference implementation used by the test suite and the real_cli demo. It
 supports per-scenario / per-noise penalties and `inject_failure` for
 controlled failure testing — **it is not** the mock adapter.
 
+### 2.6 PX4/Gazebo-oriented real_cli runner
+
+`scripts/simulators/px4_gazebo_runner.py` is an environment-driven wrapper
+that targets the same `real_cli` contract while making room for real
+PX4/Gazebo stacks when available locally.
+
+It intentionally does **not** claim the repo already contains a complete PX4
+workspace or launch graph. Instead:
+
+- `PX4_GAZEBO_DRY_RUN=true` provides deterministic fixture telemetry for CI/dev.
+- real mode requires `PX4_GAZEBO_LAUNCH_COMMAND`; if missing/unexecutable the
+  runner emits `ADAPTER_UNAVAILABLE`.
+- the lower-level site-specific launcher must write telemetry artifacts the
+  runner can ingest.
+
+See `docs/PX4_GAZEBO_RUNNER.md` for env vars, command template tokens,
+telemetry schema, metric formulas, and failure mappings.
+
 ---
 
 ## 3. Iterative optimization loop
@@ -312,6 +330,20 @@ export REAL_SIMULATOR_ARTIFACT_ROOT="$(pwd)/.artifacts"
 
 Create a new job in the UI with `simulator_backend=real_cli` and the default
 heuristic strategy.
+
+### 5.2.1 real_cli + PX4/Gazebo runner (dry-run validation path)
+
+```bash
+export REAL_SIMULATOR_COMMAND="$(which python) $(pwd)/scripts/simulators/px4_gazebo_runner.py"
+export REAL_SIMULATOR_ARTIFACT_ROOT="$(pwd)/.artifacts"
+export PX4_GAZEBO_DRY_RUN=true
+./scripts/dev-worker.sh
+```
+
+This validates the full `real_cli` orchestration path without requiring a local
+Gazebo installation. To switch to real execution, set
+`PX4_GAZEBO_DRY_RUN=false` and provide `PX4_GAZEBO_LAUNCH_COMMAND` pointing
+to your local launcher wrapper.
 
 ### 5.3 mock + GPT
 

@@ -204,6 +204,47 @@ GPT jobs (`optimizer_strategy=gpt`) use the iterative one-proposal-per-
 generation loop described in
 [`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md).
 
+### PX4/Gazebo runner (real_cli target)
+
+`scripts/simulators/px4_gazebo_runner.py` is a **real_cli protocol wrapper**
+for PX4/Gazebo environments. It is intentionally environment-driven: this repo
+does **not** include a full PX4 workspace, world assets, ROS graph contracts,
+or telemetry exporters. Use it as:
+
+```bash
+export REAL_SIMULATOR_COMMAND="python3 $(pwd)/scripts/simulators/px4_gazebo_runner.py"
+```
+
+Then configure one of two modes:
+
+1) **Dry-run mode (CI/dev, no Gazebo required):**
+
+```bash
+export PX4_GAZEBO_DRY_RUN=true
+```
+
+The runner deterministically generates fixture telemetry, computes the same
+metrics pipeline used in real mode, writes trial artifacts, and returns a
+normal `trial_result.json`.
+
+2) **Real launch mode (local PX4/Gazebo installed):**
+
+```bash
+export PX4_GAZEBO_DRY_RUN=false
+export PX4_GAZEBO_LAUNCH_COMMAND='bash /abs/path/launch_px4_gz.sh --telemetry {telemetry_json} --params {params_json} --track {track_json}'
+```
+
+`PX4_GAZEBO_LAUNCH_COMMAND` supports template tokens (for example
+`{run_dir}`, `{trial_input}`, `{telemetry_json}`, `{stdout_log}`, `{trial_id}`,
+etc.) so site-specific launchers can adapt without editing Python.
+
+If dry-run is disabled and launch command/binaries are unavailable, the runner
+returns `success=false` with `failure.code=ADAPTER_UNAVAILABLE` instead of
+pretending real PX4 support is present.
+
+For the full contract, telemetry schema, metrics, failure mapping, and
+limitations, see [`docs/PX4_GAZEBO_RUNNER.md`](docs/PX4_GAZEBO_RUNNER.md).
+
 ### End-to-end demo (Phase 8: GPT parameter tuning)
 
 `APP_SECRET_KEY` (or `DRONEDREAM_SECRET_KEY`) is used by the **backend** to
