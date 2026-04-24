@@ -77,6 +77,10 @@ Optional:
 - `{candidate_id}`
 - `{seed}`
 - `{scenario_type}`
+- `{vehicle}`
+- `{world}`
+- `{headless}`
+- `{extra_args}`
 
 If tokens are present, the runner substitutes and executes.
 If no token is present, it appends:
@@ -89,6 +93,11 @@ If no token is present, it appends:
 
 The lower-level launcher is responsible for starting PX4/Gazebo and writing
 telemetry in the expected schema.
+
+`PX4_GAZEBO_VEHICLE`, `PX4_GAZEBO_WORLD`, `PX4_GAZEBO_HEADLESS`, and
+`PX4_GAZEBO_EXTRA_ARGS` can be consumed either directly from environment
+variables by your launcher script, or passed through the command template
+tokens above.
 
 ---
 
@@ -107,7 +116,7 @@ normally the `real_cli` trial directory):
 - `trial_result.json`
 
 Artifacts are returned in `trial_result.json` metadata for at least telemetry,
-trajectory, and logs.
+trajectory (`artifact_type=trajectory_json`), and logs.
 
 ---
 

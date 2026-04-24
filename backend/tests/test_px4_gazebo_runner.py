@@ -155,6 +155,56 @@ def test_px4_runner_writes_expected_artifacts_in_dry_run(tmp_path: Path):
         assert (tmp_path / name).exists(), name
 
 
+def test_px4_runner_template_substitutes_env_tokens(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    args_dump = tmp_path / "argv.json"
+    launcher.write_text(
+        "import json, pathlib, sys\n"
+        "pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1]).write_text("
+        "'{\"samples\": [{\"t\": 0.0, \"x\": 0.0, \"y\": 0.0, \"z\": 3.0}]}'"
+        ", encoding='utf-8')\n"
+        f"pathlib.Path({str(args_dump)!r}).write_text(json.dumps(sys.argv), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    command = (
+        f"{sys.executable} {launcher} "
+        "--vehicle {vehicle} --world {world} --headless {headless} --extra {extra_args} "
+        "--params {params_json} --track {track_json} --telemetry {telemetry_json}"
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": command,
+            "PX4_GAZEBO_VEHICLE": "x500_test",
+            "PX4_GAZEBO_WORLD": "warehouse",
+            "PX4_GAZEBO_HEADLESS": "false",
+            "PX4_GAZEBO_EXTRA_ARGS": "--speed 2 --foo bar",
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    argv = json.loads(args_dump.read_text(encoding="utf-8"))
+    assert "--vehicle" in argv and "x500_test" in argv
+    assert "--world" in argv and "warehouse" in argv
+    assert "--headless" in argv and "false" in argv
+    assert "--extra" in argv
+    extra_idx = argv.index("--extra")
+    assert argv[extra_idx + 1 : extra_idx + 5] == ["--speed", "2", "--foo", "bar"]
+
+
+def test_px4_runner_trajectory_artifact_type_is_json(tmp_path: Path):
+    proc, result = _run_runner(tmp_path, env_overrides={"PX4_GAZEBO_DRY_RUN": "true"})
+    assert proc.returncode == 0
+    assert result["success"] is True
+    trajectory = next(
+        a for a in result["artifacts"] if Path(a["storage_path"]).name == "trajectory.json"
+    )
+    assert trajectory["artifact_type"] == "trajectory_json"
+    assert trajectory["display_name"] == "Trajectory Samples"
+    assert trajectory["mime_type"] == "application/json"
+
+
 def _ctx() -> TrialContext:
     return TrialContext(
         trial_id="trial-1",
@@ -204,6 +254,6 @@ def test_real_cli_integration_with_px4_runner_dry_run(
     assert (run_dir / "trajectory.json").exists()
     assert {a.artifact_type for a in result.artifacts} >= {
         "telemetry_json",
-        "trajectory_plot",
+        "trajectory_json",
         "worker_log",
     }
