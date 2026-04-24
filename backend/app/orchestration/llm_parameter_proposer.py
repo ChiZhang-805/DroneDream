@@ -234,7 +234,11 @@ def _build_prompt(
                 "parameters": dict(cand.parameter_json or {}),
                 "aggregated_metrics": agg,
                 "aggregated_score": cand.aggregated_score,
-                "pass_rate": round((passing_trial_count / trial_count), 4) if trial_count > 0 else 0.0,
+                "pass_rate": (
+                    round((passing_trial_count / trial_count), 4)
+                    if trial_count > 0
+                    else 0.0
+                ),
                 "completion_rate": round(completion_rate, 4),
                 "passing_trial_count": passing_trial_count,
                 "trial_count": cand.trial_count,

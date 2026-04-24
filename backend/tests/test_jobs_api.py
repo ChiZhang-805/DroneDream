@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 VALID_JOB_PAYLOAD: dict = {
@@ -11,7 +12,11 @@ VALID_JOB_PAYLOAD: dict = {
     "wind": {"north": 0, "east": 0, "south": 0, "west": 0},
     "sensor_noise_level": "medium",
     "objective_profile": "robust",
+}
+HEURISTIC_JOB_PAYLOAD: dict = {
+    **VALID_JOB_PAYLOAD,
     "optimizer_strategy": "heuristic",
+    "simulator_backend": "mock",
 }
 
 
@@ -19,7 +24,7 @@ VALID_JOB_PAYLOAD: dict = {
 
 
 def test_create_job_returns_queued(client: TestClient) -> None:
-    resp = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD)
+    resp = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD)
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["success"] is True
@@ -42,7 +47,7 @@ def test_create_job_returns_queued(client: TestClient) -> None:
 def test_create_job_exposes_job_id_alias(client: TestClient) -> None:
     """The create response must include ``job_id`` (alias of ``id``)."""
 
-    body = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()
+    body = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()
     job = body["data"]
     assert body["success"] is True
     assert "id" in job
@@ -58,7 +63,7 @@ def test_list_and_detail_do_not_add_job_id_alias(client: TestClient) -> None:
     while preserving the alias where the original spec promised it.
     """
 
-    created = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    created = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     detail = client.get(f"/api/v1/jobs/{created['id']}").json()["data"]
     assert detail["id"] == created["id"]
     assert "job_id" not in detail
@@ -114,7 +119,7 @@ def test_create_job_rejects_unknown_fields(client: TestClient) -> None:
 
 def test_list_jobs_paginates(client: TestClient) -> None:
     for _ in range(3):
-        r = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD)
+        r = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD)
         assert r.status_code == 200
 
     resp = client.get("/api/v1/jobs")
@@ -130,7 +135,7 @@ def test_list_jobs_paginates(client: TestClient) -> None:
 
 
 def test_get_job_detail(client: TestClient) -> None:
-    created = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    created = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     resp = client.get(f"/api/v1/jobs/{created['id']}")
     assert resp.status_code == 200
     fetched = resp.json()["data"]
@@ -150,7 +155,7 @@ def test_get_job_not_found(client: TestClient) -> None:
 
 
 def test_list_trials_for_job_is_empty(client: TestClient) -> None:
-    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     resp = client.get(f"/api/v1/jobs/{job['id']}/trials")
     assert resp.status_code == 200
     assert resp.json() == {"success": True, "data": [], "error": None}
@@ -166,7 +171,7 @@ def test_trial_not_found(client: TestClient) -> None:
 
 
 def test_rerun_creates_new_job_preserving_original(client: TestClient) -> None:
-    original = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    original = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     resp = client.post(f"/api/v1/jobs/{original['id']}/rerun")
     assert resp.status_code == 200
     new_job = resp.json()["data"]
@@ -191,7 +196,11 @@ def test_rerun_not_found(client: TestClient) -> None:
     assert resp.json()["error"]["code"] == "JOB_NOT_FOUND"
 
 
-def test_rerun_gpt_requires_fresh_openai_api_key(client: TestClient) -> None:
+def test_rerun_gpt_requires_fresh_openai_api_key(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "dev-unit-test-key")
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
     payload = {
         **VALID_JOB_PAYLOAD,
         "optimizer_strategy": "gpt",
@@ -203,7 +212,11 @@ def test_rerun_gpt_requires_fresh_openai_api_key(client: TestClient) -> None:
     assert resp.json()["error"]["code"] == "INVALID_INPUT"
 
 
-def test_rerun_gpt_stays_gpt_with_new_openai_key(client: TestClient) -> None:
+def test_rerun_gpt_stays_gpt_with_new_openai_key(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "dev-unit-test-key")
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
     payload = {
         **VALID_JOB_PAYLOAD,
         "optimizer_strategy": "gpt",
@@ -223,7 +236,7 @@ def test_rerun_gpt_stays_gpt_with_new_openai_key(client: TestClient) -> None:
 
 
 def test_cancel_queued_job(client: TestClient) -> None:
-    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     resp = client.post(f"/api/v1/jobs/{job['id']}/cancel")
     assert resp.status_code == 200
     cancelled = resp.json()["data"]
@@ -232,7 +245,7 @@ def test_cancel_queued_job(client: TestClient) -> None:
 
 
 def test_cancel_twice_rejects(client: TestClient) -> None:
-    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     assert client.post(f"/api/v1/jobs/{job['id']}/cancel").status_code == 200
     resp = client.post(f"/api/v1/jobs/{job['id']}/cancel")
     assert resp.status_code == 409
@@ -251,7 +264,7 @@ def test_cancel_not_found(client: TestClient) -> None:
 
 
 def test_report_not_ready(client: TestClient) -> None:
-    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     resp = client.get(f"/api/v1/jobs/{job['id']}/report")
     assert resp.status_code == 409
     body = resp.json()
@@ -366,7 +379,7 @@ def test_failed_job_without_ready_report_still_returns_job_failed(
 
 
 def test_artifacts_empty(client: TestClient) -> None:
-    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     resp = client.get(f"/api/v1/jobs/{job['id']}/artifacts")
     assert resp.status_code == 200
     assert resp.json() == {"success": True, "data": [], "error": None}
@@ -376,7 +389,7 @@ def test_artifacts_includes_trial_scoped_artifacts(client: TestClient) -> None:
     """Phase 8: trial-level artifacts (e.g. real_cli trajectory plots) are
     returned from the job artifacts endpoint alongside job-level artifacts."""
 
-    job = client.post("/api/v1/jobs", json=VALID_JOB_PAYLOAD).json()["data"]
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     job_id = job["id"]
 
     from app import db as db_module

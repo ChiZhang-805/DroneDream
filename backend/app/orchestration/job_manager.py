@@ -8,6 +8,7 @@ from a separate transaction.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -23,6 +24,15 @@ from app.orchestration.llm_parameter_proposer import (
     propose_candidates,
 )
 from app.orchestration.optimizer import CandidateProposal, generate_candidates
+
+
+@dataclass(frozen=True)
+class LlmDispatchResult:
+    """Outcome of one attempt to dispatch the next GPT generation."""
+
+    status: str
+    dispatched_candidates: int = 0
+    error: str | None = None
 
 
 def _now() -> datetime:
@@ -292,25 +302,29 @@ def dispatch_next_llm_generation(
     job: models.Job,
     *,
     client: OpenAIClientLike | None = None,
-) -> int:
+) -> LlmDispatchResult:
     """Ask the LLM proposer for the next generation and dispatch its trials.
 
-    Returns the number of candidates dispatched (0 when no usable proposals
-    came back or the proposer failed). Caller is responsible for the DB
-    commit lifecycle.
+    Returns a structured status so callers can distinguish proposer/system
+    failures from clean budget exhaustion and "no usable proposal" outcomes.
+    Caller is responsible for the DB commit lifecycle.
     """
 
     from app.orchestration.acceptance import criteria_for_job
 
     criteria = criteria_for_job(job)
     result = propose_candidates(db, job, criteria, client=client)
-    if result.error or not result.proposals:
-        return 0
+    if result.error:
+        return LlmDispatchResult(status="llm_error", error=result.error)
+    if not result.proposals:
+        return LlmDispatchResult(status="no_usable_proposal")
 
     generation_index = job.current_generation + 1
     trials_per_candidate = max(1, job.trials_per_candidate)
+    if generation_index > job.max_iterations:
+        return LlmDispatchResult(status="max_iterations_reached")
     if job.progress_total_trials + trials_per_candidate > job.max_total_trials:
-        return 0
+        return LlmDispatchResult(status="budget_exhausted")
     proposal = result.proposals[0]
     candidate = _create_llm_candidate(
         db,
@@ -336,7 +350,7 @@ def dispatch_next_llm_generation(
             "model": result.model,
         },
     )
-    return 1
+    return LlmDispatchResult(status="dispatched", dispatched_candidates=1)
 
 
 def start_queued_jobs(db: Session, *, limit: int = 10) -> list[str]:

@@ -78,7 +78,10 @@ def _create_queued_job(ctx: dict[str, object]) -> str:
     jobs_service = ctx["jobs_service"]
     db_module = ctx["db_module"]
 
-    req = schemas.JobCreateRequest()
+    req = schemas.JobCreateRequest(
+        simulator_backend="mock",
+        optimizer_strategy="heuristic",
+    )
     with db_module.SessionLocal() as db:
         job = jobs_service.create_job(db, req)
         return job.id
@@ -318,6 +321,8 @@ def test_api_report_endpoint_returns_ready_after_worker_runs(
                 "wind": {"north": 0, "east": 0, "south": 0, "west": 0},
                 "sensor_noise_level": "medium",
                 "objective_profile": "robust",
+                "optimizer_strategy": "heuristic",
+                "simulator_backend": "mock",
             },
         ).json()["data"]
         job_id = created["id"]
@@ -483,7 +488,13 @@ def test_list_jobs_filters_by_status(orchestration_ctx):
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]
     with ctx["db_module"].SessionLocal() as db:
-        cancelled_job = jobs_service.create_job(db, schemas.JobCreateRequest())
+        cancelled_job = jobs_service.create_job(
+            db,
+            schemas.JobCreateRequest(
+                simulator_backend="mock",
+                optimizer_strategy="heuristic",
+            ),
+        )
         cancelled_id = cancelled_job.id
     with ctx["db_module"].SessionLocal() as db:
         jobs_service.cancel_job(db, cancelled_id)
