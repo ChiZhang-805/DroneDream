@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -63,6 +64,86 @@ def _run_runner(
     assert output_path.exists(), proc.stderr
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     return proc, payload
+
+
+def _write_launcher_with_payloads(
+    path: Path,
+    telemetry_payload: dict[str, object],
+    *,
+    offboard_timing_payload: dict[str, object] | None = None,
+) -> Path:
+    script = [
+        "import json, pathlib, sys",
+        "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])",
+        f"telemetry.write_text({json.dumps(json.dumps(telemetry_payload))}, encoding='utf-8')",
+    ]
+    if offboard_timing_payload is not None:
+        script.extend(
+            [
+                "run_dir = telemetry.parent",
+                (
+                    "(run_dir / 'offboard_timing.json').write_text("
+                    f"{json.dumps(json.dumps(offboard_timing_payload))}, encoding='utf-8')"
+                ),
+            ]
+        )
+    path.write_text("\n".join(script) + "\n", encoding="utf-8")
+    return path
+
+
+def _track_following_telemetry() -> dict[str, object]:
+    samples: list[dict[str, object]] = []
+    t = 0.0
+    for _ in range(20):
+        samples.append(
+            {
+                "t": round(t, 2),
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0,
+                "mode": "takeoff",
+                "crashed": False,
+            }
+        )
+        t += 0.1
+    for i in range(10):
+        samples.append(
+            {
+                "t": round(t, 2),
+                "x": 0.5 * i,
+                "y": 0.0,
+                "z": 3.0,
+                "mode": "transition",
+                "crashed": False,
+            }
+        )
+        t += 0.1
+    for i in range(180):
+        theta = 2.0 * 3.141592653589793 * (i / 179)
+        samples.append(
+            {
+                "t": round(t, 2),
+                "x": 5.0 * math.cos(theta),
+                "y": 5.0 * math.sin(theta),
+                "z": 3.0,
+                "mode": "offboard",
+                "crashed": False,
+            }
+        )
+        t += 0.1
+    for _ in range(10):
+        samples.append(
+            {
+                "t": round(t, 2),
+                "x": 5.0,
+                "y": 0.0,
+                "z": 0.0,
+                "mode": "land",
+                "crashed": False,
+            }
+        )
+        t += 0.1
+    return {"samples": samples, "meta": {"source": "test_fixture"}}
 
 
 def test_px4_runner_requires_cli_args():
@@ -203,6 +284,119 @@ def test_px4_runner_trajectory_artifact_type_is_json(tmp_path: Path):
     assert trajectory["artifact_type"] == "trajectory_json"
     assert trajectory["display_name"] == "Trajectory Samples"
     assert trajectory["mime_type"] == "application/json"
+
+
+def test_evaluation_window_ignores_takeoff_transition_and_landing(tmp_path: Path):
+    telemetry = _track_following_telemetry()
+    launcher = _write_launcher_with_payloads(tmp_path / "launcher.py", telemetry)
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_PASS_RMSE": "1.5",
+            "PX4_GAZEBO_PASS_MAX_ERROR": "3.0",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    assert result["metrics"]["raw_metric_json"]["full_log_max_error"] > 4.5
+    assert result["metrics"]["rmse"] < 0.2
+    assert result["metrics"]["pass_flag"] is True
+
+
+def test_preflight_and_post_track_ground_samples_do_not_trigger_crash(tmp_path: Path):
+    telemetry = _track_following_telemetry()
+    launcher = _write_launcher_with_payloads(tmp_path / "launcher.py", telemetry)
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    assert result["metrics"]["crash_flag"] is False
+
+
+def test_crash_inside_evaluation_window_sets_crash_flag(tmp_path: Path):
+    telemetry = _track_following_telemetry()
+    samples = telemetry["samples"]
+    assert isinstance(samples, list)
+    for idx in range(80, 90):
+        samples[idx]["crashed"] = True
+    launcher = _write_launcher_with_payloads(tmp_path / "launcher.py", telemetry)
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    assert result["metrics"]["crash_flag"] is True
+    assert result["metrics"]["pass_flag"] is False
+
+
+def test_offboard_timing_window_source_is_used_when_present(tmp_path: Path):
+    telemetry = _track_following_telemetry()
+    launcher = _write_launcher_with_payloads(
+        tmp_path / "launcher.py",
+        telemetry,
+        offboard_timing_payload={
+            "track_start_t": 3.0,
+            "track_end_t": 21.0,
+            "time_base": "executor_relative_seconds",
+        },
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    raw = result["metrics"]["raw_metric_json"]
+    assert raw["evaluation_window_source"] == "offboard_timing"
+    assert raw["evaluation_sample_count"] < raw["total_sample_count"]
+
+
+def test_telemetry_derived_window_source_used_when_timing_missing(tmp_path: Path):
+    telemetry = _track_following_telemetry()
+    launcher = _write_launcher_with_payloads(tmp_path / "launcher.py", telemetry)
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    raw = result["metrics"]["raw_metric_json"]
+    assert raw["evaluation_window_source"] == "telemetry_derived"
+    for key in (
+        "evaluation_window_source",
+        "evaluation_start_t",
+        "evaluation_end_t",
+        "evaluation_sample_count",
+        "total_sample_count",
+    ):
+        assert key in raw
 
 
 def _ctx() -> TrialContext:

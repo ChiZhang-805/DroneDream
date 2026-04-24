@@ -110,13 +110,15 @@ normally the `real_cli` trial directory):
 - `reference_track.json`
 - `telemetry.json`
 - `trajectory.json`
+- `offboard_timing.json` (when offboard executor is enabled)
 - `stdout.log`
 - `stderr.log`
 - `runner.log`
 - `trial_result.json`
 
-Artifacts are returned in `trial_result.json` metadata for at least telemetry,
-trajectory (`artifact_type=trajectory_json`), and logs.
+Artifacts are returned in `trial_result.json` metadata for telemetry,
+trajectory (`artifact_type=trajectory_json`), logs, and offboard timing
+(`artifact_type=offboard_timing_json`) when present.
 
 ---
 
@@ -167,19 +169,38 @@ CSV fallback is supported only when `PX4_GAZEBO_ALLOW_CSV_TELEMETRY=true`.
 
 ## 8) Metric definitions
 
-Computed against nearest-point XY distance to reference path:
+Computed against nearest-point XY distance to reference path, using an
+**evaluation window** focused on track-following (not preflight/takeoff/landing):
 
-- `rmse`: RMS tracking error
-- `max_error`: max tracking error
+Window selection order:
+
+1. `offboard_timing.json` `track_start_t`/`track_end_t` (best-effort aligned to
+   telemetry timeline; fallback if incompatible).
+2. Telemetry-derived window:
+   - start when `z >= 0.8 * target_altitude` and near path (default ≤1.5m XY)
+   - end when altitude drops below `0.8 * target_altitude` after start
+3. Altitude-only fallback (`z >= 0.8 * target_altitude`)
+4. All-samples fallback (conservative behavior)
+
+- `rmse`: RMS tracking error over evaluation window
+- `max_error`: max tracking error over evaluation window
 - `completion_time`: `t_end - t_start`
 - `final_error`: final sample to final reference point
 - `overshoot_count`: deterministic peak/valley heuristic over radial error
-- `crash_flag`: telemetry crash marker or severe altitude collapse
+- `crash_flag`: evaluated primarily in the evaluation window; preflight/landing
+  ground samples outside the evaluation window do not count as crashes
 - `timeout_flag`: launcher timeout hit
 - `instability_flag`: non-finite/implausible jumps/divergence
-- `pass_flag`: healthy trial + thresholds + minimum track coverage
+- `pass_flag`: healthy trial + thresholds + minimum **evaluation** track coverage
 - `score` (lower is better): weighted error/time + penalties
-- `raw_metric_json`: mode/coverage/threshold metadata
+- `raw_metric_json`: mode/coverage/threshold metadata, including:
+  - `evaluation_window_source`
+  - `evaluation_start_t`
+  - `evaluation_end_t`
+  - `evaluation_sample_count`
+  - `total_sample_count`
+  - `evaluation_track_coverage`
+  - full-log diagnostic fields (`full_log_rmse`, `full_log_max_error`)
 
 ---
 

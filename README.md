@@ -245,6 +245,12 @@ pretending real PX4 support is present.
 For the full contract, telemetry schema, metrics, failure mapping, and
 limitations, see [`docs/PX4_GAZEBO_RUNNER.md`](docs/PX4_GAZEBO_RUNNER.md).
 
+For real PX4 runs, metric pass/fail now uses a track-following **evaluation
+window** (offboard timing metadata when available, otherwise telemetry-derived
+altitude/path heuristics). Raw telemetry/trajectory artifacts still include the
+full flight log (preflight, takeoff, transition, and landing), while RMSE and
+max-error intentionally focus on the actual track-following interval.
+
 For site-specific startup logic, use `scripts/simulators/local_px4_launch_wrapper.py`
 as the `PX4_GAZEBO_LAUNCH_COMMAND` target. It supports `PX4_SITE_DRY_RUN=true`
 for CI/dev without PX4, and real local launches when `PX4_AUTOPILOT_DIR` and
