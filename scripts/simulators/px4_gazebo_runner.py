@@ -57,6 +57,10 @@ _TEMPLATE_TOKENS = (
     "candidate_id",
     "seed",
     "scenario_type",
+    "vehicle",
+    "world",
+    "headless",
+    "extra_args",
 )
 
 
@@ -605,7 +609,7 @@ def _failure_result(reason: str, code: str, artifacts: list[dict[str, Any]], log
 def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
     records = [
         _artifact_record(run_dir / "telemetry.json", "telemetry_json", "Telemetry", "application/json"),
-        _artifact_record(run_dir / "trajectory.json", "trajectory_plot", "Trajectory Samples", "application/json"),
+        _artifact_record(run_dir / "trajectory.json", "trajectory_json", "Trajectory Samples", "application/json"),
         _artifact_record(run_dir / "runner.log", "worker_log", "Runner Log", "text/plain"),
         _artifact_record(run_dir / "stdout.log", "simulator_stdout", "Simulator stdout", "text/plain"),
         _artifact_record(run_dir / "stderr.log", "simulator_stderr", "Simulator stderr", "text/plain"),
@@ -688,6 +692,10 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 "candidate_id": meta["candidate_id"],
                 "seed": str(meta["seed"]),
                 "scenario_type": meta["scenario_type"],
+                "vehicle": env.vehicle,
+                "world": env.world,
+                "headless": "true" if env.headless else "false",
+                "extra_args": env.extra_args,
             }
             argv = _build_launch_argv(env.launch_command, values)
             cwd = Path(env.workdir) if env.workdir else run_dir
