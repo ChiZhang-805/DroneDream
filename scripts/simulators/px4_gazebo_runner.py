@@ -414,6 +414,108 @@ def _nearest_error(sample: dict[str, Any], ref_points: list[dict[str, float]]) -
     return best, best_idx
 
 
+def _find_eval_window_from_timing(
+    samples: list[dict[str, Any]],
+    reference_track: list[dict[str, float]],
+    timing: dict[str, Any],
+    *,
+    near_track_threshold: float,
+) -> tuple[int, int] | None:
+    start_t_raw = timing.get("track_start_t")
+    end_t_raw = timing.get("track_end_t")
+    if not isinstance(start_t_raw, (int, float)) or not isinstance(end_t_raw, (int, float)):
+        return None
+    start_t = float(start_t_raw)
+    end_t = float(end_t_raw)
+    if (not math.isfinite(start_t)) or (not math.isfinite(end_t)) or end_t <= start_t:
+        return None
+
+    times = [float(s["t"]) for s in samples]
+    t_min = min(times)
+    t_max = max(times)
+
+    def _pick_indices(candidate_start: float, candidate_end: float) -> tuple[int, int] | None:
+        idx_start = next((i for i, s in enumerate(samples) if s["t"] >= candidate_start), None)
+        if idx_start is None:
+            return None
+        idx_end = next((i for i, s in enumerate(samples) if s["t"] >= candidate_end), len(samples) - 1)
+        idx_end = min(idx_end, len(samples) - 1)
+        if idx_end <= idx_start:
+            return None
+        return idx_start, idx_end
+
+    direct = _pick_indices(start_t, end_t)
+    if direct is not None and (start_t >= t_min - 1.0) and (end_t <= t_max + 1.0):
+        return direct
+
+    target_altitude = float(reference_track[0]["z"])
+    altitude_threshold = 0.8 * target_altitude
+    duration = end_t - start_t
+    candidate_starts: list[int] = []
+    for i, s in enumerate(samples):
+        if s["z"] < altitude_threshold:
+            continue
+        err, _ = _nearest_error(s, reference_track)
+        if err <= near_track_threshold:
+            candidate_starts.append(i)
+    if not candidate_starts:
+        return None
+
+    best: tuple[int, int] | None = None
+    best_gap = float("inf")
+    for idx_start in candidate_starts:
+        desired_end_t = samples[idx_start]["t"] + duration
+        idx_end = next((i for i, s in enumerate(samples) if i >= idx_start and s["t"] >= desired_end_t), len(samples) - 1)
+        if idx_end <= idx_start:
+            continue
+        actual_duration = samples[idx_end]["t"] - samples[idx_start]["t"]
+        gap = abs(actual_duration - duration)
+        if gap < best_gap:
+            best = (idx_start, idx_end)
+            best_gap = gap
+    return best
+
+
+def _find_eval_window_from_telemetry(
+    samples: list[dict[str, Any]],
+    reference_track: list[dict[str, float]],
+    *,
+    near_track_threshold: float,
+) -> tuple[int, int] | None:
+    target_altitude = float(reference_track[0]["z"])
+    altitude_threshold = 0.8 * target_altitude
+    start_idx: int | None = None
+    for i, s in enumerate(samples):
+        if s["z"] < altitude_threshold:
+            continue
+        err, _ = _nearest_error(s, reference_track)
+        if err <= near_track_threshold:
+            start_idx = i
+            break
+    if start_idx is None:
+        return None
+
+    end_idx = len(samples) - 1
+    for i in range(start_idx + 1, len(samples)):
+        if samples[i]["z"] < altitude_threshold:
+            end_idx = i - 1
+            break
+    if end_idx <= start_idx:
+        return None
+    return start_idx, end_idx
+
+
+def _find_altitude_only_window(
+    samples: list[dict[str, Any]], reference_track: list[dict[str, float]]
+) -> tuple[int, int] | None:
+    target_altitude = float(reference_track[0]["z"])
+    altitude_threshold = 0.8 * target_altitude
+    eligible = [i for i, s in enumerate(samples) if s["z"] >= altitude_threshold]
+    if not eligible:
+        return None
+    return eligible[0], eligible[-1]
+
+
 def _compute_metrics(
     telemetry: dict[str, Any],
     reference_track: list[dict[str, float]],
@@ -424,8 +526,52 @@ def _compute_metrics(
     dry_run: bool,
 ) -> dict[str, Any]:
     samples = telemetry["samples"]
+    near_track_threshold = _parse_float(os.environ.get("PX4_GAZEBO_EVAL_NEAR_TRACK_THRESHOLD_M"), default=1.5)
+    total_sample_count = len(samples)
+
+    offboard_timing_path = Path(str(telemetry.get("meta", {}).get("offboard_timing_path", ""))).expanduser()
+    offboard_timing: dict[str, Any] | None = None
+    if offboard_timing_path and offboard_timing_path.exists():
+        try:
+            loaded = json.loads(offboard_timing_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                offboard_timing = loaded
+        except Exception:
+            offboard_timing = None
+
+    window = None
+    window_source = "all_samples_fallback"
+    if offboard_timing is not None:
+        window = _find_eval_window_from_timing(
+            samples,
+            reference_track,
+            offboard_timing,
+            near_track_threshold=near_track_threshold,
+        )
+        if window is not None:
+            window_source = "offboard_timing"
+    if window is None:
+        window = _find_eval_window_from_telemetry(
+            samples,
+            reference_track,
+            near_track_threshold=near_track_threshold,
+        )
+        if window is not None:
+            window_source = "telemetry_derived"
+    if window is None:
+        window = _find_altitude_only_window(samples, reference_track)
+        if window is not None:
+            window_source = "altitude_only"
+    if window is None:
+        window = (0, len(samples) - 1)
+
+    eval_start_idx, eval_end_idx = window
+    evaluation_samples = samples[eval_start_idx : eval_end_idx + 1]
+
     errors: list[float] = []
     ref_hits: set[int] = set()
+    eval_errors: list[float] = []
+    eval_ref_hits: set[int] = set()
     radial_errors: list[float] = []
     center_x = job_cfg["start_point"]["x"]
     center_y = job_cfg["start_point"]["y"]
@@ -435,12 +581,16 @@ def _compute_metrics(
         errors.append(err)
         ref_hits.add(idx)
         radial_errors.append(math.hypot(s["x"] - center_x, s["y"] - center_y))
+    for s in evaluation_samples:
+        err, idx = _nearest_error(s, reference_track)
+        eval_errors.append(err)
+        eval_ref_hits.add(idx)
 
-    rmse = math.sqrt(sum(e * e for e in errors) / len(errors))
-    max_error = max(errors)
-    completion_time = max(0.0, samples[-1]["t"] - samples[0]["t"])
+    rmse = math.sqrt(sum(e * e for e in eval_errors) / len(eval_errors))
+    max_error = max(eval_errors)
+    completion_time = max(0.0, evaluation_samples[-1]["t"] - evaluation_samples[0]["t"])
     final_ref = reference_track[-1]
-    final_error = math.hypot(samples[-1]["x"] - final_ref["x"], samples[-1]["y"] - final_ref["y"])
+    final_error = math.hypot(evaluation_samples[-1]["x"] - final_ref["x"], evaluation_samples[-1]["y"] - final_ref["y"])
 
     overshoot_count = 0
     for i in range(2, len(radial_errors)):
@@ -450,14 +600,24 @@ def _compute_metrics(
         if (b > a and b > c and b - max(a, c) > 0.25) or (b < a and b < c and min(a, c) - b > 0.25):
             overshoot_count += 1
 
-    crash_flag = any(bool(s.get("crashed", False)) for s in samples)
-    if not crash_flag and job_cfg["altitude_m"] > 0.5:
-        crash_flag = min(s["z"] for s in samples) < 0.2
+    if window_source == "all_samples_fallback":
+        crash_flag = any(bool(s.get("crashed", False)) for s in samples)
+        if not crash_flag and job_cfg["altitude_m"] > 0.5:
+            crash_flag = min(s["z"] for s in samples) < 0.2
+    else:
+        crash_flag = any(bool(s.get("crashed", False)) for s in evaluation_samples)
+        collapse_threshold = max(0.2, 0.5 * float(reference_track[0]["z"]))
+        if not crash_flag:
+            crash_flag = min(s["z"] for s in evaluation_samples) < collapse_threshold
 
     instability_flag = False
-    for i in range(1, len(samples)):
-        dt = max(1e-6, samples[i]["t"] - samples[i - 1]["t"])
-        jump = math.hypot(samples[i]["x"] - samples[i - 1]["x"], samples[i]["y"] - samples[i - 1]["y"])
+    instability_series = samples if window_source == "all_samples_fallback" else evaluation_samples
+    for i in range(1, len(instability_series)):
+        dt = max(1e-6, instability_series[i]["t"] - instability_series[i - 1]["t"])
+        jump = math.hypot(
+            instability_series[i]["x"] - instability_series[i - 1]["x"],
+            instability_series[i]["y"] - instability_series[i - 1]["y"],
+        )
         if jump / dt > 25.0:
             instability_flag = True
             break
@@ -465,13 +625,14 @@ def _compute_metrics(
         instability_flag = True
 
     track_coverage = len(ref_hits) / max(1, len(reference_track))
+    evaluation_track_coverage = len(eval_ref_hits) / max(1, len(reference_track))
     pass_flag = (
         (not crash_flag)
         and (not timeout_flag)
         and (not instability_flag)
         and rmse <= env.pass_rmse
         and max_error <= env.pass_max_error
-        and track_coverage >= env.min_track_coverage
+        and evaluation_track_coverage >= env.min_track_coverage
     )
 
     penalty = 0.0
@@ -481,7 +642,7 @@ def _compute_metrics(
         penalty += 120.0
     if instability_flag:
         penalty += 80.0
-    if track_coverage < env.min_track_coverage:
+    if evaluation_track_coverage < env.min_track_coverage:
         penalty += 20.0
     score = rmse + (0.5 * max_error) + (0.05 * completion_time) + penalty
 
@@ -499,11 +660,19 @@ def _compute_metrics(
         "raw_metric_json": {
             "simulator": "px4_gazebo",
             "track_coverage": round(track_coverage, 6),
+            "evaluation_track_coverage": round(evaluation_track_coverage, 6),
+            "full_log_rmse": round(math.sqrt(sum(e * e for e in errors) / len(errors)), 6),
+            "full_log_max_error": round(max(errors), 6),
             "pass_thresholds": {
                 "rmse": env.pass_rmse,
                 "max_error": env.pass_max_error,
                 "min_track_coverage": env.min_track_coverage,
             },
+            "evaluation_window_source": window_source,
+            "evaluation_start_t": round(float(evaluation_samples[0]["t"]), 6),
+            "evaluation_end_t": round(float(evaluation_samples[-1]["t"]), 6),
+            "evaluation_sample_count": len(evaluation_samples),
+            "total_sample_count": total_sample_count,
             "mode": "dry_run" if dry_run else "real",
             "vehicle": env.vehicle,
             "world": env.world,
@@ -619,6 +788,12 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "Offboard Executor Log",
             "text/plain",
         ),
+        _artifact_record(
+            run_dir / "offboard_timing.json",
+            "offboard_timing_json",
+            "Offboard Timing",
+            "application/json",
+        ),
     ]
     return [r for r in records if r]
 
@@ -728,6 +903,8 @@ def run_once(input_path: Path, output_path: Path) -> int:
             log(f"launcher exit code: {exit_code}")
 
         telemetry = _load_telemetry(telemetry_json, allow_csv=env.allow_csv_telemetry)
+        telemetry.setdefault("meta", {})
+        telemetry["meta"]["offboard_timing_path"] = str(run_dir / "offboard_timing.json")
         _write_trajectory_json(telemetry, trajectory_json)
 
         metrics = _compute_metrics(

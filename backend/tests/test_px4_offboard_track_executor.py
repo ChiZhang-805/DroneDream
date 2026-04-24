@@ -95,6 +95,7 @@ def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
         executor.Setpoint(2.0, 0.0, -3.0, 0.0),
     ]
     log_path = tmp_path / "offboard.log"
+    timing_path = tmp_path / "offboard_timing.json"
 
     asyncio.run(
         executor.run_executor(
@@ -106,11 +107,17 @@ def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
             rate_hz=100.0,
             land_after=True,
             log_path=log_path,
+            track_start_index=1,
+            track_end_index=2,
+            timing_path=timing_path,
         )
     )
 
     assert [sp.north_m for sp in client.setpoints[-3:]] == [0.0, 1.0, 2.0]
     assert client.landed is True
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert timing["time_base"] == "executor_relative_seconds"
+    assert timing["track_start_t"] <= timing["track_end_t"]
 
 
 def test_mavsdk_missing_exits_non_zero_with_clear_message(tmp_path: Path):

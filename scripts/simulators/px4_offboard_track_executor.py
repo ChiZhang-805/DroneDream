@@ -53,6 +53,13 @@ class Setpoint:
     yaw_deg: float
 
 
+@dataclass(frozen=True)
+class SetpointSchedulePlan:
+    schedule: list[Setpoint]
+    track_start_index: int
+    track_end_index: int
+
+
 class OffboardClientProtocol(Protocol):
     async def connect(self, connection_url: str) -> None: ...
 
@@ -206,6 +213,11 @@ def _log(path: Path, message: str) -> None:
         handle.write(message.rstrip("\n") + "\n")
 
 
+def _write_offboard_timing(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
 def load_reference_track(path: Path) -> list[TrackPoint]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or not isinstance(payload.get("points"), list):
@@ -261,6 +273,10 @@ def _interpolate_points(start: TrackPoint, end: TrackPoint, parts: int) -> list[
 
 
 def build_setpoint_schedule(points: list[TrackPoint], params: ControllerParams, rate_hz: float) -> list[Setpoint]:
+    return build_setpoint_schedule_plan(points, params, rate_hz).schedule
+
+
+def build_setpoint_schedule_plan(points: list[TrackPoint], params: ControllerParams, rate_hz: float) -> SetpointSchedulePlan:
     if rate_hz <= 0:
         raise ValueError("rate_hz must be > 0")
     if not points:
@@ -295,7 +311,13 @@ def build_setpoint_schedule(points: list[TrackPoint], params: ControllerParams, 
             for _ in range(max(2, int(rate_hz * 0.5))):
                 schedule.append(enu_point_to_ned_setpoint(point, yaw_deg=yaw_deg))
 
-    return schedule
+    track_start_index = takeoff_hold_samples
+    track_end_index = max(track_start_index, len(schedule) - 1)
+    return SetpointSchedulePlan(
+        schedule=schedule,
+        track_start_index=track_start_index,
+        track_end_index=track_end_index,
+    )
 
 
 async def run_executor(
@@ -308,7 +330,18 @@ async def run_executor(
     rate_hz: float,
     land_after: bool,
     log_path: Path,
+    track_start_index: int = 0,
+    track_end_index: int | None = None,
+    timing_path: Path | None = None,
 ) -> None:
+    exec_start = time.monotonic()
+    timing: dict[str, Any] = {
+        "time_base": "executor_relative_seconds",
+        "setpoint_count": len(schedule),
+        "rate_hz": rate_hz,
+    }
+    track_end = len(schedule) - 1 if track_end_index is None else min(max(0, track_end_index), len(schedule) - 1)
+    track_start = min(max(0, track_start_index), track_end) if schedule else 0
     await client.connect(connection)
     _log(log_path, f"connected via {connection}")
     await client.wait_until_ready(takeoff_timeout_seconds)
@@ -318,23 +351,35 @@ async def run_executor(
     if not schedule:
         raise ValueError("setpoint schedule is empty")
 
-    await client.set_position_ned(schedule[0])
-    await client.start_offboard()
-    _log(log_path, "offboard started")
+    try:
+        timing["takeoff_start_t"] = time.monotonic() - exec_start
+        await client.set_position_ned(schedule[0])
+        await client.start_offboard()
+        timing["offboard_start_t"] = time.monotonic() - exec_start
+        _log(log_path, "offboard started")
 
-    dt = 1.0 / rate_hz
-    start = time.monotonic()
-    for setpoint in schedule:
-        if (time.monotonic() - start) > track_timeout_seconds:
-            raise TimeoutError(f"track timeout after {track_timeout_seconds}s")
-        await client.set_position_ned(setpoint)
-        await asyncio.sleep(dt)
+        dt = 1.0 / rate_hz
+        start = time.monotonic()
+        for idx, setpoint in enumerate(schedule):
+            if (time.monotonic() - start) > track_timeout_seconds:
+                raise TimeoutError(f"track timeout after {track_timeout_seconds}s")
+            await client.set_position_ned(setpoint)
+            now_t = time.monotonic() - exec_start
+            if idx == track_start:
+                timing["track_start_t"] = now_t
+            if idx == track_end:
+                timing["track_end_t"] = now_t
+            await asyncio.sleep(dt)
 
-    await client.stop_offboard()
-    _log(log_path, "offboard stopped")
-    if land_after:
-        await client.land()
-        _log(log_path, "land command sent")
+        await client.stop_offboard()
+        _log(log_path, "offboard stopped")
+        if land_after:
+            timing["land_start_t"] = time.monotonic() - exec_start
+            await client.land()
+            _log(log_path, "land command sent")
+    finally:
+        if timing_path is not None:
+            _write_offboard_timing(timing_path, timing)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -345,8 +390,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         points = load_reference_track(args.track)
         params = load_controller_params(args.params)
-        schedule = build_setpoint_schedule(points, params, args.setpoint_rate_hz)
-        _log(args.log, f"vehicle={args.vehicle} world={args.world} points={len(points)} setpoints={len(schedule)}")
+        plan = build_setpoint_schedule_plan(points, params, args.setpoint_rate_hz)
+        _log(args.log, f"vehicle={args.vehicle} world={args.world} points={len(points)} setpoints={len(plan.schedule)}")
         _log(
             args.log,
             "controller_params are applied by the offboard executor, not PX4 internal parameters",
@@ -354,19 +399,32 @@ def main(argv: list[str] | None = None) -> int:
 
         if dry_run:
             _log(args.log, "PX4_OFFBOARD_DRY_RUN=true; executor exiting without MAVSDK command streaming")
+            dry_timing = {
+                "time_base": "executor_relative_seconds",
+                "setpoint_count": len(plan.schedule),
+                "rate_hz": args.setpoint_rate_hz,
+                "takeoff_start_t": 0.0,
+                "offboard_start_t": 0.0,
+                "track_start_t": plan.track_start_index / max(1e-6, args.setpoint_rate_hz),
+                "track_end_t": plan.track_end_index / max(1e-6, args.setpoint_rate_hz),
+            }
+            _write_offboard_timing(args.run_dir / "offboard_timing.json", dry_timing)
             return 0
 
         client = MavsdkOffboardClient()
         asyncio.run(
             run_executor(
                 client,
-                schedule,
+                plan.schedule,
                 connection=args.connection,
                 takeoff_timeout_seconds=args.takeoff_timeout_seconds,
                 track_timeout_seconds=args.track_timeout_seconds,
                 rate_hz=args.setpoint_rate_hz,
                 land_after=land_after,
                 log_path=args.log,
+                track_start_index=plan.track_start_index,
+                track_end_index=plan.track_end_index,
+                timing_path=args.run_dir / "offboard_timing.json",
             )
         )
         _log(args.log, "executor completed successfully")
