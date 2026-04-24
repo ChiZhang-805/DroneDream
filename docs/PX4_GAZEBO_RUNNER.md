@@ -246,14 +246,38 @@ Wrapper env vars (with defaults):
 - `PX4_TELEMETRY_SOURCE_JSON` (optional file path copied/normalized to telemetry output)
 - `PX4_ULOG_ROOT` (optional ULog search root when `PX4_TELEMETRY_MODE=ulog`)
 - `PX4_ULOG_PATH` (optional explicit ULog file path; overrides `PX4_ULOG_ROOT`)
+- `PX4_ENABLE_OFFBOARD_EXECUTOR` (default `true`; run offboard track executor)
+- `PX4_OFFBOARD_EXECUTOR_COMMAND` (optional command override; default is
+  `python3 scripts/simulators/px4_offboard_track_executor.py`)
+- `PX4_OFFBOARD_CONNECTION` (default `udp://:14540`)
+- `PX4_OFFBOARD_SETPOINT_RATE_HZ` (default `10`)
+- `PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS` (default `30`)
+- `PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS` (default `120`)
+- `PX4_OFFBOARD_LAND_AFTER` (default `true`)
+- `PX4_OFFBOARD_DRY_RUN` (default `false`)
 
 Dry-run mode (`PX4_SITE_DRY_RUN=true`) produces deterministic fixture telemetry and
 writes `launch_config.json`, `controller_params.used.json`, and
 `reference_track.used.json` in the run directory.
 
-Real mode (`PX4_SITE_DRY_RUN=false`) launches a site command via `bash -lc`, captures
-stdout/stderr logs, enforces `PX4_RUN_SECONDS`, terminates process groups cleanly,
-and fails non-zero if telemetry is missing/invalid.
+Real mode (`PX4_SITE_DRY_RUN=false`) launches PX4 SITL/Gazebo in the background via
+`bash -lc`, waits `PX4_READY_TIMEOUT_SECONDS` (simple fixed readiness wait), runs the
+offboard executor (when enabled), then terminates the PX4 process group and finalizes
+telemetry. If the executor exits non-zero, wrapper exits non-zero.
+
+`scripts/simulators/px4_offboard_track_executor.py`:
+- reads `reference_track.json` + `controller_params.json`
+- performs takeoff hold then streams offboard setpoints across the path
+- enforces vel/accel-limited schedule from controller params
+- logs to `<run_dir>/offboard_executor.log`
+- requires `mavsdk` for real execution; if missing it exits non-zero with:
+  `mavsdk is required for PX4 offboard execution`
+
+Coordinate assumption for first implementation:
+- DroneDream x/y/z (z positive-up) -> PX4 NED:
+  `north=x`, `east=y`, `down=-z`.
+- `controller_params` are applied in the offboard executor schedule and are
+  not injected into PX4 internal parameters in this version.
 
 When `PX4_TELEMETRY_MODE=ulog`, the wrapper converts PX4 `.ulg` output to the
 runner `telemetry.json` schema after the launcher exits:

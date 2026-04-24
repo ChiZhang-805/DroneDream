@@ -613,6 +613,12 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
         _artifact_record(run_dir / "runner.log", "worker_log", "Runner Log", "text/plain"),
         _artifact_record(run_dir / "stdout.log", "simulator_stdout", "Simulator stdout", "text/plain"),
         _artifact_record(run_dir / "stderr.log", "simulator_stderr", "Simulator stderr", "text/plain"),
+        _artifact_record(
+            run_dir / "offboard_executor.log",
+            "offboard_executor_log",
+            "Offboard Executor Log",
+            "text/plain",
+        ),
     ]
     return [r for r in records if r]
 

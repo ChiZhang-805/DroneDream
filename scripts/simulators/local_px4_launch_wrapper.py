@@ -26,6 +26,11 @@ DEFAULT_RUN_SECONDS = 30
 DEFAULT_READY_TIMEOUT_SECONDS = 30
 DEFAULT_SITE_DRY_RUN = False
 DEFAULT_TELEMETRY_MODE = "json"
+DEFAULT_ENABLE_OFFBOARD_EXECUTOR = True
+DEFAULT_OFFBOARD_CONNECTION = "udp://:14540"
+DEFAULT_OFFBOARD_SETPOINT_RATE_HZ = 10.0
+DEFAULT_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS = 30.0
+DEFAULT_OFFBOARD_TRACK_TIMEOUT_SECONDS = 120.0
 
 REQUIRED_SAMPLE_KEYS = (
     "t",
@@ -52,6 +57,12 @@ def _parse_int(raw: str | None, *, default: int) -> int:
     if raw is None or not raw.strip():
         return default
     return int(raw)
+
+
+def _parse_float(raw: str | None, *, default: float) -> float:
+    if raw is None or not raw.strip():
+        return default
+    return float(raw)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -362,26 +373,91 @@ def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path) -> N
         return
 
 
-def _run_real_process(command: str, *, run_seconds: int, stdout_log: Path, stderr_log: Path) -> int:
-    with stdout_log.open("a", encoding="utf-8") as out_handle, stderr_log.open("a", encoding="utf-8") as err_handle:
-        proc = subprocess.Popen(  # noqa: S603
-            ["bash", "-lc", command],
-            stdout=out_handle,
-            stderr=err_handle,
-            text=True,
-            start_new_session=True,
-        )
-        timed_out = False
-        try:
-            proc.wait(timeout=run_seconds)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            _append_log(stderr_log, f"[local_px4_launch_wrapper] Timeout after {run_seconds}s")
+def _launch_px4_process(command: str, *, stdout_log: Path, stderr_log: Path) -> subprocess.Popen[str]:
+    out_handle = stdout_log.open("a", encoding="utf-8")
+    err_handle = stderr_log.open("a", encoding="utf-8")
+    proc = subprocess.Popen(  # noqa: S603
+        ["bash", "-lc", command],
+        stdout=out_handle,
+        stderr=err_handle,
+        text=True,
+        start_new_session=True,
+    )
+    proc._stdout_handle = out_handle  # type: ignore[attr-defined]
+    proc._stderr_handle = err_handle  # type: ignore[attr-defined]
+    return proc
 
-        _terminate_process_group(proc, stderr_log)
-        if timed_out:
-            return 124
-        return proc.returncode or 0
+
+def _close_launch_handles(proc: subprocess.Popen[str]) -> None:
+    out_handle = getattr(proc, "_stdout_handle", None)
+    err_handle = getattr(proc, "_stderr_handle", None)
+    if out_handle is not None:
+        out_handle.close()
+    if err_handle is not None:
+        err_handle.close()
+
+
+def _default_offboard_executor_command() -> str:
+    script_path = Path(__file__).resolve().parent / "px4_offboard_track_executor.py"
+    return f"python3 {shlex.quote(str(script_path))}"
+
+
+def _build_offboard_executor_argv(args: argparse.Namespace) -> list[str]:
+    command = os.environ.get("PX4_OFFBOARD_EXECUTOR_COMMAND", "").strip() or _default_offboard_executor_command()
+    setpoint_rate_hz = _parse_float(
+        os.environ.get("PX4_OFFBOARD_SETPOINT_RATE_HZ"), default=DEFAULT_OFFBOARD_SETPOINT_RATE_HZ
+    )
+    takeoff_timeout = _parse_float(
+        os.environ.get("PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS"), default=DEFAULT_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS
+    )
+    track_timeout = _parse_float(
+        os.environ.get("PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS"), default=DEFAULT_OFFBOARD_TRACK_TIMEOUT_SECONDS
+    )
+    connection = os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION).strip() or DEFAULT_OFFBOARD_CONNECTION
+    offboard_log = args.run_dir / "offboard_executor.log"
+
+    argv = shlex.split(command)
+    argv.extend(
+        [
+            "--run-dir",
+            str(args.run_dir),
+            "--track",
+            str(args.track),
+            "--params",
+            str(args.params),
+            "--vehicle",
+            args.vehicle,
+            "--world",
+            args.world,
+            "--connection",
+            connection,
+            "--setpoint-rate-hz",
+            str(setpoint_rate_hz),
+            "--takeoff-timeout-seconds",
+            str(takeoff_timeout),
+            "--track-timeout-seconds",
+            str(track_timeout),
+            "--log",
+            str(offboard_log),
+        ]
+    )
+    return argv
+
+
+def _run_offboard_executor(args: argparse.Namespace, stderr_log: Path) -> int:
+    argv = _build_offboard_executor_argv(args)
+    _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Offboard executor command: {shlex.join(argv)}")
+    proc = subprocess.run(  # noqa: S603
+        argv,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if proc.stdout:
+        _append_log(args.stdout_log, proc.stdout)
+    if proc.stderr:
+        _append_log(stderr_log, proc.stderr)
+    return proc.returncode
 
 
 def _resolve_real_launch_command(args: argparse.Namespace) -> tuple[str, str | None]:
@@ -432,6 +508,10 @@ def _write_launch_config(args: argparse.Namespace, *, autopilot_dir: str | None,
         "make_target": make_target,
         "PX4_AUTOPILOT_DIR": autopilot_dir,
         "PX4_SETUP_COMMANDS": setup_commands,
+        "PX4_ENABLE_OFFBOARD_EXECUTOR": _parse_bool(
+            os.environ.get("PX4_ENABLE_OFFBOARD_EXECUTOR"), default=DEFAULT_ENABLE_OFFBOARD_EXECUTOR
+        ),
+        "PX4_OFFBOARD_CONNECTION": os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION),
         "paths": {
             "run_dir": str(args.run_dir),
             "input": str(args.input),
@@ -504,8 +584,13 @@ def main() -> int:
     make_target = os.environ.get("PX4_MAKE_TARGET", DEFAULT_MAKE_TARGET).strip() or DEFAULT_MAKE_TARGET
     setup_commands = os.environ.get("PX4_SETUP_COMMANDS", "").strip()
     run_seconds = max(1, _parse_int(os.environ.get("PX4_RUN_SECONDS"), default=DEFAULT_RUN_SECONDS))
-    _ = max(1, _parse_int(os.environ.get("PX4_READY_TIMEOUT_SECONDS"), default=DEFAULT_READY_TIMEOUT_SECONDS))
+    ready_timeout_seconds = max(
+        1, _parse_int(os.environ.get("PX4_READY_TIMEOUT_SECONDS"), default=DEFAULT_READY_TIMEOUT_SECONDS)
+    )
     site_dry_run = _parse_bool(os.environ.get("PX4_SITE_DRY_RUN"), default=DEFAULT_SITE_DRY_RUN)
+    enable_offboard_executor = _parse_bool(
+        os.environ.get("PX4_ENABLE_OFFBOARD_EXECUTOR"), default=DEFAULT_ENABLE_OFFBOARD_EXECUTOR
+    )
 
     try:
         _copy_used_inputs(args.run_dir, args.params, args.track)
@@ -525,6 +610,7 @@ def main() -> int:
         _append_log(args.stderr_log, "")
         return 0
 
+    px4_proc: subprocess.Popen[str] | None = None
     try:
         command, resolved_autopilot_dir = _resolve_real_launch_command(args)
         _write_launch_config(
@@ -534,16 +620,41 @@ def main() -> int:
             make_target=make_target,
         )
         _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Launch command: {command}")
-        exit_code = _run_real_process(
+        px4_proc = _launch_px4_process(
             command,
-            run_seconds=run_seconds,
             stdout_log=args.stdout_log,
             stderr_log=args.stderr_log,
         )
-        _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Launcher exit code: {exit_code}")
+        _append_log(
+            args.stdout_log,
+            f"[local_px4_launch_wrapper] Waiting {ready_timeout_seconds}s for PX4 readiness (simple fixed wait)",
+        )
+        time.sleep(float(ready_timeout_seconds))
+
+        if px4_proc.poll() is not None and enable_offboard_executor:
+            raise RuntimeError(f"PX4 process exited before offboard execution with code {px4_proc.returncode}")
+
+        if enable_offboard_executor:
+            executor_exit = _run_offboard_executor(args, args.stderr_log)
+            _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Offboard executor exit code: {executor_exit}")
+            if executor_exit != 0:
+                raise RuntimeError(f"offboard executor failed with code {executor_exit}")
+        else:
+            _append_log(
+                args.stdout_log,
+                "[local_px4_launch_wrapper] PX4_ENABLE_OFFBOARD_EXECUTOR=false; preserving launcher-only behavior",
+            )
+            time.sleep(float(run_seconds))
+
+        _terminate_process_group(px4_proc, args.stderr_log)
+        _close_launch_handles(px4_proc)
+        _append_log(args.stdout_log, "[local_px4_launch_wrapper] PX4 process terminated after execution window")
         _finalize_real_telemetry(args)
         return 0
     except Exception as exc:
+        if px4_proc is not None:
+            _terminate_process_group(px4_proc, args.stderr_log)
+            _close_launch_handles(px4_proc)
         _append_log(args.stderr_log, f"[local_px4_launch_wrapper] Real mode failure: {exc}")
         return 1
 
