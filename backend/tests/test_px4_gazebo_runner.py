@@ -146,6 +146,12 @@ def _track_following_telemetry() -> dict[str, object]:
     return {"samples": samples, "meta": {"source": "test_fixture"}}
 
 
+def _find_sample_time(samples: list[dict[str, object]], idx: int) -> float:
+    value = samples[idx]["t"]
+    assert isinstance(value, (int, float))
+    return float(value)
+
+
 def test_px4_runner_requires_cli_args():
     proc = subprocess.run(
         [sys.executable, str(RUNNER)],
@@ -322,6 +328,7 @@ def test_preflight_and_post_track_ground_samples_do_not_trigger_crash(tmp_path: 
     assert proc.returncode == 0
     assert result["success"] is True
     assert result["metrics"]["crash_flag"] is False
+    assert result["metrics"]["raw_metric_json"]["crash_reason"] == "none"
 
 
 def test_crash_inside_evaluation_window_sets_crash_flag(tmp_path: Path):
@@ -343,17 +350,48 @@ def test_crash_inside_evaluation_window_sets_crash_flag(tmp_path: Path):
     assert proc.returncode == 0
     assert result["success"] is True
     assert result["metrics"]["crash_flag"] is True
+    assert result["metrics"]["raw_metric_json"]["crash_reason"] == "telemetry_crashed_flag"
     assert result["metrics"]["pass_flag"] is False
+
+
+def test_altitude_collapse_inside_evaluation_window_sets_crash(tmp_path: Path):
+    telemetry = _track_following_telemetry()
+    samples = telemetry["samples"]
+    assert isinstance(samples, list)
+    for idx in range(120, 130):
+        samples[idx]["z"] = 1.0
+    launcher = _write_launcher_with_payloads(tmp_path / "launcher.py", telemetry)
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES": "5",
+            "PX4_GAZEBO_EVAL_ALTITUDE_FRACTION": "0.3",
+            "PX4_GAZEBO_EVAL_COLLAPSE_ALTITUDE_FRACTION": "0.5",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    assert result["metrics"]["crash_flag"] is True
+    assert (
+        result["metrics"]["raw_metric_json"]["crash_reason"]
+        == "altitude_collapse_in_evaluation_window"
+    )
 
 
 def test_offboard_timing_window_source_is_used_when_present(tmp_path: Path):
     telemetry = _track_following_telemetry()
+    samples = telemetry["samples"]
+    assert isinstance(samples, list)
     launcher = _write_launcher_with_payloads(
         tmp_path / "launcher.py",
         telemetry,
         offboard_timing_payload={
-            "track_start_t": 3.0,
-            "track_end_t": 21.0,
+            "track_start_t": _find_sample_time(samples, 10),
+            "track_end_t": _find_sample_time(samples, 210),
             "time_base": "executor_relative_seconds",
         },
     )
@@ -369,8 +407,14 @@ def test_offboard_timing_window_source_is_used_when_present(tmp_path: Path):
     assert proc.returncode == 0
     assert result["success"] is True
     raw = result["metrics"]["raw_metric_json"]
-    assert raw["evaluation_window_source"] == "offboard_timing"
+    assert raw["evaluation_window_source"] == "offboard_timing_refined"
+    assert raw["evaluation_window_raw_source"] == "offboard_timing"
+    assert raw["evaluation_start_t"] > raw["raw_track_start_t"]
+    assert raw["evaluation_trimmed_takeoff_samples"] > 0
+    assert raw["crash_reason"] == "none"
+    assert result["metrics"]["crash_flag"] is False
     assert raw["evaluation_sample_count"] < raw["total_sample_count"]
+    assert result["metrics"]["max_error"] < 3.5
 
 
 def test_telemetry_derived_window_source_used_when_timing_missing(tmp_path: Path):
@@ -388,15 +432,51 @@ def test_telemetry_derived_window_source_used_when_timing_missing(tmp_path: Path
     assert proc.returncode == 0
     assert result["success"] is True
     raw = result["metrics"]["raw_metric_json"]
-    assert raw["evaluation_window_source"] == "telemetry_derived"
+    assert raw["evaluation_window_source"] == "telemetry_derived_refined"
     for key in (
         "evaluation_window_source",
+        "evaluation_window_raw_source",
+        "raw_track_start_t",
+        "raw_track_end_t",
         "evaluation_start_t",
         "evaluation_end_t",
         "evaluation_sample_count",
         "total_sample_count",
+        "evaluation_start_reason",
+        "evaluation_trimmed_takeoff_samples",
+        "evaluation_trimmed_landing_samples",
+        "evaluation_min_z",
+        "evaluation_max_z",
+        "evaluation_max_error_sample",
+        "crash_reason",
     ):
         assert key in raw
+
+
+def test_entry_requires_consecutive_samples(tmp_path: Path):
+    telemetry = _track_following_telemetry()
+    samples = telemetry["samples"]
+    assert isinstance(samples, list)
+    for i in range(20, 40):
+        samples[i]["z"] = 0.0
+    samples[30]["x"] = 5.0
+    samples[30]["y"] = 0.0
+    samples[30]["z"] = 3.0
+    launcher = _write_launcher_with_payloads(tmp_path / "launcher.py", telemetry)
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES": "5",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    raw = result["metrics"]["raw_metric_json"]
+    assert raw["evaluation_start_t"] > float(samples[30]["t"])
 
 
 def _ctx() -> TrialContext:
