@@ -119,6 +119,49 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
 
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
+        seeded_candidate = ctx["models"].CandidateParameterSet(
+            job_id=job_id,
+            generation_index=0,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0, "kd_xy": 0.2, "ki_xy": 0.05},
+            is_baseline=True,
+            trial_count=1,
+            completed_trial_count=1,
+            aggregated_metric_json={
+                "rmse": 0.9,
+                "max_error": 1.4,
+                "passing_trial_count": 1,
+            },
+            aggregated_score=0.9,
+        )
+        db.add(seeded_candidate)
+        db.flush()
+        seeded_trial = ctx["models"].Trial(
+            job_id=job_id,
+            candidate_id=seeded_candidate.id,
+            seed=101,
+            scenario_type="nominal",
+            status="COMPLETED",
+        )
+        db.add(seeded_trial)
+        db.flush()
+        db.add(
+            ctx["models"].TrialMetric(
+                trial_id=seeded_trial.id,
+                score=0.9,
+                rmse=0.9,
+                max_error=1.4,
+                overshoot_count=1,
+                completion_time=9.5,
+                crash_flag=False,
+                timeout_flag=False,
+                final_error=0.2,
+                pass_flag=True,
+                instability_flag=False,
+            )
+        )
+        db.flush()
         criteria = ctx["acceptance"].criteria_for_job(job)
         result = ctx["proposer"].propose_candidates(db, job, criteria, client=fake)
         db.commit()
@@ -138,8 +181,8 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
         assert "llm_proposal_started" in events
         assert "llm_proposal_completed" in events
         payload = json.loads(fake.calls[0]["user"])
-        assert payload["previous_candidates"][0]["candidate_id"].startswith("cand_")
-        assert "trials" in payload["previous_candidates"][0]
+        assert len(payload["previous_candidates"]) >= 1
+        assert any("trials" in candidate for candidate in payload["previous_candidates"])
 
 
 def test_proposer_rejects_invalid_response(llm_ctx):

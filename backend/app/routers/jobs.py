@@ -45,7 +45,10 @@ def create_job(
     req: schemas.JobCreateRequest,
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, object]:
-    job = job_service.create_job(db, req)
+    try:
+        job = job_service.create_job(db, req)
+    except job_service.JobServiceError as err:
+        _raise(err)
     return ok(_job_payload_with_alias(job_service.to_job_schema(job)))
 
 
@@ -87,8 +90,8 @@ def get_job(
 @router.post("/jobs/{job_id}/rerun")
 def rerun_job(
     job_id: str,
-    req: schemas.JobRerunRequest | None = None,
     db: Annotated[Session, Depends(get_db)],
+    req: schemas.JobRerunRequest | None = None,
 ) -> dict[str, object]:
     try:
         job = job_service.rerun_job(db, job_id, openai=(req.openai if req else None))

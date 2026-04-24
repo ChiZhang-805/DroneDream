@@ -163,7 +163,7 @@ def test_gpt_max_iterations_reached_yields_best_so_far(gpt_ctx):
         assert job.report is not None
 
 
-def test_gpt_failure_falls_through_to_best_so_far(gpt_ctx):
+def test_gpt_failure_marks_job_failed_with_llm_failed_outcome(gpt_ctx):
     ctx = gpt_ctx
     job_id = _create_job(ctx, strategy="gpt", target_rmse=0.001, max_iterations=3)
     client = FakeOpenAIClient([RuntimeError("openai is down")])
@@ -171,11 +171,8 @@ def test_gpt_failure_falls_through_to_best_so_far(gpt_ctx):
     assert status == "FAILED"
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
-        assert job.optimization_outcome in {
-            "llm_failed",
-            "no_usable_candidate",
-            "max_iterations_reached",
-        }
+        assert job.optimization_outcome == "llm_failed"
+        assert job.latest_error_code == "LLM_FAILED"
         event_types = [e.event_type for e in job.events]
         assert "llm_proposal_failed" in event_types
 

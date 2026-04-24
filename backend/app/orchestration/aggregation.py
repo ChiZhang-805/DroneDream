@@ -294,10 +294,13 @@ def finalize_job_if_ready(
 
     # GPT iterative loop: possibly dispatch another generation instead of
     # finalizing.
-    if job.optimizer_strategy == "gpt" and _try_continue_gpt_loop(
-        db, job, baseline, candidates, criteria, llm_client=llm_client
-    ):
-        return False
+    if job.optimizer_strategy == "gpt":
+        if _try_continue_gpt_loop(
+            db, job, baseline, candidates, criteria, llm_client=llm_client
+        ):
+            return False
+        if job.status in {"FAILED", "COMPLETED", "CANCELLED"}:
+            return True
 
     best = _rank_and_select_best(candidates)
     if best is None or best.aggregated_metric_json is None:
@@ -448,12 +451,17 @@ def _try_continue_gpt_loop(
     if llm_client is not None:
         client_cast = llm_client  # type: ignore[assignment]
 
-    added = dispatch_next_llm_generation(db, job, client=client_cast)
-    if added == 0:
-        # Proposer failed — mark outcome accordingly but still let caller fall
-        # through to standard finalization with whatever best-so-far exists.
-        job.optimization_outcome = "llm_failed"
-        db.commit()
+    dispatch = dispatch_next_llm_generation(db, job, client=client_cast)
+    if dispatch.status == "llm_error":
+        _fail_job(
+            db,
+            job,
+            code="LLM_FAILED",
+            message=dispatch.error or "LLM proposer failed.",
+            outcome="llm_failed",
+        )
+        return False
+    if dispatch.status in {"budget_exhausted", "max_iterations_reached", "no_usable_proposal"}:
         return False
 
     # Return to RUNNING so the worker keeps draining trials.
