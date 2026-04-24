@@ -27,7 +27,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 FAILURE_ADAPTER_UNAVAILABLE = "ADAPTER_UNAVAILABLE"
 FAILURE_TIMEOUT = "TIMEOUT"
@@ -80,6 +80,23 @@ class RunnerEnv:
     extra_args: str
     telemetry_format: str
     allow_csv_telemetry: bool
+    eval_altitude_fraction: float
+    eval_near_track_threshold_m: float
+    eval_consecutive_samples: int
+    eval_collapse_altitude_fraction: float
+
+
+@dataclass(frozen=True)
+class EvaluationWindow:
+    start_idx: int
+    end_idx: int
+    source: str
+    raw_source: str
+    raw_start_t: float | None
+    raw_end_t: float | None
+    start_reason: str
+    trimmed_takeoff_samples: int
+    trimmed_landing_samples: int
 
 
 class RunnerError(Exception):
@@ -125,6 +142,18 @@ def _load_env() -> RunnerEnv:
         telemetry_format=os.environ.get("PX4_GAZEBO_TELEMETRY_FORMAT", "json").strip().lower() or "json",
         allow_csv_telemetry=_parse_bool(
             os.environ.get("PX4_GAZEBO_ALLOW_CSV_TELEMETRY"), default=False
+        ),
+        eval_altitude_fraction=_parse_float(
+            os.environ.get("PX4_GAZEBO_EVAL_ALTITUDE_FRACTION"), default=0.9
+        ),
+        eval_near_track_threshold_m=_parse_float(
+            os.environ.get("PX4_GAZEBO_EVAL_NEAR_TRACK_THRESHOLD_M"), default=1.5
+        ),
+        eval_consecutive_samples=max(
+            1, _parse_int(os.environ.get("PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES"), default=5)
+        ),
+        eval_collapse_altitude_fraction=_parse_float(
+            os.environ.get("PX4_GAZEBO_EVAL_COLLAPSE_ALTITUDE_FRACTION"), default=0.5
         ),
     )
 
@@ -414,13 +443,129 @@ def _nearest_error(sample: dict[str, Any], ref_points: list[dict[str, float]]) -
     return best, best_idx
 
 
+def _sample_meets_track_entry_condition(
+    sample: dict[str, Any],
+    ref_points: list[dict[str, float]],
+    target_altitude: float,
+    altitude_fraction: float,
+    near_track_threshold: float,
+) -> bool:
+    if sample["z"] < altitude_fraction * target_altitude:
+        return False
+    err, _ = _nearest_error(sample, ref_points)
+    return err <= near_track_threshold
+
+
+def _first_consecutive_index(
+    samples: list[dict[str, Any]],
+    start_idx: int,
+    end_idx: int,
+    predicate: Callable[[dict[str, Any]], bool],
+    consecutive_count: int,
+) -> int | None:
+    count = 0
+    run_start: int | None = None
+    for i in range(start_idx, end_idx + 1):
+        if predicate(samples[i]):
+            if count == 0:
+                run_start = i
+            count += 1
+            if count >= consecutive_count:
+                return run_start
+        else:
+            count = 0
+            run_start = None
+    return None
+
+
+def _last_before_landing_index(
+    samples: list[dict[str, Any]],
+    start_idx: int,
+    end_idx: int,
+    target_altitude: float,
+    altitude_fraction: float,
+    consecutive_count: int,
+) -> int:
+    threshold = altitude_fraction * target_altitude
+    count = 0
+    run_start: int | None = None
+    for i in range(start_idx + 1, end_idx + 1):
+        if samples[i]["z"] < threshold:
+            if count == 0:
+                run_start = i
+            count += 1
+            if count >= consecutive_count and run_start is not None:
+                return max(start_idx, run_start - 1)
+        else:
+            count = 0
+            run_start = None
+    return end_idx
+
+
+def _refine_candidate_window(
+    samples: list[dict[str, Any]],
+    reference_track: list[dict[str, float]],
+    raw_start_idx: int,
+    raw_end_idx: int,
+    *,
+    raw_source: str,
+    target_altitude: float,
+    altitude_fraction: float,
+    near_track_threshold: float,
+    consecutive_samples: int,
+) -> EvaluationWindow | None:
+    raw_start_idx = max(0, raw_start_idx)
+    raw_end_idx = min(len(samples) - 1, raw_end_idx)
+    if raw_end_idx <= raw_start_idx:
+        return None
+    refined_start = _first_consecutive_index(
+        samples,
+        raw_start_idx,
+        raw_end_idx,
+        lambda sample: _sample_meets_track_entry_condition(
+            sample,
+            reference_track,
+            target_altitude,
+            altitude_fraction,
+            near_track_threshold,
+        ),
+        consecutive_samples,
+    )
+    if refined_start is None:
+        return None
+    refined_end = _last_before_landing_index(
+        samples,
+        refined_start,
+        raw_end_idx,
+        target_altitude,
+        altitude_fraction,
+        consecutive_samples,
+    )
+    if refined_end <= refined_start:
+        return None
+    return EvaluationWindow(
+        start_idx=refined_start,
+        end_idx=refined_end,
+        source=f"{raw_source}_refined",
+        raw_source=raw_source,
+        raw_start_t=float(samples[raw_start_idx]["t"]),
+        raw_end_t=float(samples[raw_end_idx]["t"]),
+        start_reason="altitude_and_near_track",
+        trimmed_takeoff_samples=refined_start - raw_start_idx,
+        trimmed_landing_samples=raw_end_idx - refined_end,
+    )
+
+
 def _find_eval_window_from_timing(
     samples: list[dict[str, Any]],
     reference_track: list[dict[str, float]],
     timing: dict[str, Any],
     *,
+    target_altitude: float,
+    altitude_fraction: float,
     near_track_threshold: float,
-) -> tuple[int, int] | None:
+    consecutive_samples: int,
+) -> EvaluationWindow | None:
     start_t_raw = timing.get("track_start_t")
     end_t_raw = timing.get("track_end_t")
     if not isinstance(start_t_raw, (int, float)) or not isinstance(end_t_raw, (int, float)):
@@ -430,90 +575,115 @@ def _find_eval_window_from_timing(
     if (not math.isfinite(start_t)) or (not math.isfinite(end_t)) or end_t <= start_t:
         return None
 
-    times = [float(s["t"]) for s in samples]
-    t_min = min(times)
-    t_max = max(times)
-
-    def _pick_indices(candidate_start: float, candidate_end: float) -> tuple[int, int] | None:
-        idx_start = next((i for i, s in enumerate(samples) if s["t"] >= candidate_start), None)
-        if idx_start is None:
-            return None
-        idx_end = next((i for i, s in enumerate(samples) if s["t"] >= candidate_end), len(samples) - 1)
-        idx_end = min(idx_end, len(samples) - 1)
-        if idx_end <= idx_start:
-            return None
-        return idx_start, idx_end
-
-    direct = _pick_indices(start_t, end_t)
-    if direct is not None and (start_t >= t_min - 1.0) and (end_t <= t_max + 1.0):
-        return direct
-
-    target_altitude = float(reference_track[0]["z"])
-    altitude_threshold = 0.8 * target_altitude
-    duration = end_t - start_t
-    candidate_starts: list[int] = []
-    for i, s in enumerate(samples):
-        if s["z"] < altitude_threshold:
-            continue
-        err, _ = _nearest_error(s, reference_track)
-        if err <= near_track_threshold:
-            candidate_starts.append(i)
-    if not candidate_starts:
+    idx_start = next((i for i, s in enumerate(samples) if s["t"] >= start_t), None)
+    idx_end = next((i for i, s in enumerate(samples) if s["t"] >= end_t), None)
+    if idx_start is None or idx_end is None:
         return None
-
-    best: tuple[int, int] | None = None
-    best_gap = float("inf")
-    for idx_start in candidate_starts:
-        desired_end_t = samples[idx_start]["t"] + duration
-        idx_end = next((i for i, s in enumerate(samples) if i >= idx_start and s["t"] >= desired_end_t), len(samples) - 1)
-        if idx_end <= idx_start:
-            continue
-        actual_duration = samples[idx_end]["t"] - samples[idx_start]["t"]
-        gap = abs(actual_duration - duration)
-        if gap < best_gap:
-            best = (idx_start, idx_end)
-            best_gap = gap
-    return best
+    if idx_end <= idx_start:
+        return None
+    return _refine_candidate_window(
+        samples,
+        reference_track,
+        idx_start,
+        idx_end,
+        raw_source="offboard_timing",
+        target_altitude=target_altitude,
+        altitude_fraction=altitude_fraction,
+        near_track_threshold=near_track_threshold,
+        consecutive_samples=consecutive_samples,
+    )
 
 
 def _find_eval_window_from_telemetry(
     samples: list[dict[str, Any]],
     reference_track: list[dict[str, float]],
     *,
+    target_altitude: float,
+    altitude_fraction: float,
     near_track_threshold: float,
-) -> tuple[int, int] | None:
-    target_altitude = float(reference_track[0]["z"])
-    altitude_threshold = 0.8 * target_altitude
-    start_idx: int | None = None
-    for i, s in enumerate(samples):
-        if s["z"] < altitude_threshold:
-            continue
-        err, _ = _nearest_error(s, reference_track)
-        if err <= near_track_threshold:
-            start_idx = i
-            break
+    consecutive_samples: int,
+) -> EvaluationWindow | None:
+    raw_start_idx = 0
+    raw_end_idx = len(samples) - 1
+    start_idx = _first_consecutive_index(
+        samples,
+        raw_start_idx,
+        raw_end_idx,
+        lambda sample: _sample_meets_track_entry_condition(
+            sample,
+            reference_track,
+            target_altitude,
+            altitude_fraction,
+            near_track_threshold,
+        ),
+        consecutive_samples,
+    )
     if start_idx is None:
         return None
-
-    end_idx = len(samples) - 1
-    for i in range(start_idx + 1, len(samples)):
-        if samples[i]["z"] < altitude_threshold:
-            end_idx = i - 1
-            break
+    end_idx = _last_before_landing_index(
+        samples,
+        start_idx,
+        raw_end_idx,
+        target_altitude,
+        altitude_fraction,
+        consecutive_samples,
+    )
     if end_idx <= start_idx:
         return None
-    return start_idx, end_idx
+    return EvaluationWindow(
+        start_idx=start_idx,
+        end_idx=end_idx,
+        source="telemetry_derived_refined",
+        raw_source="telemetry_derived",
+        raw_start_t=None,
+        raw_end_t=None,
+        start_reason="altitude_and_near_track",
+        trimmed_takeoff_samples=start_idx - raw_start_idx,
+        trimmed_landing_samples=raw_end_idx - end_idx,
+    )
 
 
 def _find_altitude_only_window(
-    samples: list[dict[str, Any]], reference_track: list[dict[str, float]]
-) -> tuple[int, int] | None:
-    target_altitude = float(reference_track[0]["z"])
-    altitude_threshold = 0.8 * target_altitude
-    eligible = [i for i, s in enumerate(samples) if s["z"] >= altitude_threshold]
-    if not eligible:
+    samples: list[dict[str, Any]],
+    reference_track: list[dict[str, float]],
+    *,
+    target_altitude: float,
+    altitude_fraction: float,
+    consecutive_samples: int,
+) -> EvaluationWindow | None:
+    raw_start_idx = 0
+    raw_end_idx = len(samples) - 1
+    threshold = altitude_fraction * target_altitude
+    start_idx = _first_consecutive_index(
+        samples,
+        raw_start_idx,
+        raw_end_idx,
+        lambda sample: sample["z"] >= threshold,
+        consecutive_samples,
+    )
+    if start_idx is None:
         return None
-    return eligible[0], eligible[-1]
+    end_idx = _last_before_landing_index(
+        samples,
+        start_idx,
+        raw_end_idx,
+        target_altitude,
+        altitude_fraction,
+        consecutive_samples,
+    )
+    if end_idx <= start_idx:
+        return None
+    return EvaluationWindow(
+        start_idx=start_idx,
+        end_idx=end_idx,
+        source="altitude_only_refined",
+        raw_source="altitude_only",
+        raw_start_t=None,
+        raw_end_t=None,
+        start_reason="altitude_only",
+        trimmed_takeoff_samples=start_idx - raw_start_idx,
+        trimmed_landing_samples=raw_end_idx - end_idx,
+    )
 
 
 def _compute_metrics(
@@ -526,7 +696,10 @@ def _compute_metrics(
     dry_run: bool,
 ) -> dict[str, Any]:
     samples = telemetry["samples"]
-    near_track_threshold = _parse_float(os.environ.get("PX4_GAZEBO_EVAL_NEAR_TRACK_THRESHOLD_M"), default=1.5)
+    target_altitude = float(reference_track[0]["z"])
+    altitude_fraction = env.eval_altitude_fraction
+    near_track_threshold = env.eval_near_track_threshold_m
+    consecutive_samples = env.eval_consecutive_samples
     total_sample_count = len(samples)
 
     offboard_timing_path = Path(str(telemetry.get("meta", {}).get("offboard_timing_path", ""))).expanduser()
@@ -539,34 +712,48 @@ def _compute_metrics(
         except Exception:
             offboard_timing = None
 
-    window = None
-    window_source = "all_samples_fallback"
+    eval_window: EvaluationWindow | None = None
     if offboard_timing is not None:
-        window = _find_eval_window_from_timing(
+        eval_window = _find_eval_window_from_timing(
             samples,
             reference_track,
             offboard_timing,
+            target_altitude=target_altitude,
+            altitude_fraction=altitude_fraction,
             near_track_threshold=near_track_threshold,
+            consecutive_samples=consecutive_samples,
         )
-        if window is not None:
-            window_source = "offboard_timing"
-    if window is None:
-        window = _find_eval_window_from_telemetry(
+    if eval_window is None:
+        eval_window = _find_eval_window_from_telemetry(
             samples,
             reference_track,
+            target_altitude=target_altitude,
+            altitude_fraction=altitude_fraction,
             near_track_threshold=near_track_threshold,
+            consecutive_samples=consecutive_samples,
         )
-        if window is not None:
-            window_source = "telemetry_derived"
-    if window is None:
-        window = _find_altitude_only_window(samples, reference_track)
-        if window is not None:
-            window_source = "altitude_only"
-    if window is None:
-        window = (0, len(samples) - 1)
+    if eval_window is None:
+        eval_window = _find_altitude_only_window(
+            samples,
+            reference_track,
+            target_altitude=target_altitude,
+            altitude_fraction=altitude_fraction,
+            consecutive_samples=consecutive_samples,
+        )
+    if eval_window is None:
+        eval_window = EvaluationWindow(
+            start_idx=0,
+            end_idx=len(samples) - 1,
+            source="all_samples_fallback",
+            raw_source="all_samples_fallback",
+            raw_start_t=None,
+            raw_end_t=None,
+            start_reason="all_samples_fallback",
+            trimmed_takeoff_samples=0,
+            trimmed_landing_samples=0,
+        )
 
-    eval_start_idx, eval_end_idx = window
-    evaluation_samples = samples[eval_start_idx : eval_end_idx + 1]
+    evaluation_samples = samples[eval_window.start_idx : eval_window.end_idx + 1]
 
     errors: list[float] = []
     ref_hits: set[int] = set()
@@ -588,6 +775,7 @@ def _compute_metrics(
 
     rmse = math.sqrt(sum(e * e for e in eval_errors) / len(eval_errors))
     max_error = max(eval_errors)
+    max_error_idx = eval_errors.index(max_error)
     completion_time = max(0.0, evaluation_samples[-1]["t"] - evaluation_samples[0]["t"])
     final_ref = reference_track[-1]
     final_error = math.hypot(evaluation_samples[-1]["x"] - final_ref["x"], evaluation_samples[-1]["y"] - final_ref["y"])
@@ -600,18 +788,33 @@ def _compute_metrics(
         if (b > a and b > c and b - max(a, c) > 0.25) or (b < a and b < c and min(a, c) - b > 0.25):
             overshoot_count += 1
 
-    if window_source == "all_samples_fallback":
+    if eval_window.source == "all_samples_fallback":
         crash_flag = any(bool(s.get("crashed", False)) for s in samples)
+        crash_reason = "telemetry_crashed_flag" if crash_flag else "none"
         if not crash_flag and job_cfg["altitude_m"] > 0.5:
             crash_flag = min(s["z"] for s in samples) < 0.2
+            crash_reason = "all_samples_fallback_low_altitude" if crash_flag else "none"
     else:
         crash_flag = any(bool(s.get("crashed", False)) for s in evaluation_samples)
-        collapse_threshold = max(0.2, 0.5 * float(reference_track[0]["z"]))
-        if not crash_flag:
-            crash_flag = min(s["z"] for s in evaluation_samples) < collapse_threshold
+        crash_reason = "telemetry_crashed_flag" if crash_flag else "none"
+        collapse_threshold = max(0.2, env.eval_collapse_altitude_fraction * target_altitude)
+        stable_threshold = altitude_fraction * target_altitude
+        stable_altitude_seen = any(s["z"] >= stable_threshold for s in evaluation_samples)
+        if not crash_flag and stable_altitude_seen and len(evaluation_samples) > consecutive_samples:
+            first_check_idx = consecutive_samples
+            run = 0
+            for i in range(first_check_idx, len(evaluation_samples)):
+                if evaluation_samples[i]["z"] < collapse_threshold:
+                    run += 1
+                    if run >= consecutive_samples:
+                        crash_flag = True
+                        crash_reason = "altitude_collapse_in_evaluation_window"
+                        break
+                else:
+                    run = 0
 
     instability_flag = False
-    instability_series = samples if window_source == "all_samples_fallback" else evaluation_samples
+    instability_series = samples if eval_window.source == "all_samples_fallback" else evaluation_samples
     for i in range(1, len(instability_series)):
         dt = max(1e-6, instability_series[i]["t"] - instability_series[i - 1]["t"])
         jump = math.hypot(
@@ -668,11 +871,31 @@ def _compute_metrics(
                 "max_error": env.pass_max_error,
                 "min_track_coverage": env.min_track_coverage,
             },
-            "evaluation_window_source": window_source,
+            "evaluation_window_source": eval_window.source,
+            "evaluation_window_raw_source": eval_window.raw_source,
+            "raw_track_start_t": (
+                round(float(eval_window.raw_start_t), 6) if eval_window.raw_start_t is not None else None
+            ),
+            "raw_track_end_t": (
+                round(float(eval_window.raw_end_t), 6) if eval_window.raw_end_t is not None else None
+            ),
             "evaluation_start_t": round(float(evaluation_samples[0]["t"]), 6),
             "evaluation_end_t": round(float(evaluation_samples[-1]["t"]), 6),
             "evaluation_sample_count": len(evaluation_samples),
             "total_sample_count": total_sample_count,
+            "evaluation_start_reason": eval_window.start_reason,
+            "evaluation_trimmed_takeoff_samples": eval_window.trimmed_takeoff_samples,
+            "evaluation_trimmed_landing_samples": eval_window.trimmed_landing_samples,
+            "evaluation_min_z": round(min(s["z"] for s in evaluation_samples), 6),
+            "evaluation_max_z": round(max(s["z"] for s in evaluation_samples), 6),
+            "evaluation_max_error_sample": {
+                "t": round(float(evaluation_samples[max_error_idx]["t"]), 6),
+                "x": round(float(evaluation_samples[max_error_idx]["x"]), 6),
+                "y": round(float(evaluation_samples[max_error_idx]["y"]), 6),
+                "z": round(float(evaluation_samples[max_error_idx]["z"]), 6),
+                "error": round(float(max_error), 6),
+            },
+            "crash_reason": crash_reason,
             "mode": "dry_run" if dry_run else "real",
             "vehicle": env.vehicle,
             "world": env.world,

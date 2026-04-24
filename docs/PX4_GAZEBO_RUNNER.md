@@ -48,6 +48,10 @@ Core options:
 - `PX4_GAZEBO_PASS_RMSE` (default `0.75`)
 - `PX4_GAZEBO_PASS_MAX_ERROR` (default `2.0`)
 - `PX4_GAZEBO_MIN_TRACK_COVERAGE` (default `0.9`)
+- `PX4_GAZEBO_EVAL_ALTITUDE_FRACTION` (default `0.9`)
+- `PX4_GAZEBO_EVAL_NEAR_TRACK_THRESHOLD_M` (default `1.5`)
+- `PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES` (default `5`)
+- `PX4_GAZEBO_EVAL_COLLAPSE_ALTITUDE_FRACTION` (default `0.5`)
 
 Optional:
 
@@ -174,12 +178,15 @@ Computed against nearest-point XY distance to reference path, using an
 
 Window selection order:
 
-1. `offboard_timing.json` `track_start_t`/`track_end_t` (best-effort aligned to
-   telemetry timeline; fallback if incompatible).
-2. Telemetry-derived window:
-   - start when `z >= 0.8 * target_altitude` and near path (default ≤1.5m XY)
-   - end when altitude drops below `0.8 * target_altitude` after start
-3. Altitude-only fallback (`z >= 0.8 * target_altitude`)
+1. `offboard_timing.json` `track_start_t`/`track_end_t` is treated as a **broad
+   candidate** only (never trusted blindly).
+2. Candidate is refined using telemetry:
+   - start at first index with `N` consecutive samples satisfying both:
+     - `z >= EVAL_ALTITUDE_FRACTION * target_altitude`
+     - nearest-track XY error `<= EVAL_NEAR_TRACK_THRESHOLD_M`
+   - end at index just before first `N`-sample landing run below the altitude threshold
+3. Telemetry-derived candidate/refinement with the same rules
+4. Altitude-only fallback (`N` consecutive samples above altitude threshold, then trimmed before landing)
 4. All-samples fallback (conservative behavior)
 
 - `rmse`: RMS tracking error over evaluation window
@@ -187,18 +194,32 @@ Window selection order:
 - `completion_time`: `t_end - t_start`
 - `final_error`: final sample to final reference point
 - `overshoot_count`: deterministic peak/valley heuristic over radial error
-- `crash_flag`: evaluated primarily in the evaluation window; preflight/landing
-  ground samples outside the evaluation window do not count as crashes
+- `crash_flag`:
+  - refined windows: true only for telemetry `crashed=true` inside the refined
+    window, or altitude collapse (consecutive drop below
+    `max(0.2, EVAL_COLLAPSE_ALTITUDE_FRACTION * target_altitude)`) after stable altitude
+    has been reached in-window
+  - all-samples fallback: conservative low-altitude detection remains enabled
 - `timeout_flag`: launcher timeout hit
 - `instability_flag`: non-finite/implausible jumps/divergence
 - `pass_flag`: healthy trial + thresholds + minimum **evaluation** track coverage
 - `score` (lower is better): weighted error/time + penalties
 - `raw_metric_json`: mode/coverage/threshold metadata, including:
   - `evaluation_window_source`
+  - `evaluation_window_raw_source`
+  - `raw_track_start_t`
+  - `raw_track_end_t`
   - `evaluation_start_t`
   - `evaluation_end_t`
   - `evaluation_sample_count`
   - `total_sample_count`
+  - `evaluation_start_reason`
+  - `evaluation_trimmed_takeoff_samples`
+  - `evaluation_trimmed_landing_samples`
+  - `evaluation_min_z`
+  - `evaluation_max_z`
+  - `evaluation_max_error_sample`
+  - `crash_reason`
   - `evaluation_track_coverage`
   - full-log diagnostic fields (`full_log_rmse`, `full_log_max_error`)
 
