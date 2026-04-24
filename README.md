@@ -245,6 +245,12 @@ pretending real PX4 support is present.
 For the full contract, telemetry schema, metrics, failure mapping, and
 limitations, see [`docs/PX4_GAZEBO_RUNNER.md`](docs/PX4_GAZEBO_RUNNER.md).
 
+For site-specific startup logic, use `scripts/simulators/local_px4_launch_wrapper.py`
+as the `PX4_GAZEBO_LAUNCH_COMMAND` target. It supports `PX4_SITE_DRY_RUN=true`
+for CI/dev without PX4, and real local launches when `PX4_AUTOPILOT_DIR` and
+related env vars are provided. The repo does not bundle PX4/Gazebo assets; install
+PX4/Gazebo locally and keep external workspaces outside this repository.
+
 ### End-to-end demo (Phase 8: GPT parameter tuning)
 
 `APP_SECRET_KEY` (or `DRONEDREAM_SECRET_KEY`) is used by the **backend** to
