@@ -155,6 +155,33 @@ def test_px4_runner_writes_expected_artifacts_in_dry_run(tmp_path: Path):
         assert (tmp_path / name).exists(), name
 
 
+def test_px4_runner_csv_boolean_fields_are_parsed_correctly(tmp_path: Path):
+    launcher = tmp_path / "launcher_csv.py"
+    launcher.write_text(
+        "import pathlib, sys\n"
+        "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1]).with_suffix('.csv')\n"
+        "telemetry.write_text(\n"
+        "    't,x,y,z,vx,vy,vz,yaw,armed,mode,crashed\\n'\n"
+        "    '0,0,0,3,0,0,0,0,false,offboard,false\\n'\n"
+        "    '1,0,0,3,0,0,0,0,0,offboard,0\\n',\n"
+        "    encoding='utf-8',\n"
+        ")\n",
+        encoding="utf-8",
+    )
+    command = f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_ALLOW_CSV_TELEMETRY": "true",
+            "PX4_GAZEBO_LAUNCH_COMMAND": command,
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    assert result["metrics"]["crash_flag"] is False
+
+
 def _ctx() -> TrialContext:
     return TrialContext(
         trial_id="trial-1",

@@ -330,6 +330,21 @@ def _make_dry_run_telemetry(
 
 
 def _normalize_samples(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _coerce_bool(value: Any, *, default: bool) -> bool:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"1", "true", "t", "yes", "y", "on"}:
+                return True
+            if lowered in {"0", "false", "f", "no", "n", "off", ""}:
+                return False
+        raise ValueError("invalid boolean value")
+
     normalized: list[dict[str, Any]] = []
     for idx, raw in enumerate(samples):
         try:
@@ -342,9 +357,9 @@ def _normalize_samples(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "vy": float(raw.get("vy", 0.0)),
                 "vz": float(raw.get("vz", 0.0)),
                 "yaw": float(raw.get("yaw", 0.0)),
-                "armed": bool(raw.get("armed", True)),
+                "armed": _coerce_bool(raw.get("armed", True), default=True),
                 "mode": str(raw.get("mode", "unknown")),
-                "crashed": bool(raw.get("crashed", False)),
+                "crashed": _coerce_bool(raw.get("crashed", False), default=False),
             }
         except (KeyError, TypeError, ValueError):
             raise RunnerError(f"telemetry sample {idx} missing or invalid required fields") from None
