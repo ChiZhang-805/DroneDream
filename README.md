@@ -251,6 +251,13 @@ for CI/dev without PX4, and real local launches when `PX4_AUTOPILOT_DIR` and
 related env vars are provided. The repo does not bundle PX4/Gazebo assets; install
 PX4/Gazebo locally and keep external workspaces outside this repository.
 
+For real runs that produce PX4 ULog output, set `PX4_TELEMETRY_MODE=ulog` so the
+wrapper converts `.ulg` to the expected `telemetry.json` schema. Optional env vars:
+`PX4_ULOG_PATH` (exact file) and `PX4_ULOG_ROOT` (search root for newest `*.ulg`;
+defaults to `$PX4_AUTOPILOT_DIR/build/px4_sitl_default/rootfs/log`). This enables
+metrics from actual PX4 logs, though full track-following quality still depends on
+your offboard controller/mission layer being active.
+
 ### End-to-end demo (Phase 8: GPT parameter tuning)
 
 `APP_SECRET_KEY` (or `DRONEDREAM_SECRET_KEY`) is used by the **backend** to

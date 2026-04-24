@@ -242,8 +242,10 @@ Wrapper env vars (with defaults):
 - `PX4_RUN_SECONDS` (default `30`)
 - `PX4_READY_TIMEOUT_SECONDS` (default `30`; reserved for site probes)
 - `PX4_SITE_DRY_RUN` (default `false`)
-- `PX4_TELEMETRY_MODE` (default `json`)
+- `PX4_TELEMETRY_MODE` (`json` or `ulog`, default `json`)
 - `PX4_TELEMETRY_SOURCE_JSON` (optional file path copied/normalized to telemetry output)
+- `PX4_ULOG_ROOT` (optional ULog search root when `PX4_TELEMETRY_MODE=ulog`)
+- `PX4_ULOG_PATH` (optional explicit ULog file path; overrides `PX4_ULOG_ROOT`)
 
 Dry-run mode (`PX4_SITE_DRY_RUN=true`) produces deterministic fixture telemetry and
 writes `launch_config.json`, `controller_params.used.json`, and
@@ -252,6 +254,42 @@ writes `launch_config.json`, `controller_params.used.json`, and
 Real mode (`PX4_SITE_DRY_RUN=false`) launches a site command via `bash -lc`, captures
 stdout/stderr logs, enforces `PX4_RUN_SECONDS`, terminates process groups cleanly,
 and fails non-zero if telemetry is missing/invalid.
+
+When `PX4_TELEMETRY_MODE=ulog`, the wrapper converts PX4 `.ulg` output to the
+runner `telemetry.json` schema after the launcher exits:
+
+- ULog selection:
+  - if `PX4_ULOG_PATH` is set, that exact file is used
+  - otherwise newest `*.ulg` is selected recursively under `PX4_ULOG_ROOT`
+  - if `PX4_ULOG_ROOT` is unset, default root is
+    `$PX4_AUTOPILOT_DIR/build/px4_sitl_default/rootfs/log`
+- Required ULog dataset: `vehicle_local_position`
+- Yaw fallback order:
+  1. `vehicle_attitude`
+  2. `vehicle_attitude_groundtruth`
+  3. `vehicle_attitude_setpoint`
+  4. velocity-derived yaw (`atan2(vy, vx)`)
+  5. `0.0`
+- NED→ENU vertical conversion:
+  - `z_out = -z`
+  - `vz_out = -vz`
+
+Example real-mode config with ULog conversion:
+
+```bash
+export PX4_TELEMETRY_MODE=ulog
+export PX4_ULOG_ROOT=/home/chi/PX4-Autopilot/build/px4_sitl_default/rootfs/log
+```
+
+Inspect recent SITL logs with:
+
+```bash
+find ~/PX4-Autopilot -name '*.ulg' -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort | tail -20
+```
+
+ULog conversion unblocks metrics ingestion from real PX4 logs, but meaningful
+track-following performance still depends on your offboard controller/mission
+stack being active in the PX4/Gazebo run.
 
 Ubuntu 22.04 local sanity check for PX4/Gazebo SITL (outside DroneDream repo):
 
