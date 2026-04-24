@@ -156,6 +156,185 @@ def _write_dry_run_telemetry(path: Path, *, vehicle: str, world: str) -> None:
     _json_dump(path, payload)
 
 
+def find_latest_ulog(root: Path) -> Path:
+    candidates = [path for path in root.rglob("*.ulg") if path.is_file()]
+    if not candidates:
+        raise FileNotFoundError(f"No ULog files found under {root}")
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def _dataset_map(ulog: Any) -> dict[str, Any]:
+    return {dataset.name: dataset for dataset in getattr(ulog, "data_list", [])}
+
+
+def _to_float_list(values: Any, length: int, *, default: float = 0.0) -> list[float]:
+    if values is None:
+        return [default] * length
+    return [float(values[idx]) for idx in range(length)]
+
+
+def _bool_from_value(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    try:
+        return bool(int(value))
+    except Exception:
+        return bool(value)
+
+
+def _extract_vehicle_status(dataset_map: dict[str, Any], sample_count: int) -> tuple[list[bool], list[str]]:
+    status = dataset_map.get("vehicle_status")
+    if status is None:
+        return [True] * sample_count, ["unknown"] * sample_count
+
+    data = status.data
+    armed_values = data.get("arming_state")
+    if armed_values is None:
+        armed_values = data.get("armed")
+    armed = (
+        [_bool_from_value(value) for value in armed_values[:sample_count]]
+        if armed_values is not None
+        else [True] * sample_count
+    )
+    if len(armed) < sample_count:
+        armed.extend([armed[-1] if armed else True] * (sample_count - len(armed)))
+
+    nav_state_values = data.get("nav_state")
+    if nav_state_values is None:
+        mode = ["unknown"] * sample_count
+    else:
+        mode = [str(nav_state_values[idx]) for idx in range(min(sample_count, len(nav_state_values)))]
+        if len(mode) < sample_count:
+            mode.extend([mode[-1] if mode else "unknown"] * (sample_count - len(mode)))
+    return armed, mode
+
+
+def _extract_crash_flags(dataset_map: dict[str, Any], sample_count: int) -> list[bool]:
+    failure = dataset_map.get("failure_detector_status")
+    if failure is None:
+        return [False] * sample_count
+
+    fields = (
+        "fd_alt",
+        "fd_arm_escs",
+        "fd_battery",
+        "fd_ext",
+        "fd_imbalanced_prop",
+        "fd_motor",
+        "fd_pitch",
+        "fd_roll",
+    )
+    flags_by_field: list[Any] = [failure.data.get(field) for field in fields if failure.data.get(field) is not None]
+    if not flags_by_field:
+        return [False] * sample_count
+
+    crashed: list[bool] = []
+    for idx in range(sample_count):
+        crashed.append(any(_bool_from_value(field_values[idx]) for field_values in flags_by_field if idx < len(field_values)))
+    return crashed
+
+
+def _quat_to_yaw(q0: float, q1: float, q2: float, q3: float) -> float:
+    siny_cosp = 2.0 * (q0 * q3 + q1 * q2)
+    cosy_cosp = 1.0 - 2.0 * (q2 * q2 + q3 * q3)
+    return math.atan2(siny_cosp, cosy_cosp)
+
+
+def _extract_yaw_values(
+    dataset_map: dict[str, Any], vx_values: list[float], vy_values: list[float], sample_count: int
+) -> list[float]:
+    for attitude_name in ("vehicle_attitude", "vehicle_attitude_groundtruth", "vehicle_attitude_setpoint"):
+        attitude_dataset = dataset_map.get(attitude_name)
+        if attitude_dataset is None:
+            continue
+        q0 = attitude_dataset.data.get("q[0]")
+        q1 = attitude_dataset.data.get("q[1]")
+        q2 = attitude_dataset.data.get("q[2]")
+        q3 = attitude_dataset.data.get("q[3]")
+        if any(component is None for component in (q0, q1, q2, q3)):
+            continue
+        size = min(sample_count, len(q0), len(q1), len(q2), len(q3))
+        if size <= 0:
+            continue
+        yaw_values = [_quat_to_yaw(float(q0[idx]), float(q1[idx]), float(q2[idx]), float(q3[idx])) for idx in range(size)]
+        if size < sample_count:
+            yaw_values.extend([yaw_values[-1]] * (sample_count - size))
+        return yaw_values
+
+    yaw_values: list[float] = []
+    for idx in range(sample_count):
+        vx = vx_values[idx]
+        vy = vy_values[idx]
+        if abs(vx) > 1e-6 or abs(vy) > 1e-6:
+            yaw_values.append(math.atan2(vy, vx))
+        else:
+            yaw_values.append(0.0)
+    return yaw_values
+
+
+def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, world: str) -> None:
+    try:
+        from pyulog import ULog
+    except ModuleNotFoundError as exc:  # pragma: no cover - exercised via wrapper integration
+        raise RuntimeError("pyulog is required for PX4_TELEMETRY_MODE=ulog") from exc
+
+    ulog = ULog(str(ulog_path))
+    datasets = _dataset_map(ulog)
+    local_position = datasets.get("vehicle_local_position")
+    if local_position is None:
+        raise ValueError("vehicle_local_position dataset is required in ULog")
+
+    data = local_position.data
+    timestamps = data.get("timestamp")
+    if timestamps is None or len(timestamps) == 0:
+        raise ValueError("vehicle_local_position.timestamp is required and cannot be empty")
+
+    sample_count = len(timestamps)
+    t0 = float(timestamps[0])
+    x_values = _to_float_list(data.get("x"), sample_count)
+    y_values = _to_float_list(data.get("y"), sample_count)
+    z_values = _to_float_list(data.get("z"), sample_count)
+    vx_values = _to_float_list(data.get("vx"), sample_count)
+    vy_values = _to_float_list(data.get("vy"), sample_count)
+    vz_values = _to_float_list(data.get("vz"), sample_count)
+    yaw_values = _extract_yaw_values(datasets, vx_values, vy_values, sample_count)
+    armed_values, mode_values = _extract_vehicle_status(datasets, sample_count)
+    crashed_values = _extract_crash_flags(datasets, sample_count)
+
+    samples = []
+    for idx in range(sample_count):
+        samples.append(
+            {
+                "t": (float(timestamps[idx]) - t0) / 1_000_000.0,
+                "x": x_values[idx],
+                "y": y_values[idx],
+                "z": -z_values[idx],
+                "vx": vx_values[idx],
+                "vy": vy_values[idx],
+                "vz": -vz_values[idx],
+                "yaw": yaw_values[idx],
+                "armed": armed_values[idx],
+                "mode": mode_values[idx],
+                "crashed": crashed_values[idx],
+            }
+        )
+
+    if not samples:
+        raise ValueError("Converted telemetry samples cannot be empty")
+
+    payload = {
+        "samples": samples,
+        "meta": {
+            "simulator": "px4_gazebo",
+            "source": "ulog",
+            "ulog_path": str(ulog_path),
+            "vehicle": vehicle,
+            "world": world,
+        },
+    }
+    _json_dump(output_path, payload)
+
+
 def _render_launch_command(template: str, values: dict[str, str]) -> str:
     rendered = template
     for key, value in values.items():
@@ -279,6 +458,37 @@ def _finalize_real_telemetry(args: argparse.Namespace) -> None:
     if telemetry_mode == "json":
         if not args.telemetry.exists():
             raise ValueError("Telemetry JSON missing after launcher exit")
+        payload = _json_load(args.telemetry)
+        normalized = _normalize_telemetry_payload(payload)
+        _json_dump(args.telemetry, normalized)
+        return
+
+    if telemetry_mode == "ulog":
+        ulog_path_raw = os.environ.get("PX4_ULOG_PATH", "").strip()
+        if ulog_path_raw:
+            ulog_path = Path(ulog_path_raw)
+            if not ulog_path.is_file():
+                raise FileNotFoundError(f"PX4_ULOG_PATH does not exist or is not a file: {ulog_path_raw}")
+        else:
+            ulog_root_raw = os.environ.get("PX4_ULOG_ROOT", "").strip()
+            if ulog_root_raw:
+                ulog_root = Path(ulog_root_raw)
+            else:
+                autopilot_dir = os.environ.get("PX4_AUTOPILOT_DIR", "").strip()
+                if not autopilot_dir:
+                    raise ValueError("PX4_AUTOPILOT_DIR is required to locate default PX4 ULog root")
+                ulog_root = Path(autopilot_dir) / "build" / "px4_sitl_default" / "rootfs" / "log"
+            try:
+                ulog_path = find_latest_ulog(ulog_root)
+            except FileNotFoundError as exc:
+                raise FileNotFoundError(f"No ULog files found for PX4_TELEMETRY_MODE=ulog under: {ulog_root}") from exc
+
+        ulog_to_telemetry_json(
+            ulog_path,
+            args.telemetry,
+            vehicle=args.vehicle,
+            world=args.world,
+        )
         payload = _json_load(args.telemetry)
         normalized = _normalize_telemetry_payload(payload)
         _json_dump(args.telemetry, normalized)
