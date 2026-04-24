@@ -214,3 +214,50 @@ This mode exists for CI and developer machines without Gazebo.
   local dependencies (source scripts, environment, binaries, plugin paths).
 - The runner standardizes contract + metric computation; it does not encode
   site-specific PX4/Gazebo startup logic.
+
+
+## 12) Site-specific local wrapper (`local_px4_launch_wrapper.py`)
+
+Use `scripts/simulators/local_px4_launch_wrapper.py` as the lower-level command
+behind `px4_gazebo_runner.py`. This repository does **not** bundle PX4-Autopilot
+or Gazebo assets; users must install those locally.
+
+Example:
+
+```bash
+export REAL_SIMULATOR_COMMAND="python3 /abs/path/scripts/simulators/px4_gazebo_runner.py"
+export PX4_GAZEBO_DRY_RUN=false
+export PX4_GAZEBO_LAUNCH_COMMAND='python3 /abs/path/scripts/simulators/local_px4_launch_wrapper.py --run-dir {run_dir} --input {trial_input} --params {params_json} --track {track_json} --telemetry {telemetry_json} --stdout-log {stdout_log} --stderr-log {stderr_log} --vehicle {vehicle} --world {world} --headless {headless}'
+export PX4_AUTOPILOT_DIR=/home/chi/PX4-Autopilot
+export PX4_SETUP_COMMANDS='source /opt/ros/humble/setup.bash'
+export PX4_MAKE_TARGET=gz_x500
+```
+
+Wrapper env vars (with defaults):
+
+- `PX4_AUTOPILOT_DIR` (required in real mode unless custom launch template is provided)
+- `PX4_SETUP_COMMANDS` (optional semicolon-separated shell setup commands)
+- `PX4_LAUNCH_COMMAND_TEMPLATE` (optional full shell command template)
+- `PX4_MAKE_TARGET` (default `gz_x500`)
+- `PX4_RUN_SECONDS` (default `30`)
+- `PX4_READY_TIMEOUT_SECONDS` (default `30`; reserved for site probes)
+- `PX4_SITE_DRY_RUN` (default `false`)
+- `PX4_TELEMETRY_MODE` (default `json`)
+- `PX4_TELEMETRY_SOURCE_JSON` (optional file path copied/normalized to telemetry output)
+
+Dry-run mode (`PX4_SITE_DRY_RUN=true`) produces deterministic fixture telemetry and
+writes `launch_config.json`, `controller_params.used.json`, and
+`reference_track.used.json` in the run directory.
+
+Real mode (`PX4_SITE_DRY_RUN=false`) launches a site command via `bash -lc`, captures
+stdout/stderr logs, enforces `PX4_RUN_SECONDS`, terminates process groups cleanly,
+and fails non-zero if telemetry is missing/invalid.
+
+Ubuntu 22.04 local sanity check for PX4/Gazebo SITL (outside DroneDream repo):
+
+```bash
+cd /path/to/PX4-Autopilot
+make px4_sitl gz_x500
+```
+
+Do **not** commit PX4-Autopilot into DroneDream.
