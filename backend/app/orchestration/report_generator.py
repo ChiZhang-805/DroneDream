@@ -1,16 +1,15 @@
-"""JobReport generation + supporting mock artifact metadata (Phase 6).
+"""JobReport generation and artifact registration.
 
-The report generator turns the aggregated candidate data persisted by
+The report generator turns aggregated candidate data persisted by
 ``app.orchestration.aggregation`` into a user-readable
-:class:`~app.models.JobReport` row. All summary text is generated locally
-from structured metrics — there is no external LLM call, per the Phase 6
-constraints.
+:class:`~app.models.JobReport` row. Summary text is deterministic and local
+to the worker/backend process; this module does not call an external LLM.
 
-The module also writes mock :class:`~app.models.Artifact` metadata rows
-describing the report's comparison plot, trajectory plot, worker log, and
-telemetry JSON. The artifacts are metadata-only (no underlying files);
-frontends should treat them as references for later phases when a real
-simulator produces real files.
+The module also registers job-level artifacts:
+
+* mock backend metadata-only artifacts (comparison/trajectory/log/telemetry),
+* real_cli concrete job artifact files + metadata rows, and
+* backend-generated PDF report artifact rows.
 """
 
 from __future__ import annotations

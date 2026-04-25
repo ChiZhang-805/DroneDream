@@ -36,6 +36,20 @@ def _truncate(value: str | None, *, limit: int = 120) -> str:
     return value[: limit - 3] + "..."
 
 
+def _sanitize_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        clean: dict[str, Any] = {}
+        for key, inner in value.items():
+            lower = key.lower()
+            if any(token in lower for token in _SECRET_TOKENS):
+                continue
+            clean[key] = _sanitize_value(inner)
+        return clean
+    if isinstance(value, list):
+        return [_sanitize_value(item) for item in value]
+    return value
+
+
 def _safe_pairs(payload: dict[str, Any] | None) -> list[tuple[str, str]]:
     if not payload:
         return []
@@ -44,7 +58,7 @@ def _safe_pairs(payload: dict[str, Any] | None) -> list[tuple[str, str]]:
         lower = key.lower()
         if any(token in lower for token in _SECRET_TOKENS):
             continue
-        value = payload[key]
+        value = _sanitize_value(payload[key])
         if isinstance(value, float):
             rows.append((key, f"{value:.4f}"))
         elif isinstance(value, (dict, list)):
@@ -55,60 +69,89 @@ def _safe_pairs(payload: dict[str, Any] | None) -> list[tuple[str, str]]:
     return rows
 
 
-def _wrap_line(line: str, width: int = 110) -> list[str]:
-    if len(line) <= width:
-        return [line]
-    chunks: list[str] = []
-    rest = line
-    while len(rest) > width:
-        split = rest.rfind(" ", 0, width)
-        if split <= 0:
-            split = width
-        chunks.append(rest[:split])
-        rest = rest[split:].lstrip()
-    if rest:
-        chunks.append(rest)
-    return chunks
+def _wrap_lines(lines: list[str], width: int = 105) -> list[str]:
+    wrapped: list[str] = []
+    for line in lines:
+        if len(line) <= width:
+            wrapped.append(line)
+            continue
+        rest = line
+        while len(rest) > width:
+            split = rest.rfind(" ", 0, width)
+            if split <= 0:
+                split = width
+            wrapped.append(rest[:split])
+            rest = rest[split:].lstrip()
+        if rest:
+            wrapped.append(rest)
+    return wrapped
+
+
+def _paginate_lines(wrapped_lines: list[str], lines_per_page: int = 52) -> list[list[str]]:
+    if not wrapped_lines:
+        return [[]]
+    return [
+        wrapped_lines[i : i + lines_per_page]
+        for i in range(0, len(wrapped_lines), lines_per_page)
+    ]
 
 
 def _escape_pdf_text(text: str) -> str:
     return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
 
-def _build_pdf(lines: list[str]) -> bytes:
-    out = bytearray()
-    out.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-
-    objects: list[bytes] = []
-    objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
-    objects.append(b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
-    objects.append(
-        b"<< /Type /Page /Parent 2 0 R "
-        b"/MediaBox [0 0 595 842] "
-        b"/Resources << /Font << /F1 4 0 R >> >> "
-        b"/Contents 5 0 R >>"
-    )
-    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
-
+def _build_page_stream(page_lines: list[str], page_number: int, page_count: int) -> bytes:
     stream_lines = [b"BT", b"/F1 10 Tf", b"50 800 Td", b"14 TL"]
-    y = 800
-    for raw_line in lines:
-        for line in _wrap_line(raw_line):
-            escaped = _escape_pdf_text(line)
-            stream_lines.append(f"({escaped}) Tj".encode())
-            stream_lines.append(b"T*")
-            y -= 14
-            if y < 60:
-                break
-        if y < 60:
-            break
-    stream_lines.append(b"ET")
+    for line in page_lines:
+        escaped = _escape_pdf_text(line)
+        stream_lines.append(f"({escaped}) Tj".encode())
+        stream_lines.append(b"T*")
+    stream_lines.extend(
+        [
+            b"ET",
+            b"BT",
+            b"/F1 9 Tf",
+            b"260 30 Td",
+            f"(Page {page_number} / {page_count}) Tj".encode(),
+            b"ET",
+        ]
+    )
     stream = b"\n".join(stream_lines)
-    objects.append(
+    return (
         f"<< /Length {len(stream)} >>\nstream\n".encode()
         + stream
         + b"\nendstream"
     )
+
+
+def _build_pdf(lines: list[str]) -> bytes:
+    out = bytearray()
+    out.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+
+    wrapped_lines = _wrap_lines(lines)
+    pages = _paginate_lines(wrapped_lines)
+    page_count = len(pages)
+
+    objects: list[bytes] = []
+    objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
+    page_kids = " ".join(f"{5 + i * 2} 0 R" for i in range(page_count))
+    objects.append(f"<< /Type /Pages /Kids [{page_kids}] /Count {page_count} >>".encode())
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+
+    for idx, page_lines in enumerate(pages):
+        stream_obj = _build_page_stream(
+            page_lines,
+            page_number=idx + 1,
+            page_count=page_count,
+        )
+        objects.append(stream_obj)
+        page_obj = (
+            "<< /Type /Page /Parent 2 0 R "
+            "/MediaBox [0 0 595 842] "
+            "/Resources << /Font << /F1 3 0 R >> >> "
+            f"/Contents {4 + idx * 2} 0 R >>"
+        ).encode()
+        objects.append(page_obj)
 
     xref: list[int] = [0]
     for idx, obj in enumerate(objects, start=1):
@@ -131,14 +174,9 @@ def _build_pdf(lines: list[str]) -> bytes:
     return bytes(out)
 
 
-def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -> Path:
-    """Generate a job PDF report and return its absolute path."""
-    del db
-
+def build_job_report_lines(job: models.Job) -> list[str]:
+    """Build human-readable report lines prior to PDF rendering."""
     report = job.report
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = (output_dir / f"{job.id} report.pdf").resolve()
-
     lines: list[str] = []
     add = lines.append
 
@@ -180,11 +218,16 @@ def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -
     add("")
     add("3) Baseline metrics")
     add(f"- Baseline candidate id: {baseline.id if baseline else '—'}")
-    baseline_params = json.dumps(
-        baseline.parameter_json if baseline else {},
-        ensure_ascii=False,
-    )
-    add(f"- Baseline parameters: {_truncate(baseline_params, limit=260)}")
+    if baseline is not None:
+        baseline_pairs = _safe_pairs(baseline.parameter_json)
+        if baseline_pairs:
+            add("- Baseline parameters:")
+            for key, value in baseline_pairs:
+                add(f"  - {key}: {value}")
+        else:
+            add("- Baseline parameters: —")
+    else:
+        add("- Baseline parameters: —")
     add(f"- Aggregated RMSE: {_fmt_num(baseline_agg.get('rmse'), digits=3)} m")
     add(f"- Aggregated max_error: {_fmt_num(baseline_agg.get('max_error'), digits=3)} m")
     add(f"- Completion time: {_fmt_num(baseline_agg.get('completion_time'), digits=2)} s")
@@ -207,7 +250,7 @@ def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -
         header = (
             f"- {candidate.id} | label={candidate.label or '—'} | "
             f"source={candidate.source_type} | gen={candidate.generation_index} | "
-            f"baseline={is_base}"
+            f"baseline={is_base} | best={'yes' if candidate.is_best else 'no'}"
         )
         add(header)
         focus_params = {
@@ -226,11 +269,11 @@ def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -
             f"score={_fmt_num(agg.get('aggregated_score') or candidate.aggregated_score, digits=4)}"
         )
         add(metrics_text)
-        rationale = _truncate(candidate.proposal_reason, limit=160)
+        rationale = _truncate(candidate.proposal_reason, limit=200)
         add(
             "  trials "
             f"{candidate.completed_trial_count}/{candidate.trial_count} "
-            f"rationale={rationale}"
+            f"rationale={rationale or '—'}"
         )
 
     add("")
@@ -282,9 +325,18 @@ def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -
     add("")
     add("7) Summary")
     add(summary)
+    return lines
 
+
+def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -> Path:
+    """Generate a job PDF report and return its absolute path."""
+    del db
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = (output_dir / f"{job.id} report.pdf").resolve()
+    lines = build_job_report_lines(job)
     output_path.write_bytes(_build_pdf(lines))
     return output_path
 
 
-__all__ = ["generate_job_pdf_report"]
+__all__ = ["build_job_report_lines", "generate_job_pdf_report"]

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -452,6 +453,7 @@ def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
         db.commit()
         assert first.id == second.id
         assert first.mime_type == "application/pdf"
+        assert first.display_name == f"{job.id} report.pdf"
         assert first.file_size_bytes is not None and first.file_size_bytes > 0
         assert not first.storage_path.startswith("mock://")
         assert Path(first.storage_path).exists()
@@ -541,6 +543,219 @@ def test_generate_job_pdf_report_creates_expected_file(ctx, tmp_path):
         assert path.name == f"{job.id} report.pdf"
         assert path.stat().st_size > 0
         assert path.read_bytes().startswith(b"%PDF")
+
+
+def test_generate_job_pdf_report_paginates_and_includes_all_candidates_trials(ctx, tmp_path):
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    pdf_service = __import__("app.services.pdf_report", fromlist=["*"])
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+            optimizer_strategy="gpt",
+            max_iterations=20,
+            trials_per_candidate=3,
+        )
+        db.add(job)
+        db.flush()
+
+        base_time = datetime.now(UTC)
+        candidates: list[object] = []
+        for idx in range(21):
+            is_baseline = idx == 0
+            candidate = models.CandidateParameterSet(
+                id=f"cand_large_{idx:03d}",
+                job_id=job.id,
+                generation_index=idx,
+                source_type="baseline" if is_baseline else "llm_optimizer",
+                label="baseline" if is_baseline else f"gpt-gen-{idx}",
+                parameter_json={
+                    "kp_xy": 1.0 + idx * 0.01,
+                    "kd_xy": 0.2 + idx * 0.01,
+                    "ki_xy": 0.05 + idx * 0.001,
+                    "vel_limit": 5.0,
+                    "accel_limit": 4.0,
+                    "disturbance_rejection": 0.5,
+                },
+                aggregated_score=1.0 + idx * 0.01,
+                aggregated_metric_json={
+                    "rmse": 1.0 + idx * 0.01,
+                    "max_error": 1.2 + idx * 0.01,
+                    "completion_time": 9.0 + idx * 0.05,
+                    "aggregated_score": 1.0 + idx * 0.01,
+                    "trial_count": 3,
+                    "completed_trial_count": 3,
+                },
+                trial_count=3,
+                completed_trial_count=3,
+                is_baseline=is_baseline,
+                is_best=idx == 20,
+                proposal_reason=(
+                    "Candidate rationale " * 15 if not is_baseline else "Baseline"
+                ),
+                created_at=base_time + timedelta(seconds=idx),
+                updated_at=base_time + timedelta(seconds=idx),
+            )
+            candidates.append(candidate)
+            db.add(candidate)
+        db.flush()
+
+        job.baseline_candidate_id = "cand_large_000"
+        job.best_candidate_id = "cand_large_020"
+        db.add(
+            models.JobReport(
+                job_id=job.id,
+                best_candidate_id=job.best_candidate_id,
+                summary_text="Large-job summary",
+                report_status="READY",
+                baseline_metric_json={},
+                optimized_metric_json={},
+                comparison_metric_json=[],
+                best_parameter_json={"kp_xy": 1.2},
+            )
+        )
+        db.flush()
+
+        trials_per_candidate = [4] + [3] * 20
+        trial_index = 0
+        for candidate, trial_count in zip(candidates, trials_per_candidate, strict=True):
+            for seed in range(trial_count):
+                trial_id = f"tri_large_{trial_index:03d}"
+                trial = models.Trial(
+                    id=trial_id,
+                    job_id=job.id,
+                    candidate_id=candidate.id,
+                    seed=seed,
+                    scenario_type="nominal",
+                    status="COMPLETED",
+                    created_at=base_time + timedelta(minutes=1, seconds=trial_index),
+                    updated_at=base_time + timedelta(minutes=1, seconds=trial_index),
+                )
+                db.add(trial)
+                db.flush()
+                db.add(
+                    models.TrialMetric(
+                        trial_id=trial.id,
+                        rmse=0.3 + trial_index * 0.01,
+                        max_error=0.5 + trial_index * 0.01,
+                        completion_time=10.0 + trial_index * 0.01,
+                        score=0.9 + trial_index * 0.001,
+                        final_error=0.2 + trial_index * 0.001,
+                        pass_flag=True,
+                        instability_flag=False,
+                    )
+                )
+                trial_index += 1
+        assert trial_index == 64
+        db.commit()
+        db.refresh(job)
+
+        path = pdf_service.generate_job_pdf_report(
+            db=db,
+            job=job,
+            output_dir=tmp_path / "jobs" / job.id / "reports",
+        )
+        body = path.read_bytes()
+        assert path.exists()
+        assert path.name == f"{job.id} report.pdf"
+        assert body.startswith(b"%PDF")
+        assert b"cand_large_000" in body
+        assert b"cand_large_020" in body
+        assert b"tri_large_000" in body
+        assert b"tri_large_063" in body
+        assert b"Page 1 /" in body
+        assert b"Page 2 /" in body
+
+
+def test_generate_job_pdf_report_excludes_secret_values(ctx, tmp_path):
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    pdf_service = __import__("app.services.pdf_report", fromlist=["*"])
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+        )
+        db.add(job)
+        db.flush()
+
+        secret_value = "sk-secret-should-not-appear"
+        baseline = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={
+                "kp_xy": 1.0,
+                "kd_xy": 0.2,
+                "openai_api_key": secret_value,
+                "APP_SECRET_KEY": "app-secret-never-print",
+                "password": "p@ss",
+                "token": "tok-123",
+                "nested": {"access_token": "nested-secret", "kp_xy": 9.9},
+            },
+            aggregated_score=1.0,
+            aggregated_metric_json={
+                "rmse": 1.1,
+                "max_error": 1.4,
+                "completion_time": 9.2,
+                "aggregated_score": 1.0,
+                "trial_count": 1,
+                "completed_trial_count": 1,
+            },
+            trial_count=1,
+            completed_trial_count=1,
+            is_baseline=True,
+            is_best=True,
+        )
+        db.add(baseline)
+        db.flush()
+        job.baseline_candidate_id = baseline.id
+        job.best_candidate_id = baseline.id
+        db.add(
+            models.JobReport(
+                job_id=job.id,
+                best_candidate_id=baseline.id,
+                summary_text="Summary",
+                report_status="READY",
+                best_parameter_json={"kp_xy": 1.0},
+                baseline_metric_json={},
+                optimized_metric_json={},
+                comparison_metric_json=[],
+            )
+        )
+        db.commit()
+        db.refresh(job)
+
+        lines = pdf_service.build_job_report_lines(job)
+        joined_lines = "\n".join(lines)
+        path = pdf_service.generate_job_pdf_report(
+            db=db,
+            job=job,
+            output_dir=tmp_path / "jobs" / job.id / "reports",
+        )
+        body = path.read_bytes().decode("latin-1", errors="ignore")
+
+        assert "kp_xy" in joined_lines
+        assert "kd_xy" in joined_lines
+        assert secret_value not in joined_lines
+        assert "app-secret-never-print" not in joined_lines
+        assert "tok-123" not in joined_lines
+        assert "nested-secret" not in joined_lines
+        assert secret_value not in body
+        assert "app-secret-never-print" not in body
+        assert "tok-123" not in body
+        assert "nested-secret" not in body
 
 
 # --- API error paths ------------------------------------------------------

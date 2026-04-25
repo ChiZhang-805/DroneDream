@@ -445,8 +445,10 @@ After a job report is finalized, the backend now also generates a PDF report art
 
 - Output file path: `REAL_SIMULATOR_ARTIFACT_ROOT/jobs/{job_id}/reports/{job_id} report.pdf`
 - File name format is always: `{job_id} report.pdf`
+- The generated PDF is paginated and is expected to include all candidate/trial rows for large jobs (no silent truncation).
 - The PDF is registered as a job artifact with `artifact_type="pdf_report"` and `mime_type="application/pdf"`.
 - Frontend Job Detail shows a **Download PDF report** button when this artifact exists, and the artifact row itself also exposes a Download PDF action.
+- PDF generation failure records a `pdf_report_generation_failed` job event and does not fail the whole job/report pipeline.
 
 ### Security notes
 
@@ -459,4 +461,3 @@ After a job report is finalized, the backend now also generates a PDF report art
 ## Phase 8 visualization addendum (PR3)
 
 For browser-native trajectory replay and optional Runpod noVNC Gazebo iframe setup, see [docs/RUNPOD_GAZEBO_VISUALIZATION.md](RUNPOD_GAZEBO_VISUALIZATION.md).
-
