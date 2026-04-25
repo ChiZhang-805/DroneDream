@@ -29,7 +29,9 @@ class Settings(BaseSettings):
     )
 
     # Phase 9: artifact roots for generated job/trial outputs and safe downloads.
-    real_simulator_artifact_root: str = Field(default="/workspace/dd_artifacts")
+    # Keep this default aligned with app.simulator.real_cli._DEFAULT_ARTIFACT_ROOT
+    # so generated real-simulator artifacts are always downloadable by default.
+    real_simulator_artifact_root: str = Field(default="./artifacts")
     artifact_root: str = Field(default="/tmp/drone_dream_artifacts")
 
     @property
