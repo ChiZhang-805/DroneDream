@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, ApiClientError } from "../api/client";
 import type {
-  Artifact,
   Job,
   JobEventInfo,
   JobReport,
@@ -17,6 +16,7 @@ import { Alert } from "../components/Alert";
 import { DataTable, type Column } from "../components/DataTable";
 import { Loading, ErrorState, Empty } from "../components/States";
 import { ComparisonChart } from "../components/ComparisonChart";
+import { ArtifactsPanel } from "../components/ArtifactsPanel";
 
 // Polling interval for active jobs. The frontend only polls; all state
 // transitions are driven by the backend worker process (Phase 3+). See
@@ -334,11 +334,26 @@ export function JobDetail() {
         )}
       </SectionCard>
 
-      <ArtifactsPanel
-        artifacts={artifacts}
-        visible={artifactsEnabled}
-        isLoading={artifactsQuery.isLoading}
-      />
+      {artifactsEnabled ? (
+        <ArtifactsPanel
+          title="Artifacts"
+          description="Job-level artifacts and per-trial artifacts recorded by the backend."
+          isLoading={artifactsQuery.isLoading}
+          emptyDescription="Artifacts will appear once a completed job has generated report or trial outputs."
+          sections={[
+            {
+              heading: `Job artifacts (${artifacts.filter((a) => a.owner_type === "job").length})`,
+              artifacts: artifacts.filter((a) => a.owner_type === "job"),
+              emptyNote: "No job-level artifacts yet.",
+            },
+            {
+              heading: `Trial artifacts (${artifacts.filter((a) => a.owner_type === "trial").length})`,
+              artifacts: artifacts.filter((a) => a.owner_type === "trial"),
+              emptyNote: "No trial-level artifacts yet.",
+            },
+          ]}
+        />
+      ) : null}
 
       <DiagnosticsPanel job={job} />
     </section>
@@ -735,49 +750,6 @@ function BestParametersSection({
           </li>
         ))}
       </ul>
-    </SectionCard>
-  );
-}
-
-function ArtifactsPanel({
-  artifacts,
-  visible,
-  isLoading,
-}: {
-  artifacts: Artifact[];
-  visible: boolean;
-  isLoading: boolean;
-}) {
-  if (!visible) return null;
-  return (
-    <SectionCard
-      title="Artifacts"
-      description="Metadata for report assets produced by the worker. Mock entries in the MVP — no underlying files yet."
-    >
-      {isLoading ? (
-        <Loading label="Loading artifacts…" />
-      ) : artifacts.length === 0 ? (
-        <Empty
-          title="No artifacts yet"
-          description="Artifacts will appear once a completed job has generated its report."
-        />
-      ) : (
-        <ul className="kv-list">
-          {artifacts.map((a) => (
-            <li key={a.id}>
-              <span className="kv-key">
-                {a.display_name ?? a.artifact_type}
-              </span>
-              <span className="kv-value">
-                <code>{a.storage_path}</code>
-                {a.mime_type ? (
-                  <span className="form-hint"> · {a.mime_type}</span>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
     </SectionCard>
   );
 }

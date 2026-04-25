@@ -15,6 +15,9 @@ simulator produces real files.
 
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -47,7 +50,7 @@ def _comparison_points(
         _point("max_error", "Max error", "m", lower_is_better=True),
         _point("overshoot_count", "Overshoot", None, lower_is_better=True),
         _point("completion_time", "Completion time", "s", lower_is_better=True),
-        _point("score", "Score", None, lower_is_better=False),
+        _point("score", "Score", None, lower_is_better=True),
     ]
 
 
@@ -299,7 +302,7 @@ _JOB_ARTIFACT_TEMPLATES: tuple[dict[str, Any], ...] = (
 )
 
 
-def ensure_job_artifacts(db: Session, job: models.Job) -> list[models.Artifact]:
+def ensure_mock_job_artifacts(db: Session, job: models.Job) -> list[models.Artifact]:
     """Create the standard job-level artifact metadata rows if missing.
 
     Idempotent per ``(owner_id, artifact_type)`` — calling this twice for the
@@ -311,24 +314,196 @@ def ensure_job_artifacts(db: Session, job: models.Job) -> list[models.Artifact]:
         .where(models.Artifact.owner_type == "job")
         .where(models.Artifact.owner_id == job.id)
     ).all()
-    existing_by_type = {a.artifact_type: a for a in existing}
+    existing_keys = {(a.artifact_type, a.storage_path) for a in existing}
 
     created: list[models.Artifact] = []
     for template in _JOB_ARTIFACT_TEMPLATES:
-        if template["artifact_type"] in existing_by_type:
+        storage_path = template["storage_path"].format(job_id=job.id)
+        if (template["artifact_type"], storage_path) in existing_keys:
             continue
         artifact = models.Artifact(
             owner_type="job",
             owner_id=job.id,
             artifact_type=template["artifact_type"],
             display_name=template["display_name"],
-            storage_path=template["storage_path"].format(job_id=job.id),
+            storage_path=storage_path,
             mime_type=template["mime_type"],
             file_size_bytes=None,
         )
         db.add(artifact)
         created.append(artifact)
     return created
+
+
+def _real_artifact_root() -> Path:
+    return Path(os.environ.get("REAL_SIMULATOR_ARTIFACT_ROOT", "/workspace/dd_artifacts"))
+
+
+def _write_json(path: Path, payload: Any) -> int:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(payload, indent=2, sort_keys=True)
+    path.write_text(text + "\n", encoding="utf-8")
+    return len((text + "\n").encode("utf-8"))
+
+
+def _write_text(path: Path, text: str) -> int:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = text if text.endswith("\n") else text + "\n"
+    path.write_text(body, encoding="utf-8")
+    return len(body.encode("utf-8"))
+
+
+def ensure_real_job_artifacts(
+    db: Session,
+    *,
+    job: models.Job,
+    report_body: dict[str, Any],
+    best: models.CandidateParameterSet,
+) -> list[models.Artifact]:
+    """Ensure real backend jobs expose concrete job-level artifact files + rows."""
+
+    artifact_dir = _real_artifact_root() / "jobs" / job.id / "job_artifacts"
+    report_payload = {
+        "job_id": job.id,
+        "best_candidate_id": best.id,
+        "summary_text": report_body["summary_text"],
+        "baseline_metrics": report_body["baseline_metric_json"],
+        "optimized_metrics": report_body["optimized_metric_json"],
+        "comparison": report_body["comparison_metric_json"],
+        "best_parameters": report_body["best_parameter_json"],
+    }
+    candidate_summary = [
+        {
+            "candidate_id": c.id,
+            "label": c.label,
+            "is_baseline": c.is_baseline,
+            "is_best": c.is_best,
+            "source_type": c.source_type,
+            "generation_index": c.generation_index,
+            "aggregated_score": c.aggregated_score,
+            "aggregated_metrics": c.aggregated_metric_json,
+            "trial_count": c.trial_count,
+            "completed_trial_count": c.completed_trial_count,
+            "failed_trial_count": c.failed_trial_count,
+            "rank_in_job": c.rank_in_job,
+            "parameter_json": dict(c.parameter_json or {}),
+        }
+        for c in job.candidates
+    ]
+    trial_summary = [
+        {
+            "trial_id": t.id,
+            "candidate_id": t.candidate_id,
+            "scenario": t.scenario_type,
+            "seed": t.seed,
+            "status": t.status,
+            "pass": bool(t.metric.pass_flag) if t.metric is not None else None,
+            "rmse": t.metric.rmse if t.metric is not None else None,
+            "max_error": t.metric.max_error if t.metric is not None else None,
+            "score": t.metric.score if t.metric is not None else None,
+            "completion_time": t.metric.completion_time if t.metric is not None else None,
+        }
+        for t in job.trials
+    ]
+    comparison_payload = {
+        "job_id": job.id,
+        "best_candidate_id": best.id,
+        "baseline_metrics": report_body["baseline_metric_json"],
+        "optimized_metrics": report_body["optimized_metric_json"],
+        "comparison_points": report_body["comparison_metric_json"],
+    }
+    event_lines = [
+        (
+            f"{e.created_at.isoformat()} {e.event_type} "
+            f"{json.dumps(e.payload_json or {}, sort_keys=True)}"
+        )
+        for e in sorted(job.events, key=lambda item: item.created_at)
+    ]
+    events_text = (
+        "\n".join(event_lines)
+        if event_lines
+        else f"{job.created_at.isoformat()} job_created job_id={job.id}"
+    )
+
+    file_specs = [
+        (
+            "report_json",
+            "Job report",
+            "application/json",
+            artifact_dir / "report.json",
+            report_payload,
+        ),
+        (
+            "candidate_summary_json",
+            "Candidate summary",
+            "application/json",
+            artifact_dir / "candidate_summary.json",
+            candidate_summary,
+        ),
+        (
+            "trial_summary_json",
+            "Trial summary",
+            "application/json",
+            artifact_dir / "trial_summary.json",
+            trial_summary,
+        ),
+        (
+            "comparison_json",
+            "Comparison summary",
+            "application/json",
+            artifact_dir / "comparison.json",
+            comparison_payload,
+        ),
+        (
+            "job_events_log",
+            "Job event log",
+            "text/plain",
+            artifact_dir / "job_events.log",
+            events_text,
+        ),
+    ]
+
+    existing = db.scalars(
+        select(models.Artifact)
+        .where(models.Artifact.owner_type == "job")
+        .where(models.Artifact.owner_id == job.id)
+    ).all()
+    existing_keys = {(a.artifact_type, a.storage_path) for a in existing}
+
+    created: list[models.Artifact] = []
+    for artifact_type, display_name, mime_type, path, payload in file_specs:
+        size = (
+            _write_text(path, payload)
+            if isinstance(payload, str)
+            else _write_json(path, payload)
+        )
+        storage_path = str(path)
+        if (artifact_type, storage_path) in existing_keys:
+            continue
+        artifact = models.Artifact(
+            owner_type="job",
+            owner_id=job.id,
+            artifact_type=artifact_type,
+            display_name=display_name,
+            storage_path=storage_path,
+            mime_type=mime_type,
+            file_size_bytes=size,
+        )
+        db.add(artifact)
+        created.append(artifact)
+    return created
+
+
+def ensure_job_artifacts(
+    db: Session,
+    *,
+    job: models.Job,
+    report_body: dict[str, Any],
+    best: models.CandidateParameterSet,
+) -> list[models.Artifact]:
+    if job.simulator_backend_requested == "real_cli":
+        return ensure_real_job_artifacts(db, job=job, report_body=report_body, best=best)
+    return ensure_mock_job_artifacts(db, job)
 
 
 # --- Top-level entrypoint -------------------------------------------------
@@ -360,13 +535,15 @@ def generate_and_persist_report(
         best_trials=best_trials,
     )
     report = persist_report(db, job=job, best=best, report_body=body)
-    ensure_job_artifacts(db, job)
+    ensure_job_artifacts(db, job=job, report_body=body, best=best)
     return report
 
 
 __all__ = [
     "build_report_body",
     "ensure_job_artifacts",
+    "ensure_mock_job_artifacts",
+    "ensure_real_job_artifacts",
     "generate_and_persist_report",
     "generate_summary_text",
     "persist_report",

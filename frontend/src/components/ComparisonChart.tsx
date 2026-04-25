@@ -8,6 +8,10 @@ interface Props {
   data: ComparisonPoint[];
 }
 
+function effectiveLowerIsBetter(point: ComparisonPoint): boolean {
+  return point.metric === "score" ? true : point.lower_is_better;
+}
+
 function formatValue(point: ComparisonPoint, value: number): string {
   const rounded =
     Math.abs(value) >= 100
@@ -20,7 +24,7 @@ function formatValue(point: ComparisonPoint, value: number): string {
 
 function winner(point: ComparisonPoint): "baseline" | "optimized" | "tie" {
   if (point.baseline === point.optimized) return "tie";
-  const optimizedBetter = point.lower_is_better
+  const optimizedBetter = effectiveLowerIsBetter(point)
     ? point.optimized < point.baseline
     : point.optimized > point.baseline;
   return optimizedBetter ? "optimized" : "baseline";
@@ -47,7 +51,7 @@ export function ComparisonChart({ data }: Props) {
             <div className="comparison-label" role="rowheader">
               {point.label}
               <span className="comparison-hint">
-                {point.lower_is_better ? "lower is better" : "higher is better"}
+                {effectiveLowerIsBetter(point) ? "lower is better" : "higher is better"}
               </span>
             </div>
             <div className="comparison-bars" role="cell">

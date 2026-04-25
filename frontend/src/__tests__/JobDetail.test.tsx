@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { JobDetail } from "../pages/JobDetail";
 import { apiClient } from "../api/client";
-import type { Job, JobReport, TrialSummary } from "../types/api";
+import type { Artifact, Job, JobReport, TrialSummary } from "../types/api";
 
 const PHASE8_DEFAULTS = {
   simulator_backend_requested: "mock" as const,
@@ -297,5 +297,34 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         openai: { api_key: "sk-rerun", model: null },
       }),
     );
+  });
+
+  it("renders artifact cards for long paths with grouped sections", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    const artifacts: Artifact[] = [
+      {
+        id: "art_long",
+        owner_type: "job",
+        owner_id: job.id,
+        artifact_type: "report_json",
+        display_name: "Job report",
+        storage_path:
+          "/workspace/dd_artifacts/jobs/job_xxx/job_artifacts/really/very/long/path/report.json",
+        mime_type: "application/json",
+        file_size_bytes: 200,
+        created_at: "2026-04-22T09:05:00Z",
+      },
+    ];
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue(artifacts);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByText(/Job artifacts \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText("report.json")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy path/i })).toBeInTheDocument();
+    expect(screen.getByTestId("artifact-grid")).toBeInTheDocument();
   });
 });

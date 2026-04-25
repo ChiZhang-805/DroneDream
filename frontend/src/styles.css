@@ -637,6 +637,7 @@ code {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .comparison-legend {
@@ -668,6 +669,7 @@ code {
   grid-template-columns: 200px 1fr;
   gap: 1rem;
   align-items: center;
+  min-width: 0;
 }
 
 .comparison-label {
@@ -685,12 +687,14 @@ code {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  min-width: 0;
 }
 
 .bar-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .bar {
@@ -715,6 +719,84 @@ code {
   font-size: 0.8rem;
   color: var(--text-muted);
   min-width: 70px;
+}
+
+/* ---------- Artifact cards ---------- */
+
+.artifact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.artifact-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev-2);
+  padding: 0.75rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.artifact-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.artifact-card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.artifact-copy-btn {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.artifact-file {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-path {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-meta {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.artifact-copy-ok {
+  color: var(--success);
+}
+
+.artifact-copy-fail {
+  color: var(--warning);
 }
 
 /* ---------- Key/value list ---------- */
@@ -775,6 +857,10 @@ code {
 
 .stack-md > * + * {
   margin-top: 1rem;
+}
+
+.stack-sm > * + * {
+  margin-top: 0.5rem;
 }
 
 /* ---------- Candidate tags (Phase 5) ---------- */
