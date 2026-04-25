@@ -244,6 +244,9 @@ pretending real PX4 support is present.
 
 For the full contract, telemetry schema, metrics, failure mapping, and
 limitations, see [`docs/PX4_GAZEBO_RUNNER.md`](docs/PX4_GAZEBO_RUNNER.md).
+For PR3 visualization options (browser trajectory replay + optional Runpod
+noVNC iframe), see
+[`docs/RUNPOD_GAZEBO_VISUALIZATION.md`](docs/RUNPOD_GAZEBO_VISUALIZATION.md).
 
 For real PX4 runs, metric pass/fail now uses a track-following **evaluation
 window** (offboard timing metadata when available, otherwise telemetry-derived

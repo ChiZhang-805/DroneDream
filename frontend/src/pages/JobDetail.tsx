@@ -17,6 +17,7 @@ import { DataTable, type Column } from "../components/DataTable";
 import { Loading, ErrorState, Empty } from "../components/States";
 import { ComparisonChart } from "../components/ComparisonChart";
 import { ArtifactsPanel } from "../components/ArtifactsPanel";
+import { GazeboLivePanel } from "../components/GazeboLivePanel";
 
 // Polling interval for active jobs. The frontend only polls; all state
 // transitions are driven by the backend worker process (Phase 3+). See
@@ -219,6 +220,7 @@ export function JobDetail() {
   const trials = trialsQuery.data ?? [];
   const report = reportQuery.data;
   const artifacts = artifactsQuery.data ?? [];
+  const bestTrial = trials.find((trial) => trial.candidate_is_best);
   const pdfArtifact = artifacts.find(
     (a) => a.artifact_type === "pdf_report" || a.mime_type === "application/pdf",
   );
@@ -282,6 +284,21 @@ export function JobDetail() {
       <StatusSpecificTop job={job} report={report} />
 
       <MetricsCards job={job} report={report} />
+      <SectionCard
+        title="Best candidate replay"
+        description="Trajectory replay renders on Trial Detail using telemetry/trajectory artifacts."
+      >
+        {bestTrial ? (
+          <Link to={`/trials/${bestTrial.id}`}>Open best trial replay</Link>
+        ) : (
+          <Empty
+            title="Replay unavailable"
+            description="No best trial is available yet."
+          />
+        )}
+      </SectionCard>
+
+      <GazeboLivePanel />
 
       {report ? (
         <>

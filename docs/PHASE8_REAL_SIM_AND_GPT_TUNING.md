@@ -454,3 +454,9 @@ After a job report is finalized, the backend now also generates a PDF report art
 - Artifact downloading uses `GET /api/v1/artifacts/{artifact_id}/download`.
 - Download paths are validated with resolved absolute paths and must stay under configured artifact roots; paths outside allowed roots are rejected with `403`.
 - `mock://` artifacts are metadata-only and are not downloadable.
+
+
+## Phase 8 visualization addendum (PR3)
+
+For browser-native trajectory replay and optional Runpod noVNC Gazebo iframe setup, see [docs/RUNPOD_GAZEBO_VISUALIZATION.md](RUNPOD_GAZEBO_VISUALIZATION.md).
+

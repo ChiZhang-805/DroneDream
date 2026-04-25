@@ -150,6 +150,48 @@ export const apiClient = {
     );
   },
 
+  async fetchArtifactJson<T>(artifactId: string): Promise<T> {
+    const url = artifactDownloadUrl(artifactId);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+    } catch (networkError) {
+      throw new ApiClientError(
+        "NETWORK_ERROR",
+        networkError instanceof Error
+          ? networkError.message
+          : "Failed to download artifact.",
+        null,
+        0,
+      );
+    }
+
+    if (!response.ok) {
+      throw new ApiClientError(
+        "ARTIFACT_DOWNLOAD_FAILED",
+        `Failed to download artifact JSON (HTTP ${response.status})`,
+        null,
+        response.status,
+      );
+    }
+
+    const payloadText = await response.text();
+    try {
+      return JSON.parse(payloadText) as T;
+    } catch {
+      throw new ApiClientError(
+        "ARTIFACT_NOT_JSON",
+        "Artifact is not valid JSON.",
+        null,
+        response.status,
+      );
+    }
+  },
+
   async cancelJob(jobId: string): Promise<Job> {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel`, {
       method: "POST",
