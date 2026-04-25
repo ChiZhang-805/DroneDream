@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
@@ -193,6 +194,28 @@ def test_summary_text_reports_tradeoff_when_optimized_slower(ctx):
         assert "completion time increased" in text
 
 
+def test_score_comparison_point_is_lower_is_better(ctx):
+    rg = ctx["report_generator"]
+    points = rg._comparison_points(  # noqa: SLF001
+        {
+            "rmse": 1.0,
+            "max_error": 1.0,
+            "overshoot_count": 1,
+            "completion_time": 10.0,
+            "score": 5.0,
+        },
+        {
+            "rmse": 0.8,
+            "max_error": 0.9,
+            "overshoot_count": 0,
+            "completion_time": 9.0,
+            "score": 4.0,
+        },
+    )
+    score_point = next(p for p in points if p["metric"] == "score")
+    assert score_point["lower_is_better"] is True
+
+
 # --- Artifacts ------------------------------------------------------------
 
 
@@ -234,10 +257,39 @@ def test_ensure_job_artifacts_is_idempotent(ctx):
         )
         db.add(job)
         db.flush()
+        best = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0},
+            is_baseline=True,
+            is_best=True,
+        )
+        db.add(best)
+        db.flush()
+        report_body = {
+            "summary_text": "summary",
+            "baseline_metric_json": {
+                "rmse": 1.0,
+                "max_error": 1.0,
+                "overshoot_count": 0,
+                "completion_time": 10.0,
+                "score": 1.0,
+            },
+            "optimized_metric_json": {
+                "rmse": 1.0,
+                "max_error": 1.0,
+                "overshoot_count": 0,
+                "completion_time": 10.0,
+                "score": 1.0,
+            },
+            "comparison_metric_json": [],
+            "best_parameter_json": {"kp_xy": 1.0},
+        }
 
-        first = rg.ensure_job_artifacts(db, job)
+        first = rg.ensure_job_artifacts(db, job=job, report_body=report_body, best=best)
         db.commit()
-        second = rg.ensure_job_artifacts(db, job)
+        second = rg.ensure_job_artifacts(db, job=job, report_body=report_body, best=best)
         db.commit()
 
         assert len(first) == 4
@@ -249,6 +301,81 @@ def test_ensure_job_artifacts_is_idempotent(ctx):
             .all()
         )
         assert len(rows) == 4
+
+
+def test_real_cli_job_artifacts_are_real_files_and_idempotent(ctx, tmp_path, monkeypatch):
+    rg = ctx["report_generator"]
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+        )
+        db.add(job)
+        db.flush()
+        best = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0},
+            is_baseline=True,
+            is_best=True,
+        )
+        db.add(best)
+        db.flush()
+        report_body = {
+            "summary_text": "summary",
+            "baseline_metric_json": {
+                "rmse": 1.0,
+                "max_error": 1.0,
+                "overshoot_count": 0,
+                "completion_time": 10.0,
+                "score": 1.0,
+            },
+            "optimized_metric_json": {
+                "rmse": 0.9,
+                "max_error": 0.9,
+                "overshoot_count": 0,
+                "completion_time": 9.0,
+                "score": 0.9,
+            },
+            "comparison_metric_json": [],
+            "best_parameter_json": {"kp_xy": 1.0},
+        }
+
+        first = rg.ensure_job_artifacts(db, job=job, report_body=report_body, best=best)
+        db.commit()
+        second = rg.ensure_job_artifacts(db, job=job, report_body=report_body, best=best)
+        db.commit()
+
+        assert len(first) == 5
+        assert second == []
+
+        rows = (
+            db.query(models.Artifact)
+            .filter(models.Artifact.owner_type == "job")
+            .filter(models.Artifact.owner_id == job.id)
+            .all()
+        )
+        assert len(rows) == 5
+        assert all(not a.storage_path.startswith("mock://") for a in rows)
+        assert {a.artifact_type for a in rows} == {
+            "report_json",
+            "candidate_summary_json",
+            "trial_summary_json",
+            "comparison_json",
+            "job_events_log",
+        }
+        for row in rows:
+            path = tmp_path / "jobs" / job.id / "job_artifacts" / Path(row.storage_path).name
+            assert path.exists()
 
 
 # --- API error paths ------------------------------------------------------

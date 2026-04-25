@@ -135,6 +135,8 @@ describe("TrialDetail artifacts — Phase 8 polish", () => {
     ).not.toBeInTheDocument();
     // Job-level artifacts are still surfaced under a separate heading.
     expect(screen.getByText("Job report")).toBeInTheDocument();
+    expect(screen.getByText("trajectory.png")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /copy path/i }).length).toBeGreaterThan(0);
     // Section headings reflect the new split.
     expect(screen.getByText(/Trial artifacts \(2\)/)).toBeInTheDocument();
     expect(screen.getByText(/Job artifacts \(1\)/)).toBeInTheDocument();

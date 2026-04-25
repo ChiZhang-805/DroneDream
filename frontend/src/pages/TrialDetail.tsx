@@ -6,9 +6,10 @@ import { SectionCard } from "../components/SectionCard";
 import { MetricCard } from "../components/MetricCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Alert } from "../components/Alert";
-import { Loading, ErrorState, Empty } from "../components/States";
+import { Loading, ErrorState } from "../components/States";
 import type { Artifact, Trial } from "../types/api";
 import { formatDateTime, formatNumber } from "../utils/format";
+import { ArtifactsPanel } from "../components/ArtifactsPanel";
 
 export function TrialDetail() {
   const { trialId } = useParams<{ trialId: string }>();
@@ -195,76 +196,31 @@ function TrialArtifactsSection({
     (a) => a.owner_type === "trial" && a.owner_id === trial.id,
   );
   const jobArtifacts = artifacts.filter((a) => a.owner_type === "job");
-  const total = trialArtifacts.length + jobArtifacts.length;
   return (
-    <SectionCard
+    <ArtifactsPanel
       title="Artifacts"
       description={
         `Artifacts for this trial (scenario ${trial.scenario_type}, seed ${trial.seed})` +
         ` and for its parent job.`
       }
-    >
-      {isLoading ? (
-        <Loading label="Loading artifacts…" />
-      ) : total === 0 ? (
-        <Empty
-          title="No artifacts yet"
-          description="Artifacts become available after the parent job completes."
-        />
-      ) : (
-        <div className="stack-md">
-          <ArtifactList
-            heading={`Trial artifacts (${trialArtifacts.length})`}
-            artifacts={trialArtifacts}
-            emptyNote={
-              trial.simulator_backend === "mock"
-                ? "The mock simulator does not produce per-trial artifact files."
-                : "No trial-level artifacts were recorded for this trial."
-            }
-          />
-          <ArtifactList
-            heading={`Job artifacts (${jobArtifacts.length})`}
-            artifacts={jobArtifacts}
-            emptyNote="The job has not produced shared artifacts yet."
-          />
-        </div>
-      )}
-    </SectionCard>
-  );
-}
-
-function ArtifactList({
-  heading,
-  artifacts,
-  emptyNote,
-}: {
-  heading: string;
-  artifacts: Artifact[];
-  emptyNote: string;
-}) {
-  return (
-    <div>
-      <h3 className="section-subheading">{heading}</h3>
-      {artifacts.length === 0 ? (
-        <p className="form-hint">{emptyNote}</p>
-      ) : (
-        <ul className="kv-list">
-          {artifacts.map((a) => (
-            <li key={a.id}>
-              <span className="kv-key">
-                {a.display_name ?? a.artifact_type}
-              </span>
-              <span className="kv-value">
-                <code>{a.storage_path}</code>
-                {a.mime_type ? (
-                  <span className="form-hint"> · {a.mime_type}</span>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+      isLoading={isLoading}
+      emptyDescription="Artifacts become available after the parent job completes."
+      sections={[
+        {
+          heading: `Trial artifacts (${trialArtifacts.length})`,
+          artifacts: trialArtifacts,
+          emptyNote:
+            trial.simulator_backend === "mock"
+              ? "The mock simulator does not produce per-trial artifact files."
+              : "No trial-level artifacts were recorded for this trial.",
+        },
+        {
+          heading: `Job artifacts (${jobArtifacts.length})`,
+          artifacts: jobArtifacts,
+          emptyNote: "The job has not produced shared artifacts yet.",
+        },
+      ]}
+    />
   );
 }
 
