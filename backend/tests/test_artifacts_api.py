@@ -4,12 +4,11 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app import models
-from app.db import SessionLocal
+from app import db, models
 
 
 def _seed_job() -> str:
-    with SessionLocal() as db:
+    with db.SessionLocal() as session:
         job = models.Job(
             track_type="circle",
             altitude_m=3.0,
@@ -18,8 +17,8 @@ def _seed_job() -> str:
             status="COMPLETED",
             simulator_backend_requested="real_cli",
         )
-        db.add(job)
-        db.commit()
+        session.add(job)
+        session.commit()
         return job.id
 
 
@@ -30,7 +29,7 @@ def test_download_pdf_artifact_success(client: TestClient, tmp_path: Path) -> No
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
 
-    with SessionLocal() as db:
+    with db.SessionLocal() as session:
         artifact = models.Artifact(
             owner_type="job",
             owner_id=job_id,
@@ -40,8 +39,8 @@ def test_download_pdf_artifact_success(client: TestClient, tmp_path: Path) -> No
             mime_type="application/pdf",
             file_size_bytes=path.stat().st_size,
         )
-        db.add(artifact)
-        db.commit()
+        session.add(artifact)
+        session.commit()
         art_id = artifact.id
 
     resp = client.get(f"/api/v1/artifacts/{art_id}/download")
@@ -52,7 +51,7 @@ def test_download_pdf_artifact_success(client: TestClient, tmp_path: Path) -> No
 
 def test_download_mock_artifact_rejected(client: TestClient) -> None:
     job_id = _seed_job()
-    with SessionLocal() as db:
+    with db.SessionLocal() as session:
         artifact = models.Artifact(
             owner_type="job",
             owner_id=job_id,
@@ -61,8 +60,8 @@ def test_download_mock_artifact_rejected(client: TestClient) -> None:
             storage_path=f"mock://jobs/{job_id}/reports/{job_id} report.pdf",
             mime_type="application/pdf",
         )
-        db.add(artifact)
-        db.commit()
+        session.add(artifact)
+        session.commit()
         art_id = artifact.id
 
     resp = client.get(f"/api/v1/artifacts/{art_id}/download")
@@ -72,7 +71,7 @@ def test_download_mock_artifact_rejected(client: TestClient) -> None:
 def test_download_missing_file_returns_404(client: TestClient, tmp_path: Path) -> None:
     job_id = _seed_job()
     missing_path = tmp_path / "real_artifacts" / "jobs" / job_id / "reports" / "missing.pdf"
-    with SessionLocal() as db:
+    with db.SessionLocal() as session:
         artifact = models.Artifact(
             owner_type="job",
             owner_id=job_id,
@@ -81,8 +80,8 @@ def test_download_missing_file_returns_404(client: TestClient, tmp_path: Path) -
             storage_path=str(missing_path),
             mime_type="application/pdf",
         )
-        db.add(artifact)
-        db.commit()
+        session.add(artifact)
+        session.commit()
         art_id = artifact.id
 
     resp = client.get(f"/api/v1/artifacts/{art_id}/download")
@@ -93,7 +92,7 @@ def test_download_forbidden_outside_root(client: TestClient, tmp_path: Path) -> 
     job_id = _seed_job()
     outside = tmp_path / "outside.pdf"
     outside.write_bytes(b"%PDF-1.4\n")
-    with SessionLocal() as db:
+    with db.SessionLocal() as session:
         artifact = models.Artifact(
             owner_type="job",
             owner_id=job_id,
@@ -102,8 +101,8 @@ def test_download_forbidden_outside_root(client: TestClient, tmp_path: Path) -> 
             storage_path=str(outside),
             mime_type="application/pdf",
         )
-        db.add(artifact)
-        db.commit()
+        session.add(artifact)
+        session.commit()
         art_id = artifact.id
 
     resp = client.get(f"/api/v1/artifacts/{art_id}/download")
