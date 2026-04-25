@@ -18,8 +18,12 @@ charts, summary text, failure details, rerun, and job history in the UI.
 > [`docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md`](docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md)
 > for the full Phase 8 spec (adapter protocol, acceptance logic, env vars,
 > demos) and [`docs/ACCEPTANCE_REPORT.md`](docs/ACCEPTANCE_REPORT.md) for
-> the Phase 7 acceptance coverage. Real PX4/Gazebo, auth, PDF export, and
-> the advanced track editor remain explicitly out of scope.
+> the Phase 7 acceptance coverage. Auth/login, real drone hardware,
+> production multi-worker scaling, and the advanced track editor remain
+> explicitly out of scope. PDF job reports are implemented as
+> backend-generated downloadable artifacts. Real PX4/Gazebo SITL is
+> supported through the `real_cli` + `px4_gazebo_runner` path when an
+> external PX4/Gazebo environment is configured.
 
 ## Repo layout
 
