@@ -257,7 +257,7 @@ def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -
         add(details)
 
     best = next((c for c in job.candidates if c.id == job.best_candidate_id), None)
-    best_agg = best.aggregated_metric_json if best is not None else {}
+    best_agg = (best.aggregated_metric_json or {}) if best is not None else {}
     add("")
     add("6) Best parameters")
     add(f"- best candidate id: {best.id if best else '—'}")
