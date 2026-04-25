@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { artifactDownloadUrl } from "../api/client";
 import type { Artifact } from "../types/api";
 
 interface ArtifactCardProps {
@@ -35,6 +36,9 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const label = artifact.display_name ?? artifact.artifact_type;
   const fileName = basename(artifact.storage_path);
+  const isPdf =
+    artifact.artifact_type === "pdf_report" ||
+    artifact.mime_type === "application/pdf";
 
   const handleCopy = async () => {
     try {
@@ -57,6 +61,15 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
         >
           Copy path
         </button>
+        {isPdf ? (
+          <a
+            className="btn"
+            href={artifactDownloadUrl(artifact.id)}
+            download
+          >
+            Download PDF
+          </a>
+        ) : null}
       </header>
 
       <div className="artifact-file" title={artifact.storage_path}>

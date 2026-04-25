@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiClient, ApiClientError } from "../api/client";
+import { apiClient, ApiClientError, artifactDownloadUrl } from "../api/client";
 import type {
   Job,
   JobEventInfo,
@@ -219,6 +219,9 @@ export function JobDetail() {
   const trials = trialsQuery.data ?? [];
   const report = reportQuery.data;
   const artifacts = artifactsQuery.data ?? [];
+  const pdfArtifact = artifacts.find(
+    (a) => a.artifact_type === "pdf_report" || a.mime_type === "application/pdf",
+  );
 
   const isTerminal =
     job.status === "COMPLETED" ||
@@ -251,6 +254,13 @@ export function JobDetail() {
         cancelPending={cancelMutation.isPending}
         canCancel={!isTerminal}
       />
+      {pdfArtifact ? (
+        <div>
+          <a className="btn" href={artifactDownloadUrl(pdfArtifact.id)} download>
+            Download PDF report
+          </a>
+        </div>
+      ) : null}
       {rerunMutation.isError ? (
         <Alert tone="danger" title="Rerun failed">
           {rerunMutation.error instanceof ApiClientError

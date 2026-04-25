@@ -19,6 +19,8 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
     db_path = tmp_path / "test.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path / "real_artifacts"))
+    monkeypatch.setenv("ARTIFACT_ROOT", str(tmp_path / "mock_artifacts"))
 
     # Reset cached settings and re-import modules so the new env takes effect.
     from app import config as config_module
@@ -38,9 +40,11 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
 
     importlib.reload(jobs_service_module)
 
+    import app.routers.artifacts as artifacts_router_module
     import app.routers.jobs as jobs_router_module
     import app.routers.trials as trials_router_module
 
+    importlib.reload(artifacts_router_module)
     importlib.reload(jobs_router_module)
     importlib.reload(trials_router_module)
 

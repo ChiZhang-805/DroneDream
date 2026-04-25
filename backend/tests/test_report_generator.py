@@ -238,8 +238,12 @@ def test_completed_job_has_mock_artifacts(ctx):
         } <= types
         # storage_path is a mock URI scheme; frontend treats it as metadata.
         for a in artifacts:
-            assert a.storage_path.startswith("mock://jobs/")
-            assert job_id in a.storage_path
+            if a.artifact_type == "pdf_report":
+                assert a.storage_path.endswith(f"{job_id} report.pdf")
+                assert not a.storage_path.startswith("mock://")
+            else:
+                assert a.storage_path.startswith("mock://jobs/")
+                assert job_id in a.storage_path
 
 
 def test_ensure_job_artifacts_is_idempotent(ctx):
@@ -376,6 +380,167 @@ def test_real_cli_job_artifacts_are_real_files_and_idempotent(ctx, tmp_path, mon
         for row in rows:
             path = tmp_path / "jobs" / job.id / "job_artifacts" / Path(row.storage_path).name
             assert path.exists()
+
+
+def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
+    rg = ctx["report_generator"]
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+        )
+        db.add(job)
+        db.flush()
+        best = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0},
+            aggregated_metric_json={
+                "rmse": 1.0,
+                "max_error": 1.1,
+                "completion_time": 10.0,
+                "aggregated_score": 1.1,
+                "trial_count": 1,
+                "passing_trial_count": 1,
+            },
+            is_baseline=True,
+            is_best=True,
+        )
+        db.add(best)
+        db.flush()
+        job.baseline_candidate_id = best.id
+        job.best_candidate_id = best.id
+        db.add(
+            models.JobReport(
+                job_id=job.id,
+                best_candidate_id=best.id,
+                summary_text="summary",
+                baseline_metric_json={
+                    "rmse": 1.0,
+                    "max_error": 1.1,
+                    "overshoot_count": 0,
+                    "completion_time": 10.0,
+                    "score": 1.1,
+                },
+                optimized_metric_json={
+                    "rmse": 1.0,
+                    "max_error": 1.1,
+                    "overshoot_count": 0,
+                    "completion_time": 10.0,
+                    "score": 1.1,
+                },
+                comparison_metric_json=[],
+                best_parameter_json={"kp_xy": 1.0},
+                report_status="READY",
+            )
+        )
+        db.commit()
+        db.refresh(job)
+
+        first = rg.ensure_job_pdf_artifact(db, job=job)
+        db.commit()
+        second = rg.ensure_job_pdf_artifact(db, job=job)
+        db.commit()
+        assert first.id == second.id
+        assert first.mime_type == "application/pdf"
+        assert first.file_size_bytes is not None and first.file_size_bytes > 0
+        assert not first.storage_path.startswith("mock://")
+        assert Path(first.storage_path).exists()
+
+        rows = (
+            db.query(models.Artifact)
+            .filter(models.Artifact.owner_type == "job")
+            .filter(models.Artifact.owner_id == job.id)
+            .filter(models.Artifact.artifact_type == "pdf_report")
+            .all()
+        )
+        assert len(rows) == 1
+
+
+def test_generate_job_pdf_report_creates_expected_file(ctx, tmp_path):
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    pdf_service = __import__("app.services.pdf_report", fromlist=["*"])
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+        )
+        db.add(job)
+        db.flush()
+
+        baseline = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0, "kd_xy": 0.2},
+            aggregated_score=1.0,
+            aggregated_metric_json={
+                "rmse": 1.1,
+                "max_error": 1.4,
+                "completion_time": 9.2,
+                "aggregated_score": 1.0,
+                "trial_count": 1,
+                "passing_trial_count": 1,
+            },
+            trial_count=1,
+            completed_trial_count=1,
+            is_baseline=True,
+            is_best=True,
+        )
+        db.add(baseline)
+        db.flush()
+        job.baseline_candidate_id = baseline.id
+        job.best_candidate_id = baseline.id
+        report = models.JobReport(
+            job_id=job.id,
+            best_candidate_id=baseline.id,
+            summary_text="A deterministic summary.",
+            report_status="READY",
+            best_parameter_json={"kp_xy": 1.0, "kd_xy": 0.2},
+            baseline_metric_json={
+                "rmse": 1.1,
+                "max_error": 1.4,
+                "overshoot_count": 0,
+                "completion_time": 9.2,
+                "score": 1.0,
+            },
+            optimized_metric_json={
+                "rmse": 1.1,
+                "max_error": 1.4,
+                "overshoot_count": 0,
+                "completion_time": 9.2,
+                "score": 1.0,
+            },
+            comparison_metric_json=[],
+        )
+        db.add(report)
+        db.commit()
+        db.refresh(job)
+
+        path = pdf_service.generate_job_pdf_report(
+            db=db,
+            job=job,
+            output_dir=tmp_path / "jobs" / job.id / "reports",
+        )
+        assert path.exists()
+        assert path.name == f"{job.id} report.pdf"
+        assert path.stat().st_size > 0
+        assert path.read_bytes().startswith(b"%PDF")
 
 
 # --- API error paths ------------------------------------------------------
@@ -522,7 +687,7 @@ def test_artifacts_endpoint_exposes_job_artifacts(ctx):
     owner_types = {a["owner_type"] for a in body}
     assert "job" in owner_types
     job_rows = [a for a in body if a["owner_type"] == "job"]
-    assert {a["artifact_type"] for a in job_rows} == {
+    assert {a["artifact_type"] for a in job_rows} >= {
         "comparison_plot",
         "trajectory_plot",
         "worker_log",

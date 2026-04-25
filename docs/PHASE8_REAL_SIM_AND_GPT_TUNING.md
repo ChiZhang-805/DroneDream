@@ -17,7 +17,7 @@ Phase 8 extends the Phase 7 MVP with two coordinated capabilities:
 The loop repeats until a candidate passes the configured acceptance criteria
 or until `max_iterations` / `max_total_trials` is reached.
 
-**Out of scope (intentionally unchanged):** auth/login, PDF export, advanced
+**Out of scope (intentionally unchanged):** auth/login, advanced
 track editor, real drone hardware, production multi-worker scaling, any
 client-side call to OpenAI. Only the server ever sees the OpenAI API key.
 
@@ -435,3 +435,22 @@ Phase 8-specific test files:
   parameters — it only proposes candidate parameter sets as strict JSON,
   which the backend validates, clamps, and dispatches through the existing
   worker + `SimulatorAdapter` path.
+
+
+---
+
+## 9. Job PDF report artifact + secure download
+
+After a job report is finalized, the backend now also generates a PDF report artifact server-side (never in the browser).
+
+- Output file path: `REAL_SIMULATOR_ARTIFACT_ROOT/jobs/{job_id}/reports/{job_id} report.pdf`
+- File name format is always: `{job_id} report.pdf`
+- The PDF is registered as a job artifact with `artifact_type="pdf_report"` and `mime_type="application/pdf"`.
+- Frontend Job Detail shows a **Download PDF report** button when this artifact exists, and the artifact row itself also exposes a Download PDF action.
+
+### Security notes
+
+- The PDF content is derived from job/candidate/trial/report data and excludes secret-like fields (OpenAI API key, app secrets, etc.).
+- Artifact downloading uses `GET /api/v1/artifacts/{artifact_id}/download`.
+- Download paths are validated with resolved absolute paths and must stay under configured artifact roots; paths outside allowed roots are rejected with `403`.
+- `mock://` artifacts are metadata-only and are not downloadable.

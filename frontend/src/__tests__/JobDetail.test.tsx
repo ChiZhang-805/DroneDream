@@ -327,4 +327,42 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     expect(screen.getByRole("button", { name: /copy path/i })).toBeInTheDocument();
     expect(screen.getByTestId("artifact-grid")).toBeInTheDocument();
   });
+
+  it("shows top Download PDF report button when pdf artifact exists", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    const artifacts: Artifact[] = [
+      {
+        id: "art_pdf",
+        owner_type: "job",
+        owner_id: job.id,
+        artifact_type: "pdf_report",
+        display_name: `${job.id} report.pdf`,
+        storage_path: `/workspace/dd_artifacts/jobs/${job.id}/reports/${job.id} report.pdf`,
+        mime_type: "application/pdf",
+        file_size_bytes: 1024,
+        created_at: "2026-04-22T09:05:00Z",
+      },
+    ];
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue(artifacts);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    const link = await screen.findByRole("link", { name: /download pdf report/i });
+    expect(link).toHaveAttribute("href", expect.stringContaining("/api/v1/artifacts/art_pdf/download"));
+  });
+
+  it("does not show top Download PDF report button when no pdf artifact", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+    await screen.findByText(/Baseline vs Optimized comparison/i);
+    expect(screen.queryByRole("link", { name: /download pdf report/i })).toBeNull();
+  });
 });
