@@ -17,6 +17,14 @@ const artifact: Artifact = {
   created_at: "2026-04-22T09:00:40Z",
 };
 
+const pdfArtifact: Artifact = {
+  ...artifact,
+  id: "art_pdf",
+  artifact_type: "pdf_report",
+  mime_type: "application/pdf",
+  display_name: "job_123 report.pdf",
+};
+
 describe("ArtifactCard", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -56,5 +64,17 @@ describe("ArtifactCard", () => {
 
     await waitFor(() => expect(execCopy).toHaveBeenCalledWith("copy"));
     expect(await screen.findByText(/copy unavailable/i)).toBeInTheDocument();
+  });
+
+  it("shows a Download PDF button for pdf artifacts", () => {
+    render(<ArtifactCard artifact={pdfArtifact} />);
+    const link = screen.getByRole("link", { name: /download pdf/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", expect.stringContaining("/api/v1/artifacts/art_pdf/download"));
+  });
+
+  it("does not show Download PDF for non-pdf artifacts", () => {
+    render(<ArtifactCard artifact={artifact} />);
+    expect(screen.queryByRole("link", { name: /download pdf/i })).toBeNull();
   });
 });

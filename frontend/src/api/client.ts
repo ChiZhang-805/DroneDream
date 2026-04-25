@@ -40,6 +40,10 @@ const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
   "http://127.0.0.1:8000";
 
+export function artifactDownloadUrl(artifactId: string): string {
+  return `${API_BASE_URL}/api/v1/artifacts/${encodeURIComponent(artifactId)}/download`;
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,

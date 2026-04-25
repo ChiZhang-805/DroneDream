@@ -16,6 +16,7 @@ simulator produces real files.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models
+from app.config import get_settings
+from app.orchestration.events import record_event
+from app.services.pdf_report import generate_job_pdf_report
+
+logger = logging.getLogger("drone_dream.orchestration.report_generator")
 
 # --- Comparison point helpers ---------------------------------------------
 
@@ -336,7 +342,16 @@ def ensure_mock_job_artifacts(db: Session, job: models.Job) -> list[models.Artif
 
 
 def _real_artifact_root() -> Path:
-    return Path(os.environ.get("REAL_SIMULATOR_ARTIFACT_ROOT", "/workspace/dd_artifacts"))
+    settings = get_settings()
+    return Path(
+        os.environ.get(
+            "REAL_SIMULATOR_ARTIFACT_ROOT", str(settings.real_artifact_root_path)
+        )
+    ).resolve()
+
+
+def _default_artifact_root() -> Path:
+    return get_settings().default_artifact_root_path
 
 
 def _write_json(path: Path, payload: Any) -> int:
@@ -506,6 +521,44 @@ def ensure_job_artifacts(
     return ensure_mock_job_artifacts(db, job)
 
 
+def _upsert_pdf_artifact(
+    db: Session,
+    *,
+    job_id: str,
+    pdf_path: Path,
+) -> models.Artifact:
+    existing = db.scalars(
+        select(models.Artifact)
+        .where(models.Artifact.owner_type == "job")
+        .where(models.Artifact.owner_id == job_id)
+        .where(models.Artifact.artifact_type == "pdf_report")
+    ).first()
+    if existing is None:
+        existing = models.Artifact(
+            owner_type="job",
+            owner_id=job_id,
+            artifact_type="pdf_report",
+            storage_path=str(pdf_path),
+        )
+        db.add(existing)
+    existing.display_name = f"{job_id} report.pdf"
+    existing.storage_path = str(pdf_path)
+    existing.mime_type = "application/pdf"
+    existing.file_size_bytes = pdf_path.stat().st_size
+    return existing
+
+
+def ensure_job_pdf_artifact(db: Session, *, job: models.Job) -> models.Artifact:
+    root = (
+        _real_artifact_root()
+        if job.simulator_backend_requested == "real_cli"
+        else _default_artifact_root()
+    )
+    output_dir = root / "jobs" / job.id / "reports"
+    pdf_path = generate_job_pdf_report(db=db, job=job, output_dir=output_dir)
+    return _upsert_pdf_artifact(db, job_id=job.id, pdf_path=pdf_path)
+
+
 # --- Top-level entrypoint -------------------------------------------------
 
 
@@ -536,6 +589,16 @@ def generate_and_persist_report(
     )
     report = persist_report(db, job=job, best=best, report_body=body)
     ensure_job_artifacts(db, job=job, report_body=body, best=best)
+    try:
+        ensure_job_pdf_artifact(db, job=job)
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.exception("pdf report generation failed for job %s", job.id)
+        record_event(
+            db,
+            job.id,
+            "pdf_report_generation_failed",
+            {"error": str(exc)},
+        )
     return report
 
 
@@ -544,6 +607,7 @@ __all__ = [
     "ensure_job_artifacts",
     "ensure_mock_job_artifacts",
     "ensure_real_job_artifacts",
+    "ensure_job_pdf_artifact",
     "generate_and_persist_report",
     "generate_summary_text",
     "persist_report",

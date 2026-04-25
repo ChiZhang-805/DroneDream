@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { apiClient, ApiClientError } from "../api/client";
+import { apiClient, ApiClientError, artifactDownloadUrl } from "../api/client";
 
 function mockFetchOnce(body: unknown, status = 200) {
   const response = new Response(JSON.stringify(body), {
@@ -16,6 +16,12 @@ afterEach(() => {
 });
 
 describe("apiClient envelope handling", () => {
+  it("builds artifact download URLs from VITE_API_BASE_URL", () => {
+    expect(artifactDownloadUrl("art_abc")).toBe(
+      "http://127.0.0.1:8000/api/v1/artifacts/art_abc/download",
+    );
+  });
+
   it("unwraps the success envelope's data field", async () => {
     mockFetchOnce({
       success: true,
