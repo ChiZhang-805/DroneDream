@@ -913,3 +913,50 @@ code {
   margin-bottom: 0.75rem;
   flex-wrap: wrap;
 }
+
+/* ---------- Trajectory replay & Gazebo panel ---------- */
+
+.trajectory-replay-canvas-wrap {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.trajectory-replay-canvas {
+  display: block;
+  width: 100%;
+  height: min(56vw, 420px);
+  min-height: 240px;
+}
+
+.trajectory-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.trajectory-speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+}
+
+.trajectory-speed select {
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.2rem 0.35rem;
+}
+
+.gazebo-live-iframe {
+  width: 100%;
+  height: 720px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: #000;
+}

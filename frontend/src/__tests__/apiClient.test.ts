@@ -87,4 +87,37 @@ describe("apiClient envelope handling", () => {
       ApiClientError,
     );
   });
+
+  it("fetchArtifactJson uses artifact download URL and parses JSON", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ samples: [{ t: 0, x: 0, y: 0, z: 1 }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const data = await apiClient.fetchArtifactJson<{ samples: Array<{ t: number }> }>(
+      "art_json_1",
+    );
+    expect(data.samples[0].t).toBe(0);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/artifacts/art_json_1/download",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Accept: "application/json" }),
+      }),
+    );
+  });
+
+  it("fetchArtifactJson throws useful error on parse failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("not-json", { status: 200, headers: { "Content-Type": "application/json" } }),
+      ),
+    );
+    await expect(apiClient.fetchArtifactJson("art_not_json")).rejects.toMatchObject({
+      code: "ARTIFACT_NOT_JSON",
+    });
+  });
 });

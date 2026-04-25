@@ -10,6 +10,11 @@ import { Loading, ErrorState } from "../components/States";
 import type { Artifact, Trial } from "../types/api";
 import { formatDateTime, formatNumber } from "../utils/format";
 import { ArtifactsPanel } from "../components/ArtifactsPanel";
+import {
+  TrajectoryReplay,
+} from "../components/TrajectoryReplay";
+import { GazeboLivePanel } from "../components/GazeboLivePanel";
+import { selectReplayArtifactsForTrial } from "../components/trajectoryReplayUtils";
 
 export function TrialDetail() {
   const { trialId } = useParams<{ trialId: string }>();
@@ -51,12 +56,21 @@ export function TrialDetail() {
 
   const trial = trialQuery.data;
   const artifacts = artifactsQuery.data ?? [];
+  const replayArtifacts = selectReplayArtifactsForTrial(artifacts, trial.id);
 
   return (
     <section className="stack-md">
       <TrialHeader trial={trial} />
       <TrialMetadata trial={trial} />
       <TrialMetricsSection trial={trial} />
+      <TrajectoryReplay
+        artifacts={replayArtifacts}
+        meta={{
+          scenario: trial.scenario_type,
+          candidate_id: trial.candidate_id,
+        }}
+      />
+      <GazeboLivePanel />
       <TrialArtifactsSection
         trial={trial}
         artifacts={artifacts}

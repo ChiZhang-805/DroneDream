@@ -121,6 +121,12 @@ describe("TrialDetail artifacts — Phase 8 polish", () => {
 
     vi.spyOn(apiClient, "getTrial").mockResolvedValue(trial);
     vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue(artifacts);
+    vi.spyOn(apiClient, "fetchArtifactJson").mockResolvedValue({
+      samples: [
+        { t: 0, x: 0, y: 0, z: 3 },
+        { t: 1, x: 1, y: 1, z: 3 },
+      ],
+    });
 
     renderTrial(trial.id);
 
@@ -142,6 +148,7 @@ describe("TrialDetail artifacts — Phase 8 polish", () => {
     expect(screen.getByText(/Job artifacts \(1\)/)).toBeInTheDocument();
     // Stale "mock-only" wording must be gone for real_cli trials.
     expect(screen.queryByText(/mock-only/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Trajectory replay")).toBeInTheDocument();
   });
 
   it("keeps the mock-simulator note on trials with no real_cli artifacts", async () => {
@@ -162,6 +169,9 @@ describe("TrialDetail artifacts — Phase 8 polish", () => {
 
     vi.spyOn(apiClient, "getTrial").mockResolvedValue(trial);
     vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue(artifacts);
+    vi.spyOn(apiClient, "fetchArtifactJson").mockResolvedValue({
+      samples: [{ t: 0, x: 0, y: 0, z: 2 }],
+    });
 
     renderTrial(trial.id);
 
@@ -173,5 +183,18 @@ describe("TrialDetail artifacts — Phase 8 polish", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.getByText("Job report")).toBeInTheDocument();
+  });
+
+  it("shows replay empty state when telemetry/trajectory artifacts are missing", async () => {
+    const trial = makeTrial({ simulator_backend: "real_cli" });
+    vi.spyOn(apiClient, "getTrial").mockResolvedValue(trial);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+
+    renderTrial(trial.id);
+
+    await waitFor(() =>
+      expect(screen.getByText("Trajectory replay")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Replay unavailable")).toBeInTheDocument();
   });
 });
