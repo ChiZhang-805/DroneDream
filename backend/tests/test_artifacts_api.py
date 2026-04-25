@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi.testclient import TestClient
 
@@ -46,7 +47,9 @@ def test_download_pdf_artifact_success(client: TestClient, tmp_path: Path) -> No
     resp = client.get(f"/api/v1/artifacts/{art_id}/download")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/pdf")
-    assert f'{job_id} report.pdf' in resp.headers["content-disposition"]
+    content_disposition = resp.headers["content-disposition"]
+    assert "attachment;" in content_disposition
+    assert f"filename*=utf-8''{quote(f'{job_id} report.pdf')}" in content_disposition
 
 
 def test_download_mock_artifact_rejected(client: TestClient) -> None:
