@@ -1,4 +1,4 @@
-# Runpod Gazebo Visualization (PR3)
+# Runpod Gazebo Visualization (PR5)
 
 ## 1) Default mode (recommended)
 
@@ -52,16 +52,37 @@ Open Runpod 6080 HTTP proxy URL.
 VITE_GAZEBO_VIEWER_URL=https://<pod-id>-6080.proxy.runpod.net/vnc.html?autoconnect=1&resize=remote
 PX4_GAZEBO_HEADLESS=false
 DISPLAY=:99
+PX4_GAZEBO_LAUNCH_GUI_CLIENT=true
+PX4_GAZEBO_GUI_COMMAND="gz sim -g"
+LIBGL_ALWAYS_SOFTWARE=1
+QT_X11_NO_MITSHM=1
 ```
 
 Then restart frontend (and backend/worker when needed) so env changes take effect.
 
 Open JobDetail/TrialDetail to view the iframe panel.
 
+> noVNC/Xvfb only gives you a virtual desktop. To see Gazebo in that desktop,
+> the Gazebo GUI client must also run. PR5 adds wrapper-side auto-launch for
+> `gz sim -g` when GUI mode is explicitly enabled.
+
+### 3.5 Manual fallback verification
+
+If you need to verify GUI attach manually in a terminal:
+
+```bash
+export DISPLAY=:99
+export LIBGL_ALWAYS_SOFTWARE=1
+export QT_X11_NO_MITSHM=1
+gz sim -g
+```
+
 ## 4) Warnings / limitations
 
 - Runpod noVNC proxy is public if exposed; control access yourself.
 - Use this mode for demo/debug only.
 - GUI mode may reduce PX4/Gazebo performance.
+- `LIBGL_ALWAYS_SOFTWARE=1` forces software rendering and can increase CPU usage significantly.
 - Avoid enabling GUI during expensive batch tuning unless visualization is intentionally required.
+- Recommended batch optimization path: keep headless mode on and use trajectory replay artifacts.
 - Multi-worker concurrent visualization is not supported in this PR.

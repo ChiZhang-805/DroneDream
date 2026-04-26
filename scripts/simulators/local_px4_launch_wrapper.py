@@ -31,6 +31,11 @@ DEFAULT_OFFBOARD_CONNECTION = "udp://:14540"
 DEFAULT_OFFBOARD_SETPOINT_RATE_HZ = 10.0
 DEFAULT_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS = 30.0
 DEFAULT_OFFBOARD_TRACK_TIMEOUT_SECONDS = 120.0
+DEFAULT_LAUNCH_GUI_CLIENT = False
+DEFAULT_GUI_COMMAND = "gz sim -g"
+DEFAULT_GUI_START_DELAY_SECONDS = 5.0
+DEFAULT_GUI_WAIT_TIMEOUT_SECONDS = 15.0
+DEFAULT_REQUIRE_GUI_CLIENT = False
 
 REQUIRED_SAMPLE_KEYS = (
     "t",
@@ -353,10 +358,10 @@ def _render_launch_command(template: str, values: dict[str, str]) -> str:
     return rendered
 
 
-def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path) -> None:
+def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path, *, label: str) -> None:
     try:
         os.killpg(proc.pid, signal.SIGTERM)
-        _append_log(stderr_log, "[local_px4_launch_wrapper] Sent SIGTERM to process group")
+        _append_log(stderr_log, f"[local_px4_launch_wrapper] Sent SIGTERM to {label} process group")
     except OSError:
         return
 
@@ -368,12 +373,18 @@ def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path) -> N
 
     try:
         os.killpg(proc.pid, signal.SIGKILL)
-        _append_log(stderr_log, "[local_px4_launch_wrapper] Sent SIGKILL to process group")
+        _append_log(stderr_log, f"[local_px4_launch_wrapper] Sent SIGKILL to {label} process group")
     except OSError:
         return
 
 
-def _launch_px4_process(command: str, *, stdout_log: Path, stderr_log: Path) -> subprocess.Popen[str]:
+def _launch_process(
+    command: str,
+    *,
+    stdout_log: Path,
+    stderr_log: Path,
+    launch_env: dict[str, str] | None = None,
+) -> subprocess.Popen[str]:
     out_handle = stdout_log.open("a", encoding="utf-8")
     err_handle = stderr_log.open("a", encoding="utf-8")
     proc = subprocess.Popen(  # noqa: S603
@@ -382,6 +393,7 @@ def _launch_px4_process(command: str, *, stdout_log: Path, stderr_log: Path) -> 
         stderr=err_handle,
         text=True,
         start_new_session=True,
+        env=launch_env,
     )
     proc._stdout_handle = out_handle  # type: ignore[attr-defined]
     proc._stderr_handle = err_handle  # type: ignore[attr-defined]
@@ -395,6 +407,13 @@ def _close_launch_handles(proc: subprocess.Popen[str]) -> None:
         out_handle.close()
     if err_handle is not None:
         err_handle.close()
+
+
+def _cleanup_process(proc: subprocess.Popen[str] | None, stderr_log: Path, *, label: str) -> None:
+    if proc is None:
+        return
+    _terminate_process_group(proc, stderr_log, label=label)
+    _close_launch_handles(proc)
 
 
 def _default_offboard_executor_command() -> str:
@@ -500,7 +519,16 @@ def _resolve_real_launch_command(args: argparse.Namespace) -> tuple[str, str | N
     return "; ".join(components), str(autopilot_path)
 
 
-def _write_launch_config(args: argparse.Namespace, *, autopilot_dir: str | None, setup_commands: str, make_target: str) -> None:
+def _write_launch_config(
+    args: argparse.Namespace,
+    *,
+    autopilot_dir: str | None,
+    setup_commands: str,
+    make_target: str,
+) -> None:
+    gui_command = os.environ.get("PX4_GAZEBO_GUI_COMMAND", DEFAULT_GUI_COMMAND).strip() or DEFAULT_GUI_COMMAND
+    gui_stdout_log = args.run_dir / "gui_stdout.log"
+    gui_stderr_log = args.run_dir / "gui_stderr.log"
     payload = {
         "vehicle": args.vehicle,
         "world": args.world,
@@ -512,6 +540,19 @@ def _write_launch_config(args: argparse.Namespace, *, autopilot_dir: str | None,
             os.environ.get("PX4_ENABLE_OFFBOARD_EXECUTOR"), default=DEFAULT_ENABLE_OFFBOARD_EXECUTOR
         ),
         "PX4_OFFBOARD_CONNECTION": os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION),
+        "gui_client_enabled": _parse_bool(
+            os.environ.get("PX4_GAZEBO_LAUNCH_GUI_CLIENT"), default=DEFAULT_LAUNCH_GUI_CLIENT
+        ),
+        "gui_command": gui_command,
+        "gui_require_client": _parse_bool(
+            os.environ.get("PX4_GAZEBO_REQUIRE_GUI_CLIENT"), default=DEFAULT_REQUIRE_GUI_CLIENT
+        ),
+        "gui_start_delay_seconds": _parse_float(
+            os.environ.get("PX4_GAZEBO_GUI_START_DELAY_SECONDS"), default=DEFAULT_GUI_START_DELAY_SECONDS
+        ),
+        "gui_wait_timeout_seconds": _parse_float(
+            os.environ.get("PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS"), default=DEFAULT_GUI_WAIT_TIMEOUT_SECONDS
+        ),
         "paths": {
             "run_dir": str(args.run_dir),
             "input": str(args.input),
@@ -520,6 +561,8 @@ def _write_launch_config(args: argparse.Namespace, *, autopilot_dir: str | None,
             "telemetry": str(args.telemetry),
             "stdout_log": str(args.stdout_log),
             "stderr_log": str(args.stderr_log),
+            "gui_stdout_log": str(gui_stdout_log),
+            "gui_stderr_log": str(gui_stderr_log),
         },
     }
     _json_dump(args.run_dir / "launch_config.json", payload)
@@ -591,6 +634,31 @@ def main() -> int:
     enable_offboard_executor = _parse_bool(
         os.environ.get("PX4_ENABLE_OFFBOARD_EXECUTOR"), default=DEFAULT_ENABLE_OFFBOARD_EXECUTOR
     )
+    headless = _parse_bool(args.headless, default=True)
+    gui_launch_enabled = _parse_bool(
+        os.environ.get("PX4_GAZEBO_LAUNCH_GUI_CLIENT"), default=DEFAULT_LAUNCH_GUI_CLIENT
+    )
+    require_gui_client = _parse_bool(
+        os.environ.get("PX4_GAZEBO_REQUIRE_GUI_CLIENT"), default=DEFAULT_REQUIRE_GUI_CLIENT
+    )
+    gui_command = os.environ.get("PX4_GAZEBO_GUI_COMMAND", DEFAULT_GUI_COMMAND).strip() or DEFAULT_GUI_COMMAND
+    gui_start_delay_seconds = max(
+        0.0,
+        _parse_float(
+            os.environ.get("PX4_GAZEBO_GUI_START_DELAY_SECONDS"),
+            default=DEFAULT_GUI_START_DELAY_SECONDS,
+        ),
+    )
+    gui_wait_timeout_seconds = max(
+        0.0,
+        _parse_float(
+            os.environ.get("PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS"),
+            default=DEFAULT_GUI_WAIT_TIMEOUT_SECONDS,
+        ),
+    )
+    display = os.environ.get("DISPLAY", "").strip()
+    gui_stdout_log = args.run_dir / "gui_stdout.log"
+    gui_stderr_log = args.run_dir / "gui_stderr.log"
 
     try:
         _copy_used_inputs(args.run_dir, args.params, args.track)
@@ -611,6 +679,7 @@ def main() -> int:
         return 0
 
     px4_proc: subprocess.Popen[str] | None = None
+    gui_proc: subprocess.Popen[str] | None = None
     try:
         command, resolved_autopilot_dir = _resolve_real_launch_command(args)
         _write_launch_config(
@@ -620,7 +689,7 @@ def main() -> int:
             make_target=make_target,
         )
         _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Launch command: {command}")
-        px4_proc = _launch_px4_process(
+        px4_proc = _launch_process(
             command,
             stdout_log=args.stdout_log,
             stderr_log=args.stderr_log,
@@ -630,6 +699,57 @@ def main() -> int:
             f"[local_px4_launch_wrapper] Waiting {ready_timeout_seconds}s for PX4 readiness (simple fixed wait)",
         )
         time.sleep(float(ready_timeout_seconds))
+
+        should_launch_gui = (not headless) and gui_launch_enabled and bool(display)
+        if should_launch_gui:
+            if gui_start_delay_seconds > 0:
+                _append_log(
+                    args.stdout_log,
+                    f"[local_px4_launch_wrapper] Waiting {gui_start_delay_seconds}s before launching GUI client",
+                )
+                time.sleep(gui_start_delay_seconds)
+
+            gui_proc = _launch_process(
+                gui_command,
+                stdout_log=gui_stdout_log,
+                stderr_log=gui_stderr_log,
+                launch_env=os.environ.copy(),
+            )
+            _append_log(args.stdout_log, f"[local_px4_launch_wrapper] GUI client launch command: {gui_command}")
+
+            startup_deadline = time.time() + gui_wait_timeout_seconds
+            while time.time() < startup_deadline:
+                if gui_proc.poll() is not None:
+                    break
+                time.sleep(0.1)
+            if gui_proc.poll() is not None:
+                gui_error = (
+                    "[local_px4_launch_wrapper] GUI client exited early "
+                    f"with code {gui_proc.returncode}; command={gui_command}"
+                )
+                _append_log(gui_stderr_log, gui_error)
+                _append_log(args.stderr_log, gui_error)
+                _close_launch_handles(gui_proc)
+                gui_proc = None
+                if require_gui_client:
+                    raise RuntimeError("GUI client failed to start and PX4_GAZEBO_REQUIRE_GUI_CLIENT=true")
+            else:
+                _append_log(
+                    args.stdout_log,
+                    f"[local_px4_launch_wrapper] GUI client running after {gui_wait_timeout_seconds}s startup window",
+                )
+        else:
+            reason_bits: list[str] = []
+            if headless:
+                reason_bits.append("headless=true")
+            if not gui_launch_enabled:
+                reason_bits.append("PX4_GAZEBO_LAUNCH_GUI_CLIENT=false")
+            if not display:
+                reason_bits.append("DISPLAY is empty")
+            _append_log(
+                args.stdout_log,
+                "[local_px4_launch_wrapper] GUI client not launched: " + ", ".join(reason_bits),
+            )
 
         if px4_proc.poll() is not None and enable_offboard_executor:
             raise RuntimeError(f"PX4 process exited before offboard execution with code {px4_proc.returncode}")
@@ -646,15 +766,16 @@ def main() -> int:
             )
             time.sleep(float(run_seconds))
 
-        _terminate_process_group(px4_proc, args.stderr_log)
-        _close_launch_handles(px4_proc)
+        _cleanup_process(gui_proc, args.stderr_log, label="GUI")
+        gui_proc = None
+        _cleanup_process(px4_proc, args.stderr_log, label="PX4")
+        px4_proc = None
         _append_log(args.stdout_log, "[local_px4_launch_wrapper] PX4 process terminated after execution window")
         _finalize_real_telemetry(args)
         return 0
     except Exception as exc:
-        if px4_proc is not None:
-            _terminate_process_group(px4_proc, args.stderr_log)
-            _close_launch_handles(px4_proc)
+        _cleanup_process(gui_proc, args.stderr_log, label="GUI")
+        _cleanup_process(px4_proc, args.stderr_log, label="PX4")
         _append_log(args.stderr_log, f"[local_px4_launch_wrapper] Real mode failure: {exc}")
         return 1
 

@@ -1017,6 +1017,18 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "Offboard Timing",
             "application/json",
         ),
+        _artifact_record(
+            run_dir / "gui_stdout.log",
+            "gazebo_gui_stdout_log",
+            "Gazebo GUI stdout",
+            "text/plain",
+        ),
+        _artifact_record(
+            run_dir / "gui_stderr.log",
+            "gazebo_gui_stderr_log",
+            "Gazebo GUI stderr",
+            "text/plain",
+        ),
     ]
     return [r for r in records if r]
 
