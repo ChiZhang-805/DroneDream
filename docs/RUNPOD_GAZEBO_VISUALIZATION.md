@@ -54,6 +54,10 @@ PX4_GAZEBO_HEADLESS=false
 DISPLAY=:99
 PX4_GAZEBO_LAUNCH_GUI_CLIENT=true
 PX4_GAZEBO_GUI_COMMAND="gz sim -g"
+PX4_GAZEBO_DRAW_TRACK_MARKER=true
+PX4_GAZEBO_TRACK_MARKER_Z_OFFSET=0.03
+PX4_GAZEBO_TRACK_MARKER_COLOR="0 0.8 1 1"
+PX4_GAZEBO_TRACK_MARKER_LINE_WIDTH=0.08
 LIBGL_ALWAYS_SOFTWARE=1
 QT_X11_NO_MITSHM=1
 ```
@@ -66,6 +70,27 @@ Open JobDetail/TrialDetail to view the iframe panel.
 > the Gazebo GUI client must also run. PR5 adds wrapper-side auto-launch for
 > `gz sim -g` when GUI mode is explicitly enabled.
 
+## 4) Draw reference track in Gazebo
+
+When `PX4_GAZEBO_DRAW_TRACK_MARKER=true`, DroneDream draws the current
+trial's `reference_track.json` into Gazebo after world/PX4 readiness and before
+offboard execution starts.
+
+- The marker is projected onto the ground plane (`z = PX4_GAZEBO_TRACK_MARKER_Z_OFFSET`,
+  default `0.03`) so the path is visible as a ground guide line.
+- `circle` tracks appear as closed loops; `u_turn` / `lemniscate` render their
+  own shapes from the generated reference points.
+- This mode is intended for GUI demo/debug workflows, not large-scale headless
+  GPT optimization batches.
+- Marker failure is non-fatal by default. Set `PX4_GAZEBO_REQUIRE_TRACK_MARKER=true`
+  only when you want missing markers to fail the trial.
+
+If Gazebo shows `x500_0` but no track marker, inspect:
+
+- `track_marker_stdout.log`
+- `track_marker_stderr.log`
+- `launch_config.json` (`track_marker_enabled` should be `true`)
+
 ### 3.5 Manual fallback verification
 
 If you need to verify GUI attach manually in a terminal:
@@ -77,7 +102,7 @@ export QT_X11_NO_MITSHM=1
 gz sim -g
 ```
 
-## 4) Warnings / limitations
+## 5) Warnings / limitations
 
 - Runpod noVNC proxy is public if exposed; control access yourself.
 - Use this mode for demo/debug only.
