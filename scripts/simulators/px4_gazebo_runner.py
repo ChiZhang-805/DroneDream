@@ -1029,6 +1029,18 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "Gazebo GUI stderr",
             "text/plain",
         ),
+        _artifact_record(
+            run_dir / "track_marker_stdout.log",
+            "gazebo_track_marker_stdout_log",
+            "Gazebo Track Marker stdout",
+            "text/plain",
+        ),
+        _artifact_record(
+            run_dir / "track_marker_stderr.log",
+            "gazebo_track_marker_stderr_log",
+            "Gazebo Track Marker stderr",
+            "text/plain",
+        ),
     ]
     return [r for r in records if r]
 

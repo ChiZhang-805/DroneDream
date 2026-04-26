@@ -253,6 +253,9 @@ noVNC iframe), see
 [`docs/RUNPOD_GAZEBO_VISUALIZATION.md`](docs/RUNPOD_GAZEBO_VISUALIZATION.md).
 PR5 extends this flow with optional auto-launch of the Gazebo GUI client
 (`gz sim -g`) for noVNC live view when explicitly enabled.
+GUI demo mode can also optionally draw the generated reference track in Gazebo
+using marker artifacts; see
+[`docs/RUNPOD_GAZEBO_VISUALIZATION.md`](docs/RUNPOD_GAZEBO_VISUALIZATION.md).
 
 For real PX4 runs, metric pass/fail now uses a track-following **evaluation
 window** (offboard timing metadata when available, otherwise telemetry-derived

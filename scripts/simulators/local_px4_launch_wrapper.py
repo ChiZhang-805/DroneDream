@@ -17,6 +17,7 @@ import shlex
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,13 @@ DEFAULT_GUI_COMMAND = "gz sim -g"
 DEFAULT_GUI_START_DELAY_SECONDS = 5.0
 DEFAULT_GUI_WAIT_TIMEOUT_SECONDS = 15.0
 DEFAULT_REQUIRE_GUI_CLIENT = False
+DEFAULT_DRAW_TRACK_MARKER = False
+DEFAULT_TRACK_MARKER_START_DELAY_SECONDS = 2.0
+DEFAULT_REQUIRE_TRACK_MARKER = False
+DEFAULT_TRACK_MARKER_Z_OFFSET = 0.03
+DEFAULT_TRACK_MARKER_COLOR = "0 0.8 1 1"
+DEFAULT_TRACK_MARKER_LINE_WIDTH = 0.08
+DEFAULT_TRACK_MARKER_MODE = "line_strip"
 
 REQUIRED_SAMPLE_KEYS = (
     "t",
@@ -421,6 +429,49 @@ def _default_offboard_executor_command() -> str:
     return f"python3 {shlex.quote(str(script_path))}"
 
 
+def _default_track_marker_command(args: argparse.Namespace) -> str:
+    script_path = Path(__file__).resolve().parent / "gazebo_track_marker.py"
+    return (
+        f"{shlex.quote(sys.executable)} {shlex.quote(str(script_path))} "
+        f"--track {shlex.quote(str(args.track))} "
+        f"--world {shlex.quote(args.world)} "
+        f"--z-offset {shlex.quote(str(_parse_float(os.environ.get('PX4_GAZEBO_TRACK_MARKER_Z_OFFSET'), default=DEFAULT_TRACK_MARKER_Z_OFFSET)))} "
+        f"--color {shlex.quote(os.environ.get('PX4_GAZEBO_TRACK_MARKER_COLOR', DEFAULT_TRACK_MARKER_COLOR).strip() or DEFAULT_TRACK_MARKER_COLOR)} "
+        f"--line-width {shlex.quote(str(_parse_float(os.environ.get('PX4_GAZEBO_TRACK_MARKER_LINE_WIDTH'), default=DEFAULT_TRACK_MARKER_LINE_WIDTH)))} "
+        f"--mode {shlex.quote((os.environ.get('PX4_GAZEBO_TRACK_MARKER_MODE', DEFAULT_TRACK_MARKER_MODE).strip() or DEFAULT_TRACK_MARKER_MODE).lower())}"
+    )
+
+
+def _build_track_marker_command(args: argparse.Namespace) -> str:
+    override = os.environ.get("PX4_GAZEBO_TRACK_MARKER_COMMAND", "").strip()
+    if override:
+        return override
+    return _default_track_marker_command(args)
+
+
+def _run_track_marker(args: argparse.Namespace, stderr_log: Path) -> int:
+    command = _build_track_marker_command(args)
+    stdout_log = args.run_dir / "track_marker_stdout.log"
+    stderr_marker_log = args.run_dir / "track_marker_stderr.log"
+    _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Track marker command: {command}")
+    proc = subprocess.run(  # noqa: S603
+        ["bash", "-lc", command],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    stdout_log.write_text(proc.stdout or "", encoding="utf-8")
+    stderr_marker_log.write_text(proc.stderr or "", encoding="utf-8")
+    _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Track marker exit code: {proc.returncode}")
+    if proc.returncode != 0:
+        _append_log(
+            stderr_log,
+            "[local_px4_launch_wrapper] WARNING: track marker failed "
+            f"with code {proc.returncode}; see {stderr_marker_log}",
+        )
+    return proc.returncode
+
+
 def _build_offboard_executor_argv(args: argparse.Namespace) -> list[str]:
     command = os.environ.get("PX4_OFFBOARD_EXECUTOR_COMMAND", "").strip() or _default_offboard_executor_command()
     setpoint_rate_hz = _parse_float(
@@ -527,6 +578,9 @@ def _write_launch_config(
     make_target: str,
 ) -> None:
     gui_command = os.environ.get("PX4_GAZEBO_GUI_COMMAND", DEFAULT_GUI_COMMAND).strip() or DEFAULT_GUI_COMMAND
+    track_marker_command = _build_track_marker_command(args)
+    track_marker_stdout_log = args.run_dir / "track_marker_stdout.log"
+    track_marker_stderr_log = args.run_dir / "track_marker_stderr.log"
     gui_stdout_log = args.run_dir / "gui_stdout.log"
     gui_stderr_log = args.run_dir / "gui_stderr.log"
     payload = {
@@ -553,6 +607,31 @@ def _write_launch_config(
         "gui_wait_timeout_seconds": _parse_float(
             os.environ.get("PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS"), default=DEFAULT_GUI_WAIT_TIMEOUT_SECONDS
         ),
+        "track_marker_enabled": _parse_bool(
+            os.environ.get("PX4_GAZEBO_DRAW_TRACK_MARKER"), default=DEFAULT_DRAW_TRACK_MARKER
+        ),
+        "track_marker_command": track_marker_command,
+        "track_marker_start_delay_seconds": _parse_float(
+            os.environ.get("PX4_GAZEBO_TRACK_MARKER_START_DELAY_SECONDS"),
+            default=DEFAULT_TRACK_MARKER_START_DELAY_SECONDS,
+        ),
+        "track_marker_require": _parse_bool(
+            os.environ.get("PX4_GAZEBO_REQUIRE_TRACK_MARKER"), default=DEFAULT_REQUIRE_TRACK_MARKER
+        ),
+        "track_marker_z_offset": _parse_float(
+            os.environ.get("PX4_GAZEBO_TRACK_MARKER_Z_OFFSET"), default=DEFAULT_TRACK_MARKER_Z_OFFSET
+        ),
+        "track_marker_color": os.environ.get(
+            "PX4_GAZEBO_TRACK_MARKER_COLOR", DEFAULT_TRACK_MARKER_COLOR
+        ).strip()
+        or DEFAULT_TRACK_MARKER_COLOR,
+        "track_marker_line_width": _parse_float(
+            os.environ.get("PX4_GAZEBO_TRACK_MARKER_LINE_WIDTH"), default=DEFAULT_TRACK_MARKER_LINE_WIDTH
+        ),
+        "track_marker_mode": os.environ.get(
+            "PX4_GAZEBO_TRACK_MARKER_MODE", DEFAULT_TRACK_MARKER_MODE
+        ).strip()
+        or DEFAULT_TRACK_MARKER_MODE,
         "paths": {
             "run_dir": str(args.run_dir),
             "input": str(args.input),
@@ -563,6 +642,8 @@ def _write_launch_config(
             "stderr_log": str(args.stderr_log),
             "gui_stdout_log": str(gui_stdout_log),
             "gui_stderr_log": str(gui_stderr_log),
+            "track_marker_stdout_log": str(track_marker_stdout_log),
+            "track_marker_stderr_log": str(track_marker_stderr_log),
         },
     }
     _json_dump(args.run_dir / "launch_config.json", payload)
@@ -657,6 +738,19 @@ def main() -> int:
         ),
     )
     display = os.environ.get("DISPLAY", "").strip()
+    draw_track_marker = _parse_bool(
+        os.environ.get("PX4_GAZEBO_DRAW_TRACK_MARKER"), default=DEFAULT_DRAW_TRACK_MARKER
+    )
+    track_marker_start_delay_seconds = max(
+        0.0,
+        _parse_float(
+            os.environ.get("PX4_GAZEBO_TRACK_MARKER_START_DELAY_SECONDS"),
+            default=DEFAULT_TRACK_MARKER_START_DELAY_SECONDS,
+        ),
+    )
+    require_track_marker = _parse_bool(
+        os.environ.get("PX4_GAZEBO_REQUIRE_TRACK_MARKER"), default=DEFAULT_REQUIRE_TRACK_MARKER
+    )
     gui_stdout_log = args.run_dir / "gui_stdout.log"
     gui_stderr_log = args.run_dir / "gui_stderr.log"
 
@@ -753,6 +847,36 @@ def main() -> int:
 
         if px4_proc.poll() is not None and enable_offboard_executor:
             raise RuntimeError(f"PX4 process exited before offboard execution with code {px4_proc.returncode}")
+
+        should_draw_track_marker = (not headless) and bool(display) and draw_track_marker
+        if should_draw_track_marker:
+            if track_marker_start_delay_seconds > 0:
+                _append_log(
+                    args.stdout_log,
+                    (
+                        "[local_px4_launch_wrapper] Waiting "
+                        f"{track_marker_start_delay_seconds}s before drawing track marker"
+                    ),
+                )
+                time.sleep(track_marker_start_delay_seconds)
+            marker_exit = _run_track_marker(args, args.stderr_log)
+            if marker_exit != 0 and require_track_marker:
+                raise RuntimeError(
+                    "track marker failed and PX4_GAZEBO_REQUIRE_TRACK_MARKER=true "
+                    f"(exit={marker_exit})"
+                )
+        else:
+            reason_bits = []
+            if headless:
+                reason_bits.append("headless=true")
+            if not display:
+                reason_bits.append("DISPLAY empty")
+            if not draw_track_marker:
+                reason_bits.append("PX4_GAZEBO_DRAW_TRACK_MARKER=false")
+            _append_log(
+                args.stdout_log,
+                "[local_px4_launch_wrapper] Track marker not launched: " + " / ".join(reason_bits),
+            )
 
         if enable_offboard_executor:
             executor_exit = _run_offboard_executor(args, args.stderr_log)

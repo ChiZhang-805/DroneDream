@@ -292,6 +292,35 @@ def test_px4_runner_trajectory_artifact_type_is_json(tmp_path: Path):
     assert trajectory["mime_type"] == "application/json"
 
 
+def test_px4_runner_collects_track_marker_logs_when_present(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text(
+        "import pathlib, sys\n"
+        "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
+        "run_dir = telemetry.parent\n"
+        "telemetry.write_text("
+        "'{\"samples\": [{\"t\": 0.0, \"x\": 0.0, \"y\": 0.0, \"z\": 3.0}]}'"
+        ", encoding='utf-8')\n"
+        "(run_dir / 'track_marker_stdout.log').write_text('marker ok\\n', encoding='utf-8')\n"
+        "(run_dir / 'track_marker_stderr.log').write_text('', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    artifact_types = {artifact["artifact_type"] for artifact in result["artifacts"]}
+    assert "gazebo_track_marker_stdout_log" in artifact_types
+    assert "gazebo_track_marker_stderr_log" in artifact_types
+
+
 def test_evaluation_window_ignores_takeoff_transition_and_landing(tmp_path: Path):
     telemetry = _track_following_telemetry()
     launcher = _write_launcher_with_payloads(tmp_path / "launcher.py", telemetry)

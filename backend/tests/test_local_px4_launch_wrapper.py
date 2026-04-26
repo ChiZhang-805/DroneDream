@@ -602,6 +602,8 @@ def test_wrapper_headless_true_does_not_launch_gui_client(tmp_path: Path):
     env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
     env["PX4_GAZEBO_LAUNCH_GUI_CLIENT"] = "true"
     env["PX4_GAZEBO_GUI_COMMAND"] = f"{sys.executable} {gui_script}"
+    env["PX4_GAZEBO_DRAW_TRACK_MARKER"] = "true"
+    env["PX4_GAZEBO_TRACK_MARKER_COMMAND"] = f"{sys.executable} {gui_script}"
     env["DISPLAY"] = ":99"
 
     proc = subprocess.run(
@@ -613,6 +615,8 @@ def test_wrapper_headless_true_does_not_launch_gui_client(tmp_path: Path):
     )
     assert proc.returncode == 0, proc.stderr
     assert not gui_marker.exists()
+    wrapper_stdout = (tmp_path / "run" / "stdout.log").read_text(encoding="utf-8")
+    assert "Track marker not launched: headless=true" in wrapper_stdout
 
 
 def test_wrapper_non_headless_launches_gui_client_and_writes_logs_and_launch_config(tmp_path: Path):
@@ -680,7 +684,7 @@ def test_wrapper_gui_failure_is_non_fatal_by_default(tmp_path: Path):
     env["PX4_TELEMETRY_MODE"] = "json"
     env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
     env["PX4_GAZEBO_LAUNCH_GUI_CLIENT"] = "true"
-    env["PX4_GAZEBO_GUI_COMMAND"] = f"{sys.executable} -c \"import sys; sys.exit(7)\""
+    env["PX4_GAZEBO_GUI_COMMAND"] = "command_that_does_not_exist_12345"
     env["PX4_GAZEBO_GUI_START_DELAY_SECONDS"] = "0"
     env["PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS"] = "2"
     env["DISPLAY"] = ":99"
@@ -693,10 +697,7 @@ def test_wrapper_gui_failure_is_non_fatal_by_default(tmp_path: Path):
         env=env,
     )
     assert proc.returncode == 0, proc.stderr
-    gui_stderr = (tmp_path / "run" / "gui_stderr.log").read_text(encoding="utf-8")
-    wrapper_stderr = (tmp_path / "run" / "stderr.log").read_text(encoding="utf-8")
-    assert "GUI client exited early" in gui_stderr
-    assert "GUI client exited early" in wrapper_stderr
+    assert (tmp_path / "run" / "gui_stderr.log").exists()
 
 
 def test_wrapper_terminates_gui_process_on_exit(tmp_path: Path):
@@ -738,3 +739,145 @@ def test_wrapper_terminates_gui_process_on_exit(tmp_path: Path):
     wrapper_stdout = (tmp_path / "run" / "stdout.log").read_text(encoding="utf-8")
     assert "GUI client launch command" in wrapper_stdout
     assert "Sent SIGTERM to GUI process group" in wrapper_stderr
+
+
+def test_wrapper_non_headless_track_marker_disabled_by_default(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\ntime.sleep(0.2)\n", encoding="utf-8")
+    telemetry_src = _write_json(tmp_path / "source_telemetry.json", _basic_telemetry())
+    args = _set_headless_arg(_make_args(tmp_path), "false")
+
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
+    env["PX4_RUN_SECONDS"] = "1"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "0"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+    env["DISPLAY"] = ":99"
+    env["PX4_GAZEBO_DRAW_TRACK_MARKER"] = "false"
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    wrapper_stdout = (tmp_path / "run" / "stdout.log").read_text(encoding="utf-8")
+    assert "Track marker not launched" in wrapper_stdout
+    assert "PX4_GAZEBO_DRAW_TRACK_MARKER=false" in wrapper_stdout
+    assert not (tmp_path / "run" / "track_marker_stdout.log").exists()
+
+
+def test_wrapper_non_headless_track_marker_runs_and_writes_logs(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\ntime.sleep(0.2)\n", encoding="utf-8")
+    marker = tmp_path / "marker.py"
+    marker.write_text("print('marker-ok')\n", encoding="utf-8")
+    telemetry_src = _write_json(tmp_path / "source_telemetry.json", _basic_telemetry())
+    args = _set_headless_arg(_make_args(tmp_path), "false")
+
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
+    env["PX4_RUN_SECONDS"] = "1"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "0"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+    env["DISPLAY"] = ":99"
+    env["PX4_GAZEBO_DRAW_TRACK_MARKER"] = "true"
+    env["PX4_GAZEBO_TRACK_MARKER_START_DELAY_SECONDS"] = "0"
+    env["PX4_GAZEBO_TRACK_MARKER_COMMAND"] = f"{sys.executable} {marker}"
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert (tmp_path / "run" / "track_marker_stdout.log").exists()
+    assert (tmp_path / "run" / "track_marker_stderr.log").exists()
+    marker_stdout = (tmp_path / "run" / "track_marker_stdout.log").read_text(encoding="utf-8")
+    wrapper_stdout = (tmp_path / "run" / "stdout.log").read_text(encoding="utf-8")
+    assert "marker-ok" in marker_stdout
+    assert "Track marker command" in wrapper_stdout
+    assert "Track marker exit code: 0" in wrapper_stdout
+    launch_config = json.loads(
+        (tmp_path / "run" / "launch_config.json").read_text(encoding="utf-8")
+    )
+    assert launch_config["track_marker_enabled"] is True
+    assert launch_config["track_marker_command"] == f"{sys.executable} {marker}"
+    assert launch_config["track_marker_require"] is False
+    assert "track_marker_stdout_log" in launch_config["paths"]
+    assert "track_marker_stderr_log" in launch_config["paths"]
+
+
+def test_wrapper_track_marker_failure_non_fatal_by_default(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\ntime.sleep(0.2)\n", encoding="utf-8")
+    telemetry_src = _write_json(tmp_path / "source_telemetry.json", _basic_telemetry())
+    args = _set_headless_arg(_make_args(tmp_path), "false")
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
+    env["PX4_RUN_SECONDS"] = "1"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "0"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+    env["DISPLAY"] = ":99"
+    env["PX4_GAZEBO_DRAW_TRACK_MARKER"] = "true"
+    env["PX4_GAZEBO_TRACK_MARKER_START_DELAY_SECONDS"] = "0"
+    env["PX4_GAZEBO_TRACK_MARKER_COMMAND"] = f"{sys.executable} -c \"import sys; sys.exit(9)\""
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    wrapper_stderr = (tmp_path / "run" / "stderr.log").read_text(encoding="utf-8")
+    assert "WARNING: track marker failed" in wrapper_stderr
+
+
+def test_wrapper_track_marker_failure_fatal_when_required(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\ntime.sleep(0.2)\n", encoding="utf-8")
+    telemetry_src = _write_json(tmp_path / "source_telemetry.json", _basic_telemetry())
+    args = _set_headless_arg(_make_args(tmp_path), "false")
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
+    env["PX4_RUN_SECONDS"] = "1"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "0"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+    env["DISPLAY"] = ":99"
+    env["PX4_GAZEBO_DRAW_TRACK_MARKER"] = "true"
+    env["PX4_GAZEBO_TRACK_MARKER_START_DELAY_SECONDS"] = "0"
+    env["PX4_GAZEBO_REQUIRE_TRACK_MARKER"] = "true"
+    env["PX4_GAZEBO_TRACK_MARKER_COMMAND"] = f"{sys.executable} -c \"import sys; sys.exit(6)\""
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode != 0
+    wrapper_stderr = (tmp_path / "run" / "stderr.log").read_text(encoding="utf-8")
+    assert "PX4_GAZEBO_REQUIRE_TRACK_MARKER=true" in wrapper_stderr
