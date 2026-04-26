@@ -62,6 +62,33 @@ def _make_args(tmp_path: Path) -> list[str]:
     ]
 
 
+def _set_headless_arg(args: list[str], value: str) -> list[str]:
+    updated = list(args)
+    headless_idx = updated.index("--headless")
+    updated[headless_idx + 1] = value
+    return updated
+
+
+def _basic_telemetry() -> dict:
+    return {
+        "samples": [
+            {
+                "t": 0.0,
+                "x": 0.0,
+                "y": 0.0,
+                "z": 3.0,
+                "vx": 0.0,
+                "vy": 0.0,
+                "vz": 0.0,
+                "yaw": 0.0,
+                "armed": True,
+                "mode": "offboard",
+                "crashed": False,
+            }
+        ]
+    }
+
+
 def test_wrapper_requires_required_args():
     proc = subprocess.run(
         [sys.executable, str(WRAPPER)],
@@ -549,3 +576,165 @@ def test_wrapper_offboard_executor_failure_exits_non_zero(tmp_path: Path):
     assert proc.returncode != 0
     stderr_text = (tmp_path / "run" / "stderr.log").read_text(encoding="utf-8")
     assert "offboard executor failed" in stderr_text
+
+
+def test_wrapper_headless_true_does_not_launch_gui_client(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\ntime.sleep(0.4)\n", encoding="utf-8")
+    gui_marker = tmp_path / "run" / "gui_invoked.txt"
+    gui_script = tmp_path / "gui.py"
+    gui_script.write_text(
+        "import pathlib\n"
+        f"pathlib.Path({str(gui_marker)!r}).write_text('yes', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    telemetry_src = _write_json(tmp_path / "source_telemetry.json", _basic_telemetry())
+    args = _set_headless_arg(_make_args(tmp_path), "true")
+
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
+    env["PX4_RUN_SECONDS"] = "1"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "0"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+    env["PX4_GAZEBO_LAUNCH_GUI_CLIENT"] = "true"
+    env["PX4_GAZEBO_GUI_COMMAND"] = f"{sys.executable} {gui_script}"
+    env["DISPLAY"] = ":99"
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert not gui_marker.exists()
+
+
+def test_wrapper_non_headless_launches_gui_client_and_writes_logs_and_launch_config(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\ntime.sleep(2)\n", encoding="utf-8")
+    gui_script = tmp_path / "gui.py"
+    gui_script.write_text(
+        "import pathlib,time\n"
+        "run_dir=pathlib.Path(__file__).resolve().parent / 'run'\n"
+        "(run_dir / 'gui_started.txt').write_text('started', encoding='utf-8')\n"
+        "print('gui-stdout-line')\n"
+        "print('gui-stderr-line', file=__import__('sys').stderr)\n"
+        "time.sleep(5)\n",
+        encoding="utf-8",
+    )
+    telemetry_src = _write_json(tmp_path / "source_telemetry.json", _basic_telemetry())
+    args = _set_headless_arg(_make_args(tmp_path), "false")
+
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
+    env["PX4_RUN_SECONDS"] = "1"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "0"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+    env["PX4_GAZEBO_LAUNCH_GUI_CLIENT"] = "true"
+    env["PX4_GAZEBO_GUI_COMMAND"] = f"{sys.executable} {gui_script}"
+    env["PX4_GAZEBO_GUI_START_DELAY_SECONDS"] = "0"
+    env["PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS"] = "0.2"
+    env["DISPLAY"] = ":99"
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert (tmp_path / "run" / "gui_stdout.log").exists()
+    assert (tmp_path / "run" / "gui_stderr.log").exists()
+    launch_config = json.loads(
+        (tmp_path / "run" / "launch_config.json").read_text(encoding="utf-8")
+    )
+    assert launch_config["gui_client_enabled"] is True
+    assert launch_config["gui_command"] == f"{sys.executable} {gui_script}"
+    assert "gui_stdout_log" in launch_config["paths"]
+    assert "gui_stderr_log" in launch_config["paths"]
+
+
+def test_wrapper_gui_failure_is_non_fatal_by_default(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\ntime.sleep(0.4)\n", encoding="utf-8")
+    telemetry_src = _write_json(tmp_path / "source_telemetry.json", _basic_telemetry())
+    args = _set_headless_arg(_make_args(tmp_path), "false")
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
+    env["PX4_RUN_SECONDS"] = "1"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "0"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+    env["PX4_GAZEBO_LAUNCH_GUI_CLIENT"] = "true"
+    env["PX4_GAZEBO_GUI_COMMAND"] = f"{sys.executable} -c \"import sys; sys.exit(7)\""
+    env["PX4_GAZEBO_GUI_START_DELAY_SECONDS"] = "0"
+    env["PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS"] = "2"
+    env["DISPLAY"] = ":99"
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    gui_stderr = (tmp_path / "run" / "gui_stderr.log").read_text(encoding="utf-8")
+    wrapper_stderr = (tmp_path / "run" / "stderr.log").read_text(encoding="utf-8")
+    assert "GUI client exited early" in gui_stderr
+    assert "GUI client exited early" in wrapper_stderr
+
+
+def test_wrapper_terminates_gui_process_on_exit(tmp_path: Path):
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text("import time\ntime.sleep(2)\n", encoding="utf-8")
+    gui_script = tmp_path / "gui.py"
+    gui_script.write_text(
+        "import time\n"
+        "print('gui-started')\n"
+        "time.sleep(30)\n",
+        encoding="utf-8",
+    )
+    telemetry_src = _write_json(tmp_path / "source_telemetry.json", _basic_telemetry())
+    args = _set_headless_arg(_make_args(tmp_path), "false")
+    env = os.environ.copy()
+    env["PX4_SITE_DRY_RUN"] = "false"
+    env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
+    env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
+    env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
+    env["PX4_RUN_SECONDS"] = "1"
+    env["PX4_READY_TIMEOUT_SECONDS"] = "0"
+    env["PX4_TELEMETRY_MODE"] = "json"
+    env["PX4_TELEMETRY_SOURCE_JSON"] = str(telemetry_src)
+    env["PX4_GAZEBO_LAUNCH_GUI_CLIENT"] = "true"
+    env["PX4_GAZEBO_GUI_COMMAND"] = f"{sys.executable} {gui_script}"
+    env["PX4_GAZEBO_GUI_START_DELAY_SECONDS"] = "0"
+    env["PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS"] = "0.2"
+    env["DISPLAY"] = ":99"
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode == 0, proc.stderr
+    wrapper_stderr = (tmp_path / "run" / "stderr.log").read_text(encoding="utf-8")
+    wrapper_stdout = (tmp_path / "run" / "stdout.log").read_text(encoding="utf-8")
+    assert "GUI client launch command" in wrapper_stdout
+    assert "Sent SIGTERM to GUI process group" in wrapper_stderr
