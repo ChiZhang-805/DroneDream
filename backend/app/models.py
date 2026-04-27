@@ -69,6 +69,7 @@ class Job(Base):
     wind_west: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     sensor_noise_level: Mapped[str] = mapped_column(String(16), nullable=False)
     objective_profile: Mapped[str] = mapped_column(String(16), nullable=False)
+    reference_track_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
 
     # State.
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="CREATED", index=True)

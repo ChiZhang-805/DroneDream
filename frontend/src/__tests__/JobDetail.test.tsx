@@ -26,6 +26,7 @@ function makeJob(overrides: Partial<Job>): Job {
   const base: Job = {
     id: "job_test_1",
     track_type: "circle",
+    reference_track: null,
     start_point: { x: 0, y: 0 },
     altitude_m: 3,
     wind: { north: 0, east: 0, south: 0, west: 0 },
@@ -118,6 +119,26 @@ beforeEach(() => {
 });
 
 describe("JobDetail — Phase 8 best-so-far rendering", () => {
+  it("shows custom track count and preview when track_type=custom", async () => {
+    const job = makeJob({
+      track_type: "custom",
+      reference_track: [
+        { x: 0, y: 0, z: 3 },
+        { x: 5, y: 0, z: 3 },
+        { x: 5, y: 5, z: 3 },
+      ],
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByText(/3 points/i)).toBeInTheDocument();
+    expect(screen.getByText(/\[\{"x":0,"y":0,"z":3\}/)).toBeInTheDocument();
+  });
+
   it("renders best-so-far metrics and a budget-exhausted banner for COMPLETED+READY report", async () => {
     const job = makeJob({
       status: "COMPLETED",

@@ -57,6 +57,15 @@ function extractPoints(payload: unknown): ReplayPoint[] {
   return [];
 }
 
+function extractReferencePoints(payload: unknown): ReplayPoint[] {
+  if (!payload || typeof payload !== "object") return [];
+  const root = payload as Record<string, unknown>;
+  if (!Array.isArray(root.reference_track)) return [];
+  return root.reference_track
+    .map((item, idx) => normalizePoint(item, idx))
+    .filter((item): item is ReplayPoint => item !== null);
+}
+
 function toViewBoxCoordinates(points: ReplayPoint[]): {
   linePoints: string;
   markerX: (idx: number) => number;
@@ -125,6 +134,10 @@ export function TrajectoryReplay({
         const primaryPoints = extractPoints(primary);
         if (!cancelled) {
           setActualPoints(primaryPoints);
+          const embeddedReference = extractReferencePoints(primary);
+          if (embeddedReference.length > 0) {
+            setReferencePoints(embeddedReference);
+          }
         }
 
         if (artifacts.reference) {

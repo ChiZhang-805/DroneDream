@@ -195,9 +195,10 @@ def _validate_trial_input(payload: dict[str, Any]) -> tuple[dict[str, Any], dict
     wind = _cfg_value("wind")
     sensor_noise_level = _cfg_value("sensor_noise_level")
     objective_profile = _cfg_value("objective_profile")
+    reference_track_raw = _cfg_value("reference_track")
 
-    if track_type not in {"circle", "u_turn", "lemniscate"}:
-        raise RunnerError("track_type must be one of: circle, u_turn, lemniscate")
+    if track_type not in {"circle", "u_turn", "lemniscate", "custom"}:
+        raise RunnerError("track_type must be one of: circle, u_turn, lemniscate, custom")
     if not isinstance(start_point, dict):
         raise RunnerError("start_point must be an object with x/y")
 
@@ -223,7 +224,29 @@ def _validate_trial_input(payload: dict[str, Any]) -> tuple[dict[str, Any], dict
         },
         "sensor_noise_level": str(sensor_noise_level or "medium"),
         "objective_profile": str(objective_profile or "robust"),
+        "reference_track": [],
     }
+    if reference_track_raw is not None:
+        if not isinstance(reference_track_raw, list):
+            raise RunnerError("reference_track must be an array when provided")
+        normalized_points: list[dict[str, float]] = []
+        for idx, point in enumerate(reference_track_raw):
+            if not isinstance(point, dict):
+                raise RunnerError(f"reference_track[{idx}] must be an object with x/y")
+            try:
+                x = float(point.get("x"))
+                y = float(point.get("y"))
+            except (TypeError, ValueError):
+                raise RunnerError(f"reference_track[{idx}].x/y must be numeric") from None
+            z_raw = point.get("z")
+            try:
+                z = float(altitude if z_raw is None else z_raw)
+            except (TypeError, ValueError):
+                raise RunnerError(f"reference_track[{idx}].z must be numeric when provided") from None
+            normalized_points.append({"x": x, "y": y, "z": z})
+        normalized_job_cfg["reference_track"] = normalized_points
+    if track_type == "custom" and len(normalized_job_cfg["reference_track"]) < 2:
+        raise RunnerError("custom track_type requires reference_track with at least 2 points")
 
     params_raw = payload.get("parameters") if isinstance(payload.get("parameters"), dict) else {}
     params: dict[str, float] = {}
@@ -255,7 +278,15 @@ def _validate_trial_input(payload: dict[str, Any]) -> tuple[dict[str, Any], dict
     return normalized_job_cfg, params, meta
 
 
-def _make_reference_track(track_type: str, start_x: float, start_y: float, altitude: float) -> list[dict[str, float]]:
+def _make_reference_track(
+    track_type: str,
+    start_x: float,
+    start_y: float,
+    altitude: float,
+    reference_track: list[dict[str, float]] | None = None,
+) -> list[dict[str, float]]:
+    if track_type == "custom":
+        return list(reference_track or [])
     points: list[dict[str, float]] = []
     if track_type == "circle":
         radius = 5.0
@@ -1074,8 +1105,16 @@ def run_once(input_path: Path, output_path: Path) -> int:
             job_cfg["start_point"]["x"],
             job_cfg["start_point"]["y"],
             job_cfg["altitude_m"],
+            job_cfg.get("reference_track"),
         )
-        _json_dump(track_json, {"track_type": job_cfg["track_type"], "points": reference_track})
+        _json_dump(
+            track_json,
+            {
+                "track_type": job_cfg["track_type"],
+                "points": reference_track,
+                "reference_track": reference_track,
+            },
+        )
         _json_dump(params_json, params)
 
         timeout_flag = False

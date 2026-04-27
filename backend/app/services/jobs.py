@@ -81,6 +81,11 @@ def _create_job_from_config(
         wind_west=req.wind.west,
         sensor_noise_level=req.sensor_noise_level,
         objective_profile=req.objective_profile,
+        reference_track_json=(
+            [point.model_dump(mode="json") for point in req.reference_track]
+            if req.reference_track is not None
+            else None
+        ),
         status="QUEUED",
         current_phase="queued",
         progress_completed_trials=0,
@@ -226,6 +231,11 @@ def rerun_job(
         ),
         sensor_noise_level=source.sensor_noise_level,  # type: ignore[arg-type]
         objective_profile=source.objective_profile,  # type: ignore[arg-type]
+        reference_track=(
+            [schemas.TrackPoint(**point) for point in source.reference_track_json]
+            if source.reference_track_json
+            else None
+        ),
         simulator_backend=source.simulator_backend_requested,  # type: ignore[arg-type]
         optimizer_strategy=strategy,
         max_iterations=source.max_iterations,
@@ -320,6 +330,11 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         ),
         sensor_noise_level=job.sensor_noise_level,  # type: ignore[arg-type]
         objective_profile=job.objective_profile,  # type: ignore[arg-type]
+        reference_track=(
+            [schemas.TrackPoint(**point) for point in job.reference_track_json]
+            if job.reference_track_json
+            else None
+        ),
         status=job.status,  # type: ignore[arg-type]
         progress=schemas.JobProgress(
             completed_trials=job.progress_completed_trials,

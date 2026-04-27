@@ -89,4 +89,34 @@ describe("TrajectoryReplay", () => {
 
     expect(screen.getByText(/Replay unavailable/i)).toBeInTheDocument();
   });
+
+  it("renders embedded reference_track from primary artifact payload", async () => {
+    vi.spyOn(apiClient, "fetchArtifactJson").mockResolvedValue({
+      samples: [
+        { t: 0, x: 0, y: 0, z: 1 },
+        { t: 1, x: 1, y: 1, z: 1 },
+      ],
+      reference_track: [
+        { x: 0, y: 0, z: 1 },
+        { x: 1.2, y: 1.1, z: 1 },
+      ],
+    });
+
+    render(
+      <TrajectoryReplay
+        artifacts={{
+          trajectory: makeArtifact("a3", "telemetry_json", "/tmp/telemetry.json"),
+          telemetry: null,
+          reference: null,
+        }}
+        meta={{}}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("trajectory-replay")).toBeInTheDocument(),
+    );
+    const canvas = screen.getByLabelText("Trajectory replay");
+    expect(canvas.querySelectorAll("polyline")).toHaveLength(2);
+  });
 });

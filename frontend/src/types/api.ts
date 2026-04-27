@@ -28,11 +28,12 @@ export type TrialStatus =
   | "FAILED"
   | "CANCELLED";
 
-export type TrackType = "circle" | "u_turn" | "lemniscate";
+export type TrackType = "circle" | "u_turn" | "lemniscate" | "custom";
 export const TRACK_TYPES: readonly TrackType[] = [
   "circle",
   "u_turn",
   "lemniscate",
+  "custom",
 ];
 
 export type SensorNoiseLevel = "low" | "medium" | "high";
@@ -74,6 +75,12 @@ export interface WindVector {
   west: number;
 }
 
+export interface TrackPoint {
+  x: number;
+  y: number;
+  z?: number | null;
+}
+
 export interface JobProgress {
   completed_trials: number;
   total_trials: number;
@@ -112,6 +119,7 @@ export interface Artifact {
 
 export interface JobCreateRequest {
   track_type: TrackType;
+  reference_track?: TrackPoint[] | null;
   start_point: StartPoint;
   altitude_m: number;
   wind: WindVector;
@@ -134,6 +142,7 @@ export interface JobRerunRequest {
 export interface Job {
   id: string;
   track_type: TrackType;
+  reference_track: TrackPoint[] | null;
   start_point: StartPoint;
   altitude_m: number;
   wind: WindVector;

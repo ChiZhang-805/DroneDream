@@ -10,11 +10,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # --- Enums / literals -------------------------------------------------------
 
-TrackType = Literal["circle", "u_turn", "lemniscate"]
+TrackType = Literal["circle", "u_turn", "lemniscate", "custom"]
 SensorNoiseLevel = Literal["low", "medium", "high"]
 ObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom"]
 JobStatus = Literal[
@@ -103,6 +103,12 @@ class OpenAIConfig(_Strict):
     model: str | None = Field(default=None, max_length=128)
 
 
+class TrackPoint(_Strict):
+    x: float
+    y: float
+    z: float | None = None
+
+
 class JobCreateRequest(_Strict):
     """POST /api/v1/jobs body."""
 
@@ -112,6 +118,7 @@ class JobCreateRequest(_Strict):
     wind: WindVector = Field(default_factory=WindVector)
     sensor_noise_level: SensorNoiseLevel = "medium"
     objective_profile: ObjectiveProfile = "robust"
+    reference_track: list[TrackPoint] | None = None
 
     simulator_backend: SimulatorBackend = "mock"
     optimizer_strategy: OptimizerStrategy = "gpt"
@@ -120,6 +127,16 @@ class JobCreateRequest(_Strict):
     max_total_trials: Annotated[int, Field(ge=1, le=1000)] = 100
     acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
     openai: OpenAIConfig | None = None
+
+    @model_validator(mode="after")
+    def _validate_custom_reference_track(self) -> JobCreateRequest:
+        if self.track_type == "custom" and (
+            self.reference_track is None or len(self.reference_track) < 2
+        ):
+            raise ValueError(
+                "reference_track with at least 2 points is required when track_type=custom"
+            )
+        return self
 
 
 # --- Responses --------------------------------------------------------------
@@ -133,6 +150,7 @@ class Job(BaseModel):
     wind: WindVector
     sensor_noise_level: SensorNoiseLevel
     objective_profile: ObjectiveProfile
+    reference_track: list[TrackPoint] | None = None
     status: JobStatus
     progress: JobProgress
     baseline_candidate_id: str | None = None
