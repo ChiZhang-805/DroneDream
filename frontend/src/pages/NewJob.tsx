@@ -565,7 +565,7 @@ export function NewJob() {
               required
               error={errors.optimizer_strategy}
               htmlFor="optimizer_strategy"
-              hint="heuristic uses the deterministic optimizer. gpt asks OpenAI to propose the next candidates."
+              hint="heuristic uses deterministic perturbations. cma_es runs a dependency-free adaptive search. gpt asks OpenAI to propose next candidates."
             >
               <select
                 id="optimizer_strategy"

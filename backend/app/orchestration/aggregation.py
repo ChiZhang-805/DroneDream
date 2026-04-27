@@ -292,10 +292,10 @@ def finalize_job_if_ready(
 
     criteria = criteria_for_job(job)
 
-    # GPT iterative loop: possibly dispatch another generation instead of
-    # finalizing.
-    if job.optimizer_strategy == "gpt":
-        if _try_continue_gpt_loop(
+    # Iterative optimizer loop (GPT / CMA-ES-style): possibly dispatch another
+    # generation instead of finalizing.
+    if job.optimizer_strategy in {"gpt", "cma_es"}:
+        if _try_continue_iterative_optimizer(
             db, job, baseline, candidates, criteria, llm_client=llm_client
         ):
             return False
@@ -401,9 +401,9 @@ def _determine_terminal_state(
         result.pass_rate + 1e-9
     ):
         return "success", "COMPLETED", None
-    if job.optimizer_strategy == "gpt":
-        # GPT exhausted its iteration/trial budget without finding a passing
-        # candidate — report best-so-far as a completed run.
+    if job.optimizer_strategy in {"gpt", "cma_es"}:
+        # Iterative optimizer exhausted iteration/trial budget without finding
+        # a passing candidate — report best-so-far as a completed run.
         if job.current_generation >= job.max_iterations:
             return ("max_iterations_reached", "COMPLETED", None)
         return ("no_usable_candidate", "COMPLETED", None)
@@ -411,7 +411,7 @@ def _determine_terminal_state(
     return "no_usable_candidate", "COMPLETED", None
 
 
-def _try_continue_gpt_loop(
+def _try_continue_iterative_optimizer(
     db: Session,
     job: models.Job,
     baseline: models.CandidateParameterSet,
@@ -420,7 +420,7 @@ def _try_continue_gpt_loop(
     *,
     llm_client: object | None,
 ) -> bool:
-    """If the GPT loop should run another generation, dispatch it and return True.
+    """If an iterative optimizer should run another generation, dispatch it.
 
     Guarantees of the loop:
 
@@ -444,24 +444,38 @@ def _try_continue_gpt_loop(
     if job.progress_total_trials + next_generation_trials > job.max_total_trials:
         return False
 
-    from app.orchestration.job_manager import dispatch_next_llm_generation
+    from app.orchestration.job_manager import (
+        dispatch_next_cma_es_generation,
+        dispatch_next_llm_generation,
+    )
     from app.orchestration.llm_parameter_proposer import OpenAIClientLike
 
     client_cast: OpenAIClientLike | None = None
     if llm_client is not None:
         client_cast = llm_client  # type: ignore[assignment]
 
-    dispatch = dispatch_next_llm_generation(db, job, client=client_cast)
-    if dispatch.status == "llm_error":
-        _fail_job(
-            db,
-            job,
-            code="LLM_FAILED",
-            message=dispatch.error or "LLM proposer failed.",
-            outcome="llm_failed",
-        )
-        return False
-    if dispatch.status in {"budget_exhausted", "max_iterations_reached", "no_usable_proposal"}:
+    if job.optimizer_strategy == "gpt":
+        llm_dispatch = dispatch_next_llm_generation(db, job, client=client_cast)
+        if llm_dispatch.status == "llm_error":
+            _fail_job(
+                db,
+                job,
+                code="LLM_FAILED",
+                message=llm_dispatch.error or "LLM proposer failed.",
+                outcome="llm_failed",
+            )
+            return False
+        if llm_dispatch.status in {
+            "budget_exhausted",
+            "max_iterations_reached",
+            "no_usable_proposal",
+        }:
+            return False
+    elif job.optimizer_strategy == "cma_es":
+        cma_dispatch = dispatch_next_cma_es_generation(db, job)
+        if cma_dispatch.status in {"budget_exhausted", "max_iterations_reached"}:
+            return False
+    else:
         return False
 
     # Return to RUNNING so the worker keeps draining trials.

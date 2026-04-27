@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.orchestration import constants
+from app.orchestration.cma_es_optimizer import propose_next_generation
 from app.orchestration.events import record_event
 from app.orchestration.llm_parameter_proposer import (
     LlmProposal,
@@ -33,6 +34,14 @@ class LlmDispatchResult:
     status: str
     dispatched_candidates: int = 0
     error: str | None = None
+
+
+@dataclass(frozen=True)
+class AdaptiveDispatchResult:
+    """Outcome of one attempt to dispatch next adaptive-optimizer generation."""
+
+    status: str
+    dispatched_candidates: int = 0
 
 
 def _now() -> datetime:
@@ -186,6 +195,8 @@ def _create_optimizer_candidate(
     db: Session,
     job: models.Job,
     proposal: CandidateProposal,
+    *,
+    trial_count: int,
 ) -> models.CandidateParameterSet:
     """Persist one optimizer-generated CandidateParameterSet."""
 
@@ -196,7 +207,8 @@ def _create_optimizer_candidate(
         label=proposal.label,
         parameter_json=dict(proposal.parameters),
         is_baseline=False,
-        trial_count=len(constants.OPTIMIZER_SCENARIOS),
+        trial_count=trial_count,
+        proposal_reason=proposal.strategy,
     )
     db.add(candidate)
     db.flush()
@@ -218,13 +230,20 @@ def _dispatch_optimizer_trials(
     db: Session,
     job: models.Job,
     candidate: models.CandidateParameterSet,
+    *,
+    trials_per_candidate: int | None = None,
 ) -> list[models.Trial]:
     """Create PENDING Trial rows for one optimizer candidate."""
 
     trials: list[models.Trial] = []
     now = _now()
-    for scenario in constants.OPTIMIZER_SCENARIOS:
-        seed = constants.optimizer_seed_for(candidate.generation_index, scenario)
+    scenario_count = len(constants.OPTIMIZER_SCENARIOS)
+    dispatch_count = (
+        scenario_count if trials_per_candidate is None else max(1, trials_per_candidate)
+    )
+    for idx in range(dispatch_count):
+        scenario = constants.OPTIMIZER_SCENARIOS[idx % scenario_count]
+        seed = constants.optimizer_seed_for(candidate.generation_index * 10 + idx, scenario)
         trial = models.Trial(
             job_id=job.id,
             candidate_id=candidate.id,
@@ -288,8 +307,18 @@ def start_job(db: Session, job: models.Job) -> models.Job:
             {"candidate_count": len(proposals), "strategy": "heuristic"},
         )
         for proposal in proposals:
-            opt_candidate = _create_optimizer_candidate(db, job, proposal)
-            _dispatch_optimizer_trials(db, job, opt_candidate)
+            opt_candidate = _create_optimizer_candidate(
+                db,
+                job,
+                proposal,
+                trial_count=len(constants.OPTIMIZER_SCENARIOS),
+            )
+            _dispatch_optimizer_trials(
+                db,
+                job,
+                opt_candidate,
+                trials_per_candidate=len(constants.OPTIMIZER_SCENARIOS),
+            )
         total_trials += len(proposals) * len(constants.OPTIMIZER_SCENARIOS)
 
     job.progress_completed_trials = 0
@@ -351,6 +380,55 @@ def dispatch_next_llm_generation(
         },
     )
     return LlmDispatchResult(status="dispatched", dispatched_candidates=1)
+
+
+def dispatch_next_cma_es_generation(
+    db: Session,
+    job: models.Job,
+) -> AdaptiveDispatchResult:
+    """Generate and dispatch the next dependency-free CMA-ES-style candidate."""
+
+    generation_index = job.current_generation + 1
+    trials_per_candidate = max(1, job.trials_per_candidate)
+    if generation_index > job.max_iterations:
+        return AdaptiveDispatchResult(status="max_iterations_reached")
+    if job.progress_total_trials + trials_per_candidate > job.max_total_trials:
+        return AdaptiveDispatchResult(status="budget_exhausted")
+
+    proposal = propose_next_generation(
+        job=job,
+        candidates=list(job.candidates),
+        safe_ranges=constants.PARAMETER_SAFE_RANGES,
+        baseline_parameters=constants.BASELINE_PARAMETERS,
+        generation_index=generation_index,
+    )
+    candidate = _create_optimizer_candidate(
+        db,
+        job,
+        proposal,
+        trial_count=trials_per_candidate,
+    )
+    _dispatch_optimizer_trials(
+        db,
+        job,
+        candidate,
+        trials_per_candidate=trials_per_candidate,
+    )
+    job.current_generation = generation_index
+    job.current_phase = f"candidate_generation_{generation_index}"
+    job.progress_total_trials += trials_per_candidate
+    record_event(
+        db,
+        job.id,
+        "generation_dispatched",
+        {
+            "generation_index": generation_index,
+            "candidate_count": 1,
+            "trials_per_candidate": trials_per_candidate,
+            "strategy": "cma_es",
+        },
+    )
+    return AdaptiveDispatchResult(status="dispatched", dispatched_candidates=1)
 
 
 def start_queued_jobs(db: Session, *, limit: int = 10) -> list[str]:
