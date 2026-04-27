@@ -1315,9 +1315,10 @@ GUI + software rendering 是高 CPU 模式。正式优化建议 headless + Traje
 ## 🧪 Quality checks
 
 ```bash
-cd frontend && npm run typecheck && npm run lint && npm run build && npm test
-backend/.venv/bin/pytest backend
-./scripts/check.sh
+./scripts/check-backend.sh
+./scripts/check-worker.sh
+./scripts/check-frontend.sh
+./scripts/check-all.sh
 ```
 
 ## 🧭 API conventions
