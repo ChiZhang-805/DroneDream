@@ -28,9 +28,15 @@ import os
 import shlex
 import shutil
 import subprocess
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+from app.config import get_settings
+from app.simulator.artifact_schema import (
+    validate_reference_track_payload,
+    validate_telemetry_payload,
+)
 from app.simulator.base import (
     FAILURE_ADAPTER_UNAVAILABLE,
     FAILURE_SIMULATION,
@@ -155,6 +161,8 @@ def _parse_artifacts(raw: dict[str, Any]) -> list[ArtifactMetadata]:
         if not isinstance(artifact_type, str) or not isinstance(storage_path, str):
             raise ValueError("artifact requires 'artifact_type' and 'storage_path'")
         mime_type = item.get("mime_type")
+        if not isinstance(mime_type, str):
+            mime_type = _infer_mime_type(artifact_type)
         file_size = item.get("file_size_bytes")
         artifacts.append(
             ArtifactMetadata(
@@ -166,6 +174,74 @@ def _parse_artifacts(raw: dict[str, Any]) -> list[ArtifactMetadata]:
             )
         )
     return artifacts
+
+
+def _infer_mime_type(artifact_type: str) -> str | None:
+    if artifact_type in {"telemetry_json", "reference_track_json", "trajectory_json"}:
+        return "application/json"
+    if artifact_type in {"worker_log", "simulator_stdout", "simulator_stderr"}:
+        return "text/plain"
+    return None
+
+
+def _is_under_allowed_root(path: Path) -> bool:
+    resolved = path.resolve()
+    settings = get_settings()
+    roots = list(settings.allowed_artifact_roots)
+    env_root = os.environ.get("REAL_SIMULATOR_ARTIFACT_ROOT")
+    if env_root:
+        roots.append(Path(env_root).resolve())
+    return any(resolved.is_relative_to(root.resolve()) for root in roots)
+
+
+def _normalize_artifact_path(storage_path: str, run_dir: Path) -> Path:
+    path = Path(storage_path)
+    return (run_dir / path).resolve() if not path.is_absolute() else path.resolve()
+
+
+def _validate_known_artifact_payload(artifact: ArtifactMetadata) -> None:
+    if artifact.mime_type != "application/json":
+        return
+    if artifact.artifact_type not in {"telemetry_json", "reference_track_json"}:
+        return
+    payload = json.loads(Path(artifact.storage_path).read_text(encoding="utf-8"))
+    if artifact.artifact_type == "telemetry_json":
+        validate_telemetry_payload(payload)
+    else:
+        validate_reference_track_payload(payload)
+
+
+def _sanitize_artifacts_for_trial(
+    artifacts: list[ArtifactMetadata], *, run_dir: Path, trial_id: str
+) -> list[ArtifactMetadata]:
+    sanitized: list[ArtifactMetadata] = []
+    for artifact in artifacts:
+        normalized_path = _normalize_artifact_path(artifact.storage_path, run_dir)
+        if not _is_under_allowed_root(normalized_path):
+            logger.warning(
+                "real_cli trial=%s dropped artifact outside allowed roots type=%s path=%s",
+                trial_id,
+                artifact.artifact_type,
+                artifact.storage_path,
+            )
+            continue
+        artifact.storage_path = str(normalized_path)
+        if artifact.file_size_bytes is None and normalized_path.exists():
+            with suppress(OSError):
+                artifact.file_size_bytes = normalized_path.stat().st_size
+        if normalized_path.exists() and normalized_path.is_file():
+            try:
+                _validate_known_artifact_payload(artifact)
+            except (OSError, json.JSONDecodeError, ValueError) as exc:
+                logger.warning(
+                    "real_cli trial=%s artifact validation warning type=%s path=%s: %s",
+                    trial_id,
+                    artifact.artifact_type,
+                    artifact.storage_path,
+                    exc,
+                )
+        sanitized.append(artifact)
+    return sanitized
 
 
 class RealCliSimulatorAdapter(SimulatorAdapter):
@@ -326,7 +402,11 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 else "Simulator reported failure without a reason."
             )
             try:
-                failure_artifacts = _parse_artifacts(raw)
+                failure_artifacts = _sanitize_artifacts_for_trial(
+                    _parse_artifacts(raw),
+                    run_dir=run_dir,
+                    trial_id=ctx.trial_id,
+                )
             except ValueError:
                 failure_artifacts = []
             return TrialResult(
@@ -339,7 +419,11 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
 
         try:
             metrics = _parse_metrics(raw)
-            artifacts = _parse_artifacts(raw)
+            artifacts = _sanitize_artifacts_for_trial(
+                _parse_artifacts(raw),
+                run_dir=run_dir,
+                trial_id=ctx.trial_id,
+            )
         except (ValueError, TypeError) as exc:
             return TrialResult(
                 success=False,

@@ -8,6 +8,7 @@ the `/api/v1/jobs/{job_id}/report` endpoint's failure-path behaviour.
 from __future__ import annotations
 
 import importlib
+import json
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -381,6 +382,11 @@ def test_real_cli_job_artifacts_are_real_files_and_idempotent(ctx, tmp_path, mon
         for row in rows:
             path = tmp_path / "jobs" / job.id / "job_artifacts" / Path(row.storage_path).name
             assert path.exists()
+        trial_summary_path = tmp_path / "jobs" / job.id / "job_artifacts" / "trial_summary.json"
+        trial_summary = json.loads(trial_summary_path.read_text(encoding="utf-8"))
+        assert isinstance(trial_summary, list)
+        assert "has_telemetry_json" in trial_summary[0]
+        assert "has_reference_track_json" in trial_summary[0]
 
 
 def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):

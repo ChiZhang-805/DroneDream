@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { apiClient } from "../api/client";
 import { artifactDownloadUrl } from "../api/client";
 import type { Artifact } from "../types/api";
 
@@ -34,6 +35,7 @@ async function copyToClipboard(value: string): Promise<boolean> {
 
 export function ArtifactCard({ artifact }: ArtifactCardProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [schemaVersion, setSchemaVersion] = useState<string | null>(null);
   const label = artifact.display_name ?? artifact.artifact_type;
   const fileName = basename(artifact.storage_path);
   const isPdf =
@@ -49,6 +51,27 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
     }
     window.setTimeout(() => setCopyState("idle"), 1500);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    setSchemaVersion(null);
+    const isJson =
+      artifact.mime_type === "application/json" ||
+      artifact.storage_path.toLowerCase().endsWith(".json");
+    if (!isJson || artifact.storage_path.startsWith("mock://")) return;
+    void apiClient
+      .fetchArtifactJson<Record<string, unknown>>(artifact.id)
+      .then((payload) => {
+        const value = payload?.schema_version;
+        if (!cancelled && typeof value === "string" && value.length > 0) {
+          setSchemaVersion(value);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [artifact.id, artifact.mime_type, artifact.storage_path]);
 
   return (
     <article className="artifact-card" data-testid="artifact-card">
@@ -83,6 +106,7 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
       <div className="artifact-meta">
         {artifact.mime_type ? <span>{artifact.mime_type}</span> : null}
         {artifact.file_size_bytes !== null ? <span>{artifact.file_size_bytes} bytes</span> : null}
+        {schemaVersion ? <span>schema: {schemaVersion}</span> : null}
         {copyState === "copied" ? <span className="artifact-copy-ok">Copied</span> : null}
         {copyState === "failed" ? <span className="artifact-copy-fail">Copy unavailable</span> : null}
       </div>

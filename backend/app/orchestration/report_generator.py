@@ -412,6 +412,20 @@ def ensure_real_job_artifacts(
         }
         for c in job.candidates
     ]
+    trial_ids = [t.id for t in job.trials]
+    trial_artifact_rows = (
+        db.scalars(
+            select(models.Artifact)
+            .where(models.Artifact.owner_type == "trial")
+            .where(models.Artifact.owner_id.in_(trial_ids))
+        ).all()
+        if trial_ids
+        else []
+    )
+    trial_artifact_types: dict[str, set[str]] = {}
+    for row in trial_artifact_rows:
+        trial_artifact_types.setdefault(row.owner_id, set()).add(row.artifact_type)
+
     trial_summary = [
         {
             "trial_id": t.id,
@@ -424,6 +438,10 @@ def ensure_real_job_artifacts(
             "max_error": t.metric.max_error if t.metric is not None else None,
             "score": t.metric.score if t.metric is not None else None,
             "completion_time": t.metric.completion_time if t.metric is not None else None,
+            "has_telemetry_json": "telemetry_json"
+            in trial_artifact_types.get(t.id, set()),
+            "has_reference_track_json": "reference_track_json"
+            in trial_artifact_types.get(t.id, set()),
         }
         for t in job.trials
     ]

@@ -220,5 +220,81 @@ def test_real_cli_parses_structured_failure(monkeypatch, tmp_path):
     assert "injected simulation_failed" in result.failure.reason
 
 
+def test_real_cli_parses_v1_artifacts_and_infers_mime(monkeypatch, tmp_path):
+    fake = tmp_path / "fake_sim_v1.py"
+    fake.write_text(
+        """
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[sys.argv.index('--output') + 1])
+run_dir = out.parent
+telemetry = run_dir / 'telemetry.json'
+ref = run_dir / 'reference_track.json'
+telemetry.write_text(json.dumps({
+    'schema_version': 'dronedream.telemetry.v1',
+    'samples': [{'t': 0, 'x': 0, 'y': 0, 'z': 3}],
+}))
+ref.write_text(json.dumps({
+    'schema_version': 'dronedream.reference_track.v1',
+    'reference_track': [{'x': 0, 'y': 0, 'z': 3}],
+}))
+payload = {
+    'success': True,
+    'metrics': {
+        'rmse': 1.0, 'max_error': 1.0, 'overshoot_count': 0,
+        'completion_time': 1.0, 'score': 1.0,
+    },
+    'artifacts': [
+        {'artifact_type': 'telemetry_json', 'storage_path': str(telemetry)},
+        {'artifact_type': 'reference_track_json', 'storage_path': str(ref)},
+    ],
+}
+out.write_text(json.dumps(payload))
+""".strip()
+    )
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f"{sys.executable} {fake}")
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+    assert result.success is True
+    types = {a.artifact_type: a for a in result.artifacts}
+    assert types["telemetry_json"].mime_type == "application/json"
+    assert types["reference_track_json"].mime_type == "application/json"
+
+
+def test_real_cli_malformed_telemetry_does_not_fail_success_trial(monkeypatch, tmp_path):
+    fake = tmp_path / "fake_sim_bad_telemetry.py"
+    fake.write_text(
+        """
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[sys.argv.index('--output') + 1])
+run_dir = out.parent
+telemetry = run_dir / 'telemetry.json'
+telemetry.write_text(json.dumps({
+    'schema_version': 'dronedream.telemetry.v1',
+    'samples': [{'x': 0, 'y': 0, 'z': 3}],
+}))
+payload = {
+    'success': True,
+    'metrics': {
+        'rmse': 1.0, 'max_error': 1.0, 'overshoot_count': 0,
+        'completion_time': 1.0, 'score': 1.0,
+    },
+    'artifacts': [
+        {
+            'artifact_type': 'telemetry_json',
+            'storage_path': str(telemetry),
+            'mime_type': 'application/json',
+        },
+    ],
+}
+out.write_text(json.dumps(payload))
+""".strip()
+    )
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f"{sys.executable} {fake}")
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+    assert result.success is True
+    assert {a.artifact_type for a in result.artifacts} == {"telemetry_json"}
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
