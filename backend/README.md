@@ -47,3 +47,19 @@ python3 -m venv .venv
 .venv/bin/mypy app
 .venv/bin/pytest
 ```
+
+## Key environment variables
+
+- Worker lease / reclaim:
+  - `WORKER_LEASE_SECONDS` (default `900`)
+  - `WORKER_STALE_RUNNING_RECLAIM_ENABLED` (default `true`)
+- Artifact storage backend:
+  - `ARTIFACT_STORAGE_BACKEND=local|s3` (default `local`)
+  - `S3_ENDPOINT_URL` (optional, for MinIO/custom endpoints)
+  - `S3_REGION` (optional)
+  - `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`
+  - `S3_PREFIX` (optional, default `dronedream/`)
+- Optional auth:
+  - `AUTH_MODE=disabled|demo_token` (default `disabled`)
+  - `DEMO_AUTH_TOKENS` format:
+    `user1@example.com:token1,user2@example.com:token2`

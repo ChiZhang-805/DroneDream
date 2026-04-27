@@ -33,6 +33,17 @@ class Settings(BaseSettings):
     # so generated real-simulator artifacts are always downloadable by default.
     real_simulator_artifact_root: str = Field(default="./artifacts")
     artifact_root: str = Field(default="/tmp/drone_dream_artifacts")
+    worker_lease_seconds: int = Field(default=900)
+    worker_stale_running_reclaim_enabled: bool = Field(default=True)
+    artifact_storage_backend: str = Field(default="local")
+    s3_endpoint_url: str | None = Field(default=None)
+    s3_region: str | None = Field(default=None)
+    s3_bucket: str | None = Field(default=None)
+    s3_access_key_id: str | None = Field(default=None)
+    s3_secret_access_key: str | None = Field(default=None)
+    s3_prefix: str = Field(default="dronedream/")
+    auth_mode: str = Field(default="disabled")
+    demo_auth_tokens: str = Field(default="")
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -54,6 +65,20 @@ class Settings(BaseSettings):
             if root not in dedup:
                 dedup.append(root)
         return dedup
+
+    @property
+    def demo_auth_token_map(self) -> dict[str, str]:
+        pairs = [p.strip() for p in self.demo_auth_tokens.split(",") if p.strip()]
+        mapping: dict[str, str] = {}
+        for pair in pairs:
+            if ":" not in pair:
+                continue
+            email, token = pair.split(":", 1)
+            email = email.strip()
+            token = token.strip()
+            if email and token:
+                mapping[token] = email
+        return mapping
 
 
 @lru_cache(maxsize=1)

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app import models
+from app.auth import get_current_user
 from app.db import get_db
 from app.response import ok
 from app.services import jobs as job_service
@@ -19,9 +20,15 @@ router = APIRouter(tags=["trials"])
 def get_trial(
     trial_id: str,
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
 ) -> dict[str, object]:
     trial = db.get(models.Trial, trial_id)
     if trial is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "TRIAL_NOT_FOUND", "message": f"Trial {trial_id} was not found."},
+        )
+    if user is not None and (trial.job is None or trial.job.user_id != user.id):
         raise HTTPException(
             status_code=404,
             detail={"code": "TRIAL_NOT_FOUND", "message": f"Trial {trial_id} was not found."},

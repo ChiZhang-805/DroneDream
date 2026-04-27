@@ -120,4 +120,29 @@ describe("apiClient envelope handling", () => {
       code: "ARTIFACT_NOT_JSON",
     });
   });
+
+  it("adds Authorization header when VITE_DEMO_AUTH_TOKEN is configured", async () => {
+    vi.stubEnv("VITE_DEMO_AUTH_TOKEN", "demo-token");
+    vi.resetModules();
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { items: [], page: 1, page_size: 20, total: 0 },
+          error: null,
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    const mod = await import("../api/client");
+    await mod.apiClient.listJobs();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/jobs",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer demo-token",
+        }),
+      }),
+    );
+  });
 });

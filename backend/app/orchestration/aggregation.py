@@ -25,7 +25,7 @@ The scoring formula is deterministic and documented in
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -47,7 +47,7 @@ _TERMINAL_TRIAL = {"COMPLETED", "FAILED", "CANCELLED"}
 
 
 def _now() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 # --- Scoring ---------------------------------------------------------------

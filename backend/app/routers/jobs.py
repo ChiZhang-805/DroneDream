@@ -7,7 +7,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app import schemas
+from app import models, schemas
+from app.auth import get_current_user
 from app.db import get_db
 from app.response import ok
 from app.services import jobs as job_service
@@ -44,9 +45,10 @@ def _job_payload_with_alias(job_schema: schemas.Job) -> dict[str, object]:
 def create_job(
     req: schemas.JobCreateRequest,
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
-        job = job_service.create_job(db, req)
+        job = job_service.create_job(db, req, user=user)
     except job_service.JobServiceError as err:
         _raise(err)
     return ok(_job_payload_with_alias(job_service.to_job_schema(job)))
@@ -55,13 +57,14 @@ def create_job(
 @router.get("/jobs")
 def list_jobs(
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
     page: int = _PageQ,
     page_size: int = _PageSizeQ,
     status: schemas.JobStatus | None = _StatusQ,
 ) -> dict[str, object]:
     try:
         items, total = job_service.list_jobs(
-            db, page=page, page_size=page_size, status=status
+            db, user=user, page=page, page_size=page_size, status=status
         )
     except job_service.JobServiceError as err:
         _raise(err)
@@ -79,9 +82,10 @@ def list_jobs(
 def get_job(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
-        job = job_service.get_job(db, job_id)
+        job = job_service.get_job(db, job_id, user=user)
     except job_service.JobServiceError as err:
         _raise(err)
     return ok(job_service.to_job_schema(job).model_dump(mode="json"))
@@ -91,10 +95,11 @@ def get_job(
 def rerun_job(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
     req: schemas.JobRerunRequest | None = None,
 ) -> dict[str, object]:
     try:
-        job = job_service.rerun_job(db, job_id, openai=(req.openai if req else None))
+        job = job_service.rerun_job(db, job_id, user=user, openai=(req.openai if req else None))
     except job_service.JobServiceError as err:
         _raise(err)
     return ok(_job_payload_with_alias(job_service.to_job_schema(job)))
@@ -104,9 +109,10 @@ def rerun_job(
 def cancel_job(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
-        job = job_service.cancel_job(db, job_id)
+        job = job_service.cancel_job(db, job_id, user=user)
     except job_service.JobServiceError as err:
         _raise(err)
     return ok(job_service.to_job_schema(job).model_dump(mode="json"))
@@ -116,9 +122,10 @@ def cancel_job(
 def list_job_trials(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
-        job = job_service.get_job(db, job_id)
+        job = job_service.get_job(db, job_id, user=user)
     except job_service.JobServiceError as err:
         _raise(err)
     summaries = [job_service.to_trial_summary(t) for t in job.trials]
@@ -129,9 +136,10 @@ def list_job_trials(
 def get_job_report(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
-        job = job_service.get_job(db, job_id)
+        job = job_service.get_job(db, job_id, user=user)
     except job_service.JobServiceError as err:
         _raise(err)
 
@@ -207,9 +215,10 @@ def get_job_report(
 def list_job_artifacts(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
-        job = job_service.get_job(db, job_id)
+        job = job_service.get_job(db, job_id, user=user)
     except job_service.JobServiceError as err:
         _raise(err)
 

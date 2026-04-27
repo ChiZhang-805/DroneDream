@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -39,6 +39,27 @@ def init_db() -> None:
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _apply_sqlite_lightweight_migrations()
+
+
+def _apply_sqlite_lightweight_migrations() -> None:
+    settings = get_settings()
+    if not settings.database_url.startswith("sqlite"):
+        return
+    with engine.begin() as conn:
+        columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()
+        }
+        add_sql: list[str] = []
+        if "lease_owner" not in columns:
+            add_sql.append("ALTER TABLE trials ADD COLUMN lease_owner VARCHAR(64)")
+        if "lease_expires_at" not in columns:
+            add_sql.append("ALTER TABLE trials ADD COLUMN lease_expires_at DATETIME")
+        if "claimed_at" not in columns:
+            add_sql.append("ALTER TABLE trials ADD COLUMN claimed_at DATETIME")
+        for stmt in add_sql:
+            conn.execute(text(stmt))
 
 
 def get_db() -> Iterator[Session]:

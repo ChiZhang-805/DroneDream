@@ -132,3 +132,64 @@ def test_download_forbidden_path_traversal(client: TestClient, tmp_path: Path) -
 
     resp = client.get(f"/api/v1/artifacts/{art_id}/download")
     assert resp.status_code == 403
+
+
+def test_download_s3_artifact_via_storage_backend(client: TestClient, monkeypatch) -> None:
+    job_id = _seed_job()
+    with db.SessionLocal() as session:
+        artifact = models.Artifact(
+            owner_type="job",
+            owner_id=job_id,
+            artifact_type="report_json",
+            display_name="report.json",
+            storage_path="s3://bucket/jobs/job/report.json",
+            mime_type="application/json",
+        )
+        session.add(artifact)
+        session.commit()
+        art_id = artifact.id
+
+    class _FakeStorage:
+        def open_for_download(self, storage_uri: str):
+            assert storage_uri.startswith("s3://")
+            from app.storage.base import StorageDownload
+
+            return StorageDownload(
+                content=b'{"ok":true}',
+                content_type="application/json",
+                filename="report.json",
+            )
+
+    monkeypatch.setattr("app.routers.artifacts.get_artifact_storage", lambda: _FakeStorage())
+
+    resp = client.get(f"/api/v1/artifacts/{art_id}/download")
+    assert resp.status_code == 200
+    assert resp.text == '{"ok":true}'
+
+
+def test_s3_storage_config_missing_returns_explicit_error(
+    client: TestClient, monkeypatch, tmp_path: Path
+) -> None:
+    job_id = _seed_job()
+    path = tmp_path / "x.txt"
+    path.write_text("x", encoding="utf-8")
+    with db.SessionLocal() as session:
+        artifact = models.Artifact(
+            owner_type="job",
+            owner_id=job_id,
+            artifact_type="report_json",
+            display_name="report.json",
+            storage_path="s3://bucket/jobs/job/report.json",
+            mime_type="application/json",
+        )
+        session.add(artifact)
+        session.commit()
+        art_id = artifact.id
+    monkeypatch.setenv("ARTIFACT_STORAGE_BACKEND", "s3")
+    monkeypatch.delenv("S3_BUCKET", raising=False)
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    resp = client.get(f"/api/v1/artifacts/{art_id}/download")
+    assert resp.status_code == 500
+    assert resp.json()["error"]["code"] == "CONFIGURATION_ERROR"

@@ -8,9 +8,9 @@ process — never inside a request handler.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -29,16 +29,7 @@ class JobServiceError(Exception):
 
 
 def _now() -> datetime:
-    return datetime.now(UTC)
-
-
-def _get_or_create_default_user(db: Session) -> models.User:
-    user = db.scalars(select(models.User).limit(1)).first()
-    if user is None:
-        user = models.User(display_name="Default User")
-        db.add(user)
-        db.flush()
-    return user
+    return datetime.now(timezone.utc)
 
 
 def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
@@ -64,10 +55,10 @@ def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
 def _create_job_from_config(
     db: Session,
     *,
+    user: models.User,
     req: schemas.JobCreateRequest,
     source_job_id: str | None = None,
 ) -> models.Job:
-    user = _get_or_create_default_user(db)
     now = _now()
     job = models.Job(
         user_id=user.id,
@@ -137,9 +128,35 @@ def _create_job_from_config(
     return job
 
 
-def create_job(db: Session, req: schemas.JobCreateRequest) -> models.Job:
+def _resolve_user(db: Session, user: models.User | None) -> models.User:
+    if user is not None and user.id:
+        return user
+    if user is not None and user.email:
+        existing_email = (
+            db.scalars(select(models.User).where(models.User.email == user.email).limit(1)).first()
+        )
+        if existing_email is not None:
+            return existing_email
+        created_email_user = models.User(email=user.email, display_name=user.display_name)
+        db.add(created_email_user)
+        db.flush()
+        return created_email_user
+    existing = db.scalars(select(models.User).limit(1)).first()
+    if existing is not None:
+        return existing
+    created = models.User(display_name="Default User")
+    db.add(created)
+    db.flush()
+    return created
+
+
+def create_job(
+    db: Session, req: schemas.JobCreateRequest, *, user: models.User | None = None
+) -> models.Job:
     _validate_gpt_request(req)
-    job = _create_job_from_config(db, req=req, source_job_id=None)
+    job = _create_job_from_config(
+        db, user=_resolve_user(db, user), req=req, source_job_id=None
+    )
     db.commit()
     db.refresh(job)
     return job
@@ -167,6 +184,7 @@ def purge_job_secrets(db: Session, job: models.Job, *, reason: str = "job_termin
 def list_jobs(
     db: Session,
     *,
+    user: models.User | None = None,
     page: int = 1,
     page_size: int = 20,
     status: str | None = None,
@@ -176,8 +194,10 @@ def list_jobs(
     if page_size < 1 or page_size > 200:
         raise JobServiceError("INVALID_INPUT", "page_size must be in [1, 200]", http_status=422)
 
-    stmt = select(models.Job)
-    count_stmt = select(func.count(models.Job.id))
+    resolved_user = _resolve_user(db, user)
+    owner_filter = or_(models.Job.user_id == resolved_user.id, models.Job.user_id.is_(None))
+    stmt = select(models.Job).where(owner_filter)
+    count_stmt = select(func.count(models.Job.id)).where(owner_filter)
     if status is not None:
         stmt = stmt.where(models.Job.status == status)
         count_stmt = count_stmt.where(models.Job.status == status)
@@ -192,9 +212,10 @@ def list_jobs(
     return items, total
 
 
-def get_job(db: Session, job_id: str) -> models.Job:
+def get_job(db: Session, job_id: str, *, user: models.User | None = None) -> models.Job:
     job = db.get(models.Job, job_id)
-    if job is None:
+    resolved_user = _resolve_user(db, user)
+    if job is None or (job.user_id is not None and job.user_id != resolved_user.id):
         raise JobServiceError("JOB_NOT_FOUND", f"Job {job_id} was not found.", http_status=404)
     return job
 
@@ -203,9 +224,11 @@ def rerun_job(
     db: Session,
     job_id: str,
     *,
+    user: models.User | None = None,
     openai: schemas.OpenAIConfig | None = None,
 ) -> models.Job:
-    source = get_job(db, job_id)
+    resolved_user = _resolve_user(db, user)
+    source = get_job(db, job_id, user=resolved_user)
     strategy: schemas.OptimizerStrategy = source.optimizer_strategy  # type: ignore[assignment]
     rerun_openai: schemas.OpenAIConfig | None = None
     if strategy == "gpt":
@@ -248,14 +271,14 @@ def rerun_job(
         ),
         openai=rerun_openai,
     )
-    new_job = _create_job_from_config(db, req=req, source_job_id=source.id)
+    new_job = _create_job_from_config(db, user=resolved_user, req=req, source_job_id=source.id)
     db.commit()
     db.refresh(new_job)
     return new_job
 
 
-def cancel_job(db: Session, job_id: str) -> models.Job:
-    job = get_job(db, job_id)
+def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> models.Job:
+    job = get_job(db, job_id, user=user)
     if job.status in schemas.JOB_TERMINAL_STATUSES:
         code = (
             "JOB_ALREADY_CANCELLED" if job.status == "CANCELLED" else "JOB_ALREADY_COMPLETED"

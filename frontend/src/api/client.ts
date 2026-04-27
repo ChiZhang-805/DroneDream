@@ -39,6 +39,15 @@ export class ApiClientError extends Error {
 const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
   "http://127.0.0.1:8000";
+const DEMO_AUTH_TOKEN: string | undefined =
+  import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
+
+function authHeaders(): Record<string, string> {
+  if (!DEMO_AUTH_TOKEN) {
+    return {};
+  }
+  return { Authorization: `Bearer ${DEMO_AUTH_TOKEN}` };
+}
 
 export function artifactDownloadUrl(artifactId: string): string {
   return `${API_BASE_URL}/api/v1/artifacts/${encodeURIComponent(artifactId)}/download`;
@@ -55,6 +64,7 @@ async function request<T>(
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...authHeaders(),
         ...(init?.headers ?? {}),
       },
     });
@@ -157,6 +167,7 @@ export const apiClient = {
       response = await fetch(url, {
         headers: {
           Accept: "application/json",
+          ...authHeaders(),
         },
       });
     } catch (networkError) {
