@@ -96,6 +96,52 @@ def test_create_job_rejects_invalid_track_type(client: TestClient) -> None:
     assert resp.json()["error"]["code"] == "INVALID_INPUT"
 
 
+def test_create_job_rejects_custom_track_without_reference_track(client: TestClient) -> None:
+    bad = {**HEURISTIC_JOB_PAYLOAD, "track_type": "custom", "reference_track": None}
+    resp = client.post("/api/v1/jobs", json=bad)
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "INVALID_INPUT"
+
+
+def test_create_job_rejects_custom_track_with_short_reference_track(client: TestClient) -> None:
+    bad = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "track_type": "custom",
+        "reference_track": [{"x": 0, "y": 0, "z": 3}],
+    }
+    resp = client.post("/api/v1/jobs", json=bad)
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "INVALID_INPUT"
+
+
+def test_create_job_accepts_and_persists_custom_reference_track(client: TestClient) -> None:
+    payload = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "track_type": "custom",
+        "reference_track": [{"x": 0, "y": 0, "z": 3}, {"x": 5, "y": 0}, {"x": 5, "y": 5, "z": 3}],
+    }
+    created = client.post("/api/v1/jobs", json=payload)
+    assert created.status_code == 200, created.text
+    data = created.json()["data"]
+    assert data["track_type"] == "custom"
+    assert len(data["reference_track"]) == 3
+    assert data["reference_track"][1]["z"] is None
+
+    fetched = client.get(f"/api/v1/jobs/{data['id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["data"]["reference_track"] == data["reference_track"]
+
+
+@pytest.mark.parametrize("track_type", ["circle", "u_turn", "lemniscate"])
+def test_non_custom_track_creation_unchanged(client: TestClient, track_type: str) -> None:
+    payload = {**HEURISTIC_JOB_PAYLOAD, "track_type": track_type}
+    resp = client.post("/api/v1/jobs", json=payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()["data"]
+    assert body["track_type"] == track_type
+    assert body["reference_track"] is None
+
+
 def test_create_job_rejects_invalid_sensor_noise(client: TestClient) -> None:
     bad = {**VALID_JOB_PAYLOAD, "sensor_noise_level": "extreme"}
     resp = client.post("/api/v1/jobs", json=bad)

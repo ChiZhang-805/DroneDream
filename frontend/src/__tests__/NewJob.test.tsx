@@ -114,6 +114,32 @@ describe("NewJob — client-side validation", () => {
     expect(await screen.findByText(/Required numeric value/i)).toBeVisible();
     expect(createSpy).not.toHaveBeenCalled();
   });
+
+  it("requires valid reference_track JSON with at least 2 points when track=custom", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "job_unused" } as unknown as Job);
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText(/Track type/i), {
+      target: { value: "custom" },
+    });
+    fireEvent.change(screen.getByLabelText(/Reference track \(JSON\)/i), {
+      target: { value: "{\"x\":1}" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
+    expect(await screen.findByText(/Must be JSON array/i)).toBeVisible();
+    expect(createSpy).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText(/Reference track \(JSON\)/i), {
+      target: { value: "[{\"x\":0,\"y\":0}]" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
+    expect(
+      await screen.findByText(/Custom track requires at least 2 points/i),
+    ).toBeVisible();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
@@ -176,6 +202,35 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
     expect(payload.openai?.api_key).toBe("sk-testing");
     expect(payload.openai?.model).toBe("gpt-4.1");
     expect(payload.acceptance_criteria?.min_pass_rate).toBe(0.8);
+  });
+
+  it("submits reference_track payload for custom track", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "job_created" } as unknown as Job);
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/Track type/i), {
+      target: { value: "custom" },
+    });
+    fireEvent.change(screen.getByLabelText(/Reference track \(JSON\)/i), {
+      target: {
+        value:
+          '[{"x":0,"y":0,"z":3},{"x":5,"y":0,"z":3},{"x":5,"y":5}]',
+      },
+    });
+    fireEvent.change(screen.getByLabelText(/OpenAI API key/i), {
+      target: { value: "sk-testing" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
+
+    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
+    const payload = createSpy.mock.calls[0][0];
+    expect(payload.track_type).toBe("custom");
+    expect(payload.reference_track).toEqual([
+      { x: 0, y: 0, z: 3 },
+      { x: 5, y: 0, z: 3 },
+      { x: 5, y: 5, z: null },
+    ]);
   });
 });
 

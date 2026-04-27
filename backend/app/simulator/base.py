@@ -49,6 +49,7 @@ class JobConfig:
     wind_west: float
     sensor_noise_level: str
     objective_profile: str
+    reference_track: list[dict[str, float]] | None = None
 
 
 @dataclass(frozen=True)

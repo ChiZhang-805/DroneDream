@@ -23,6 +23,7 @@ import type {
 
 interface FormState {
   track_type: TrackType;
+  reference_track_json: string;
   start_x: string;
   start_y: string;
   altitude_m: string;
@@ -46,6 +47,7 @@ interface FormState {
 
 const DEFAULTS: FormState = {
   track_type: "circle",
+  reference_track_json: "",
   start_x: "0",
   start_y: "0",
   altitude_m: "3.0",
@@ -74,11 +76,59 @@ function parseNumber(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseReferenceTrackInput(raw: string): {
+  points: JobCreateRequest["reference_track"];
+  error: string | null;
+} {
+  if (raw.trim() === "") {
+    return { points: null, error: null };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { points: null, error: "Must be valid JSON array" };
+  }
+  if (!Array.isArray(parsed)) {
+    return { points: null, error: "Must be JSON array" };
+  }
+  const points: NonNullable<JobCreateRequest["reference_track"]> = [];
+  for (let i = 0; i < parsed.length; i += 1) {
+    const point = parsed[i];
+    if (!point || typeof point !== "object") {
+      return { points: null, error: `Point #${i + 1} must be an object` };
+    }
+    const x = Number((point as { x?: unknown }).x);
+    const y = Number((point as { y?: unknown }).y);
+    const zRaw = (point as { z?: unknown }).z;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return { points: null, error: `Point #${i + 1} requires numeric x/y` };
+    }
+    if (zRaw !== undefined && zRaw !== null && !Number.isFinite(Number(zRaw))) {
+      return { points: null, error: `Point #${i + 1} z must be numeric when provided` };
+    }
+    points.push({
+      x,
+      y,
+      z: zRaw === undefined ? null : (zRaw === null ? null : Number(zRaw)),
+    });
+  }
+  return { points, error: null };
+}
+
 function validate(form: FormState): FieldErrors {
   const errors: FieldErrors = {};
 
   if (!TRACK_TYPES.includes(form.track_type)) {
     errors.track_type = "Select a valid track type";
+  }
+  const parsedTrack = parseReferenceTrackInput(form.reference_track_json);
+  if (parsedTrack.error) {
+    errors.reference_track_json = parsedTrack.error;
+  } else if (form.track_type === "custom") {
+    if (!parsedTrack.points || parsedTrack.points.length < 2) {
+      errors.reference_track_json = "Custom track requires at least 2 points";
+    }
   }
   if (!SENSOR_NOISE_LEVELS.includes(form.sensor_noise_level)) {
     errors.sensor_noise_level = "Select a valid sensor noise level";
@@ -161,8 +211,10 @@ function validate(form: FormState): FieldErrors {
 }
 
 function formToRequest(form: FormState): JobCreateRequest {
+  const parsedTrack = parseReferenceTrackInput(form.reference_track_json);
   const req: JobCreateRequest = {
     track_type: form.track_type,
+    reference_track: parsedTrack.points ?? null,
     start_point: {
       x: Number(form.start_x),
       y: Number(form.start_y),
@@ -333,6 +385,22 @@ export function NewJob() {
                 onChange={handleTextChange("altitude_m")}
               />
             </Field>
+            {form.track_type === "custom" ? (
+              <Field
+                label="Reference track (JSON)"
+                required
+                error={errors.reference_track_json}
+                htmlFor="reference_track_json"
+                hint='Example: [{"x":0,"y":0,"z":3},{"x":5,"y":0,"z":3}]'
+              >
+                <textarea
+                  id="reference_track_json"
+                  rows={6}
+                  value={form.reference_track_json}
+                  onChange={(e) => update("reference_track_json", e.target.value)}
+                />
+              </Field>
+            ) : null}
           </div>
         </SectionCard>
 

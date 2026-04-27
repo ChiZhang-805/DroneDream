@@ -174,6 +174,8 @@ class MockSimulatorAdapter(SimulatorAdapter):
             "noise_factor": noise_factor,
             "wind_penalty": round(wind_penalty, 4),
             "backend": self.backend_name,
+            "track_type": ctx.job_config.track_type,
+            "reference_track_point_count": len(ctx.job_config.reference_track or []),
         }
 
         return TrialMetricsPayload(

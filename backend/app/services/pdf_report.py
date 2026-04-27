@@ -197,6 +197,18 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add("")
     add("2) Initial job settings")
     add(f"- Track type: {job.track_type}")
+    reference_track = (
+        [p for p in (job.reference_track_json or []) if isinstance(p, dict)]
+        if job.reference_track_json
+        else []
+    )
+    if reference_track:
+        preview = reference_track[:5]
+        add(f"- Custom track points: {len(reference_track)} total")
+        preview_text = json.dumps(preview, ensure_ascii=False)
+        add(f"- Custom track preview (first {len(preview)}): {preview_text}")
+    elif job.track_type == "custom":
+        add("- Custom track points: 0 total")
     add(f"- Start point: ({job.start_point_x:.2f}, {job.start_point_y:.2f})")
     add(f"- Altitude: {job.altitude_m:.2f} m")
     wind_text = (

@@ -367,6 +367,11 @@ def _write_text(path: Path, text: str) -> int:
     return len(body.encode("utf-8"))
 
 
+def _custom_track_summary(job: models.Job) -> tuple[int, list[dict[str, Any]]]:
+    points = [p for p in (job.reference_track_json or []) if isinstance(p, dict)]
+    return len(points), points[:5]
+
+
 def ensure_real_job_artifacts(
     db: Session,
     *,
@@ -377,10 +382,13 @@ def ensure_real_job_artifacts(
     """Ensure real backend jobs expose concrete job-level artifact files + rows."""
 
     artifact_dir = _real_artifact_root() / "jobs" / job.id / "job_artifacts"
+    custom_track_count, custom_track_preview = _custom_track_summary(job)
     report_payload = {
         "job_id": job.id,
         "best_candidate_id": best.id,
         "summary_text": report_body["summary_text"],
+        "custom_track_point_count": custom_track_count,
+        "custom_track_preview": custom_track_preview,
         "baseline_metrics": report_body["baseline_metric_json"],
         "optimized_metrics": report_body["optimized_metric_json"],
         "comparison": report_body["comparison_metric_json"],
@@ -586,6 +594,12 @@ def generate_and_persist_report(
         baseline_trials=baseline_trials,
         best_trials=best_trials,
     )
+    custom_track_count, _ = _custom_track_summary(job)
+    if custom_track_count:
+        body["summary_text"] = (
+            f"{body['summary_text']} Custom track points: {custom_track_count} "
+            "(preview limited to first 5 points in artifacts/PDF)."
+        )
     report = persist_report(db, job=job, best=best, report_body=body)
     ensure_job_artifacts(db, job=job, report_body=body, best=best)
     try:

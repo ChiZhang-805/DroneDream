@@ -442,6 +442,7 @@ function JobHeader({
 }
 
 function JobSummaryCard({ job }: { job: Job }) {
+  const customPreview = (job.reference_track ?? []).slice(0, 5);
   return (
     <SectionCard title="Job summary">
       <ul className="kv-list">
@@ -449,6 +450,17 @@ function JobSummaryCard({ job }: { job: Job }) {
           <span className="kv-key">Track type</span>
           <span className="kv-value">{job.track_type}</span>
         </li>
+        {job.track_type === "custom" ? (
+          <li>
+            <span className="kv-key">Custom track</span>
+            <span className="kv-value">
+              {(job.reference_track ?? []).length} points
+              {customPreview.length > 0
+                ? ` · preview ${JSON.stringify(customPreview)}`
+                : ""}
+            </span>
+          </li>
+        ) : null}
         <li>
           <span className="kv-key">Objective profile</span>
           <span className="kv-value">{job.objective_profile}</span>

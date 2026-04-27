@@ -57,6 +57,7 @@ export const MOCK_JOBS: Job[] = [
   {
     id: "job_completed_001",
     track_type: "circle",
+    reference_track: null,
     start_point: { x: 0, y: 0 },
     altitude_m: 3.0,
     wind: { north: 1, east: 0, south: 0, west: 0 },
@@ -85,6 +86,7 @@ export const MOCK_JOBS: Job[] = [
   {
     id: "job_running_002",
     track_type: "u_turn",
+    reference_track: null,
     start_point: { x: 0, y: 0 },
     altitude_m: 4.5,
     wind: { north: 2, east: 1, south: 0, west: 0 },
@@ -113,6 +115,7 @@ export const MOCK_JOBS: Job[] = [
   {
     id: "job_queued_003",
     track_type: "lemniscate",
+    reference_track: null,
     start_point: { x: 1, y: -1 },
     altitude_m: 5.0,
     wind: { north: 0, east: 0, south: 0, west: 0 },
@@ -141,6 +144,7 @@ export const MOCK_JOBS: Job[] = [
   {
     id: "job_aggregating_004",
     track_type: "circle",
+    reference_track: null,
     start_point: { x: 0, y: 0 },
     altitude_m: 3.0,
     wind: { north: 3, east: 0, south: 2, west: 0 },
@@ -169,6 +173,7 @@ export const MOCK_JOBS: Job[] = [
   {
     id: "job_failed_005",
     track_type: "u_turn",
+    reference_track: null,
     start_point: { x: 2, y: 0 },
     altitude_m: 6.0,
     wind: { north: 5, east: 0, south: 0, west: 0 },
@@ -201,6 +206,7 @@ export const MOCK_JOBS: Job[] = [
   {
     id: "job_cancelled_006",
     track_type: "circle",
+    reference_track: null,
     start_point: { x: 0, y: 0 },
     altitude_m: 3.0,
     wind: { north: 0, east: 0, south: 0, west: 0 },

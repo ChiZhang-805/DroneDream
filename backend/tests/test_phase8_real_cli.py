@@ -15,7 +15,7 @@ from app.simulator.base import (
     JobConfig,
     TrialContext,
 )
-from app.simulator.real_cli import RealCliSimulatorAdapter
+from app.simulator.real_cli import RealCliSimulatorAdapter, _trial_input_payload
 
 _EXAMPLE_SIM = (
     Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "example_real_simulator.py"
@@ -92,6 +92,7 @@ def test_real_cli_succeeds_against_example_simulator(monkeypatch, tmp_path):
     assert payload["track_type"] == payload["job_config"]["track_type"]
     assert payload["altitude_m"] == payload["job_config"]["altitude_m"]
     assert payload["start_point"] == payload["job_config"]["start_point"]
+    assert payload["reference_track"] == payload["job_config"]["reference_track"]
     assert payload["wind"] == payload["job_config"]["wind"]
     assert payload["sensor_noise_level"] == payload["job_config"]["sensor_noise_level"]
     assert payload["objective_profile"] == payload["job_config"]["objective_profile"]
@@ -111,6 +112,39 @@ def test_real_cli_succeeds_against_example_simulator(monkeypatch, tmp_path):
     for a in result.artifacts:
         assert Path(a.storage_path).exists()
         assert a.file_size_bytes is None or a.file_size_bytes > 0
+
+
+def test_trial_input_payload_includes_custom_reference_track() -> None:
+    ctx = _ctx()
+    ctx = TrialContext(
+        trial_id=ctx.trial_id,
+        job_id=ctx.job_id,
+        candidate_id=ctx.candidate_id,
+        seed=ctx.seed,
+        scenario_type=ctx.scenario_type,
+        scenario_config=ctx.scenario_config,
+        parameters=ctx.parameters,
+        job_config=JobConfig(
+            track_type="custom",
+            start_point_x=0.0,
+            start_point_y=0.0,
+            altitude_m=3.0,
+            wind_north=0.0,
+            wind_east=0.0,
+            wind_south=0.0,
+            wind_west=0.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            reference_track=[
+                {"x": 0.0, "y": 0.0, "z": 3.0},
+                {"x": 5.0, "y": 0.0, "z": 3.0},
+            ],
+        ),
+    )
+    payload = _trial_input_payload(ctx, Path("/tmp/out.json"))
+    assert payload["track_type"] == "custom"
+    assert payload["job_config"]["reference_track"] == payload["reference_track"]
+    assert len(payload["reference_track"]) == 2
 
 
 def test_real_cli_maps_timeout(monkeypatch, tmp_path):

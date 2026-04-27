@@ -129,6 +129,7 @@ def _compute_metrics(payload: dict[str, Any]) -> dict[str, Any]:
         for k in (
             "track_type",
             "altitude_m",
+            "reference_track",
             "wind",
             "start_point",
             "sensor_noise_level",

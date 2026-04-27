@@ -98,6 +98,11 @@ function validateCreate(req: JobCreateRequest): string | null {
       return "wind components must be between -10 and 10";
     }
   }
+  if (req.track_type === "custom") {
+    if (!req.reference_track || req.reference_track.length < 2) {
+      return "reference_track with at least 2 points is required for custom track";
+    }
+  }
   return null;
 }
 
@@ -114,6 +119,7 @@ export const mockApi = {
     const created: Job = {
       id,
       track_type: req.track_type,
+      reference_track: req.reference_track ?? null,
       start_point: { ...req.start_point },
       altitude_m: req.altitude_m,
       wind: { ...req.wind },

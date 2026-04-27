@@ -95,6 +95,28 @@ def _refresh_progress_counters(db: Session, job: models.Job) -> None:
 
 
 def _job_config_from(job: models.Job) -> JobConfig:
+    reference_track: list[dict[str, float]] | None = None
+    if job.reference_track_json:
+        normalized: list[dict[str, float]] = []
+        for point in job.reference_track_json:
+            if not isinstance(point, dict):
+                continue
+            x = point.get("x")
+            y = point.get("y")
+            z_raw = point.get("z")
+            if x is None or y is None:
+                continue
+            try:
+                normalized.append(
+                    {
+                        "x": float(x),
+                        "y": float(y),
+                        "z": float(job.altitude_m if z_raw is None else z_raw),
+                    }
+                )
+            except (TypeError, ValueError):
+                continue
+        reference_track = normalized or None
     return JobConfig(
         track_type=job.track_type,
         start_point_x=job.start_point_x,
@@ -106,6 +128,7 @@ def _job_config_from(job: models.Job) -> JobConfig:
         wind_west=job.wind_west,
         sensor_noise_level=job.sensor_noise_level,
         objective_profile=job.objective_profile,
+        reference_track=reference_track,
     )
 
 

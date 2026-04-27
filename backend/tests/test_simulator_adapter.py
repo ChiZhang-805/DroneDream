@@ -163,6 +163,9 @@ def test_mock_adapter_metrics_payload_fields_complete():
         "raw_metric_json",
     }
     assert expected_keys.issubset(payload.keys())
+    raw = payload["raw_metric_json"]
+    assert raw["track_type"] == "circle"
+    assert raw["reference_track_point_count"] == 0
 
 
 @pytest.mark.parametrize(
