@@ -5,13 +5,14 @@ import { SectionCard } from "./SectionCard";
 import { Alert } from "./Alert";
 import { Loading, Empty } from "./States";
 import type { ReplayArtifacts } from "./trajectoryReplayUtils";
-
-interface ReplayPoint {
-  t: number;
-  x: number;
-  y: number;
-  z: number;
-}
+import {
+  extractPoints,
+  extractReferencePoints,
+  getCombinedBounds,
+  to2DViewBoxCoordinates,
+  to3DViewBoxCoordinates,
+  type ReplayPoint,
+} from "./trajectoryReplayMath";
 
 interface ReplayMeta {
   scenario?: string;
@@ -26,71 +27,7 @@ interface TrajectoryReplayProps {
 
 const SPEEDS = [0.5, 1, 2, 4] as const;
 
-function normalizePoint(raw: unknown, idx: number): ReplayPoint | null {
-  if (!raw || typeof raw !== "object") return null;
-  const sample = raw as Record<string, unknown>;
-  const x = Number(sample.x);
-  const y = Number(sample.y);
-  const z = Number(sample.z ?? 0);
-  const t = Number(sample.t ?? idx);
-  if (![x, y, z, t].every(Number.isFinite)) return null;
-  return { x, y, z, t };
-}
-
-function extractPoints(payload: unknown): ReplayPoint[] {
-  if (!payload || typeof payload !== "object") return [];
-  const root = payload as Record<string, unknown>;
-  const candidates: unknown[] = [
-    root.samples,
-    root.points,
-    root.trajectory,
-    root.path,
-    root.reference_track,
-  ];
-  for (const candidate of candidates) {
-    if (!Array.isArray(candidate)) continue;
-    const parsed = candidate
-      .map((item, idx) => normalizePoint(item, idx))
-      .filter((item): item is ReplayPoint => item !== null);
-    if (parsed.length > 0) return parsed;
-  }
-  return [];
-}
-
-function extractReferencePoints(payload: unknown): ReplayPoint[] {
-  if (!payload || typeof payload !== "object") return [];
-  const root = payload as Record<string, unknown>;
-  if (!Array.isArray(root.reference_track)) return [];
-  return root.reference_track
-    .map((item, idx) => normalizePoint(item, idx))
-    .filter((item): item is ReplayPoint => item !== null);
-}
-
-function toViewBoxCoordinates(points: ReplayPoint[]): {
-  linePoints: string;
-  markerX: (idx: number) => number;
-  markerY: (idx: number) => number;
-} {
-  const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-
-  const width = maxX - minX || 1;
-  const height = maxY - minY || 1;
-  const pad = 8;
-
-  const mapX = (x: number) => ((x - minX) / width) * (100 - pad * 2) + pad;
-  const mapY = (y: number) => 100 - (((y - minY) / height) * (100 - pad * 2) + pad);
-
-  return {
-    linePoints: points.map((p) => `${mapX(p.x)},${mapY(p.y)}`).join(" "),
-    markerX: (idx: number) => mapX(points[idx]?.x ?? points[0].x),
-    markerY: (idx: number) => mapY(points[idx]?.y ?? points[0].y),
-  };
-}
+type ReplayViewMode = "2d" | "3d";
 
 function statusTextForError(error: unknown): string {
   if (error instanceof ApiClientError) {
@@ -111,6 +48,7 @@ export function TrajectoryReplay({
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState<number>(1);
   const [position, setPosition] = useState(0);
+  const [viewMode, setViewMode] = useState<ReplayViewMode>("2d");
 
   const primaryArtifact = artifacts.trajectory ?? artifacts.telemetry;
 
@@ -121,6 +59,7 @@ export function TrajectoryReplay({
       setError(null);
       setIsPlaying(false);
       setPosition(0);
+      setViewMode("2d");
       setActualPoints(null);
       setReferencePoints([]);
 
@@ -185,11 +124,18 @@ export function TrajectoryReplay({
 
   const viewModel = useMemo(() => {
     if (!actualPoints || actualPoints.length === 0) return null;
-    const actual = toViewBoxCoordinates(actualPoints);
-    const reference =
-      referencePoints.length > 0 ? toViewBoxCoordinates(referencePoints) : null;
+
+    const bounds = getCombinedBounds([actualPoints, referencePoints]);
+    const project =
+      viewMode === "3d"
+        ? (points: ReplayPoint[]) =>
+            to3DViewBoxCoordinates(points, bounds ?? undefined)
+        : (points: ReplayPoint[]) => to2DViewBoxCoordinates(points);
+
+    const actual = project(actualPoints);
+    const reference = referencePoints.length > 0 ? project(referencePoints) : null;
     return { actual, reference };
-  }, [actualPoints, referencePoints]);
+  }, [actualPoints, referencePoints, viewMode]);
 
   const current = actualPoints?.[position] ?? null;
 
@@ -220,12 +166,27 @@ export function TrajectoryReplay({
         />
       ) : (
         <div className="stack-sm" data-testid="trajectory-replay">
+          <div className="trajectory-controls">
+            <label className="trajectory-speed">
+              View
+              <select
+                aria-label="Replay view mode"
+                value={viewMode}
+                onChange={(event) => setViewMode(event.target.value as ReplayViewMode)}
+              >
+                <option value="2d">2D</option>
+                <option value="3d">3D</option>
+              </select>
+            </label>
+          </div>
+
           <div className="trajectory-replay-canvas-wrap">
             <svg
               className="trajectory-replay-canvas"
               viewBox="0 0 100 100"
               role="img"
-              aria-label="Trajectory replay"
+              data-testid={`trajectory-replay-svg-${viewMode}`}
+              aria-label={viewMode === "3d" ? "Trajectory replay 3D" : "Trajectory replay 2D"}
             >
               <rect x="0" y="0" width="100" height="100" fill="rgba(255,255,255,0.02)" />
               {viewModel.reference ? (

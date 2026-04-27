@@ -49,7 +49,7 @@ describe("TrajectoryReplay", () => {
     );
     expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Trajectory replay")).toBeInTheDocument();
+    expect(screen.getByTestId("trajectory-replay-svg-2d")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
@@ -77,6 +77,38 @@ describe("TrajectoryReplay", () => {
     await waitFor(() =>
       expect(screen.getByText(/Replay data missing/i)).toBeInTheDocument(),
     );
+  });
+
+
+  it("defaults to 2D and can switch to 3D view", async () => {
+    vi.spyOn(apiClient, "fetchArtifactJson").mockResolvedValue({
+      samples: [
+        { t: 0, x: 0, y: 0, z: 0 },
+        { t: 1, x: 1, y: 1, z: 1 },
+      ],
+    });
+
+    render(
+      <TrajectoryReplay
+        artifacts={{
+          trajectory: makeArtifact("a4", "trajectory_json", "/tmp/trajectory.json"),
+          telemetry: null,
+          reference: null,
+        }}
+        meta={{}}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("trajectory-replay-svg-2d")).toBeInTheDocument(),
+    );
+
+    fireEvent.change(screen.getByLabelText("Replay view mode"), {
+      target: { value: "3d" },
+    });
+
+    expect(screen.getByTestId("trajectory-replay-svg-3d")).toBeInTheDocument();
+    expect(screen.getByText("x / y / z")).toBeInTheDocument();
   });
 
   it("shows empty state when artifact is not provided", async () => {
@@ -116,7 +148,7 @@ describe("TrajectoryReplay", () => {
     await waitFor(() =>
       expect(screen.getByTestId("trajectory-replay")).toBeInTheDocument(),
     );
-    const canvas = screen.getByLabelText("Trajectory replay");
+    const canvas = screen.getByTestId("trajectory-replay-svg-2d");
     expect(canvas.querySelectorAll("polyline")).toHaveLength(2);
   });
 });
