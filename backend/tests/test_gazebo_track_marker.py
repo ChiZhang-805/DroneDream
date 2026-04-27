@@ -63,7 +63,15 @@ def test_load_reference_points_errors(tmp_path: Path):
         marker.load_reference_points(empty)
 
 
-def test_build_marker_command_is_deterministic():
+def test_marker_service_candidates_default_and_override(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("PX4_GAZEBO_MARKER_SERVICE", raising=False)
+    assert marker.marker_service_candidates("default") == ["/world/default/marker", "/marker"]
+
+    monkeypatch.setenv("PX4_GAZEBO_MARKER_SERVICE", "/marker")
+    assert marker.marker_service_candidates("default") == ["/marker"]
+
+
+def test_build_marker_command_accepts_world_or_service():
     request = marker.build_marker_service_request(
         points=[(1.0, 2.0, 0.03)],
         world="default",
@@ -73,22 +81,27 @@ def test_build_marker_command_is_deterministic():
         marker_id=805,
         mode="line_strip",
     )
-    command = marker.build_marker_command(world="default", request=request)
-    assert command[0] == "gz"
-    assert "/world/default/marker" in command
-    assert "--req" in command
+    world_command = marker.build_marker_command(world="default", request=request)
+    assert "/world/default/marker" in world_command
+
+    service_command = marker.build_marker_command(service="/marker", request=request)
+    assert "/marker" in service_command
+    assert "--req" in service_command
 
 
-def test_draw_track_marker_success_and_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_draw_track_marker_falls_back_to_global_marker_service(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     track = _write_track(tmp_path / "track.json", {"points": [{"x": 0, "y": 0, "z": 3}]})
     log = tmp_path / "marker.log"
 
     monkeypatch.setattr(marker.shutil, "which", lambda _: "/usr/bin/gz")
 
-    def _ok(_argv: list[str]) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(_argv, 0, stdout="ok", stderr="")
+    def _fake_run(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        if argv == ["gz", "service", "-l"]:
+            return subprocess.CompletedProcess(argv, 0, stdout="/marker\n/marker/list\n/marker_array\n", stderr="")
+        assert "/marker" in argv
+        return subprocess.CompletedProcess(argv, 0, stdout="data: true", stderr="")
 
-    monkeypatch.setattr(marker, "_run_cmd", _ok)
+    monkeypatch.setattr(marker, "_run_cmd", _fake_run)
     ok_exit = marker.draw_track_marker(
         track_path=track,
         world="default",
@@ -102,13 +115,51 @@ def test_draw_track_marker_success_and_failure(monkeypatch: pytest.MonkeyPatch, 
         log_path=log,
     )
     assert ok_exit == 0
-    assert "backend=gz_service" in log.read_text(encoding="utf-8")
+    log_text = log.read_text(encoding="utf-8")
+    assert "skipping unavailable marker service: /world/default/marker" in log_text
+    assert "marker service succeeded: /marker" in log_text
 
-    def _fail(_argv: list[str]) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(_argv, 9, stdout="", stderr="boom")
+
+def test_draw_track_marker_uses_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    track = _write_track(tmp_path / "track.json", {"points": [{"x": 0, "y": 0, "z": 3}]})
+    monkeypatch.setenv("PX4_GAZEBO_MARKER_SERVICE", "/marker")
+    monkeypatch.setattr(marker.shutil, "which", lambda _: "/usr/bin/gz")
+
+    called_services: list[str] = []
+
+    def _fake_run(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        if argv == ["gz", "service", "-l"]:
+            return subprocess.CompletedProcess(argv, 0, stdout="/marker\n", stderr="")
+        called_services.append(argv[argv.index("-s") + 1])
+        return subprocess.CompletedProcess(argv, 0, stdout="data: true", stderr="")
+
+    monkeypatch.setattr(marker, "_run_cmd", _fake_run)
+    marker.draw_track_marker(
+        track_path=track,
+        world="default",
+        z_offset=0.03,
+        color="0 0.8 1 1",
+        line_width=0.08,
+        marker_namespace="dronedream_track",
+        marker_id=805,
+        mode="line_strip",
+        hold_seconds=0,
+        log_path=None,
+    )
+    assert called_services == ["/marker"]
+
+
+def test_draw_track_marker_failure_when_all_services_fail(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    track = _write_track(tmp_path / "track.json", {"points": [{"x": 0, "y": 0, "z": 3}]})
+    monkeypatch.setattr(marker.shutil, "which", lambda _: "/usr/bin/gz")
+
+    def _fail(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        if argv == ["gz", "service", "-l"]:
+            return subprocess.CompletedProcess(argv, 0, stdout="/world/default/marker\n/marker\n", stderr="")
+        return subprocess.CompletedProcess(argv, 9, stdout="data: false", stderr="boom")
 
     monkeypatch.setattr(marker, "_run_cmd", _fail)
-    with pytest.raises(marker.TrackMarkerError, match="marker service unavailable"):
+    with pytest.raises(marker.TrackMarkerError, match="marker service failed"):
         marker.draw_track_marker(
             track_path=track,
             world="default",
@@ -119,5 +170,5 @@ def test_draw_track_marker_success_and_failure(monkeypatch: pytest.MonkeyPatch, 
             marker_id=805,
             mode="line_strip",
             hold_seconds=0,
-            log_path=log,
+            log_path=None,
         )
