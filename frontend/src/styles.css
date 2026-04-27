@@ -960,3 +960,194 @@ code {
   border-radius: 10px;
   background: #000;
 }
+
+
+/* ---------- DroneDream purple/pink theme overrides ---------- */
+:root {
+  --bg: #12051f;
+  --bg-elev: rgba(31, 10, 54, 0.94);
+  --bg-elev-2: rgba(52, 18, 88, 0.92);
+  --border: rgba(184, 92, 255, 0.28);
+  --border-strong: rgba(255, 115, 213, 0.48);
+  --text: #fff7ff;
+  --text-muted: #d6b7ea;
+  --text-dim: #f0d9ff;
+  --primary: #ff73d5;
+  --primary-strong: #a855f7;
+  --success: #5df7c8;
+  --warning: #ffd166;
+  --danger: #ff5c9c;
+  --active: #f0a2ff;
+  --focus-ring: 0 0 0 2px rgba(255, 115, 213, 0.45), 0 0 24px rgba(168, 85, 247, 0.35);
+}
+
+body {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 115, 213, 0.22), transparent 28%),
+    radial-gradient(circle at 88% 6%, rgba(168, 85, 247, 0.28), transparent 30%),
+    radial-gradient(circle at 68% 92%, rgba(236, 72, 153, 0.18), transparent 34%),
+    linear-gradient(135deg, #12051f 0%, #240938 48%, #3c115f 100%);
+}
+
+.app-sidebar {
+  background: linear-gradient(180deg, rgba(44, 13, 78, 0.96), rgba(24, 5, 43, 0.98));
+  box-shadow: inset -1px 0 0 rgba(255, 115, 213, 0.12);
+}
+
+.app-header {
+  background: rgba(39, 9, 68, 0.78);
+  border-bottom-color: rgba(255, 115, 213, 0.22);
+  backdrop-filter: blur(10px);
+}
+
+.app-main {
+  max-width: 1240px;
+}
+
+.app-title-mark,
+.app-nav a.active,
+a {
+  color: var(--primary);
+}
+
+.app-nav a:hover,
+.app-nav a.active {
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.22), rgba(255, 115, 213, 0.12));
+}
+
+.phase-pill,
+.env-chip,
+.status-muted {
+  background: rgba(255, 115, 213, 0.1);
+  border: 1px solid rgba(255, 115, 213, 0.2);
+  color: var(--active);
+}
+
+.section-card,
+.metric-card,
+.artifact-card,
+.data-table-wrapper,
+.trajectory-replay-canvas-wrap,
+.gazebo-live-iframe {
+  background: linear-gradient(180deg, rgba(43, 14, 74, 0.9), rgba(28, 7, 50, 0.9));
+  border-color: rgba(255, 115, 213, 0.22);
+  box-shadow: 0 18px 48px rgba(12, 2, 20, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.btn {
+  background: rgba(71, 24, 116, 0.85);
+  border-color: rgba(255, 115, 213, 0.35);
+}
+
+.btn:hover:not(:disabled) {
+  background: rgba(104, 38, 166, 0.92);
+  border-color: rgba(255, 115, 213, 0.62);
+}
+
+.btn-primary,
+.progress-bar-fill {
+  background: linear-gradient(90deg, #a855f7, #ff73d5);
+  border-color: rgba(255, 115, 213, 0.72);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(90deg, #c084fc, #ff8bdc);
+}
+
+.form-field input,
+.form-field select,
+.trajectory-speed select {
+  background: rgba(18, 5, 31, 0.88);
+  border-color: rgba(255, 115, 213, 0.32);
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.trajectory-speed select:focus {
+  border-color: var(--primary);
+}
+
+.data-table thead {
+  background: rgba(255, 115, 213, 0.08);
+}
+
+.data-table th,
+.metric-label,
+.kv-list .kv-key {
+  color: #f2c7ff;
+}
+
+.status-info,
+.status-active {
+  background: rgba(168, 85, 247, 0.16);
+  border-color: rgba(255, 115, 213, 0.4);
+  color: #ff9be3;
+}
+
+.status-success {
+  background: rgba(93, 247, 200, 0.12);
+  border-color: rgba(93, 247, 200, 0.38);
+}
+
+.status-danger,
+.btn-danger {
+  background: rgba(255, 92, 156, 0.12);
+  border-color: rgba(255, 92, 156, 0.45);
+  color: #ff8fbd;
+}
+
+.alert-info {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(255, 115, 213, 0.36);
+}
+
+.alert-danger,
+.state-error {
+  background: rgba(255, 92, 156, 0.1);
+  border-color: rgba(255, 92, 156, 0.42);
+}
+
+.spinner {
+  border-top-color: var(--primary);
+}
+
+.progress-bar {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.progress-bar-fill-active {
+  background: linear-gradient(90deg, #a855f7 0%, #ff73d5 50%, #f0a2ff 100%);
+}
+
+.legend-optimized,
+.bar-optimized {
+  background: linear-gradient(90deg, #a855f7, #ff73d5);
+}
+
+.bar-winner {
+  box-shadow: 0 0 0 2px rgba(255, 115, 213, 0.5), 0 0 18px rgba(255, 115, 213, 0.28);
+}
+
+.candidate-tag-baseline {
+  background: rgba(240, 162, 255, 0.14);
+  color: #f5d0ff;
+  border-color: rgba(240, 162, 255, 0.28);
+}
+
+.candidate-tag-optimizer {
+  background: rgba(168, 85, 247, 0.18);
+  color: #e9d5ff;
+  border-color: rgba(168, 85, 247, 0.38);
+}
+
+.candidate-tag-best {
+  background: rgba(255, 115, 213, 0.18);
+  color: #ffd7f2;
+  border-color: rgba(255, 115, 213, 0.4);
+}
+
+.log-panel {
+  background: #090212;
+  border-color: rgba(255, 115, 213, 0.24);
+  color: #f5e8ff;
+}

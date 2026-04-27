@@ -6,12 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import shutil
 import subprocess
 import time
 from pathlib import Path
 
 CLOSE_DISTANCE_THRESHOLD_M = 2.0
+DEFAULT_MARKER_TIMEOUT_MS = 3000
 
 
 class TrackMarkerError(RuntimeError):
@@ -126,18 +128,50 @@ def build_marker_service_request(
     )
 
 
-def build_marker_command(*, world: str, request: str) -> list[str]:
+def _dedupe(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        if normalized and normalized not in seen:
+            deduped.append(normalized)
+            seen.add(normalized)
+    return deduped
+
+
+def marker_service_candidates(world: str) -> list[str]:
+    """Return marker service endpoints in preferred order.
+
+    Gazebo Sim distributions differ here: some expose world-scoped marker
+    services, while PX4 Gazebo Sim 8.x commonly exposes the global /marker
+    endpoint. PX4_GAZEBO_MARKER_SERVICE can pin a site-specific endpoint.
+    """
+
+    override = os.environ.get("PX4_GAZEBO_MARKER_SERVICE", "").strip()
+    if override:
+        return [override]
+    return _dedupe([f"/world/{world}/marker", "/marker"])
+
+
+def build_marker_command(
+    *,
+    request: str,
+    world: str | None = None,
+    service: str | None = None,
+    timeout_ms: int = DEFAULT_MARKER_TIMEOUT_MS,
+) -> list[str]:
+    marker_service = service or f"/world/{world or 'default'}/marker"
     return [
         "gz",
         "service",
         "-s",
-        f"/world/{world}/marker",
+        marker_service,
         "--reqtype",
         "gz.msgs.Marker",
         "--reptype",
         "gz.msgs.Boolean",
         "--timeout",
-        "3000",
+        str(timeout_ms),
         "--req",
         request,
     ]
@@ -149,6 +183,27 @@ def _run_cmd(argv: list[str]) -> subprocess.CompletedProcess[str]:
 
 def _marker_backend_available() -> bool:
     return shutil.which("gz") is not None
+
+
+def _list_gz_services(log_path: Path | None) -> set[str] | None:
+    result = _run_cmd(["gz", "service", "-l"])
+    if result.returncode != 0:
+        _append_log(log_path, "[gazebo_track_marker] unable to list Gazebo services; trying marker endpoints directly")
+        if result.stderr:
+            _append_log(log_path, f"[gazebo_track_marker] service-list stderr={result.stderr.strip()}")
+        return None
+    services = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    marker_services = sorted(service for service in services if "marker" in service)
+    _append_log(log_path, f"[gazebo_track_marker] available_marker_services={marker_services}")
+    return services
+
+
+def _service_result_looks_successful(result: subprocess.CompletedProcess[str]) -> bool:
+    if result.returncode != 0:
+        return False
+    payload = f"{result.stdout}\n{result.stderr}".lower()
+    false_tokens = ("data: false", "data:false", "boolean { data: false", "boolean{data:false")
+    return not any(token in payload for token in false_tokens)
 
 
 def draw_track_marker(
@@ -183,24 +238,37 @@ def draw_track_marker(
         marker_id=marker_id,
         mode=mode,
     )
-    cmd = build_marker_command(world=world, request=request)
+
+    services = _list_gz_services(log_path)
+    candidates = marker_service_candidates(world)
+    last_error = "no marker service attempted"
 
     _append_log(log_path, f"[gazebo_track_marker] backend=gz_service world={world} mode={mode}")
-    _append_log(log_path, f"[gazebo_track_marker] command={cmd}")
+    _append_log(log_path, f"[gazebo_track_marker] marker_service_candidates={candidates}")
 
-    result = _run_cmd(cmd)
-    if result.stdout:
-        _append_log(log_path, f"[gazebo_track_marker] stdout={result.stdout.strip()}")
-    if result.stderr:
-        _append_log(log_path, f"[gazebo_track_marker] stderr={result.stderr.strip()}")
+    for service in candidates:
+        if services is not None and service not in services:
+            _append_log(log_path, f"[gazebo_track_marker] skipping unavailable marker service: {service}")
+            last_error = f"marker service not listed: {service}"
+            continue
 
-    if result.returncode != 0:
-        raise TrackMarkerError(f"marker service unavailable or failed (exit={result.returncode})")
+        cmd = build_marker_command(service=service, request=request)
+        _append_log(log_path, f"[gazebo_track_marker] marker_service={service}")
+        _append_log(log_path, f"[gazebo_track_marker] command={cmd}")
+        result = _run_cmd(cmd)
+        if result.stdout:
+            _append_log(log_path, f"[gazebo_track_marker] stdout={result.stdout.strip()}")
+        if result.stderr:
+            _append_log(log_path, f"[gazebo_track_marker] stderr={result.stderr.strip()}")
+        if _service_result_looks_successful(result):
+            _append_log(log_path, f"[gazebo_track_marker] marker service succeeded: {service}")
+            if hold_seconds > 0:
+                _append_log(log_path, f"[gazebo_track_marker] hold_seconds={hold_seconds}")
+                time.sleep(hold_seconds)
+            return 0
+        last_error = f"marker service failed: {service} exit={result.returncode}"
 
-    if hold_seconds > 0:
-        _append_log(log_path, f"[gazebo_track_marker] hold_seconds={hold_seconds}")
-        time.sleep(hold_seconds)
-    return 0
+    raise TrackMarkerError(last_error)
 
 
 def _parse_args() -> argparse.Namespace:
