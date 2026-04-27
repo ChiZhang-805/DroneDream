@@ -27,6 +27,7 @@ from app import models
 from app.config import get_settings
 from app.orchestration.events import record_event
 from app.services.pdf_report import generate_job_pdf_report
+from app.storage import get_artifact_storage
 
 logger = logging.getLogger("drone_dream.orchestration.report_generator")
 
@@ -445,6 +446,23 @@ def ensure_real_job_artifacts(
         }
         for t in job.trials
     ]
+    if not trial_summary:
+        trial_summary = [
+            {
+                "trial_id": None,
+                "candidate_id": None,
+                "scenario": None,
+                "seed": None,
+                "status": None,
+                "pass": None,
+                "rmse": None,
+                "max_error": None,
+                "score": None,
+                "completion_time": None,
+                "has_telemetry_json": False,
+                "has_reference_track_json": False,
+            }
+        ]
     comparison_payload = {
         "job_id": job.id,
         "best_candidate_id": best.id,
@@ -511,13 +529,15 @@ def ensure_real_job_artifacts(
     existing_keys = {(a.artifact_type, a.storage_path) for a in existing}
 
     created: list[models.Artifact] = []
+    storage = get_artifact_storage()
     for artifact_type, display_name, mime_type, path, payload in file_specs:
         size = (
             _write_text(path, payload)
             if isinstance(payload, str)
             else _write_json(path, payload)
         )
-        storage_path = str(path)
+        storage_key = f"jobs/{job.id}/job_artifacts/{path.name}"
+        storage_path = storage.put_file(str(path), storage_key, mime_type)
         if (artifact_type, storage_path) in existing_keys:
             continue
         artifact = models.Artifact(
@@ -551,6 +571,7 @@ def _upsert_pdf_artifact(
     *,
     job_id: str,
     pdf_path: Path,
+    storage_path: str,
 ) -> models.Artifact:
     existing = db.scalars(
         select(models.Artifact)
@@ -563,11 +584,11 @@ def _upsert_pdf_artifact(
             owner_type="job",
             owner_id=job_id,
             artifact_type="pdf_report",
-            storage_path=str(pdf_path),
+            storage_path=storage_path,
         )
         db.add(existing)
     existing.display_name = f"{job_id} report.pdf"
-    existing.storage_path = str(pdf_path)
+    existing.storage_path = storage_path
     existing.mime_type = "application/pdf"
     existing.file_size_bytes = pdf_path.stat().st_size
     return existing
@@ -581,7 +602,11 @@ def ensure_job_pdf_artifact(db: Session, *, job: models.Job) -> models.Artifact:
     )
     output_dir = root / "jobs" / job.id / "reports"
     pdf_path = generate_job_pdf_report(db=db, job=job, output_dir=output_dir)
-    return _upsert_pdf_artifact(db, job_id=job.id, pdf_path=pdf_path)
+    storage = get_artifact_storage()
+    storage_path = storage.put_file(
+        str(pdf_path), f"jobs/{job.id}/reports/{pdf_path.name}", "application/pdf"
+    )
+    return _upsert_pdf_artifact(db, job_id=job.id, pdf_path=pdf_path, storage_path=storage_path)
 
 
 # --- Top-level entrypoint -------------------------------------------------

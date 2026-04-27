@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Iterator
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.orm import Session
@@ -215,6 +216,79 @@ def test_claim_returns_none_when_no_pending(orchestration_ctx):
     with ctx["db_module"].SessionLocal() as db:
         trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(db, "test-worker")
     assert trial_id is None
+
+
+def _seed_single_pending_trial(ctx: dict[str, object]) -> str:
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        user = models.User(display_name="u")
+        db.add(user)
+        db.flush()
+        job = models.Job(
+            user_id=user.id,
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="RUNNING",
+            simulator_backend_requested="mock",
+        )
+        db.add(job)
+        db.flush()
+        cand = models.CandidateParameterSet(job_id=job.id, parameter_json={"kp_xy": 1.0})
+        db.add(cand)
+        db.flush()
+        trial = models.Trial(job_id=job.id, candidate_id=cand.id, status="PENDING")
+        db.add(trial)
+        db.commit()
+        return trial.id
+
+
+def test_pending_trial_claim_is_single_winner(orchestration_ctx):
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    with ctx["db_module"].SessionLocal() as db1:
+        claimed1 = ctx["trial_executor"].claim_and_run_one_pending_trial(db1, "worker-a")
+    with ctx["db_module"].SessionLocal() as db2:
+        claimed2 = ctx["trial_executor"].claim_and_run_one_pending_trial(db2, "worker-b")
+    assert {claimed1, claimed2} == {trial_id, None}
+
+
+def test_running_trial_reclaimed_after_lease_expiry(orchestration_ctx):
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        trial.status = "RUNNING"
+        trial.worker_id = "worker-a"
+        trial.lease_owner = "worker-a"
+        trial.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=5)
+        db.commit()
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(db, "worker-b")
+        assert claimed == trial_id
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.lease_owner is None
+        assert trial.lease_expires_at is None
+
+
+def test_unexpired_lease_blocks_second_worker(orchestration_ctx):
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        trial.lease_owner = "worker-a"
+        trial.lease_expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+        db.commit()
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(db, "worker-b")
+    assert claimed is None
 
 
 # --- Aggregation / full loop -----------------------------------------------

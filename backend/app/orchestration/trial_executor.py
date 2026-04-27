@@ -23,12 +23,13 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import UTC, datetime
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
 from app import models
+from app.config import get_settings
 from app.orchestration.events import record_event
 from app.simulator import (
     ArtifactMetadata,
@@ -79,7 +80,7 @@ logger = logging.getLogger("drone_dream.orchestration.trial")
 
 
 def _now() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def _refresh_progress_counters(db: Session, job: models.Job) -> None:
@@ -185,15 +186,31 @@ def claim_and_run_one_pending_trial(
     ``SIMULATOR_BACKEND`` environment variable.
     """
 
-    stmt = (
-        select(models.Trial)
-        .where(models.Trial.status == "PENDING")
-        .order_by(models.Trial.queued_at.asc().nullsfirst(), models.Trial.created_at.asc())
-        .limit(1)
+    now = _now()
+    lease_seconds = get_settings().worker_lease_seconds
+    lease_until = now + timedelta(seconds=lease_seconds)
+    reclaim_enabled = get_settings().worker_stale_running_reclaim_enabled
+    claimable = (
+        (models.Trial.status == "PENDING")
+        & (
+            models.Trial.lease_expires_at.is_(None)
+            | (models.Trial.lease_expires_at <= now)
+        )
     )
-    # TODO(phase5+): for multi-worker safety, claim with an UPDATE ... WHERE
-    # status='PENDING' ... RETURNING (Postgres) or a leased_until column.
-    trial = db.scalars(stmt).first()
+    stale_running = (
+        (models.Trial.status == "RUNNING")
+        & (models.Trial.lease_expires_at.is_not(None))
+        & (models.Trial.lease_expires_at <= now)
+    )
+    stmt = select(models.Trial.id)
+    stmt = stmt.where(or_(claimable, stale_running)) if reclaim_enabled else stmt.where(claimable)
+    stmt = stmt.order_by(
+        models.Trial.queued_at.asc().nullsfirst(), models.Trial.created_at.asc()
+    ).limit(1)
+    trial_id = db.scalar(stmt)
+    if trial_id is None:
+        return None
+    trial = db.get(models.Trial, trial_id)
     if trial is None:
         return None
 
@@ -211,14 +228,42 @@ def claim_and_run_one_pending_trial(
     sim = adapter or get_simulator_adapter(backend_override)
 
     # --- Claim ----------------------------------------------------------
-    now = _now()
-    trial.status = "RUNNING"
-    trial.worker_id = worker_id
-    trial.attempt_count = (trial.attempt_count or 0) + 1
-    trial.started_at = now
-    trial.simulator_backend = sim.backend_name
+    was_pending = trial.status == "PENDING"
+    expected_status = trial.status
+    expected_lease = trial.lease_expires_at
+    update_stmt = (
+        update(models.Trial)
+        .where(models.Trial.id == trial.id)
+        .where(models.Trial.status == expected_status)
+        .values(
+            status="RUNNING",
+            worker_id=worker_id,
+            lease_owner=worker_id,
+            lease_expires_at=lease_until,
+            claimed_at=now,
+            simulator_backend=sim.backend_name,
+        )
+    )
+    if expected_lease is None:
+        update_stmt = update_stmt.where(models.Trial.lease_expires_at.is_(None))
+    else:
+        update_stmt = update_stmt.where(models.Trial.lease_expires_at == expected_lease)
+    if trial.started_at is None:
+        update_stmt = update_stmt.values(started_at=now)
+    update_stmt = update_stmt.values(attempt_count=(models.Trial.attempt_count + 1))
+    claim_result = db.execute(update_stmt)
+    if claim_result.rowcount != 1:  # type: ignore[attr-defined]
+        db.rollback()
+        return None
     db.commit()
     db.refresh(trial)
+    record_event(
+        db,
+        trial.job_id,
+        "trial_reclaimed_from_stale_worker" if not was_pending else "trial_claimed",
+        {"trial_id": trial.id, "worker_id": worker_id},
+    )
+    db.commit()
 
     logger.info(
         "claimed trial %s (job=%s candidate=%s scenario=%s seed=%d backend=%s)",
@@ -271,6 +316,8 @@ def claim_and_run_one_pending_trial(
         )
         # Artifacts can still be useful for post-mortem even on failure.
         _persist_artifacts(db, trial, result.artifacts)
+        trial.lease_owner = None
+        trial.lease_expires_at = None
         db.commit()
         return trial.id
 
@@ -295,6 +342,8 @@ def claim_and_run_one_pending_trial(
 
     trial.status = "COMPLETED"
     trial.finished_at = _now()
+    trial.lease_owner = None
+    trial.lease_expires_at = None
     trial.log_excerpt = result.log_excerpt or (
         f"[{sim.backend_name}] scenario={trial.scenario_type} seed={trial.seed} "
         f"rmse={payload.rmse} score={payload.score}"
@@ -330,6 +379,8 @@ def _mark_trial_failed(
 ) -> None:
     trial.status = "FAILED"
     trial.finished_at = _now()
+    trial.lease_owner = None
+    trial.lease_expires_at = None
     trial.failure_code = code
     trial.failure_reason = reason
     if log_excerpt is not None:

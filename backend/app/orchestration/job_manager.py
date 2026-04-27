@@ -9,7 +9,7 @@ from a separate transaction.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -45,7 +45,7 @@ class AdaptiveDispatchResult:
 
 
 def _now() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def _create_baseline_candidate(db: Session, job: models.Job) -> models.CandidateParameterSet:

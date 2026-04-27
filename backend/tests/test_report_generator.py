@@ -10,7 +10,7 @@ from __future__ import annotations
 import importlib
 import json
 from collections.abc import Iterator
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -571,7 +571,7 @@ def test_generate_job_pdf_report_paginates_and_includes_all_candidates_trials(ct
         db.add(job)
         db.flush()
 
-        base_time = datetime.now(UTC)
+        base_time = datetime.now(timezone.utc)
         candidates: list[object] = []
         for idx in range(21):
             is_baseline = idx == 0

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -95,7 +96,7 @@ def _register_exception_handlers(target: FastAPI) -> None:
             content=err(
                 code="INVALID_INPUT",
                 message="Invalid request payload",
-                details=exc.errors(),
+                details=jsonable_encoder(exc.errors()),
             ),
         )
 
