@@ -937,7 +937,7 @@ def _compute_metrics(
 def _write_trajectory_json(telemetry: dict[str, Any], path: Path) -> None:
     samples = telemetry["samples"]
     simplified = [{"t": s["t"], "x": s["x"], "y": s["y"], "z": s["z"]} for s in samples]
-    _json_dump(path, {"samples": simplified})
+    _json_dump(path, {"schema_version": "dronedream.telemetry.v1", "samples": simplified})
 
 
 def _artifact_record(path: Path, artifact_type: str, display_name: str, mime_type: str) -> dict[str, Any]:
@@ -1032,6 +1032,12 @@ def _failure_result(reason: str, code: str, artifacts: list[dict[str, Any]], log
 def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
     records = [
         _artifact_record(run_dir / "telemetry.json", "telemetry_json", "Telemetry", "application/json"),
+        _artifact_record(
+            run_dir / "reference_track.json",
+            "reference_track_json",
+            "Reference Track",
+            "application/json",
+        ),
         _artifact_record(run_dir / "trajectory.json", "trajectory_json", "Trajectory Samples", "application/json"),
         _artifact_record(run_dir / "runner.log", "worker_log", "Runner Log", "text/plain"),
         _artifact_record(run_dir / "stdout.log", "simulator_stdout", "Simulator stdout", "text/plain"),
@@ -1110,6 +1116,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
         _json_dump(
             track_json,
             {
+                "schema_version": "dronedream.reference_track.v1",
                 "track_type": job_cfg["track_type"],
                 "points": reference_track,
                 "reference_track": reference_track,
@@ -1189,6 +1196,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             log(f"launcher exit code: {exit_code}")
 
         telemetry = _load_telemetry(telemetry_json, allow_csv=env.allow_csv_telemetry)
+        telemetry.setdefault("schema_version", "dronedream.telemetry.v1")
         telemetry.setdefault("meta", {})
         telemetry["meta"]["offboard_timing_path"] = str(run_dir / "offboard_timing.json")
         _write_trajectory_json(telemetry, trajectory_json)

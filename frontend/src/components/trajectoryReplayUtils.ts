@@ -46,17 +46,22 @@ export function selectReplayArtifactsForTrial(
   );
 
   const trajectory = selectBestArtifact(replayCandidates, [
+    "telemetry_json",
+    "telemetry.json",
+    "trajectory_plot",
     "trajectory.json",
     "trajectory",
     "trajectory_samples",
     "trajectory_json",
   ]);
   const telemetry = selectBestArtifact(replayCandidates, [
+    "telemetry_json",
     "telemetry.json",
     "telemetry",
-    "telemetry_json",
+    "trajectory_plot",
   ]);
   const reference = selectBestArtifact(replayCandidates, [
+    "reference_track_json",
     "reference_track.used.json",
     "reference_track",
     "reference",

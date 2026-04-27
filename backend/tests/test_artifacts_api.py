@@ -110,3 +110,25 @@ def test_download_forbidden_outside_root(client: TestClient, tmp_path: Path) -> 
 
     resp = client.get(f"/api/v1/artifacts/{art_id}/download")
     assert resp.status_code == 403
+
+
+def test_download_forbidden_path_traversal(client: TestClient, tmp_path: Path) -> None:
+    job_id = _seed_job()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret", encoding="utf-8")
+    traversed = tmp_path / "real_artifacts" / "jobs" / job_id / ".." / ".." / "outside.txt"
+    with db.SessionLocal() as session:
+        artifact = models.Artifact(
+            owner_type="job",
+            owner_id=job_id,
+            artifact_type="worker_log",
+            display_name="outside.txt",
+            storage_path=str(traversed),
+            mime_type="text/plain",
+        )
+        session.add(artifact)
+        session.commit()
+        art_id = artifact.id
+
+    resp = client.get(f"/api/v1/artifacts/{art_id}/download")
+    assert resp.status_code == 403
