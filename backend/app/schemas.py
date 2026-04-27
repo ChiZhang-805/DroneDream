@@ -30,7 +30,7 @@ TrialStatus = Literal["PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"]
 ScenarioType = Literal["nominal", "noise_perturbed", "wind_perturbed", "combined_perturbed"]
 ReportStatus = Literal["PENDING", "READY", "FAILED"]
 SimulatorBackend = Literal["mock", "real_cli"]
-OptimizerStrategy = Literal["heuristic", "gpt"]
+OptimizerStrategy = Literal["heuristic", "gpt", "cma_es"]
 OptimizationOutcome = Literal[
     "success",
     "max_iterations_reached",

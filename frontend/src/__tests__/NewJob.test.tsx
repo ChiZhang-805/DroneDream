@@ -152,6 +152,7 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
     expect(screen.getByLabelText(/Max iterations/i)).toHaveValue(20);
     expect(screen.getByLabelText(/Trials per candidate/i)).toHaveValue(3);
     expect(screen.getByLabelText(/Min pass rate/i)).toHaveValue(0.8);
+    expect(screen.getByRole("option", { name: "cma_es" })).toBeInTheDocument();
   });
 
   it("shows the OpenAI API key field only when strategy is gpt", () => {

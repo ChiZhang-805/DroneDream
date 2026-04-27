@@ -188,6 +188,37 @@ def test_heuristic_mode_still_finalizes_and_purges_secrets(gpt_ctx):
         assert all(s.deleted_at is not None for s in job.secrets)
 
 
+def test_cma_es_loop_runs_baseline_then_dispatches_next_generation(gpt_ctx):
+    ctx = gpt_ctx
+    job_id = _create_job(ctx, strategy="cma_es", target_rmse=0.01, max_iterations=2)
+    status = _drive(ctx, job_id, client=None, max_ticks=80)
+    assert status == "COMPLETED"
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.current_generation >= 1
+        baseline = next(c for c in job.candidates if c.is_baseline)
+        optimizer_candidates = [
+            c for c in job.candidates if c.source_type == "optimizer" and not c.is_baseline
+        ]
+        assert baseline.generation_index == 0
+        assert len(optimizer_candidates) >= 1
+        assert all(c.label.startswith("cma_es_gen_") for c in optimizer_candidates)
+        event_types = [e.event_type for e in job.events]
+        assert "generation_dispatched" in event_types
+
+
+def test_cma_es_max_iterations_reached_yields_best_so_far(gpt_ctx):
+    ctx = gpt_ctx
+    job_id = _create_job(ctx, strategy="cma_es", target_rmse=0.001, max_iterations=1)
+    status = _drive(ctx, job_id, client=None, max_ticks=80)
+    assert status == "COMPLETED"
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.current_generation == 1
+        assert job.optimization_outcome == "max_iterations_reached"
+        assert job.report is not None
+
+
 def test_acceptance_evaluator_checks_thresholds(gpt_ctx):
     ctx = gpt_ctx
     models_mod = ctx["models"]

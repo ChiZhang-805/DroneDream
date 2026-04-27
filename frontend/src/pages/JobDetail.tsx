@@ -26,6 +26,9 @@ const ACTIVE_POLL_INTERVAL_MS = 4000;
 
 function CandidateCell({ t }: { t: TrialSummary }) {
   const label = t.candidate_label ?? (t.candidate_is_baseline ? "baseline" : "—");
+  const isCmaEsOptimizer =
+    t.candidate_source_type === "optimizer" &&
+    (t.candidate_label ?? "").toLowerCase().startsWith("cma_es_gen_");
   // Phase 8: "llm_optimizer" rows must render as GPT Gen N, not collapse into
   // "Baseline". Tone classes fall through to "optimizer" for the LLM variant
   // so the existing CSS (orange/heuristic) still applies.
@@ -40,7 +43,9 @@ function CandidateCell({ t }: { t: TrialSummary }) {
   const tagText =
     tone === "baseline"
       ? "Baseline"
-      : tone === "optimizer"
+      : tone === "optimizer" && isCmaEsOptimizer
+        ? `CMA-ES Gen ${t.candidate_generation_index}`
+        : tone === "optimizer"
         ? `Heuristic #${t.candidate_generation_index}`
         : `GPT Gen ${t.candidate_generation_index}`;
   return (

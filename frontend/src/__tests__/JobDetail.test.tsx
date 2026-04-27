@@ -212,6 +212,34 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     expect(screen.queryByText(/Baseline$/)).toBeNull();
   });
 
+  it("labels cma_es optimizer rows as 'CMA-ES Gen N'", async () => {
+    const job = makeJob({ status: "COMPLETED", optimizer_strategy: "cma_es" });
+    const trials: TrialSummary[] = [
+      {
+        id: "tri_cma_1",
+        candidate_id: "cand_cma_1",
+        seed: 21,
+        scenario_type: "nominal",
+        status: "COMPLETED",
+        score: 0.7,
+        pass_flag: true,
+        candidate_label: "cma_es_gen_2",
+        candidate_source_type: "optimizer",
+        candidate_is_baseline: false,
+        candidate_is_best: false,
+        candidate_generation_index: 2,
+      },
+    ];
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue(trials);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByText(/CMA-ES Gen 2/)).toBeInTheDocument();
+  });
+
   it("renders a PASS/FAIL badge per completed trial based on pass_flag", async () => {
     const job = makeJob({ status: "COMPLETED" });
     const trials: TrialSummary[] = [

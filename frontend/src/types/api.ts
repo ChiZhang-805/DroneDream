@@ -195,10 +195,11 @@ export type CandidateSourceType = "baseline" | "optimizer" | "llm_optimizer";
 export type SimulatorBackend = "mock" | "real_cli";
 export const SIMULATOR_BACKENDS: readonly SimulatorBackend[] = ["mock", "real_cli"];
 
-export type OptimizerStrategy = "heuristic" | "gpt";
+export type OptimizerStrategy = "heuristic" | "gpt" | "cma_es";
 export const OPTIMIZER_STRATEGIES: readonly OptimizerStrategy[] = [
   "heuristic",
   "gpt",
+  "cma_es",
 ];
 
 export type OptimizationOutcome =
