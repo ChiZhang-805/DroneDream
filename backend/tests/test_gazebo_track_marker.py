@@ -89,7 +89,9 @@ def test_build_marker_command_accepts_world_or_service():
     assert "--req" in service_command
 
 
-def test_draw_track_marker_falls_back_to_global_marker_service(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_draw_track_marker_falls_back_to_global_marker_service(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
     track = _write_track(tmp_path / "track.json", {"points": [{"x": 0, "y": 0, "z": 3}]})
     log = tmp_path / "marker.log"
 
@@ -97,7 +99,12 @@ def test_draw_track_marker_falls_back_to_global_marker_service(monkeypatch: pyte
 
     def _fake_run(argv: list[str]) -> subprocess.CompletedProcess[str]:
         if argv == ["gz", "service", "-l"]:
-            return subprocess.CompletedProcess(argv, 0, stdout="/marker\n/marker/list\n/marker_array\n", stderr="")
+            return subprocess.CompletedProcess(
+                argv,
+                0,
+                stdout="/marker\n/marker/list\n/marker_array\n",
+                stderr="",
+            )
         assert "/marker" in argv
         return subprocess.CompletedProcess(argv, 0, stdout="data: true", stderr="")
 
@@ -149,13 +156,20 @@ def test_draw_track_marker_uses_override(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert called_services == ["/marker"]
 
 
-def test_draw_track_marker_failure_when_all_services_fail(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_draw_track_marker_failure_when_all_services_fail(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
     track = _write_track(tmp_path / "track.json", {"points": [{"x": 0, "y": 0, "z": 3}]})
     monkeypatch.setattr(marker.shutil, "which", lambda _: "/usr/bin/gz")
 
     def _fail(argv: list[str]) -> subprocess.CompletedProcess[str]:
         if argv == ["gz", "service", "-l"]:
-            return subprocess.CompletedProcess(argv, 0, stdout="/world/default/marker\n/marker\n", stderr="")
+            return subprocess.CompletedProcess(
+                argv,
+                0,
+                stdout="/world/default/marker\n/marker\n",
+                stderr="",
+            )
         return subprocess.CompletedProcess(argv, 9, stdout="data: false", stderr="boom")
 
     monkeypatch.setattr(marker, "_run_cmd", _fail)
