@@ -598,6 +598,11 @@ def _write_launch_config(
             os.environ.get("PX4_GAZEBO_LAUNCH_GUI_CLIENT"), default=DEFAULT_LAUNCH_GUI_CLIENT
         ),
         "gui_command": gui_command,
+        "PX4_GAZEBO_RAW_GUI_COMMAND": os.environ.get("PX4_GAZEBO_RAW_GUI_COMMAND", "").strip(),
+        "PX4_GAZEBO_GUI_WINDOW_MODE": os.environ.get("PX4_GAZEBO_GUI_WINDOW_MODE", "").strip(),
+        "PX4_GAZEBO_GUI_WINDOW_GEOMETRY": os.environ.get("PX4_GAZEBO_GUI_WINDOW_GEOMETRY", "").strip(),
+        "PX4_GAZEBO_GUI_WINDOW_WIDTH": os.environ.get("PX4_GAZEBO_GUI_WINDOW_WIDTH", "").strip(),
+        "PX4_GAZEBO_GUI_WINDOW_HEIGHT": os.environ.get("PX4_GAZEBO_GUI_WINDOW_HEIGHT", "").strip(),
         "gui_require_client": _parse_bool(
             os.environ.get("PX4_GAZEBO_REQUIRE_GUI_CLIENT"), default=DEFAULT_REQUIRE_GUI_CLIENT
         ),
