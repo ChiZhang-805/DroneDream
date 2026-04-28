@@ -132,6 +132,57 @@ def test_create_job_accepts_and_persists_custom_reference_track(client: TestClie
     assert fetched.json()["data"]["reference_track"] == data["reference_track"]
 
 
+def test_create_job_accepts_advanced_scenario_config(client: TestClient) -> None:
+    payload = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "advanced_scenario_config": {
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 2.5,
+                "direction_deg": 45,
+                "period_s": 8,
+            },
+            "sensor_degradation": {
+                "gps_noise_m": 1.0,
+                "baro_noise_m": 0.5,
+                "imu_noise_scale": 1.2,
+                "dropout_rate": 0.2,
+            },
+            "battery": {"initial_percent": 70, "voltage_sag": True},
+            "obstacles": [{"type": "cylinder", "x": 1, "y": 2, "z": 0, "radius": 0.5, "height": 2}],
+        },
+    }
+    resp = client.post("/api/v1/jobs", json=payload)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["advanced_scenario_config"]["battery"]["initial_percent"] == 70
+
+
+def test_create_job_rejects_invalid_advanced_dropout_rate(client: TestClient) -> None:
+    payload = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "advanced_scenario_config": {
+            "sensor_degradation": {
+                "gps_noise_m": 0.0,
+                "baro_noise_m": 0.0,
+                "imu_noise_scale": 1.0,
+                "dropout_rate": 1.5,
+            }
+        },
+    }
+    resp = client.post("/api/v1/jobs", json=payload)
+    assert resp.status_code == 422
+
+
+def test_create_job_rejects_invalid_battery_percent(client: TestClient) -> None:
+    payload = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "advanced_scenario_config": {"battery": {"initial_percent": 120, "voltage_sag": False}},
+    }
+    resp = client.post("/api/v1/jobs", json=payload)
+    assert resp.status_code == 422
+
+
 @pytest.mark.parametrize("track_type", ["circle", "u_turn", "lemniscate"])
 def test_non_custom_track_creation_unchanged(client: TestClient, track_type: str) -> None:
     payload = {**HEURISTIC_JOB_PAYLOAD, "track_type": track_type}
@@ -240,6 +291,47 @@ def test_rerun_not_found(client: TestClient) -> None:
     resp = client.post("/api/v1/jobs/job_missing/rerun")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "JOB_NOT_FOUND"
+
+
+def test_compare_jobs_returns_completed_metrics(client: TestClient) -> None:
+    from app import models
+    from app.db import SessionLocal
+
+    job_a = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+    job_b = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+    with SessionLocal() as db:
+        for job_id in (job_a, job_b):
+            job = db.get(models.Job, job_id)
+            assert job is not None
+            job.status = "COMPLETED"
+            job.report = models.JobReport(
+                job_id=job.id,
+                report_status="READY",
+                baseline_metric_json={"rmse": 1.0},
+                optimized_metric_json={"rmse": 0.8},
+            )
+        db.commit()
+    resp = client.post("/api/v1/jobs/compare", json={"job_ids": [job_a, job_b]})
+    assert resp.status_code == 200, resp.text
+    items = resp.json()["data"]["items"]
+    assert len(items) == 2
+    assert items[0]["optimized_metrics"]["rmse"] == 0.8
+
+
+def test_compare_jobs_active_job_metrics_are_null(client: TestClient) -> None:
+    job_a = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+    job_b = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+    resp = client.post("/api/v1/jobs/compare", json={"job_ids": [job_a, job_b]})
+    assert resp.status_code == 200
+    for item in resp.json()["data"]["items"]:
+        assert item["baseline_metrics"] is None
+        assert item["optimized_metrics"] is None
+
+
+def test_compare_jobs_unknown_job_returns_404(client: TestClient) -> None:
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+    resp = client.post("/api/v1/jobs/compare", json={"job_ids": [job, "job_missing"]})
+    assert resp.status_code == 404
 
 
 def test_rerun_gpt_requires_fresh_openai_api_key(

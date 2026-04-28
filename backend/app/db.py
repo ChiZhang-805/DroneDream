@@ -47,6 +47,12 @@ def _apply_sqlite_lightweight_migrations() -> None:
     if not settings.database_url.startswith("sqlite"):
         return
     with engine.begin() as conn:
+        job_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info('jobs')")).fetchall()
+        }
+        if "advanced_scenario_config_json" not in job_columns:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN advanced_scenario_config_json JSON"))
         columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()

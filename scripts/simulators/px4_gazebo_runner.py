@@ -267,13 +267,19 @@ def _validate_trial_input(payload: dict[str, Any]) -> tuple[dict[str, Any], dict
         if not math.isfinite(params[key]):
             raise RunnerError(f"parameters.{key} must be finite")
 
+    scenario_config = payload.get("scenario_config") if isinstance(payload.get("scenario_config"), dict) else {}
+    advanced = payload.get("advanced_scenario_config")
+    if not isinstance(advanced, dict):
+        nested_advanced = scenario_config.get("advanced_scenario_config")
+        advanced = nested_advanced if isinstance(nested_advanced, dict) else {}
     meta = {
         "trial_id": str(payload["trial_id"]),
         "job_id": str(payload["job_id"]),
         "candidate_id": str(payload["candidate_id"]),
         "seed": int(payload["seed"]),
         "scenario_type": str(payload["scenario_type"]),
-        "scenario_config": payload.get("scenario_config") if isinstance(payload.get("scenario_config"), dict) else {},
+        "scenario_config": scenario_config,
+        "advanced_scenario_config": advanced,
     }
     return normalized_job_cfg, params, meta
 
@@ -725,6 +731,7 @@ def _compute_metrics(
     *,
     timeout_flag: bool,
     dry_run: bool,
+    advanced_scenario_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     samples = telemetry["samples"]
     target_altitude = float(reference_track[0]["z"])
@@ -880,6 +887,8 @@ def _compute_metrics(
         penalty += 20.0
     score = rmse + (0.5 * max_error) + (0.05 * completion_time) + penalty
 
+    advanced = dict(advanced_scenario_config or {})
+    sensor_deg = advanced.get("sensor_degradation") if isinstance(advanced.get("sensor_degradation"), dict) else {}
     return {
         "rmse": round(rmse, 6),
         "max_error": round(max_error, 6),
@@ -930,6 +939,19 @@ def _compute_metrics(
             "mode": "dry_run" if dry_run else "real",
             "vehicle": env.vehicle,
             "world": env.world,
+            "advanced_scenario_summary": {
+                "enabled": bool(advanced),
+                "obstacle_count": len(advanced.get("obstacles", []))
+                if isinstance(advanced.get("obstacles"), list)
+                else 0,
+                "dropout_rate": float(sensor_deg.get("dropout_rate", 0.0))
+                if sensor_deg
+                else 0.0,
+                "wind_gust_enabled": bool(
+                    isinstance(advanced.get("wind_gusts"), dict)
+                    and advanced.get("wind_gusts", {}).get("enabled")
+                ),
+            },
         },
     }
 
@@ -1171,6 +1193,17 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 "headless": "true" if env.headless else "false",
                 "extra_args": env.extra_args,
             }
+            _json_dump(
+                run_dir / "launch_config.json",
+                {
+                    "vehicle": env.vehicle,
+                    "world": env.world,
+                    "headless": env.headless,
+                    "extra_args": env.extra_args,
+                    "scenario_type": meta["scenario_type"],
+                    "advanced_scenario_config": meta.get("advanced_scenario_config", {}),
+                },
+            )
             argv = _build_launch_argv(env.launch_command, values)
             cwd = Path(env.workdir) if env.workdir else run_dir
             log(f"launch argv: {argv}")
@@ -1208,6 +1241,11 @@ def run_once(input_path: Path, output_path: Path) -> int:
             env,
             timeout_flag=timeout_flag,
             dry_run=env.dry_run,
+            advanced_scenario_config=(
+                meta.get("advanced_scenario_config")
+                if isinstance(meta.get("advanced_scenario_config"), dict)
+                else {}
+            ),
         )
 
         result = {

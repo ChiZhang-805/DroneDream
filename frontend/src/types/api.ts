@@ -81,6 +81,43 @@ export interface TrackPoint {
   z?: number | null;
 }
 
+export interface ScenarioWindGusts {
+  enabled: boolean;
+  magnitude_mps: number;
+  direction_deg: number;
+  period_s: number;
+}
+
+export interface ScenarioObstacle {
+  type: "cylinder" | "box";
+  x: number;
+  y: number;
+  z: number;
+  radius?: number | null;
+  size?: number[] | null;
+  height: number;
+}
+
+export interface ScenarioSensorDegradation {
+  gps_noise_m: number;
+  baro_noise_m: number;
+  imu_noise_scale: number;
+  dropout_rate: number;
+}
+
+export interface ScenarioBattery {
+  initial_percent: number;
+  voltage_sag: boolean;
+  mass_payload_kg?: number | null;
+}
+
+export interface ScenarioAdvancedConfig {
+  wind_gusts?: ScenarioWindGusts | null;
+  obstacles?: ScenarioObstacle[];
+  sensor_degradation?: ScenarioSensorDegradation | null;
+  battery?: ScenarioBattery | null;
+}
+
 export interface JobProgress {
   completed_trials: number;
   total_trials: number;
@@ -125,6 +162,7 @@ export interface JobCreateRequest {
   wind: WindVector;
   sensor_noise_level: SensorNoiseLevel;
   objective_profile: ObjectiveProfile;
+  advanced_scenario_config?: ScenarioAdvancedConfig | null;
   // Phase 8 optional execution-backend & auto-tuning fields. Omitting them
   // preserves the Phase 7 mock + heuristic behaviour.
   simulator_backend?: SimulatorBackend;
@@ -148,6 +186,7 @@ export interface Job {
   wind: WindVector;
   sensor_noise_level: SensorNoiseLevel;
   objective_profile: ObjectiveProfile;
+  advanced_scenario_config?: ScenarioAdvancedConfig | null;
   status: JobStatus;
   progress: JobProgress;
   baseline_candidate_id: string | null;
@@ -294,6 +333,32 @@ export interface PaginatedJobs {
   page: number;
   page_size: number;
   total: number;
+}
+
+export interface JobsCompareRequest {
+  job_ids: string[];
+}
+
+export interface JobCompareItem {
+  job_id: string;
+  status: JobStatus;
+  track_type: TrackType;
+  simulator_backend: SimulatorBackend;
+  optimizer_strategy: OptimizerStrategy;
+  optimization_outcome: OptimizationOutcome | null;
+  baseline_metrics: Record<string, unknown> | null;
+  optimized_metrics: Record<string, unknown> | null;
+  best_candidate_id: string | null;
+  best_parameters: Record<string, unknown>;
+  trial_count: number;
+  completed_trial_count: number;
+  failed_trial_count: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface JobsCompareResponse {
+  items: JobCompareItem[];
 }
 
 // Standard API envelope (mirrors docs/04_API_SPEC.md §4). Exposed here so the

@@ -43,6 +43,15 @@ interface FormState {
   min_pass_rate: string;
   openai_api_key: string;
   openai_model: string;
+  advanced_enabled: boolean;
+  gust_enabled: boolean;
+  gust_magnitude_mps: string;
+  gust_direction_deg: string;
+  gust_period_s: string;
+  gps_noise_m: string;
+  dropout_rate: string;
+  battery_initial_percent: string;
+  obstacles_json: string;
 }
 
 const DEFAULTS: FormState = {
@@ -66,6 +75,15 @@ const DEFAULTS: FormState = {
   min_pass_rate: "0.8",
   openai_api_key: "",
   openai_model: "",
+  advanced_enabled: false,
+  gust_enabled: false,
+  gust_magnitude_mps: "0",
+  gust_direction_deg: "0",
+  gust_period_s: "10",
+  gps_noise_m: "0",
+  dropout_rate: "0",
+  battery_initial_percent: "100",
+  obstacles_json: "[]",
 };
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
@@ -206,6 +224,30 @@ function validate(form: FormState): FieldErrors {
   ) {
     errors.openai_api_key = "API key required when strategy is gpt";
   }
+  if (form.advanced_enabled) {
+    const dropout = parseNumber(form.dropout_rate);
+    if (dropout === null || dropout < 0 || dropout > 1) {
+      errors.dropout_rate = "Must be between 0 and 1";
+    }
+    const battery = parseNumber(form.battery_initial_percent);
+    if (battery === null || battery < 0 || battery > 100) {
+      errors.battery_initial_percent = "Must be between 0 and 100";
+    }
+    if (form.gust_enabled) {
+      const magnitude = parseNumber(form.gust_magnitude_mps);
+      const direction = parseNumber(form.gust_direction_deg);
+      const period = parseNumber(form.gust_period_s);
+      if (magnitude === null || magnitude < 0) errors.gust_magnitude_mps = "Must be >= 0";
+      if (direction === null || direction < 0 || direction > 360) errors.gust_direction_deg = "Must be 0-360";
+      if (period === null || period <= 0) errors.gust_period_s = "Must be > 0";
+    }
+    try {
+      const parsed = JSON.parse(form.obstacles_json);
+      if (!Array.isArray(parsed)) errors.obstacles_json = "Must be JSON array";
+    } catch {
+      errors.obstacles_json = "Must be valid JSON array";
+    }
+  }
 
   return errors;
 }
@@ -248,6 +290,28 @@ function formToRequest(form: FormState): JobCreateRequest {
       model: form.openai_model.trim() === "" ? null : form.openai_model.trim(),
     };
   }
+  if (form.advanced_enabled) {
+    const obstacles = JSON.parse(form.obstacles_json) as unknown[];
+    req.advanced_scenario_config = {
+      wind_gusts: {
+        enabled: form.gust_enabled,
+        magnitude_mps: Number(form.gust_magnitude_mps),
+        direction_deg: Number(form.gust_direction_deg),
+        period_s: Number(form.gust_period_s),
+      },
+      obstacles: obstacles as [],
+      sensor_degradation: {
+        gps_noise_m: Number(form.gps_noise_m),
+        baro_noise_m: 0,
+        imu_noise_scale: 1,
+        dropout_rate: Number(form.dropout_rate),
+      },
+      battery: {
+        initial_percent: Number(form.battery_initial_percent),
+        voltage_sag: false,
+      },
+    };
+  }
   return req;
 }
 
@@ -257,6 +321,7 @@ export function NewJob() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showAdvancedScenario, setShowAdvancedScenario] = useState(false);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -402,6 +467,45 @@ export function NewJob() {
               </Field>
             ) : null}
           </div>
+        </SectionCard>
+        <SectionCard
+          title="Advanced scenario"
+          description="Optional extended PX4/Gazebo scenario parameters."
+        >
+          <button type="button" className="btn btn-ghost" onClick={() => setShowAdvancedScenario((v) => !v)}>
+            {showAdvancedScenario ? "Hide" : "Show"} Advanced scenario
+          </button>
+          {showAdvancedScenario ? (
+            <div className="form-grid">
+              <Field label="Enable advanced scenario" htmlFor="advanced_enabled">
+                <input id="advanced_enabled" type="checkbox" checked={form.advanced_enabled} onChange={(e) => update("advanced_enabled", e.target.checked)} />
+              </Field>
+              <Field label="Enable gust" htmlFor="gust_enabled">
+                <input id="gust_enabled" type="checkbox" checked={form.gust_enabled} onChange={(e) => update("gust_enabled", e.target.checked)} />
+              </Field>
+              <Field label="Gust magnitude (m/s)" htmlFor="gust_magnitude_mps" error={errors.gust_magnitude_mps}>
+                <input id="gust_magnitude_mps" type="number" step="0.1" value={form.gust_magnitude_mps} onChange={handleTextChange("gust_magnitude_mps")} />
+              </Field>
+              <Field label="Gust direction (deg)" htmlFor="gust_direction_deg" error={errors.gust_direction_deg}>
+                <input id="gust_direction_deg" type="number" step="0.1" value={form.gust_direction_deg} onChange={handleTextChange("gust_direction_deg")} />
+              </Field>
+              <Field label="Gust period (s)" htmlFor="gust_period_s" error={errors.gust_period_s}>
+                <input id="gust_period_s" type="number" step="0.1" value={form.gust_period_s} onChange={handleTextChange("gust_period_s")} />
+              </Field>
+              <Field label="GPS noise (m)" htmlFor="gps_noise_m">
+                <input id="gps_noise_m" type="number" step="0.1" value={form.gps_noise_m} onChange={handleTextChange("gps_noise_m")} />
+              </Field>
+              <Field label="Dropout rate" htmlFor="dropout_rate" error={errors.dropout_rate}>
+                <input id="dropout_rate" type="number" step="0.01" value={form.dropout_rate} onChange={handleTextChange("dropout_rate")} />
+              </Field>
+              <Field label="Battery initial percent" htmlFor="battery_initial_percent" error={errors.battery_initial_percent}>
+                <input id="battery_initial_percent" type="number" step="0.1" value={form.battery_initial_percent} onChange={handleTextChange("battery_initial_percent")} />
+              </Field>
+              <Field label="Obstacles JSON" htmlFor="obstacles_json" error={errors.obstacles_json}>
+                <textarea id="obstacles_json" rows={5} value={form.obstacles_json} onChange={(e) => update("obstacles_json", e.target.value)} />
+              </Field>
+            </div>
+          ) : null}
         </SectionCard>
 
         <SectionCard

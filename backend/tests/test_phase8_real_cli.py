@@ -147,6 +147,24 @@ def test_trial_input_payload_includes_custom_reference_track() -> None:
     assert len(payload["reference_track"]) == 2
 
 
+def test_trial_input_payload_includes_advanced_scenario_config() -> None:
+    ctx = _ctx(
+        scenario_config={
+            "scenario": "nominal",
+            "advanced_scenario_config": {
+                "wind_gusts": {
+                    "enabled": True,
+                    "magnitude_mps": 1.2,
+                    "direction_deg": 90,
+                    "period_s": 5,
+                },
+            },
+        }
+    )
+    payload = _trial_input_payload(ctx, Path("/tmp/out.json"))
+    assert payload["advanced_scenario_config"]["wind_gusts"]["enabled"] is True
+
+
 def test_real_cli_maps_timeout(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "REAL_SIMULATOR_COMMAND",

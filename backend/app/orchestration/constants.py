@@ -94,6 +94,15 @@ def optimizer_scenario_config(
     }
 
 
+def with_advanced_scenario(
+    scenario_config: dict[str, Any],
+    advanced_scenario_config: dict[str, Any] | None,
+) -> dict[str, Any]:
+    payload = dict(scenario_config)
+    payload["advanced_scenario_config"] = dict(advanced_scenario_config or {})
+    return payload
+
+
 def optimizer_seed_for(candidate_index: int, scenario: str) -> int:
     """Deterministic seed for one optimizer trial.
 

@@ -143,11 +143,31 @@ class MockSimulatorAdapter(SimulatorAdapter):
         wind_penalty = 0.0
         if ctx.scenario_type in {"wind_perturbed", "combined_perturbed"}:
             wind_penalty = wind_mag * 0.01
+        scenario_cfg = dict(ctx.scenario_config or {})
+        advanced = scenario_cfg.get("advanced_scenario_config")
+        advanced_cfg = advanced if isinstance(advanced, dict) else {}
+        gusts = advanced_cfg.get("wind_gusts")
+        gust_penalty = 0.0
+        if isinstance(gusts, dict) and bool(gusts.get("enabled", False)):
+            try:
+                gust_penalty = max(0.0, float(gusts.get("magnitude_mps", 0.0)) * 0.015)
+            except (TypeError, ValueError):
+                gust_penalty = 0.0
+        sensor_degradation = advanced_cfg.get("sensor_degradation")
+        dropout_rate = 0.0
+        if isinstance(sensor_degradation, dict):
+            try:
+                dropout_rate = _clamp(float(sensor_degradation.get("dropout_rate", 0.0)), 0.0, 1.0)
+            except (TypeError, ValueError):
+                dropout_rate = 0.0
 
         rng = random.Random(ctx.seed * 31 + sum(ord(c) for c in ctx.scenario_type))
         jitter = rng.uniform(-0.04, 0.04)
 
-        rmse = max(0.05, base_err * scenario_factor * noise_factor + wind_penalty + jitter)
+        rmse = max(
+            0.05,
+            base_err * scenario_factor * noise_factor + wind_penalty + gust_penalty + jitter,
+        )
         max_error = rmse * 2.1 + rng.uniform(0.0, 0.15)
         overshoot_count = max(0, int(rmse * 3.0))
         completion_time = 12.0 + rng.uniform(-0.4, 0.6)
@@ -156,7 +176,7 @@ class MockSimulatorAdapter(SimulatorAdapter):
 
         crash_flag = False
         timeout_flag = False
-        instability_flag = rmse > 1.1
+        instability_flag = rmse > 1.1 or (dropout_rate >= 0.5 and (ctx.seed % 2 == 0))
         pass_flag = (not instability_flag) and (not crash_flag) and (not timeout_flag)
 
         raw: dict[str, Any] = {
@@ -173,6 +193,16 @@ class MockSimulatorAdapter(SimulatorAdapter):
             "scenario_factor": scenario_factor,
             "noise_factor": noise_factor,
             "wind_penalty": round(wind_penalty, 4),
+            "gust_penalty": round(gust_penalty, 4),
+            "dropout_rate": round(dropout_rate, 4),
+            "advanced_scenario_summary": {
+                "has_advanced": bool(advanced_cfg),
+                "gust_enabled": bool(isinstance(gusts, dict) and gusts.get("enabled")),
+                "obstacle_count": len(advanced_cfg.get("obstacles", []))
+                if isinstance(advanced_cfg.get("obstacles"), list)
+                else 0,
+                "dropout_rate": round(dropout_rate, 4),
+            },
             "backend": self.backend_name,
             "track_type": ctx.job_config.track_type,
             "reference_track_point_count": len(ctx.job_config.reference_track or []),

@@ -70,6 +70,9 @@ class Job(Base):
     sensor_noise_level: Mapped[str] = mapped_column(String(16), nullable=False)
     objective_profile: Mapped[str] = mapped_column(String(16), nullable=False)
     reference_track_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    advanced_scenario_config_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
 
     # State.
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="CREATED", index=True)

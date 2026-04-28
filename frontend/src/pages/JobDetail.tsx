@@ -448,6 +448,9 @@ function JobHeader({
 
 function JobSummaryCard({ job }: { job: Job }) {
   const customPreview = (job.reference_track ?? []).slice(0, 5);
+  const advanced = job.advanced_scenario_config;
+  const obstacleCount = advanced?.obstacles?.length ?? 0;
+  const dropout = advanced?.sensor_degradation?.dropout_rate;
   return (
     <SectionCard title="Job summary">
       <ul className="kv-list">
@@ -489,6 +492,14 @@ function JobSummaryCard({ job }: { job: Job }) {
           <span className="kv-value">
             {job.wind.north} / {job.wind.east} / {job.wind.south} /{" "}
             {job.wind.west}
+          </span>
+        </li>
+        <li>
+          <span className="kv-key">Advanced scenario</span>
+          <span className="kv-value">
+            {advanced
+              ? `enabled · obstacles=${obstacleCount} · dropout=${dropout ?? 0}`
+              : "disabled"}
           </span>
         </li>
       </ul>

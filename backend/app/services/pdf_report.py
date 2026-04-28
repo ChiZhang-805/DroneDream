@@ -218,6 +218,24 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(wind_text)
     add(f"- Sensor noise level: {job.sensor_noise_level}")
     add(f"- Objective profile: {job.objective_profile}")
+    advanced: dict[str, Any] = dict(job.advanced_scenario_config_json or {})
+    add(f"- Advanced scenario enabled: {'yes' if bool(advanced) else 'no'}")
+    if advanced:
+        gust_raw = advanced.get("wind_gusts")
+        sensor_raw = advanced.get("sensor_degradation")
+        battery_raw = advanced.get("battery")
+        obstacles_raw = advanced.get("obstacles")
+        gust: dict[str, Any] = gust_raw if isinstance(gust_raw, dict) else {}
+        sensor_deg: dict[str, Any] = sensor_raw if isinstance(sensor_raw, dict) else {}
+        battery: dict[str, Any] = battery_raw if isinstance(battery_raw, dict) else {}
+        obstacles: list[Any] = obstacles_raw if isinstance(obstacles_raw, list) else []
+        add(
+            "- Advanced summary: "
+            f"gust_enabled={bool(gust.get('enabled', False))}, "
+            f"obstacles={len(obstacles)}, "
+            f"dropout_rate={_fmt_num(sensor_deg.get('dropout_rate'), digits=3)}, "
+            f"battery_initial={_fmt_num(battery.get('initial_percent'), digits=1)}"
+        )
     add(f"- target_rmse: {_fmt_num(job.target_rmse, digits=3)}")
     add(f"- target_max_error: {_fmt_num(job.target_max_error, digits=3)}")
     add(f"- min_pass_rate: {_fmt_num(job.min_pass_rate, digits=3)}")

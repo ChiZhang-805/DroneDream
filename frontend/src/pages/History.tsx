@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { apiClient, ApiClientError } from "../api/client";
@@ -11,8 +11,8 @@ import {
 } from "../types/api";
 import { SectionCard } from "../components/SectionCard";
 import { StatusBadge } from "../components/StatusBadge";
-import { DataTable, type Column } from "../components/DataTable";
-import { Loading, Empty, ErrorState } from "../components/States";
+import { type Column } from "../components/DataTable";
+import { Loading, ErrorState } from "../components/States";
 import { formatDateTime } from "../utils/format";
 
 const COLUMNS: Column<Job>[] = [
@@ -55,11 +55,13 @@ const COLUMNS: Column<Job>[] = [
 ];
 
 export function History() {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
   const [trackFilter, setTrackFilter] = useState<TrackType | "ALL">("ALL");
   const [objectiveFilter, setObjectiveFilter] = useState<
     ObjectiveProfile | "ALL"
   >("ALL");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const query = useQuery({
     queryKey: ["jobs", "history"],
@@ -75,6 +77,7 @@ export function History() {
         (objectiveFilter === "ALL" || j.objective_profile === objectiveFilter),
     );
   }, [allJobs, statusFilter, trackFilter, objectiveFilter]);
+  const canCompare = selectedIds.length >= 2 && selectedIds.length <= 10;
 
   return (
     <section className="stack-md">
@@ -161,6 +164,18 @@ export function History() {
       </SectionCard>
 
       <SectionCard title="Jobs">
+        <div style={{ marginBottom: 12 }}>
+          <button
+            type="button"
+            className="btn"
+            disabled={!canCompare}
+            onClick={() =>
+              navigate(`/compare?job_ids=${encodeURIComponent(selectedIds.join(","))}`)
+            }
+          >
+            Compare selected ({selectedIds.length})
+          </button>
+        </div>
         {query.isLoading ? (
           <Loading label="Loading jobs…" />
         ) : query.isError ? (
@@ -181,32 +196,37 @@ export function History() {
             }
           />
         ) : (
-          <DataTable
-            columns={COLUMNS}
-            rows={filtered}
-            rowKey={(j) => j.id}
-            emptyState={
-              <Empty
-                title={
-                  allJobs.length === 0
-                    ? "No jobs yet"
-                    : "No jobs match the filters"
-                }
-                description={
-                  allJobs.length === 0
-                    ? "Create your first optimization job from New Job."
-                    : "Try clearing some filters to broaden the results."
-                }
-                action={
-                  allJobs.length === 0 ? (
-                    <Link to="/jobs/new" className="btn btn-primary">
-                      + New Job
-                    </Link>
-                  ) : undefined
-                }
-              />
-            }
-          />
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Select</th>
+                {COLUMNS.map((c) => <th key={String(c.key)}>{c.header}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((j) => (
+                <tr key={j.id}>
+                  <td>
+                    <input
+                      aria-label={`select-${j.id}`}
+                      type="checkbox"
+                      checked={selectedIds.includes(j.id)}
+                      onChange={(e) =>
+                        setSelectedIds((prev) =>
+                          e.target.checked
+                            ? [...prev, j.id].slice(0, 10)
+                            : prev.filter((id) => id !== j.id),
+                        )
+                      }
+                    />
+                  </td>
+                  {COLUMNS.map((c) => (
+                    <td key={String(c.key)}>{c.render(j)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </SectionCard>
     </section>
