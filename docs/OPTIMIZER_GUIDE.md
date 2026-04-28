@@ -2,24 +2,32 @@
 
 ## Supported strategies
 
-- `heuristic`: built-in deterministic search.
-- `gpt`: LLM proposes next candidates.
-- `cma_es`: CMA-ES optimizer (`backend/app/orchestration/cma_es_optimizer.py`).
+- `heuristic`: built-in baseline iterative search.
+- `gpt`: LLM-assisted proposal loop.
+- `cma_es`: evolutionary optimizer.
 
-## Safe ranges
+## Request fields (job create)
 
-Input-level safety validation is enforced via request schemas (e.g. altitude, wind, pass-rate limits). Optimizer proposals are constrained by backend-side acceptance checks before use.
+- `optimizer_strategy`
+- `max_iterations`
+- `trials_per_candidate`
+- `max_total_trials`
+- `acceptance_criteria` (`target_rmse`, `target_max_error`, `min_pass_rate`)
+- `openai` (`api_key`, optional `model`) when `optimizer_strategy=gpt`
 
-## Acceptance criteria
+## GPT strategy notes
 
-Configured in job request:
+- API key is required on create/rerun request body for GPT jobs.
+- API key is stored in encrypted form and not returned in responses.
+- Use placeholders in docs/scripts only, e.g. `<OPENAI_API_KEY>`.
 
-- `target_rmse`
-- `target_max_error`
-- `min_pass_rate`
+## Current capabilities
 
-Worker evaluates these against aggregated metrics to decide optimization outcome.
+- End-to-end loop from candidate proposal -> trials -> aggregation -> report.
+- Generation index and optimization outcome surfaced in job detail.
+- Compare API can summarize completed jobs (including batch child jobs).
 
-## Roadmap
+## Limitations / roadmap
 
-- Add user-configurable per-parameter hard bounds in UI.
+- No UI-side optimizer debugger per generation yet.
+- Batch-level optimizer policy templates are not yet implemented (batch currently reuses per-job payloads).

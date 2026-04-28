@@ -285,6 +285,7 @@ class BatchJob(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None = None
+    cancelled_at: datetime | None = None
 
 
 class PaginatedBatchJobs(BaseModel):

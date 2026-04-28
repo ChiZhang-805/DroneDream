@@ -39,6 +39,7 @@ describe("BatchDetail", () => {
       created_at: "2026-01-01",
       updated_at: "2026-01-01",
       completed_at: null,
+      cancelled_at: null,
     } as never);
     vi.spyOn(apiClient, "listBatchJobs").mockResolvedValue([
       { id: "job_1", status: "COMPLETED", track_type: "circle", objective_profile: "robust" },

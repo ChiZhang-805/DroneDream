@@ -55,6 +55,19 @@ def _apply_sqlite_lightweight_migrations() -> None:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN advanced_scenario_config_json JSON"))
         if "batch_id" not in job_columns:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN batch_id VARCHAR(64)"))
+        batch_tables = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table'")
+            ).fetchall()
+        }
+        if "batch_jobs" in batch_tables:
+            batch_columns = {
+                row[1]
+                for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
+            }
+            if "cancelled_at" not in batch_columns:
+                conn.execute(text("ALTER TABLE batch_jobs ADD COLUMN cancelled_at DATETIME"))
         columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()

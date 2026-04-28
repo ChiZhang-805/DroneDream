@@ -1,40 +1,57 @@
 # Development Guide
 
-## Python venv setup
+## Local setup
 
-Backend:
+### Backend
 
 ```bash
 python -m venv backend/.venv
+backend/.venv/bin/pip install --upgrade pip
 backend/.venv/bin/pip install -e "backend[dev]"
 ```
 
-Worker:
+### Worker
 
 ```bash
 python -m venv worker/.venv
+worker/.venv/bin/pip install --upgrade pip
 worker/.venv/bin/pip install -e backend
 worker/.venv/bin/pip install -e "worker[dev]"
 ```
 
-## Frontend setup
+### Frontend
 
 ```bash
 cd frontend
 npm ci
 ```
 
-## Local checks
+## Run services
 
-在仓库根目录运行（脚本会自动切换到仓库根目录）：
+```bash
+# terminal 1
+cd backend
+.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-- `./scripts/check-backend.sh`：执行 `ruff check backend`、`mypy backend/app`、`pytest backend`
-- `./scripts/check-worker.sh`：执行 `ruff check worker`
-- `./scripts/check-frontend.sh`：执行 frontend 的 `typecheck/lint/build/test`
-- `./scripts/check-all.sh`：按顺序执行 backend、worker、frontend 三组检查
-- `./scripts/check.sh`：兼容入口（保留）
+# terminal 2
+cd worker
+.venv/bin/python -m drone_dream_worker.main
 
-Manual commands:
+# terminal 3
+cd frontend
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+## Quality gates
+
+Use existing scripts (recommended):
+
+- `./scripts/check-backend.sh`
+- `./scripts/check-worker.sh`
+- `./scripts/check-frontend.sh`
+- `./scripts/check-all.sh`
+
+Equivalent manual commands:
 
 ```bash
 ruff check backend
@@ -43,10 +60,12 @@ pytest backend
 cd frontend && npm run typecheck && npm run lint && npm run build && npm test
 ```
 
-## CI local reproduction
+## Current capabilities
 
-Run the same lint/type/test command groups above in a clean environment with fresh virtualenv/node_modules.
+- Backend includes SQLite lightweight migration logic for additive columns.
+- Batch APIs and frontend pages are covered by backend/frontend tests.
 
-## Roadmap
+## Limitations / roadmap
 
-- Add one-command dev bootstrap script for backend + worker + frontend.
+- No Alembic migration chain yet.
+- CI bootstrap remains multi-step (no single `make dev` entrypoint yet).

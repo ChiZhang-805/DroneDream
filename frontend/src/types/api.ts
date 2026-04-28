@@ -371,6 +371,7 @@ export interface BatchJob {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  cancelled_at: string | null;
 }
 
 export interface PaginatedBatchJobs {
