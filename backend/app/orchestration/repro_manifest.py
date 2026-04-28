@@ -104,6 +104,24 @@ def _selected_env_vars() -> dict[str, str]:
     return selected
 
 
+def _is_sensitive_key(name: str) -> bool:
+    upper = name.upper()
+    return any(token in upper for token in _SENSITIVE_ENV_TOKENS)
+
+
+def _sanitize_payload(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        clean: dict[str, Any] = {}
+        for key, value in payload.items():
+            if _is_sensitive_key(str(key)):
+                continue
+            clean[key] = _sanitize_payload(value)
+        return clean
+    if isinstance(payload, list):
+        return [_sanitize_payload(item) for item in payload]
+    return payload
+
+
 def _candidate_summaries(job: models.Job) -> list[dict[str, Any]]:
     rows = sorted(job.candidates, key=lambda c: (c.generation_index, c.created_at))
     return [
@@ -144,6 +162,32 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
     git = _git_info()
     real_command = os.environ.get("REAL_SIMULATOR_COMMAND")
     px4_dir = os.environ.get("PX4_AUTOPILOT_DIR")
+    acceptance_criteria = {
+        "target_rmse": job.target_rmse,
+        "target_max_error": job.target_max_error,
+        "min_pass_rate": job.min_pass_rate,
+    }
+    job_config = {
+        "track_type": job.track_type,
+        "start_point": {"x": job.start_point_x, "y": job.start_point_y},
+        "altitude_m": job.altitude_m,
+        "wind": {
+            "north": job.wind_north,
+            "east": job.wind_east,
+            "south": job.wind_south,
+            "west": job.wind_west,
+        },
+        "sensor_noise_level": job.sensor_noise_level,
+        "objective_profile": job.objective_profile,
+        "reference_track_json": job.reference_track_json,
+        "advanced_scenario_config_json": job.advanced_scenario_config_json,
+        "simulator_backend_requested": job.simulator_backend_requested,
+        "optimizer_strategy": job.optimizer_strategy,
+        "max_iterations": job.max_iterations,
+        "trials_per_candidate": job.trials_per_candidate,
+        "max_total_trials": job.max_total_trials,
+        "acceptance_criteria": acceptance_criteria,
+    }
     return {
         "project": {
             "app_version": _app_version(),
@@ -166,16 +210,10 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
             },
             "sensor_noise": job.sensor_noise_level,
             "objective_profile": job.objective_profile,
+            "job_config": _sanitize_payload(job_config),
             "simulator_backend_requested": job.simulator_backend_requested,
             "optimizer_strategy": job.optimizer_strategy,
-            "max_iterations": job.max_iterations,
-            "trials_per_candidate": job.trials_per_candidate,
-            "max_total_trials": job.max_total_trials,
-            "acceptance_criteria": {
-                "target_rmse": job.target_rmse,
-                "target_max_error": job.target_max_error,
-                "min_pass_rate": job.min_pass_rate,
-            },
+            "acceptance_criteria": acceptance_criteria,
         },
         "optimizer": {
             "parameter_safe_ranges": {
@@ -184,6 +222,13 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
             },
             "baseline_parameters": dict(BASELINE_PARAMETERS),
             "best_candidate_id": best.id,
+            "best_candidate_summary": {
+                "id": best.id,
+                "label": best.label,
+                "generation_index": best.generation_index,
+                "source_type": best.source_type,
+                "aggregated_score": best.aggregated_score,
+            },
             "best_parameters": dict(best.parameter_json or {}),
             "candidate_summaries": _candidate_summaries(job),
         },
