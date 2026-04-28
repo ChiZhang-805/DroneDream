@@ -7,6 +7,7 @@ validation; unknown fields are rejected (``extra="forbid"``) per the API spec.
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -185,12 +186,16 @@ class JobCreateRequest(_Strict):
 
     @model_validator(mode="after")
     def _validate_custom_reference_track(self) -> JobCreateRequest:
-        if self.track_type == "custom" and (
-            self.reference_track is None or len(self.reference_track) < 2
-        ):
+        points = self.reference_track or []
+        if self.track_type == "custom" and len(points) < 2:
             raise ValueError(
                 "reference_track with at least 2 points is required when track_type=custom"
             )
+        for idx, point in enumerate(points):
+            if not math.isfinite(point.x) or not math.isfinite(point.y):
+                raise ValueError(f"reference_track[{idx}] x/y must be finite numbers")
+            if point.z is not None and not math.isfinite(point.z):
+                raise ValueError(f"reference_track[{idx}].z must be a finite number")
         return self
 
 

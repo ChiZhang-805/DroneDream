@@ -88,6 +88,12 @@ const DEFAULTS: FormState = {
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
+const CUSTOM_REFERENCE_TRACK_EXAMPLE = `[
+  {"x": 0, "y": 0, "z": 3},
+  {"x": 5, "y": 0, "z": 3},
+  {"x": 5, "y": 5, "z": 3}
+]`;
+
 function parseNumber(raw: string): number | null {
   if (raw.trim() === "") return null;
   const n = Number(raw);
@@ -394,9 +400,16 @@ export function NewJob() {
               <select
                 id="track_type"
                 value={form.track_type}
-                onChange={(e) =>
-                  update("track_type", e.target.value as TrackType)
-                }
+                onChange={(e) => {
+                  const nextTrack = e.target.value as TrackType;
+                  update("track_type", nextTrack);
+                  if (
+                    nextTrack === "custom" &&
+                    form.reference_track_json.trim() === ""
+                  ) {
+                    update("reference_track_json", CUSTOM_REFERENCE_TRACK_EXAMPLE);
+                  }
+                }}
               >
                 {TRACK_TYPES.map((t) => (
                   <option key={t} value={t}>
@@ -456,7 +469,7 @@ export function NewJob() {
                 required
                 error={errors.reference_track_json}
                 htmlFor="reference_track_json"
-                hint='Example: [{"x":0,"y":0,"z":3},{"x":5,"y":0,"z":3}]'
+                hint="Provide a JSON array of waypoint objects."
               >
                 <textarea
                   id="reference_track_json"

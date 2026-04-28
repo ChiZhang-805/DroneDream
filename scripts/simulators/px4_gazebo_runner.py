@@ -291,6 +291,8 @@ def _make_reference_track(
     altitude: float,
     reference_track: list[dict[str, float]] | None = None,
 ) -> list[dict[str, float]]:
+    if reference_track:
+        return list(reference_track)
     if track_type == "custom":
         return list(reference_track or [])
     points: list[dict[str, float]] = []

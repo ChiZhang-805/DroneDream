@@ -242,6 +242,38 @@ def test_px4_runner_writes_expected_artifacts_in_dry_run(tmp_path: Path):
         assert (tmp_path / name).exists(), name
 
 
+def test_px4_runner_prefers_trial_input_reference_track_even_when_track_type_not_custom(
+    tmp_path: Path,
+):
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["job_config"]["track_type"] = "circle"
+    payload["job_config"]["reference_track"] = [
+        {"x": 0.0, "y": 0.0, "z": 3.0},
+        {"x": 2.0, "y": 1.0, "z": 3.0},
+        {"x": 4.0, "y": 1.0, "z": 3.0},
+    ]
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env["PX4_GAZEBO_DRY_RUN"] = "true"
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert output_path.exists(), proc.stderr
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert proc.returncode == 0
+    assert result["success"] is True
+    track_payload = json.loads((tmp_path / "reference_track.json").read_text(encoding="utf-8"))
+    assert track_payload["reference_track"] == payload["job_config"]["reference_track"]
+    assert track_payload["points"] == payload["job_config"]["reference_track"]
+
+
 def test_px4_runner_template_substitutes_env_tokens(tmp_path: Path):
     launcher = tmp_path / "launcher.py"
     args_dump = tmp_path / "argv.json"

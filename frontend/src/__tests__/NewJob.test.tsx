@@ -140,6 +140,16 @@ describe("NewJob — client-side validation", () => {
     ).toBeVisible();
     expect(createSpy).not.toHaveBeenCalled();
   });
+
+  it("prefills custom reference track textarea with the default example", () => {
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/Track type/i), {
+      target: { value: "custom" },
+    });
+    const textarea = screen.getByLabelText(/Reference track \(JSON\)/i) as HTMLTextAreaElement;
+    expect(textarea.value).toContain('"x": 0');
+    expect(textarea.value).toContain('"x": 5');
+  });
 });
 
 describe("NewJob — Phase 8 execution backend & auto-tuning", () => {

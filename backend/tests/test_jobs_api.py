@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -130,6 +132,18 @@ def test_create_job_accepts_and_persists_custom_reference_track(client: TestClie
     fetched = client.get(f"/api/v1/jobs/{data['id']}")
     assert fetched.status_code == 200
     assert fetched.json()["data"]["reference_track"] == data["reference_track"]
+
+
+def test_create_job_rejects_non_finite_custom_reference_track_values(client: TestClient) -> None:
+    body = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "track_type": "custom",
+        # 1e309 decodes to +inf in Python's float parser.
+        "reference_track": [{"x": 0, "y": 0, "z": 3}, {"x": 1e309, "y": 1}],
+    }
+    resp = client.post("/api/v1/jobs", content=json.dumps(body))
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "INVALID_INPUT"
 
 
 def test_create_job_accepts_advanced_scenario_config(client: TestClient) -> None:
@@ -285,6 +299,24 @@ def test_rerun_creates_new_job_preserving_original(client: TestClient) -> None:
     again = client.get(f"/api/v1/jobs/{original['id']}").json()["data"]
     assert again["id"] == original["id"]
     assert again["source_job_id"] is None
+
+
+def test_rerun_preserves_custom_reference_track(client: TestClient) -> None:
+    created = client.post(
+        "/api/v1/jobs",
+        json={
+            **HEURISTIC_JOB_PAYLOAD,
+            "track_type": "custom",
+            "reference_track": [{"x": 0, "y": 0, "z": 3}, {"x": 4, "y": 2, "z": 3}],
+        },
+    )
+    assert created.status_code == 200, created.text
+    source = created.json()["data"]
+    rerun = client.post(f"/api/v1/jobs/{source['id']}/rerun")
+    assert rerun.status_code == 200, rerun.text
+    child = rerun.json()["data"]
+    assert child["track_type"] == "custom"
+    assert child["reference_track"] == source["reference_track"]
 
 
 def test_rerun_not_found(client: TestClient) -> None:
