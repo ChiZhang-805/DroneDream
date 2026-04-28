@@ -294,9 +294,12 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         add(
             "- Advanced summary: "
             f"gust_enabled={bool(gust.get('enabled', False))}, "
+            f"gust_magnitude={_fmt_num(gust.get('magnitude_mps'), digits=2)}, "
+            f"gust_direction={_fmt_num(gust.get('direction_deg'), digits=1)}, "
             f"obstacles={len(obstacles)}, "
             f"dropout_rate={_fmt_num(sensor_deg.get('dropout_rate'), digits=3)}, "
-            f"battery_initial={_fmt_num(battery.get('initial_percent'), digits=1)}"
+            f"battery_initial={_fmt_num(battery.get('initial_percent'), digits=1)}, "
+            f"payload_kg={_fmt_num(battery.get('mass_payload_kg'), digits=2)}"
         )
     add(f"- target_rmse: {_fmt_num(job.target_rmse, digits=3)}")
     add(f"- target_max_error: {_fmt_num(job.target_max_error, digits=3)}")

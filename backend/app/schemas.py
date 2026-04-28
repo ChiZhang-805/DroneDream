@@ -119,49 +119,59 @@ class TrackPoint(_Strict):
     z: float | None = None
 
 
-class ScenarioWindGusts(_Strict):
+class WindGustsConfig(_Strict):
     enabled: bool = False
-    magnitude_mps: Annotated[float, Field(ge=0.0, le=50.0)] = 0.0
-    direction_deg: Annotated[float, Field(ge=0.0, le=360.0)] = 0.0
-    period_s: Annotated[float, Field(ge=0.1, le=600.0)] = 10.0
+    magnitude_mps: Annotated[float, Field(ge=0.0, le=30.0)] = 0.0
+    direction_deg: Annotated[float, Field(ge=0.0, lt=360.0)] = 0.0
+    period_s: Annotated[float, Field(gt=0.0, le=300.0)] = 10.0
 
 
-class ScenarioObstacle(_Strict):
+class ObstacleConfig(_Strict):
     type: Literal["cylinder", "box"]
     x: float
     y: float
     z: float
     radius: Annotated[float, Field(gt=0.0)] | None = None
-    size: list[Annotated[float, Field(gt=0.0)]] | None = None
-    height: Annotated[float, Field(gt=0.0)] = 1.0
+    size_x: Annotated[float, Field(gt=0.0)] | None = None
+    size_y: Annotated[float, Field(gt=0.0)] | None = None
+    size_z: Annotated[float, Field(gt=0.0)] | None = None
+    height: Annotated[float, Field(gt=0.0)] | None = None
 
     @model_validator(mode="after")
-    def _validate_shape(self) -> ScenarioObstacle:
-        if self.type == "cylinder" and self.radius is None:
-            raise ValueError("cylinder obstacle requires radius")
-        if self.type == "box" and (self.size is None or len(self.size) != 3):
-            raise ValueError("box obstacle requires size=[x,y,z]")
+    def _validate_shape(self) -> ObstacleConfig:
+        if self.type == "cylinder":
+            if self.radius is None:
+                raise ValueError("cylinder obstacle requires radius")
+            if self.height is None:
+                raise ValueError("cylinder obstacle requires height")
+        if self.type == "box" and (
+            self.size_x is None or self.size_y is None or self.size_z is None
+        ):
+            raise ValueError("box obstacle requires size_x/size_y/size_z")
         return self
 
 
-class ScenarioSensorDegradation(_Strict):
+class SensorDegradationConfig(_Strict):
     gps_noise_m: Annotated[float, Field(ge=0.0, le=100.0)] = 0.0
     baro_noise_m: Annotated[float, Field(ge=0.0, le=100.0)] = 0.0
     imu_noise_scale: Annotated[float, Field(ge=0.0, le=10.0)] = 1.0
     dropout_rate: Annotated[float, Field(ge=0.0, le=1.0)] = 0.0
 
 
-class ScenarioBattery(_Strict):
+class BatteryConfig(_Strict):
     initial_percent: Annotated[float, Field(ge=0.0, le=100.0)] = 100.0
     voltage_sag: bool = False
-    mass_payload_kg: Annotated[float, Field(ge=0.0, le=50.0)] | None = None
+    mass_payload_kg: Annotated[float, Field(ge=0.0, le=20.0)] | None = None
 
 
-class ScenarioAdvancedConfig(_Strict):
-    wind_gusts: ScenarioWindGusts | None = None
-    obstacles: list[ScenarioObstacle] = Field(default_factory=list)
-    sensor_degradation: ScenarioSensorDegradation | None = None
-    battery: ScenarioBattery | None = None
+class AdvancedScenarioConfig(_Strict):
+    wind_gusts: WindGustsConfig = Field(default_factory=WindGustsConfig)
+    obstacles: list[ObstacleConfig] = Field(default_factory=list)
+    sensor_degradation: SensorDegradationConfig = Field(default_factory=SensorDegradationConfig)
+    battery: BatteryConfig = Field(default_factory=BatteryConfig)
+
+
+ScenarioAdvancedConfig = AdvancedScenarioConfig
 
 
 class JobCreateRequest(_Strict):
@@ -174,7 +184,7 @@ class JobCreateRequest(_Strict):
     sensor_noise_level: SensorNoiseLevel = "medium"
     objective_profile: ObjectiveProfile = "robust"
     reference_track: list[TrackPoint] | None = None
-    advanced_scenario_config: ScenarioAdvancedConfig | None = None
+    advanced_scenario_config: AdvancedScenarioConfig | None = None
 
     simulator_backend: SimulatorBackend = "mock"
     optimizer_strategy: OptimizerStrategy = "gpt"
@@ -217,7 +227,7 @@ class Job(BaseModel):
     sensor_noise_level: SensorNoiseLevel
     objective_profile: ObjectiveProfile
     reference_track: list[TrackPoint] | None = None
-    advanced_scenario_config: ScenarioAdvancedConfig | None = None
+    advanced_scenario_config: AdvancedScenarioConfig | None = None
     status: JobStatus
     progress: JobProgress
     baseline_candidate_id: str | None = None
@@ -426,6 +436,7 @@ __all__ = [
     "OptimizerStrategy",
     "PaginatedJobs",
     "SensorNoiseLevel",
+    "AdvancedScenarioConfig",
     "ScenarioAdvancedConfig",
     "SimulatorBackend",
     "StartPoint",

@@ -469,6 +469,8 @@ function JobSummaryCard({ job }: { job: Job }) {
   const advanced = job.advanced_scenario_config;
   const obstacleCount = advanced?.obstacles?.length ?? 0;
   const dropout = advanced?.sensor_degradation?.dropout_rate;
+  const gust = advanced?.wind_gusts;
+  const battery = advanced?.battery;
   return (
     <SectionCard title="Job summary">
       <ul className="kv-list">
@@ -516,7 +518,7 @@ function JobSummaryCard({ job }: { job: Job }) {
           <span className="kv-key">Advanced scenario</span>
           <span className="kv-value">
             {advanced
-              ? `enabled · obstacles=${obstacleCount} · dropout=${dropout ?? 0}`
+              ? `enabled · gust=${gust?.enabled ? "on" : "off"} · obstacles=${obstacleCount} · dropout=${dropout ?? 0} · battery=${battery?.initial_percent ?? 100}%`
               : "disabled"}
           </span>
         </li>

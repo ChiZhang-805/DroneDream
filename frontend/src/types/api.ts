@@ -101,8 +101,10 @@ export interface ScenarioObstacle {
   y: number;
   z: number;
   radius?: number | null;
-  size?: number[] | null;
-  height: number;
+  size_x?: number | null;
+  size_y?: number | null;
+  size_z?: number | null;
+  height?: number | null;
 }
 
 export interface ScenarioSensorDegradation {

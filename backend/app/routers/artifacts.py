@@ -48,7 +48,12 @@ def download_artifact(
 
     if artifact.owner_type == "job":
         job = db.get(models.Job, artifact.owner_id)
-        if job is None or (job.user_id != user.id and not (get_settings().auth_mode == "disabled" and job.user_id is None)):
+        auth_disabled_owned_null = (
+            get_settings().auth_mode == "disabled"
+            and job is not None
+            and job.user_id is None
+        )
+        if job is None or (job.user_id != user.id and not auth_disabled_owned_null):
             raise HTTPException(
                 status_code=404,
                 detail={"code": "ARTIFACT_NOT_FOUND", "message": "Artifact not found."},

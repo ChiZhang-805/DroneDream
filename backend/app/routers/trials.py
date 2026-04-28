@@ -29,7 +29,12 @@ def get_trial(
             status_code=404,
             detail={"code": "TRIAL_NOT_FOUND", "message": f"Trial {trial_id} was not found."},
         )
-    if trial.job is None or (trial.job.user_id != user.id and not (get_settings().auth_mode == "disabled" and trial.job.user_id is None)):
+    auth_disabled_owned_null = (
+        get_settings().auth_mode == "disabled"
+        and trial.job is not None
+        and trial.job.user_id is None
+    )
+    if trial.job is None or (trial.job.user_id != user.id and not auth_disabled_owned_null):
         raise HTTPException(
             status_code=404,
             detail={"code": "TRIAL_NOT_FOUND", "message": f"Trial {trial_id} was not found."},
