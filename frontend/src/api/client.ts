@@ -8,8 +8,8 @@ import type {
   BatchCreateRequest,
   BatchJob,
   Job,
+  JobCompareResponse,
   JobCreateRequest,
-  JobsCompareResponse,
   JobRerunRequest,
   JobReport,
   PaginatedBatchJobs,
@@ -272,8 +272,8 @@ export const apiClient = {
     });
   },
 
-  async compareJobs(jobIds: string[]): Promise<JobsCompareResponse> {
-    return request<JobsCompareResponse>("/jobs/compare", {
+  async compareJobs(jobIds: string[]): Promise<JobCompareResponse> {
+    return request<JobCompareResponse>("/jobs/compare", {
       method: "POST",
       body: JSON.stringify({ job_ids: jobIds }),
     });
@@ -282,6 +282,24 @@ export const apiClient = {
   compareJobsCsvUrl(jobIds: string[]): string {
     const joined = encodeURIComponent(jobIds.join(","));
     return `${API_BASE_URL}/api/v1/jobs/compare.csv?job_ids=${joined}`;
+  },
+
+  async downloadCompareJobsCsv(jobIds: string[]): Promise<void> {
+    const response = await fetch(this.compareJobsCsvUrl(jobIds), {
+      headers: { ...authHeaders() },
+    });
+    if (!response.ok) {
+      throw new ApiClientError(
+        "COMPARE_CSV_DOWNLOAD_FAILED",
+        `Failed to download compare CSV (HTTP ${response.status})`,
+        null,
+        response.status,
+      );
+    }
+    await triggerBrowserDownload(
+      await response.blob(),
+      `job-compare-${jobIds.join("_")}.csv`,
+    );
   },
 
   async createBatch(req: BatchCreateRequest): Promise<BatchJob> {

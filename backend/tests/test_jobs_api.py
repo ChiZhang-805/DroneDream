@@ -366,6 +366,14 @@ def test_compare_jobs_unknown_job_returns_404(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
+def test_compare_jobs_csv_content_type(client: TestClient) -> None:
+    job_a = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+    job_b = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+    resp = client.get(f"/api/v1/jobs/compare.csv?job_ids={job_a},{job_b}")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/csv")
+
+
 def test_rerun_gpt_requires_fresh_openai_api_key(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

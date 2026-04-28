@@ -664,15 +664,16 @@ def compare_jobs(
     user: models.User | None = None,
 ) -> schemas.JobsCompareResponse:
     resolved_user = _resolve_user(db, user)
+    auth_disabled = get_settings().auth_mode == "disabled"
     ids = list(dict.fromkeys(req.job_ids))
-    rows = list(
-        db.scalars(
-            select(models.Job).where(
-                models.Job.id.in_(ids),
-                or_(models.Job.user_id == resolved_user.id, models.Job.user_id.is_(None)),
-            )
+    stmt = select(models.Job).where(models.Job.id.in_(ids))
+    if auth_disabled:
+        stmt = stmt.where(
+            or_(models.Job.user_id == resolved_user.id, models.Job.user_id.is_(None))
         )
-    )
+    else:
+        stmt = stmt.where(models.Job.user_id == resolved_user.id)
+    rows = list(db.scalars(stmt))
     by_id = {row.id: row for row in rows}
     missing = [job_id for job_id in ids if job_id not in by_id]
     if missing:

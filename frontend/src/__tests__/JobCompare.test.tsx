@@ -17,8 +17,8 @@ describe("JobCompare page", () => {
           simulator_backend: "mock",
           optimizer_strategy: "heuristic",
           optimization_outcome: "success",
-          baseline_metrics: { rmse: 1.2 },
-          optimized_metrics: { rmse: 0.9 },
+          baseline_metrics: { rmse: 1.2, max_error: 2.1 },
+          optimized_metrics: { rmse: 0.9, max_error: 1.8 },
           best_candidate_id: "cand_1",
           best_parameters: {},
           trial_count: 10,
@@ -55,6 +55,6 @@ describe("JobCompare page", () => {
       </QueryClientProvider>,
     );
     expect(await screen.findByText("job_1")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Download CSV/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Download CSV/i })).toBeInTheDocument();
   });
 });

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -115,10 +116,15 @@ def compare_jobs_csv(
             "simulator_backend",
             "optimizer_strategy",
             "optimization_outcome",
+            "baseline_metrics",
+            "optimized_metrics",
+            "best_parameters",
             "trial_count",
             "completed_trial_count",
             "failed_trial_count",
             "best_candidate_id",
+            "created_at",
+            "completed_at",
         ]
     )
     for item in data.items:
@@ -130,10 +136,15 @@ def compare_jobs_csv(
                 item.simulator_backend,
                 item.optimizer_strategy,
                 item.optimization_outcome or "",
+                json.dumps(item.baseline_metrics) if item.baseline_metrics is not None else "",
+                json.dumps(item.optimized_metrics) if item.optimized_metrics is not None else "",
+                json.dumps(item.best_parameters),
                 item.trial_count,
                 item.completed_trial_count,
                 item.failed_trial_count,
                 item.best_candidate_id or "",
+                item.created_at.isoformat(),
+                item.completed_at.isoformat() if item.completed_at is not None else "",
             ]
         )
     return PlainTextResponse(buf.getvalue(), media_type="text/csv")
