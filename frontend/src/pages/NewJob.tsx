@@ -102,6 +102,34 @@ const CUSTOM_REFERENCE_TRACK_EXAMPLE = `[
   {"x": 5, "y": 5, "z": 3}
 ]`;
 
+const OBSTACLES_JSON_EXAMPLE = `[
+  {
+    "type": "cylinder",
+    "x": 3,
+    "y": 2,
+    "z": 0,
+    "radius": 0.5,
+    "height": 2.0
+  },
+  {
+    "type": "box",
+    "x": -2,
+    "y": 4,
+    "z": 0,
+    "size_x": 1.0,
+    "size_y": 1.5,
+    "size_z": 2.0
+  }
+]`;
+
+function boolToYesNo(value: boolean): "yes" | "no" {
+  return value ? "yes" : "no";
+}
+
+function yesNoToBool(value: string): boolean {
+  return value === "yes";
+}
+
 function parseNumber(raw: string): number | null {
   if (raw.trim() === "") return null;
   const n = Number(raw);
@@ -519,10 +547,24 @@ export function NewJob() {
           {showAdvancedScenario ? (
             <div className="form-grid">
               <Field label="Enable advanced scenario" htmlFor="advanced_enabled">
-                <input id="advanced_enabled" type="checkbox" checked={form.advanced_enabled} onChange={(e) => update("advanced_enabled", e.target.checked)} />
+                <select
+                  id="advanced_enabled"
+                  value={boolToYesNo(form.advanced_enabled)}
+                  onChange={(e) => update("advanced_enabled", yesNoToBool(e.target.value))}
+                >
+                  <option value="no">no</option>
+                  <option value="yes">yes</option>
+                </select>
               </Field>
               <Field label="Enable gust" htmlFor="gust_enabled">
-                <input id="gust_enabled" type="checkbox" checked={form.gust_enabled} onChange={(e) => update("gust_enabled", e.target.checked)} />
+                <select
+                  id="gust_enabled"
+                  value={boolToYesNo(form.gust_enabled)}
+                  onChange={(e) => update("gust_enabled", yesNoToBool(e.target.value))}
+                >
+                  <option value="no">no</option>
+                  <option value="yes">yes</option>
+                </select>
               </Field>
               <Field label="Gust magnitude (m/s)" htmlFor="gust_magnitude_mps" error={errors.gust_magnitude_mps}>
                 <input id="gust_magnitude_mps" type="number" step="0.1" value={form.gust_magnitude_mps} onChange={handleTextChange("gust_magnitude_mps")} />
@@ -549,13 +591,41 @@ export function NewJob() {
                 <input id="battery_initial_percent" type="number" step="0.1" value={form.battery_initial_percent} onChange={handleTextChange("battery_initial_percent")} />
               </Field>
               <Field label="Battery voltage sag" htmlFor="battery_voltage_sag">
-                <input id="battery_voltage_sag" type="checkbox" checked={form.battery_voltage_sag} onChange={(e) => update("battery_voltage_sag", e.target.checked)} />
+                <select
+                  id="battery_voltage_sag"
+                  value={boolToYesNo(form.battery_voltage_sag)}
+                  onChange={(e) => update("battery_voltage_sag", yesNoToBool(e.target.value))}
+                >
+                  <option value="no">no</option>
+                  <option value="yes">yes</option>
+                </select>
               </Field>
               <Field label="Payload mass (kg)" htmlFor="mass_payload_kg" error={errors.mass_payload_kg}>
                 <input id="mass_payload_kg" type="number" step="0.1" value={form.mass_payload_kg} onChange={handleTextChange("mass_payload_kg")} />
               </Field>
-              <Field label="Obstacles JSON" htmlFor="obstacles_json" error={errors.obstacles_json}>
-                <textarea id="obstacles_json" rows={5} value={form.obstacles_json} onChange={(e) => update("obstacles_json", e.target.value)} />
+              <Field
+                label="Obstacles JSON"
+                htmlFor="obstacles_json"
+                error={errors.obstacles_json}
+                hint="Provide a JSON array of obstacle objects. Leave [] for no obstacles."
+              >
+                <textarea
+                  id="obstacles_json"
+                  rows={5}
+                  value={form.obstacles_json}
+                  onChange={(e) => update("obstacles_json", e.target.value)}
+                />
+                <details className="json-example">
+                  <summary>Example obstacles JSON</summary>
+                  <pre>{OBSTACLES_JSON_EXAMPLE}</pre>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-small"
+                    onClick={() => update("obstacles_json", OBSTACLES_JSON_EXAMPLE)}
+                  >
+                    Use example
+                  </button>
+                </details>
               </Field>
             </div>
           ) : null}
