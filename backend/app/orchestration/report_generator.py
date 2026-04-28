@@ -538,7 +538,7 @@ def ensure_real_job_artifacts(
             else _write_json(path, payload)
         )
         storage_key = f"jobs/{job.id}/job_artifacts/{path.name}"
-        storage_path = storage.put_file(str(path), storage_key, mime_type)
+        storage_path = storage.put_file(path, storage_key, mime_type)
         if (artifact_type, storage_path) in existing_keys:
             continue
         artifact = models.Artifact(
@@ -613,7 +613,7 @@ def ensure_repro_manifest_artifact(
     _write_json(manifest_path, manifest_payload)
     storage = get_artifact_storage()
     storage_path = storage.put_file(
-        str(manifest_path),
+        manifest_path,
         f"jobs/{job.id}/job_artifacts/{manifest_path.name}",
         "application/json",
     )
@@ -661,7 +661,7 @@ def ensure_job_pdf_artifact(db: Session, *, job: models.Job) -> models.Artifact:
     pdf_path = generate_job_pdf_report(db=db, job=job, output_dir=output_dir)
     storage = get_artifact_storage()
     storage_path = storage.put_file(
-        str(pdf_path), f"jobs/{job.id}/reports/{pdf_path.name}", "application/pdf"
+        pdf_path, f"jobs/{job.id}/reports/{pdf_path.name}", "application/pdf"
     )
     return _upsert_pdf_artifact(db, job_id=job.id, pdf_path=pdf_path, storage_path=storage_path)
 

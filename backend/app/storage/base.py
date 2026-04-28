@@ -1,25 +1,15 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol
 
 
-@dataclass
-class StorageDownload:
-    content: bytes
-    content_type: str
-    filename: str
+class ArtifactStorage(Protocol):
+    def put_file(self, local_path: Path, key: str, content_type: str | None = None) -> str:
+        """Persist a local file and return a storage URI/path."""
 
+    def read_bytes(self, storage_uri: str) -> bytes:
+        """Read an artifact payload from storage."""
 
-class ArtifactStorage(ABC):
-    @abstractmethod
-    def put_file(self, local_path: str, key: str, content_type: str | None = None) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def open_for_download(self, storage_uri: str) -> StorageDownload:
-        raise NotImplementedError
-
-    @abstractmethod
     def exists(self, storage_uri: str) -> bool:
-        raise NotImplementedError
+        """Return whether the artifact exists in storage."""

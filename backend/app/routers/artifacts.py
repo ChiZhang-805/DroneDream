@@ -66,28 +66,26 @@ def download_artifact(
     if artifact.storage_path.startswith("s3://"):
         try:
             storage = get_artifact_storage()
-            downloaded = storage.open_for_download(artifact.storage_path)
+            if not storage.exists(artifact.storage_path):
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "code": "ARTIFACT_FILE_MISSING",
+                        "message": "Artifact file does not exist.",
+                    },
+                )
+            content = storage.read_bytes(artifact.storage_path)
         except S3StorageConfigError as exc:
             raise HTTPException(
                 status_code=500,
                 detail={"code": "CONFIGURATION_ERROR", "message": str(exc)},
             ) from exc
-        if not downloaded.content:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "code": "ARTIFACT_FILE_MISSING",
-                    "message": "Artifact file does not exist.",
-                },
-            )
+
+        filename = artifact.display_name or Path(artifact.storage_path).name
         return Response(
-            content=downloaded.content,
-            media_type=artifact.mime_type or downloaded.content_type,
-            headers={
-                "Content-Disposition": (
-                    f"attachment; filename={artifact.display_name or downloaded.filename}"
-                )
-            },
+            content=content,
+            media_type=artifact.mime_type or "application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
     raw_path = Path(artifact.storage_path)

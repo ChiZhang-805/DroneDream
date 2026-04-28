@@ -177,15 +177,13 @@ def test_download_s3_artifact_via_storage_backend(client: TestClient, monkeypatc
         art_id = artifact.id
 
     class _FakeStorage:
-        def open_for_download(self, storage_uri: str):
+        def exists(self, storage_uri: str) -> bool:
             assert storage_uri.startswith("s3://")
-            from app.storage.base import StorageDownload
+            return True
 
-            return StorageDownload(
-                content=b'{"ok":true}',
-                content_type="application/json",
-                filename="report.json",
-            )
+        def read_bytes(self, storage_uri: str) -> bytes:
+            assert storage_uri.startswith("s3://")
+            return b'{"ok":true}'
 
     monkeypatch.setattr("app.routers.artifacts.get_artifact_storage", lambda: _FakeStorage())
 

@@ -2,22 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.storage.base import ArtifactStorage, StorageDownload
+from app.storage.base import ArtifactStorage
 
 
 class LocalArtifactStorage(ArtifactStorage):
-    def put_file(self, local_path: str, key: str, content_type: str | None = None) -> str:
+    def put_file(self, local_path: Path, key: str, content_type: str | None = None) -> str:
         _ = key
         _ = content_type
-        return str(Path(local_path).resolve())
+        return str(local_path.resolve())
 
-    def open_for_download(self, storage_uri: str) -> StorageDownload:
-        path = Path(storage_uri).resolve()
-        return StorageDownload(
-            content=path.read_bytes(),
-            content_type="application/octet-stream",
-            filename=path.name,
-        )
+    def read_bytes(self, storage_uri: str) -> bytes:
+        return Path(storage_uri).resolve().read_bytes()
 
     def exists(self, storage_uri: str) -> bool:
         path = Path(storage_uri).resolve()
