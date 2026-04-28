@@ -803,6 +803,11 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
             status="COMPLETED",
             simulator_backend_requested="real_cli",
             openai_model="gpt-4.1-mini",
+            advanced_scenario_config_json={
+                "wind_gusts": {"enabled": True},
+                "service_token": "should-not-appear",
+                "nested": {"db_password": "do-not-leak"},
+            },
         )
         db.add(job)
         db.flush()
@@ -865,6 +870,11 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
             status="COMPLETED",
             simulator_backend_requested="real_cli",
             openai_model="gpt-4.1-mini",
+            advanced_scenario_config_json={
+                "wind_gusts": {"enabled": True},
+                "service_token": "should-not-appear",
+                "nested": {"db_password": "do-not-leak"},
+            },
         )
         db.add(job)
         db.flush()
@@ -894,6 +904,8 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
         assert "top-secret" not in text
         assert "tok-secret" not in text
         assert "db-secret" not in text
+        assert "should-not-appear" not in text
+        assert "do-not-leak" not in text
         assert "encrypted_api_key" not in text
         assert "APP_SECRET_KEY" not in text
 
