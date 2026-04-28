@@ -252,6 +252,12 @@ def test_pending_trial_claim_is_single_winner(orchestration_ctx):
     with ctx["db_module"].SessionLocal() as db2:
         claimed2 = ctx["trial_executor"].claim_and_run_one_pending_trial(db2, "worker-b")
     assert {claimed1, claimed2} == {trial_id, None}
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        assert trial.claimed_at is not None
+        event_types = [e.event_type for e in trial.job.events]
+        assert "trial_claimed" in event_types
 
 
 def test_running_trial_reclaimed_after_lease_expiry(orchestration_ctx):
@@ -274,6 +280,8 @@ def test_running_trial_reclaimed_after_lease_expiry(orchestration_ctx):
         assert trial is not None
         assert trial.lease_owner is None
         assert trial.lease_expires_at is None
+        event_types = [e.event_type for e in trial.job.events]
+        assert "trial_reclaimed_from_stale_worker" in event_types
 
 
 def test_unexpired_lease_blocks_second_worker(orchestration_ctx):
@@ -289,6 +297,28 @@ def test_unexpired_lease_blocks_second_worker(orchestration_ctx):
     with ctx["db_module"].SessionLocal() as db:
         claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(db, "worker-b")
     assert claimed is None
+
+
+def test_cancel_job_clears_trial_lease(orchestration_ctx):
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    jobs_service = ctx["jobs_service"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        trial.status = "RUNNING"
+        trial.lease_owner = "worker-a"
+        trial.lease_expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+        trial.worker_id = "worker-a"
+        db.commit()
+        jobs_service.cancel_job(db, trial.job_id)
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "CANCELLED"
+        assert trial.lease_owner is None
+        assert trial.lease_expires_at is None
 
 
 # --- Aggregation / full loop -----------------------------------------------
