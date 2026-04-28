@@ -310,6 +310,7 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
         "CREATED": 0,
         "QUEUED": 0,
         "RUNNING": 0,
+        "AGGREGATING": 0,
         "COMPLETED": 0,
         "FAILED": 0,
         "CANCELLED": 0,
@@ -326,7 +327,7 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
             status = "CANCELLED"
         else:
             status = "COMPLETED"
-    elif by_status["RUNNING"] > 0:
+    elif by_status["RUNNING"] > 0 or by_status["AGGREGATING"] > 0:
         status = "RUNNING"
     elif by_status["QUEUED"] > 0:
         status = "QUEUED"
@@ -350,6 +351,7 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
 def to_batch_schema(batch: models.BatchJob) -> schemas.BatchJob:
     progress, computed_status = _aggregate_batch_progress(batch.jobs)
     completed_at = batch.completed_at
+    cancelled_at = batch.cancelled_at
     if computed_status in schemas.BATCH_TERMINAL_STATUSES and completed_at is None:
         terminal_times = [
             ts
@@ -366,6 +368,7 @@ def to_batch_schema(batch: models.BatchJob) -> schemas.BatchJob:
         created_at=batch.created_at,
         updated_at=batch.updated_at,
         completed_at=completed_at,
+        cancelled_at=cancelled_at,
     )
 
 
@@ -445,6 +448,7 @@ def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None)
                 payload_json={"by": "batch"},
             )
         )
+    batch.cancelled_at = now
     db.commit()
     db.refresh(batch)
     return batch

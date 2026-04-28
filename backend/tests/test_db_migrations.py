@@ -56,6 +56,17 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 """
             )
         )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE batch_jobs (
+                    id VARCHAR(64) PRIMARY KEY,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
 
     db_module._apply_sqlite_lightweight_migrations()
 
@@ -64,6 +75,11 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
             row[1]
             for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()
         }
+        batch_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
+        }
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
+    assert "cancelled_at" in batch_columns

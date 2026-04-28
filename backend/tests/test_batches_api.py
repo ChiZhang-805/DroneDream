@@ -97,8 +97,34 @@ def test_cancel_batch_cancels_non_terminal_children(client: TestClient) -> None:
 
     resp = client.post(f"/api/v1/batches/{created['id']}/cancel")
     assert resp.status_code == 200
+    assert resp.json()["data"]["cancelled_at"] is not None
 
     jobs_after = client.get(f"/api/v1/batches/{created['id']}/jobs").json()["data"]
     by_id = {job["id"]: job for job in jobs_after}
     assert by_id[jobs[0]["id"]]["status"] == "COMPLETED"
     assert by_id[jobs[1]["id"]]["status"] == "CANCELLED"
+
+
+def test_batch_aggregates_aggregating_child_as_running(client: TestClient) -> None:
+    payload = {
+        "name": "agg-running",
+        "jobs": [{**HEURISTIC_JOB_PAYLOAD}, {**HEURISTIC_JOB_PAYLOAD}],
+    }
+    created = client.post("/api/v1/batches", json=payload).json()["data"]
+    jobs = client.get(f"/api/v1/batches/{created['id']}/jobs").json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        first = db.get(models.Job, jobs[0]["id"])
+        second = db.get(models.Job, jobs[1]["id"])
+        assert first is not None
+        assert second is not None
+        first.status = "AGGREGATING"
+        second.status = "QUEUED"
+        db.commit()
+
+    detail = client.get(f"/api/v1/batches/{created['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["data"]["status"] == "RUNNING"

@@ -1,26 +1,33 @@
 # Simulator Adapters
 
-## Built-in adapters
+DroneDream uses a pluggable simulator interface in `backend/app/simulator/`.
 
-- `mock`: fast deterministic simulation for local testing.
-- `real_cli`: invokes external runner tooling for PX4/Gazebo integration.
+## Adapter contract
 
-## Protocol artifacts
+- `base.py`: shared adapter protocol and result schema.
+- `factory.py`: selects adapter by `simulator_backend` (`mock` / `real_cli`).
 
-Current adapter protocol uses JSON files in run directories:
+## Implemented adapters
 
-- `trial_input.json`: worker-generated input contract for one trial.
-- `trial_result.json`: simulator output consumed by orchestration.
+### `mock`
 
-See also: [REAL_CLI_ARTIFACT_SCHEMA.md](./REAL_CLI_ARTIFACT_SCHEMA.md).
+- Deterministic/local simulation for fast CI and API validation.
+- No PX4/Gazebo runtime dependency.
+- Best for unit/integration tests and frontend development.
 
-## Add a new simulator backend
+### `real_cli`
 
-1. Implement adapter class under `backend/app/simulator/` extending base adapter interface.
-2. Register it in `backend/app/simulator/factory.py`.
-3. Ensure returned result payload can be mapped to trial metrics/artifacts.
-4. Add backend tests covering success + failure paths.
+- Calls external scripts (PX4/Gazebo tooling) and ingests normalized artifacts/metrics.
+- Used for real SITL-style execution when environment is prepared.
+- Artifact payload format documented in [REAL_CLI artifact schema](./REAL_CLI_ARTIFACT_SCHEMA.md).
 
-## Roadmap
+## Current capabilities
 
-- Standardize richer telemetry schema across all adapters.
+- Runtime backend selection per job.
+- Compatible with heuristic/GPT/CMA-ES optimization loops.
+- Real adapter outputs are consumed by existing report + artifact API flow.
+
+## Limitations / roadmap
+
+- Real adapter requires environment bootstrapping and external dependencies.
+- Adapter health/preflight endpoint is still minimal; failures are mainly surfaced as job/trial error states.

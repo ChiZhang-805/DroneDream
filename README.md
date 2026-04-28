@@ -15,6 +15,7 @@
 - [Simulator Adapters](./docs/SIMULATOR_ADAPTERS.md)
 - [Optimizer Guide](./docs/OPTIMIZER_GUIDE.md)
 - [Development Guide](./docs/DEVELOPMENT.md)
+- [Runpod Setup](./docs/RUNPOD_FULL_SETUP.md)
 
 ## ✨ 项目简介
 

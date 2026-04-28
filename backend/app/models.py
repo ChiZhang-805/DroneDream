@@ -68,6 +68,7 @@ class BatchJob(Base):
         DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User | None] = relationship(back_populates="batch_jobs")
     jobs: Mapped[list[Job]] = relationship(back_populates="batch")
