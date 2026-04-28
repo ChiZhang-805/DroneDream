@@ -160,6 +160,22 @@ class MockSimulatorAdapter(SimulatorAdapter):
                 dropout_rate = _clamp(float(sensor_degradation.get("dropout_rate", 0.0)), 0.0, 1.0)
             except (TypeError, ValueError):
                 dropout_rate = 0.0
+        battery = advanced_cfg.get("battery")
+        battery_initial_percent = 100.0
+        payload_kg = 0.0
+        if isinstance(battery, dict):
+            try:
+                battery_initial_percent = _clamp(
+                    float(battery.get("initial_percent", 100.0)),
+                    0.0,
+                    100.0,
+                )
+            except (TypeError, ValueError):
+                battery_initial_percent = 100.0
+            try:
+                payload_kg = _clamp(float(battery.get("mass_payload_kg", 0.0) or 0.0), 0.0, 20.0)
+            except (TypeError, ValueError):
+                payload_kg = 0.0
 
         rng = random.Random(ctx.seed * 31 + sum(ord(c) for c in ctx.scenario_type))
         jitter = rng.uniform(-0.04, 0.04)
@@ -170,7 +186,12 @@ class MockSimulatorAdapter(SimulatorAdapter):
         )
         max_error = rmse * 2.1 + rng.uniform(0.0, 0.15)
         overshoot_count = max(0, int(rmse * 3.0))
-        completion_time = 12.0 + rng.uniform(-0.4, 0.6)
+        completion_time = (
+            12.0
+            + rng.uniform(-0.4, 0.6)
+            + payload_kg * 0.04
+            + max(0.0, (100.0 - battery_initial_percent) * 0.006)
+        )
         final_error = rmse * 0.55
         score = 1.0 / (1.0 + rmse)
 
@@ -195,6 +216,8 @@ class MockSimulatorAdapter(SimulatorAdapter):
             "wind_penalty": round(wind_penalty, 4),
             "gust_penalty": round(gust_penalty, 4),
             "dropout_rate": round(dropout_rate, 4),
+            "battery_initial_percent": round(battery_initial_percent, 2),
+            "payload_kg": round(payload_kg, 3),
             "advanced_scenario_summary": {
                 "has_advanced": bool(advanced_cfg),
                 "gust_enabled": bool(isinstance(gusts, dict) and gusts.get("enabled")),
@@ -202,6 +225,9 @@ class MockSimulatorAdapter(SimulatorAdapter):
                 if isinstance(advanced_cfg.get("obstacles"), list)
                 else 0,
                 "dropout_rate": round(dropout_rate, 4),
+                "dropout_instability_risk": "high" if dropout_rate >= 0.5 else "normal",
+                "battery_initial_percent": round(battery_initial_percent, 2),
+                "payload_kg": round(payload_kg, 3),
             },
             "backend": self.backend_name,
             "track_type": ctx.job_config.track_type,

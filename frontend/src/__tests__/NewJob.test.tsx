@@ -254,6 +254,12 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
     fireEvent.change(screen.getByLabelText(/Dropout rate/i), {
       target: { value: "0.3" },
     });
+    fireEvent.change(screen.getByLabelText(/Baro noise \(m\)/i), {
+      target: { value: "0.4" },
+    });
+    fireEvent.change(screen.getByLabelText(/IMU noise scale/i), {
+      target: { value: "2.5" },
+    });
     fireEvent.change(screen.getByLabelText(/OpenAI API key/i), {
       target: { value: "sk-testing" },
     });
@@ -261,6 +267,8 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
     const payload = createSpy.mock.calls[0][0];
     expect(payload.advanced_scenario_config?.sensor_degradation?.dropout_rate).toBe(0.3);
+    expect(payload.advanced_scenario_config?.sensor_degradation?.baro_noise_m).toBe(0.4);
+    expect(payload.advanced_scenario_config?.sensor_degradation?.imu_noise_scale).toBe(2.5);
   });
 });
 

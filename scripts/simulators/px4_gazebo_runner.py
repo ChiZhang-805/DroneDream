@@ -891,6 +891,24 @@ def _compute_metrics(
 
     advanced = dict(advanced_scenario_config or {})
     sensor_deg = advanced.get("sensor_degradation") if isinstance(advanced.get("sensor_degradation"), dict) else {}
+    obstacle_count = (
+        len(advanced.get("obstacles", []))
+        if isinstance(advanced.get("obstacles"), list)
+        else 0
+    )
+    wind_gust_enabled = bool(
+        isinstance(advanced.get("wind_gusts"), dict)
+        and advanced.get("wind_gusts", {}).get("enabled")
+    )
+    advanced_warnings: list[str] = []
+    if obstacle_count > 0:
+        advanced_warnings.append(
+            "TODO: native Gazebo obstacle injection not implemented yet; continuing without obstacle physics."
+        )
+    if wind_gust_enabled:
+        advanced_warnings.append(
+            "TODO: native Gazebo gust model wiring not implemented yet; continuing with baseline wind only."
+        )
     return {
         "rmse": round(rmse, 6),
         "max_error": round(max_error, 6),
@@ -943,16 +961,12 @@ def _compute_metrics(
             "world": env.world,
             "advanced_scenario_summary": {
                 "enabled": bool(advanced),
-                "obstacle_count": len(advanced.get("obstacles", []))
-                if isinstance(advanced.get("obstacles"), list)
-                else 0,
+                "obstacle_count": obstacle_count,
                 "dropout_rate": float(sensor_deg.get("dropout_rate", 0.0))
                 if sensor_deg
                 else 0.0,
-                "wind_gust_enabled": bool(
-                    isinstance(advanced.get("wind_gusts"), dict)
-                    and advanced.get("wind_gusts", {}).get("enabled")
-                ),
+                "wind_gust_enabled": wind_gust_enabled,
+                "warnings": advanced_warnings,
             },
         },
     }

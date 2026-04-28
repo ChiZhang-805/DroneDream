@@ -182,6 +182,7 @@ def test_mock_adapter_includes_advanced_scenario_summary():
                         "period_s": 4,
                     },
                     "sensor_degradation": {"dropout_rate": 0.6},
+                    "battery": {"initial_percent": 75, "voltage_sag": True, "mass_payload_kg": 3.0},
                     "obstacles": [{"type": "cylinder"}],
                 }
             },
@@ -191,6 +192,7 @@ def test_mock_adapter_includes_advanced_scenario_summary():
     raw = result.metrics.raw_metric_json
     assert raw["advanced_scenario_summary"]["has_advanced"] is True
     assert raw["advanced_scenario_summary"]["gust_enabled"] is True
+    assert raw["advanced_scenario_summary"]["dropout_instability_risk"] == "high"
 
 
 @pytest.mark.parametrize(

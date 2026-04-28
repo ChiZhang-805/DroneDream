@@ -14,8 +14,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.config import get_settings
 from app import secrets as job_secrets
+from app.config import get_settings
 from app.orchestration.events import record_event
 
 
@@ -237,7 +237,8 @@ def get_job(db: Session, job_id: str, *, user: models.User | None = None) -> mod
     job = db.get(models.Job, job_id)
     if job is None:
         raise JobServiceError("JOB_NOT_FOUND", f"Job {job_id} was not found.", http_status=404)
-    if user is not None and job.user_id != user.id and not (get_settings().auth_mode == "disabled" and job.user_id is None):
+    auth_disabled_owned_null = get_settings().auth_mode == "disabled" and job.user_id is None
+    if user is not None and job.user_id != user.id and not auth_disabled_owned_null:
         raise JobServiceError("JOB_NOT_FOUND", f"Job {job_id} was not found.", http_status=404)
     return job
 
@@ -282,7 +283,7 @@ def rerun_job(
             else None
         ),
         advanced_scenario_config=(
-            schemas.ScenarioAdvancedConfig(**source.advanced_scenario_config_json)
+            schemas.AdvancedScenarioConfig(**source.advanced_scenario_config_json)
             if source.advanced_scenario_config_json
             else None
         ),
@@ -539,7 +540,7 @@ def to_job_schema(job: models.Job) -> schemas.Job:
             else None
         ),
         advanced_scenario_config=(
-            schemas.ScenarioAdvancedConfig(**job.advanced_scenario_config_json)
+            schemas.AdvancedScenarioConfig(**job.advanced_scenario_config_json)
             if job.advanced_scenario_config_json
             else None
         ),

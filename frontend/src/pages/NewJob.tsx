@@ -49,8 +49,12 @@ interface FormState {
   gust_direction_deg: string;
   gust_period_s: string;
   gps_noise_m: string;
+  baro_noise_m: string;
+  imu_noise_scale: string;
   dropout_rate: string;
   battery_initial_percent: string;
+  battery_voltage_sag: boolean;
+  mass_payload_kg: string;
   obstacles_json: string;
 }
 
@@ -81,8 +85,12 @@ const DEFAULTS: FormState = {
   gust_direction_deg: "0",
   gust_period_s: "10",
   gps_noise_m: "0",
+  baro_noise_m: "0",
+  imu_noise_scale: "1",
   dropout_rate: "0",
   battery_initial_percent: "100",
+  battery_voltage_sag: false,
+  mass_payload_kg: "",
   obstacles_json: "[]",
 };
 
@@ -231,6 +239,18 @@ function validate(form: FormState): FieldErrors {
     errors.openai_api_key = "API key required when strategy is gpt";
   }
   if (form.advanced_enabled) {
+    const gps = parseNumber(form.gps_noise_m);
+    if (gps === null || gps < 0 || gps > 100) {
+      errors.gps_noise_m = "Must be between 0 and 100";
+    }
+    const baro = parseNumber(form.baro_noise_m);
+    if (baro === null || baro < 0 || baro > 100) {
+      errors.baro_noise_m = "Must be between 0 and 100";
+    }
+    const imu = parseNumber(form.imu_noise_scale);
+    if (imu === null || imu < 0 || imu > 100) {
+      errors.imu_noise_scale = "Must be between 0 and 100";
+    }
     const dropout = parseNumber(form.dropout_rate);
     if (dropout === null || dropout < 0 || dropout > 1) {
       errors.dropout_rate = "Must be between 0 and 1";
@@ -239,13 +259,19 @@ function validate(form: FormState): FieldErrors {
     if (battery === null || battery < 0 || battery > 100) {
       errors.battery_initial_percent = "Must be between 0 and 100";
     }
+    if (form.mass_payload_kg.trim() !== "") {
+      const payloadMass = parseNumber(form.mass_payload_kg);
+      if (payloadMass === null || payloadMass < 0 || payloadMass > 20) {
+        errors.mass_payload_kg = "Must be between 0 and 20";
+      }
+    }
     if (form.gust_enabled) {
       const magnitude = parseNumber(form.gust_magnitude_mps);
       const direction = parseNumber(form.gust_direction_deg);
       const period = parseNumber(form.gust_period_s);
-      if (magnitude === null || magnitude < 0) errors.gust_magnitude_mps = "Must be >= 0";
-      if (direction === null || direction < 0 || direction > 360) errors.gust_direction_deg = "Must be 0-360";
-      if (period === null || period <= 0) errors.gust_period_s = "Must be > 0";
+      if (magnitude === null || magnitude < 0 || magnitude > 30) errors.gust_magnitude_mps = "Must be 0-30";
+      if (direction === null || direction < 0 || direction >= 360) errors.gust_direction_deg = "Must be 0-<360";
+      if (period === null || period <= 0 || period > 300) errors.gust_period_s = "Must be >0 and <=300";
     }
     try {
       const parsed = JSON.parse(form.obstacles_json);
@@ -308,13 +334,15 @@ function formToRequest(form: FormState): JobCreateRequest {
       obstacles: obstacles as [],
       sensor_degradation: {
         gps_noise_m: Number(form.gps_noise_m),
-        baro_noise_m: 0,
-        imu_noise_scale: 1,
+        baro_noise_m: Number(form.baro_noise_m),
+        imu_noise_scale: Number(form.imu_noise_scale),
         dropout_rate: Number(form.dropout_rate),
       },
       battery: {
         initial_percent: Number(form.battery_initial_percent),
-        voltage_sag: false,
+        voltage_sag: form.battery_voltage_sag,
+        mass_payload_kg:
+          form.mass_payload_kg.trim() === "" ? null : Number(form.mass_payload_kg),
       },
     };
   }
@@ -508,11 +536,23 @@ export function NewJob() {
               <Field label="GPS noise (m)" htmlFor="gps_noise_m">
                 <input id="gps_noise_m" type="number" step="0.1" value={form.gps_noise_m} onChange={handleTextChange("gps_noise_m")} />
               </Field>
+              <Field label="Baro noise (m)" htmlFor="baro_noise_m" error={errors.baro_noise_m}>
+                <input id="baro_noise_m" type="number" step="0.1" value={form.baro_noise_m} onChange={handleTextChange("baro_noise_m")} />
+              </Field>
+              <Field label="IMU noise scale" htmlFor="imu_noise_scale" error={errors.imu_noise_scale}>
+                <input id="imu_noise_scale" type="number" step="0.1" value={form.imu_noise_scale} onChange={handleTextChange("imu_noise_scale")} />
+              </Field>
               <Field label="Dropout rate" htmlFor="dropout_rate" error={errors.dropout_rate}>
                 <input id="dropout_rate" type="number" step="0.01" value={form.dropout_rate} onChange={handleTextChange("dropout_rate")} />
               </Field>
               <Field label="Battery initial percent" htmlFor="battery_initial_percent" error={errors.battery_initial_percent}>
                 <input id="battery_initial_percent" type="number" step="0.1" value={form.battery_initial_percent} onChange={handleTextChange("battery_initial_percent")} />
+              </Field>
+              <Field label="Battery voltage sag" htmlFor="battery_voltage_sag">
+                <input id="battery_voltage_sag" type="checkbox" checked={form.battery_voltage_sag} onChange={(e) => update("battery_voltage_sag", e.target.checked)} />
+              </Field>
+              <Field label="Payload mass (kg)" htmlFor="mass_payload_kg" error={errors.mass_payload_kg}>
+                <input id="mass_payload_kg" type="number" step="0.1" value={form.mass_payload_kg} onChange={handleTextChange("mass_payload_kg")} />
               </Field>
               <Field label="Obstacles JSON" htmlFor="obstacles_json" error={errors.obstacles_json}>
                 <textarea id="obstacles_json" rows={5} value={form.obstacles_json} onChange={(e) => update("obstacles_json", e.target.value)} />
