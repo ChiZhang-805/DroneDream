@@ -513,14 +513,14 @@ Runpod Connect 页面复制 5173 / 8000 / 6080 URL，然后写入：
 ```bash
 cd /workspace/DroneDream
 
-FRONTEND_URL="https://<pod-id>-5173.proxy.runpod.net"
-BACKEND_URL="https://<pod-id>-8000.proxy.runpod.net"
-GAZEBO_URL="https://<pod-id>-6080.proxy.runpod.net/vnc.html?autoconnect=1&resize=remote"
+FRONTEND_URL="https://fcnygw1ys9ggdy-5173.proxy.runpod.net"
+BACKEND_URL="https://fcnygw1ys9ggdy-8000.proxy.runpod.net"
+GAZEBO_URL="https://fcnygw1ys9ggdy-6080.proxy.runpod.net/vnc.html?autoconnect=1&resize=remote"
 
 python3 - <<PY
 from pathlib import Path
 p = Path('.env')
-text = p.read_text()
+text = p.read_text() if p.exists() else ""
 updates = {
     'VITE_API_BASE_URL': '$BACKEND_URL',
     'CORS_ORIGINS': '$FRONTEND_URL',
@@ -534,7 +534,7 @@ for line in text.splitlines():
     if '=' in line and not line.lstrip().startswith('#'):
         k = line.split('=', 1)[0]
         if k in updates:
-            out.append(f'{k}={updates[k]}')
+            out.append(f'{k}="{updates[k]}"')
             seen.add(k)
         else:
             out.append(line)
@@ -542,13 +542,13 @@ for line in text.splitlines():
         out.append(line)
 for k, v in updates.items():
     if k not in seen:
-        out.append(f'{k}={v}')
+        out.append(f'{k}="{v}"')
 p.write_text('\n'.join(out) + '\n')
 PY
 
 cat > frontend/.env.local <<EOF
-VITE_API_BASE_URL=$BACKEND_URL
-VITE_GAZEBO_VIEWER_URL=$GAZEBO_URL
+VITE_API_BASE_URL="$BACKEND_URL"
+VITE_GAZEBO_VIEWER_URL="$GAZEBO_URL"
 EOF
 ```
 
