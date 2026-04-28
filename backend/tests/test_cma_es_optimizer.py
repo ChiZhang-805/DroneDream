@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from app import models
 from app.orchestration import constants
 from app.orchestration.cma_es_optimizer import propose_next_generation
@@ -139,9 +141,13 @@ def test_cma_es_sigma_shrinks_with_generation():
         baseline_parameters=baseline,
         generation_index=4,
     )
-    early_delta = sum(abs(early.parameters[k] - baseline[k]) for k in constants.BASELINE_PARAMETERS)
-    late_delta = sum(abs(late.parameters[k] - baseline[k]) for k in constants.BASELINE_PARAMETERS)
-    assert late_delta <= early_delta
+    pattern = r"kp_xy=([0-9.]+)"
+    early_match = re.search(pattern, early.strategy)
+    late_match = re.search(pattern, late.strategy)
+    assert early_match is not None and late_match is not None
+    early_sigma = float(early_match.group(1))
+    late_sigma = float(late_match.group(1))
+    assert late_sigma < early_sigma
 
 
 def test_cma_es_avoids_duplicate_history_candidate():

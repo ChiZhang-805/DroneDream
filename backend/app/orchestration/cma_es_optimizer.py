@@ -75,20 +75,20 @@ def _seed_for(
     job_id: str,
     generation_index: int,
     center_candidate: models.CandidateParameterSet | None,
-    scored_history: list[models.CandidateParameterSet],
+    candidate_history: list[models.CandidateParameterSet],
 ) -> int:
     payload = {
         "job_id": job_id,
         "generation_index": generation_index,
         "center_candidate_id": center_candidate.id if center_candidate is not None else "baseline",
-        "scored": [
+        "history": [
             {
                 "id": c.id,
                 "g": c.generation_index,
                 "score": c.aggregated_score,
                 "params": {k: float(c.parameter_json.get(k, 0.0)) for k in _TUNABLE_KEYS},
             }
-            for c in sorted(scored_history, key=lambda c: (c.generation_index, c.id))
+            for c in sorted(candidate_history, key=lambda c: (c.generation_index, c.id))
         ],
     }
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
@@ -113,12 +113,11 @@ def propose_next_generation(
     if not center:
         center = {k: float(baseline_parameters[k]) for k in _TUNABLE_KEYS}
 
-    scored_history = [c for c in candidates if c.aggregated_score is not None]
     seed = _seed_for(
         job_id=job.id,
         generation_index=generation_index,
         center_candidate=center_candidate,
-        scored_history=scored_history,
+        candidate_history=candidates,
     )
     rng = random.Random(seed)
 
