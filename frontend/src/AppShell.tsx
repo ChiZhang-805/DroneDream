@@ -29,7 +29,7 @@ export function AppShell() {
       </aside>
       <div className="app-body">
         <header className="app-header">
-          <div className="app-header-title">DreamDrone —— Auto Parameter Tuning Platform</div>
+          <div className="app-header-title">DroneDream —— Auto Parameter Tuning Platform</div>
           <div className="app-header-meta">
             <span className="env-chip">live API</span>
           </div>
@@ -38,7 +38,10 @@ export function AppShell() {
           <Outlet />
         </main>
         <footer className="app-footer">
-          Author: Chi Zhang    Contact: cz005623@gmail.com
+          <div className="app-footer-content">
+            <span>Author: Chi Zhang</span>
+            <span>Contact: cz005623@gmail.com</span>
+          </div>
         </footer>
       </div>
     </div>

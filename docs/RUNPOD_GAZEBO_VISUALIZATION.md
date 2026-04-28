@@ -29,7 +29,7 @@ In Runpod **Edit Pod**, expose HTTP port `6080`.
 
 ```bash
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb x11vnc fluxbox novnc websockify wmctrl
+DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb x11vnc fluxbox novnc websockify wmctrl x11-utils
 ```
 
 ### 3.3 Start the helper script
@@ -49,16 +49,17 @@ Open Runpod 6080 HTTP proxy URL.
 ### 3.4 Configure frontend + simulator env
 
 ```bash
-VITE_GAZEBO_VIEWER_URL=https://<pod-id>-6080.proxy.runpod.net/vnc.html?autoconnect=1&resize=scale
+VITE_GAZEBO_VIEWER_URL=https://<pod-id>-6080.proxy.runpod.net/vnc.html?autoconnect=1&resize=scale&view_clip=0
 PX4_GAZEBO_HEADLESS=false
 DISPLAY=:99
-PX4_GAZEBO_LAUNCH_GUI_CLIENT=true
-PX4_GAZEBO_GUI_COMMAND="gz sim -g"
 GEOMETRY=1600x900x24
 PX4_GAZEBO_VNC_DESKTOP_GEOMETRY=1600x900x24
-PX4_GAZEBO_GUI_WINDOW_GEOMETRY=center
-PX4_GAZEBO_GUI_WINDOW_WIDTH=1280
-PX4_GAZEBO_GUI_WINDOW_HEIGHT=720
+PX4_GAZEBO_LAUNCH_GUI_CLIENT=true
+PX4_GAZEBO_GUI_COMMAND=
+PX4_GAZEBO_RAW_GUI_COMMAND="gz sim -g"
+PX4_GAZEBO_GUI_WINDOW_TITLE="Gazebo Sim"
+PX4_GAZEBO_GUI_WINDOW_MODE=fill
+PX4_GAZEBO_GUI_WINDOW_GEOMETRY=fill
 PX4_GAZEBO_DRAW_TRACK_MARKER=true
 PX4_GAZEBO_TRACK_MARKER_Z_OFFSET=0.03
 PX4_GAZEBO_TRACK_MARKER_COLOR="0 0.8 1 1"
@@ -69,7 +70,17 @@ QT_X11_NO_MITSHM=1
 
 
 The frontend iframe normalizes the noVNC URL to enforce `autoconnect=1`, `resize=scale`, and `view_clip=0` for better embedded scaling behavior.
-`gazebo_gui_client.sh` uses `wmctrl` to center the Gazebo GUI window on the virtual desktop. If `wmctrl` is unavailable, it logs a warning and continues without blocking the simulation.
+`gazebo_gui_client.sh` defaults to `fill` mode and tries to maximize/fill Gazebo in the noVNC desktop. Switch to centered 1280x720 mode with:
+
+```bash
+PX4_GAZEBO_GUI_WINDOW_MODE=center
+PX4_GAZEBO_GUI_WINDOW_GEOMETRY=center
+PX4_GAZEBO_GUI_WINDOW_WIDTH=1280
+PX4_GAZEBO_GUI_WINDOW_HEIGHT=720
+```
+
+Avoid `PX4_GAZEBO_GUI_COMMAND="gz sim -g"` because it bypasses the bundled wrapper (`scripts/simulators/gazebo_gui_client.sh`) and its wmctrl-based fill/center/geometry handling. Keep `PX4_GAZEBO_GUI_COMMAND` blank (default) or point it to the wrapper script, and customize the real GUI launch with `PX4_GAZEBO_RAW_GUI_COMMAND`.
+If `wmctrl` is unavailable, the wrapper logs a warning and continues without blocking the simulation.
 
 Then restart frontend (and backend/worker when needed) so env changes take effect.
 
@@ -78,6 +89,14 @@ Open JobDetail/TrialDetail to view the iframe panel.
 > noVNC/Xvfb only gives you a virtual desktop. To see Gazebo in that desktop,
 > the Gazebo GUI client must also run. PR5 adds wrapper-side auto-launch for
 > `gz sim -g` when GUI mode is explicitly enabled.
+
+If Gazebo still appears stuck in the top-left or clipped, check:
+
+- `command -v wmctrl`
+- `command -v xdpyinfo`
+- `/workspace/logs/window-manager.log`
+- per-trial `gui_stdout.log` / `gui_stderr.log`
+- `launch_config.json` (`gui_command`, `PX4_GAZEBO_GUI_WINDOW_MODE`)
 
 ## 4) Draw reference track in Gazebo
 

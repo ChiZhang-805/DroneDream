@@ -173,6 +173,13 @@ code {
   border-top: 1px solid var(--border);
 }
 
+.app-footer-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5rem;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
