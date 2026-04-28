@@ -16,10 +16,14 @@ describe("GazeboLivePanel", () => {
 
     const frame = screen.getByTitle("Gazebo live view");
     expect(frame).toBeInTheDocument();
-    expect(frame).toHaveAttribute(
-      "src",
-      "https://example.com/vnc.html?autoconnect=1",
-    );
+    const src = frame.getAttribute("src");
+    expect(src).toBeTruthy();
+    const parsed = new URL(src!);
+    expect(parsed.origin).toBe("https://example.com");
+    expect(parsed.pathname).toBe("/vnc.html");
+    expect(parsed.searchParams.get("autoconnect")).toBe("1");
+    expect(parsed.searchParams.get("resize")).toBe("scale");
+    expect(parsed.searchParams.get("view_clip")).toBe("0");
     expect(
       screen.getByText(/optional and intended for Runpod demo\/debug mode/i),
     ).toBeInTheDocument();
