@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.config import get_settings
 from app.orchestration.events import record_event
+from app.orchestration.repro_manifest import build_repro_manifest
 from app.services.pdf_report import generate_job_pdf_report
 from app.storage import get_artifact_storage
 
@@ -566,6 +567,62 @@ def ensure_job_artifacts(
     return ensure_mock_job_artifacts(db, job)
 
 
+
+
+def _upsert_repro_manifest_artifact(
+    db: Session,
+    *,
+    job_id: str,
+    path: Path,
+    storage_path: str,
+) -> models.Artifact:
+    existing = db.scalars(
+        select(models.Artifact)
+        .where(models.Artifact.owner_type == "job")
+        .where(models.Artifact.owner_id == job_id)
+        .where(models.Artifact.artifact_type == "repro_manifest_json")
+    ).first()
+    if existing is None:
+        existing = models.Artifact(
+            owner_type="job",
+            owner_id=job_id,
+            artifact_type="repro_manifest_json",
+            storage_path=storage_path,
+        )
+        db.add(existing)
+    existing.display_name = "Reproducibility manifest"
+    existing.storage_path = storage_path
+    existing.mime_type = "application/json"
+    existing.file_size_bytes = path.stat().st_size
+    return existing
+
+
+def ensure_repro_manifest_artifact(
+    db: Session,
+    *,
+    job: models.Job,
+    best: models.CandidateParameterSet,
+) -> models.Artifact:
+    root = (
+        _real_artifact_root()
+        if job.simulator_backend_requested == "real_cli"
+        else _default_artifact_root()
+    )
+    manifest_path = root / "jobs" / job.id / "job_artifacts" / "repro_manifest.json"
+    manifest_payload = build_repro_manifest(job=job, best=best)
+    _write_json(manifest_path, manifest_payload)
+    storage = get_artifact_storage()
+    storage_path = storage.put_file(
+        str(manifest_path),
+        f"jobs/{job.id}/job_artifacts/{manifest_path.name}",
+        "application/json",
+    )
+    return _upsert_repro_manifest_artifact(
+        db,
+        job_id=job.id,
+        path=manifest_path,
+        storage_path=storage_path,
+    )
 def _upsert_pdf_artifact(
     db: Session,
     *,
@@ -646,6 +703,16 @@ def generate_and_persist_report(
     report = persist_report(db, job=job, best=best, report_body=body)
     ensure_job_artifacts(db, job=job, report_body=body, best=best)
     try:
+        ensure_repro_manifest_artifact(db, job=job, best=best)
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.exception("repro manifest generation failed for job %s", job.id)
+        record_event(
+            db,
+            job.id,
+            "repro_manifest_generation_failed",
+            {"error": str(exc)},
+        )
+    try:
         ensure_job_pdf_artifact(db, job=job)
     except Exception as exc:  # pragma: no cover - defensive guard
         logger.exception("pdf report generation failed for job %s", job.id)
@@ -667,4 +734,5 @@ __all__ = [
     "generate_and_persist_report",
     "generate_summary_text",
     "persist_report",
+    "ensure_repro_manifest_artifact",
 ]
