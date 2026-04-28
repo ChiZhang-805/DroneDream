@@ -115,29 +115,21 @@ export function to2DViewBoxCoordinates(points: ReplayPoint[]): ViewBoxProjection
   return mapToViewBox(points.map((point) => ({ x: point.x, y: point.y })));
 }
 
-export function to3DViewBoxCoordinates(
+export function to3DProjectedCoordinates(
   points: ReplayPoint[],
   bounds?: ProjectionBounds,
 ): ViewBoxProjection {
-  const projectionBounds = bounds ?? getProjectionBounds(points);
-
-  const rangeX = projectionBounds.maxX - projectionBounds.minX || 1;
-  const rangeY = projectionBounds.maxY - projectionBounds.minY || 1;
-  const rangeZ = projectionBounds.maxZ - projectionBounds.minZ || 1;
-
-  const projected = points.map((point) => {
-    const nx = (point.x - projectionBounds.minX) / rangeX;
-    const ny = (point.y - projectionBounds.minY) / rangeY;
-    const nz = (point.z - projectionBounds.minZ) / rangeZ;
-
-    const isoX = (nx - ny) * 0.866;
-    const isoY = (nx + ny) * 0.5 - nz * 0.9;
-
-    return { x: isoX, y: isoY };
-  });
+  void bounds;
+  const projected = points.map((point) => ({
+    x: point.x - point.y * 0.5,
+    y: -point.z + (point.x + point.y) * 0.25,
+  }));
 
   return mapToViewBox(projected);
 }
+
+// Backward-compatible alias for existing imports/tests.
+export const to3DViewBoxCoordinates = to3DProjectedCoordinates;
 
 export function getCombinedBounds(tracks: ReplayPoint[][]): ProjectionBounds | null {
   const allPoints = tracks.flat();

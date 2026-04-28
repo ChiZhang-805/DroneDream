@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   extractPoints,
-  to3DViewBoxCoordinates,
+  to3DProjectedCoordinates,
 } from "../components/trajectoryReplayMath";
 
 describe("trajectoryReplayMath", () => {
@@ -33,7 +33,7 @@ describe("trajectoryReplayMath", () => {
   });
 
   it("3D projection returns finite SVG coordinates", () => {
-    const projected = to3DViewBoxCoordinates([
+    const projected = to3DProjectedCoordinates([
       { t: 0, x: 0, y: 0, z: 0 },
       { t: 1, x: 1, y: 2, z: 3 },
       { t: 2, x: 2, y: 0.5, z: -1 },
@@ -53,7 +53,7 @@ describe("trajectoryReplayMath", () => {
   });
 
   it("3D projection remains valid when all z are identical", () => {
-    const projected = to3DViewBoxCoordinates([
+    const projected = to3DProjectedCoordinates([
       { t: 0, x: 0, y: 0, z: 2 },
       { t: 1, x: 2, y: 1, z: 2 },
     ]);
