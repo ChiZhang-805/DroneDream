@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "$REPO_ROOT"
 
-"$ROOT_DIR/scripts/check-backend.sh"
-"$ROOT_DIR/scripts/check-worker.sh"
-"$ROOT_DIR/scripts/check-frontend.sh"
+./scripts/check-backend.sh
+./scripts/check-worker.sh
+./scripts/check-frontend.sh
