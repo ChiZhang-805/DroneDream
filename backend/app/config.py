@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,7 +36,7 @@ class Settings(BaseSettings):
     artifact_root: str = Field(default="/tmp/drone_dream_artifacts")
     worker_lease_seconds: int = Field(default=900)
     worker_stale_running_reclaim_enabled: bool = Field(default=True)
-    artifact_storage_backend: str = Field(default="local")
+    artifact_storage_backend: Literal["local", "s3"] = Field(default="local")
     s3_endpoint_url: str | None = Field(default=None)
     s3_region: str | None = Field(default=None)
     s3_bucket: str | None = Field(default=None)

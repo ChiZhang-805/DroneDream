@@ -1,25 +1,26 @@
 from __future__ import annotations
 
-import mimetypes
 from pathlib import Path
 from urllib.parse import urlparse
 
 from app.config import get_settings
-from app.storage.base import ArtifactStorage, StorageDownload
+from app.storage.base import ArtifactStorage
 
 
 class S3StorageConfigError(RuntimeError):
-    pass
+    """Raised when S3 backend is requested with invalid/missing config."""
 
 
 class S3ArtifactStorage(ArtifactStorage):
     def __init__(self) -> None:
         settings = get_settings()
         if not settings.s3_bucket:
-            raise S3StorageConfigError("S3_BUCKET is required when ARTIFACT_STORAGE_BACKEND=s3")
+            raise S3StorageConfigError(
+                "S3 backend requires S3_BUCKET when ARTIFACT_STORAGE_BACKEND=s3"
+            )
         if not settings.s3_access_key_id or not settings.s3_secret_access_key:
             raise S3StorageConfigError(
-                "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required "
+                "S3 backend requires S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY "
                 "when ARTIFACT_STORAGE_BACKEND=s3"
             )
         self.bucket = settings.s3_bucket
@@ -30,7 +31,7 @@ class S3ArtifactStorage(ArtifactStorage):
             import boto3  # type: ignore
         except ModuleNotFoundError as exc:
             raise S3StorageConfigError(
-                "boto3 is not installed; install backend storage dependencies"
+                "boto3 is not installed; install backend[storage] dependencies"
             ) from exc
         self._client = boto3.client(
             "s3",
@@ -40,24 +41,20 @@ class S3ArtifactStorage(ArtifactStorage):
             aws_secret_access_key=settings.s3_secret_access_key,
         )
 
-    def put_file(self, local_path: str, key: str, content_type: str | None = None) -> str:
+    def put_file(self, local_path: Path, key: str, content_type: str | None = None) -> str:
         object_key = f"{self.prefix}{key}" if self.prefix else key
         extra: dict[str, str] = {}
         if content_type:
             extra["ContentType"] = content_type
-        self._client.upload_file(local_path, self.bucket, object_key, ExtraArgs=extra or None)
+        self._client.upload_file(
+            str(local_path), self.bucket, object_key, ExtraArgs=extra or None
+        )
         return f"s3://{self.bucket}/{object_key}"
 
-    def open_for_download(self, storage_uri: str) -> StorageDownload:
+    def read_bytes(self, storage_uri: str) -> bytes:
         bucket, key = _parse_s3_uri(storage_uri)
-        res = self._client.get_object(Bucket=bucket, Key=key)
-        content = res["Body"].read()
-        ct = (
-            res.get("ContentType")
-            or mimetypes.guess_type(Path(key).name)[0]
-            or "application/octet-stream"
-        )
-        return StorageDownload(content=content, content_type=ct, filename=Path(key).name)
+        response = self._client.get_object(Bucket=bucket, Key=key)
+        return response["Body"].read()
 
     def exists(self, storage_uri: str) -> bool:
         bucket, key = _parse_s3_uri(storage_uri)
