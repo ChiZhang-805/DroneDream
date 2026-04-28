@@ -10,7 +10,7 @@ import {
   extractReferencePoints,
   getCombinedBounds,
   to2DViewBoxCoordinates,
-  to3DViewBoxCoordinates,
+  to3DProjectedCoordinates,
   type ReplayPoint,
 } from "./trajectoryReplayMath";
 
@@ -129,7 +129,7 @@ export function TrajectoryReplay({
     const project =
       viewMode === "3d"
         ? (points: ReplayPoint[]) =>
-            to3DViewBoxCoordinates(points, bounds ?? undefined)
+            to3DProjectedCoordinates(points, bounds ?? undefined)
         : (points: ReplayPoint[]) => to2DViewBoxCoordinates(points);
 
     const actual = project(actualPoints);
