@@ -399,8 +399,10 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
 
     renderWithJob(job.id);
 
-    const link = await screen.findByRole("link", { name: /download pdf report/i });
-    expect(link).toHaveAttribute("href", expect.stringContaining("/api/v1/artifacts/art_pdf/download"));
+    const downloadSpy = vi.spyOn(apiClient, "downloadArtifact").mockResolvedValue();
+    const button = await screen.findByRole("button", { name: /download pdf report/i });
+    button.click();
+    expect(downloadSpy).toHaveBeenCalledWith("art_pdf", `${job.id} report.pdf`);
   });
 
   it("does not show top Download PDF report button when no pdf artifact", async () => {
@@ -412,6 +414,6 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
 
     renderWithJob(job.id);
     await screen.findByText(/Baseline vs Optimized comparison/i);
-    expect(screen.queryByRole("link", { name: /download pdf report/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /download pdf report/i })).toBeNull();
   });
 });

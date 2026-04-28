@@ -146,6 +146,31 @@ describe("apiClient envelope handling", () => {
     );
   });
 
+
+  it("downloadArtifact sends Authorization header when configured", async () => {
+    vi.stubEnv("VITE_DEMO_AUTH_TOKEN", "demo-token");
+    vi.resetModules();
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response("file-bytes", {
+        status: 200,
+        headers: { "Content-Type": "application/octet-stream" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+    const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
+    const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const mod = await import("../api/client");
+    await mod.apiClient.downloadArtifact("art_1", "file.txt");
+    expect(createObjectURLSpy).toHaveBeenCalled();
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/artifacts/art_1/download",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer demo-token" }),
+      }),
+    );
+  });
+
   it("compareJobs posts job_ids payload", async () => {
     mockFetchOnce({
       success: true,

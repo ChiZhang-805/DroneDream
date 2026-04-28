@@ -48,7 +48,7 @@ def _job_payload_with_alias(job_schema: schemas.Job) -> dict[str, object]:
 def create_job(
     req: schemas.JobCreateRequest,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         job = job_service.create_job(db, req, user=user)
@@ -60,7 +60,7 @@ def create_job(
 @router.get("/jobs")
 def list_jobs(
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
     page: int = _PageQ,
     page_size: int = _PageSizeQ,
     status: schemas.JobStatus | None = _StatusQ,
@@ -85,7 +85,7 @@ def list_jobs(
 def compare_jobs(
     req: schemas.JobsCompareRequest,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         data = job_service.compare_jobs(db, req, user=user)
@@ -98,7 +98,7 @@ def compare_jobs(
 def compare_jobs_csv(
     job_ids: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> PlainTextResponse:
     req = schemas.JobsCompareRequest(job_ids=[item for item in job_ids.split(",") if item])
     try:
@@ -143,7 +143,7 @@ def compare_jobs_csv(
 def get_job(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         job = job_service.get_job(db, job_id, user=user)
@@ -156,7 +156,7 @@ def get_job(
 def rerun_job(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
     req: schemas.JobRerunRequest | None = None,
 ) -> dict[str, object]:
     try:
@@ -170,7 +170,7 @@ def rerun_job(
 def cancel_job(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         job = job_service.cancel_job(db, job_id, user=user)
@@ -183,7 +183,7 @@ def cancel_job(
 def list_job_trials(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         job = job_service.get_job(db, job_id, user=user)
@@ -197,7 +197,7 @@ def list_job_trials(
 def get_job_report(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         job = job_service.get_job(db, job_id, user=user)
@@ -276,7 +276,7 @@ def get_job_report(
 def list_job_artifacts(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         job = job_service.get_job(db, job_id, user=user)

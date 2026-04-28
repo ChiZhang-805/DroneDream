@@ -10,6 +10,9 @@ from app import models
 from app.config import get_settings
 from app.db import get_db
 
+_DEFAULT_USER_EMAIL = "default@drone-dream.local"
+_DEFAULT_USER_NAME = "Default User"
+
 
 def _extract_bearer_token(authorization: str | None) -> str | None:
     if not authorization:
@@ -21,13 +24,25 @@ def _extract_bearer_token(authorization: str | None) -> str | None:
     return token or None
 
 
-def get_current_user_optional(
+def _get_or_create_user(db: Session, *, email: str, display_name: str | None = None) -> models.User:
+    existing = db.scalars(select(models.User).where(models.User.email == email).limit(1)).first()
+    if existing is not None:
+        return existing
+
+    user = models.User(email=email, display_name=display_name or email)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def get_current_user(
     db: Annotated[Session, Depends(get_db)],
     request: Request,
-) -> models.User | None:
+) -> models.User:
     settings = get_settings()
     if settings.auth_mode == "disabled":
-        return None
+        return _get_or_create_user(db, email=_DEFAULT_USER_EMAIL, display_name=_DEFAULT_USER_NAME)
 
     if settings.auth_mode != "demo_token":
         raise HTTPException(
@@ -48,13 +63,5 @@ def get_current_user_optional(
             status_code=401,
             detail={"code": "UNAUTHORIZED", "message": "Invalid bearer token."},
         )
-    existing = db.scalars(select(models.User).where(models.User.email == email).limit(1)).first()
-    if existing is not None:
-        return existing
-    return models.User(email=email, display_name=email)
 
-
-def get_current_user(
-    user: Annotated[models.User | None, Depends(get_current_user_optional)],
-) -> models.User | None:
-    return user
+    return _get_or_create_user(db, email=email, display_name=email)

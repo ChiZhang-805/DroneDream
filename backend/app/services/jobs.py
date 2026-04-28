@@ -14,6 +14,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app import models, schemas
+from app.config import get_settings
 from app import secrets as job_secrets
 from app.orchestration.events import record_event
 
@@ -149,10 +150,16 @@ def _resolve_user(db: Session, user: models.User | None) -> models.User:
         db.add(created_email_user)
         db.flush()
         return created_email_user
-    existing = db.scalars(select(models.User).limit(1)).first()
+    existing = (
+        db.scalars(
+            select(models.User)
+            .where(models.User.email == "default@drone-dream.local")
+            .limit(1)
+        ).first()
+    )
     if existing is not None:
         return existing
-    created = models.User(display_name="Default User")
+    created = models.User(email="default@drone-dream.local", display_name="Default User")
     db.add(created)
     db.flush()
     return created
@@ -202,10 +209,16 @@ def list_jobs(
     if page_size < 1 or page_size > 200:
         raise JobServiceError("INVALID_INPUT", "page_size must be in [1, 200]", http_status=422)
 
-    resolved_user = _resolve_user(db, user)
-    owner_filter = or_(models.Job.user_id == resolved_user.id, models.Job.user_id.is_(None))
-    stmt = select(models.Job).where(owner_filter)
-    count_stmt = select(func.count(models.Job.id)).where(owner_filter)
+    stmt = select(models.Job)
+    count_stmt = select(func.count(models.Job.id))
+    if user is not None:
+        if get_settings().auth_mode == "disabled":
+            owner_filter = or_(models.Job.user_id == user.id, models.Job.user_id.is_(None))
+            stmt = stmt.where(owner_filter)
+            count_stmt = count_stmt.where(owner_filter)
+        else:
+            stmt = stmt.where(models.Job.user_id == user.id)
+            count_stmt = count_stmt.where(models.Job.user_id == user.id)
     if status is not None:
         stmt = stmt.where(models.Job.status == status)
         count_stmt = count_stmt.where(models.Job.status == status)
@@ -222,8 +235,9 @@ def list_jobs(
 
 def get_job(db: Session, job_id: str, *, user: models.User | None = None) -> models.Job:
     job = db.get(models.Job, job_id)
-    resolved_user = _resolve_user(db, user)
-    if job is None or (job.user_id is not None and job.user_id != resolved_user.id):
+    if job is None:
+        raise JobServiceError("JOB_NOT_FOUND", f"Job {job_id} was not found.", http_status=404)
+    if user is not None and job.user_id != user.id and not (get_settings().auth_mode == "disabled" and job.user_id is None):
         raise JobServiceError("JOB_NOT_FOUND", f"Job {job_id} was not found.", http_status=404)
     return job
 
