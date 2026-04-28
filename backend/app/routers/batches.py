@@ -27,7 +27,7 @@ def _raise(err: job_service.JobServiceError) -> None:
 def create_batch(
     req: schemas.BatchCreateRequest,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         batch = job_service.create_batch(db, req, user=user)
@@ -39,7 +39,7 @@ def create_batch(
 @router.get("/batches")
 def list_batches(
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         items = job_service.list_batches(db, user=user)
@@ -56,7 +56,7 @@ def list_batches(
 def get_batch(
     batch_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         batch = job_service.get_batch(db, batch_id, user=user)
@@ -69,7 +69,7 @@ def get_batch(
 def get_batch_jobs(
     batch_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         batch = job_service.get_batch(db, batch_id, user=user)
@@ -82,7 +82,7 @@ def get_batch_jobs(
 def cancel_batch(
     batch_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     try:
         batch = job_service.cancel_batch(db, batch_id, user=user)

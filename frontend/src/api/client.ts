@@ -57,6 +57,23 @@ export function artifactDownloadUrl(artifactId: string): string {
   return `${API_BASE_URL}/api/v1/artifacts/${encodeURIComponent(artifactId)}/download`;
 }
 
+async function triggerBrowserDownload(
+  content: Blob,
+  filename: string,
+): Promise<void> {
+  const objectUrl = URL.createObjectURL(content);
+  try {
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,
@@ -161,6 +178,41 @@ export const apiClient = {
   async listJobArtifacts(jobId: string): Promise<Artifact[]> {
     return request<Artifact[]>(
       `/jobs/${encodeURIComponent(jobId)}/artifacts`,
+    );
+  },
+
+  async downloadArtifact(artifactId: string, filename?: string): Promise<void> {
+    const url = artifactDownloadUrl(artifactId);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          ...authHeaders(),
+        },
+      });
+    } catch (networkError) {
+      throw new ApiClientError(
+        "NETWORK_ERROR",
+        networkError instanceof Error
+          ? networkError.message
+          : "Failed to download artifact.",
+        null,
+        0,
+      );
+    }
+
+    if (!response.ok) {
+      throw new ApiClientError(
+        "ARTIFACT_DOWNLOAD_FAILED",
+        `Failed to download artifact (HTTP ${response.status})`,
+        null,
+        response.status,
+      );
+    }
+
+    await triggerBrowserDownload(
+      await response.blob(),
+      filename ?? `artifact-${artifactId}`,
     );
   },
 

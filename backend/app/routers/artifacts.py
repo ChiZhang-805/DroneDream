@@ -28,7 +28,7 @@ def _is_under_allowed_root(path: Path, allowed_roots: list[Path]) -> bool:
 def download_artifact(
     artifact_id: str,
     db: Annotated[Session, Depends(get_db)],
-    user: Annotated[models.User | None, Depends(get_current_user)],
+    user: Annotated[models.User, Depends(get_current_user)],
 ) -> Response:
     artifact = db.get(models.Artifact, artifact_id)
     if artifact is None:
@@ -48,7 +48,7 @@ def download_artifact(
 
     if artifact.owner_type == "job":
         job = db.get(models.Job, artifact.owner_id)
-        if job is None or (user is not None and job.user_id != user.id):
+        if job is None or (job.user_id != user.id and not (get_settings().auth_mode == "disabled" and job.user_id is None)):
             raise HTTPException(
                 status_code=404,
                 detail={"code": "ARTIFACT_NOT_FOUND", "message": "Artifact not found."},
@@ -56,7 +56,8 @@ def download_artifact(
     elif artifact.owner_type == "trial":
         trial = db.get(models.Trial, artifact.owner_id)
         if trial is None or trial.job is None or (
-            user is not None and trial.job.user_id != user.id
+            trial.job.user_id != user.id
+            and not (get_settings().auth_mode == "disabled" and trial.job.user_id is None)
         ):
             raise HTTPException(
                 status_code=404,

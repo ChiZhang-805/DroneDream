@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiClient, ApiClientError, artifactDownloadUrl } from "../api/client";
+import { apiClient, ApiClientError } from "../api/client";
 import type {
   Job,
   JobEventInfo,
@@ -272,9 +272,18 @@ export function JobDetail() {
       />
       {pdfArtifact ? (
         <div>
-          <a className="btn" href={artifactDownloadUrl(pdfArtifact.id)} download>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              void apiClient.downloadArtifact(
+                pdfArtifact.id,
+                pdfArtifact.display_name ?? `${job.id}-report.pdf`,
+              )
+            }
+          >
             Download PDF report
-          </a>
+          </button>
         </div>
       ) : null}
       {rerunMutation.isError ? (

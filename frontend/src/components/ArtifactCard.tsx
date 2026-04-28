@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 import { apiClient } from "../api/client";
-import { artifactDownloadUrl } from "../api/client";
 import type { Artifact } from "../types/api";
 
 interface ArtifactCardProps {
@@ -85,13 +84,15 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
           Copy path
         </button>
         {isPdf ? (
-          <a
+          <button
+            type="button"
             className="btn"
-            href={artifactDownloadUrl(artifact.id)}
-            download
+            onClick={() =>
+              void apiClient.downloadArtifact(artifact.id, artifact.display_name ?? fileName)
+            }
           >
             Download PDF
-          </a>
+          </button>
         ) : null}
       </header>
 
