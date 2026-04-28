@@ -378,7 +378,7 @@ export interface PaginatedBatchJobs {
   total: number;
 }
 
-export interface JobsCompareRequest {
+export interface JobCompareRequest {
   job_ids: string[];
 }
 
@@ -400,9 +400,12 @@ export interface JobCompareItem {
   completed_at: string | null;
 }
 
-export interface JobsCompareResponse {
+export interface JobCompareResponse {
   items: JobCompareItem[];
 }
+
+export type JobsCompareRequest = JobCompareRequest;
+export type JobsCompareResponse = JobCompareResponse;
 
 // Standard API envelope (mirrors docs/04_API_SPEC.md §4). Exposed here so the
 // mock client can mimic the wire format before unwrapping for callers.
