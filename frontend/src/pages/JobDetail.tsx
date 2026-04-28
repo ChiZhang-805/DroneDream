@@ -24,11 +24,16 @@ import { GazeboLivePanel } from "../components/GazeboLivePanel";
 // docs/04_API_SPEC.md §12.
 const ACTIVE_POLL_INTERVAL_MS = 4000;
 
-function CandidateCell({ t }: { t: TrialSummary }) {
+function CandidateCell({
+  t,
+  optimizerStrategy,
+}: {
+  t: TrialSummary;
+  optimizerStrategy: Job["optimizer_strategy"];
+}) {
   const label = t.candidate_label ?? (t.candidate_is_baseline ? "baseline" : "—");
   const isCmaEsOptimizer =
-    t.candidate_source_type === "optimizer" &&
-    (t.candidate_label ?? "").toLowerCase().startsWith("cma_es_gen_");
+    t.candidate_source_type === "optimizer" && optimizerStrategy === "cma_es";
   // Phase 8: "llm_optimizer" rows must render as GPT Gen N, not collapse into
   // "Baseline". Tone classes fall through to "optimizer" for the LLM variant
   // so the existing CSS (orange/heuristic) still applies.
@@ -79,7 +84,10 @@ function PassBadge({ pass_flag }: { pass_flag: boolean | null }) {
   );
 }
 
-const TRIAL_COLUMNS: Column<TrialSummary>[] = [
+function buildTrialColumns(
+  optimizerStrategy: Job["optimizer_strategy"],
+): Column<TrialSummary>[] {
+  return [
   {
     key: "id",
     header: "Trial ID",
@@ -92,7 +100,7 @@ const TRIAL_COLUMNS: Column<TrialSummary>[] = [
   {
     key: "candidate",
     header: "Candidate",
-    render: (t) => <CandidateCell t={t} />,
+    render: (t) => <CandidateCell t={t} optimizerStrategy={optimizerStrategy} />,
   },
   { key: "seed", header: "Seed", render: (t) => t.seed },
   { key: "scenario_type", header: "Scenario", render: (t) => t.scenario_type },
@@ -118,7 +126,8 @@ const TRIAL_COLUMNS: Column<TrialSummary>[] = [
     align: "right",
     render: (t) => <Link to={`/trials/${t.id}`}>View</Link>,
   },
-];
+  ];
+}
 
 export function JobDetail() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -353,7 +362,7 @@ export function JobDetail() {
           />
         ) : (
           <DataTable
-            columns={TRIAL_COLUMNS}
+            columns={buildTrialColumns(job.optimizer_strategy)}
             rows={trials}
             rowKey={(t) => t.id}
             emptyState={
