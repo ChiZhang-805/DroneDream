@@ -48,6 +48,29 @@ class User(Base):
     )
 
     jobs: Mapped[list[Job]] = relationship(back_populates="user")
+    batch_jobs: Mapped[list[BatchJob]] = relationship(back_populates="user")
+
+
+class BatchJob(Base):
+    __tablename__ = "batch_jobs"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("bat"))
+    user_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("users.id"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="CREATED", index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped[User | None] = relationship(back_populates="batch_jobs")
+    jobs: Mapped[list[Job]] = relationship(back_populates="batch")
 
 
 class Job(Base):
@@ -105,6 +128,9 @@ class Job(Base):
     source_job_id: Mapped[str | None] = mapped_column(
         String(64), ForeignKey("jobs.id"), nullable=True, index=True
     )
+    batch_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("batch_jobs.id"), nullable=True, index=True
+    )
 
     # Timestamps.
     created_at: Mapped[datetime] = mapped_column(
@@ -133,6 +159,7 @@ class Job(Base):
     secrets: Mapped[list[JobSecret]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
+    batch: Mapped[BatchJob | None] = relationship(back_populates="jobs")
 
 
 class CandidateParameterSet(Base):

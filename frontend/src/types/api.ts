@@ -10,6 +10,13 @@ export type JobStatus =
   | "COMPLETED"
   | "FAILED"
   | "CANCELLED";
+export type BatchStatus =
+  | "CREATED"
+  | "QUEUED"
+  | "RUNNING"
+  | "COMPLETED"
+  | "FAILED"
+  | "CANCELLED";
 
 export const JOB_STATUSES: readonly JobStatus[] = [
   "CREATED",
@@ -192,6 +199,7 @@ export interface Job {
   baseline_candidate_id: string | null;
   best_candidate_id: string | null;
   source_job_id: string | null;
+  batch_id?: string | null;
   latest_error: JobError | null;
   created_at: string;
   updated_at: string;
@@ -332,6 +340,39 @@ export interface PaginatedJobs {
   items: Job[];
   page: number;
   page_size: number;
+  total: number;
+}
+
+export interface BatchCreateRequest {
+  name: string;
+  description?: string | null;
+  jobs: JobCreateRequest[];
+}
+
+export interface BatchProgress {
+  total_jobs: number;
+  completed_jobs: number;
+  failed_jobs: number;
+  cancelled_jobs: number;
+  running_jobs: number;
+  queued_jobs: number;
+  created_jobs: number;
+  terminal_jobs: number;
+}
+
+export interface BatchJob {
+  id: string;
+  name: string;
+  description: string | null;
+  status: BatchStatus;
+  progress: BatchProgress;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface PaginatedBatchJobs {
+  items: BatchJob[];
   total: number;
 }
 

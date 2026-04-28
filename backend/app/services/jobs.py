@@ -58,6 +58,7 @@ def _create_job_from_config(
     user: models.User,
     req: schemas.JobCreateRequest,
     source_job_id: str | None = None,
+    batch_id: str | None = None,
 ) -> models.Job:
     now = _now()
     job = models.Job(
@@ -87,6 +88,7 @@ def _create_job_from_config(
         progress_completed_trials=0,
         progress_total_trials=0,
         source_job_id=source_job_id,
+        batch_id=batch_id,
         queued_at=now,
         simulator_backend_requested=req.simulator_backend,
         optimizer_strategy=req.optimizer_strategy,
@@ -116,6 +118,7 @@ def _create_job_from_config(
             event_type="job_created",
             payload_json={
                 "source_job_id": source_job_id,
+                "batch_id": batch_id,
                 "simulator_backend": req.simulator_backend,
                 "optimizer_strategy": req.optimizer_strategy,
                 "max_iterations": req.max_iterations,
@@ -287,6 +290,142 @@ def rerun_job(
     return new_job
 
 
+def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.BatchProgress, str]:
+    by_status = {
+        "CREATED": 0,
+        "QUEUED": 0,
+        "RUNNING": 0,
+        "COMPLETED": 0,
+        "FAILED": 0,
+        "CANCELLED": 0,
+    }
+    for child in children:
+        if child.status in by_status:
+            by_status[child.status] += 1
+    total_jobs = len(children)
+    terminal_jobs = by_status["COMPLETED"] + by_status["FAILED"] + by_status["CANCELLED"]
+    if total_jobs > 0 and terminal_jobs == total_jobs:
+        if by_status["FAILED"] > 0:
+            status = "FAILED"
+        elif by_status["CANCELLED"] > 0:
+            status = "CANCELLED"
+        else:
+            status = "COMPLETED"
+    elif by_status["RUNNING"] > 0:
+        status = "RUNNING"
+    elif by_status["QUEUED"] > 0:
+        status = "QUEUED"
+    else:
+        status = "CREATED"
+    return (
+        schemas.BatchProgress(
+            total_jobs=total_jobs,
+            completed_jobs=by_status["COMPLETED"],
+            failed_jobs=by_status["FAILED"],
+            cancelled_jobs=by_status["CANCELLED"],
+            running_jobs=by_status["RUNNING"],
+            queued_jobs=by_status["QUEUED"],
+            created_jobs=by_status["CREATED"],
+            terminal_jobs=terminal_jobs,
+        ),
+        status,
+    )
+
+
+def to_batch_schema(batch: models.BatchJob) -> schemas.BatchJob:
+    progress, computed_status = _aggregate_batch_progress(batch.jobs)
+    completed_at = batch.completed_at
+    if computed_status in schemas.BATCH_TERMINAL_STATUSES and completed_at is None:
+        terminal_times = [
+            ts
+            for ts in (j.completed_at or j.failed_at or j.cancelled_at for j in batch.jobs)
+            if ts is not None
+        ]
+        completed_at = max(terminal_times) if terminal_times else None
+    return schemas.BatchJob(
+        id=batch.id,
+        name=batch.name,
+        description=batch.description,
+        status=computed_status,  # type: ignore[arg-type]
+        progress=progress,
+        created_at=batch.created_at,
+        updated_at=batch.updated_at,
+        completed_at=completed_at,
+    )
+
+
+def create_batch(
+    db: Session,
+    req: schemas.BatchCreateRequest,
+    *,
+    user: models.User | None = None,
+) -> models.BatchJob:
+    resolved_user = _resolve_user(db, user)
+    for child_req in req.jobs:
+        _validate_gpt_request(child_req)
+    batch = models.BatchJob(
+        user_id=resolved_user.id,
+        name=req.name,
+        description=req.description,
+        status="QUEUED",
+    )
+    db.add(batch)
+    db.flush()
+    for child_req in req.jobs:
+        _create_job_from_config(db, user=resolved_user, req=child_req, batch_id=batch.id)
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
+def list_batches(db: Session, *, user: models.User | None = None) -> list[models.BatchJob]:
+    resolved_user = _resolve_user(db, user)
+    return list(
+        db.scalars(
+            select(models.BatchJob)
+            .where(
+                or_(
+                    models.BatchJob.user_id == resolved_user.id,
+                    models.BatchJob.user_id.is_(None),
+                )
+            )
+            .order_by(models.BatchJob.created_at.desc())
+        )
+    )
+
+
+def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
+    batch = db.get(models.BatchJob, batch_id)
+    resolved_user = _resolve_user(db, user)
+    if batch is None or (batch.user_id is not None and batch.user_id != resolved_user.id):
+        raise JobServiceError(
+            "BATCH_NOT_FOUND",
+            f"Batch {batch_id} was not found.",
+            http_status=404,
+        )
+    return batch
+
+
+def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
+    batch = get_batch(db, batch_id, user=user)
+    for child in batch.jobs:
+        if child.status in schemas.JOB_TERMINAL_STATUSES:
+            continue
+        child.status = "CANCELLED"
+        child.cancelled_at = _now()
+        child.current_phase = None
+        db.add(
+            models.JobEvent(
+                job_id=child.id,
+                event_type="job_cancelled",
+                payload_json={"by": "batch"},
+            )
+        )
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
 def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> models.Job:
     job = get_job(db, job_id, user=user)
     if job.status in schemas.JOB_TERMINAL_STATUSES:
@@ -382,6 +521,7 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         baseline_candidate_id=job.baseline_candidate_id,
         best_candidate_id=job.best_candidate_id,
         source_job_id=job.source_job_id,
+        batch_id=job.batch_id,
         latest_error=latest_error,
         created_at=job.created_at,
         updated_at=job.updated_at,
