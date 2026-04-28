@@ -34,6 +34,7 @@ from typing import Any
 
 from app.config import get_settings
 from app.simulator.artifact_schema import (
+    infer_mime_type,
     validate_reference_track_payload,
     validate_telemetry_payload,
 )
@@ -167,7 +168,7 @@ def _parse_artifacts(raw: dict[str, Any]) -> list[ArtifactMetadata]:
             raise ValueError("artifact requires 'artifact_type' and 'storage_path'")
         mime_type = item.get("mime_type")
         if not isinstance(mime_type, str):
-            mime_type = _infer_mime_type(artifact_type)
+            mime_type = infer_mime_type(artifact_type)
         file_size = item.get("file_size_bytes")
         artifacts.append(
             ArtifactMetadata(
@@ -180,13 +181,6 @@ def _parse_artifacts(raw: dict[str, Any]) -> list[ArtifactMetadata]:
         )
     return artifacts
 
-
-def _infer_mime_type(artifact_type: str) -> str | None:
-    if artifact_type in {"telemetry_json", "reference_track_json", "trajectory_json"}:
-        return "application/json"
-    if artifact_type in {"worker_log", "simulator_stdout", "simulator_stderr"}:
-        return "text/plain"
-    return None
 
 
 def _is_under_allowed_root(path: Path) -> bool:
@@ -210,10 +204,13 @@ def _validate_known_artifact_payload(artifact: ArtifactMetadata) -> None:
     if artifact.artifact_type not in {"telemetry_json", "reference_track_json"}:
         return
     payload = json.loads(Path(artifact.storage_path).read_text(encoding="utf-8"))
-    if artifact.artifact_type == "telemetry_json":
+    errors = (
         validate_telemetry_payload(payload)
-    else:
-        validate_reference_track_payload(payload)
+        if artifact.artifact_type == "telemetry_json"
+        else validate_reference_track_payload(payload)
+    )
+    if errors:
+        raise ValueError("; ".join(errors))
 
 
 def _sanitize_artifacts_for_trial(

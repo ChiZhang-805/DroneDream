@@ -1,4 +1,4 @@
-"""Lightweight validators for real_cli artifact payload schemas."""
+"""Lightweight validators and helpers for real_cli artifact schemas."""
 
 from __future__ import annotations
 
@@ -9,65 +9,76 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _validate_sample(sample: Any, idx: int) -> None:
-    if not isinstance(sample, dict):
-        raise ValueError(f"telemetry sample[{idx}] must be an object")
-    required = ("t", "x", "y", "z")
-    for key in required:
-        if not _is_number(sample.get(key)):
-            raise ValueError(f"telemetry sample[{idx}] missing numeric '{key}'")
-    optional_numeric = (
-        "vx",
-        "vy",
-        "vz",
-        "roll",
-        "pitch",
-        "yaw",
-        "reference_x",
-        "reference_y",
-        "reference_z",
-    )
-    for key in optional_numeric:
-        if key in sample and sample[key] is not None and not _is_number(sample[key]):
-            raise ValueError(f"telemetry sample[{idx}] field '{key}' must be numeric")
+def infer_mime_type(artifact_type: str) -> str | None:
+    if artifact_type in {"telemetry_json", "reference_track_json", "trajectory_json"}:
+        return "application/json"
+    if artifact_type in {"worker_log", "simulator_stdout", "simulator_stderr"}:
+        return "text/plain"
+    return None
 
 
-def validate_telemetry_payload(payload: Any) -> None:
-    """Validate dronedream.telemetry.v1 payload shape.
+def validate_telemetry_payload(payload: object) -> list[str]:
+    """Return a list of schema validation errors for telemetry payloads."""
 
-    Raises ``ValueError`` when the payload is malformed.
-    """
-
+    errors: list[str] = []
     if not isinstance(payload, dict):
-        raise ValueError("telemetry payload must be a JSON object")
+        return ["telemetry payload must be a JSON object"]
+
     if payload.get("schema_version") != "dronedream.telemetry.v1":
-        raise ValueError("telemetry schema_version must be 'dronedream.telemetry.v1'")
+        errors.append("telemetry schema_version must be 'dronedream.telemetry.v1'")
+
     samples = payload.get("samples")
     if not isinstance(samples, list):
-        raise ValueError("telemetry payload must contain samples[]")
+        errors.append("telemetry payload must contain samples[]")
+        return errors
+
     for idx, sample in enumerate(samples):
-        _validate_sample(sample, idx)
+        if not isinstance(sample, dict):
+            errors.append(f"telemetry sample[{idx}] must be an object")
+            continue
+
+        for key in ("t", "x", "y", "z"):
+            if not _is_number(sample.get(key)):
+                errors.append(f"telemetry sample[{idx}] missing numeric '{key}'")
+
+        for key in (
+            "vx",
+            "vy",
+            "vz",
+            "roll",
+            "pitch",
+            "yaw",
+            "reference_x",
+            "reference_y",
+            "reference_z",
+        ):
+            if key in sample and sample[key] is not None and not _is_number(sample[key]):
+                errors.append(f"telemetry sample[{idx}] field '{key}' must be numeric")
+
+    return errors
 
 
-def validate_reference_track_payload(payload: Any) -> None:
-    """Validate dronedream.reference_track.v1 payload shape.
+def validate_reference_track_payload(payload: object) -> list[str]:
+    """Return a list of schema validation errors for reference-track payloads."""
 
-    Raises ``ValueError`` when the payload is malformed.
-    """
-
+    errors: list[str] = []
     if not isinstance(payload, dict):
-        raise ValueError("reference track payload must be a JSON object")
+        return ["reference track payload must be a JSON object"]
+
     if payload.get("schema_version") != "dronedream.reference_track.v1":
-        raise ValueError(
-            "reference track schema_version must be 'dronedream.reference_track.v1'"
-        )
+        errors.append("reference track schema_version must be 'dronedream.reference_track.v1'")
+
     points = payload.get("reference_track")
     if not isinstance(points, list):
-        raise ValueError("reference track payload must contain reference_track[]")
+        errors.append("reference track payload must contain reference_track[]")
+        return errors
+
     for idx, point in enumerate(points):
         if not isinstance(point, dict):
-            raise ValueError(f"reference_track[{idx}] must be an object")
+            errors.append(f"reference_track[{idx}] must be an object")
+            continue
         for axis in ("x", "y", "z"):
             if not _is_number(point.get(axis)):
-                raise ValueError(f"reference_track[{idx}] missing numeric '{axis}'")
+                errors.append(f"reference_track[{idx}] missing numeric '{axis}'")
 
+    return errors

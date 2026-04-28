@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -278,7 +279,7 @@ out.write_text(json.dumps(payload))
     assert types["reference_track_json"].mime_type == "application/json"
 
 
-def test_real_cli_malformed_telemetry_does_not_fail_success_trial(monkeypatch, tmp_path):
+def test_real_cli_malformed_telemetry_does_not_fail_success_trial(monkeypatch, tmp_path, caplog):
     fake = tmp_path / "fake_sim_bad_telemetry.py"
     fake.write_text(
         """
@@ -309,9 +310,16 @@ out.write_text(json.dumps(payload))
     )
     monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f"{sys.executable} {fake}")
     monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
-    result = RealCliSimulatorAdapter().run_trial(_ctx())
+    with caplog.at_level(logging.WARNING, logger="drone_dream.simulator.real_cli"):
+        result = RealCliSimulatorAdapter().run_trial(_ctx())
     assert result.success is True
     assert {a.artifact_type for a in result.artifacts} == {"telemetry_json"}
+    assert "artifact validation warning" in caplog.text
+
+
+def test_real_cli_artifact_schema_doc_exists() -> None:
+    doc = Path(__file__).resolve().parents[2] / "docs" / "REAL_CLI_ARTIFACT_SCHEMA.md"
+    assert doc.exists()
 
 
 if __name__ == "__main__":  # pragma: no cover
