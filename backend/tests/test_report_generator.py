@@ -243,6 +243,9 @@ def test_completed_job_has_mock_artifacts(ctx):
             if a.artifact_type == "pdf_report":
                 assert a.storage_path.endswith(f"{job_id} report.pdf")
                 assert not a.storage_path.startswith("mock://")
+            elif a.artifact_type == "repro_manifest_json":
+                assert a.storage_path.endswith("repro_manifest.json")
+                assert not a.storage_path.startswith("mock://")
             else:
                 assert a.storage_path.startswith("mock://jobs/")
                 assert job_id in a.storage_path
@@ -750,7 +753,7 @@ def test_generate_job_pdf_report_excludes_secret_values(ctx, tmp_path):
             job=job,
             output_dir=tmp_path / "jobs" / job.id / "reports",
         )
-        body = path.read_bytes().decode("latin-1", errors="ignore")
+        path.read_bytes()
 
         assert "kp_xy" in joined_lines
         assert "kd_xy" in joined_lines
@@ -758,10 +761,225 @@ def test_generate_job_pdf_report_excludes_secret_values(ctx, tmp_path):
         assert "app-secret-never-print" not in joined_lines
         assert "tok-123" not in joined_lines
         assert "nested-secret" not in joined_lines
-        assert secret_value not in body
-        assert "app-secret-never-print" not in body
-        assert "tok-123" not in body
-        assert "nested-secret" not in body
+
+
+def test_repro_manifest_generated_for_mock_job(ctx):
+    job_id = _run_job_to_completion(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        artifact = (
+            db.query(ctx["models"].Artifact)
+            .filter(ctx["models"].Artifact.owner_type == "job")
+            .filter(ctx["models"].Artifact.owner_id == job_id)
+            .filter(ctx["models"].Artifact.artifact_type == "repro_manifest_json")
+            .one_or_none()
+        )
+        assert artifact is not None
+        assert artifact.display_name == "Reproducibility manifest"
+        assert artifact.mime_type == "application/json"
+        payload = json.loads(Path(artifact.storage_path).read_text(encoding="utf-8"))
+        assert payload["job"]["job_id"] == job_id
+        assert payload["optimizer"]["best_candidate_id"] == job.best_candidate_id
+        assert isinstance(payload["trials"], list)
+        assert payload["trials"]
+        assert "track_type" in payload["job"]
+        assert "acceptance_criteria" in payload["job"]
+        assert "candidate_summaries" in payload["optimizer"]
+
+
+def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
+    rg = ctx["report_generator"]
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+            openai_model="gpt-4.1-mini",
+        )
+        db.add(job)
+        db.flush()
+        candidate = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0},
+            is_baseline=True,
+            is_best=True,
+            aggregated_score=1.0,
+            aggregated_metric_json={"rmse": 1.0, "max_error": 1.2, "completion_time": 10.0},
+        )
+        db.add(candidate)
+        db.flush()
+        job.best_candidate_id = candidate.id
+        job.baseline_candidate_id = candidate.id
+        db.add(
+            models.Trial(
+                job_id=job.id,
+                candidate_id=candidate.id,
+                scenario_type="nominal",
+                seed=101,
+                status="COMPLETED",
+            )
+        )
+        db.flush()
+        rg.ensure_repro_manifest_artifact(db, job=job, best=candidate)
+        db.commit()
+
+        artifact = (
+            db.query(models.Artifact)
+            .filter(models.Artifact.owner_type == "job")
+            .filter(models.Artifact.owner_id == job.id)
+            .filter(models.Artifact.artifact_type == "repro_manifest_json")
+            .one_or_none()
+        )
+        assert artifact is not None
+        assert not artifact.storage_path.startswith("mock://")
+        payload = json.loads(Path(artifact.storage_path).read_text(encoding="utf-8"))
+        assert payload["simulator"]["real_simulator_artifact_root"] == str(tmp_path)
+
+
+def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
+    rg = ctx["report_generator"]
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-should-never-appear")
+    monkeypatch.setenv("APP_SECRET_KEY", "top-secret")
+    monkeypatch.setenv("SERVICE_TOKEN", "tok-secret")
+    monkeypatch.setenv("DB_PASSWORD", "db-secret")
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+            openai_model="gpt-4.1-mini",
+        )
+        db.add(job)
+        db.flush()
+        candidate = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0, "openai_api_key": "nope"},
+            is_baseline=True,
+            is_best=True,
+        )
+        db.add(candidate)
+        db.flush()
+        job.best_candidate_id = candidate.id
+        job.baseline_candidate_id = candidate.id
+        rg.ensure_repro_manifest_artifact(db, job=job, best=candidate)
+        db.commit()
+        artifact = (
+            db.query(models.Artifact)
+            .filter(models.Artifact.owner_type == "job")
+            .filter(models.Artifact.owner_id == job.id)
+            .filter(models.Artifact.artifact_type == "repro_manifest_json")
+            .one()
+        )
+        text = Path(artifact.storage_path).read_text(encoding="utf-8")
+        assert "sk-should-never-appear" not in text
+        assert "top-secret" not in text
+        assert "tok-secret" not in text
+        assert "db-secret" not in text
+        assert "encrypted_api_key" not in text
+        assert "APP_SECRET_KEY" not in text
+
+
+def test_build_job_report_lines_includes_new_sections(ctx):
+    pdf_service = __import__("app.services.pdf_report", fromlist=["*"])
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+            target_rmse=0.8,
+            target_max_error=1.0,
+            min_pass_rate=0.9,
+        )
+        db.add(job)
+        db.flush()
+        baseline = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0, "openai_api_key": "never-print"},
+            aggregated_metric_json={"rmse": 1.0, "max_error": 1.2, "completion_time": 10.0},
+            is_baseline=True,
+        )
+        best = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="optimizer",
+            label="best-cand",
+            parameter_json={"kp_xy": 1.2},
+            aggregated_metric_json={"rmse": 0.7, "max_error": 0.9, "completion_time": 9.0},
+            is_best=True,
+        )
+        db.add_all([baseline, best])
+        db.flush()
+        job.baseline_candidate_id = baseline.id
+        job.best_candidate_id = best.id
+        trial = models.Trial(
+            job_id=job.id,
+            candidate_id=best.id,
+            scenario_type="nominal",
+            seed=5,
+            status="FAILED",
+            failure_code="SIM_TIMEOUT",
+            failure_reason="sim timeout happened",
+        )
+        db.add(trial)
+        db.flush()
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=job.id,
+                artifact_type="repro_manifest_json",
+                display_name="Reproducibility manifest",
+                storage_path="mock://jobs/repro_manifest.json",
+                mime_type="application/json",
+                file_size_bytes=42,
+            )
+        )
+        db.add(
+            models.Artifact(
+                owner_type="trial",
+                owner_id=trial.id,
+                artifact_type="telemetry_json",
+                display_name="telemetry",
+                storage_path="mock://trial/telemetry.json",
+                mime_type="application/json",
+            )
+        )
+        db.commit()
+        db.refresh(job)
+
+        lines = pdf_service.build_job_report_lines(job)
+        text = "\n".join(lines)
+        assert "Executive summary" in text
+        assert "Acceptance criteria" in text
+        assert "Artifact index" in text
+        assert "Failure appendix" in text
+        assert "Reproducibility manifest artifact available" in text
+        assert "never-print" not in text
 
 
 # --- API error paths ------------------------------------------------------

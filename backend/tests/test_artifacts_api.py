@@ -52,6 +52,33 @@ def test_download_pdf_artifact_success(client: TestClient, tmp_path: Path) -> No
     assert f"filename*=utf-8''{quote(f'{job_id} report.pdf')}" in content_disposition
 
 
+def test_download_repro_manifest_artifact_success(client: TestClient, tmp_path: Path) -> None:
+    job_id = _seed_job()
+    root = tmp_path / "real_artifacts"
+    path = root / "jobs" / job_id / "job_artifacts" / "repro_manifest.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('{"ok":true}\n', encoding="utf-8")
+
+    with db.SessionLocal() as session:
+        artifact = models.Artifact(
+            owner_type="job",
+            owner_id=job_id,
+            artifact_type="repro_manifest_json",
+            display_name="Reproducibility manifest",
+            storage_path=str(path),
+            mime_type="application/json",
+            file_size_bytes=path.stat().st_size,
+        )
+        session.add(artifact)
+        session.commit()
+        art_id = artifact.id
+
+    resp = client.get(f"/api/v1/artifacts/{art_id}/download")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("application/json")
+    assert resp.text == '{"ok":true}\n'
+
+
 def test_download_mock_artifact_rejected(client: TestClient) -> None:
     job_id = _seed_job()
     with db.SessionLocal() as session:

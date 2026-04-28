@@ -7,7 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, object_session
 
 from app import models
 
@@ -85,6 +86,39 @@ def _wrap_lines(lines: list[str], width: int = 105) -> list[str]:
         if rest:
             wrapped.append(rest)
     return wrapped
+
+
+def _pct_change(old: Any, new: Any) -> str:
+    if not isinstance(old, (int, float)) or not isinstance(new, (int, float)):
+        return "—"
+    if old == 0:
+        return "—"
+    return f"{((new - old) / old) * 100.0:+.1f}%"
+
+
+def _collect_artifacts(job: models.Job) -> tuple[list[models.Artifact], list[models.Artifact]]:
+    session = object_session(job)
+    if session is None:
+        return [], []
+    job_artifacts = list(
+        session.scalars(
+        select(models.Artifact)
+        .where(models.Artifact.owner_type == "job")
+        .where(models.Artifact.owner_id == job.id)
+        .order_by(models.Artifact.created_at.asc())
+    ).all()
+    )
+    trial_ids = [t.id for t in job.trials]
+    if not trial_ids:
+        return job_artifacts, []
+    trial_artifacts = list(
+        session.scalars(
+        select(models.Artifact)
+        .where(models.Artifact.owner_type == "trial")
+        .where(models.Artifact.owner_id.in_(trial_ids))
+    ).all()
+    )
+    return job_artifacts, trial_artifacts
 
 
 def _paginate_lines(wrapped_lines: list[str], lines_per_page: int = 52) -> list[list[str]]:
@@ -194,8 +228,36 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- Current generation / max iterations: {job.current_generation} / {job.max_iterations}")
     add(f"- Trials per candidate: {job.trials_per_candidate}")
 
+    baseline = next((c for c in job.candidates if c.id == job.baseline_candidate_id), None)
+    baseline_agg = {}
+    if baseline is not None and baseline.aggregated_metric_json is not None:
+        baseline_agg = baseline.aggregated_metric_json
+    best = next((c for c in job.candidates if c.id == job.best_candidate_id), None)
+    best_agg = (best.aggregated_metric_json or {}) if best is not None else {}
+
     add("")
-    add("2) Initial job settings")
+    add("2) Executive summary")
+    add(f"- Job status: {job.status}")
+    add(f"- Optimization outcome: {job.optimization_outcome or '—'}")
+    add(
+        "- Best candidate: "
+        f"{(best.label if best else '—')} / {(best.id if best else '—')}"
+    )
+    add(
+        "- Baseline vs best RMSE change: "
+        f"{_pct_change(baseline_agg.get('rmse'), best_agg.get('rmse'))}"
+    )
+    add(
+        "- Baseline vs best max_error change: "
+        f"{_pct_change(baseline_agg.get('max_error'), best_agg.get('max_error'))}"
+    )
+    add(
+        "- Baseline vs best completion_time change: "
+        f"{_pct_change(baseline_agg.get('completion_time'), best_agg.get('completion_time'))}"
+    )
+
+    add("")
+    add("3) Initial job settings")
     add(f"- Track type: {job.track_type}")
     reference_track = (
         [p for p in (job.reference_track_json or []) if isinstance(p, dict)]
@@ -240,13 +302,57 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- target_max_error: {_fmt_num(job.target_max_error, digits=3)}")
     add(f"- min_pass_rate: {_fmt_num(job.min_pass_rate, digits=3)}")
 
-    baseline = next((c for c in job.candidates if c.id == job.baseline_candidate_id), None)
-    baseline_agg = {}
-    if baseline is not None and baseline.aggregated_metric_json is not None:
-        baseline_agg = baseline.aggregated_metric_json
+    add("")
+    add("4) Acceptance criteria")
+    add(f"- target_rmse: {_fmt_num(job.target_rmse, digits=3)}")
+    add(f"- target_max_error: {_fmt_num(job.target_max_error, digits=3)}")
+    add(f"- min_pass_rate: {_fmt_num(job.min_pass_rate, digits=3)}")
+    pass_count = 0
+    completed_count = 0
+    for trial in best.trials if best is not None else []:
+        if trial.status != "COMPLETED" or trial.metric is None:
+            continue
+        completed_count += 1
+        if trial.metric.pass_flag:
+            pass_count += 1
+    pass_rate = (pass_count / completed_count) if completed_count else None
+    reasons: list[str] = []
+    if isinstance(job.target_rmse, (int, float)):
+        rmse_value = best_agg.get("rmse")
+        if not isinstance(rmse_value, (int, float)) or rmse_value > job.target_rmse:
+            reasons.append(
+                "rmse="
+                f"{_fmt_num(rmse_value, digits=3)} > "
+                f"target={_fmt_num(job.target_rmse, digits=3)}"
+            )
+    if isinstance(job.target_max_error, (int, float)):
+        max_error_value = best_agg.get("max_error")
+        if (
+            not isinstance(max_error_value, (int, float))
+            or max_error_value > job.target_max_error
+        ):
+            reasons.append(
+                "max_error="
+                f"{_fmt_num(max_error_value, digits=3)} > "
+                f"target={_fmt_num(job.target_max_error, digits=3)}"
+            )
+    if isinstance(job.min_pass_rate, (int, float)) and (
+        pass_rate is None or pass_rate < job.min_pass_rate
+    ):
+        reasons.append(
+            f"pass_rate={_fmt_num(pass_rate, digits=3)} < "
+            f"min={_fmt_num(job.min_pass_rate, digits=3)}"
+        )
+    add(f"- Best candidate meets acceptance: {'yes' if not reasons else 'no'}")
+    if reasons:
+        add("- Rejection reasons:")
+        for reason in reasons:
+            add(f"  - {reason}")
+    else:
+        add("- Rejection reasons: —")
 
     add("")
-    add("3) Baseline metrics")
+    add("5) Baseline metrics")
     add(f"- Baseline candidate id: {baseline.id if baseline else '—'}")
     if baseline is not None:
         baseline_pairs = _safe_pairs(baseline.parameter_json)
@@ -268,7 +374,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- Trial count: {done}/{total}")
 
     add("")
-    add("4) Candidate summary")
+    add("6) Candidate summary")
     sorted_candidates = sorted(
         job.candidates,
         key=lambda item: (item.generation_index, item.created_at),
@@ -307,7 +413,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         )
 
     add("")
-    add("5) Trial summary")
+    add("7) Trial summary")
     trial_to_label = {c.id: c.label or c.id for c in job.candidates}
     for trial in sorted(job.trials, key=lambda item: item.created_at):
         metric = trial.metric
@@ -329,10 +435,8 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         )
         add(details)
 
-    best = next((c for c in job.candidates if c.id == job.best_candidate_id), None)
-    best_agg = (best.aggregated_metric_json or {}) if best is not None else {}
     add("")
-    add("6) Best parameters")
+    add("8) Best parameters")
     add(f"- best candidate id: {best.id if best else '—'}")
     add(f"- best label: {best.label if best else '—'}")
     add(f"- best generation index: {best.generation_index if best else '—'}")
@@ -347,13 +451,71 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         for key, value in _safe_pairs(best.parameter_json):
             add(f"  - {key}: {value}")
 
+    add("")
+    add("9) Artifact index")
+    job_artifacts, trial_artifacts = _collect_artifacts(job)
+    if job_artifacts:
+        for artifact in job_artifacts:
+            add(
+                "- "
+                f"{artifact.artifact_type} | {artifact.display_name or '—'} | "
+                f"{artifact.mime_type or '—'} | size={artifact.file_size_bytes or '—'}"
+            )
+    else:
+        add("- Job-level artifacts: —")
+    trial_counts: dict[str, int] = {}
+    for artifact in trial_artifacts:
+        trial_counts[artifact.artifact_type] = trial_counts.get(artifact.artifact_type, 0) + 1
+    if trial_counts:
+        add("- Trial-level artifact counts:")
+        for artifact_type in sorted(trial_counts):
+            add(f"  - {artifact_type}: {trial_counts[artifact_type]}")
+    else:
+        add("- Trial-level artifact counts: —")
+
+    add("")
+    add("10) Failure appendix")
+    failed_trials = [t for t in job.trials if t.status == "FAILED"]
+    if job.status == "FAILED":
+        add(
+            "- Job failure: "
+            f"code={job.latest_error_code or '—'} "
+            f"reason={_truncate(job.latest_error_message, limit=180) or '—'}"
+        )
+    else:
+        add("- Job failure: —")
+    if failed_trials:
+        for trial in failed_trials:
+            add(
+                "- Trial failure: "
+                f"{trial.id} code={trial.failure_code or '—'} "
+                f"reason={_truncate(trial.failure_reason, limit=180) or '—'}"
+            )
+    else:
+        add("- Trial failures: —")
+
+    add("")
+    add("11) Reproducibility note")
+    repro_artifact = next(
+        (a for a in job_artifacts if a.artifact_type == "repro_manifest_json"),
+        None,
+    )
+    if repro_artifact is None:
+        add("- Reproducibility manifest artifact: —")
+    else:
+        add(
+            "- Reproducibility manifest artifact available: "
+            f"{repro_artifact.display_name or '—'}"
+        )
+        add("- Download from artifact list; PDF omits full manifest payload by design.")
+
     fallback = (
         f"Job {job.id} finished with status {job.status}. "
         f"Best candidate: {job.best_candidate_id or 'N/A'}."
     )
     summary = (report.summary_text if report and report.summary_text else None) or fallback
     add("")
-    add("7) Summary")
+    add("12) Summary")
     add(summary)
     return lines
 
