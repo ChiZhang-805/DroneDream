@@ -250,7 +250,9 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
       .mockResolvedValue({ id: "job_created" } as unknown as Job);
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /Show Advanced scenario/i }));
-    fireEvent.click(screen.getByLabelText(/Enable advanced scenario/i));
+    fireEvent.change(screen.getByLabelText(/Enable advanced scenario/i), {
+      target: { value: "yes" },
+    });
     fireEvent.change(screen.getByLabelText(/Dropout rate/i), {
       target: { value: "0.3" },
     });
