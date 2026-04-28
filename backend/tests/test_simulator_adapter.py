@@ -168,6 +168,31 @@ def test_mock_adapter_metrics_payload_fields_complete():
     assert raw["reference_track_point_count"] == 0
 
 
+def test_mock_adapter_includes_advanced_scenario_summary():
+    adapter = MockSimulatorAdapter()
+    result = adapter.run_trial(
+        _make_ctx(
+            scenario="combined_perturbed",
+            scenario_config={
+                "advanced_scenario_config": {
+                    "wind_gusts": {
+                        "enabled": True,
+                        "magnitude_mps": 3.0,
+                        "direction_deg": 10,
+                        "period_s": 4,
+                    },
+                    "sensor_degradation": {"dropout_rate": 0.6},
+                    "obstacles": [{"type": "cylinder"}],
+                }
+            },
+        )
+    )
+    assert result.metrics is not None
+    raw = result.metrics.raw_metric_json
+    assert raw["advanced_scenario_summary"]["has_advanced"] is True
+    assert raw["advanced_scenario_summary"]["gust_enabled"] is True
+
+
 @pytest.mark.parametrize(
     ("inject", "expected_code"),
     [

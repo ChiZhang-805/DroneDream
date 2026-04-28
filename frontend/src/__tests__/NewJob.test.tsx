@@ -233,6 +233,25 @@ describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
       { x: 5, y: 5, z: null },
     ]);
   });
+
+  it("submits advanced_scenario_config when advanced scenario is enabled", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "job_created" } as unknown as Job);
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /Show Advanced scenario/i }));
+    fireEvent.click(screen.getByLabelText(/Enable advanced scenario/i));
+    fireEvent.change(screen.getByLabelText(/Dropout rate/i), {
+      target: { value: "0.3" },
+    });
+    fireEvent.change(screen.getByLabelText(/OpenAI API key/i), {
+      target: { value: "sk-testing" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create job/i }));
+    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
+    const payload = createSpy.mock.calls[0][0];
+    expect(payload.advanced_scenario_config?.sensor_degradation?.dropout_rate).toBe(0.3);
+  });
 });
 
 describe("NewJob — failed submission", () => {

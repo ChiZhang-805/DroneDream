@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -76,6 +79,64 @@ def list_jobs(
         total=total,
     )
     return ok(page_data.model_dump(mode="json"))
+
+
+@router.post("/jobs/compare")
+def compare_jobs(
+    req: schemas.JobsCompareRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        data = job_service.compare_jobs(db, req, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    return ok(data.model_dump(mode="json"))
+
+
+@router.get("/jobs/compare.csv", response_class=PlainTextResponse)
+def compare_jobs_csv(
+    job_ids: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User | None, Depends(get_current_user)],
+) -> PlainTextResponse:
+    req = schemas.JobsCompareRequest(job_ids=[item for item in job_ids.split(",") if item])
+    try:
+        data = job_service.compare_jobs(db, req, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "job_id",
+            "status",
+            "track_type",
+            "simulator_backend",
+            "optimizer_strategy",
+            "optimization_outcome",
+            "trial_count",
+            "completed_trial_count",
+            "failed_trial_count",
+            "best_candidate_id",
+        ]
+    )
+    for item in data.items:
+        writer.writerow(
+            [
+                item.job_id,
+                item.status,
+                item.track_type,
+                item.simulator_backend,
+                item.optimizer_strategy,
+                item.optimization_outcome or "",
+                item.trial_count,
+                item.completed_trial_count,
+                item.failed_trial_count,
+                item.best_candidate_id or "",
+            ]
+        )
+    return PlainTextResponse(buf.getvalue(), media_type="text/csv")
 
 
 @router.get("/jobs/{job_id}")

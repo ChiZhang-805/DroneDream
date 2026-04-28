@@ -6,6 +6,7 @@ import { NewJob } from "./pages/NewJob";
 import { JobDetail } from "./pages/JobDetail";
 import { TrialDetail } from "./pages/TrialDetail";
 import { History } from "./pages/History";
+import { JobCompare } from "./pages/JobCompare";
 
 export const router = createBrowserRouter([
   {
@@ -17,6 +18,7 @@ export const router = createBrowserRouter([
       { path: "jobs/:jobId", element: <JobDetail /> },
       { path: "trials/:trialId", element: <TrialDetail /> },
       { path: "history", element: <History /> },
+      { path: "compare", element: <JobCompare /> },
     ],
   },
 ]);

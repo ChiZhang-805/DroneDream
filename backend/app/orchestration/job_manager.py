@@ -128,10 +128,13 @@ def _dispatch_llm_candidate_trials(
             candidate_id=candidate.id,
             seed=seed,
             scenario_type=scenario,
-            scenario_config_json=constants.optimizer_scenario_config(
-                scenario,
-                candidate_index=candidate.generation_index,
-                seed=seed,
+            scenario_config_json=constants.with_advanced_scenario(
+                constants.optimizer_scenario_config(
+                    scenario,
+                    candidate_index=candidate.generation_index,
+                    seed=seed,
+                ),
+                job.advanced_scenario_config_json,
             ),
             status="PENDING",
             queued_at=now,
@@ -170,7 +173,10 @@ def _dispatch_baseline_trials(
             candidate_id=candidate.id,
             seed=seed,
             scenario_type=scenario,
-            scenario_config_json=constants.baseline_scenario_config(scenario),
+            scenario_config_json=constants.with_advanced_scenario(
+                constants.baseline_scenario_config(scenario),
+                job.advanced_scenario_config_json,
+            ),
             status="PENDING",
             queued_at=now,
         )
@@ -249,8 +255,11 @@ def _dispatch_optimizer_trials(
             candidate_id=candidate.id,
             seed=seed,
             scenario_type=scenario,
-            scenario_config_json=constants.optimizer_scenario_config(
-                scenario, candidate_index=candidate.generation_index, seed=seed
+            scenario_config_json=constants.with_advanced_scenario(
+                constants.optimizer_scenario_config(
+                    scenario, candidate_index=candidate.generation_index, seed=seed
+                ),
+                job.advanced_scenario_config_json,
             ),
             status="PENDING",
             queued_at=now,

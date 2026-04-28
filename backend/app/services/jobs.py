@@ -77,6 +77,11 @@ def _create_job_from_config(
             if req.reference_track is not None
             else None
         ),
+        advanced_scenario_config_json=(
+            req.advanced_scenario_config.model_dump(mode="json")
+            if req.advanced_scenario_config is not None
+            else None
+        ),
         status="QUEUED",
         current_phase="queued",
         progress_completed_trials=0,
@@ -259,6 +264,11 @@ def rerun_job(
             if source.reference_track_json
             else None
         ),
+        advanced_scenario_config=(
+            schemas.ScenarioAdvancedConfig(**source.advanced_scenario_config_json)
+            if source.advanced_scenario_config_json
+            else None
+        ),
         simulator_backend=source.simulator_backend_requested,  # type: ignore[arg-type]
         optimizer_strategy=strategy,
         max_iterations=source.max_iterations,
@@ -356,6 +366,11 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         reference_track=(
             [schemas.TrackPoint(**point) for point in job.reference_track_json]
             if job.reference_track_json
+            else None
+        ),
+        advanced_scenario_config=(
+            schemas.ScenarioAdvancedConfig(**job.advanced_scenario_config_json)
+            if job.advanced_scenario_config_json
             else None
         ),
         status=job.status,  # type: ignore[arg-type]
@@ -468,3 +483,65 @@ def to_artifact_schema(artifact: models.Artifact) -> schemas.Artifact:
         file_size_bytes=artifact.file_size_bytes,
         created_at=artifact.created_at,
     )
+
+
+def compare_jobs(
+    db: Session,
+    req: schemas.JobsCompareRequest,
+    *,
+    user: models.User | None = None,
+) -> schemas.JobsCompareResponse:
+    resolved_user = _resolve_user(db, user)
+    ids = list(dict.fromkeys(req.job_ids))
+    rows = list(
+        db.scalars(
+            select(models.Job).where(
+                models.Job.id.in_(ids),
+                or_(models.Job.user_id == resolved_user.id, models.Job.user_id.is_(None)),
+            )
+        )
+    )
+    by_id = {row.id: row for row in rows}
+    missing = [job_id for job_id in ids if job_id not in by_id]
+    if missing:
+        raise JobServiceError(
+            "JOB_NOT_FOUND",
+            f"Job(s) not found: {', '.join(missing)}",
+            http_status=404,
+        )
+
+    items: list[schemas.JobCompareItem] = []
+    for job_id in ids:
+        job = by_id[job_id]
+        baseline_metrics = (
+            dict(job.report.baseline_metric_json or {}) if job.report is not None else None
+        )
+        optimized_metrics = (
+            dict(job.report.optimized_metric_json or {}) if job.report is not None else None
+        )
+        if job.status != "COMPLETED":
+            baseline_metrics = None
+            optimized_metrics = None
+        best_candidate = next((c for c in job.candidates if c.id == job.best_candidate_id), None)
+        items.append(
+            schemas.JobCompareItem(
+                job_id=job.id,
+                status=job.status,  # type: ignore[arg-type]
+                track_type=job.track_type,  # type: ignore[arg-type]
+                simulator_backend=job.simulator_backend_requested,  # type: ignore[arg-type]
+                optimizer_strategy=job.optimizer_strategy,  # type: ignore[arg-type]
+                optimization_outcome=job.optimization_outcome,  # type: ignore[arg-type]
+                baseline_metrics=baseline_metrics,
+                optimized_metrics=optimized_metrics,
+                best_candidate_id=job.best_candidate_id,
+                best_parameters=dict(best_candidate.parameter_json or {})
+                if best_candidate is not None
+                else {},
+                trial_count=len(job.trials),
+                completed_trial_count=sum(1 for t in job.trials if t.status == "COMPLETED"),
+                failed_trial_count=sum(1 for t in job.trials if t.status == "FAILED"),
+                created_at=job.created_at,
+                completed_at=job.completed_at,
+            )
+        )
+    return schemas.JobsCompareResponse(items=items)

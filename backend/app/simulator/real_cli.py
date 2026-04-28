@@ -99,13 +99,18 @@ def _trial_input_payload(ctx: TrialContext, output_path: Path) -> dict[str, Any]
         "sensor_noise_level": jc.sensor_noise_level,
         "objective_profile": jc.objective_profile,
     }
+    scenario_config = dict(ctx.scenario_config or {})
+    advanced = scenario_config.get("advanced_scenario_config")
+    if not isinstance(advanced, dict):
+        advanced = {}
     return {
         "trial_id": ctx.trial_id,
         "job_id": ctx.job_id,
         "candidate_id": ctx.candidate_id,
         "seed": ctx.seed,
         "scenario_type": ctx.scenario_type,
-        "scenario_config": ctx.scenario_config or {},
+        "scenario_config": scenario_config,
+        "advanced_scenario_config": advanced,
         # Canonical grouped object.
         "job_config": job_config,
         # Top-level convenience aliases (identical values).

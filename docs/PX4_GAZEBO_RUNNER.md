@@ -118,6 +118,7 @@ normally the `real_cli` trial directory):
 - `stdout.log`
 - `stderr.log`
 - `runner.log`
+- `launch_config.json` (includes advanced scenario config passthrough)
 - `trial_result.json`
 
 Artifacts are returned in `trial_result.json` metadata for telemetry,
@@ -218,6 +219,22 @@ Window selection order:
   - `evaluation_trimmed_landing_samples`
   - `evaluation_min_z`
   - `evaluation_max_z`
+
+---
+
+## 9) Advanced scenario config support level
+
+`advanced_scenario_config` is accepted from backend `trial_input.json` and is:
+
+- persisted to `launch_config.json` for downstream launch wrappers/scripts,
+- propagated to `raw_metric_json.advanced_scenario_summary`,
+- **non-blocking** (unsupported fields never fail a trial by themselves).
+
+Current PX4/Gazebo integration status in this repo:
+
+- wind gusts / sensor degradation / battery / obstacles are currently **passthrough metadata** for launch orchestration;
+- no full world/physics mutation is enforced by default scripts;
+- site operators can consume `launch_config.json` in custom wrappers to implement full behavior.
   - `evaluation_max_error_sample`
   - `crash_reason`
   - `evaluation_track_coverage`

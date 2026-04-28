@@ -145,4 +145,20 @@ describe("apiClient envelope handling", () => {
       }),
     );
   });
+
+  it("compareJobs posts job_ids payload", async () => {
+    mockFetchOnce({
+      success: true,
+      data: { items: [] },
+      error: null,
+    });
+    await apiClient.compareJobs(["job_1", "job_2"]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/jobs/compare",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ job_ids: ["job_1", "job_2"] }),
+      }),
+    );
+  });
 });

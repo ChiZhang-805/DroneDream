@@ -109,6 +109,51 @@ class TrackPoint(_Strict):
     z: float | None = None
 
 
+class ScenarioWindGusts(_Strict):
+    enabled: bool = False
+    magnitude_mps: Annotated[float, Field(ge=0.0, le=50.0)] = 0.0
+    direction_deg: Annotated[float, Field(ge=0.0, le=360.0)] = 0.0
+    period_s: Annotated[float, Field(ge=0.1, le=600.0)] = 10.0
+
+
+class ScenarioObstacle(_Strict):
+    type: Literal["cylinder", "box"]
+    x: float
+    y: float
+    z: float
+    radius: Annotated[float, Field(gt=0.0)] | None = None
+    size: list[Annotated[float, Field(gt=0.0)]] | None = None
+    height: Annotated[float, Field(gt=0.0)] = 1.0
+
+    @model_validator(mode="after")
+    def _validate_shape(self) -> ScenarioObstacle:
+        if self.type == "cylinder" and self.radius is None:
+            raise ValueError("cylinder obstacle requires radius")
+        if self.type == "box" and (self.size is None or len(self.size) != 3):
+            raise ValueError("box obstacle requires size=[x,y,z]")
+        return self
+
+
+class ScenarioSensorDegradation(_Strict):
+    gps_noise_m: Annotated[float, Field(ge=0.0, le=100.0)] = 0.0
+    baro_noise_m: Annotated[float, Field(ge=0.0, le=100.0)] = 0.0
+    imu_noise_scale: Annotated[float, Field(ge=0.0, le=10.0)] = 1.0
+    dropout_rate: Annotated[float, Field(ge=0.0, le=1.0)] = 0.0
+
+
+class ScenarioBattery(_Strict):
+    initial_percent: Annotated[float, Field(ge=0.0, le=100.0)] = 100.0
+    voltage_sag: bool = False
+    mass_payload_kg: Annotated[float, Field(ge=0.0, le=50.0)] | None = None
+
+
+class ScenarioAdvancedConfig(_Strict):
+    wind_gusts: ScenarioWindGusts | None = None
+    obstacles: list[ScenarioObstacle] = Field(default_factory=list)
+    sensor_degradation: ScenarioSensorDegradation | None = None
+    battery: ScenarioBattery | None = None
+
+
 class JobCreateRequest(_Strict):
     """POST /api/v1/jobs body."""
 
@@ -119,6 +164,7 @@ class JobCreateRequest(_Strict):
     sensor_noise_level: SensorNoiseLevel = "medium"
     objective_profile: ObjectiveProfile = "robust"
     reference_track: list[TrackPoint] | None = None
+    advanced_scenario_config: ScenarioAdvancedConfig | None = None
 
     simulator_backend: SimulatorBackend = "mock"
     optimizer_strategy: OptimizerStrategy = "gpt"
@@ -151,6 +197,7 @@ class Job(BaseModel):
     sensor_noise_level: SensorNoiseLevel
     objective_profile: ObjectiveProfile
     reference_track: list[TrackPoint] | None = None
+    advanced_scenario_config: ScenarioAdvancedConfig | None = None
     status: JobStatus
     progress: JobProgress
     baseline_candidate_id: str | None = None
@@ -286,6 +333,32 @@ class JobRerunRequest(_Strict):
     openai: OpenAIConfig | None = None
 
 
+class JobsCompareRequest(_Strict):
+    job_ids: list[str] = Field(min_length=2, max_length=10)
+
+
+class JobCompareItem(BaseModel):
+    job_id: str
+    status: JobStatus
+    track_type: TrackType
+    simulator_backend: SimulatorBackend
+    optimizer_strategy: OptimizerStrategy
+    optimization_outcome: OptimizationOutcome | None = None
+    baseline_metrics: dict[str, Any] | None = None
+    optimized_metrics: dict[str, Any] | None = None
+    best_candidate_id: str | None = None
+    best_parameters: dict[str, Any] = Field(default_factory=dict)
+    trial_count: int
+    completed_trial_count: int
+    failed_trial_count: int
+    created_at: datetime
+    completed_at: datetime | None = None
+
+
+class JobsCompareResponse(BaseModel):
+    items: list[JobCompareItem]
+
+
 __all__ = [
     "AcceptanceCriteria",
     "AggregatedMetrics",
@@ -305,9 +378,12 @@ __all__ = [
     "OptimizerStrategy",
     "PaginatedJobs",
     "SensorNoiseLevel",
+    "ScenarioAdvancedConfig",
     "SimulatorBackend",
     "StartPoint",
     "TrackType",
+    "JobsCompareRequest",
+    "JobsCompareResponse",
     "Trial",
     "TrialMetrics",
     "TrialStatus",

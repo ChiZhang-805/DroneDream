@@ -7,6 +7,7 @@ import type {
   Artifact,
   Job,
   JobCreateRequest,
+  JobsCompareResponse,
   JobRerunRequest,
   JobReport,
   JobStatus,
@@ -214,6 +215,18 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(req ?? {}),
     });
+  },
+
+  async compareJobs(jobIds: string[]): Promise<JobsCompareResponse> {
+    return request<JobsCompareResponse>("/jobs/compare", {
+      method: "POST",
+      body: JSON.stringify({ job_ids: jobIds }),
+    });
+  },
+
+  compareJobsCsvUrl(jobIds: string[]): string {
+    const joined = encodeURIComponent(jobIds.join(","));
+    return `${API_BASE_URL}/api/v1/jobs/compare.csv?job_ids=${joined}`;
   },
 };
 
