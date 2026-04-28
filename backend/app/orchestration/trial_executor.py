@@ -25,7 +25,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import case, or_, select, update
 from sqlalchemy.orm import Session
 
 from app import models
@@ -202,23 +202,55 @@ def claim_and_run_one_pending_trial(
         & (models.Trial.lease_expires_at.is_not(None))
         & (models.Trial.lease_expires_at <= now)
     )
-    stmt = select(models.Trial.id)
-    stmt = stmt.where(or_(claimable, stale_running)) if reclaim_enabled else stmt.where(claimable)
-    stmt = stmt.order_by(
-        models.Trial.queued_at.asc().nullsfirst(), models.Trial.created_at.asc()
-    ).limit(1)
-    trial_id = db.scalar(stmt)
-    if trial_id is None:
+    claim_pool = or_(claimable, stale_running) if reclaim_enabled else claimable
+    selected_trial = db.execute(
+        select(models.Trial.id, models.Trial.job_id, models.Trial.status)
+        .where(claim_pool)
+        .order_by(models.Trial.queued_at.asc().nullsfirst(), models.Trial.created_at.asc())
+        .limit(1)
+    ).one_or_none()
+    if selected_trial is None:
         return None
-    trial = db.get(models.Trial, trial_id)
-    if trial is None:
-        return None
+    trial_id = str(selected_trial.id)
+    job_id = str(selected_trial.job_id)
+    was_pending = selected_trial.status == "PENDING"
 
     backend_override: str | None = None
+    env_backend = _env_simulator_backend() if adapter is None else None
+
+    # --- Claim ----------------------------------------------------------
+    update_stmt = (
+        update(models.Trial)
+        .where(models.Trial.id == trial_id)
+        .where(claim_pool)
+        .values(
+            status="RUNNING",
+            worker_id=worker_id,
+            lease_owner=worker_id,
+            lease_expires_at=lease_until,
+            claimed_at=now,
+        )
+        .values(attempt_count=(models.Trial.attempt_count + 1))
+        .values(
+            started_at=case(
+                (models.Trial.started_at.is_(None), now),
+                else_=models.Trial.started_at,
+            )
+        )
+    )
+    claim_result = db.execute(update_stmt)
+    if claim_result.rowcount != 1:  # type: ignore[attr-defined]
+        db.rollback()
+        return None
+
+    trial = db.get(models.Trial, trial_id)
+    if trial is None:
+        db.rollback()
+        return None
     if adapter is None:
-        job_row = db.get(models.Job, trial.job_id)
+        job_row = db.get(models.Job, job_id)
         backend_override = _resolve_backend_override(
-            env_backend=_env_simulator_backend(),
+            env_backend=env_backend,
             job_backend_requested=(
                 str(job_row.simulator_backend_requested)
                 if job_row is not None and job_row.simulator_backend_requested
@@ -226,35 +258,7 @@ def claim_and_run_one_pending_trial(
             ),
         )
     sim = adapter or get_simulator_adapter(backend_override)
-
-    # --- Claim ----------------------------------------------------------
-    was_pending = trial.status == "PENDING"
-    expected_status = trial.status
-    expected_lease = trial.lease_expires_at
-    update_stmt = (
-        update(models.Trial)
-        .where(models.Trial.id == trial.id)
-        .where(models.Trial.status == expected_status)
-        .values(
-            status="RUNNING",
-            worker_id=worker_id,
-            lease_owner=worker_id,
-            lease_expires_at=lease_until,
-            claimed_at=now,
-            simulator_backend=sim.backend_name,
-        )
-    )
-    if expected_lease is None:
-        update_stmt = update_stmt.where(models.Trial.lease_expires_at.is_(None))
-    else:
-        update_stmt = update_stmt.where(models.Trial.lease_expires_at == expected_lease)
-    if trial.started_at is None:
-        update_stmt = update_stmt.values(started_at=now)
-    update_stmt = update_stmt.values(attempt_count=(models.Trial.attempt_count + 1))
-    claim_result = db.execute(update_stmt)
-    if claim_result.rowcount != 1:  # type: ignore[attr-defined]
-        db.rollback()
-        return None
+    trial.simulator_backend = sim.backend_name
     db.commit()
     db.refresh(trial)
     record_event(

@@ -408,12 +408,21 @@ def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) ->
 
 def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
     batch = get_batch(db, batch_id, user=user)
+    now = _now()
+    terminal_trials = {"COMPLETED", "FAILED", "CANCELLED"}
     for child in batch.jobs:
         if child.status in schemas.JOB_TERMINAL_STATUSES:
             continue
         child.status = "CANCELLED"
-        child.cancelled_at = _now()
+        child.cancelled_at = now
         child.current_phase = None
+        for trial in child.trials:
+            if trial.status in terminal_trials:
+                continue
+            trial.status = "CANCELLED"
+            trial.finished_at = now
+            trial.lease_owner = None
+            trial.lease_expires_at = None
         db.add(
             models.JobEvent(
                 job_id=child.id,
@@ -444,9 +453,17 @@ def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
             http_status=409,
         )
     now = _now()
+    terminal_trials = {"COMPLETED", "FAILED", "CANCELLED"}
     job.status = "CANCELLED"
     job.cancelled_at = now
     job.current_phase = None
+    for trial in job.trials:
+        if trial.status in terminal_trials:
+            continue
+        trial.status = "CANCELLED"
+        trial.finished_at = now
+        trial.lease_owner = None
+        trial.lease_expires_at = None
     db.add(models.JobEvent(job_id=job.id, event_type="job_cancelled", payload_json=None))
     db.commit()
     db.refresh(job)
