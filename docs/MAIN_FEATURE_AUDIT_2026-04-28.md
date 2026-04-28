@@ -36,3 +36,9 @@ This note records the verification run requested by the user to ensure `main` in
 - `cd frontend && npm run lint`
 - `cd frontend && npm run build`
 - `cd frontend && npm test`
+
+## 2026-04-28 re-verification in this workspace
+
+- Current branch is `work` (no local `main` branch exists in this clone).
+- `git remote -v` returned no remotes, so pushing/merging to public GitHub cannot be performed from this environment.
+- Re-ran full backend/frontend/script acceptance checks successfully in this workspace.
