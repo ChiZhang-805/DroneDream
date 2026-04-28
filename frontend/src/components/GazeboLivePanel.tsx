@@ -5,12 +5,29 @@ interface GazeboLivePanelProps {
   viewerUrl?: string;
 }
 
+function normalizeNoVncViewerUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    const url = new URL(trimmed);
+    url.searchParams.set("autoconnect", "1");
+    url.searchParams.set("resize", "scale");
+    url.searchParams.set("view_clip", "0");
+    return url.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
 export function GazeboLivePanel({ viewerUrl }: GazeboLivePanelProps) {
   const resolvedUrl =
     viewerUrl ?? (import.meta.env.VITE_GAZEBO_VIEWER_URL as string | undefined);
-  const trimmedUrl = resolvedUrl?.trim() ?? "";
+  const normalizedUrl = normalizeNoVncViewerUrl(resolvedUrl ?? "");
 
-  if (!trimmedUrl) {
+  if (!normalizedUrl) {
     return null;
   }
 
@@ -24,13 +41,16 @@ export function GazeboLivePanel({ viewerUrl }: GazeboLivePanelProps) {
           Gazebo live view is optional and intended for Runpod demo/debug mode.
           Normal optimization remains headless.
         </Alert>
-        <iframe
-          title="Gazebo live view"
-          src={trimmedUrl}
-          className="gazebo-live-iframe"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-        />
+        <div className="gazebo-live-frame-wrap">
+          <iframe
+            title="Gazebo live view"
+            src={normalizedUrl}
+            className="gazebo-live-iframe"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            scrolling="no"
+          />
+        </div>
       </div>
     </SectionCard>
   );

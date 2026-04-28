@@ -29,7 +29,7 @@ In Runpod **Edit Pod**, expose HTTP port `6080`.
 
 ```bash
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb x11vnc fluxbox novnc websockify
+DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb x11vnc fluxbox novnc websockify wmctrl
 ```
 
 ### 3.3 Start the helper script
@@ -49,11 +49,16 @@ Open Runpod 6080 HTTP proxy URL.
 ### 3.4 Configure frontend + simulator env
 
 ```bash
-VITE_GAZEBO_VIEWER_URL=https://<pod-id>-6080.proxy.runpod.net/vnc.html?autoconnect=1&resize=remote
+VITE_GAZEBO_VIEWER_URL=https://<pod-id>-6080.proxy.runpod.net/vnc.html?autoconnect=1&resize=scale
 PX4_GAZEBO_HEADLESS=false
 DISPLAY=:99
 PX4_GAZEBO_LAUNCH_GUI_CLIENT=true
 PX4_GAZEBO_GUI_COMMAND="gz sim -g"
+GEOMETRY=1600x900x24
+PX4_GAZEBO_VNC_DESKTOP_GEOMETRY=1600x900x24
+PX4_GAZEBO_GUI_WINDOW_GEOMETRY=center
+PX4_GAZEBO_GUI_WINDOW_WIDTH=1280
+PX4_GAZEBO_GUI_WINDOW_HEIGHT=720
 PX4_GAZEBO_DRAW_TRACK_MARKER=true
 PX4_GAZEBO_TRACK_MARKER_Z_OFFSET=0.03
 PX4_GAZEBO_TRACK_MARKER_COLOR="0 0.8 1 1"
@@ -61,6 +66,10 @@ PX4_GAZEBO_TRACK_MARKER_LINE_WIDTH=0.08
 LIBGL_ALWAYS_SOFTWARE=1
 QT_X11_NO_MITSHM=1
 ```
+
+
+The frontend iframe normalizes the noVNC URL to enforce `autoconnect=1`, `resize=scale`, and `view_clip=0` for better embedded scaling behavior.
+`gazebo_gui_client.sh` uses `wmctrl` to center the Gazebo GUI window on the virtual desktop. If `wmctrl` is unavailable, it logs a warning and continues without blocking the simulation.
 
 Then restart frontend (and backend/worker when needed) so env changes take effect.
 

@@ -4,7 +4,7 @@ set -euo pipefail
 DISPLAY="${DISPLAY:-:99}"
 VNC_PORT="${VNC_PORT:-5900}"
 NOVNC_PORT="${NOVNC_PORT:-6080}"
-GEOMETRY="${GEOMETRY:-1280x720x24}"
+GEOMETRY="${GEOMETRY:-1600x900x24}"
 LOG_DIR="/workspace/logs"
 
 mkdir -p "${LOG_DIR}"
@@ -67,6 +67,13 @@ for pid in "${XVFB_PID}" "${WM_PID}" "${X11VNC_PID}" "${NOVNC_PID}"; do
   fi
 done
 
+export PX4_GAZEBO_VNC_DESKTOP_GEOMETRY="${PX4_GAZEBO_VNC_DESKTOP_GEOMETRY:-${GEOMETRY}}"
+
+echo "DISPLAY=${DISPLAY}"
+echo "VNC_PORT=${VNC_PORT}"
+echo "NOVNC_PORT=${NOVNC_PORT}"
+echo "GEOMETRY=${GEOMETRY}"
+echo "PX4_GAZEBO_VNC_DESKTOP_GEOMETRY=${PX4_GAZEBO_VNC_DESKTOP_GEOMETRY}"
 echo "noVNC listening on 0.0.0.0:${NOVNC_PORT}"
 echo "Open Runpod ${NOVNC_PORT} HTTP proxy URL."
 

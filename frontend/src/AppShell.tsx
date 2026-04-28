@@ -24,12 +24,12 @@ export function AppShell() {
           ))}
         </nav>
         <div className="app-sidebar-footer">
-          <span className="phase-pill">Phase 6 · Live Backend</span>
+          <span className="phase-pill">DroneDream V1.0</span>
         </div>
       </aside>
       <div className="app-body">
         <header className="app-header">
-          <div className="app-header-title">DroneDream MVP</div>
+          <div className="app-header-title">DreamDrone —— Auto Parameter Tuning Platform</div>
           <div className="app-header-meta">
             <span className="env-chip">live API</span>
           </div>
@@ -38,7 +38,7 @@ export function AppShell() {
           <Outlet />
         </main>
         <footer className="app-footer">
-          Mock-first MVP · real backend persistence via /api/v1
+          Author: Chi Zhang    Contact: cz005623@gmail.com
         </footer>
       </div>
     </div>
