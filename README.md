@@ -8,6 +8,14 @@
   Purple-themed PX4/Gazebo drone track simulation, trajectory replay, artifact reporting, and automatic controller-parameter tuning.
 </p>
 
+## 📚 文档导航
+
+- [Architecture](./docs/ARCHITECTURE.md)
+- [API Quickstart](./docs/API_QUICKSTART.md)
+- [Simulator Adapters](./docs/SIMULATOR_ADAPTERS.md)
+- [Optimizer Guide](./docs/OPTIMIZER_GUIDE.md)
+- [Development Guide](./docs/DEVELOPMENT.md)
+
 ## ✨ 项目简介
 
 DroneDream 是一个 Web 端无人机轨迹仿真与自动调参平台。用户在前端配置赛道、起点、高度、风、传感器噪声、优化目标、仿真后端和优化策略；后端创建异步 Job；worker 执行 trial；`real_cli` 可接入 PX4/Gazebo SITL；最终生成 metrics、artifacts、Trajectory replay 和 PDF 报告。

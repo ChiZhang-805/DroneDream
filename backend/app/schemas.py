@@ -38,12 +38,21 @@ OptimizationOutcome = Literal[
     "simulator_unavailable",
     "llm_failed",
 ]
+BatchStatus = Literal[
+    "CREATED",
+    "QUEUED",
+    "RUNNING",
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED",
+]
 
 
 JOB_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 JOB_CANCELLABLE_STATUSES: frozenset[str] = frozenset(
     {"CREATED", "QUEUED", "RUNNING", "AGGREGATING"}
 )
+BATCH_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
 
 # --- Shared shapes ----------------------------------------------------------
@@ -185,6 +194,12 @@ class JobCreateRequest(_Strict):
         return self
 
 
+class BatchCreateRequest(_Strict):
+    name: Annotated[str, Field(min_length=1, max_length=255)]
+    description: str | None = Field(default=None, max_length=2000)
+    jobs: Annotated[list[JobCreateRequest], Field(min_length=1, max_length=50)]
+
+
 # --- Responses --------------------------------------------------------------
 
 
@@ -203,6 +218,7 @@ class Job(BaseModel):
     baseline_candidate_id: str | None = None
     best_candidate_id: str | None = None
     source_job_id: str | None = None
+    batch_id: str | None = None
     latest_error: JobErrorInfo | None = None
     created_at: datetime
     updated_at: datetime
@@ -231,6 +247,33 @@ class PaginatedJobs(BaseModel):
     items: list[Job]
     page: int
     page_size: int
+    total: int
+
+
+class BatchProgress(BaseModel):
+    total_jobs: int
+    completed_jobs: int
+    failed_jobs: int
+    cancelled_jobs: int
+    running_jobs: int
+    queued_jobs: int
+    created_jobs: int
+    terminal_jobs: int
+
+
+class BatchJob(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    status: BatchStatus
+    progress: BatchProgress
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None = None
+
+
+class PaginatedBatchJobs(BaseModel):
+    items: list[BatchJob]
     total: int
 
 

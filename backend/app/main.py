@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.db import init_db
 from app.response import err
 from app.routers import artifacts as artifacts_router
+from app.routers import batches as batches_router
 from app.routers import health
 from app.routers import jobs as jobs_router
 from app.routers import trials as trials_router
@@ -56,6 +57,7 @@ def create_app() -> FastAPI:
     # /api/v1 namespace for the real domain routes.
     api_v1 = FastAPI(title="DroneDream API v1", version=__version__)
     api_v1.include_router(jobs_router.router)
+    api_v1.include_router(batches_router.router)
     api_v1.include_router(trials_router.router)
     api_v1.include_router(artifacts_router.router)
 

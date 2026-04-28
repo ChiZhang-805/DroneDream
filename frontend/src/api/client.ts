@@ -5,11 +5,14 @@
 import type {
   ApiEnvelope,
   Artifact,
+  BatchCreateRequest,
+  BatchJob,
   Job,
   JobCreateRequest,
   JobsCompareResponse,
   JobRerunRequest,
   JobReport,
+  PaginatedBatchJobs,
   JobStatus,
   PaginatedJobs,
   Trial,
@@ -227,6 +230,31 @@ export const apiClient = {
   compareJobsCsvUrl(jobIds: string[]): string {
     const joined = encodeURIComponent(jobIds.join(","));
     return `${API_BASE_URL}/api/v1/jobs/compare.csv?job_ids=${joined}`;
+  },
+
+  async createBatch(req: BatchCreateRequest): Promise<BatchJob> {
+    return request<BatchJob>("/batches", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  },
+
+  async listBatches(): Promise<PaginatedBatchJobs> {
+    return request<PaginatedBatchJobs>("/batches");
+  },
+
+  async getBatch(batchId: string): Promise<BatchJob> {
+    return request<BatchJob>(`/batches/${encodeURIComponent(batchId)}`);
+  },
+
+  async listBatchJobs(batchId: string): Promise<Job[]> {
+    return request<Job[]>(`/batches/${encodeURIComponent(batchId)}/jobs`);
+  },
+
+  async cancelBatch(batchId: string): Promise<BatchJob> {
+    return request<BatchJob>(`/batches/${encodeURIComponent(batchId)}/cancel`, {
+      method: "POST",
+    });
   },
 };
 
