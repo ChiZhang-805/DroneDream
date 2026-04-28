@@ -1322,11 +1322,19 @@ GUI + software rendering 是高 CPU 模式。正式优化建议 headless + Traje
 
 ## 🧪 Quality checks
 
+在仓库根目录执行：
+
 ```bash
-./scripts/check-backend.sh
-./scripts/check-worker.sh
-./scripts/check-frontend.sh
-./scripts/check-all.sh
+./scripts/check-backend.sh   # backend: ruff + mypy + pytest
+./scripts/check-worker.sh    # worker: ruff
+./scripts/check-frontend.sh  # frontend: typecheck + lint + build + test
+./scripts/check-all.sh       # 依次执行 backend/worker/frontend
+```
+
+兼容入口（保留）：
+
+```bash
+./scripts/check.sh
 ```
 
 ## 🧭 API conventions

@@ -26,12 +26,13 @@ npm ci
 
 ## Local checks
 
-Scripts:
+在仓库根目录运行（脚本会自动切换到仓库根目录）：
 
-- `./scripts/check-backend.sh`
-- `./scripts/check-frontend.sh`
-- `./scripts/check-worker.sh`
-- `./scripts/check-all.sh`
+- `./scripts/check-backend.sh`：执行 `ruff check backend`、`mypy backend/app`、`pytest backend`
+- `./scripts/check-worker.sh`：执行 `ruff check worker`
+- `./scripts/check-frontend.sh`：执行 frontend 的 `typecheck/lint/build/test`
+- `./scripts/check-all.sh`：按顺序执行 backend、worker、frontend 三组检查
+- `./scripts/check.sh`：兼容入口（保留）
 
 Manual commands:
 
