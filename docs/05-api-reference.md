@@ -1,4 +1,4 @@
-# 04_API_SPEC.md
+# 05-api-reference.md
 
 > **Note on this revision.** The previously committed copy of this file had
 > every Chinese sentence truncated mid-character, rendering most prose
@@ -175,7 +175,7 @@ Request body (Phase 7 baseline — all Phase 8 fields below are optional):
 ```
 
 **Phase 8 optional fields** (see
-[`PHASE8_REAL_SIM_AND_GPT_TUNING.md`](PHASE8_REAL_SIM_AND_GPT_TUNING.md) for
+[`archive/phase8-real-sim-and-gpt-tuning.md`](archive/phase8-real-sim-and-gpt-tuning.md) for
 full details):
 
 ```json
