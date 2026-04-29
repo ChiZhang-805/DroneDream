@@ -3,11 +3,11 @@
 </p>
 
 <h1 align="center">🚁 DroneDream</h1>
-<p align="center">DroneDream —— Auto Parameter Tuning Platform</p>
+<p align="center">Auto Drone Control Parameters Tuning Platform</p>
 
 ## 项目简介
 
-DroneDream 是一个面向 PX4/Gazebo 的 Web 自动调参平台，支持仿真任务配置、异步优化执行、指标与 artifacts 管理、Trajectory Replay 和报告导出。
+DroneDream 是一个面向 PX4/Gazebo 的自动调参平台，支持仿真任务配置、高级赛道编辑、异步优化执行、实时 gazebo 运行观测、 artifacts 管理、Trajectory Replay 和 PDF 版报告导出。
 
 ## 核心能力
 
