@@ -7,7 +7,7 @@
 
 ## 项目简介
 
-DroneDream 是一个面向 PX4/Gazebo 的自动调参平台，支持多样化仿真任务配置、高级赛道编辑、异步优化执行、实时 gazebo 运行观测、 artifacts 管理、2D/3D Trajectory Replay 和 PDF 版报告导出。
+DroneDream 是一个面向 PX4/Gazebo 的无人机自动调参平台，支持多样化仿真任务配置、高级赛道编辑、异步优化执行、实时 gazebo 窗口观测、 artifacts 管理、2D/3D Trajectory Replay 和 PDF 版报告导出。
 
 ## 核心能力
 
@@ -35,8 +35,8 @@ DroneDream 是一个面向 PX4/Gazebo 的自动调参平台，支持多样化仿
 
 ### 1) Pod 配置
 
-- 镜像：Ubuntu 22.04 / PyTorch CUDA devel（示例：`runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04`）
-- Volume：`/workspace`，建议 200GB
+- 镜像：Ubuntu 22.04 / PyTorch CUDA（示例：`runpod/pytorch:2.4.0-py3.11-cuda12.4.1-ubuntu22.04`）
+- Volume：`/workspace`，建议 100GB
 - 端口：`5173, 8000, 6080, 8888`
 
 noVNC URL 示例（统一使用）：
