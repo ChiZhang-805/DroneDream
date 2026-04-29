@@ -10,6 +10,7 @@ import { JobCompare } from "./pages/JobCompare";
 import { BatchCreate } from "./pages/BatchCreate";
 import { BatchDetail } from "./pages/BatchDetail";
 import { Batches } from "./pages/Batches";
+import { ECE498 } from "./pages/ECE498";
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "batches/new", element: <BatchCreate /> },
       { path: "batches/:batchId", element: <BatchDetail /> },
       { path: "compare", element: <JobCompare /> },
+      { path: "ece498", element: <ECE498 /> },
     ],
   },
 ]);
