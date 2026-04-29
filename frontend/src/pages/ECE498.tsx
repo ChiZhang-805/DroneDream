@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { apiClient } from "../api/client";
@@ -93,11 +93,94 @@ export function ECE498() {
     <h1>ECE498</h1><p>Assignment 3 pipeline: baseline, tool-augmented, and tool + refinement evaluation.</p>
     <SectionCard title="Overview"><ul><li>Baseline: no external tool; evaluates fixed DroneDream baseline parameters.</li><li>Tool-Augmented: invokes the existing CMA-ES-style adaptive parameter tuning tool once.</li><li>Tool + Refinement: repeats CMA-ES proposal after verifier failure, up to two refinement turns.</li><li>Verifier: acceptance criteria based on RMSE, max error, and pass rate.</li></ul></SectionCard>
     {error && <Alert tone="danger" title="Error">{error}</Alert>}
-    <SectionCard title="Config"><input aria-label="start_x" value={form.start_x} onChange={update("start_x")} /><select aria-label="track_type" value={form.track_type} onChange={update("track_type")}><option value="circle">circle</option><option value="u_turn">u_turn</option><option value="lemniscate">lemniscate</option><option value="custom">custom</option></select></SectionCard>
+    <SectionCard title="Config">
+      <div className="form-grid">
+        <Field label="Track Type" htmlFor="track_type">
+          <select id="track_type" value={form.track_type} onChange={update("track_type")}>
+            <option value="circle">circle</option><option value="u_turn">u_turn</option><option value="lemniscate">lemniscate</option><option value="custom">custom</option>
+          </select>
+        </Field>
+        <Field label="Start X" htmlFor="start_x">
+          <input id="start_x" aria-label="start_x" type="number" step="any" value={form.start_x} onChange={update("start_x")} />
+        </Field>
+        <Field label="Start Y" htmlFor="start_y">
+          <input id="start_y" type="number" step="any" value={form.start_y} onChange={update("start_y")} />
+        </Field>
+        <Field label="Altitude (m)" htmlFor="altitude_m">
+          <input id="altitude_m" type="number" step="0.1" value={form.altitude_m} onChange={update("altitude_m")} />
+        </Field>
+        <Field label="Wind North" htmlFor="wind_north">
+          <input id="wind_north" type="number" step="any" value={form.wind_north} onChange={update("wind_north")} />
+        </Field>
+        <Field label="Wind East" htmlFor="wind_east">
+          <input id="wind_east" type="number" step="any" value={form.wind_east} onChange={update("wind_east")} />
+        </Field>
+        <Field label="Wind South" htmlFor="wind_south">
+          <input id="wind_south" type="number" step="any" value={form.wind_south} onChange={update("wind_south")} />
+        </Field>
+        <Field label="Wind West" htmlFor="wind_west">
+          <input id="wind_west" type="number" step="any" value={form.wind_west} onChange={update("wind_west")} />
+        </Field>
+        <Field label="Sensor Noise Level" htmlFor="sensor_noise_level">
+          <select id="sensor_noise_level" value={form.sensor_noise_level} onChange={update("sensor_noise_level")}>
+            <option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
+          </select>
+        </Field>
+        <Field label="Objective Profile" htmlFor="objective_profile">
+          <select id="objective_profile" value={form.objective_profile} onChange={update("objective_profile")}>
+            <option value="stable">stable</option><option value="fast">fast</option><option value="smooth">smooth</option><option value="robust">robust</option><option value="custom">custom</option>
+          </select>
+        </Field>
+        <Field label="Simulator Backend" htmlFor="simulator_backend">
+          <select id="simulator_backend" value={form.simulator_backend} onChange={update("simulator_backend")}>
+            <option value="mock">mock</option><option value="real_cli">real_cli</option>
+          </select>
+        </Field>
+        {form.simulator_backend === "real_cli" ? (
+          <Alert tone="warning" title="real_cli environment requirement">
+            real_cli requires REAL_SIMULATOR_COMMAND and PX4/Gazebo runner environment to be configured.
+          </Alert>
+        ) : null}
+        <Field label="Target RMSE" htmlFor="target_rmse">
+          <input id="target_rmse" type="number" step="any" value={form.target_rmse} onChange={update("target_rmse")} />
+        </Field>
+        <Field label="Target Max Error" htmlFor="target_max_error">
+          <input id="target_max_error" type="number" step="any" value={form.target_max_error} onChange={update("target_max_error")} />
+        </Field>
+        <Field label="Min Pass Rate" htmlFor="min_pass_rate">
+          <input id="min_pass_rate" type="number" min={0} max={1} step="0.01" value={form.min_pass_rate} onChange={update("min_pass_rate")} />
+        </Field>
+        {form.track_type === "custom" ? (
+          <Field label="Custom Reference Track JSON" htmlFor="reference_track_json">
+            <textarea id="reference_track_json" rows={5} value={form.reference_track_json} onChange={update("reference_track_json")} />
+          </Field>
+        ) : null}
+        <Field label="Advanced Scenario JSON" htmlFor="advanced_scenario_config_json" hint="Optional. Leave empty to disable advanced scenario config.">
+          <textarea id="advanced_scenario_config_json" rows={5} value={form.advanced_scenario_config_json} onChange={update("advanced_scenario_config_json")} />
+        </Field>
+      </div>
+    </SectionCard>
     <button disabled={running} onClick={() => void runMode("baseline_no_tool")}>Run Baseline (No Tool)</button>
     <button disabled={running} onClick={() => void runMode("tool_augmented")}>Run Tool-Augmented (CMA-ES)</button>
     <button disabled={running} onClick={() => void runMode("tool_refinement")}>Run Tool + Refinement (CMA-ES Loop)</button>
     <table><thead><tr><th>Mode</th><th>Job ID</th><th>Status</th><th>Pass / Fail</th></tr></thead><tbody>{results.map((r)=><tr key={r.jobId}><td>{r.mode}</td><td><Link to={`/jobs/${r.jobId}`}>{r.jobId}</Link></td><td>{r.jobStatus}</td><td>{r.pass?"Pass":"Fail"}</td></tr>)}</tbody></table>
     <table><thead><tr><th>Role</th><th>Candidate Label</th><th>Generation</th><th>Candidate ID</th><th>Pass / Fail</th></tr></thead><tbody>{allTurns.map((t)=><tr key={`${t.mode}-${t.candidateId}`}><td>{t.role}</td><td>{t.label}</td><td>{t.generationIndex}</td><td>{t.candidateId}</td><td>{t.pass?"Pass":"Fail"}</td></tr>)}</tbody></table>
   </div>;
+}
+
+interface FieldProps {
+  label: string;
+  htmlFor: string;
+  hint?: string;
+  children: ReactNode;
+}
+
+function Field({ label, htmlFor, hint, children }: FieldProps) {
+  return (
+    <div className="form-field">
+      <label htmlFor={htmlFor}>{label}</label>
+      {children}
+      {hint ? <span className="form-hint">{hint}</span> : null}
+    </div>
+  );
 }
