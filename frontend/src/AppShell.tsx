@@ -6,6 +6,7 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean }[] = [
   { to: "/batches/new", label: "New Batch" },
   { to: "/batches", label: "Batches" },
   { to: "/history", label: "History / Reports" },
+  { to: "/ece498", label: "ECE498" },
 ];
 
 export function AppShell() {

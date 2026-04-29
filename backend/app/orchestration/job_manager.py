@@ -307,7 +307,9 @@ def start_job(db: Session, job: models.Job) -> models.Job:
 
     total_trials = len(constants.BASELINE_SCENARIOS)
 
-    if job.optimizer_strategy == "heuristic":
+    if job.optimizer_strategy == "none":
+        pass
+    elif job.optimizer_strategy == "heuristic":
         proposals = generate_candidates(dict(constants.BASELINE_PARAMETERS))
         record_event(
             db,
