@@ -7,7 +7,7 @@
 
 ## 项目简介
 
-DroneDream 是一个面向 PX4/Gazebo 的自动调参平台，支持仿真任务配置、高级赛道编辑、异步优化执行、实时 gazebo 运行观测、 artifacts 管理、Trajectory Replay 和 PDF 版报告导出。
+DroneDream 是一个面向 PX4/Gazebo 的自动调参平台，支持多样化仿真任务配置、高级赛道编辑、异步优化执行、实时 gazebo 运行观测、 artifacts 管理、2D/3D Trajectory Replay 和 PDF 版报告导出。
 
 ## 核心能力
 
@@ -112,8 +112,6 @@ PX4_GAZEBO_GUI_WINDOW_RETRY_SECONDS=20
 PX4_GAZEBO_GUI_WINDOW_ENFORCE_SECONDS=30
 ```
 
-> 不要把 `PX4_GAZEBO_GUI_COMMAND` 设置成原始 `gz sim -g`。这会绕过仓库内置 `gazebo_gui_client.sh` 的 fill/center/resize 窗口逻辑。若需自定义 Gazebo GUI 原始命令，请使用 `PX4_GAZEBO_RAW_GUI_COMMAND`。
-
 ### 7) 写入 `frontend/.env.local`
 
 ```env
@@ -146,6 +144,6 @@ npm run dev -- --host 0.0.0.0 --port 5173
 
 ### 10) 在 Web UI 创建任务
 
-- 先创建 `real_cli + heuristic` 任务验证链路。
-- 可选：创建 `real_cli + gpt` 任务。
-- 可选：切回 headless 正式优化模式（`PX4_GAZEBO_HEADLESS=true`）。
+- 范例1： `real_cli + heuristic` 任务验证链路。
+- 范例2： 创建 `real_cli + gpt` 任务。
+- 范例3： 切回 headless 正式优化模式（`PX4_GAZEBO_HEADLESS=true`）。
