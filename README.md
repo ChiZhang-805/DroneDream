@@ -7,7 +7,7 @@
 
 ## 项目简介
 
-DroneDream 是一个面向 PX4/Gazebo 的 Web 端无人机自动调参平台，支持多样化仿真任务配置、高级赛道编辑、异步优化执行、实时 gazebo 窗口观测、 artifacts 管理、2D/3D Trajectory Replay 和 PDF 版报告导出。
+DroneDream 是一个面向 PX4/Gazebo 的 Web 端无人机自动调参平台，支持多样化的仿真任务配置、高级赛道编辑、异步优化执行、实时 gazebo 窗口观测、 artifacts 管理、2D/3D Trajectory Replay 和 PDF 版报告导出。
 
 ## 核心能力
 
