@@ -1,4 +1,4 @@
-# 02_ARCHITECTURE.md
+# 02_02-architecture.md
 
 ## 1. 文档信息
 
@@ -725,7 +725,7 @@ Candidate 是参数层，Trial 是执行层，不能混。
 
 ## 22. Summary
 
-`02_ARCHITECTURE.md` 的核心作用，是确保 DroneDream 不会被实现成：
+`02_02-architecture.md` 的核心作用，是确保 DroneDream 不会被实现成：
 
 - 一个只有页面的 demo
 - 一个和 simulator 强绑定的脚本集合
@@ -765,7 +765,7 @@ dispatch, aggregation, report generation) remain intact.
 
 | Layer | Module | Role |
 |---|---|---|
-| Simulator Execution | `backend/app/simulator/real_cli.py` | `RealCliSimulatorAdapter` — subprocess adapter that speaks the JSON file protocol defined in `PHASE8_REAL_SIM_AND_GPT_TUNING.md`. Registered in `simulator/factory.py` as `real_cli`. |
+| Simulator Execution | `backend/app/simulator/real_cli.py` | `RealCliSimulatorAdapter` — subprocess adapter that speaks the JSON file protocol defined in `archive/phase8-real-sim-and-gpt-tuning.md`. Registered in `simulator/factory.py` as `real_cli`. |
 | Simulator Execution | `scripts/simulators/example_real_simulator.py` | Reference external simulator used by tests and by the `real_cli` demo. |
 | Orchestration | `backend/app/orchestration/acceptance.py` | `evaluate_candidate()` — deterministic acceptance check (pass-rate, RMSE, max-error). |
 | Optimization Strategy | `backend/app/orchestration/llm_parameter_proposer.py` | Server-side OpenAI client; validates + clamps + dedups proposals. Emits `llm_proposal_{started,completed,failed}` `JobEvent`s. |
@@ -801,6 +801,6 @@ is used.
   persisting a new `CandidateParameterSet`. GPT cannot control the worker
   or execute simulations directly.
 
-See [`PHASE8_REAL_SIM_AND_GPT_TUNING.md`](PHASE8_REAL_SIM_AND_GPT_TUNING.md)
+See [`archive/phase8-real-sim-and-gpt-tuning.md`](archive/phase8-real-sim-and-gpt-tuning.md)
 for the adapter protocol, prompt/response schemas, env vars, and
 verification commands.

@@ -103,7 +103,7 @@ exact spelling above.
 ## Phase history (historical — all phases complete)
 
 The MVP followed the canonical execution plan in
-[`docs/07_EXECUTION_PLAN.md`](./07_EXECUTION_PLAN.md) (§3.2). The ordering —
+[`docs/archive/execution-plan.md`](./archive/execution-plan.md) (§3.2). The ordering —
 frontend skeleton first, then real backend, then async worker framework, then
 simulator adapter, then optimization loop — was the product's "close the loop
 first, replace mocks later" strategy and is preserved here so future
@@ -165,7 +165,7 @@ complete; current state lives in the sections above this one.**
   info, rerun creates a new job and preserves the original, invalid input is
   rejected on both frontend and backend, terminal jobs are not cancellable
   again, charts render from persisted metrics (no mock fallback).
-  Shipped [`docs/ACCEPTANCE_REPORT.md`](./ACCEPTANCE_REPORT.md).
+  Shipped [`docs/archive/acceptance-report.md`](./acceptance-report.md).
 - **Post-Phase-7 hardening.**
   Documentation drift corrected, `POST /api/v1/jobs` response contract
   clarified (full `Job` object plus a backward-compatible `job_id` alias),

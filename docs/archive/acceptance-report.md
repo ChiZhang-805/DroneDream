@@ -282,12 +282,12 @@ After Phase 7 shipped, the following hardening landed in a follow-up PR.
 No product behavior changed; no new features were added.
 
 - **Documentation drift corrected.** Root, backend, and frontend READMEs,
-  `docs/IMPLEMENTATION_NOTES.md`, and Python docstrings on
+  `docs/01-overview.md`, and Python docstrings on
   `backend/app/main.py`, `backend/app/services/jobs.py`,
   `backend/app/orchestration/runner.py`, and
   `worker/drone_dream_worker/main.py` no longer reference obsolete
   Phase 0 / 2 / 3 / 5 scope; they describe the current Phase 7 behavior.
-  `docs/04_API_SPEC.md` and `docs/06_ACCEPTANCE_CRITERIA.md` were
+  `docs/05-api-reference.md` and `docs/archive/acceptance-criteria.md` were
   rewritten in readable Markdown to replace the previously-committed
   files that had UTF-8 encoding artifacts and collapsed lines.
 - **API create/rerun response contract clarified.** `POST /api/v1/jobs`
