@@ -202,7 +202,7 @@ workspace or launch graph. Instead:
 - the lower-level site-specific launcher must write telemetry artifacts the
   runner can ingest.
 
-See `docs/PX4_GAZEBO_RUNNER.md` for env vars, command template tokens,
+See `docs/08-px4-gazebo.md` for env vars, command template tokens,
 telemetry schema, metric formulas, and failure mappings.
 
 ---
@@ -460,4 +460,4 @@ After a job report is finalized, the backend now also generates a PDF report art
 
 ## Phase 8 visualization addendum (PR3)
 
-For browser-native trajectory replay and optional Runpod noVNC Gazebo iframe setup, see [docs/RUNPOD_GAZEBO_VISUALIZATION.md](RUNPOD_GAZEBO_VISUALIZATION.md).
+For browser-native trajectory replay and optional Runpod noVNC Gazebo iframe setup, see [docs/11-operations.md](RUNPOD_GAZEBO_VISUALIZATION.md).

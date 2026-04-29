@@ -5,7 +5,7 @@
 > unreadable. The heading structure, acceptance IDs, and checklist items
 > have been preserved where they were intact; the explanatory text has
 > been restored in English to match the criteria actually being enforced
-> by [`docs/ACCEPTANCE_REPORT.md`](./ACCEPTANCE_REPORT.md) and the test
+> by [`docs/archive/acceptance-report.md`](./acceptance-report.md) and the test
 > suite. No acceptance requirement has been relaxed by this rewrite.
 
 ## 1. Document info
@@ -150,7 +150,7 @@ Covers:
 ## 7. API-Level Acceptance
 
 - Every API response uses the standard envelope.
-- Error structure is consistent (see `04_API_SPEC.md` §5).
+- Error structure is consistent (see `05-api-reference.md` §5).
 - Status enums are stable.
 - `POST /api/v1/jobs` creates a real `Job` row.
 - `GET /api/v1/jobs` returns the list.
@@ -259,7 +259,7 @@ The MVP is Done if **all** of the following hold:
    History / Reports.
 2. Happy path is end-to-end live: user creates a job, watches status,
    reaches `COMPLETED` or `FAILED`, can rerun, can review history.
-3. The API contract matches `04_API_SPEC.md`.
+3. The API contract matches `05-api-reference.md`.
 4. `Job`, `CandidateParameterSet`, `Trial`, `TrialMetric`, `JobReport` are
    persisted as real rows.
 5. Job creation is asynchronous; trials run via the worker or an
