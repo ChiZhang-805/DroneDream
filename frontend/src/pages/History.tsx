@@ -63,6 +63,19 @@ export function History() {
   >("ALL");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  async function saveName(job: Job, rawName: string) {
+    const nextName = rawName.trim();
+    setSaveError(null);
+    try {
+      await apiClient.updateJob(job.id, { display_name: nextName === "" ? null : nextName });
+      setEditingId(null);
+      await query.refetch();
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Failed to save job name");
+    }
+  }
 
   const query = useQuery({
     queryKey: ["jobs", "history"],
@@ -165,6 +178,7 @@ export function History() {
       </SectionCard>
 
       <SectionCard title="Jobs">
+        {saveError ? <ErrorState description={saveError} /> : null}
         <div style={{ marginBottom: 12 }}>
           <button
             type="button"
@@ -210,18 +224,6 @@ export function History() {
                 <tr key={j.id}>
                   <td>
                     <input
-                      aria-label={`job-name-${j.id}`}
-                      value={editingNames[j.id] ?? (j.display_name ?? "")}
-                      onChange={(e) => setEditingNames((prev) => ({ ...prev, [j.id]: e.target.value }))}
-                      onBlur={() => {
-                        const nextName = (editingNames[j.id] ?? (j.display_name ?? "")).trim();
-                        if ((j.display_name ?? "") === nextName) return;
-                        void apiClient.updateJob(j.id, { display_name: nextName === "" ? null : nextName }).then(() => query.refetch());
-                      }}
-                    />
-                  </td>
-                  <td>
-                    <input
                       aria-label={`select-${j.id}`}
                       type="checkbox"
                       checked={selectedIds.includes(j.id)}
@@ -233,6 +235,20 @@ export function History() {
                         )
                       }
                     />
+                  </td>
+                  <td>
+                    {editingId === j.id ? (
+                      <>
+                        <input aria-label={`job-name-${j.id}`} value={editingNames[j.id] ?? (j.display_name ?? "")} onChange={(e) => setEditingNames((prev) => ({ ...prev, [j.id]: e.target.value }))} />
+                        <button type="button" className="btn btn-ghost" onClick={() => void saveName(j, editingNames[j.id] ?? (j.display_name ?? ""))}>Save</button>
+                        <button type="button" className="btn btn-ghost" onClick={() => { setEditingId(null); setEditingNames((prev) => ({ ...prev, [j.id]: j.display_name ?? "" })); }}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <span>{j.display_name?.trim() || "Unnamed"}</span>{" "}
+                        <button type="button" className="btn btn-ghost" onClick={() => setEditingId(j.id)}>Edit</button>
+                      </>
+                    )}
                   </td>
                   {COLUMNS.map((c) => (
                     <td key={String(c.key)}>{c.render(j)}</td>
