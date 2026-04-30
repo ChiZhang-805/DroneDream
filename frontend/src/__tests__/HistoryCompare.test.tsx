@@ -44,10 +44,11 @@ describe("History compare selection", () => {
     const deleteSpy = vi.spyOn(apiClient, "deleteJob").mockResolvedValue({ id: "job_1", deleted: true });
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
-    expect(screen.getByText("确认删除 job")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "确认删除 job" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(document.querySelector("table.history-table-centered")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
-    expect(screen.queryByText("确认删除 job")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "确认删除 job" })).not.toBeInTheDocument();
     expect(deleteSpy).not.toHaveBeenCalled();
     listSpy.mockRestore();
     deleteSpy.mockRestore();
@@ -59,11 +60,12 @@ describe("History compare selection", () => {
       .mockResolvedValueOnce({ items: [], page: 1, page_size: 100, total: 0 } as never);
     const deleteSpy = vi.spyOn(apiClient, "deleteJob").mockResolvedValue({ id: "job_1", deleted: true });
     renderPage();
+    expect(await screen.findByText("job_1")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "确定删除" }));
     expect(deleteSpy).toHaveBeenCalledWith("job_1");
     await waitFor(() => expect(listSpy).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(/Compare selected/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("job_1")).not.toBeInTheDocument());
     listSpy.mockRestore();
     deleteSpy.mockRestore();
   });
