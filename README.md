@@ -325,7 +325,7 @@ grep -nE "SIMULATOR_BACKEND|REAL_SIMULATOR_COMMAND|PX4_GAZEBO_DRY_RUN|PX4_GAZEBO
 ```bash
 cd /workspace/DroneDream
 
-POD_ID="0p552ixoodqm5y"
+POD_ID="your-pod-id"
 
 cat > frontend/.env.local << EOF
 VITE_API_BASE_URL=https://${POD_ID}-8000.proxy.runpod.net
