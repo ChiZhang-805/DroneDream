@@ -713,6 +713,7 @@ def compare_jobs(
     items: list[schemas.JobCompareItem] = []
     for job_id in ids:
         job = by_id[job_id]
+        baseline_parameters = schemas.BaselineParameters(**(job.baseline_parameter_json or {}))
         baseline_metrics = (
             dict(job.report.baseline_metric_json or {}) if job.report is not None else None
         )
@@ -727,7 +728,7 @@ def compare_jobs(
             schemas.JobCompareItem(
                 job_id=job.id,
                 display_name=job.display_name,
-        baseline_parameters=baseline_parameters,
+                baseline_parameters=baseline_parameters,
         status=job.status,  # type: ignore[arg-type]
                 track_type=job.track_type,  # type: ignore[arg-type]
                 simulator_backend=job.simulator_backend_requested,  # type: ignore[arg-type]

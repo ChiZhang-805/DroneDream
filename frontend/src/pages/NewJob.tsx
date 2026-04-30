@@ -22,7 +22,19 @@ import type {
 } from "../types/api";
 
 interface FormState {
+  display_name: string;
   track_type: TrackType;
+  baseline_kp_xy: string;
+  baseline_kd_xy: string;
+  baseline_ki_xy: string;
+  baseline_vel_limit: string;
+  baseline_accel_limit: string;
+  baseline_disturbance_rejection: string;
+  circle_radius_m: string;
+  u_turn_straight_m: string;
+  u_turn_radius_m: string;
+  lemniscate_width_m: string;
+  lemniscate_height_m: string;
   reference_track_json: string;
   start_x: string;
   start_y: string;
@@ -59,7 +71,19 @@ interface FormState {
 }
 
 const DEFAULTS: FormState = {
+  display_name: "",
   track_type: "circle",
+  baseline_kp_xy: "1",
+  baseline_kd_xy: "0.2",
+  baseline_ki_xy: "0.05",
+  baseline_vel_limit: "5",
+  baseline_accel_limit: "2",
+  baseline_disturbance_rejection: "0.8",
+  circle_radius_m: "5",
+  u_turn_straight_m: "8",
+  u_turn_radius_m: "3",
+  lemniscate_width_m: "8",
+  lemniscate_height_m: "4",
   reference_track_json: "",
   start_x: "0",
   start_y: "0",
@@ -314,9 +338,22 @@ function validate(form: FormState): FieldErrors {
 
 function formToRequest(form: FormState): JobCreateRequest {
   const parsedTrack = parseReferenceTrackInput(form.reference_track_json);
+  const generatedTrack = form.track_type === "custom" ? parsedTrack.points : [
+    { x: 0, y: 0, z: Number(form.altitude_m) },
+    { x: form.track_type === "circle" ? Number(form.circle_radius_m) : Number(form.u_turn_straight_m), y: 0, z: Number(form.altitude_m) },
+  ];
   const req: JobCreateRequest = {
+    display_name: form.display_name.trim() === "" ? null : form.display_name.trim(),
     track_type: form.track_type,
-    reference_track: parsedTrack.points ?? null,
+    reference_track: generatedTrack ?? null,
+    baseline_parameters: {
+      kp_xy: Number(form.baseline_kp_xy),
+      kd_xy: Number(form.baseline_kd_xy),
+      ki_xy: Number(form.baseline_ki_xy),
+      vel_limit: Number(form.baseline_vel_limit),
+      accel_limit: Number(form.baseline_accel_limit),
+      disturbance_rejection: Number(form.baseline_disturbance_rejection),
+    },
     start_point: {
       x: Number(form.start_x),
       y: Number(form.start_y),
@@ -448,6 +485,12 @@ export function NewJob() {
         >
           <div className="form-grid">
             <Field
+              label="Job Name"
+              htmlFor="display_name"
+            >
+              <input id="display_name" value={form.display_name} onChange={handleTextChange("display_name")} />
+            </Field>
+            <Field
               label="Track Type"
               required
               error={errors.track_type}
@@ -474,6 +517,36 @@ export function NewJob() {
                 ))}
               </select>
             </Field>
+            <Field
+              label="Baseline kp_xy"
+              htmlFor="baseline_kp_xy"
+            >
+              <input id="baseline_kp_xy" type="number" step="any" value={form.baseline_kp_xy} onChange={handleTextChange("baseline_kp_xy")} />
+            </Field>
+            <Field label="Baseline kd_xy" htmlFor="baseline_kd_xy">
+              <input id="baseline_kd_xy" type="number" step="any" value={form.baseline_kd_xy} onChange={handleTextChange("baseline_kd_xy")} />
+            </Field>
+            <Field label="Baseline ki_xy" htmlFor="baseline_ki_xy">
+              <input id="baseline_ki_xy" type="number" step="any" value={form.baseline_ki_xy} onChange={handleTextChange("baseline_ki_xy")} />
+            </Field>
+            <Field label="Baseline vel_limit" htmlFor="baseline_vel_limit">
+              <input id="baseline_vel_limit" type="number" step="any" value={form.baseline_vel_limit} onChange={handleTextChange("baseline_vel_limit")} />
+            </Field>
+            <Field label="Baseline accel_limit" htmlFor="baseline_accel_limit">
+              <input id="baseline_accel_limit" type="number" step="any" value={form.baseline_accel_limit} onChange={handleTextChange("baseline_accel_limit")} />
+            </Field>
+            <Field label="Baseline disturbance_rejection" htmlFor="baseline_disturbance_rejection">
+              <input id="baseline_disturbance_rejection" type="number" step="any" value={form.baseline_disturbance_rejection} onChange={handleTextChange("baseline_disturbance_rejection")} />
+            </Field>
+            {form.track_type === "circle" ? <Field label="Circle radius (m)" htmlFor="circle_radius_m"><input id="circle_radius_m" type="number" step="any" value={form.circle_radius_m} onChange={handleTextChange("circle_radius_m")} /></Field> : null}
+            {form.track_type === "u_turn" ? <>
+              <Field label="U-turn straight (m)" htmlFor="u_turn_straight_m"><input id="u_turn_straight_m" type="number" step="any" value={form.u_turn_straight_m} onChange={handleTextChange("u_turn_straight_m")} /></Field>
+              <Field label="U-turn radius (m)" htmlFor="u_turn_radius_m"><input id="u_turn_radius_m" type="number" step="any" value={form.u_turn_radius_m} onChange={handleTextChange("u_turn_radius_m")} /></Field>
+            </> : null}
+            {form.track_type === "lemniscate" ? <>
+              <Field label="Lemniscate width (m)" htmlFor="lemniscate_width_m"><input id="lemniscate_width_m" type="number" step="any" value={form.lemniscate_width_m} onChange={handleTextChange("lemniscate_width_m")} /></Field>
+              <Field label="Lemniscate height (m)" htmlFor="lemniscate_height_m"><input id="lemniscate_height_m" type="number" step="any" value={form.lemniscate_height_m} onChange={handleTextChange("lemniscate_height_m")} /></Field>
+            </> : null}
             <Field
               label="Start X"
               required
