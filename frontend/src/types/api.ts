@@ -403,6 +403,8 @@ export interface JobCompareRequest {
 
 export interface JobCompareItem {
   job_id: string;
+  display_name?: string | null;
+  baseline_parameters?: BaselineParameters;
   status: JobStatus;
   track_type: TrackType;
   simulator_backend: SimulatorBackend;

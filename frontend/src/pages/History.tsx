@@ -62,6 +62,7 @@ export function History() {
     ObjectiveProfile | "ALL"
   >("ALL");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [editingNames, setEditingNames] = useState<Record<string, string>>({});
 
   const query = useQuery({
     queryKey: ["jobs", "history"],
@@ -200,12 +201,25 @@ export function History() {
             <thead>
               <tr>
                 <th>Select</th>
+                <th>Job Name</th>
                 {COLUMNS.map((c) => <th key={String(c.key)}>{c.header}</th>)}
               </tr>
             </thead>
             <tbody>
               {filtered.map((j) => (
                 <tr key={j.id}>
+                  <td>
+                    <input
+                      aria-label={`job-name-${j.id}`}
+                      value={editingNames[j.id] ?? (j.display_name ?? "")}
+                      onChange={(e) => setEditingNames((prev) => ({ ...prev, [j.id]: e.target.value }))}
+                      onBlur={() => {
+                        const nextName = (editingNames[j.id] ?? (j.display_name ?? "")).trim();
+                        if ((j.display_name ?? "") === nextName) return;
+                        void apiClient.updateJob(j.id, { display_name: nextName === "" ? null : nextName }).then(() => query.refetch());
+                      }}
+                    />
+                  </td>
                   <td>
                     <input
                       aria-label={`select-${j.id}`}

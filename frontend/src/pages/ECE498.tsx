@@ -14,19 +14,21 @@ type Role = "baseline" | "tool_turn_1" | "refinement_turn_2" | "refinement_turn_
 export interface Ece498CandidateTurn { candidateId: string; label: string | null; sourceType: CandidateSourceType | null; generationIndex: number; role: Role; trialCount: number; completedTrialCount: number; passingTrialCount: number; passRate: number; meanRmse: number | null; meanMaxError: number | null; meanScore: number | null; pass: boolean; }
 export interface Ece498RunResult { mode: Ece498Mode; jobId: string; jobStatus: JobStatus; pass: boolean; reason: string; optimizationOutcome: OptimizationOutcome | null; bestCandidateId: string | null; rmse: number | null; maxError: number | null; passRate: number | null; completedTrials: number; failedTrials: number; candidateTurns: Ece498CandidateTurn[]; }
 
-export interface Ece498FormState { track_type: TrackType; reference_track_json: string; start_x: string; start_y: string; altitude_m: string; wind_north: string; wind_east: string; wind_south: string; wind_west: string; sensor_noise_level: "low"|"medium"|"high"; objective_profile: "stable"|"fast"|"smooth"|"robust"|"custom"; advanced_scenario_config_json: string; target_rmse: string; target_max_error: string; min_pass_rate: string; simulator_backend: SimulatorBackend; }
+export interface Ece498FormState { display_name?: string; track_type: TrackType; reference_track_json: string; baseline_kp_xy?: string; baseline_kd_xy?: string; baseline_ki_xy?: string; baseline_vel_limit?: string; baseline_accel_limit?: string; baseline_disturbance_rejection?: string; circle_radius_m?: string; u_turn_straight_m?: string; u_turn_radius_m?: string; lemniscate_width_m?: string; lemniscate_height_m?: string; start_x: string; start_y: string; altitude_m: string; wind_north: string; wind_east: string; wind_south: string; wind_west: string; sensor_noise_level: "low"|"medium"|"high"; objective_profile: "stable"|"fast"|"smooth"|"robust"|"custom"; advanced_scenario_config_json: string; target_rmse: string; target_max_error: string; min_pass_rate: string; simulator_backend: SimulatorBackend; }
 
-const DEFAULT_FORM: Ece498FormState = { track_type: "circle", reference_track_json: "", start_x: "0", start_y: "0", altitude_m: "3", wind_north: "0", wind_east: "0", wind_south: "0", wind_west: "0", sensor_noise_level: "medium", objective_profile: "robust", advanced_scenario_config_json: "", target_rmse: "0.5", target_max_error: "", min_pass_rate: "0.8", simulator_backend: "mock" };
+const DEFAULT_FORM: Ece498FormState = { display_name: "", track_type: "circle", reference_track_json: "", baseline_kp_xy: "1", baseline_kd_xy: "0.2", baseline_ki_xy: "0.05", baseline_vel_limit: "5", baseline_accel_limit: "2", baseline_disturbance_rejection: "0.8", circle_radius_m: "5", u_turn_straight_m: "8", u_turn_radius_m: "3", lemniscate_width_m: "8", lemniscate_height_m: "4", start_x: "0", start_y: "0", altitude_m: "3", wind_north: "0", wind_east: "0", wind_south: "0", wind_west: "0", sensor_noise_level: "medium", objective_profile: "robust", advanced_scenario_config_json: "", target_rmse: "0.5", target_max_error: "", min_pass_rate: "0.8", simulator_backend: "mock" };
 
-function n(v: string): number | null { if (v.trim()==="") return null; const x=Number(v); return Number.isFinite(x)?x:null; }
+function n(v: string | undefined | null): number | null { if (!v || v.trim()==="") return null; const x=Number(v); return Number.isFinite(x)?x:null; }
 function parseTrack(raw: string) { if (!raw.trim()) return null; try { const data = JSON.parse(raw) as Array<{x:number;y:number;z?:number}>; return Array.isArray(data)?data:null;} catch { return null; } }
 
 export function buildEce498JobRequest(form: Ece498FormState, mode: Ece498Mode): JobCreateRequest {
   const optimizer_strategy = mode === "baseline_no_tool" ? "none" : "cma_es";
   const max_iterations = mode === "tool_refinement" ? 3 : 1;
   return {
+    display_name: form.display_name?.trim?.() || null,
     track_type: form.track_type,
-    reference_track: form.track_type === "custom" ? parseTrack(form.reference_track_json) : null,
+    reference_track: form.track_type === "custom" ? parseTrack(form.reference_track_json) : [{x:0,y:0,z:n(form.altitude_m) ?? 3},{x: n(form.circle_radius_m) ?? 5, y:0, z:n(form.altitude_m) ?? 3}],
+    baseline_parameters: { kp_xy: n(form.baseline_kp_xy ?? "1") ?? 1, kd_xy: n(form.baseline_kd_xy ?? "0.2") ?? 0.2, ki_xy: n(form.baseline_ki_xy ?? "0.05") ?? 0.05, vel_limit: n(form.baseline_vel_limit ?? "5") ?? 5, accel_limit: n(form.baseline_accel_limit ?? "2") ?? 2, disturbance_rejection: n(form.baseline_disturbance_rejection ?? "0.8") ?? 0.8 },
     start_point: { x: n(form.start_x) ?? 0, y: n(form.start_y) ?? 0 },
     altitude_m: n(form.altitude_m) ?? 3,
     wind: { north: n(form.wind_north) ?? 0, east: n(form.wind_east) ?? 0, south: n(form.wind_south) ?? 0, west: n(form.wind_west) ?? 0 },
@@ -95,6 +97,8 @@ export function ECE498() {
     {error && <Alert tone="danger" title="Error">{error}</Alert>}
     <SectionCard title="Config">
       <div className="form-grid">
+                <Field label="Job Name" htmlFor="display_name"><input id="display_name" value={form.display_name} onChange={update("display_name")} /></Field>
+        <Field label="Baseline kp_xy" htmlFor="baseline_kp_xy"><input id="baseline_kp_xy" type="number" step="any" value={form.baseline_kp_xy} onChange={update("baseline_kp_xy")} /></Field>
         <Field label="Track Type" htmlFor="track_type">
           <select id="track_type" value={form.track_type} onChange={update("track_type")}>
             <option value="circle">circle</option><option value="u_turn">u_turn</option><option value="lemniscate">lemniscate</option><option value="custom">custom</option>
@@ -160,10 +164,12 @@ export function ECE498() {
         </Field>
       </div>
     </SectionCard>
-    <button disabled={running} onClick={() => void runMode("baseline_no_tool")}>Run Baseline (No Tool)</button>
-    <button disabled={running} onClick={() => void runMode("tool_augmented")}>Run Tool-Augmented (CMA-ES)</button>
-    <button disabled={running} onClick={() => void runMode("tool_refinement")}>Run Tool + Refinement (CMA-ES Loop)</button>
-    <table><thead><tr><th>Mode</th><th>Job ID</th><th>Status</th><th>Pass / Fail</th></tr></thead><tbody>{results.map((r)=><tr key={r.jobId}><td>{r.mode}</td><td><Link to={`/jobs/${r.jobId}`}>{r.jobId}</Link></td><td>{r.jobStatus}</td><td>{r.pass?"Pass":"Fail"}</td></tr>)}</tbody></table>
+    <div style={{ display: "flex", gap: 12 }}>
+      <button disabled={running} onClick={() => void runMode("baseline_no_tool")}>Run Baseline (No Tool)</button>
+      <button disabled={running} onClick={() => void runMode("tool_augmented")}>Run Tool-Augmented (CMA-ES)</button>
+      <button disabled={running} onClick={() => void runMode("tool_refinement")}>Run Tool + Refinement (CMA-ES Loop)</button>
+    </div>
+    {results.length > 0 ? <table><thead><tr><th>Mode</th><th>Job ID</th><th>Status</th><th>Pass / Fail</th></tr></thead><tbody>{results.map((r)=><tr key={r.jobId}><td>{r.mode}</td><td><Link to={`/jobs/${r.jobId}`}>{r.jobId}</Link></td><td>{r.jobStatus}</td><td>{r.pass?"Pass":"Fail"}</td></tr>)}</tbody></table> : null}
     <table><thead><tr><th>Role</th><th>Candidate Label</th><th>Generation</th><th>Candidate ID</th><th>Pass / Fail</th></tr></thead><tbody>{allTurns.map((t)=><tr key={`${t.mode}-${t.candidateId}`}><td>{t.role}</td><td>{t.label}</td><td>{t.generationIndex}</td><td>{t.candidateId}</td><td>{t.pass?"Pass":"Fail"}</td></tr>)}</tbody></table>
   </div>;
 }

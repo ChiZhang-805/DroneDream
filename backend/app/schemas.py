@@ -429,6 +429,8 @@ class JobsCompareRequest(_Strict):
 
 class JobCompareItem(BaseModel):
     job_id: str
+    display_name: str | None = None
+    baseline_parameters: BaselineParameters = Field(default_factory=BaselineParameters)
     status: JobStatus
     track_type: TrackType
     simulator_backend: SimulatorBackend
