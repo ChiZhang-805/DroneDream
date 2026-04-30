@@ -6,7 +6,10 @@ import { AppShell } from "../AppShell";
 import { ECE498, buildEce498JobRequest, type Ece498FormState } from "../pages/ECE498";
 
 const form: Ece498FormState = {
+  display_name: "",
   track_type: "circle", reference_track_json: "", start_x: "0", start_y: "0", altitude_m: "3",
+  baseline_kp_xy: "1", baseline_kd_xy: "0.2", baseline_ki_xy: "0.05", baseline_vel_limit: "5", baseline_accel_limit: "4", baseline_disturbance_rejection: "0.5",
+  circle_radius_m: "5", u_turn_straight_length_m: "10", u_turn_turn_radius_m: "3", lemniscate_scale_m: "4",
   wind_north: "0", wind_east: "0", wind_south: "0", wind_west: "0", sensor_noise_level: "medium",
   objective_profile: "robust", advanced_scenario_config_json: "", target_rmse: "0.5", target_max_error: "", min_pass_rate: "0.8", simulator_backend: "mock",
 };
