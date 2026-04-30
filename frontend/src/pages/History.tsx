@@ -265,6 +265,7 @@ export function History() {
                     />
                   </td>
                   <td>
+                    <div className="history-job-name-cell">
                     {editingId === j.id ? (
                       <>
                         <input aria-label={`job-name-${j.id}`} value={editingNames[j.id] ?? (j.display_name ?? "")} onChange={(e) => setEditingNames((prev) => ({ ...prev, [j.id]: e.target.value }))} />
@@ -273,10 +274,11 @@ export function History() {
                       </>
                     ) : (
                       <>
-                        <span>{j.display_name?.trim() || "Unnamed"}</span>{" "}
+                        <span>{j.display_name?.trim() || "Unnamed"}</span>
                         <button type="button" className="btn btn-ghost" onClick={() => setEditingId(j.id)}>Edit</button>
                       </>
                     )}
+                    </div>
                   </td>
                   {COLUMNS.map((c) => (
                     <td key={String(c.key)}>{c.render(j)}</td>

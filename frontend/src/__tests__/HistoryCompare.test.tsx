@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -45,6 +45,7 @@ describe("History compare selection", () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     expect(screen.getByText("确认删除 job")).toBeInTheDocument();
+    expect(document.querySelector("table.history-table-centered")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(screen.queryByText("确认删除 job")).not.toBeInTheDocument();
     expect(deleteSpy).not.toHaveBeenCalled();
@@ -61,6 +62,7 @@ describe("History compare selection", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "确定删除" }));
     expect(deleteSpy).toHaveBeenCalledWith("job_1");
+    await waitFor(() => expect(listSpy).toHaveBeenCalledTimes(2));
     expect(await screen.findByText(/Compare selected/)).toBeInTheDocument();
     listSpy.mockRestore();
     deleteSpy.mockRestore();

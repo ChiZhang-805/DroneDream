@@ -530,18 +530,42 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
             )
         )
     )
-    storage = get_artifact_storage()
+    real_artifacts = [a for a in artifact_rows if not a.storage_path.startswith("mock://")]
+    storage = get_artifact_storage() if real_artifacts else None
     try:
-        for artifact in artifact_rows:
-            if artifact.storage_path.startswith("mock://"):
+        for artifact in real_artifacts:
+            if storage is None:
                 continue
-            if artifact.storage_path.startswith("s3://"):
-                storage.delete(artifact.storage_path)
-                continue
-            raw_path = Path(artifact.storage_path)
-            if ".." in raw_path.parts:
-                raise JobServiceError("ARTIFACT_PATH_FORBIDDEN", "Artifact path is outside allowed roots.", http_status=403)
-            storage.delete(artifact.storage_path)
+            storage_path = artifact.storage_path
+            try:
+                if storage_path.startswith("s3://"):
+                    if storage.exists(storage_path):
+                        storage.delete(storage_path)
+                    continue
+                raw_path = Path(storage_path)
+                if ".." in raw_path.parts:
+                    raise JobServiceError(
+                        "ARTIFACT_PATH_FORBIDDEN",
+                        "Artifact path is outside allowed roots.",
+                        http_status=403,
+                    )
+                if not storage.exists(storage_path):
+                    continue
+                storage.delete(storage_path)
+            except JobServiceError:
+                raise
+            except ValueError as exc:
+                raise JobServiceError(
+                    "ARTIFACT_PATH_FORBIDDEN",
+                    f"Artifact path is outside allowed roots. artifact_id={artifact.id}",
+                    http_status=403,
+                ) from exc
+            except Exception as exc:
+                raise JobServiceError(
+                    "ARTIFACT_DELETE_FAILED",
+                    f"Failed to delete artifact_id={artifact.id}",
+                    http_status=500,
+                ) from exc
 
         for child in db.scalars(select(models.Job).where(models.Job.source_job_id == job.id)):
             child.source_job_id = None
