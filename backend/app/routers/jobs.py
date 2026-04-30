@@ -204,6 +204,19 @@ def cancel_job(
     return ok(job_service.to_job_schema(job).model_dump(mode="json"))
 
 
+@router.delete("/jobs/{job_id}")
+def delete_job(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        payload = job_service.delete_job(db, job_id, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    return ok(payload)
+
+
 @router.get("/jobs/{job_id}/trials")
 def list_job_trials(
     job_id: str,

@@ -1214,3 +1214,24 @@ a {
 .muted { color: var(--text-muted); }
 
 .ece498-result-reason { max-width: 360px; white-space: normal; }
+
+.history-table-centered th,
+.history-table-centered td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.confirm-dialog {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+.confirm-dialog::backdrop { background: rgba(12, 9, 23, 0.55); }
+.confirm-dialog-card {
+  min-width: 420px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-elevated);
+  border-radius: 12px;
+  padding: 18px;
+}
+.confirm-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }

@@ -9,6 +9,7 @@ process — never inside a request handler.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -17,6 +18,7 @@ from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
 from app.orchestration.events import record_event
+from app.storage import get_artifact_storage
 
 
 class JobServiceError(Exception):
@@ -507,6 +509,52 @@ def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
     db.commit()
     db.refresh(job)
     return job
+
+
+def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> dict[str, object]:
+    job = get_job(db, job_id, user=user)
+    if job.status not in schemas.JOB_TERMINAL_STATUSES:
+        raise JobServiceError(
+            "JOB_NOT_DELETABLE",
+            f"Active job {job.id} cannot be deleted.",
+            http_status=409,
+        )
+    trial_ids = [t.id for t in job.trials]
+    artifact_rows = list(
+        db.scalars(
+            select(models.Artifact).where(
+                or_(
+                    (models.Artifact.owner_type == "job") & (models.Artifact.owner_id == job.id),
+                    (models.Artifact.owner_type == "trial") & (models.Artifact.owner_id.in_(trial_ids)),
+                )
+            )
+        )
+    )
+    storage = get_artifact_storage()
+    try:
+        for artifact in artifact_rows:
+            if artifact.storage_path.startswith("mock://"):
+                continue
+            if artifact.storage_path.startswith("s3://"):
+                storage.delete(artifact.storage_path)
+                continue
+            raw_path = Path(artifact.storage_path)
+            if ".." in raw_path.parts:
+                raise JobServiceError("ARTIFACT_PATH_FORBIDDEN", "Artifact path is outside allowed roots.", http_status=403)
+            storage.delete(artifact.storage_path)
+
+        for child in db.scalars(select(models.Job).where(models.Job.source_job_id == job.id)):
+            child.source_job_id = None
+        for artifact in artifact_rows:
+            db.delete(artifact)
+        db.delete(job)
+        db.commit()
+        return {"id": job_id, "deleted": True}
+    except Exception as exc:
+        db.rollback()
+        if isinstance(exc, JobServiceError):
+            raise exc
+        raise
 
 
 # --- Serialization ----------------------------------------------------------

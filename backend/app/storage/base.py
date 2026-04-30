@@ -13,3 +13,6 @@ class ArtifactStorage(Protocol):
 
     def exists(self, storage_uri: str) -> bool:
         """Return whether the artifact exists in storage."""
+
+    def delete(self, storage_uri: str) -> None:
+        """Delete an artifact payload from storage."""

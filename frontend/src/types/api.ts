@@ -200,6 +200,10 @@ export interface JobUpdateRequest {
 export interface JobRerunRequest {
   openai?: OpenAIConfig | null;
 }
+export interface DeleteJobResponse {
+  id: string;
+  deleted: boolean;
+}
 
 export interface Job {
   id: string;

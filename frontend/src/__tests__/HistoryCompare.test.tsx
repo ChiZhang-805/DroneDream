@@ -35,4 +35,34 @@ describe("History compare selection", () => {
     fireEvent.click(await screen.findByLabelText("select-job_2"));
     expect(button).not.toBeDisabled();
   });
+
+  it("shows confirm modal and cancels deletion", async () => {
+    const listSpy = vi.spyOn(apiClient, "listJobs").mockResolvedValue({
+      items: [{ id: "job_1", track_type: "circle", objective_profile: "robust", status: "COMPLETED", created_at: "2026-01-01", updated_at: "2026-01-01" }],
+      page: 1, page_size: 100, total: 1,
+    } as never);
+    const deleteSpy = vi.spyOn(apiClient, "deleteJob").mockResolvedValue({ id: "job_1", deleted: true });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    expect(screen.getByText("确认删除 job")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.queryByText("确认删除 job")).not.toBeInTheDocument();
+    expect(deleteSpy).not.toHaveBeenCalled();
+    listSpy.mockRestore();
+    deleteSpy.mockRestore();
+  });
+
+  it("confirms deletion and refetches jobs", async () => {
+    const listSpy = vi.spyOn(apiClient, "listJobs")
+      .mockResolvedValueOnce({ items: [{ id: "job_1", track_type: "circle", objective_profile: "robust", status: "COMPLETED", created_at: "2026-01-01", updated_at: "2026-01-01" }], page: 1, page_size: 100, total: 1 } as never)
+      .mockResolvedValueOnce({ items: [], page: 1, page_size: 100, total: 0 } as never);
+    const deleteSpy = vi.spyOn(apiClient, "deleteJob").mockResolvedValue({ id: "job_1", deleted: true });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "确定删除" }));
+    expect(deleteSpy).toHaveBeenCalledWith("job_1");
+    expect(await screen.findByText(/Compare selected/)).toBeInTheDocument();
+    listSpy.mockRestore();
+    deleteSpy.mockRestore();
+  });
 });

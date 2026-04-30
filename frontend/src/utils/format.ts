@@ -4,13 +4,12 @@ export function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const yyyy = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}/${month}/${day} ${hh}:${mm}`;
 }
 
 export function isActiveJobStatus(status: JobStatus): boolean {
