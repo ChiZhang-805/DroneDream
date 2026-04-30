@@ -10,6 +10,7 @@ import type {
   Job,
   JobCompareResponse,
   JobCreateRequest,
+  JobUpdateRequest,
   JobRerunRequest,
   JobReport,
   PaginatedBatchJobs,
@@ -157,6 +158,13 @@ export const apiClient = {
 
   async getJob(jobId: string): Promise<Job> {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}`);
+  },
+
+  async updateJob(jobId: string, req: JobUpdateRequest): Promise<Job> {
+    return request<Job>(`/jobs/${encodeURIComponent(jobId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(req),
+    });
   },
 
   async listJobTrials(jobId: string): Promise<TrialSummary[]> {

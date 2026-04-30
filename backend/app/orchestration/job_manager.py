@@ -48,6 +48,17 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _baseline_parameters_for_job(job: models.Job) -> dict[str, float]:
+    params = dict(constants.BASELINE_PARAMETERS)
+    if job.baseline_parameter_json:
+        for key in constants.BASELINE_PARAMETERS:
+            value = job.baseline_parameter_json.get(key)
+            if isinstance(value, (int, float)):
+                lo, hi = constants.PARAMETER_SAFE_RANGES[key]
+                params[key] = round(max(lo, min(hi, float(value))), 6)
+    return params
+
+
 def _create_baseline_candidate(db: Session, job: models.Job) -> models.CandidateParameterSet:
     """Persist the baseline CandidateParameterSet for a job."""
 
@@ -56,7 +67,7 @@ def _create_baseline_candidate(db: Session, job: models.Job) -> models.Candidate
         generation_index=0,
         source_type="baseline",
         label="baseline",
-        parameter_json=dict(constants.BASELINE_PARAMETERS),
+        parameter_json=_baseline_parameters_for_job(job),
         is_baseline=True,
         trial_count=len(constants.BASELINE_SCENARIOS),
     )
@@ -310,7 +321,7 @@ def start_job(db: Session, job: models.Job) -> models.Job:
     if job.optimizer_strategy == "none":
         pass
     elif job.optimizer_strategy == "heuristic":
-        proposals = generate_candidates(dict(constants.BASELINE_PARAMETERS))
+        proposals = generate_candidates(_baseline_parameters_for_job(job))
         record_event(
             db,
             job.id,
@@ -410,7 +421,7 @@ def dispatch_next_cma_es_generation(
         job=job,
         candidates=list(job.candidates),
         safe_ranges=constants.PARAMETER_SAFE_RANGES,
-        baseline_parameters=constants.BASELINE_PARAMETERS,
+        baseline_parameters=_baseline_parameters_for_job(job),
         generation_index=generation_index,
     )
     candidate = _create_optimizer_candidate(

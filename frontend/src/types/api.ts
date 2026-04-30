@@ -82,6 +82,15 @@ export interface WindVector {
   west: number;
 }
 
+export interface BaselineParameters {
+  kp_xy: number;
+  kd_xy: number;
+  ki_xy: number;
+  vel_limit: number;
+  accel_limit: number;
+  disturbance_rejection: number;
+}
+
 export interface TrackPoint {
   x: number;
   y: number;
@@ -172,6 +181,8 @@ export interface JobCreateRequest {
   sensor_noise_level: SensorNoiseLevel;
   objective_profile: ObjectiveProfile;
   advanced_scenario_config?: ScenarioAdvancedConfig | null;
+  display_name?: string | null;
+  baseline_parameters?: BaselineParameters;
   // Phase 8 optional execution-backend & auto-tuning fields. Omitting them
   // preserves the Phase 7 mock + heuristic behaviour.
   simulator_backend?: SimulatorBackend;
@@ -180,6 +191,10 @@ export interface JobCreateRequest {
   trials_per_candidate?: number;
   acceptance_criteria?: AcceptanceCriteria | null;
   openai?: OpenAIConfig | null;
+}
+
+export interface JobUpdateRequest {
+  display_name?: string | null;
 }
 
 export interface JobRerunRequest {
@@ -196,6 +211,8 @@ export interface Job {
   sensor_noise_level: SensorNoiseLevel;
   objective_profile: ObjectiveProfile;
   advanced_scenario_config?: ScenarioAdvancedConfig | null;
+  display_name?: string | null;
+  baseline_parameters?: BaselineParameters;
   status: JobStatus;
   progress: JobProgress;
   baseline_candidate_id: string | null;
