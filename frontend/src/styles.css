@@ -944,7 +944,7 @@ code {
 }
 
 .candidate-id {
-  color: var(--color-muted, #6b7280);
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -1216,32 +1216,44 @@ a {
 .ece498-result-reason { max-width: 360px; white-space: normal; }
 
 .history-table-centered th,
-.history-table-centered td { text-align: center; }
-.history-table-centered td { vertical-align: middle; }
+.history-table-centered td {
+  text-align: center;
+  vertical-align: middle;
+}
+
 .history-table-centered .history-job-name-cell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
-.confirm-dialog {
+.confirm-dialog-backdrop {
   position: fixed;
   inset: 0;
-  margin: auto;
-  border: none;
-  padding: 0;
-  background: transparent;
   z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(12, 9, 23, 0.55);
 }
-.confirm-dialog::backdrop { background: rgba(12, 9, 23, 0.55); }
+
 .confirm-dialog-card {
-  min-width: 420px;
+  min-width: min(420px, 100%);
   max-width: min(92vw, 560px);
   border: 1px solid var(--border-strong);
-  background: linear-gradient(180deg, #17143a 0%, #100f2d 100%);
+  background: linear-gradient(180deg, var(--bg-elev-2) 0%, var(--bg-elev) 100%);
+  color: var(--text);
   border-radius: 12px;
   padding: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
 }
-.confirm-dialog-actions { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}

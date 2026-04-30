@@ -301,9 +301,9 @@ export function History() {
         )}
       </SectionCard>
       {deleteTarget ? (
-        <dialog className="confirm-dialog" open>
-          <div className="confirm-dialog-card">
-            <h3>确认删除 job</h3>
+        <div className="confirm-dialog-backdrop" role="presentation">
+          <div className="confirm-dialog-card" role="dialog" aria-modal="true" aria-labelledby="delete-job-dialog-title">
+            <h3 id="delete-job-dialog-title">确认删除 job</h3>
             <p>将删除 {deleteTarget.display_name?.trim() || deleteTarget.id} 及其相关文件，且不可恢复。</p>
             {deleteError ? <p className="form-error">{deleteError}</p> : null}
             <div className="confirm-dialog-actions">
@@ -313,7 +313,7 @@ export function History() {
               </button>
             </div>
           </div>
-        </dialog>
+        </div>
       ) : null}
     </section>
   );
