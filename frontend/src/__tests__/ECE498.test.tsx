@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { AppShell } from "../AppShell";
@@ -91,6 +91,32 @@ describe("ECE498", () => {
     expect(screen.getByRole("button", { name: /Run Baseline \(No Tool\)/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Run Tool-Augmented \(CMA-ES\)/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Run Tool \+ Refinement \(CMA-ES Loop\)/i })).toBeInTheDocument();
+  });
+
+
+  it("renders extended config fields", () => {
+    render(<MemoryRouter><ECE498 /></MemoryRouter>);
+    expect(screen.getByLabelText("Wind North")).toBeInTheDocument();
+    expect(screen.getByLabelText("Wind East")).toBeInTheDocument();
+    expect(screen.getByLabelText("Wind South")).toBeInTheDocument();
+    expect(screen.getByLabelText("Wind West")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sensor Noise Level")).toBeInTheDocument();
+    expect(screen.getByLabelText("Objective Profile")).toBeInTheDocument();
+    expect(screen.getByLabelText("Target Max Error")).toBeInTheDocument();
+    expect(screen.getByLabelText("Min Pass Rate")).toBeInTheDocument();
+    expect(screen.getByLabelText("Simulator Backend")).toBeInTheDocument();
+    expect(screen.getByLabelText("Advanced Scenario JSON")).toBeInTheDocument();
+  });
+
+  it("shows validation errors for invalid inputs", () => {
+    render(<MemoryRouter><ECE498 /></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText("accel_limit"), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText("Circle Radius (m)"), { target: { value: "abc" } });
+    fireEvent.change(screen.getByLabelText("Min Pass Rate"), { target: { value: "1.5" } });
+    fireEvent.click(screen.getByRole("button", { name: /Run Baseline/i }));
+    expect(screen.getByText(/accel_limit must be between 2 and 8/i)).toBeInTheDocument();
+    expect(screen.getByText(/Circle radius must be between/i)).toBeInTheDocument();
+    expect(screen.getByText(/Min pass rate must be between 0 and 1/i)).toBeInTheDocument();
   });
 
   it("shows empty results state before runs", () => {
