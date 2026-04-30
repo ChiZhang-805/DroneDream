@@ -128,6 +128,75 @@ function n(v: string | undefined | null): number | null {
   return Number.isFinite(x) ? x : null;
 }
 
+
+export type Ece498FieldErrors = Partial<Record<keyof Ece498FormState, string>>;
+
+function formatMode(mode: Ece498Mode): string {
+  switch (mode) {
+    case "baseline_no_tool":
+      return "Baseline (No Tool)";
+    case "tool_augmented":
+      return "Tool-Augmented (CMA-ES)";
+    case "tool_refinement":
+      return "Tool + Refinement (CMA-ES Loop)";
+  }
+}
+
+function formatCandidateRole(role: Ece498CandidateRole): string {
+  switch (role) {
+    case "baseline":
+      return "Baseline";
+    case "tool_turn_1":
+      return "Tool Turn 1";
+    case "refinement_turn_2":
+      return "Refinement Turn 2";
+    case "refinement_turn_3":
+      return "Refinement Turn 3";
+    default:
+      return "Other";
+  }
+}
+
+function validateEce498Form(form: Ece498FormState): Ece498FieldErrors {
+  const errors: Ece498FieldErrors = {};
+  const inRange = (k: keyof Ece498FormState, min: number, max: number, label: string) => {
+    const val = Number(form[k]);
+    if (!Number.isFinite(val) || val < min || val > max) {
+      errors[k] = `${label} must be between ${min} and ${max}.`;
+    }
+  };
+  inRange("baseline_kp_xy", 0.3, 2.5, "kp_xy");
+  inRange("baseline_kd_xy", 0.05, 0.8, "kd_xy");
+  inRange("baseline_ki_xy", 0, 0.25, "ki_xy");
+  inRange("baseline_vel_limit", 2, 10, "vel_limit");
+  inRange("baseline_accel_limit", 2, 8, "accel_limit");
+  inRange("baseline_disturbance_rejection", 0, 1, "disturbance_rejection");
+  if (form.track_type === "circle") inRange("circle_radius_m", 0.000001, 100, "Circle radius");
+  if (form.track_type === "u_turn") {
+    inRange("u_turn_straight_length_m", 0.000001, 200, "U-turn straight length");
+    inRange("u_turn_turn_radius_m", 0.000001, 100, "U-turn radius");
+  }
+  if (form.track_type === "lemniscate") inRange("lemniscate_scale_m", 0.000001, 100, "Figure-eight scale");
+  inRange("wind_north", -10, 10, "Wind north");
+  inRange("wind_east", -10, 10, "Wind east");
+  inRange("wind_south", -10, 10, "Wind south");
+  inRange("wind_west", -10, 10, "Wind west");
+  if (!["low", "medium", "high"].includes(form.sensor_noise_level)) {
+    errors.sensor_noise_level = "Sensor noise level must be low, medium, or high.";
+  }
+  if (form.target_rmse.trim() !== "") inRange("target_rmse", 0, 100, "Target RMSE");
+  if (form.target_max_error.trim() !== "") inRange("target_max_error", 0, 100, "Target max error");
+  inRange("min_pass_rate", 0, 1, "Min pass rate");
+  if (form.track_type === "custom") {
+    const parsed = parseTrack(form.reference_track_json);
+    if (!parsed || parsed.length < 2) errors.reference_track_json = "Custom track JSON must be an array with at least 2 points.";
+  }
+  if (form.advanced_scenario_config_json.trim()) {
+    try { JSON.parse(form.advanced_scenario_config_json); } catch { errors.advanced_scenario_config_json = "Advanced scenario JSON must be valid JSON."; }
+  }
+  return errors;
+}
+
 function parseTrack(raw: string) {
   if (!raw.trim()) return null;
   try {
@@ -380,7 +449,8 @@ export function summarizeRunResult(
 function Ece498RunResultsTable({ results }: { results: Ece498RunResult[] }) {
   return (
     <SectionCard title="Run Results">
-      <table>
+      <div className="data-table-wrapper">
+        <table className="data-table">
         <thead>
           <tr>
             <th>Mode</th>
@@ -402,10 +472,10 @@ function Ece498RunResultsTable({ results }: { results: Ece498RunResult[] }) {
         <tbody>
           {results.map((result) => (
             <tr key={result.jobId}>
-              <td>{result.mode}</td>
+              <td>{formatMode(result.mode)}</td>
               <td>{result.jobName || "Unnamed"}</td>
               <td>
-                <Link to={`/jobs/${result.jobId}`}>{result.jobId}</Link>
+                <Link to={`/jobs/${result.jobId}`}><code>{result.jobId}</code></Link>
               </td>
               <td>{result.jobStatus}</td>
               <td>{passFailLabel(result.pass)}</td>
@@ -414,14 +484,15 @@ function Ece498RunResultsTable({ results }: { results: Ece498RunResult[] }) {
               <td>{formatPercent(result.passRate)}</td>
               <td>{formatNullableNumber(result.score)}</td>
               <td>{result.optimizationOutcome ?? "—"}</td>
-              <td>{result.bestCandidateId ?? "—"}</td>
+              <td>{result.bestCandidateId ? <code>{result.bestCandidateId}</code> : "—"}</td>
               <td>{result.completedTrials}</td>
               <td>{result.failedTrials}</td>
-              <td>{result.reason}</td>
+              <td className="ece498-result-reason">{result.reason}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </SectionCard>
   );
 }
@@ -429,7 +500,8 @@ function Ece498RunResultsTable({ results }: { results: Ece498RunResult[] }) {
 function Ece498CandidateTurnsTable({ turns }: { turns: Ece498CandidateTurn[] }) {
   return (
     <SectionCard title="Candidate / Refinement Turns">
-      <table>
+      <div className="data-table-wrapper">
+        <table className="data-table">
         <thead>
           <tr>
             <th>Mode</th>
@@ -452,11 +524,11 @@ function Ece498CandidateTurnsTable({ turns }: { turns: Ece498CandidateTurn[] }) 
         <tbody>
           {turns.map((turn) => (
             <tr key={`${turn.mode}-${turn.candidateId}`}>
-              <td>{turn.mode}</td>
-              <td>{turn.role}</td>
+              <td>{formatMode(turn.mode)}</td>
+              <td>{formatCandidateRole(turn.role)}</td>
               <td>{turn.label ?? "—"}</td>
               <td>{turn.generationIndex}</td>
-              <td>{turn.candidateId}</td>
+              <td><code>{turn.candidateId}</code></td>
               <td>{turn.sourceType ?? "—"}</td>
               <td>{turn.trialCount}</td>
               <td>{turn.completedTrialCount}</td>
@@ -471,6 +543,7 @@ function Ece498CandidateTurnsTable({ turns }: { turns: Ece498CandidateTurn[] }) 
           ))}
         </tbody>
       </table>
+      </div>
     </SectionCard>
   );
 }
@@ -480,6 +553,8 @@ export function ECE498() {
   const [results, setResults] = useState<Ece498RunResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [runningMode, setRunningMode] = useState<Ece498Mode | null>(null);
+  const [errors, setErrors] = useState<Ece498FieldErrors>({});
 
   const update =
     (k: keyof Ece498FormState) =>
@@ -488,6 +563,10 @@ export function ECE498() {
 
   async function runMode(mode: Ece498Mode) {
     setError(null);
+    const nextErrors = validateEce498Form(form);
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+    setRunningMode(mode);
     setRunning(true);
     try {
       const created = await apiClient.createJob(buildEce498JobRequest(form, mode));
@@ -501,6 +580,7 @@ export function ECE498() {
       setError(e instanceof Error ? e.message : "Run failed");
     } finally {
       setRunning(false);
+      setRunningMode(null);
     }
   }
 
@@ -518,105 +598,25 @@ export function ECE498() {
         </Alert>
       )}
 
-      <SectionCard title="Config">
-        <div className="form-grid">
-          <Field label="Job Name" htmlFor="display_name">
-            <input id="display_name" value={form.display_name} onChange={update("display_name")} />
-          </Field>
-          <Field label="Track Type" htmlFor="track_type">
-            <select id="track_type" value={form.track_type} onChange={update("track_type")}>
-              <option value="circle">circle</option>
-              <option value="u_turn">u_turn</option>
-              <option value="lemniscate">lemniscate</option>
-              <option value="custom">custom</option>
-            </select>
-          </Field>
-          <Field label="Start X" htmlFor="start_x">
-            <input id="start_x" type="number" value={form.start_x} onChange={update("start_x")} />
-          </Field>
-          <Field label="Start Y" htmlFor="start_y">
-            <input id="start_y" type="number" value={form.start_y} onChange={update("start_y")} />
-          </Field>
-          <Field label="Altitude" htmlFor="altitude_m">
-            <input id="altitude_m" type="number" value={form.altitude_m} onChange={update("altitude_m")} />
-          </Field>
-
-          {form.track_type === "circle" && (
-            <Field label="Circle Radius (m)" htmlFor="circle_radius_m">
-              <input
-                id="circle_radius_m"
-                type="number"
-                value={form.circle_radius_m}
-                onChange={update("circle_radius_m")}
-              />
-            </Field>
-          )}
-
-          {form.track_type === "u_turn" && (
-            <>
-              <Field label="U-turn Straight Length (m)" htmlFor="u_turn_straight_length_m">
-                <input
-                  id="u_turn_straight_length_m"
-                  type="number"
-                  value={form.u_turn_straight_length_m}
-                  onChange={update("u_turn_straight_length_m")}
-                />
-              </Field>
-              <Field label="U-turn Radius (m)" htmlFor="u_turn_turn_radius_m">
-                <input
-                  id="u_turn_turn_radius_m"
-                  type="number"
-                  value={form.u_turn_turn_radius_m}
-                  onChange={update("u_turn_turn_radius_m")}
-                />
-              </Field>
-            </>
-          )}
-
-          {form.track_type === "lemniscate" && (
-            <Field label="Figure-eight Scale (m)" htmlFor="lemniscate_scale_m">
-              <input
-                id="lemniscate_scale_m"
-                type="number"
-                value={form.lemniscate_scale_m}
-                onChange={update("lemniscate_scale_m")}
-              />
-            </Field>
-          )}
-
-          {form.track_type === "custom" && (
-            <Field label="Custom Reference Track JSON" htmlFor="reference_track_json">
-              <textarea
-                id="reference_track_json"
-                value={form.reference_track_json}
-                onChange={update("reference_track_json")}
-              />
-            </Field>
-          )}
-
-          {[
-            "kp_xy",
-            "kd_xy",
-            "ki_xy",
-            "vel_limit",
-            "accel_limit",
-            "disturbance_rejection",
-          ].map((k) => (
-            <Field key={k} label={`Baseline ${k}`} htmlFor={`baseline_${k}`}>
-              <input
-                id={`baseline_${k}`}
-                type="number"
-                value={form[`baseline_${k}` as keyof Ece498FormState] as string}
-                onChange={update(`baseline_${k}` as keyof Ece498FormState)}
-              />
-            </Field>
-          ))}
-
-          <Field label="Target RMSE" htmlFor="target_rmse">
-            <input id="target_rmse" type="number" value={form.target_rmse} onChange={update("target_rmse")} />
-          </Field>
-        </div>
+      <SectionCard title="Assignment Modes">
+        <p className="muted">Baseline runs without tooling (optimizer_strategy="none"). Tool-Augmented runs CMA-ES once. Tool + Refinement runs CMA-ES for generations 1, 2, and 3. Verifier pass/fail uses RMSE, max error, and pass rate.</p>
       </SectionCard>
+      <SectionCard title="Job & Track Configuration"><div className="form-grid">
+      <Field label="Job Name" htmlFor="display_name" hint="Optional label for your own reference. Job ID remains the canonical identifier." error={errors.display_name}><input id="display_name" value={form.display_name} onChange={update("display_name")} /></Field>
+      <Field label="Track Type" htmlFor="track_type"><select id="track_type" value={form.track_type} onChange={update("track_type")}><option value="circle">circle</option><option value="u_turn">u_turn</option><option value="lemniscate">lemniscate</option><option value="custom">custom</option></select></Field>
+      <Field label="Start X" htmlFor="start_x"><input id="start_x" type="number" value={form.start_x} onChange={update("start_x")} /></Field><Field label="Start Y" htmlFor="start_y"><input id="start_y" type="number" value={form.start_y} onChange={update("start_y")} /></Field><Field label="Altitude (m)" htmlFor="altitude_m"><input id="altitude_m" type="number" value={form.altitude_m} onChange={update("altitude_m")} /></Field>
+      {form.track_type === "circle" && <Field label="Circle Radius (m)" htmlFor="circle_radius_m" error={errors.circle_radius_m}><input id="circle_radius_m" type="number" value={form.circle_radius_m} onChange={update("circle_radius_m")} /></Field>}
+      {form.track_type === "u_turn" && <><Field label="U-turn Straight Length (m)" htmlFor="u_turn_straight_length_m" error={errors.u_turn_straight_length_m}><input id="u_turn_straight_length_m" type="number" value={form.u_turn_straight_length_m} onChange={update("u_turn_straight_length_m")} /></Field><Field label="U-turn Radius (m)" htmlFor="u_turn_turn_radius_m" error={errors.u_turn_turn_radius_m}><input id="u_turn_turn_radius_m" type="number" value={form.u_turn_turn_radius_m} onChange={update("u_turn_turn_radius_m")} /></Field></>}
+      {form.track_type === "lemniscate" && <Field label="Figure-eight Scale (m)" htmlFor="lemniscate_scale_m" error={errors.lemniscate_scale_m}><input id="lemniscate_scale_m" type="number" value={form.lemniscate_scale_m} onChange={update("lemniscate_scale_m")} /></Field>}
+      {form.track_type === "custom" && <Field label="Custom Reference Track JSON" htmlFor="reference_track_json" error={errors.reference_track_json}><textarea id="reference_track_json" value={form.reference_track_json} onChange={update("reference_track_json")} /></Field>}
+      </div></SectionCard>
+      <SectionCard title="Baseline Controller Parameters"><div className="form-grid">
+      {[["baseline_kp_xy","kp_xy"],["baseline_kd_xy","kd_xy"],["baseline_ki_xy","ki_xy"],["baseline_vel_limit","vel_limit"],["baseline_accel_limit","accel_limit"],["baseline_disturbance_rejection","disturbance_rejection"]].map(([k,label]) => <Field key={k} label={label} htmlFor={k} error={errors[k as keyof Ece498FormState]}><input id={k} type="number" value={form[k as keyof Ece498FormState] as string} onChange={update(k as keyof Ece498FormState)} /></Field>)}
+      </div><button type="button" className="btn" onClick={() => setForm((p)=>({...p,baseline_kp_xy:"1",baseline_kd_xy:"0.2",baseline_ki_xy:"0.05",baseline_vel_limit:"5",baseline_accel_limit:"4",baseline_disturbance_rejection:"0.5"}))}>Reset Baseline Defaults</button></SectionCard>
+      <SectionCard title="Environment"><div className="form-grid"><Field label="Wind North" htmlFor="wind_north" error={errors.wind_north}><input id="wind_north" type="number" value={form.wind_north} onChange={update("wind_north")} /></Field><Field label="Wind East" htmlFor="wind_east" error={errors.wind_east}><input id="wind_east" type="number" value={form.wind_east} onChange={update("wind_east")} /></Field><Field label="Wind South" htmlFor="wind_south" error={errors.wind_south}><input id="wind_south" type="number" value={form.wind_south} onChange={update("wind_south")} /></Field><Field label="Wind West" htmlFor="wind_west" error={errors.wind_west}><input id="wind_west" type="number" value={form.wind_west} onChange={update("wind_west")} /></Field><Field label="Sensor Noise Level" htmlFor="sensor_noise_level" error={errors.sensor_noise_level}><select id="sensor_noise_level" value={form.sensor_noise_level} onChange={update("sensor_noise_level")}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></Field></div></SectionCard>
+      <SectionCard title="Verifier / Acceptance Criteria"><div className="form-grid"><Field label="Objective Profile" htmlFor="objective_profile"><select id="objective_profile" value={form.objective_profile} onChange={update("objective_profile")}><option value="stable">stable</option><option value="fast">fast</option><option value="smooth">smooth</option><option value="robust">robust</option><option value="custom">custom</option></select></Field><Field label="Target RMSE" htmlFor="target_rmse" error={errors.target_rmse}><input id="target_rmse" type="number" value={form.target_rmse} onChange={update("target_rmse")} /></Field><Field label="Target Max Error" htmlFor="target_max_error" error={errors.target_max_error}><input id="target_max_error" type="number" value={form.target_max_error} onChange={update("target_max_error")} /></Field><Field label="Min Pass Rate" htmlFor="min_pass_rate" error={errors.min_pass_rate}><input id="min_pass_rate" type="number" value={form.min_pass_rate} onChange={update("min_pass_rate")} /></Field></div></SectionCard>
+      <SectionCard title="Execution Backend"><div className="form-grid"><Field label="Simulator Backend" htmlFor="simulator_backend"><select id="simulator_backend" value={form.simulator_backend} onChange={update("simulator_backend")}><option value="mock">mock</option><option value="real_cli">real_cli</option></select></Field></div>{form.simulator_backend==="real_cli" && <p className="form-error">real_cli requires REAL_SIMULATOR_COMMAND and the PX4/Gazebo runner environment to be configured.</p>}</SectionCard>
+      <SectionCard title="Advanced Scenario"><Field label="Advanced Scenario JSON" htmlFor="advanced_scenario_config_json" hint="Optional JSON. Leave empty to disable advanced scenario config." error={errors.advanced_scenario_config_json}><textarea id="advanced_scenario_config_json" value={form.advanced_scenario_config_json} onChange={update("advanced_scenario_config_json")} /></Field></SectionCard>
 
       <div className="ece498-run-actions">
         <button disabled={running} onClick={() => void runMode("baseline_no_tool")}>
@@ -629,6 +629,8 @@ export function ECE498() {
           Run Tool + Refinement (CMA-ES Loop)
         </button>
       </div>
+      {running && <p className="muted">Running selected ECE498 mode. This may take time, especially with real_cli.</p>}
+      {runningMode && <p className="muted">Current mode: {formatMode(runningMode)}</p>}
 
       {results.length === 0 ? (
         <SectionCard title="Results">
@@ -649,14 +651,16 @@ interface FieldProps {
   htmlFor: string;
   hint?: string;
   children: ReactNode;
+  error?: string;
 }
 
-function Field({ label, htmlFor, hint, children }: FieldProps) {
+function Field({ label, htmlFor, hint, children, error }: FieldProps) {
   return (
     <div className="form-field">
       <label htmlFor={htmlFor}>{label}</label>
       {children}
       {hint ? <span className="form-hint">{hint}</span> : null}
+      {error ? <span className="form-error">{error}</span> : null}
     </div>
   );
 }
