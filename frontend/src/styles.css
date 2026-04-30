@@ -1216,22 +1216,32 @@ a {
 .ece498-result-reason { max-width: 360px; white-space: normal; }
 
 .history-table-centered th,
-.history-table-centered td {
-  text-align: center;
-  vertical-align: middle;
+.history-table-centered td { text-align: center; }
+.history-table-centered td { vertical-align: middle; }
+.history-table-centered .history-job-name-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
 .confirm-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
   border: none;
   padding: 0;
   background: transparent;
+  z-index: 1200;
 }
 .confirm-dialog::backdrop { background: rgba(12, 9, 23, 0.55); }
 .confirm-dialog-card {
   min-width: 420px;
-  border: 1px solid var(--border-color);
-  background: var(--surface-elevated);
+  max-width: min(92vw, 560px);
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(180deg, #17143a 0%, #100f2d 100%);
   border-radius: 12px;
   padding: 18px;
 }
-.confirm-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.confirm-dialog-actions { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }

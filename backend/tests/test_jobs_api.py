@@ -647,6 +647,11 @@ def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) 
     assert client.get(f"/api/v1/jobs/{job['id']}").status_code == 404
     ids = [x['id'] for x in client.get('/api/v1/jobs').json()['data']['items']]
     assert job['id'] not in ids and other['id'] in ids
+    with SessionLocal() as db:
+        remaining = list(db.query(models.Artifact).all())
+        assert all(a.owner_id != job['id'] for a in remaining)
+        assert any(a.owner_id == other['id'] for a in remaining)
+        assert not art_file.exists()
 
 
 def test_delete_active_job_conflict(client: TestClient) -> None:
@@ -670,3 +675,23 @@ def test_delete_source_job_nulls_child_source_id(client: TestClient) -> None:
     child_detail = client.get(f"/api/v1/jobs/{child['id']}")
     assert child_detail.status_code == 200
     assert child_detail.json()['data']['source_job_id'] is None
+
+
+def test_delete_job_ignores_missing_artifact_file(client: TestClient, tmp_path: Path) -> None:
+    from app import models
+    from app.db import SessionLocal
+
+    job = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
+    missing_path = tmp_path / 'artifacts' / 'missing.bin'
+    with SessionLocal() as db:
+        j = db.get(models.Job, job['id'])
+        assert j is not None
+        j.status = 'COMPLETED'
+        db.add(models.Artifact(owner_type='job', owner_id=j.id, artifact_type='log', storage_path=str(missing_path)))
+        db.commit()
+
+    resp = client.delete(f"/api/v1/jobs/{job['id']}")
+    assert resp.status_code == 200, resp.text
+    with SessionLocal() as db:
+        assert db.get(models.Job, job['id']) is None
+        assert db.query(models.Artifact).filter(models.Artifact.owner_id == job['id']).count() == 0
