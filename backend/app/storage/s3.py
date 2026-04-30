@@ -64,6 +64,10 @@ class S3ArtifactStorage(ArtifactStorage):
         except Exception:
             return False
 
+    def delete(self, storage_uri: str) -> None:
+        bucket, key = _parse_s3_uri(storage_uri)
+        self._client.delete_object(Bucket=bucket, Key=key)
+
 
 def _parse_s3_uri(uri: str) -> tuple[str, str]:
     parsed = urlparse(uri)

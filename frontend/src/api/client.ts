@@ -10,6 +10,7 @@ import type {
   Job,
   JobCompareResponse,
   JobCreateRequest,
+  DeleteJobResponse,
   JobUpdateRequest,
   JobRerunRequest,
   JobReport,
@@ -164,6 +165,11 @@ export const apiClient = {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}`, {
       method: "PATCH",
       body: JSON.stringify(req),
+    });
+  },
+  async deleteJob(jobId: string): Promise<DeleteJobResponse> {
+    return request<DeleteJobResponse>(`/jobs/${encodeURIComponent(jobId)}`, {
+      method: "DELETE",
     });
   },
 

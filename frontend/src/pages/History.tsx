@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, ApiClientError } from "../api/client";
 import type { Job, JobStatus, ObjectiveProfile, TrackType } from "../types/api";
@@ -55,6 +55,7 @@ const COLUMNS: Column<Job>[] = [
 ];
 
 export function History() {
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
   const [trackFilter, setTrackFilter] = useState<TrackType | "ALL">("ALL");
@@ -65,6 +66,10 @@ export function History() {
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const terminal = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
   async function saveName(job: Job, rawName: string) {
     const nextName = rawName.trim();
     setSaveError(null);
@@ -92,6 +97,28 @@ export function History() {
     );
   }, [allJobs, statusFilter, trackFilter, objectiveFilter]);
   const canCompare = selectedIds.length >= 2 && selectedIds.length <= 10;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteError(null);
+    setIsDeleting(true);
+    try {
+      await apiClient.deleteJob(deleteTarget.id);
+      setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
+      if (editingId === deleteTarget.id) setEditingId(null);
+      setEditingNames((prev) => {
+        const next = { ...prev };
+        delete next[deleteTarget.id];
+        return next;
+      });
+      setDeleteTarget(null);
+      await query.refetch();
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Failed to delete job");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   return (
     <section className="stack-md">
@@ -211,12 +238,13 @@ export function History() {
             }
           />
         ) : (
-          <table className="data-table">
+          <table className="data-table history-table-centered">
             <thead>
               <tr>
                 <th>Select</th>
                 <th>Job Name</th>
                 {COLUMNS.map((c) => <th key={String(c.key)}>{c.header}</th>)}
+                <th>Delete</th>
               </tr>
             </thead>
             <tbody>
@@ -253,12 +281,38 @@ export function History() {
                   {COLUMNS.map((c) => (
                     <td key={String(c.key)}>{c.render(j)}</td>
                   ))}
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={!terminal.has(j.status)}
+                      title={!terminal.has(j.status) ? "active job cannot be deleted" : "Delete job"}
+                      onClick={() => setDeleteTarget(j)}
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </SectionCard>
+      {deleteTarget ? (
+        <dialog className="confirm-dialog" open>
+          <div className="confirm-dialog-card">
+            <h3>确认删除 job</h3>
+            <p>将删除 {deleteTarget.display_name?.trim() || deleteTarget.id} 及其相关文件，且不可恢复。</p>
+            {deleteError ? <p className="form-error">{deleteError}</p> : null}
+            <div className="confirm-dialog-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>取消</button>
+              <button type="button" className="btn btn-danger" onClick={() => void confirmDelete()} disabled={isDeleting}>
+                {isDeleting ? "删除中..." : "确定删除"}
+              </button>
+            </div>
+          </div>
+        </dialog>
+      ) : null}
     </section>
   );
 }
