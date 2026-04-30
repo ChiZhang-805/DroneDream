@@ -53,6 +53,10 @@ def _apply_sqlite_lightweight_migrations() -> None:
         }
         if "advanced_scenario_config_json" not in job_columns:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN advanced_scenario_config_json JSON"))
+        if "baseline_parameter_json" not in job_columns:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN baseline_parameter_json JSON"))
+        if "display_name" not in job_columns:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN display_name VARCHAR(255)"))
         if "batch_id" not in job_columns:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN batch_id VARCHAR(64)"))
         batch_tables = {

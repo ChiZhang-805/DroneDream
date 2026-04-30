@@ -84,6 +84,8 @@ def _create_job_from_config(
             if req.advanced_scenario_config is not None
             else None
         ),
+        baseline_parameter_json=req.baseline_parameters.model_dump(mode="json"),
+        display_name=req.display_name.strip() if req.display_name else None,
         status="QUEUED",
         current_phase="queued",
         progress_completed_trials=0,
@@ -124,6 +126,7 @@ def _create_job_from_config(
                 "optimizer_strategy": req.optimizer_strategy,
                 "max_iterations": req.max_iterations,
                 "trials_per_candidate": req.trials_per_candidate,
+                "baseline_parameters": req.baseline_parameters.model_dump(mode="json"),
             },
         )
     )
@@ -298,6 +301,12 @@ def rerun_job(
             min_pass_rate=source.min_pass_rate,
         ),
         openai=rerun_openai,
+        display_name=(f"{source.display_name} (rerun)" if source.display_name else None),
+        baseline_parameters=(
+            schemas.BaselineParameters(**source.baseline_parameter_json)
+            if source.baseline_parameter_json
+            else schemas.BaselineParameters()
+        ),
     )
     new_job = _create_job_from_config(db, user=resolved_user, req=req, source_job_id=source.id)
     db.commit()
@@ -454,6 +463,17 @@ def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None)
     return batch
 
 
+def update_job(
+    db: Session, job_id: str, req: schemas.JobUpdateRequest, *, user: models.User | None = None
+) -> models.Job:
+    job = get_job(db, job_id, user=user)
+    job.display_name = req.display_name
+    db.add(models.JobEvent(job_id=job.id, event_type="job_updated", payload_json={"display_name": req.display_name}))
+    db.commit()
+    db.refresh(job)
+    return job
+
+
 def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> models.Job:
     job = get_job(db, job_id, user=user)
     if job.status in schemas.JOB_TERMINAL_STATUSES:
@@ -525,6 +545,7 @@ def to_job_schema(job: models.Job) -> schemas.Job:
             code=job.latest_error_code,
             message=job.latest_error_message or "",
         )
+    baseline_parameters = schemas.BaselineParameters(**(job.baseline_parameter_json or {}))
     return schemas.Job(
         id=job.id,
         track_type=job.track_type,  # type: ignore[arg-type]
@@ -548,6 +569,8 @@ def to_job_schema(job: models.Job) -> schemas.Job:
             if job.advanced_scenario_config_json
             else None
         ),
+        display_name=job.display_name,
+        baseline_parameters=baseline_parameters,
         status=job.status,  # type: ignore[arg-type]
         progress=schemas.JobProgress(
             completed_trials=job.progress_completed_trials,
@@ -703,7 +726,9 @@ def compare_jobs(
         items.append(
             schemas.JobCompareItem(
                 job_id=job.id,
-                status=job.status,  # type: ignore[arg-type]
+                display_name=job.display_name,
+        baseline_parameters=baseline_parameters,
+        status=job.status,  # type: ignore[arg-type]
                 track_type=job.track_type,  # type: ignore[arg-type]
                 simulator_backend=job.simulator_backend_requested,  # type: ignore[arg-type]
                 optimizer_strategy=job.optimizer_strategy,  # type: ignore[arg-type]

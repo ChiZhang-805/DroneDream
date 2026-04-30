@@ -163,6 +163,20 @@ def get_job(
     return ok(job_service.to_job_schema(job).model_dump(mode="json"))
 
 
+@router.patch("/jobs/{job_id}")
+def update_job(
+    job_id: str,
+    req: schemas.JobUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        job = job_service.update_job(db, job_id, req, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    return ok(job_service.to_job_schema(job).model_dump(mode="json"))
+
+
 @router.post("/jobs/{job_id}/rerun")
 def rerun_job(
     job_id: str,

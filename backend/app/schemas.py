@@ -108,6 +108,15 @@ class AcceptanceCriteria(_Strict):
     min_pass_rate: Annotated[float, Field(ge=0.0, le=1.0)] = 0.8
 
 
+class BaselineParameters(_Strict):
+    kp_xy: Annotated[float, Field(ge=0.3, le=2.5)] = 1.0
+    kd_xy: Annotated[float, Field(ge=0.05, le=0.8)] = 0.2
+    ki_xy: Annotated[float, Field(ge=0.0, le=0.25)] = 0.05
+    vel_limit: Annotated[float, Field(ge=2.0, le=10.0)] = 5.0
+    accel_limit: Annotated[float, Field(ge=2.0, le=8.0)] = 4.0
+    disturbance_rejection: Annotated[float, Field(ge=0.0, le=1.0)] = 0.5
+
+
 class OpenAIConfig(_Strict):
     api_key: str = Field(min_length=1, max_length=512)
     model: str | None = Field(default=None, max_length=128)
@@ -185,6 +194,8 @@ class JobCreateRequest(_Strict):
     objective_profile: ObjectiveProfile = "robust"
     reference_track: list[TrackPoint] | None = None
     advanced_scenario_config: AdvancedScenarioConfig | None = None
+    display_name: str | None = Field(default=None, max_length=255)
+    baseline_parameters: BaselineParameters = Field(default_factory=BaselineParameters)
 
     simulator_backend: SimulatorBackend = "mock"
     optimizer_strategy: OptimizerStrategy = "gpt"
@@ -228,6 +239,8 @@ class Job(BaseModel):
     objective_profile: ObjectiveProfile
     reference_track: list[TrackPoint] | None = None
     advanced_scenario_config: AdvancedScenarioConfig | None = None
+    display_name: str | None = None
+    baseline_parameters: BaselineParameters = Field(default_factory=BaselineParameters)
     status: JobStatus
     progress: JobProgress
     baseline_candidate_id: str | None = None
@@ -392,6 +405,24 @@ class JobRerunRequest(_Strict):
     openai: OpenAIConfig | None = None
 
 
+
+
+class JobUpdateRequest(_Strict):
+    display_name: str | None = Field(default=None, max_length=255)
+
+    @model_validator(mode="after")
+    def _validate_display_name(self) -> JobUpdateRequest:
+        if self.display_name is None:
+            return self
+        value = self.display_name.strip()
+        if value == "":
+            self.display_name = None
+            return self
+        if any(ord(ch) < 32 for ch in value):
+            raise ValueError("display_name cannot contain control characters")
+        self.display_name = value
+        return self
+
 class JobsCompareRequest(_Strict):
     job_ids: list[str] = Field(min_length=2, max_length=10)
 
@@ -422,6 +453,7 @@ __all__ = [
     "AcceptanceCriteria",
     "AggregatedMetrics",
     "Artifact",
+    "BaselineParameters",
     "ComparisonPoint",
     "JOB_CANCELLABLE_STATUSES",
     "JOB_TERMINAL_STATUSES",
@@ -430,6 +462,7 @@ __all__ = [
     "JobErrorInfo",
     "JobEventInfo",
     "JobProgress",
+    "JobUpdateRequest",
     "JobReport",
     "ObjectiveProfile",
     "OpenAIConfig",
