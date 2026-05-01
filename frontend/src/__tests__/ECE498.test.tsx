@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { AppShell } from "../AppShell";
+import { apiClient } from "../api/client";
 import {
   ECE498,
   buildEce498JobRequest,
@@ -34,7 +35,19 @@ const form: Ece498FormState = {
   wind_west: "0",
   sensor_noise_level: "medium",
   objective_profile: "robust",
-  advanced_scenario_config_json: "",
+  advanced_enabled: false,
+  gust_enabled: false,
+  gust_magnitude_mps: "0",
+  gust_direction_deg: "0",
+  gust_period_s: "10",
+  gps_noise_m: "0",
+  baro_noise_m: "0",
+  imu_noise_scale: "1",
+  dropout_rate: "0",
+  battery_initial_percent: "100",
+  battery_voltage_sag: false,
+  mass_payload_kg: "",
+  obstacles_json: "[]",
   target_rmse: "0.5",
   target_max_error: "",
   min_pass_rate: "0.8",
@@ -105,7 +118,13 @@ describe("ECE498", () => {
     expect(screen.getByLabelText("Target Max Error")).toBeInTheDocument();
     expect(screen.getByLabelText("Min Pass Rate")).toBeInTheDocument();
     expect(screen.getByLabelText("Simulator Backend")).toBeInTheDocument();
-    expect(screen.getByLabelText("Advanced Scenario JSON")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show Advanced scenario" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show Advanced scenario" }));
+    expect(screen.getByLabelText("Enable advanced scenario")).toBeInTheDocument();
+    expect(screen.getByLabelText("Enable gust")).toBeInTheDocument();
+    expect(screen.getByLabelText("Dropout rate")).toBeInTheDocument();
+    expect(screen.getByLabelText("Obstacles JSON")).toBeInTheDocument();
+    expect(screen.getByText("Example obstacles JSON")).toBeInTheDocument();
   });
 
   it("shows validation errors for invalid inputs", () => {
@@ -145,6 +164,27 @@ describe("ECE498", () => {
     expect(req.optimizer_strategy).toBe("cma_es");
     expect(req.max_iterations).toBe(3);
   });
+  it("does not include advanced_scenario_config when advanced is disabled", () => {
+    expect(buildEce498JobRequest(form, "baseline_no_tool").advanced_scenario_config).toBeNull();
+  });
+  it("builds advanced_scenario_config when advanced is enabled", () => {
+    const req = buildEce498JobRequest({
+      ...form, advanced_enabled: true, gust_enabled: true, dropout_rate: "0.2", baro_noise_m: "0.3", imu_noise_scale: "2", obstacles_json: "[]",
+    }, "baseline_no_tool");
+    expect(req.advanced_scenario_config?.sensor_degradation?.dropout_rate).toBe(0.2);
+    expect(req.advanced_scenario_config?.sensor_degradation?.baro_noise_m).toBe(0.3);
+    expect(req.advanced_scenario_config?.sensor_degradation?.imu_noise_scale).toBe(2);
+  });
+  it("blocks run when advanced enabled and obstacles JSON invalid", () => {
+    const createSpy = vi.spyOn(apiClient, "createJob");
+    render(<MemoryRouter><ECE498 /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "Show Advanced scenario" }));
+    fireEvent.change(screen.getByLabelText("Enable advanced scenario"), { target: { value: "yes" } });
+    fireEvent.change(screen.getByLabelText("Obstacles JSON"), { target: { value: "{\"a\":1}" } });
+    fireEvent.click(screen.getByRole("button", { name: /Run Baseline/i }));
+    expect(screen.getByText(/Obstacles JSON must be a JSON array/i)).toBeInTheDocument();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
 
   it("builds generated track with more than 2 points for non-custom track", () => {
     const req = buildEce498JobRequest(form, "baseline_no_tool");
@@ -168,10 +208,18 @@ describe("ECE498", () => {
 
   it("shows nav link label", () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/batches/new"]}>
         <AppShell />
       </MemoryRouter>,
     );
     expect(screen.getByRole("link", { name: "ECE498" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "New Batch" })).toHaveClass("active");
+    expect(screen.getByRole("link", { name: "Batches" })).not.toHaveClass("active");
+  });
+  it("sets batches nav active for /batches and /batches/:id", () => {
+    const { rerender } = render(<MemoryRouter initialEntries={["/batches"]}><AppShell /></MemoryRouter>);
+    expect(screen.getByRole("link", { name: "Batches" })).toHaveClass("active");
+    rerender(<MemoryRouter initialEntries={["/batches/bat_123"]}><AppShell /></MemoryRouter>);
+    expect(screen.getByRole("link", { name: "Batches" })).toHaveClass("active");
   });
 });

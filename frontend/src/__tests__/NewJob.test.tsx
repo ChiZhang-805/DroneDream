@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -59,6 +59,16 @@ describe("NewJob — documented defaults", () => {
     expect(screen.getByLabelText(/Wind west/i)).toHaveValue(0);
     expect(screen.getByLabelText(/Sensor noise/i)).toHaveValue("medium");
     expect(screen.getByLabelText(/Objective profile/i)).toHaveValue("robust");
+  });
+  it("renders split Job/Track and Baseline sections", () => {
+    renderPage();
+    expect(screen.getByText("Job & Track Configuration")).toBeInTheDocument();
+    expect(screen.getByText("Baseline Controller Parameters")).toBeInTheDocument();
+    expect(screen.queryByText("Track configuration")).toBeNull();
+    const trackSection = screen.getByText("Job & Track Configuration").closest(".section-card") as HTMLElement;
+    const baselineSection = screen.getByText("Baseline Controller Parameters").closest(".section-card") as HTMLElement;
+    expect(within(trackSection).queryByLabelText("kp_xy")).toBeNull();
+    expect(within(baselineSection).getByLabelText("kp_xy")).toBeInTheDocument();
   });
 });
 
@@ -153,6 +163,15 @@ describe("NewJob — client-side validation", () => {
 });
 
 describe("NewJob — Phase 8 execution backend & auto-tuning", () => {
+  it("resets baseline defaults only", () => {
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/kp_xy/i), { target: { value: "2.2" } });
+    fireEvent.change(screen.getByLabelText(/Job Name/i), { target: { value: "keep-me" } });
+    fireEvent.click(screen.getByRole("button", { name: /Reset Baseline Defaults/i }));
+    expect(screen.getByLabelText(/kp_xy/i)).toHaveValue(1);
+    expect(screen.getByLabelText(/kd_xy/i)).toHaveValue(0.2);
+    expect(screen.getByLabelText(/Job Name/i)).toHaveValue("keep-me");
+  });
   it("renders defaults for simulator_backend and optimizer_strategy", () => {
     renderPage();
     expect(screen.getByLabelText(/Simulator backend/i)).toHaveValue("mock");

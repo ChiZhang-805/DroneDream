@@ -1,15 +1,17 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom";
 
 const NAV_ITEMS: { to: string; label: string; end?: boolean }[] = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/jobs/new", label: "New Job" },
-  { to: "/batches/new", label: "New Batch" },
-  { to: "/batches", label: "Batches" },
+  { to: "/batches/new", label: "New Batch", end: true },
+  { to: "/batches", label: "Batches", end: true },
   { to: "/history", label: "History / Reports" },
   { to: "/ece498", label: "ECE498" },
 ];
 
 export function AppShell() {
+  const location = useLocation();
+
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
@@ -18,11 +20,30 @@ export function AppShell() {
           <span>DroneDream</span>
         </Link>
         <nav className="app-nav" aria-label="Primary">
-          {NAV_ITEMS.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end}>
-              {item.label}
-            </NavLink>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const isBatchesItem = item.to === "/batches";
+            const isBatchesActive =
+              isBatchesItem &&
+              location.pathname !== "/batches/new" &&
+              (Boolean(matchPath("/batches", location.pathname)) ||
+                Boolean(matchPath("/batches/:batchId", location.pathname)));
+
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) => {
+                  if (isBatchesItem) {
+                    return isBatchesActive ? "active" : undefined;
+                  }
+                  return isActive ? "active" : undefined;
+                }}
+              >
+                {item.label}
+              </NavLink>
+            );
+          })}
         </nav>
         <div className="app-sidebar-footer">
           <span className="phase-pill">DroneDream V1.0</span>
