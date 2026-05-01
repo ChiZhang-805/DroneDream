@@ -467,6 +467,27 @@ export function NewJob() {
   function handleTextChange(key: keyof FormState) {
     return (e: ChangeEvent<HTMLInputElement>) => update(key, e.target.value);
   }
+  function resetBaselineDefaults() {
+    setForm((prev) => ({
+      ...prev,
+      baseline_kp_xy: DEFAULTS.baseline_kp_xy,
+      baseline_kd_xy: DEFAULTS.baseline_kd_xy,
+      baseline_ki_xy: DEFAULTS.baseline_ki_xy,
+      baseline_vel_limit: DEFAULTS.baseline_vel_limit,
+      baseline_accel_limit: DEFAULTS.baseline_accel_limit,
+      baseline_disturbance_rejection: DEFAULTS.baseline_disturbance_rejection,
+    }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.baseline_kp_xy;
+      delete next.baseline_kd_xy;
+      delete next.baseline_ki_xy;
+      delete next.baseline_vel_limit;
+      delete next.baseline_accel_limit;
+      delete next.baseline_disturbance_rejection;
+      return next;
+    });
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -518,7 +539,7 @@ export function NewJob() {
         ) : null}
 
         <SectionCard
-          title="Track configuration"
+          title="Job & Track Configuration"
           description="Select the flight track and start position."
         >
           <div className="form-grid">
@@ -554,27 +575,6 @@ export function NewJob() {
                   </option>
                 ))}
               </select>
-            </Field>
-            <Field
-              label="Baseline kp_xy"
-              htmlFor="baseline_kp_xy"
-            >
-              <input id="baseline_kp_xy" type="number" step="any" value={form.baseline_kp_xy} onChange={handleTextChange("baseline_kp_xy")} />
-            </Field>
-            <Field label="Baseline kd_xy" htmlFor="baseline_kd_xy">
-              <input id="baseline_kd_xy" type="number" step="any" value={form.baseline_kd_xy} onChange={handleTextChange("baseline_kd_xy")} />
-            </Field>
-            <Field label="Baseline ki_xy" htmlFor="baseline_ki_xy">
-              <input id="baseline_ki_xy" type="number" step="any" value={form.baseline_ki_xy} onChange={handleTextChange("baseline_ki_xy")} />
-            </Field>
-            <Field label="Baseline vel_limit" htmlFor="baseline_vel_limit">
-              <input id="baseline_vel_limit" type="number" step="any" value={form.baseline_vel_limit} onChange={handleTextChange("baseline_vel_limit")} />
-            </Field>
-            <Field label="Baseline accel_limit" htmlFor="baseline_accel_limit">
-              <input id="baseline_accel_limit" type="number" step="any" value={form.baseline_accel_limit} onChange={handleTextChange("baseline_accel_limit")} />
-            </Field>
-            <Field label="Baseline disturbance_rejection" htmlFor="baseline_disturbance_rejection">
-              <input id="baseline_disturbance_rejection" type="number" step="any" value={form.baseline_disturbance_rejection} onChange={handleTextChange("baseline_disturbance_rejection")} />
             </Field>
             {form.track_type === "circle" ? <Field label="Circle Radius (m)" htmlFor="circle_radius_m"><input id="circle_radius_m" type="number" step="any" value={form.circle_radius_m} onChange={handleTextChange("circle_radius_m")} /></Field> : null}
             {form.track_type === "u_turn" ? <>
@@ -646,6 +646,31 @@ export function NewJob() {
               </Field>
             ) : null}
           </div>
+        </SectionCard>
+        <SectionCard title="Baseline Controller Parameters">
+          <div className="form-grid">
+            <Field label="kp_xy" htmlFor="baseline_kp_xy">
+              <input id="baseline_kp_xy" type="number" step="any" value={form.baseline_kp_xy} onChange={handleTextChange("baseline_kp_xy")} />
+            </Field>
+            <Field label="kd_xy" htmlFor="baseline_kd_xy">
+              <input id="baseline_kd_xy" type="number" step="any" value={form.baseline_kd_xy} onChange={handleTextChange("baseline_kd_xy")} />
+            </Field>
+            <Field label="ki_xy" htmlFor="baseline_ki_xy">
+              <input id="baseline_ki_xy" type="number" step="any" value={form.baseline_ki_xy} onChange={handleTextChange("baseline_ki_xy")} />
+            </Field>
+            <Field label="vel_limit" htmlFor="baseline_vel_limit">
+              <input id="baseline_vel_limit" type="number" step="any" value={form.baseline_vel_limit} onChange={handleTextChange("baseline_vel_limit")} />
+            </Field>
+            <Field label="accel_limit" htmlFor="baseline_accel_limit">
+              <input id="baseline_accel_limit" type="number" step="any" value={form.baseline_accel_limit} onChange={handleTextChange("baseline_accel_limit")} />
+            </Field>
+            <Field label="disturbance_rejection" htmlFor="baseline_disturbance_rejection">
+              <input id="baseline_disturbance_rejection" type="number" step="any" value={form.baseline_disturbance_rejection} onChange={handleTextChange("baseline_disturbance_rejection")} />
+            </Field>
+          </div>
+          <button type="button" className="btn" onClick={resetBaselineDefaults}>
+            Reset Baseline Defaults
+          </button>
         </SectionCard>
         <SectionCard
           title="Advanced scenario"

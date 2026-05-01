@@ -85,7 +85,19 @@ export interface Ece498FormState {
   wind_west: string;
   sensor_noise_level: "low" | "medium" | "high";
   objective_profile: "stable" | "fast" | "smooth" | "robust" | "custom";
-  advanced_scenario_config_json: string;
+  advanced_enabled: boolean;
+  gust_enabled: boolean;
+  gust_magnitude_mps: string;
+  gust_direction_deg: string;
+  gust_period_s: string;
+  gps_noise_m: string;
+  baro_noise_m: string;
+  imu_noise_scale: string;
+  dropout_rate: string;
+  battery_initial_percent: string;
+  battery_voltage_sag: boolean;
+  mass_payload_kg: string;
+  obstacles_json: string;
   target_rmse: string;
   target_max_error: string;
   min_pass_rate: string;
@@ -115,7 +127,19 @@ const DEFAULT_FORM: Ece498FormState = {
   wind_west: "0",
   sensor_noise_level: "medium",
   objective_profile: "robust",
-  advanced_scenario_config_json: "",
+  advanced_enabled: false,
+  gust_enabled: false,
+  gust_magnitude_mps: "0",
+  gust_direction_deg: "0",
+  gust_period_s: "10",
+  gps_noise_m: "0",
+  baro_noise_m: "0",
+  imu_noise_scale: "1",
+  dropout_rate: "0",
+  battery_initial_percent: "100",
+  battery_voltage_sag: false,
+  mass_payload_kg: "",
+  obstacles_json: "[]",
   target_rmse: "0.5",
   target_max_error: "",
   min_pass_rate: "0.8",
@@ -126,6 +150,33 @@ function n(v: string | undefined | null): number | null {
   if (!v || v.trim() === "") return null;
   const x = Number(v);
   return Number.isFinite(x) ? x : null;
+}
+const OBSTACLES_JSON_EXAMPLE = `[
+  {
+    "type": "cylinder",
+    "x": 3,
+    "y": 2,
+    "z": 0,
+    "radius": 0.5,
+    "height": 2.0
+  },
+  {
+    "type": "box",
+    "x": -2,
+    "y": 4,
+    "z": 0,
+    "size_x": 1.0,
+    "size_y": 1.5,
+    "size_z": 2.0
+  }
+]`;
+
+function boolToYesNo(value: boolean): "yes" | "no" {
+  return value ? "yes" : "no";
+}
+
+function yesNoToBool(value: string): boolean {
+  return value === "yes";
 }
 
 
@@ -191,8 +242,26 @@ function validateEce498Form(form: Ece498FormState): Ece498FieldErrors {
     const parsed = parseTrack(form.reference_track_json);
     if (!parsed || parsed.length < 2) errors.reference_track_json = "Custom track JSON must be an array with at least 2 points.";
   }
-  if (form.advanced_scenario_config_json.trim()) {
-    try { JSON.parse(form.advanced_scenario_config_json); } catch { errors.advanced_scenario_config_json = "Advanced scenario JSON must be valid JSON."; }
+  if (form.advanced_enabled) {
+    inRange("gps_noise_m", 0, 100, "GPS noise");
+    inRange("baro_noise_m", 0, 100, "Baro noise");
+    inRange("imu_noise_scale", 0, 100, "IMU noise scale");
+    inRange("dropout_rate", 0, 1, "Dropout rate");
+    inRange("battery_initial_percent", 0, 100, "Battery initial percent");
+    if (form.mass_payload_kg.trim() !== "") inRange("mass_payload_kg", 0, 20, "Payload mass");
+    try {
+      const obstacles = JSON.parse(form.obstacles_json);
+      if (!Array.isArray(obstacles)) errors.obstacles_json = "Obstacles JSON must be a JSON array.";
+    } catch {
+      errors.obstacles_json = "Obstacles JSON must be valid JSON.";
+    }
+    if (form.gust_enabled) {
+      inRange("gust_magnitude_mps", 0, 30, "Gust magnitude");
+      const direction = Number(form.gust_direction_deg);
+      if (!Number.isFinite(direction) || direction < 0 || direction >= 360) errors.gust_direction_deg = "Gust direction must be between 0 (inclusive) and 360 (exclusive).";
+      const period = Number(form.gust_period_s);
+      if (!Number.isFinite(period) || period <= 0 || period > 300) errors.gust_period_s = "Gust period must be > 0 and <= 300.";
+    }
   }
   return errors;
 }
@@ -295,8 +364,27 @@ export function buildEce498JobRequest(form: Ece498FormState, mode: Ece498Mode): 
     },
     sensor_noise_level: form.sensor_noise_level,
     objective_profile: form.objective_profile,
-    advanced_scenario_config: form.advanced_scenario_config_json.trim()
-      ? (JSON.parse(form.advanced_scenario_config_json) as JobCreateRequest["advanced_scenario_config"])
+    advanced_scenario_config: form.advanced_enabled
+      ? {
+          wind_gusts: {
+            enabled: form.gust_enabled,
+            magnitude_mps: Number(form.gust_magnitude_mps),
+            direction_deg: Number(form.gust_direction_deg),
+            period_s: Number(form.gust_period_s),
+          },
+          obstacles: JSON.parse(form.obstacles_json),
+          sensor_degradation: {
+            gps_noise_m: Number(form.gps_noise_m),
+            baro_noise_m: Number(form.baro_noise_m),
+            imu_noise_scale: Number(form.imu_noise_scale),
+            dropout_rate: Number(form.dropout_rate),
+          },
+          battery: {
+            initial_percent: Number(form.battery_initial_percent),
+            voltage_sag: form.battery_voltage_sag,
+            mass_payload_kg: form.mass_payload_kg.trim() === "" ? null : Number(form.mass_payload_kg),
+          },
+        }
       : null,
     simulator_backend: form.simulator_backend,
     optimizer_strategy: mode === "baseline_no_tool" ? "none" : "cma_es",
@@ -550,6 +638,7 @@ function Ece498CandidateTurnsTable({ turns }: { turns: Ece498CandidateTurn[] }) 
 
 export function ECE498() {
   const [form, setForm] = useState<Ece498FormState>(DEFAULT_FORM);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [results, setResults] = useState<Ece498RunResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -616,7 +705,35 @@ export function ECE498() {
       <SectionCard title="Environment"><div className="form-grid"><Field label="Wind North" htmlFor="wind_north" error={errors.wind_north}><input id="wind_north" type="number" value={form.wind_north} onChange={update("wind_north")} /></Field><Field label="Wind East" htmlFor="wind_east" error={errors.wind_east}><input id="wind_east" type="number" value={form.wind_east} onChange={update("wind_east")} /></Field><Field label="Wind South" htmlFor="wind_south" error={errors.wind_south}><input id="wind_south" type="number" value={form.wind_south} onChange={update("wind_south")} /></Field><Field label="Wind West" htmlFor="wind_west" error={errors.wind_west}><input id="wind_west" type="number" value={form.wind_west} onChange={update("wind_west")} /></Field><Field label="Sensor Noise Level" htmlFor="sensor_noise_level" error={errors.sensor_noise_level}><select id="sensor_noise_level" value={form.sensor_noise_level} onChange={update("sensor_noise_level")}><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></Field></div></SectionCard>
       <SectionCard title="Verifier / Acceptance Criteria"><div className="form-grid"><Field label="Objective Profile" htmlFor="objective_profile"><select id="objective_profile" value={form.objective_profile} onChange={update("objective_profile")}><option value="stable">stable</option><option value="fast">fast</option><option value="smooth">smooth</option><option value="robust">robust</option><option value="custom">custom</option></select></Field><Field label="Target RMSE" htmlFor="target_rmse" error={errors.target_rmse}><input id="target_rmse" type="number" value={form.target_rmse} onChange={update("target_rmse")} /></Field><Field label="Target Max Error" htmlFor="target_max_error" error={errors.target_max_error}><input id="target_max_error" type="number" value={form.target_max_error} onChange={update("target_max_error")} /></Field><Field label="Min Pass Rate" htmlFor="min_pass_rate" error={errors.min_pass_rate}><input id="min_pass_rate" type="number" value={form.min_pass_rate} onChange={update("min_pass_rate")} /></Field></div></SectionCard>
       <SectionCard title="Execution Backend"><div className="form-grid"><Field label="Simulator Backend" htmlFor="simulator_backend"><select id="simulator_backend" value={form.simulator_backend} onChange={update("simulator_backend")}><option value="mock">mock</option><option value="real_cli">real_cli</option></select></Field></div>{form.simulator_backend==="real_cli" && <p className="form-error">real_cli requires REAL_SIMULATOR_COMMAND and the PX4/Gazebo runner environment to be configured.</p>}</SectionCard>
-      <SectionCard title="Advanced Scenario"><Field label="Advanced Scenario JSON" htmlFor="advanced_scenario_config_json" hint="Optional JSON. Leave empty to disable advanced scenario config." error={errors.advanced_scenario_config_json}><textarea id="advanced_scenario_config_json" value={form.advanced_scenario_config_json} onChange={update("advanced_scenario_config_json")} /></Field></SectionCard>
+      <SectionCard title="Advanced Scenario" description="Optional extended PX4/Gazebo scenario parameters.">
+        <button type="button" className="btn btn-ghost" onClick={() => setAdvancedOpen((p) => !p)}>
+          {advancedOpen ? "Hide Advanced scenario" : "Show Advanced scenario"}
+        </button>
+        {advancedOpen ? (
+          <div className="stack-sm">
+            <div className="form-grid">
+              <Field label="Enable advanced scenario" htmlFor="advanced_enabled">
+                <select id="advanced_enabled" value={boolToYesNo(form.advanced_enabled)} onChange={(e) => setForm((p) => ({ ...p, advanced_enabled: yesNoToBool(e.target.value) }))}><option value="no">no</option><option value="yes">yes</option></select>
+              </Field>
+              <Field label="Enable gust" htmlFor="gust_enabled">
+                <select id="gust_enabled" value={boolToYesNo(form.gust_enabled)} onChange={(e) => setForm((p) => ({ ...p, gust_enabled: yesNoToBool(e.target.value) }))}><option value="no">no</option><option value="yes">yes</option></select>
+              </Field>
+              <Field label="Gust magnitude (m/s)" htmlFor="gust_magnitude_mps" error={errors.gust_magnitude_mps}><input id="gust_magnitude_mps" type="number" value={form.gust_magnitude_mps} onChange={update("gust_magnitude_mps")} /></Field>
+              <Field label="Gust direction (deg)" htmlFor="gust_direction_deg" error={errors.gust_direction_deg}><input id="gust_direction_deg" type="number" value={form.gust_direction_deg} onChange={update("gust_direction_deg")} /></Field>
+              <Field label="Gust period (s)" htmlFor="gust_period_s" error={errors.gust_period_s}><input id="gust_period_s" type="number" value={form.gust_period_s} onChange={update("gust_period_s")} /></Field>
+              <Field label="GPS noise (m)" htmlFor="gps_noise_m" error={errors.gps_noise_m}><input id="gps_noise_m" type="number" value={form.gps_noise_m} onChange={update("gps_noise_m")} /></Field>
+              <Field label="Baro noise (m)" htmlFor="baro_noise_m" error={errors.baro_noise_m}><input id="baro_noise_m" type="number" value={form.baro_noise_m} onChange={update("baro_noise_m")} /></Field>
+              <Field label="IMU noise scale" htmlFor="imu_noise_scale" error={errors.imu_noise_scale}><input id="imu_noise_scale" type="number" value={form.imu_noise_scale} onChange={update("imu_noise_scale")} /></Field>
+              <Field label="Dropout rate" htmlFor="dropout_rate" error={errors.dropout_rate}><input id="dropout_rate" type="number" value={form.dropout_rate} onChange={update("dropout_rate")} /></Field>
+              <Field label="Battery initial percent" htmlFor="battery_initial_percent" error={errors.battery_initial_percent}><input id="battery_initial_percent" type="number" value={form.battery_initial_percent} onChange={update("battery_initial_percent")} /></Field>
+              <Field label="Battery voltage sag" htmlFor="battery_voltage_sag"><select id="battery_voltage_sag" value={boolToYesNo(form.battery_voltage_sag)} onChange={(e) => setForm((p) => ({ ...p, battery_voltage_sag: yesNoToBool(e.target.value) }))}><option value="no">no</option><option value="yes">yes</option></select></Field>
+              <Field label="Payload mass (kg)" htmlFor="mass_payload_kg" error={errors.mass_payload_kg}><input id="mass_payload_kg" type="number" value={form.mass_payload_kg} onChange={update("mass_payload_kg")} /></Field>
+              <Field label="Obstacles JSON" htmlFor="obstacles_json" error={errors.obstacles_json}><textarea id="obstacles_json" value={form.obstacles_json} onChange={update("obstacles_json")} /></Field>
+            </div>
+            <details><summary>Example obstacles JSON</summary><pre>{OBSTACLES_JSON_EXAMPLE}</pre><button type="button" className="btn btn-ghost" onClick={() => setForm((p) => ({ ...p, obstacles_json: OBSTACLES_JSON_EXAMPLE }))}>Use example</button></details>
+          </div>
+        ) : null}
+      </SectionCard>
 
       <div className="ece498-run-actions">
         <button disabled={running} onClick={() => void runMode("baseline_no_tool")}>
