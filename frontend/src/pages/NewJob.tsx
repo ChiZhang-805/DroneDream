@@ -957,11 +957,13 @@ export function NewJob() {
                   <Alert tone="warning">{runtimeState.mode_warning}</Alert>
                 ) : null}
                 <Alert tone={runtimeState.px4_gazebo_dry_run ? "info" : "warning"}>
-                  {runtimeState.px4_gazebo_dry_run
-                    ? "real_cli launches actual PX4/Gazebo in Hosted B."
-                    : runtimeState.real_mode_config_complete
-                      ? "PX4/Gazebo real mode active. Trials may take significantly longer."
-                      : "Real PX4/Gazebo configuration is incomplete; Hosted B strict mode will fail early."}
+                  {runtimeState.hosted_real_cli_requires_px4
+                    ? runtimeState.real_mode_config_complete
+                      ? "real_cli PX4/Gazebo real mode active. Trials may take significantly longer. Gazebo live view should be available."
+                      : "Hosted B strict real_cli is enabled, but real PX4/Gazebo configuration is incomplete. real_cli jobs will fail early until configuration is fixed."
+                    : runtimeState.px4_gazebo_dry_run
+                      ? "Developer dry-run mode: no external PX4/Gazebo process is launched."
+                      : "Non-strict real_cli mode. Check configuration before assuming PX4/Gazebo is running."}
                 </Alert>
               </>
             ) : null}

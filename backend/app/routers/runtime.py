@@ -54,6 +54,10 @@ def runtime_state() -> dict[str, object]:
             strict_missing.append("PX4_AUTOPILOT_DIR is required")
         if px4_gazebo_headless:
             strict_missing.append("PX4_GAZEBO_HEADLESS must be false")
+        if not vnc_configured:
+            strict_missing.append("VNC_PASSWORD is required")
+        if not gazebo_viewer_url_configured:
+            strict_missing.append("VITE_GAZEBO_VIEWER_URL is recommended for web embedding")
     real_mode_config_complete = len(strict_missing) == 0 and launch_configured and autopilot_dir_configured and (not px4_gazebo_dry_run)
 
     if hosted_real_cli_requires_px4 and strict_missing:

@@ -355,3 +355,17 @@ def test_real_cli_dev_mode_can_use_dry_run(monkeypatch, tmp_path):
     monkeypatch.setenv("REAL_SIMULATOR_COMMAND", "python scripts/simulators/example_real_simulator.py")
     result = RealCliSimulatorAdapter().run_trial(_ctx())
     assert result.backend == "real_cli"
+
+
+def test_real_cli_strict_mode_missing_vnc_password(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOSTED_REAL_CLI_REQUIRES_PX4", "true")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "false")
+    monkeypatch.setenv("PX4_GAZEBO_HEADLESS", "false")
+    monkeypatch.setenv("PX4_GAZEBO_LAUNCH_COMMAND", "launch")
+    monkeypatch.setenv("PX4_AUTOPILOT_DIR", str(tmp_path))
+    monkeypatch.delenv("VNC_PASSWORD", raising=False)
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", "python scripts/simulators/example_real_simulator.py")
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+    assert result.success is False
+    assert result.failure is not None
+    assert "VNC_PASSWORD is required" in result.failure.reason

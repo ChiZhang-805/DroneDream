@@ -195,6 +195,13 @@ def _validate_hosted_real_cli_requirements() -> str | None:
         missing.append("PX4_AUTOPILOT_DIR is required")
     if os.environ.get("PX4_GAZEBO_HEADLESS", "false").strip().lower() in {"1","true","yes","on"}:
         missing.append("PX4_GAZEBO_HEADLESS must be false")
+    if not os.environ.get("VNC_PASSWORD", "").strip():
+        missing.append("VNC_PASSWORD is required")
+    if not os.environ.get("VITE_GAZEBO_VIEWER_URL", "").strip():
+        missing.append("VITE_GAZEBO_VIEWER_URL is recommended for web embedding")
+    px4_dir = os.environ.get("PX4_AUTOPILOT_DIR", "").strip()
+    if px4_dir and not Path(px4_dir).exists():
+        missing.append(f"PX4_AUTOPILOT_DIR does not exist in worker container: {px4_dir}")
     return "; ".join(missing) if missing else None
 
 

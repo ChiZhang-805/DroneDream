@@ -3,16 +3,35 @@ set -euo pipefail
 
 ENV_FILE="${ENV_FILE:-deploy/hosted-b/.env}"
 COMPOSE_FILE="${COMPOSE_FILE:-deploy/hosted-b/docker-compose.yml}"
+VERBOSE="${VERBOSE:-0}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing $ENV_FILE (copy deploy/hosted-b/.env.example to deploy/hosted-b/.env and edit values)."
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+eval "$(python3 - "$ENV_FILE" <<'PY'
+import re
+import shlex
+import sys
+from pathlib import Path
+
+env_path = Path(sys.argv[1])
+key_re = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+for raw in env_path.read_text(encoding='utf-8').splitlines():
+    line = raw.strip()
+    if not line or line.startswith('#') or '=' not in line:
+        continue
+    key, value = line.split('=', 1)
+    key = key.strip()
+    if not key_re.match(key):
+        continue
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1]
+    print(f"export {key}={shlex.quote(value)}")
+PY
+)"
 
 status=0
 req(){ [[ -n "${!1:-}" ]] || { echo "ERROR: $1 is required"; status=1; }; }
@@ -23,8 +42,11 @@ echo "HOSTED_REAL_CLI_REQUIRES_PX4=${strict_mode}"
 echo "REAL_SIMULATOR_COMMAND=${REAL_SIMULATOR_COMMAND:-}"
 echo "PX4_GAZEBO_DRY_RUN=${PX4_GAZEBO_DRY_RUN:-}"
 echo "PX4_GAZEBO_HEADLESS=${PX4_GAZEBO_HEADLESS:-}"
-
-echo "PX4_GAZEBO_LAUNCH_COMMAND=${PX4_GAZEBO_LAUNCH_COMMAND:+configured}"
+if [[ "$VERBOSE" == "1" ]]; then
+  echo "PX4_GAZEBO_LAUNCH_COMMAND=${PX4_GAZEBO_LAUNCH_COMMAND:-}"
+else
+  echo "PX4_GAZEBO_LAUNCH_COMMAND=${PX4_GAZEBO_LAUNCH_COMMAND:+configured}"
+fi
 echo "PX4_AUTOPILOT_HOST_DIR=${PX4_AUTOPILOT_HOST_DIR:-}"
 echo "PX4_AUTOPILOT_DIR=${PX4_AUTOPILOT_DIR:-}"
 
