@@ -114,6 +114,22 @@ def test_rerun_gpt_without_key_succeeds_when_server_mode_enabled(client, monkeyp
     assert resp.status_code == 200, resp.text
 
 
+def test_rerun_gpt_without_key_returns_422_before_secret_store_check(client, monkeypatch):
+    monkeypatch.setenv('APP_SECRET_KEY', 'dev-secret')
+    from app.config import get_settings
+    get_settings.cache_clear()
+    payload = _gpt_payload(); payload['openai']['api_key'] = 'sk-user'
+    job_id = _create_job(client, payload)
+    monkeypatch.delenv('APP_SECRET_KEY', raising=False)
+    monkeypatch.delenv('DRONEDREAM_SECRET_KEY', raising=False)
+    monkeypatch.delenv('HOSTED_ALLOW_SERVER_OPENAI_KEY', raising=False)
+    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+    get_settings.cache_clear()
+    resp = client.post(f'/api/v1/jobs/{job_id}/rerun', json={})
+    assert resp.status_code == 422, resp.text
+    assert resp.json()['error']['code'] == 'INVALID_INPUT'
+
+
 def test_rerun_gpt_with_explicit_key_fails_when_secret_store_not_configured(client, monkeypatch):
     monkeypatch.setenv('APP_SECRET_KEY', 'dev-secret')
     from app.config import get_settings

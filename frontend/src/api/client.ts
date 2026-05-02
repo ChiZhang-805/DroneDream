@@ -145,9 +145,13 @@ async function request<T>(
     return envelope.data;
   }
   const error = envelope?.error;
+  const message =
+    response.status === 401
+      ? `${error?.message ?? "Unauthorized: missing or invalid access token."} Check the Hosted access token in the header.`
+      : (error?.message ?? `Request failed with HTTP ${response.status}`);
   throw new ApiClientError(
     error?.code ?? "INTERNAL_ERROR",
-    error?.message ?? (response.status === 401 ? "Unauthorized: missing or invalid access token." : `Request failed with HTTP ${response.status}`),
+    message,
     error?.details ?? null,
     response.status,
   );

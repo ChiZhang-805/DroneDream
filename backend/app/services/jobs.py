@@ -282,8 +282,8 @@ def rerun_job(
     strategy: schemas.OptimizerStrategy = source.optimizer_strategy  # type: ignore[assignment]
     rerun_openai: schemas.OpenAIConfig | None = None
     if strategy == "gpt":
-        _ensure_gpt_secret_store_configured()
         resolved_key, _ = _resolve_gpt_api_key(openai)
+        _ensure_gpt_secret_store_configured()
         rerun_openai = schemas.OpenAIConfig(
             api_key=resolved_key,
             model=(openai.model if openai is not None and openai.model is not None else source.openai_model),
