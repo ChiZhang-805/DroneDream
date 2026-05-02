@@ -288,7 +288,7 @@ export interface AcceptanceCriteria {
 
 export interface OpenAIConfig {
   // NEVER surfaced by API responses. Present only on create-job requests.
-  api_key: string;
+  api_key?: string;
   model?: string | null;
 }
 

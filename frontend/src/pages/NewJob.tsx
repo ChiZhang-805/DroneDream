@@ -93,7 +93,7 @@ const DEFAULTS: FormState = {
   wind_west: "0",
   sensor_noise_level: "medium",
   objective_profile: "robust",
-  simulator_backend: "mock",
+  simulator_backend: ((import.meta.env.VITE_DEFAULT_SIMULATOR_BACKEND as SimulatorBackend | undefined) ?? "mock"),
   optimizer_strategy: "gpt",
   max_iterations: "20",
   trials_per_candidate: "3",
@@ -315,7 +315,8 @@ function validate(form: FormState): FieldErrors {
   }
   if (
     form.optimizer_strategy === "gpt" &&
-    form.openai_api_key.trim() === ""
+    form.openai_api_key.trim() === "" &&
+    import.meta.env.VITE_SERVER_OPENAI_ENABLED !== "true"
   ) {
     errors.openai_api_key = "API key required when strategy is gpt";
   }
@@ -405,7 +406,7 @@ function formToRequest(form: FormState): JobCreateRequest {
     },
     sensor_noise_level: form.sensor_noise_level,
     objective_profile: form.objective_profile,
-    simulator_backend: form.simulator_backend,
+    simulator_backend: (import.meta.env.VITE_LOCK_SIMULATOR_BACKEND === "true" ? ((import.meta.env.VITE_DEFAULT_SIMULATOR_BACKEND as SimulatorBackend | undefined) ?? "real_cli") : form.simulator_backend),
     optimizer_strategy: form.optimizer_strategy,
     max_iterations: Number(form.max_iterations),
     trials_per_candidate: Number(form.trials_per_candidate),
@@ -421,7 +422,7 @@ function formToRequest(form: FormState): JobCreateRequest {
   };
   if (form.optimizer_strategy === "gpt") {
     req.openai = {
-      api_key: form.openai_api_key.trim(),
+      ...(form.openai_api_key.trim() ? { api_key: form.openai_api_key.trim() } : {}),
       model: form.openai_model.trim() === "" ? null : form.openai_model.trim(),
     };
   }
@@ -453,6 +454,10 @@ function formToRequest(form: FormState): JobCreateRequest {
 }
 
 export function NewJob() {
+  const hostedMode = import.meta.env.VITE_HOSTED_MODE === "true";
+  const lockSimulatorBackend = import.meta.env.VITE_LOCK_SIMULATOR_BACKEND === "true";
+  const hostedServerOpenAIEnabled = import.meta.env.VITE_SERVER_OPENAI_ENABLED === "true";
+  const hostedDefaultSimulator = ((import.meta.env.VITE_DEFAULT_SIMULATOR_BACKEND as SimulatorBackend | undefined) ?? "real_cli");
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(DEFAULTS);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -907,7 +912,8 @@ export function NewJob() {
             >
               <select
                 id="simulator_backend"
-                value={form.simulator_backend}
+                disabled={lockSimulatorBackend}
+                value={lockSimulatorBackend ? hostedDefaultSimulator : form.simulator_backend}
                 onChange={(e) =>
                   update(
                     "simulator_backend",
@@ -922,6 +928,7 @@ export function NewJob() {
                 ))}
               </select>
             </Field>
+            {hostedMode && lockSimulatorBackend ? <p className="field-hint">Hosted mode uses the platform-managed PX4/Gazebo backend.</p> : null}
             <Field
               label="Optimizer Strategy"
               required
@@ -1029,10 +1036,10 @@ export function NewJob() {
               <>
                 <Field
                   label="OpenAI API Key"
-                  required
+                  required={!hostedServerOpenAIEnabled}
                   error={errors.openai_api_key}
                   htmlFor="openai_api_key"
-                  hint="Used server-side only. Stored encrypted for the duration of the job and wiped on completion."
+                  hint={hostedServerOpenAIEnabled ? "Optional in hosted mode; leave blank to use server-managed key." : "Used server-side only. Stored encrypted for the duration of the job and wiped on completion."}
                 >
                   <input
                     id="openai_api_key"

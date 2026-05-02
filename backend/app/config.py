@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     s3_prefix: str = Field(default="dronedream/")
     auth_mode: str = Field(default="disabled")
     demo_auth_tokens: str = Field(default="")
+    hosted_allow_server_openai_key: bool = Field(default=False)
+    openai_api_key: str | None = Field(default=None)
+    openai_model: str | None = Field(default=None)
 
     @property
     def cors_origin_list(self) -> list[str]:

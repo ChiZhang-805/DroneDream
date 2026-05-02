@@ -1,4 +1,6 @@
 import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { clearDemoAuthToken, getDemoAuthToken, setDemoAuthToken } from "./api/client";
 
 const NAV_ITEMS: { to: string; label: string; end?: boolean }[] = [
   { to: "/", label: "Dashboard", end: true },
@@ -10,6 +12,9 @@ const NAV_ITEMS: { to: string; label: string; end?: boolean }[] = [
 ];
 
 export function AppShell() {
+  const requireDemoToken = import.meta.env.VITE_REQUIRE_DEMO_AUTH_TOKEN === "true";
+  const [tokenInput, setTokenInput] = useState("");
+  const [savedToken, setSavedToken] = useState<string | null>(getDemoAuthToken());
   const location = useLocation();
 
   return (
@@ -54,6 +59,19 @@ export function AppShell() {
           <div className="app-header-title">DroneDream —— Auto Parameter Tuning Platform</div>
           <div className="app-header-meta">
             <span className="env-chip">live API</span>
+            {requireDemoToken ? (
+              <div>
+                <input
+                  placeholder="Access token"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
+                />
+                <button type="button" onClick={() => { setDemoAuthToken(tokenInput); setSavedToken(getDemoAuthToken()); setTokenInput(""); }}>
+                  Save Token
+                </button>
+                {savedToken ? <button type="button" onClick={() => { clearDemoAuthToken(); setSavedToken(null); }}>Clear</button> : null}
+              </div>
+            ) : null}
           </div>
         </header>
         <main className="app-main">

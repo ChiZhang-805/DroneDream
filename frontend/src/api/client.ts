@@ -47,12 +47,31 @@ const API_BASE_URL: string =
   "http://127.0.0.1:8000";
 const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
+const DEMO_AUTH_TOKEN_STORAGE_KEY = "dronedream.demo_auth_token";
+
+export function getDemoAuthToken(): string | null {
+  if (typeof window !== "undefined") {
+    const localToken = window.localStorage.getItem(DEMO_AUTH_TOKEN_STORAGE_KEY);
+    if (localToken && localToken.trim()) return localToken.trim();
+  }
+  if (DEMO_AUTH_TOKEN && DEMO_AUTH_TOKEN.trim()) return DEMO_AUTH_TOKEN.trim();
+  return null;
+}
+
+export function setDemoAuthToken(token: string): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DEMO_AUTH_TOKEN_STORAGE_KEY, token.trim());
+}
+
+export function clearDemoAuthToken(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(DEMO_AUTH_TOKEN_STORAGE_KEY);
+}
 
 function authHeaders(): Record<string, string> {
-  if (!DEMO_AUTH_TOKEN) {
-    return {};
-  }
-  return { Authorization: `Bearer ${DEMO_AUTH_TOKEN}` };
+  const token = getDemoAuthToken();
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
 }
 
 export function artifactDownloadUrl(artifactId: string): string {

@@ -38,7 +38,11 @@ def _now() -> datetime:
 def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
     if req.optimizer_strategy != "gpt":
         return
-    if req.openai is None or not req.openai.api_key:
+    settings = get_settings()
+    has_request_key = req.openai is not None and bool(req.openai.api_key)
+    if not has_request_key and not (
+        settings.hosted_allow_server_openai_key and settings.openai_api_key
+    ):
         raise JobServiceError(
             "INVALID_INPUT",
             "openai.api_key is required when optimizer_strategy=gpt.",
@@ -105,18 +109,20 @@ def _create_job_from_config(
         min_pass_rate=req.acceptance_criteria.min_pass_rate,
         current_generation=0,
         optimization_outcome=None,
-        openai_model=(req.openai.model if req.openai is not None else None),
+        openai_model=(req.openai.model if req.openai is not None and req.openai.model else get_settings().openai_model),
     )
     db.add(job)
     db.flush()
-    if req.openai is not None and req.openai.api_key:
-        db.add(
-            models.JobSecret(
-                job_id=job.id,
-                provider="openai",
-                encrypted_api_key=job_secrets.encrypt_secret(req.openai.api_key),
+    if req.optimizer_strategy == "gpt":
+        api_key = req.openai.api_key if req.openai is not None and req.openai.api_key else get_settings().openai_api_key
+        if api_key:
+            db.add(
+                models.JobSecret(
+                    job_id=job.id,
+                    provider="openai",
+                    encrypted_api_key=job_secrets.encrypt_secret(api_key),
+                )
             )
-        )
     db.add(
         models.JobEvent(
             job_id=job.id,

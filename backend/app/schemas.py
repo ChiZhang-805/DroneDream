@@ -118,7 +118,7 @@ class BaselineParameters(_Strict):
 
 
 class OpenAIConfig(_Strict):
-    api_key: str = Field(min_length=1, max_length=512)
+    api_key: str | None = Field(default=None, min_length=1, max_length=512)
     model: str | None = Field(default=None, max_length=128)
 
 
