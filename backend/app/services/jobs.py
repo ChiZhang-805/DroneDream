@@ -48,10 +48,7 @@ def _resolve_gpt_api_key(req_openai: schemas.OpenAIConfig | None) -> tuple[str, 
         http_status=422,
     )
 
-def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
-    if req.optimizer_strategy != "gpt":
-        return
-    _resolve_gpt_api_key(req.openai)
+def _ensure_gpt_secret_store_configured() -> None:
     if not job_secrets.is_configured():
         raise JobServiceError(
             "CONFIGURATION_ERROR",
@@ -61,6 +58,21 @@ def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
             ),
             http_status=500,
         )
+
+
+def _resolve_openai_model_for_job(req: schemas.JobCreateRequest) -> str | None:
+    if req.optimizer_strategy != "gpt":
+        return None
+    if req.openai is not None and req.openai.model:
+        return req.openai.model
+    return get_settings().openai_model
+
+
+def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
+    if req.optimizer_strategy != "gpt":
+        return
+    _resolve_gpt_api_key(req.openai)
+    _ensure_gpt_secret_store_configured()
 
 
 def _create_job_from_config(
@@ -113,7 +125,7 @@ def _create_job_from_config(
         min_pass_rate=req.acceptance_criteria.min_pass_rate,
         current_generation=0,
         optimization_outcome=None,
-        openai_model=(req.openai.model if req.openai is not None and req.openai.model else get_settings().openai_model),
+        openai_model=_resolve_openai_model_for_job(req),
     )
     db.add(job)
     db.flush()
@@ -270,6 +282,7 @@ def rerun_job(
     strategy: schemas.OptimizerStrategy = source.optimizer_strategy  # type: ignore[assignment]
     rerun_openai: schemas.OpenAIConfig | None = None
     if strategy == "gpt":
+        _ensure_gpt_secret_store_configured()
         resolved_key, _ = _resolve_gpt_api_key(openai)
         rerun_openai = schemas.OpenAIConfig(
             api_key=resolved_key,

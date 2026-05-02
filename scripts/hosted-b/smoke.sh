@@ -43,16 +43,26 @@ for _ in range(120):
  req=urllib.request.Request(f"{url}/api/v1/jobs/{jid}",headers=headers)
  last=json.loads(urllib.request.urlopen(req).read().decode())["data"]
  st=last.get("status")
+ progress=last.get("progress") or {}
+ completed=progress.get("completed_trials")
+ total=progress.get("total_trials")
+ phase=progress.get("current_phase")
  if st in ("COMPLETED","FAILED","CANCELLED"):
   print("final status:",st)
   print("latest_error:",last.get("latest_error"))
-  print("progress:",f"{last.get('progress_completed_trials')}/{last.get('progress_total_trials')}")
-  print("last response summary:",json.dumps({"id":last.get("id"),"status":st,"phase":last.get("current_phase")},indent=2))
+  print("progress:",f"{completed}/{total}")
+  print("phase:",phase)
+  print("last response summary:",json.dumps({"id":last.get("id"),"status":st,"phase":phase,"progress":progress},indent=2))
   sys.exit(0 if st=="COMPLETED" else 1)
  time.sleep(2)
 print("final status:", last.get("status") if last else "unknown")
 print("latest_error:", None if not last else last.get("latest_error"))
-print("progress:", None if not last else f"{last.get('progress_completed_trials')}/{last.get('progress_total_trials')}")
-print("last response summary:", json.dumps(last or {}, indent=2)[:1200])
+progress=(last.get("progress") if last else None) or {}
+completed=progress.get("completed_trials")
+total=progress.get("total_trials")
+phase=progress.get("current_phase")
+print("progress:", None if not last else f"{completed}/{total}")
+print("phase:", None if not last else phase)
+print("last response summary:", json.dumps({"id": None if not last else last.get("id"), "status": None if not last else last.get("status"), "phase": phase, "progress": progress}, indent=2)[:1200])
 sys.exit(1)
 PY
