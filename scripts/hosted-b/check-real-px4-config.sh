@@ -52,19 +52,25 @@ echo "PX4_AUTOPILOT_DIR=${PX4_AUTOPILOT_DIR:-}"
 
 [[ "${REAL_SIMULATOR_COMMAND:-}" == *"px4_gazebo_runner.py"* ]] || { echo "ERROR: REAL_SIMULATOR_COMMAND must reference px4_gazebo_runner.py"; status=1; }
 
-if [[ "$strict_mode" == "true" ]]; then
+truthy(){ case "${1,,}" in 1|true|yes|on) return 0;; *) return 1;; esac; }
+
+if truthy "$strict_mode"; then
   [[ "${PX4_GAZEBO_DRY_RUN:-false}" == "false" ]] || { echo "ERROR: PX4_GAZEBO_DRY_RUN must be false in strict mode"; status=1; }
   [[ "${PX4_GAZEBO_HEADLESS:-false}" == "false" ]] || { echo "ERROR: PX4_GAZEBO_HEADLESS must be false in strict mode"; status=1; }
   req PX4_GAZEBO_LAUNCH_COMMAND
   req PX4_AUTOPILOT_HOST_DIR
   req PX4_AUTOPILOT_DIR
   req VNC_PASSWORD
+  if [[ -z "${VITE_GAZEBO_VIEWER_URL:-}" ]]; then
+    echo "WARN: VITE_GAZEBO_VIEWER_URL is not configured; web iframe embedding will be unavailable."
+  fi
   [[ -d "${PX4_AUTOPILOT_HOST_DIR:-/missing}" ]] || { echo "ERROR: PX4_AUTOPILOT_HOST_DIR does not exist: ${PX4_AUTOPILOT_HOST_DIR:-}"; status=1; }
 else
   echo "INFO: strict mode disabled; dry-run/dev checks are relaxed."
 fi
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  echo "Docker available: yes"
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config >/dev/null || status=1
   echo "Active worker services:"
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps worker worker-real-px4-vnc || true
@@ -72,6 +78,9 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T worker-real-px4-vnc sh -lc 'env | grep -E "DISPLAY|NOVNC_PORT|VNC_PORT|PX4_GAZEBO|PX4_AUTOPILOT_DIR|HOSTED_REAL_CLI_REQUIRES_PX4"' || true
     curl -fsS "http://localhost:${NOVNC_PORT:-6080}/vnc.html" >/dev/null || echo "WARN: noVNC endpoint not reachable yet"
   fi
+  curl -fsS "http://localhost:8080/gazebo/vnc.html" >/dev/null || echo "WARN: same-origin /gazebo/vnc.html not reachable yet"
+else
+  echo "Docker available: no"
 fi
 
 exit "$status"

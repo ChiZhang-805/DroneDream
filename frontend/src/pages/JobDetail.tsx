@@ -560,12 +560,18 @@ function ExecutionBackendCard({ job, runtimeState }: { job: Job; runtimeState: R
                 <span className="kv-value">{runtimeState.mode_warning}</span>
               </li>
             ) : null}
+            {runtimeState.mode_advisory ? (
+              <li>
+                <span className="kv-key">Runtime advisory</span>
+                <span className="kv-value">Gazebo real mode may run, but the web live-view iframe is not configured.</span>
+              </li>
+            ) : null}
             <li>
               <span className="kv-key">Runtime detail</span>
               <span className="kv-value">
                 {runtimeState.hosted_real_cli_requires_px4
                   ? runtimeState.real_mode_config_complete
-                    ? "real_cli PX4/Gazebo real mode active. Trials may take significantly longer. Gazebo live view should be available."
+                    ? "PX4/Gazebo real mode active. Trials may take significantly longer."
                     : "Hosted B strict real_cli is enabled, but real PX4/Gazebo configuration is incomplete. real_cli jobs will fail early until configuration is fixed."
                   : runtimeState.px4_gazebo_dry_run
                     ? "Developer dry-run mode: no external PX4/Gazebo process is launched."

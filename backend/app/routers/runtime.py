@@ -44,25 +44,27 @@ def runtime_state() -> dict[str, object]:
     autopilot_dir_configured = px4_autopilot_dir is not None
     autopilot_host_dir_configured = px4_autopilot_host_dir is not None
 
-    strict_missing = []
+    hard_missing = []
     if hosted_real_cli_requires_px4:
         if px4_gazebo_dry_run:
-            strict_missing.append("PX4_GAZEBO_DRY_RUN must be false")
+            hard_missing.append("PX4_GAZEBO_DRY_RUN must be false")
         if not launch_configured:
-            strict_missing.append("PX4_GAZEBO_LAUNCH_COMMAND is required")
+            hard_missing.append("PX4_GAZEBO_LAUNCH_COMMAND is required")
         if not autopilot_dir_configured:
-            strict_missing.append("PX4_AUTOPILOT_DIR is required")
+            hard_missing.append("PX4_AUTOPILOT_DIR is required")
         if px4_gazebo_headless:
-            strict_missing.append("PX4_GAZEBO_HEADLESS must be false")
+            hard_missing.append("PX4_GAZEBO_HEADLESS must be false")
         if not vnc_configured:
-            strict_missing.append("VNC_PASSWORD is required")
-        if not gazebo_viewer_url_configured:
-            strict_missing.append("VITE_GAZEBO_VIEWER_URL is recommended for web embedding")
-    real_mode_config_complete = len(strict_missing) == 0 and launch_configured and autopilot_dir_configured and (not px4_gazebo_dry_run)
+            hard_missing.append("VNC_PASSWORD is required")
+    mode_advisory = None
+    if hosted_real_cli_requires_px4 and (not gazebo_viewer_url_configured):
+        mode_advisory = "Gazebo viewer URL is not configured; real simulation can run but web iframe will not be embedded."
 
-    if hosted_real_cli_requires_px4 and strict_missing:
+    real_mode_config_complete = len(hard_missing) == 0 and launch_configured and autopilot_dir_configured and (not px4_gazebo_dry_run)
+
+    if hosted_real_cli_requires_px4 and hard_missing:
         mode_label = "real_cli configuration incomplete"
-        mode_warning = "; ".join(strict_missing)
+        mode_warning = "; ".join(hard_missing)
     elif real_mode_config_complete:
         mode_label = "real_cli PX4/Gazebo real mode"
         mode_warning = None
@@ -85,6 +87,7 @@ def runtime_state() -> dict[str, object]:
         "px4_make_target": px4_make_target,
         "mode_label": mode_label,
         "mode_warning": mode_warning,
+        "mode_advisory": mode_advisory,
         "runtime_source_note": (
             "Runtime values are read from backend/shared deployment environment "
             "(for example deploy/hosted-b/.env), not from live probes of every worker process."

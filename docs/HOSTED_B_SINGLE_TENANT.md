@@ -23,7 +23,7 @@ Hosted B is a single-tenant self-hosted deployment profile for one team/site, wi
 ### B) Real PX4/Gazebo + noVNC strict mode
 1. Run `scripts/hosted-b/init-env.sh`.
 2. Edit `deploy/hosted-b/.env` and set required values:
-   - `HOSTED_REAL_CLI_REQUIRES_PX4=true`
+   - `HOSTED_REAL_CLI_REQUIRES_PX4=true (truthy values accepted: 1, true, yes, on)`
    - `PX4_GAZEBO_DRY_RUN=false`
    - `PX4_GAZEBO_HEADLESS=false`
    - `PX4_AUTOPILOT_HOST_DIR=/absolute/host/path/to/PX4-Autopilot`
@@ -69,3 +69,12 @@ Hosted B is a single-tenant self-hosted deployment profile for one team/site, wi
 - `SIMULATION_FAILED`: simulator launch returned non-zero/invalid payload.
 - `TIMEOUT`: launch or mission did not complete before timeout.
 - Missing PX4/Gazebo dependencies: install site-specific packages/toolchains or mount prebuilt workspace.
+
+
+### Verify PX4/Gazebo toolchain inside worker-real-px4-vnc
+Run:
+`docker compose --env-file deploy/hosted-b/.env --profile real-px4 exec worker-real-px4-vnc bash`
+Then inside container:
+`cd $PX4_AUTOPILOT_DIR`
+`make px4_sitl gz_x500`
+Only after this succeeds should DroneDream real_cli jobs be expected to run true PX4/Gazebo missions.

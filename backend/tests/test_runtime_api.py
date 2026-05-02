@@ -50,3 +50,19 @@ def test_runtime_strict_mode_requires_vnc_password(client, monkeypatch):
     payload = resp.json()["data"]
     assert payload["real_mode_config_complete"] is False
     assert "VNC_PASSWORD is required" in payload["mode_warning"]
+
+
+def test_runtime_strict_mode_missing_viewer_is_advisory(client, monkeypatch):
+    monkeypatch.setenv("HOSTED_REAL_CLI_REQUIRES_PX4", "true")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "false")
+    monkeypatch.setenv("PX4_GAZEBO_HEADLESS", "false")
+    monkeypatch.setenv("PX4_GAZEBO_LAUNCH_COMMAND", "launch")
+    monkeypatch.setenv("PX4_AUTOPILOT_DIR", "/opt/PX4-Autopilot")
+    monkeypatch.setenv("VNC_PASSWORD", "secret")
+    monkeypatch.delenv("VITE_GAZEBO_VIEWER_URL", raising=False)
+    resp = client.get("/api/v1/runtime")
+    payload = resp.json()["data"]
+    assert payload["real_mode_config_complete"] is True
+    assert payload["gazebo_viewer_url_configured"] is False
+    assert payload["mode_warning"] is None
+    assert payload["mode_advisory"] is not None

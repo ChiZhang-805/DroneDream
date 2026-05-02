@@ -24,8 +24,14 @@ print(v)
 PY
 )"
 
-if [[ "$strict_mode" == "true" ]] && [[ "${ALLOW_STRICT_REAL_CLI_WITH_DEFAULT_WORKER:-false}" != "true" ]]; then
-  echo "HOSTED_REAL_CLI_REQUIRES_PX4=true detected in deploy/hosted-b/.env."
+strict_mode_truthy="false"
+case "${strict_mode}" in
+  1|true|yes|on) strict_mode_truthy="true" ;;
+  *) strict_mode_truthy="false" ;;
+esac
+
+if [[ "$strict_mode_truthy" == "true" ]] && [[ "${ALLOW_STRICT_REAL_CLI_WITH_DEFAULT_WORKER:-false}" != "true" ]]; then
+  echo "HOSTED_REAL_CLI_REQUIRES_PX4 truthy value detected in deploy/hosted-b/.env (accepted: 1,true,yes,on)."
   echo "Delegating to scripts/hosted-b/up-real-px4.sh so strict real_cli jobs use the PX4/noVNC worker."
   exec "$ROOT/scripts/hosted-b/up-real-px4.sh" "$@"
 fi

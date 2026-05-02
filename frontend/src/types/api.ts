@@ -280,6 +280,7 @@ export interface RuntimeState {
   px4_make_target: string | null;
   mode_label: "mock/dev" | "real_cli PX4/Gazebo real mode" | "real_cli configuration incomplete";
   mode_warning: string | null;
+  mode_advisory: string | null;
   runtime_source_note: string;
 }
 
