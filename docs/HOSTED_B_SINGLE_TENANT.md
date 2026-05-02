@@ -1,29 +1,80 @@
 # Hosted B Single-Tenant Deployment
 
-This document describes B: a single-tenant hosted deployment.
+## What Hosted B is
+Hosted B is a single-tenant self-hosted deployment profile for one team/site, with one shared backend, worker, and database stack. It ships with simple shared-token access, local artifact volume storage, and defaults intended to run out-of-the-box in dry-run mode.
 
-Not SaaS: no billing, no multi-tenant account system, no autoscaling.
+## What Hosted B is not
+- Not multi-tenant SaaS.
+- Not a billing/account platform.
+- Not an autoscaling production control plane.
+- Not a guaranteed full PX4/Gazebo production image when using `worker-px4`.
 
-Quick start:
-1. Checkout `feature/hosted-b-single-tenant`.
-2. Run `scripts/hosted-b/init-env.sh`.
-3. Edit `deploy/hosted-b/.env`.
-4. Run `scripts/hosted-b/up.sh`.
-5. Open `http://localhost:8080`.
-6. Enter shared token if enabled.
-7. Submit job in New Job page.
-8. Run `scripts/hosted-b/smoke.sh`.
+## Quick start
+```bash
+scripts/hosted-b/init-env.sh
+scripts/hosted-b/up.sh
+scripts/hosted-b/smoke.sh
+scripts/hosted-b/down.sh
+```
 
-Default mode uses `real_cli` dry run (`PX4_GAZEBO_DRY_RUN=true`) and headless mode. noVNC is off by default.
+## Default execution mode
+Default Hosted B validates the real simulator path using:
+- `simulator_backend=real_cli`
+- `REAL_SIMULATOR_COMMAND=python scripts/simulators/px4_gazebo_runner.py`
+- `PX4_GAZEBO_DRY_RUN=true`
+- `PX4_GAZEBO_HEADLESS=true`
 
-For real PX4/Gazebo: set `PX4_GAZEBO_DRY_RUN=false`, keep `PX4_GAZEBO_HEADLESS=true`, configure `PX4_AUTOPILOT_DIR`, `PX4_GAZEBO_LAUNCH_COMMAND`, `PX4_MAKE_TARGET`, `PX4_TELEMETRY_MODE`. Optional `worker-px4` profile is heavier.
+To use a minimal subprocess simulator instead, set:
+`REAL_SIMULATOR_COMMAND=python scripts/simulators/example_real_simulator.py`
 
-OpenAI:
-- BYOK per-job key.
-- Hosted server-key mode with `OPENAI_API_KEY`, `HOSTED_ALLOW_SERVER_OPENAI_KEY=true`, and `APP_SECRET_KEY`.
+## Same-origin API routing
+Frontend is built to call `/api/v1` in hosted mode. Nginx receives browser traffic and proxies `/api/*` to backend, preventing cross-origin setup for default hosted use.
 
-Auth: `demo_token` is only a single-tenant shared access gate. Rotate by updating `.env` and restarting.
+## Demo token auth
+Hosted B uses `AUTH_MODE=demo_token` by default.
+- Token source: `DRONEDREAM_DEMO_TOKEN` in `deploy/hosted-b/.env`
+- Frontend users enter token once and it is stored in localStorage
+- 401 usually means missing/invalid token
 
-Artifacts: default local volume, S3/MinIO optional future work.
+## OpenAI modes
+### BYOK mode (default)
+Keep server-managed key disabled and provide API key per GPT job/rerun.
 
-Troubleshooting: check `/health`, web->API proxy, 401 token mismatch, `docker compose logs worker`, DB URL, artifact mounts, APP_SECRET_KEY for GPT, adapter unavailable, PX4 timeouts, smoke failures.
+### Server-managed OpenAI mode
+Set all of:
+- `HOSTED_ALLOW_SERVER_OPENAI_KEY=true`
+- `OPENAI_API_KEY=...`
+- `VITE_SERVER_OPENAI_ENABLED=true`
+Then rebuild web assets:
+```bash
+scripts/hosted-b/up.sh --build
+```
+
+## Switching from dry-run to real PX4/Gazebo
+Set:
+- `PX4_GAZEBO_DRY_RUN=false`
+- `PX4_AUTOPILOT_DIR=...`
+- `PX4_GAZEBO_LAUNCH_COMMAND=...`
+- `PX4_MAKE_TARGET=...`
+- `PX4_TELEMETRY_MODE=...`
+Optional:
+- `PX4_ULOG_ROOT=...`
+
+noVNC remains off by default.
+
+## Storage
+Artifacts use local shared volume storage by default (`artifacts` volume).
+
+## worker-px4 note
+`docker/worker-px4.Dockerfile` is an optional starter image for experimentation. It is not guaranteed to be a complete production PX4/Gazebo image without additional site-specific dependencies/configuration.
+
+## Troubleshooting
+- frontend calls `/api/api/v1`: fix `VITE_API_BASE_URL` and rebuild frontend.
+- 401 token errors: verify `DRONEDREAM_DEMO_TOKEN` and browser saved token.
+- backend cannot connect to Postgres: verify DB env vars and postgres health.
+- worker stuck: inspect `docker compose logs worker`.
+- smoke timeout: backend/worker may not be healthy yet.
+- `ADAPTER_UNAVAILABLE`: check simulator backend settings and command path.
+- GPT secret errors: set `APP_SECRET_KEY` or `DRONEDREAM_SECRET_KEY`.
+- artifact path/volume errors: verify `/artifacts` mount and permissions.
+- PX4/Gazebo timeout: verify launch command, autopilot dir, headless/runtime constraints.

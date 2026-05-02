@@ -70,6 +70,16 @@ interface FormState {
   obstacles_json: string;
 }
 
+const VALID_OPTIMIZER_STRATEGIES: OptimizerStrategy[] = ["none", "heuristic", "gpt", "cma_es"];
+
+function resolveDefaultOptimizerStrategy(): OptimizerStrategy {
+  const hosted = String(import.meta.env.VITE_HOSTED_MODE ?? "false") === "true";
+  const fallback: OptimizerStrategy = hosted ? "heuristic" : "gpt";
+  const raw = (import.meta.env.VITE_DEFAULT_OPTIMIZER_STRATEGY as string | undefined)?.trim();
+  if (!raw) return fallback;
+  return (VALID_OPTIMIZER_STRATEGIES as string[]).includes(raw) ? (raw as OptimizerStrategy) : fallback;
+}
+
 const DEFAULTS: FormState = {
   display_name: "",
   track_type: "circle",
@@ -94,7 +104,7 @@ const DEFAULTS: FormState = {
   sensor_noise_level: "medium",
   objective_profile: "robust",
   simulator_backend: ((import.meta.env.VITE_DEFAULT_SIMULATOR_BACKEND as SimulatorBackend | undefined) ?? "mock"),
-  optimizer_strategy: "gpt",
+  optimizer_strategy: resolveDefaultOptimizerStrategy(),
   max_iterations: "20",
   trials_per_candidate: "3",
   target_rmse: "0.5",

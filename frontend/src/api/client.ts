@@ -42,9 +42,17 @@ export class ApiClientError extends Error {
 
 // Vite injects import.meta.env at build time. Falls back to the dev server
 // host so `npm run dev` + `uvicorn` works with no config.
-const API_BASE_URL: string =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "http://127.0.0.1:8000";
+function apiV1BaseUrl(): string {
+  const raw = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  if (raw === undefined) return "http://127.0.0.1:8000/api/v1";
+  const base = raw.trim().replace(/\/+$/, "");
+  if (base === "") return "/api/v1";
+  if (base.endsWith("/api/v1")) return base;
+  if (base.endsWith("/api")) return `${base}/v1`;
+  return `${base}/api/v1`;
+}
+
+const API_V1_BASE_URL = apiV1BaseUrl();
 const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
 const DEMO_AUTH_TOKEN_STORAGE_KEY = "dronedream.demo_auth_token";
@@ -75,7 +83,7 @@ function authHeaders(): Record<string, string> {
 }
 
 export function artifactDownloadUrl(artifactId: string): string {
-  return `${API_BASE_URL}/api/v1/artifacts/${encodeURIComponent(artifactId)}/download`;
+  return `${API_V1_BASE_URL}/artifacts/${encodeURIComponent(artifactId)}/download`;
 }
 
 async function triggerBrowserDownload(
@@ -101,7 +109,7 @@ async function request<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
+    response = await fetch(`${API_V1_BASE_URL}${path}`, {
       ...init,
       headers: {
         "Content-Type": "application/json",
@@ -139,7 +147,7 @@ async function request<T>(
   const error = envelope?.error;
   throw new ApiClientError(
     error?.code ?? "INTERNAL_ERROR",
-    error?.message ?? `Request failed with HTTP ${response.status}`,
+    error?.message ?? (response.status === 401 ? "Unauthorized: missing or invalid access token." : `Request failed with HTTP ${response.status}`),
     error?.details ?? null,
     response.status,
   );
@@ -314,7 +322,7 @@ export const apiClient = {
 
   compareJobsCsvUrl(jobIds: string[]): string {
     const joined = encodeURIComponent(jobIds.join(","));
-    return `${API_BASE_URL}/api/v1/jobs/compare.csv?job_ids=${joined}`;
+    return `${API_V1_BASE_URL}/jobs/compare.csv?job_ids=${joined}`;
   },
 
   async downloadCompareJobsCsv(jobIds: string[]): Promise<void> {

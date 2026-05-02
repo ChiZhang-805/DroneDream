@@ -35,19 +35,23 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _resolve_gpt_api_key(req_openai: schemas.OpenAIConfig | None) -> tuple[str, str | None]:
+    settings = get_settings()
+    request_key = req_openai.api_key if req_openai is not None and req_openai.api_key else None
+    if request_key:
+        return request_key, req_openai.model if req_openai is not None else None
+    if settings.hosted_allow_server_openai_key and settings.openai_api_key:
+        return settings.openai_api_key, req_openai.model if req_openai is not None else None
+    raise JobServiceError(
+        "INVALID_INPUT",
+        "openai.api_key is required when optimizer_strategy=gpt.",
+        http_status=422,
+    )
+
 def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
     if req.optimizer_strategy != "gpt":
         return
-    settings = get_settings()
-    has_request_key = req.openai is not None and bool(req.openai.api_key)
-    if not has_request_key and not (
-        settings.hosted_allow_server_openai_key and settings.openai_api_key
-    ):
-        raise JobServiceError(
-            "INVALID_INPUT",
-            "openai.api_key is required when optimizer_strategy=gpt.",
-            http_status=422,
-        )
+    _resolve_gpt_api_key(req.openai)
     if not job_secrets.is_configured():
         raise JobServiceError(
             "CONFIGURATION_ERROR",
@@ -114,7 +118,7 @@ def _create_job_from_config(
     db.add(job)
     db.flush()
     if req.optimizer_strategy == "gpt":
-        api_key = req.openai.api_key if req.openai is not None and req.openai.api_key else get_settings().openai_api_key
+        api_key, _ = _resolve_gpt_api_key(req.openai)
         if api_key:
             db.add(
                 models.JobSecret(
@@ -266,15 +270,10 @@ def rerun_job(
     strategy: schemas.OptimizerStrategy = source.optimizer_strategy  # type: ignore[assignment]
     rerun_openai: schemas.OpenAIConfig | None = None
     if strategy == "gpt":
-        if openai is None or not openai.api_key:
-            raise JobServiceError(
-                "INVALID_INPUT",
-                "openai.api_key is required when rerunning a gpt job.",
-                http_status=422,
-            )
+        resolved_key, _ = _resolve_gpt_api_key(openai)
         rerun_openai = schemas.OpenAIConfig(
-            api_key=openai.api_key,
-            model=openai.model if openai.model is not None else source.openai_model,
+            api_key=resolved_key,
+            model=(openai.model if openai is not None and openai.model is not None else source.openai_model),
         )
     req = schemas.JobCreateRequest(
         track_type=source.track_type,  # type: ignore[arg-type]

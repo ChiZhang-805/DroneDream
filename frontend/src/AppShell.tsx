@@ -69,7 +69,8 @@ export function AppShell() {
                 <button type="button" onClick={() => { setDemoAuthToken(tokenInput); setSavedToken(getDemoAuthToken()); setTokenInput(""); }}>
                   Save Token
                 </button>
-                {savedToken ? <button type="button" onClick={() => { clearDemoAuthToken(); setSavedToken(null); }}>Clear</button> : null}
+                <span className="form-hint">{savedToken ? "Token saved" : "No token saved"}</span>
+                {savedToken ? <button type="button" onClick={() => { clearDemoAuthToken(); setSavedToken(null); }}>Clear token</button> : null}
               </div>
             ) : null}
           </div>

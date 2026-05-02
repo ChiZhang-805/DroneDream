@@ -23,6 +23,7 @@ import { GazeboLivePanel } from "../components/GazeboLivePanel";
 // transitions are driven by the backend worker process (Phase 3+). See
 // docs/04_API_SPEC.md §12.
 const ACTIVE_POLL_INTERVAL_MS = 4000;
+const SERVER_OPENAI_ENABLED = String(import.meta.env.VITE_SERVER_OPENAI_ENABLED ?? "false") === "true";
 
 function CandidateCell({
   t,
@@ -245,7 +246,7 @@ export function JobDetail() {
     job.status === "CANCELLED";
 
   const handleRerun = () => {
-    if (job.optimizer_strategy === "gpt") {
+    if (job.optimizer_strategy === "gpt" && !SERVER_OPENAI_ENABLED) {
       const freshKey = window.prompt(
         "Enter a fresh OpenAI API key for this GPT rerun:",
       );

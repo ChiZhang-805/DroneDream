@@ -12,6 +12,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import clear_mappers
 
 
 @pytest.fixture()
@@ -33,6 +34,8 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
 
     import app.models as models_module
 
+    clear_mappers()
+    models_module.Base.metadata.clear()
     importlib.reload(models_module)
 
     # Reload services so they import the freshly reloaded models/db.

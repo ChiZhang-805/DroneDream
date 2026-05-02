@@ -4,28 +4,45 @@ services:
       context: ../..
       dockerfile: docker/frontend.Dockerfile
       args:
-        VITE_API_BASE_URL: /api
-        VITE_HOSTED_MODE: "true"
-        VITE_LOCK_SIMULATOR_BACKEND: "true"
-        VITE_DEFAULT_SIMULATOR_BACKEND: real_cli
-        VITE_REQUIRE_DEMO_AUTH_TOKEN: "true"
-        VITE_SERVER_OPENAI_ENABLED: "true"
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_HOSTED_MODE: ${VITE_HOSTED_MODE:-true}
+        VITE_LOCK_SIMULATOR_BACKEND: ${VITE_LOCK_SIMULATOR_BACKEND:-true}
+        VITE_DEFAULT_SIMULATOR_BACKEND: ${VITE_DEFAULT_SIMULATOR_BACKEND:-real_cli}
+        VITE_DEFAULT_OPTIMIZER_STRATEGY: ${VITE_DEFAULT_OPTIMIZER_STRATEGY:-heuristic}
+        VITE_REQUIRE_DEMO_AUTH_TOKEN: ${VITE_REQUIRE_DEMO_AUTH_TOKEN:-true}
+        VITE_SERVER_OPENAI_ENABLED: ${VITE_SERVER_OPENAI_ENABLED:-false}
     ports: ["8080:80"]
     volumes: ["./nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
-    depends_on: [backend]
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
   backend:
     build:
       context: ../..
       dockerfile: docker/backend.Dockerfile
     env_file: .env
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c "import urllib.request; urllib.request.urlopen(\'http://127.0.0.1:8000/health\')""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     volumes: ["artifacts:/artifacts"]
   worker:
     build:
       context: ../..
       dockerfile: docker/worker.Dockerfile
     env_file: .env
-    depends_on: [backend, postgres]
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
     volumes: ["artifacts:/artifacts"]
   postgres:
     image: postgres:16-alpine
@@ -34,13 +51,24 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes: ["pgdata:/var/lib/postgresql/data"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
   worker-px4:
     profiles: ["px4"]
     build:
       context: ../..
       dockerfile: docker/worker-px4.Dockerfile
     env_file: .env
-    depends_on: [backend, postgres]
+    depends_on:
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
     volumes: ["artifacts:/artifacts"]
 volumes:
   pgdata:
