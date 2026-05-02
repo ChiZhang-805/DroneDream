@@ -79,8 +79,6 @@ services:
       context: ../..
       dockerfile: docker/worker-px4.Dockerfile
     env_file: .env
-    environment:
-      PX4_AUTOPILOT_DIR: /opt/PX4-Autopilot
     depends_on:
       backend:
         condition: service_healthy
@@ -89,7 +87,7 @@ services:
     restart: unless-stopped
     volumes:
       - artifacts:/artifacts
-      - ${PX4_AUTOPILOT_HOST_DIR:-./missing-px4-autopilot}:/opt/PX4-Autopilot:ro
+      - ${PX4_AUTOPILOT_HOST_DIR:-./missing-px4-autopilot}:${PX4_AUTOPILOT_DIR:-/opt/PX4-Autopilot}:ro
 volumes:
   pgdata:
   artifacts:

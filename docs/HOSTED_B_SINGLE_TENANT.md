@@ -38,6 +38,9 @@ This is why Hosted B `real_cli` trials are fast and deterministic by default: th
 
 Merely setting `PX4_GAZEBO_DRY_RUN=false` is **not enough**.
 
+## Runtime API source note
+`/api/v1/runtime` returns safe runtime flags from the backend/shared deployment environment (for example `deploy/hosted-b/.env`). It is not a live probe of every worker binary/dependency state.
+
 ## Confirm current mode
 ```bash
 grep -E "PX4_GAZEBO_DRY_RUN|PX4_GAZEBO_LAUNCH_COMMAND|PX4_AUTOPILOT_DIR" deploy/hosted-b/.env
@@ -49,7 +52,8 @@ docker compose --env-file deploy/hosted-b/.env exec worker sh -lc 'env | grep -E
 Set in `deploy/hosted-b/.env`:
 - `PX4_GAZEBO_DRY_RUN=false`
 - `PX4_GAZEBO_LAUNCH_COMMAND=...`
-- `PX4_AUTOPILOT_DIR=...`
+- `PX4_AUTOPILOT_HOST_DIR=/absolute/host/path/to/PX4-Autopilot`
+- `PX4_AUTOPILOT_DIR=/opt/PX4-Autopilot`
 - `PX4_TELEMETRY_MODE=ulog` or `PX4_TELEMETRY_MODE=json`
 - optionally set `PX4_MAKE_TARGET` and `PX4_ULOG_ROOT`
 
@@ -112,3 +116,22 @@ General checks:
 - backend cannot connect to Postgres: verify DB env vars and postgres health.
 - worker stuck: inspect `docker compose logs worker`.
 - smoke timeout: backend/worker may not be healthy yet.
+
+
+## Start commands by mode
+- Dry-run/default mode: `scripts/hosted-b/up.sh`
+- Real PX4/Gazebo profile mode: `scripts/hosted-b/up-real-px4.sh`
+
+`up-real-px4.sh` stops the default `worker` first, then starts only `postgres`, `backend`, `web`, and `worker-real-px4` with `--profile real-px4`. Do not run default `worker` and `worker-real-px4` together, or they can race to claim jobs.
+
+Check active workers:
+```bash
+docker compose --env-file deploy/hosted-b/.env ps
+```
+
+To return to dry-run mode:
+1. Set `PX4_GAZEBO_DRY_RUN=true` in `deploy/hosted-b/.env`.
+2. Run `scripts/hosted-b/up.sh`.
+
+## Real-mode config checker
+Use `scripts/hosted-b/check-real-px4-config.sh` to validate required runtime env and print worker env snapshots when containers are running.

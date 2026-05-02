@@ -951,11 +951,19 @@ export function NewJob() {
             </Field>
             {hostedMode && lockSimulatorBackend ? <p className="field-hint">Hosted mode uses the platform-managed PX4/Gazebo backend.</p> : null}
             {form.simulator_backend === "real_cli" && runtimeState ? (
-              <p className="field-hint">
-                {runtimeState.px4_gazebo_dry_run
-                  ? "real_cli dry-run: no external PX4/Gazebo process is launched"
-                  : "real_cli PX4/Gazebo real mode"}
-              </p>
+              <>
+                <p className="field-hint">{runtimeState.mode_label}</p>
+                {runtimeState.mode_warning ? (
+                  <Alert tone="warning">{runtimeState.mode_warning}</Alert>
+                ) : null}
+                <Alert tone={runtimeState.px4_gazebo_dry_run ? "info" : "warning"}>
+                  {runtimeState.px4_gazebo_dry_run
+                    ? "real_cli dry-run: no external PX4/Gazebo process is launched."
+                    : runtimeState.real_mode_config_complete
+                      ? "real_cli PX4/Gazebo real mode. Trials may take significantly longer."
+                      : "PX4/Gazebo real mode is incomplete. Check launch command and PX4_AUTOPILOT_DIR."}
+                </Alert>
+              </>
             ) : null}
             <Field
               label="Optimizer Strategy"

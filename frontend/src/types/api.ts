@@ -272,9 +272,11 @@ export interface RuntimeState {
   px4_gazebo_headless: boolean;
   px4_gazebo_launch_command_configured: boolean;
   px4_autopilot_dir_configured: boolean;
+  real_mode_config_complete: boolean;
   px4_make_target: string | null;
   mode_label: "real_cli dry-run" | "real_cli PX4/Gazebo real mode";
   mode_warning: string | null;
+  runtime_source_note: string;
 }
 
 export type OptimizerStrategy = "none" | "heuristic" | "gpt" | "cma_es";

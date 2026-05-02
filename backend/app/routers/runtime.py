@@ -37,6 +37,9 @@ def runtime_state() -> dict[str, object]:
     px4_make_target = _normalized_or_none("PX4_MAKE_TARGET")
     launch_configured = px4_gazebo_launch_command is not None
     autopilot_configured = px4_autopilot_dir is not None
+    real_mode_config_complete = (not px4_gazebo_dry_run) and (
+        launch_configured and autopilot_configured
+    )
     real_mode_incomplete = (not px4_gazebo_dry_run) and (
         (not launch_configured) or (not autopilot_configured)
     )
@@ -57,8 +60,13 @@ def runtime_state() -> dict[str, object]:
             "px4_gazebo_headless": px4_gazebo_headless,
             "px4_gazebo_launch_command_configured": launch_configured,
             "px4_autopilot_dir_configured": autopilot_configured,
+            "real_mode_config_complete": real_mode_config_complete,
             "px4_make_target": px4_make_target,
             "mode_label": mode_label,
             "mode_warning": mode_warning,
+            "runtime_source_note": (
+                "Runtime values are read from backend/shared deployment environment "
+                "(for example deploy/hosted-b/.env), not from live probes of every worker process."
+            ),
         }
     )

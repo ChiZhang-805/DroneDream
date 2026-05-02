@@ -549,14 +549,28 @@ function ExecutionBackendCard({ job, runtimeState }: { job: Job; runtimeState: R
           </span>
         </li>
         {job.simulator_backend_requested === "real_cli" && runtimeState ? (
-          <li>
-            <span className="kv-key">Platform runtime mode</span>
-            <span className="kv-value">
-              {runtimeState.px4_gazebo_dry_run
-                ? "real_cli dry-run: no external PX4/Gazebo process is launched"
-                : "real_cli PX4/Gazebo real mode"}
-            </span>
-          </li>
+          <>
+            <li>
+              <span className="kv-key">Platform runtime mode</span>
+              <span className="kv-value">{runtimeState.mode_label}</span>
+            </li>
+            {runtimeState.mode_warning ? (
+              <li>
+                <span className="kv-key">Runtime warning</span>
+                <span className="kv-value">{runtimeState.mode_warning}</span>
+              </li>
+            ) : null}
+            <li>
+              <span className="kv-key">Runtime detail</span>
+              <span className="kv-value">
+                {runtimeState.px4_gazebo_dry_run
+                  ? "real_cli dry-run: no external PX4/Gazebo process is launched."
+                  : runtimeState.real_mode_config_complete
+                    ? "real_cli PX4/Gazebo real mode. Trials may take significantly longer."
+                    : "PX4/Gazebo real mode is incomplete. Check launch command and PX4_AUTOPILOT_DIR."}
+              </span>
+            </li>
+          </>
         ) : null}
         <li>
           <span className="kv-key">Optimizer strategy</span>
