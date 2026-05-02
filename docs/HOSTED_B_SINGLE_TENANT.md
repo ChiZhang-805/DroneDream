@@ -27,6 +27,16 @@ Default Hosted B validates the real simulator path using:
 To use a minimal subprocess simulator instead, set:
 `REAL_SIMULATOR_COMMAND=python scripts/simulators/example_real_simulator.py`
 
+
+## Simulator backend selection
+Hosted B exposes both `real_cli` and `mock` in the New Job UI by default.
+
+- `VITE_LOCK_SIMULATOR_BACKEND=false` keeps the frontend dropdown editable.
+- `VITE_DEFAULT_SIMULATOR_BACKEND=real_cli` keeps `real_cli` as the default selection.
+- `SIMULATOR_BACKEND=` leaves the worker global override unset, so each job's selected backend is respected.
+
+Use `mock` for fast deterministic UI/workflow checks. Use `real_cli` for the hosted simulator path; the default Hosted B `real_cli` command uses `px4_gazebo_runner.py` in dry-run mode until real PX4/Gazebo is configured.
+
 ## Same-origin API routing
 Frontend is built to call `/api/v1` in hosted mode. Nginx receives browser traffic and proxies `/api/*` to backend, preventing cross-origin setup for default hosted use.
 
