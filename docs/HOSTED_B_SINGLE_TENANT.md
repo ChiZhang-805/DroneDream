@@ -135,3 +135,16 @@ To return to dry-run mode:
 
 ## Real-mode config checker
 Use `scripts/hosted-b/check-real-px4-config.sh` to validate required runtime env and print worker env snapshots when containers are running.
+
+## Hosted B strict real_cli mode (PX4/Gazebo + noVNC)
+- `real_cli` means actual PX4/Gazebo execution in strict Hosted B mode (`HOSTED_REAL_CLI_REQUIRES_PX4=true`).
+- `mock` remains the fast deterministic simulator.
+- Dry-run is only an explicit CI/dev opt-out (`HOSTED_REAL_CLI_REQUIRES_PX4=false` plus `PX4_GAZEBO_DRY_RUN=true`).
+- Required: `PX4_AUTOPILOT_HOST_DIR`, `PX4_AUTOPILOT_DIR`, `PX4_GAZEBO_LAUNCH_COMMAND`, `PX4_TELEMETRY_MODE`, `VNC_PASSWORD`, `VITE_GAZEBO_VIEWER_URL`.
+- Start real mode: `scripts/hosted-b/up-real-px4.sh`.
+- Validate: `scripts/hosted-b/check-real-px4-config.sh`.
+- Inspect runtime: `docker compose --env-file deploy/hosted-b/.env ps` and `docker compose --env-file deploy/hosted-b/.env logs worker-real-px4-vnc --tail=200`.
+- Open `http://localhost:8080`; Job Detail should show the Gazebo iframe.
+- Real mode is slower than dry-run and can fail when PX4/Gazebo dependencies are missing.
+- Return to mock/dev mode by running default worker and setting `HOSTED_REAL_CLI_REQUIRES_PX4=false` with `PX4_GAZEBO_DRY_RUN=true`.
+

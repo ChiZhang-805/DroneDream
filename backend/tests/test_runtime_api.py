@@ -1,49 +1,36 @@
 from __future__ import annotations
 
 
-def test_runtime_defaults_to_dry_run(client, monkeypatch):
+def test_runtime_defaults_to_strict_real_mode(client, monkeypatch):
     monkeypatch.delenv("SIMULATOR_BACKEND", raising=False)
-    monkeypatch.delenv("PX4_GAZEBO_DRY_RUN", raising=False)
-    monkeypatch.delenv("PX4_GAZEBO_LAUNCH_COMMAND", raising=False)
-    monkeypatch.delenv("PX4_AUTOPILOT_DIR", raising=False)
-    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", "python scripts/simulators/px4_gazebo_runner.py")
-    resp = client.get("/api/v1/runtime")
-    assert resp.status_code == 200
-    payload = resp.json()["data"]
-    assert payload["simulator_backend_env_override"] is None
-    assert payload["px4_gazebo_dry_run"] is True
-    assert payload["mode_label"] == "real_cli dry-run"
-    assert payload["mode_warning"] == "No external PX4/Gazebo process is launched."
-    assert payload["real_mode_config_complete"] is False
-    assert "shared deployment environment" in payload["runtime_source_note"]
-
-
-def test_runtime_real_mode_flags_incomplete(client, monkeypatch):
-    monkeypatch.setenv("SIMULATOR_BACKEND", "real_cli")
+    monkeypatch.setenv("HOSTED_REAL_CLI_REQUIRES_PX4", "true")
     monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "false")
-    monkeypatch.setenv("PX4_GAZEBO_HEADLESS", "true")
-    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", "python scripts/simulators/px4_gazebo_runner.py")
-    monkeypatch.delenv("PX4_GAZEBO_LAUNCH_COMMAND", raising=False)
-    monkeypatch.delenv("PX4_AUTOPILOT_DIR", raising=False)
-    resp = client.get("/api/v1/runtime")
-    payload = resp.json()["data"]
-    assert payload["mode_label"] == "real_cli PX4/Gazebo real mode"
-    assert payload["mode_warning"] == "PX4/Gazebo real mode is incomplete."
-    assert payload["px4_gazebo_launch_command_configured"] is False
-    assert payload["px4_autopilot_dir_configured"] is False
-    assert payload["real_mode_config_complete"] is False
-
-
-def test_runtime_real_mode_flags_complete(client, monkeypatch):
-    monkeypatch.setenv("SIMULATOR_BACKEND", "real_cli")
-    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "false")
-    monkeypatch.setenv("PX4_GAZEBO_LAUNCH_COMMAND", "make px4_sitl gz_x500")
+    monkeypatch.setenv("PX4_GAZEBO_HEADLESS", "false")
+    monkeypatch.setenv("PX4_GAZEBO_LAUNCH_COMMAND", "launch")
     monkeypatch.setenv("PX4_AUTOPILOT_DIR", "/opt/PX4-Autopilot")
+    monkeypatch.setenv("PX4_AUTOPILOT_HOST_DIR", "/tmp")
     monkeypatch.setenv("REAL_SIMULATOR_COMMAND", "python scripts/simulators/px4_gazebo_runner.py")
     resp = client.get("/api/v1/runtime")
     payload = resp.json()["data"]
     assert payload["mode_label"] == "real_cli PX4/Gazebo real mode"
-    assert payload["mode_warning"] is None
-    assert payload["px4_gazebo_launch_command_configured"] is True
-    assert payload["px4_autopilot_dir_configured"] is True
+    assert payload["hosted_real_cli_requires_px4"] is True
     assert payload["real_mode_config_complete"] is True
+
+
+def test_runtime_incomplete_in_strict_mode(client, monkeypatch):
+    monkeypatch.setenv("HOSTED_REAL_CLI_REQUIRES_PX4", "true")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "true")
+    monkeypatch.delenv("PX4_GAZEBO_LAUNCH_COMMAND", raising=False)
+    monkeypatch.delenv("PX4_AUTOPILOT_DIR", raising=False)
+    resp = client.get("/api/v1/runtime")
+    payload = resp.json()["data"]
+    assert payload["mode_label"] == "real_cli configuration incomplete"
+    assert "PX4_GAZEBO_DRY_RUN must be false" in payload["mode_warning"]
+
+
+def test_runtime_mock_dev_label_when_not_strict(client, monkeypatch):
+    monkeypatch.setenv("HOSTED_REAL_CLI_REQUIRES_PX4", "false")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "true")
+    resp = client.get("/api/v1/runtime")
+    payload = resp.json()["data"]
+    assert payload["mode_label"] == "mock/dev"

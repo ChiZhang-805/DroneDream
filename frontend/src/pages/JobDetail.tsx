@@ -564,10 +564,10 @@ function ExecutionBackendCard({ job, runtimeState }: { job: Job; runtimeState: R
               <span className="kv-key">Runtime detail</span>
               <span className="kv-value">
                 {runtimeState.px4_gazebo_dry_run
-                  ? "real_cli dry-run: no external PX4/Gazebo process is launched."
+                  ? "real_cli launches actual PX4/Gazebo in Hosted B."
                   : runtimeState.real_mode_config_complete
-                    ? "real_cli PX4/Gazebo real mode. Trials may take significantly longer."
-                    : "PX4/Gazebo real mode is incomplete. Check launch command and PX4_AUTOPILOT_DIR."}
+                    ? "PX4/Gazebo real mode active. Trials may take significantly longer."
+                    : "Real PX4/Gazebo configuration is incomplete; Hosted B strict mode will fail early."}
               </span>
             </li>
           </>

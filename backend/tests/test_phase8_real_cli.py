@@ -324,3 +324,34 @@ def test_real_cli_artifact_schema_doc_exists() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+def test_real_cli_strict_mode_blocks_dry_run(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOSTED_REAL_CLI_REQUIRES_PX4", "true")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "true")
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", "python scripts/simulators/example_real_simulator.py")
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+    assert result.success is False
+    assert result.failure is not None
+    assert result.failure.code == "ADAPTER_UNAVAILABLE"
+    assert "PX4_GAZEBO_DRY_RUN must be false" in result.failure.reason
+
+
+def test_real_cli_strict_mode_missing_px4_fields(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOSTED_REAL_CLI_REQUIRES_PX4", "true")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "false")
+    monkeypatch.delenv("PX4_GAZEBO_LAUNCH_COMMAND", raising=False)
+    monkeypatch.delenv("PX4_AUTOPILOT_DIR", raising=False)
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", "python scripts/simulators/example_real_simulator.py")
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+    assert result.success is False
+    assert result.failure is not None
+    assert "PX4_GAZEBO_LAUNCH_COMMAND is required" in result.failure.reason
+
+
+def test_real_cli_dev_mode_can_use_dry_run(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOSTED_REAL_CLI_REQUIRES_PX4", "false")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "true")
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", "python scripts/simulators/example_real_simulator.py")
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+    assert result.backend == "real_cli"

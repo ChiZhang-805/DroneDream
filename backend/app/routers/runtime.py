@@ -30,43 +30,59 @@ def _normalized_or_none(name: str) -> str | None:
 def runtime_state() -> dict[str, object]:
     simulator_backend_env_override = _normalized_or_none("SIMULATOR_BACKEND")
     real_simulator_command = os.environ.get("REAL_SIMULATOR_COMMAND", "")
-    px4_gazebo_dry_run = _env_bool("PX4_GAZEBO_DRY_RUN", True)
-    px4_gazebo_headless = _env_bool("PX4_GAZEBO_HEADLESS", True)
+    hosted_real_cli_requires_px4 = _env_bool("HOSTED_REAL_CLI_REQUIRES_PX4", True)
+    px4_gazebo_dry_run = _env_bool("PX4_GAZEBO_DRY_RUN", False)
+    px4_gazebo_headless = _env_bool("PX4_GAZEBO_HEADLESS", False)
     px4_gazebo_launch_command = _normalized_or_none("PX4_GAZEBO_LAUNCH_COMMAND")
     px4_autopilot_dir = _normalized_or_none("PX4_AUTOPILOT_DIR")
+    px4_autopilot_host_dir = _normalized_or_none("PX4_AUTOPILOT_HOST_DIR")
     px4_make_target = _normalized_or_none("PX4_MAKE_TARGET")
-    launch_configured = px4_gazebo_launch_command is not None
-    autopilot_configured = px4_autopilot_dir is not None
-    real_mode_config_complete = (not px4_gazebo_dry_run) and (
-        launch_configured and autopilot_configured
-    )
-    real_mode_incomplete = (not px4_gazebo_dry_run) and (
-        (not launch_configured) or (not autopilot_configured)
-    )
+    gazebo_viewer_url_configured = _normalized_or_none("VITE_GAZEBO_VIEWER_URL") is not None
+    vnc_configured = _normalized_or_none("VNC_PASSWORD") is not None
 
-    mode_label = (
-        "real_cli dry-run" if px4_gazebo_dry_run else "real_cli PX4/Gazebo real mode"
-    )
-    mode_warning = (
-        "No external PX4/Gazebo process is launched."
-        if px4_gazebo_dry_run
-        else ("PX4/Gazebo real mode is incomplete." if real_mode_incomplete else None)
-    )
-    return ok(
-        {
-            "simulator_backend_env_override": simulator_backend_env_override,
-            "real_simulator_command": real_simulator_command,
-            "px4_gazebo_dry_run": px4_gazebo_dry_run,
-            "px4_gazebo_headless": px4_gazebo_headless,
-            "px4_gazebo_launch_command_configured": launch_configured,
-            "px4_autopilot_dir_configured": autopilot_configured,
-            "real_mode_config_complete": real_mode_config_complete,
-            "px4_make_target": px4_make_target,
-            "mode_label": mode_label,
-            "mode_warning": mode_warning,
-            "runtime_source_note": (
-                "Runtime values are read from backend/shared deployment environment "
-                "(for example deploy/hosted-b/.env), not from live probes of every worker process."
-            ),
-        }
-    )
+    launch_configured = px4_gazebo_launch_command is not None
+    autopilot_dir_configured = px4_autopilot_dir is not None
+    autopilot_host_dir_configured = px4_autopilot_host_dir is not None
+
+    strict_missing = []
+    if hosted_real_cli_requires_px4:
+        if px4_gazebo_dry_run:
+            strict_missing.append("PX4_GAZEBO_DRY_RUN must be false")
+        if not launch_configured:
+            strict_missing.append("PX4_GAZEBO_LAUNCH_COMMAND is required")
+        if not autopilot_dir_configured:
+            strict_missing.append("PX4_AUTOPILOT_DIR is required")
+        if px4_gazebo_headless:
+            strict_missing.append("PX4_GAZEBO_HEADLESS must be false")
+    real_mode_config_complete = len(strict_missing) == 0 and launch_configured and autopilot_dir_configured and (not px4_gazebo_dry_run)
+
+    if hosted_real_cli_requires_px4 and strict_missing:
+        mode_label = "real_cli configuration incomplete"
+        mode_warning = "; ".join(strict_missing)
+    elif real_mode_config_complete:
+        mode_label = "real_cli PX4/Gazebo real mode"
+        mode_warning = None
+    else:
+        mode_label = "mock/dev"
+        mode_warning = None
+
+    return ok({
+        "simulator_backend_env_override": simulator_backend_env_override,
+        "real_simulator_command": real_simulator_command,
+        "hosted_real_cli_requires_px4": hosted_real_cli_requires_px4,
+        "gazebo_viewer_url_configured": gazebo_viewer_url_configured,
+        "vnc_configured": vnc_configured,
+        "px4_gazebo_dry_run": px4_gazebo_dry_run,
+        "px4_gazebo_headless": px4_gazebo_headless,
+        "px4_gazebo_launch_command_configured": launch_configured,
+        "px4_autopilot_dir_configured": autopilot_dir_configured,
+        "px4_autopilot_host_dir_configured": autopilot_host_dir_configured,
+        "real_mode_config_complete": real_mode_config_complete,
+        "px4_make_target": px4_make_target,
+        "mode_label": mode_label,
+        "mode_warning": mode_warning,
+        "runtime_source_note": (
+            "Runtime values are read from backend/shared deployment environment "
+            "(for example deploy/hosted-b/.env), not from live probes of every worker process."
+        ),
+    })

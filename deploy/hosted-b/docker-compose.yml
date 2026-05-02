@@ -11,42 +11,45 @@ services:
         VITE_DEFAULT_OPTIMIZER_STRATEGY: ${VITE_DEFAULT_OPTIMIZER_STRATEGY:-heuristic}
         VITE_REQUIRE_DEMO_AUTH_TOKEN: ${VITE_REQUIRE_DEMO_AUTH_TOKEN:-true}
         VITE_SERVER_OPENAI_ENABLED: ${VITE_SERVER_OPENAI_ENABLED:-false}
+        VITE_GAZEBO_VIEWER_URL: ${VITE_GAZEBO_VIEWER_URL:-/gazebo/vnc.html}
     ports: ["8080:80"]
     volumes: ["./nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
-    depends_on:
-      backend:
-        condition: service_healthy
+    depends_on: {backend: {condition: service_healthy}}
     restart: unless-stopped
   backend:
-    build:
-      context: ../..
-      dockerfile: docker/backend.Dockerfile
+    build: {context: ../.., dockerfile: docker/backend.Dockerfile}
     env_file: .env
-    depends_on:
-      postgres:
-        condition: service_healthy
+    depends_on: {postgres: {condition: service_healthy}}
     restart: unless-stopped
     healthcheck:
-      test:
-        - CMD-SHELL
-        - python -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/health")'
+      test: [CMD-SHELL, python -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/health")']
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 10s
     volumes: ["artifacts:/artifacts"]
   worker:
-    build:
-      context: ../..
-      dockerfile: docker/worker.Dockerfile
+    build: {context: ../.., dockerfile: docker/worker.Dockerfile}
     env_file: .env
-    depends_on:
-      backend:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+    depends_on: {backend: {condition: service_healthy}, postgres: {condition: service_healthy}}
     restart: unless-stopped
     volumes: ["artifacts:/artifacts"]
+  worker-real-px4-vnc:
+    profiles: ["real-px4"]
+    build: {context: ../.., dockerfile: docker/worker-real-px4-vnc.Dockerfile}
+    env_file: .env
+    environment:
+      DISPLAY: ${DISPLAY:-:99}
+      NOVNC_PORT: ${NOVNC_PORT:-6080}
+      VNC_PORT: ${VNC_PORT:-5900}
+      VNC_PASSWORD: ${VNC_PASSWORD}
+      PX4_GAZEBO_HEADLESS: "false"
+      PX4_AUTOPILOT_DIR: ${PX4_AUTOPILOT_DIR:-/opt/PX4-Autopilot}
+    volumes:
+      - artifacts:/artifacts
+      - ${PX4_AUTOPILOT_HOST_DIR}:${PX4_AUTOPILOT_DIR:-/opt/PX4-Autopilot}:rw
+    depends_on: {backend: {condition: service_healthy}, postgres: {condition: service_healthy}}
+    restart: unless-stopped
   postgres:
     image: postgres:16-alpine
     environment:
@@ -60,34 +63,4 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-  worker-px4:
-    profiles: ["px4"]
-    build:
-      context: ../..
-      dockerfile: docker/worker-px4.Dockerfile
-    env_file: .env
-    depends_on:
-      backend:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    volumes: ["artifacts:/artifacts"]
-  worker-real-px4:
-    profiles: ["real-px4"]
-    build:
-      context: ../..
-      dockerfile: docker/worker-px4.Dockerfile
-    env_file: .env
-    depends_on:
-      backend:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    volumes:
-      - artifacts:/artifacts
-      - ${PX4_AUTOPILOT_HOST_DIR:-./missing-px4-autopilot}:${PX4_AUTOPILOT_DIR:-/opt/PX4-Autopilot}:ro
-volumes:
-  pgdata:
-  artifacts:
+volumes: {pgdata: {}, artifacts: {}}

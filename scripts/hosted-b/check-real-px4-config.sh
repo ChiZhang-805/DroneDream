@@ -1,58 +1,55 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE="deploy/hosted-b/.env"
-COMPOSE_FILE="deploy/hosted-b/docker-compose.yml"
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "Missing ${ENV_FILE}"
+ENV_FILE="${ENV_FILE:-deploy/hosted-b/.env}"
+COMPOSE_FILE="${COMPOSE_FILE:-deploy/hosted-b/docker-compose.yml}"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "Missing $ENV_FILE (copy deploy/hosted-b/.env.example to deploy/hosted-b/.env and edit values)."
   exit 1
 fi
 
-while IFS= read -r line || [[ -n "$line" ]]; do
-  [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-  key="${line%%=*}"
-  value="${line#*=}"
-  key="$(echo "$key" | xargs)"
-  [[ -z "$key" ]] && continue
-  export "$key=$value"
-done < "${ENV_FILE}"
-
-echo "PX4_GAZEBO_DRY_RUN=${PX4_GAZEBO_DRY_RUN:-}"
-echo "REAL_SIMULATOR_COMMAND=${REAL_SIMULATOR_COMMAND:-}"
-echo "PX4_GAZEBO_LAUNCH_COMMAND=${PX4_GAZEBO_LAUNCH_COMMAND:+configured}${PX4_GAZEBO_LAUNCH_COMMAND:-}"
-echo "PX4_AUTOPILOT_HOST_DIR=${PX4_AUTOPILOT_HOST_DIR:-}"
-echo "PX4_AUTOPILOT_DIR=${PX4_AUTOPILOT_DIR:-}"
-echo "PX4_MAKE_TARGET=${PX4_MAKE_TARGET:-}"
-echo "PX4_TELEMETRY_MODE=${PX4_TELEMETRY_MODE:-}"
-echo "PX4_ULOG_ROOT=${PX4_ULOG_ROOT:-}"
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
 
 status=0
-if [[ "${REAL_SIMULATOR_COMMAND:-}" != *"px4_gazebo_runner.py"* ]]; then
-  echo "ERROR: REAL_SIMULATOR_COMMAND must point to px4_gazebo_runner.py"
-  status=1
-fi
+req(){ [[ -n "${!1:-}" ]] || { echo "ERROR: $1 is required"; status=1; }; }
 
-if [[ "${PX4_GAZEBO_DRY_RUN:-true}" == "false" ]]; then
-  [[ -n "${PX4_GAZEBO_LAUNCH_COMMAND:-}" ]] || { echo "ERROR: PX4_GAZEBO_LAUNCH_COMMAND is required"; status=1; }
-  [[ -n "${PX4_AUTOPILOT_DIR:-}" ]] || { echo "ERROR: PX4_AUTOPILOT_DIR is required"; status=1; }
-  [[ -n "${PX4_AUTOPILOT_HOST_DIR:-}" ]] || { echo "ERROR: PX4_AUTOPILOT_HOST_DIR is required for compose real-px4 profile"; status=1; }
-fi
-if [[ -n "${PX4_AUTOPILOT_HOST_DIR:-}" && ! -d "${PX4_AUTOPILOT_HOST_DIR}" ]]; then
-  echo "ERROR: PX4_AUTOPILOT_HOST_DIR does not exist on host: ${PX4_AUTOPILOT_HOST_DIR}"
-  status=1
+strict_mode="${HOSTED_REAL_CLI_REQUIRES_PX4:-true}"
+echo "HOSTED_REAL_CLI_REQUIRES_PX4=${strict_mode}"
+
+echo "REAL_SIMULATOR_COMMAND=${REAL_SIMULATOR_COMMAND:-}"
+echo "PX4_GAZEBO_DRY_RUN=${PX4_GAZEBO_DRY_RUN:-}"
+echo "PX4_GAZEBO_HEADLESS=${PX4_GAZEBO_HEADLESS:-}"
+
+echo "PX4_GAZEBO_LAUNCH_COMMAND=${PX4_GAZEBO_LAUNCH_COMMAND:+configured}"
+echo "PX4_AUTOPILOT_HOST_DIR=${PX4_AUTOPILOT_HOST_DIR:-}"
+echo "PX4_AUTOPILOT_DIR=${PX4_AUTOPILOT_DIR:-}"
+
+[[ "${REAL_SIMULATOR_COMMAND:-}" == *"px4_gazebo_runner.py"* ]] || { echo "ERROR: REAL_SIMULATOR_COMMAND must reference px4_gazebo_runner.py"; status=1; }
+
+if [[ "$strict_mode" == "true" ]]; then
+  [[ "${PX4_GAZEBO_DRY_RUN:-false}" == "false" ]] || { echo "ERROR: PX4_GAZEBO_DRY_RUN must be false in strict mode"; status=1; }
+  [[ "${PX4_GAZEBO_HEADLESS:-false}" == "false" ]] || { echo "ERROR: PX4_GAZEBO_HEADLESS must be false in strict mode"; status=1; }
+  req PX4_GAZEBO_LAUNCH_COMMAND
+  req PX4_AUTOPILOT_HOST_DIR
+  req PX4_AUTOPILOT_DIR
+  req VNC_PASSWORD
+  [[ -d "${PX4_AUTOPILOT_HOST_DIR:-/missing}" ]] || { echo "ERROR: PX4_AUTOPILOT_HOST_DIR does not exist: ${PX4_AUTOPILOT_HOST_DIR:-}"; status=1; }
+else
+  echo "INFO: strict mode disabled; dry-run/dev checks are relaxed."
 fi
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  echo "Docker detected; container env snapshots (when running):"
-  for svc in worker worker-real-px4; do
-    cid=$(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps -q "$svc" 2>/dev/null || true)
-    if [[ -n "$cid" ]]; then
-      echo "--- $svc ---"
-      docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T "$svc" sh -lc 'env | grep -E "PX4_GAZEBO_DRY_RUN|REAL_SIMULATOR_COMMAND|PX4_GAZEBO_LAUNCH_COMMAND|PX4_AUTOPILOT_HOST_DIR|PX4_AUTOPILOT_DIR|PX4_MAKE_TARGET|PX4_TELEMETRY_MODE|PX4_ULOG_ROOT"' || true
-    else
-      echo "--- $svc not running ---"
-    fi
-  done
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config >/dev/null || status=1
+  echo "Active worker services:"
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps worker worker-real-px4-vnc || true
+  if docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps -q worker-real-px4-vnc | grep -q .; then
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T worker-real-px4-vnc sh -lc 'env | grep -E "DISPLAY|NOVNC_PORT|VNC_PORT|PX4_GAZEBO|PX4_AUTOPILOT_DIR|HOSTED_REAL_CLI_REQUIRES_PX4"' || true
+    curl -fsS "http://localhost:${NOVNC_PORT:-6080}/vnc.html" >/dev/null || echo "WARN: noVNC endpoint not reachable yet"
+  fi
 fi
 
 exit "$status"

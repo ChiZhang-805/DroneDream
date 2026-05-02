@@ -183,6 +183,21 @@ def _parse_artifacts(raw: dict[str, Any]) -> list[ArtifactMetadata]:
 
 
 
+def _validate_hosted_real_cli_requirements() -> str | None:
+    if os.environ.get("HOSTED_REAL_CLI_REQUIRES_PX4", "false").strip().lower() not in {"1","true","yes","on"}:
+        return None
+    missing: list[str] = []
+    if os.environ.get("PX4_GAZEBO_DRY_RUN", "false").strip().lower() in {"1","true","yes","on"}:
+        missing.append("PX4_GAZEBO_DRY_RUN must be false")
+    if not os.environ.get("PX4_GAZEBO_LAUNCH_COMMAND", "").strip():
+        missing.append("PX4_GAZEBO_LAUNCH_COMMAND is required")
+    if not os.environ.get("PX4_AUTOPILOT_DIR", "").strip():
+        missing.append("PX4_AUTOPILOT_DIR is required")
+    if os.environ.get("PX4_GAZEBO_HEADLESS", "false").strip().lower() in {"1","true","yes","on"}:
+        missing.append("PX4_GAZEBO_HEADLESS must be false")
+    return "; ".join(missing) if missing else None
+
+
 def _is_under_allowed_root(path: Path) -> bool:
     resolved = path.resolve()
     settings = get_settings()
@@ -252,6 +267,15 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
     backend_name = "real_cli"
 
     def run_trial(self, ctx: TrialContext) -> TrialResult:
+        config_error = _validate_hosted_real_cli_requirements()
+        if config_error:
+            return TrialResult(
+                success=False,
+                backend=self.backend_name,
+                failure=TrialFailure(code=FAILURE_ADAPTER_UNAVAILABLE, reason=f"Hosted real_cli configuration error: {config_error}"),
+                log_excerpt=f"[real_cli] Hosted strict mode blocked run: {config_error}",
+            )
+
         command_template = os.environ.get("REAL_SIMULATOR_COMMAND", "").strip()
         if not command_template:
             return TrialResult(
