@@ -19,6 +19,7 @@ import type {
   PaginatedJobs,
   Trial,
   TrialSummary,
+  RuntimeState,
 } from "../types/api";
 
 export class ApiClientError extends Error {
@@ -370,6 +371,9 @@ export const apiClient = {
     return request<BatchJob>(`/batches/${encodeURIComponent(batchId)}/cancel`, {
       method: "POST",
     });
+  },
+  async getRuntimeState(): Promise<RuntimeState> {
+    return request<RuntimeState>("/runtime");
   },
 };
 

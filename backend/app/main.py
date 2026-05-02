@@ -19,6 +19,7 @@ from app.routers import artifacts as artifacts_router
 from app.routers import batches as batches_router
 from app.routers import health
 from app.routers import jobs as jobs_router
+from app.routers import runtime as runtime_router
 from app.routers import trials as trials_router
 
 logger = logging.getLogger("drone_dream.backend")
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
     api_v1.include_router(batches_router.router)
     api_v1.include_router(trials_router.router)
     api_v1.include_router(artifacts_router.router)
+    api_v1.include_router(runtime_router.router)
 
     _register_exception_handlers(api_v1)
     app.mount("/api/v1", api_v1)

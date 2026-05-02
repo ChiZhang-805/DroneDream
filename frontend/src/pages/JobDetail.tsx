@@ -6,6 +6,7 @@ import type {
   Job,
   JobEventInfo,
   JobReport,
+  RuntimeState,
   TrialSummary,
 } from "../types/api";
 import { isActiveJobStatus, formatDateTime, formatNumber } from "../utils/format";
@@ -214,6 +215,11 @@ export function JobDetail() {
     enabled: artifactsEnabled,
     retry: false,
   });
+  const runtimeQuery = useQuery({
+    queryKey: ["runtime-state"],
+    queryFn: () => apiClient.getRuntimeState(),
+    retry: false,
+  });
 
   if (jobQuery.isLoading) {
     return <Loading label="Loading job…" />;
@@ -302,7 +308,7 @@ export function JobDetail() {
         </Alert>
       ) : null}
       <JobSummaryCard job={job} />
-      <ExecutionBackendCard job={job} />
+        <ExecutionBackendCard job={job} runtimeState={runtimeQuery.data ?? null} />
       <ProgressSection job={job} />
 
       <StatusSpecificTop job={job} report={report} />
@@ -528,7 +534,7 @@ function JobSummaryCard({ job }: { job: Job }) {
   );
 }
 
-function ExecutionBackendCard({ job }: { job: Job }) {
+function ExecutionBackendCard({ job, runtimeState }: { job: Job; runtimeState: RuntimeState | null }) {
   const ac = job.acceptance_criteria;
   return (
     <SectionCard
@@ -542,6 +548,16 @@ function ExecutionBackendCard({ job }: { job: Job }) {
             <code>{job.simulator_backend_requested}</code>
           </span>
         </li>
+        {job.simulator_backend_requested === "real_cli" && runtimeState ? (
+          <li>
+            <span className="kv-key">Platform runtime mode</span>
+            <span className="kv-value">
+              {runtimeState.px4_gazebo_dry_run
+                ? "real_cli dry-run: no external PX4/Gazebo process is launched"
+                : "real_cli PX4/Gazebo real mode"}
+            </span>
+          </li>
+        ) : null}
         <li>
           <span className="kv-key">Optimizer strategy</span>
           <span className="kv-value">

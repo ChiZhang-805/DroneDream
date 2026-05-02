@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -19,6 +19,7 @@ import type {
   SensorNoiseLevel,
   SimulatorBackend,
   TrackType,
+  RuntimeState,
 } from "../types/api";
 import { generateReferenceTrack } from "../utils/referenceTrack";
 
@@ -473,7 +474,17 @@ export function NewJob() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [runtimeState, setRuntimeState] = useState<RuntimeState | null>(null);
   const [showAdvancedScenario, setShowAdvancedScenario] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    apiClient.getRuntimeState().then((data) => {
+      if (alive) setRuntimeState(data);
+    }).catch(() => {
+      // Keep local dev behavior if runtime endpoint is unavailable.
+    });
+    return () => { alive = false; };
+  }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -939,6 +950,13 @@ export function NewJob() {
               </select>
             </Field>
             {hostedMode && lockSimulatorBackend ? <p className="field-hint">Hosted mode uses the platform-managed PX4/Gazebo backend.</p> : null}
+            {form.simulator_backend === "real_cli" && runtimeState ? (
+              <p className="field-hint">
+                {runtimeState.px4_gazebo_dry_run
+                  ? "real_cli dry-run: no external PX4/Gazebo process is launched"
+                  : "real_cli PX4/Gazebo real mode"}
+              </p>
+            ) : null}
             <Field
               label="Optimizer Strategy"
               required
