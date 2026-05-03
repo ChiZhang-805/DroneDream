@@ -78,3 +78,14 @@ Then inside container:
 `cd $PX4_AUTOPILOT_DIR`
 `make px4_sitl gz_x500`
 Only after this succeeds should DroneDream real_cli jobs be expected to run true PX4/Gazebo missions.
+
+
+### Gazebo live view sizing
+
+The Hosted B real PX4/Gazebo profile serves the Gazebo desktop through noVNC at:
+
+`/gazebo/vnc.html?path=gazebo/websockify&resize=scale`
+
+The `worker-real-px4-vnc` image includes `wmctrl`, `xdotool`, and `x11-utils`.
+The startup flow runs `scripts/hosted-b/maximize-gazebo-window.sh`, which watches for Gazebo windows and maximizes them to the virtual display size. This avoids requiring users to manually resize the Gazebo GUI inside noVNC.
+

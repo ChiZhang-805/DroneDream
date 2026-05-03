@@ -39,7 +39,7 @@ services:
     build: {context: ../.., dockerfile: docker/worker-real-px4-vnc.Dockerfile}
     env_file: .env
     environment:
-      DISPLAY: ${DISPLAY:-:99}
+      DISPLAY: ${PX4_GAZEBO_DISPLAY:-:99}
       NOVNC_PORT: ${NOVNC_PORT:-6080}
       VNC_PORT: ${VNC_PORT:-5900}
       VNC_PASSWORD: ${VNC_PASSWORD}
