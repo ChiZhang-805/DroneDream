@@ -25,22 +25,33 @@ interface ProbeState {
   prerequisites: SystemPrerequisiteReport | null;
   runtime: RuntimeStatusReport | null;
   plan: RuntimeInstallPlan | null;
-  errors: string[];
+  issues: ProbeIssue[];
   loading: boolean;
   planLoading: boolean;
+  prerequisitesFresh: boolean;
+  runtimeFresh: boolean;
+}
+
+type ProbeIssueSource = "prerequisites" | "runtime" | "plan";
+
+interface ProbeIssue {
+  source: ProbeIssueSource;
+  command: string;
+  message: string;
 }
 
 const INITIAL_STATE: ProbeState = {
   prerequisites: null,
   runtime: null,
   plan: null,
-  errors: [],
+  issues: [],
   loading: false,
   planLoading: false,
+  prerequisitesFresh: false,
+  runtimeFresh: false,
 };
 
 const GIB = 1024 ** 3;
-const PLAN_ERROR_PREFIX = "get_runtime_install_plan:";
 // Windows reserves a small part of a nominal 16 GB installation for hardware.
 // Treat 15 GiB of reported physical memory as a 16 GB-class machine.
 const MINIMUM_MEMORY_BYTES = 15 * GIB;
@@ -69,13 +80,46 @@ function runtimeTargetRoot(drive: string): string | undefined {
   return /^[A-Z]:$/.test(normalized) ? `${normalized}\\DroneDream` : undefined;
 }
 
-async function getSettledInstallPlan(
-  drive: string,
-): Promise<PromiseSettledResult<RuntimeInstallPlan>> {
-  const [plan] = await Promise.allSettled([
-    getRuntimeInstallPlan(runtimeTargetRoot(drive)),
-  ]);
-  return plan;
+async function getSettledInstallPlan(drive: string) {
+  try {
+    return {
+      status: "fulfilled" as const,
+      value: await getRuntimeInstallPlan(runtimeTargetRoot(drive)),
+    };
+  } catch (reason) {
+    return { status: "rejected" as const, reason };
+  }
+}
+
+function replaceIssues(
+  current: ProbeIssue[],
+  sources: ProbeIssueSource[],
+  replacements: ProbeIssue[],
+): ProbeIssue[] {
+  const replacedSources = new Set(sources);
+  return [
+    ...current.filter((issue) => !replacedSources.has(issue.source)),
+    ...replacements,
+  ];
+}
+
+function probeIssue(
+  source: ProbeIssueSource,
+  command: string,
+  reason: unknown,
+): ProbeIssue {
+  return { source, command, message: errorMessage(reason) };
+}
+
+function runtimeIsReady(report: RuntimeStatusReport | null): boolean {
+  const requiredComponents = report?.components.filter((component) => component.required) ?? [];
+  return Boolean(
+    report?.ready &&
+    report.installed &&
+    report.running &&
+    requiredComponents.length > 0 &&
+    requiredComponents.every((component) => component.status === "ready"),
+  );
 }
 
 export function DesktopSetup() {
@@ -83,8 +127,16 @@ export function DesktopSetup() {
   const desktopAvailable = isDesktopRuntime();
   const requestId = useRef(0);
   const selectedDriveRef = useRef("");
-  const [state, setState] = useState<ProbeState>(INITIAL_STATE);
+  const [state, setState] = useState<ProbeState>(() => ({
+    ...INITIAL_STATE,
+    loading: desktopAvailable,
+  }));
   const [selectedDrive, setSelectedDrive] = useState("");
+  const busy = state.loading || state.planLoading;
+  const showInstallPlanner =
+    state.prerequisitesFresh &&
+    state.runtimeFresh &&
+    state.runtime?.installed === false;
 
   const refresh = useCallback(async () => {
     if (!desktopAvailable) return;
@@ -93,7 +145,9 @@ export function DesktopSetup() {
       ...current,
       loading: true,
       planLoading: false,
-      errors: [],
+      plan: null,
+      prerequisitesFresh: false,
+      runtimeFresh: false,
     }));
 
     const [prerequisites, runtime] = await Promise.allSettled([
@@ -102,40 +156,75 @@ export function DesktopSetup() {
     ]);
     if (requestId.current !== currentRequest) return;
 
+    const probeIssues: ProbeIssue[] = [];
+    if (prerequisites.status === "rejected") {
+      probeIssues.push(probeIssue(
+        "prerequisites",
+        "probe_system_prerequisites",
+        prerequisites.reason,
+      ));
+    }
+    if (runtime.status === "rejected") {
+      probeIssues.push(probeIssue("runtime", "probe_runtime_status", runtime.reason));
+    }
+
     const fixedDisks = prerequisites.status === "fulfilled"
       ? fixedDiskOptions(prerequisites.value.disks)
       : [];
-    const nextDrive = chooseRuntimeDrive(fixedDisks, selectedDriveRef.current);
-    selectedDriveRef.current = nextDrive;
-    setSelectedDrive(nextDrive);
+    const nextDrive = prerequisites.status === "fulfilled"
+      ? chooseRuntimeDrive(fixedDisks, selectedDriveRef.current)
+      : selectedDriveRef.current;
+    if (prerequisites.status === "fulfilled") {
+      selectedDriveRef.current = nextDrive;
+      setSelectedDrive(nextDrive);
+    }
+    const shouldRequestPlan =
+      prerequisites.status === "fulfilled" &&
+      runtime.status === "fulfilled" &&
+      !runtime.value.installed &&
+      fixedDisks.length > 0 &&
+      Boolean(nextDrive);
 
+    setState((current) => ({
+      ...current,
+      prerequisites: prerequisites.status === "fulfilled"
+        ? prerequisites.value
+        : current.prerequisites,
+      runtime: runtime.status === "fulfilled" ? runtime.value : current.runtime,
+      plan: null,
+      issues: replaceIssues(
+        current.issues,
+        ["prerequisites", "runtime", "plan"],
+        probeIssues,
+      ),
+      loading: false,
+      planLoading: shouldRequestPlan,
+      prerequisitesFresh: prerequisites.status === "fulfilled",
+      runtimeFresh: runtime.status === "fulfilled",
+    }));
+
+    if (!shouldRequestPlan) return;
     const plan = await getSettledInstallPlan(nextDrive);
     if (requestId.current !== currentRequest) return;
 
-    const errors: string[] = [];
-    if (prerequisites.status === "rejected") {
-      errors.push(`probe_system_prerequisites: ${errorMessage(prerequisites.reason)}`);
-    }
-    if (runtime.status === "rejected") {
-      errors.push(`probe_runtime_status: ${errorMessage(runtime.reason)}`);
-    }
-    if (plan.status === "rejected") {
-      errors.push(`${PLAN_ERROR_PREFIX} ${errorMessage(plan.reason)}`);
-    }
-
-    setState({
-      prerequisites:
-        prerequisites.status === "fulfilled" ? prerequisites.value : null,
-      runtime: runtime.status === "fulfilled" ? runtime.value : null,
+    const planIssues = plan.status === "rejected"
+      ? [probeIssue("plan", "get_runtime_install_plan", plan.reason)]
+      : [];
+    setState((current) => ({
+      ...current,
       plan: plan.status === "fulfilled" ? plan.value : null,
-      errors,
-      loading: false,
+      issues: replaceIssues(current.issues, ["plan"], planIssues),
       planLoading: false,
-    });
+    }));
   }, [desktopAvailable]);
 
   const selectRuntimeDrive = useCallback(async (drive: string) => {
-    if (!desktopAvailable) return;
+    if (
+      !desktopAvailable ||
+      !state.prerequisitesFresh ||
+      !state.runtimeFresh ||
+      state.runtime?.installed !== false
+    ) return;
     const fixedDisks = fixedDiskOptions(state.prerequisites?.disks ?? []);
     if (!fixedDisks.some((disk) => disk.drive === drive)) return;
 
@@ -146,7 +235,7 @@ export function DesktopSetup() {
       ...current,
       plan: null,
       planLoading: true,
-      errors: current.errors.filter((error) => !error.startsWith(PLAN_ERROR_PREFIX)),
+      issues: replaceIssues(current.issues, ["plan"], []),
     }));
 
     const plan = await getSettledInstallPlan(drive);
@@ -156,14 +245,21 @@ export function DesktopSetup() {
       ...current,
       plan: plan.status === "fulfilled" ? plan.value : null,
       planLoading: false,
-      errors: plan.status === "rejected"
-        ? [
-            ...current.errors.filter((error) => !error.startsWith(PLAN_ERROR_PREFIX)),
-            `${PLAN_ERROR_PREFIX} ${errorMessage(plan.reason)}`,
-          ]
-        : current.errors.filter((error) => !error.startsWith(PLAN_ERROR_PREFIX)),
+      issues: replaceIssues(
+        current.issues,
+        ["plan"],
+        plan.status === "rejected"
+          ? [probeIssue("plan", "get_runtime_install_plan", plan.reason)]
+          : [],
+      ),
     }));
-  }, [desktopAvailable, state.prerequisites]);
+  }, [
+    desktopAvailable,
+    state.prerequisites,
+    state.prerequisitesFresh,
+    state.runtime,
+    state.runtimeFresh,
+  ]);
 
   useEffect(() => {
     void refresh();
@@ -173,7 +269,10 @@ export function DesktopSetup() {
   }, [refresh]);
 
   return (
-    <section className="desktop-setup-page stack-md">
+    <section
+      className="desktop-setup-page stack-md"
+      aria-busy={desktopAvailable ? busy : undefined}
+    >
       <header className="page-header desktop-setup-header">
         <div>
           <div className="desktop-eyebrow">{t("desktop.eyebrow")}</div>
@@ -185,9 +284,13 @@ export function DesktopSetup() {
             type="button"
             className="btn"
             onClick={() => void refresh()}
-            disabled={state.loading || state.planLoading}
+            disabled={busy}
           >
-            {state.loading ? t("desktop.checking") : t("desktop.refresh")}
+            {state.loading
+              ? t("desktop.checking")
+              : state.planLoading
+                ? t("desktop.planUpdating")
+                : t("desktop.refresh")}
           </button>
         ) : null}
       </header>
@@ -196,14 +299,22 @@ export function DesktopSetup() {
         <BrowserExplanation />
       ) : (
         <>
-          <ReadinessHero runtime={state.runtime} loading={state.loading} />
+          <ReadinessHero
+            prerequisites={state.prerequisites}
+            runtime={state.runtime}
+            loading={state.loading}
+            prerequisitesFresh={state.prerequisitesFresh}
+            runtimeFresh={state.runtimeFresh}
+          />
 
-          {state.errors.length > 0 ? (
+          {state.issues.length > 0 ? (
             <Alert tone="warning" title={t("desktop.probeIssue")}>
               <p className="desktop-alert-copy">{t("desktop.partialFailure")}</p>
               <ul className="desktop-diagnostic-list">
-                {state.errors.map((error) => (
-                  <li key={error}><code>{error}</code></li>
+                {state.issues.map((issue) => (
+                  <li key={issue.source}>
+                    <code>{issue.command}: {issue.message}</code>
+                  </li>
                 ))}
               </ul>
             </Alert>
@@ -214,19 +325,31 @@ export function DesktopSetup() {
           ) : null}
 
           {state.prerequisites ? (
-            <PrerequisiteOverview report={state.prerequisites} />
+            <PrerequisiteOverview
+              report={state.prerequisites}
+              stale={!state.prerequisitesFresh}
+            />
           ) : null}
-          {state.runtime ? <RuntimeOverview report={state.runtime} /> : null}
-          {state.prerequisites ? (
+          {state.runtime ? (
+            <RuntimeOverview report={state.runtime} stale={!state.runtimeFresh} />
+          ) : null}
+          {state.runtimeFresh && state.runtime?.installed ? (
+            <InstalledRuntimeNotice report={state.runtime} />
+          ) : null}
+          {showInstallPlanner && state.prerequisites ? (
             <RuntimeStorageSelector
               disks={fixedDiskOptions(state.prerequisites.disks)}
               selectedDrive={selectedDrive}
-              disabled={state.loading || state.planLoading}
+              disabled={busy}
               onChange={(drive) => void selectRuntimeDrive(drive)}
             />
           ) : null}
-          {state.planLoading ? <Loading label={t("desktop.planUpdating")} /> : null}
-          {state.plan ? <InstallPlanOverview plan={state.plan} /> : null}
+          {showInstallPlanner && state.planLoading ? (
+            <Loading label={t("desktop.planUpdating")} />
+          ) : null}
+          {showInstallPlanner && state.plan ? (
+            <InstallPlanOverview plan={state.plan} />
+          ) : null}
         </>
       )}
     </section>
@@ -251,17 +374,27 @@ function BrowserExplanation() {
 }
 
 function ReadinessHero({
+  prerequisites,
   runtime,
   loading,
+  prerequisitesFresh,
+  runtimeFresh,
 }: {
+  prerequisites: SystemPrerequisiteReport | null;
   runtime: RuntimeStatusReport | null;
   loading: boolean;
+  prerequisitesFresh: boolean;
+  runtimeFresh: boolean;
 }) {
   const { t } = useI18n();
-  const ready = runtime?.ready === true;
-  const title = loading && !runtime
+  const ready =
+    prerequisitesFresh &&
+    prerequisites?.supported === true &&
+    runtimeFresh &&
+    runtimeIsReady(runtime);
+  const title = loading
     ? t("desktop.checking")
-    : runtime
+    : prerequisitesFresh && runtimeFresh && runtime
       ? ready
         ? t("desktop.ready")
         : t("desktop.needsAction")
@@ -280,7 +413,7 @@ function ReadinessHero({
       </span>
       <div>
         <strong>{title}</strong>
-        {runtime ? (
+        {runtime && !loading ? (
           <span>
             {runtime.runtimeName} · {runtime.installed
               ? t("desktop.installed")
@@ -299,7 +432,13 @@ function ReadinessHero({
   );
 }
 
-function PrerequisiteOverview({ report }: { report: SystemPrerequisiteReport }) {
+function PrerequisiteOverview({
+  report,
+  stale,
+}: {
+  report: SystemPrerequisiteReport;
+  stale: boolean;
+}) {
   const { t } = useI18n();
   const hasWsl2 = report.wsl.distributions.some((distribution) => distribution.version === 2);
   const memoryReady = (report.memory?.totalBytes ?? 0) >= MINIMUM_MEMORY_BYTES;
@@ -312,6 +451,7 @@ function PrerequisiteOverview({ report }: { report: SystemPrerequisiteReport }) 
     <SectionCard
       title={t("desktop.overviewTitle")}
       description={t("desktop.overviewDesc")}
+      actions={stale ? <StaleResultBadge /> : null}
     >
       <div className="desktop-check-grid">
         <CheckCard
@@ -374,7 +514,9 @@ function PrerequisiteOverview({ report }: { report: SystemPrerequisiteReport }) 
                 <span>
                   {gpu.adapterRamBytes ? formatBytes(gpu.adapterRamBytes) : null}
                   {gpu.adapterRamBytes && gpu.driverVersion ? " · " : null}
-                  {gpu.driverVersion ? `driver ${gpu.driverVersion}` : null}
+                  {gpu.driverVersion
+                    ? `${t("desktop.driver")} ${gpu.driverVersion}`
+                    : null}
                 </span>
               </li>
             ))}
@@ -387,7 +529,9 @@ function PrerequisiteOverview({ report }: { report: SystemPrerequisiteReport }) 
       {report.probeErrors.length > 0 ? (
         <Alert tone="warning" title={t("desktop.probeIssue")}>
           <ul className="desktop-diagnostic-list">
-            {report.probeErrors.map((error) => <li key={error}>{error}</li>)}
+            {report.probeErrors.map((error, index) => (
+              <li key={`${index}-${error}`}>{error}</li>
+            ))}
           </ul>
         </Alert>
       ) : null}
@@ -406,11 +550,17 @@ function CheckCard({
   value: string;
   detail: string;
 }) {
+  const { t } = useI18n();
   return (
     <article className={`desktop-check-card desktop-check-${state}`}>
       <div className="desktop-check-heading">
         <span>{label}</span>
-        <span aria-hidden="true">{state === "ready" ? "✓" : "!"}</span>
+        <span>
+          <span aria-hidden="true">{state === "ready" ? "✓" : "!"}</span>
+          <span className="sr-only">
+            {state === "ready" ? t("desktop.checkReady") : t("desktop.checkWarning")}
+          </span>
+        </span>
       </div>
       <strong>{value}</strong>
       <p>{detail}</p>
@@ -449,6 +599,7 @@ function RuntimeStorageSelector({
               id="desktop-runtime-drive"
               value={selectedDrive}
               disabled={disabled}
+              aria-describedby="desktop-runtime-target"
               onChange={(event) => onChange(event.target.value)}
             >
               {disks.map((disk) => (
@@ -460,7 +611,7 @@ function RuntimeStorageSelector({
               ))}
             </select>
           </div>
-          <div className="desktop-storage-target">
+          <div className="desktop-storage-target" id="desktop-runtime-target">
             <span>{t("desktop.storageTarget")}</span>
             <code>{targetRoot ?? "—"}</code>
           </div>
@@ -470,16 +621,27 @@ function RuntimeStorageSelector({
   );
 }
 
-function RuntimeOverview({ report }: { report: RuntimeStatusReport }) {
+function RuntimeOverview({
+  report,
+  stale,
+}: {
+  report: RuntimeStatusReport;
+  stale: boolean;
+}) {
   const { t } = useI18n();
+  const ready = !stale && runtimeIsReady(report);
   return (
     <SectionCard
       title={t("desktop.runtimeTitle")}
       description={t("desktop.runtimeDesc")}
       actions={
-        <span className={`desktop-runtime-pill ${report.ready ? "ready" : "pending"}`}>
-          {report.ready ? t("desktop.ready") : t("desktop.needsAction")}
-        </span>
+        stale ? (
+          <StaleResultBadge />
+        ) : (
+          <span className={`desktop-runtime-pill ${ready ? "ready" : "pending"}`}>
+            {ready ? t("desktop.ready") : t("desktop.needsAction")}
+          </span>
+        )
       }
     >
       <dl className="desktop-runtime-facts">
@@ -510,7 +672,7 @@ function RuntimeOverview({ report }: { report: RuntimeStatusReport }) {
                 aria-hidden="true"
               />
               <div>
-                <strong>{component.label}</strong>
+                <strong>{translatedComponentLabel(t, component.id, component.label)}</strong>
                 <span>{component.detail || component.version || "—"}</span>
               </div>
               <div className="desktop-component-badges">
@@ -530,8 +692,8 @@ function RuntimeOverview({ report }: { report: RuntimeStatusReport }) {
         <div className="desktop-diagnostics">
           <h3>{t("desktop.diagnosticsTitle")}</h3>
           <ul className="desktop-diagnostic-list">
-            {report.diagnostics.map((diagnostic) => (
-              <li key={diagnostic}>{diagnostic}</li>
+            {report.diagnostics.map((diagnostic, index) => (
+              <li key={`${index}-${diagnostic}`}>{diagnostic}</li>
             ))}
           </ul>
         </div>
@@ -540,8 +702,34 @@ function RuntimeOverview({ report }: { report: RuntimeStatusReport }) {
   );
 }
 
+function StaleResultBadge() {
+  const { t } = useI18n();
+  return <span className="desktop-stale-pill">{t("desktop.lastSuccessful")}</span>;
+}
+
+function InstalledRuntimeNotice({ report }: { report: RuntimeStatusReport }) {
+  const { t } = useI18n();
+  const ready = runtimeIsReady(report);
+  return (
+    <Alert
+      tone={ready ? "success" : "warning"}
+      title={ready
+        ? t("desktop.runtimeAlreadyReady")
+        : t("desktop.runtimeNeedsRepair")}
+    >
+      {t("desktop.installedStorageHint")}
+    </Alert>
+  );
+}
+
 function InstallPlanOverview({ plan }: { plan: RuntimeInstallPlan }) {
   const { t } = useI18n();
+  const canProceed = plan.canInstall && plan.blockers.length === 0;
+  const blockers = plan.blockers.length > 0
+    ? plan.blockers
+    : plan.canInstall
+      ? []
+      : [t("desktop.unknownBlocker")];
   return (
     <SectionCard
       title={t("desktop.planTitle")}
@@ -562,17 +750,19 @@ function InstallPlanOverview({ plan }: { plan: RuntimeInstallPlan }) {
       </div>
 
       <Alert
-        tone={plan.canInstall ? "success" : "warning"}
-        title={plan.canInstall ? t("desktop.canInstall") : t("desktop.planBlocked")}
+        tone={canProceed ? "success" : "warning"}
+        title={canProceed ? t("desktop.canInstall") : t("desktop.planBlocked")}
       >
         {t("desktop.noChanges")}
       </Alert>
 
-      {plan.blockers.length > 0 ? (
+      {blockers.length > 0 ? (
         <div className="desktop-plan-blockers">
           <h3>{t("desktop.blockers")}</h3>
           <ul className="desktop-diagnostic-list">
-            {plan.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+            {blockers.map((blocker, index) => (
+              <li key={`${index}-${blocker}`}>{blocker}</li>
+            ))}
           </ul>
         </div>
       ) : null}
@@ -584,8 +774,8 @@ function InstallPlanOverview({ plan }: { plan: RuntimeInstallPlan }) {
             <li key={step.id}>
               <span className="desktop-step-number">{index + 1}</span>
               <div>
-                <strong>{step.title}</strong>
-                <p>{step.description}</p>
+                <strong>{translatedStepText(t, step.id, "title", step.title)}</strong>
+                <p>{translatedStepText(t, step.id, "description", step.description)}</p>
                 <div className="desktop-step-meta">
                   {step.requiresAdministrator ? (
                     <span>{t("desktop.administrator")}</span>
@@ -623,7 +813,70 @@ function componentStateKey(state: RuntimeComponentState): TranslationKey {
   return `desktop.component.${state}`;
 }
 
+const COMPONENT_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
+  "wsl-runtime": "desktop.componentLabel.wslRuntime",
+  "runtime-manifest": "desktop.componentLabel.manifest",
+  "local-backend": "desktop.componentLabel.backend",
+  px4: "desktop.componentLabel.px4",
+  gazebo: "desktop.componentLabel.gazebo",
+};
+
+function translatedComponentLabel(
+  t: (key: TranslationKey) => string,
+  id: string,
+  fallback: string,
+): string {
+  const key = COMPONENT_LABEL_KEYS[id];
+  return key ? t(key) : fallback;
+}
+
+const STEP_TEXT_KEYS: Partial<
+  Record<string, { title: TranslationKey; description: TranslationKey }>
+> = {
+  preflight: {
+    title: "desktop.step.preflight.title",
+    description: "desktop.step.preflight.description",
+  },
+  "enable-wsl": {
+    title: "desktop.step.enableWsl.title",
+    description: "desktop.step.enableWsl.description",
+  },
+  download: {
+    title: "desktop.step.download.title",
+    description: "desktop.step.download.description",
+  },
+  import: {
+    title: "desktop.step.import.title",
+    description: "desktop.step.import.description",
+  },
+  "smoke-test": {
+    title: "desktop.step.smokeTest.title",
+    description: "desktop.step.smokeTest.description",
+  },
+};
+
+function translatedStepText(
+  t: (key: TranslationKey) => string,
+  id: string,
+  field: "title" | "description",
+  fallback: string,
+): string {
+  const key = STEP_TEXT_KEYS[id]?.[field];
+  return key ? t(key) : fallback;
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
-  return typeof error === "string" ? error : JSON.stringify(error);
+  if (typeof error === "string") return error;
+  try {
+    const serialized = JSON.stringify(error);
+    if (serialized) return serialized;
+  } catch {
+    // Fall through to a side-effect-free string conversion for circular values.
+  }
+  try {
+    return String(error);
+  } catch {
+    return "Unknown desktop command error";
+  }
 }

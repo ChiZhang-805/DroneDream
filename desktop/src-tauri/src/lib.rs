@@ -1,5 +1,9 @@
 mod prerequisites;
+#[cfg(target_os = "windows")]
+mod process;
 mod runtime;
+
+pub(crate) const MINIMUM_WINDOWS_BUILD: u32 = 19041;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

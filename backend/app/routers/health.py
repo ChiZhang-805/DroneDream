@@ -13,11 +13,27 @@ from app.storage import get_artifact_storage
 router = APIRouter(tags=["health"])
 
 
+def _runtime_id() -> str | None:
+    # Some test and worker bootstrap paths reload app.config after changing the
+    # environment. Import lazily so readiness never retains a stale cached
+    # get_settings function from the previous module state.
+    from app.config import get_settings
+
+    return get_settings().dronedream_runtime_id
+
+
 @router.get("/health")
 def health() -> dict[str, object]:
     """Return a simple liveness payload in the standard envelope."""
 
-    return ok({"status": "ok", "service": "drone-dream-backend", "version": __version__})
+    return ok(
+        {
+            "status": "ok",
+            "service": "drone-dream-backend",
+            "version": __version__,
+            "runtime_id": _runtime_id(),
+        }
+    )
 
 
 @router.get("/health/live")
@@ -66,6 +82,7 @@ def ready() -> dict[str, object] | JSONResponse:
             "status": "ready" if is_ready else "not_ready",
             "service": "drone-dream-backend",
             "version": __version__,
+            "runtime_id": _runtime_id(),
             "components": components,
         }
     )

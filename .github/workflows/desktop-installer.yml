@@ -8,7 +8,9 @@ on:
       - "desktop/**"
       - "frontend/**"
       - "backend/app/config.py"
+      - "backend/app/routers/health.py"
       - "backend/tests/test_config.py"
+      - "backend/tests/test_health.py"
   push:
     tags:
       - "desktop-v*"
@@ -26,10 +28,41 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Verify desktop version consistency
+        shell: pwsh
+        run: |
+          $tauriVersion = (Get-Content -LiteralPath "desktop/src-tauri/tauri.conf.json" -Raw |
+            ConvertFrom-Json).version
+          $packageVersion = (Get-Content -LiteralPath "desktop/package.json" -Raw |
+            ConvertFrom-Json).version
+          $cargoVersionMatch = Select-String -LiteralPath "desktop/src-tauri/Cargo.toml" `
+            -Pattern '^version\s*=\s*"([^"]+)"\s*$' |
+            Select-Object -First 1
+          if (-not $cargoVersionMatch) {
+            throw "Cargo package version was not found"
+          }
+          $cargoVersion = $cargoVersionMatch.Matches[0].Groups[1].Value
+
+          if ($tauriVersion -cne $packageVersion -or $tauriVersion -cne $cargoVersion) {
+            throw "Desktop versions disagree: tauri=$tauriVersion package=$packageVersion cargo=$cargoVersion"
+          }
+
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $prefix = "desktop-v"
+            if (-not $env:GITHUB_REF_NAME.StartsWith($prefix)) {
+              throw "Unexpected desktop release tag: $env:GITHUB_REF_NAME"
+            }
+            $tagVersion = $env:GITHUB_REF_NAME.Substring($prefix.Length)
+            if ($tagVersion -cne $tauriVersion) {
+              throw "Tag version $tagVersion does not match desktop version $tauriVersion"
+            }
+          }
+          Write-Host "Desktop version verified: $tauriVersion"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "22"
           cache: npm
@@ -37,8 +70,18 @@ jobs:
             frontend/package-lock.json
             desktop/package-lock.json
 
-      - name: Set up stable Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Set up Rust 1.97.0
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # action snapshot, 2026-07-10
+        with:
+          toolchain: 1.97.0
+          components: rustfmt, clippy
 
       - name: Install JavaScript dependencies
         shell: pwsh
@@ -46,11 +89,37 @@ jobs:
           npm ci --prefix frontend
           npm ci --prefix desktop
 
+      - name: Install backend test dependencies
+        shell: pwsh
+        run: >-
+          python -m pip install -e "./backend[dev]"
+          "ruff==0.15.21" "mypy==2.2.0" "pytest==9.1.1"
+
+      - name: Verify desktop backend configuration
+        shell: pwsh
+        working-directory: backend
+        run: |
+          python -m ruff check app/config.py app/routers/health.py tests/test_config.py tests/test_health.py
+          python -m mypy app/config.py app/routers/health.py
+          python -m pytest tests/test_config.py tests/test_health.py
+
       - name: Verify shared frontend
         shell: pwsh
         run: |
           npm --prefix frontend run typecheck
-          npm --prefix frontend run test
+          npm --prefix frontend run lint
+          # The Windows hosted runner is materially slower than local jsdom.
+          # Keep assertions unchanged while allowing the existing wizard tests
+          # enough time to finish under runner load.
+          npm --prefix frontend run test -- --testTimeout 15000
+
+      - name: Verify desktop Rust
+        shell: pwsh
+        run: |
+          cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check
+          cargo clippy --release --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
+          # Release-profile tests reuse most compiled artifacts in the NSIS build.
+          cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml
 
       - name: Build DroneDream setup executable
         shell: pwsh
@@ -59,17 +128,24 @@ jobs:
       - name: Write SHA-256 checksum
         shell: pwsh
         run: |
-          $installer = Get-ChildItem "desktop/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
-          if (-not $installer) { throw "NSIS installer was not produced" }
+          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $installers = @(Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS installer, found $($installers.Count)"
+          }
+          $installer = $installers[0]
           $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName
-          "$($hash.Hash.ToLower())  $($installer.Name)" | Set-Content -Encoding ascii "desktop-installer.sha256"
+          $checksumPath = "$($installer.FullName).sha256"
+          "$($hash.Hash.ToLowerInvariant())  $($installer.Name)" |
+            Set-Content -Encoding ascii -LiteralPath $checksumPath
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: DroneDream-Windows-x64
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0
           path: |
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
-            desktop-installer.sha256
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sha256

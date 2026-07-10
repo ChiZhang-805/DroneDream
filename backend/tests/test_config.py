@@ -9,9 +9,41 @@ from app.config import Settings, get_settings
 def test_default_cors_origins_include_web_and_desktop_clients() -> None:
     origins = Settings().cors_origin_list
 
-    assert "http://127.0.0.1:5173" in origins
-    assert "http://tauri.localhost" in origins
-    assert "tauri://localhost" in origins
+    assert set(origins) == {
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://tauri.localhost",
+        "tauri://localhost",
+    }
+    assert "*" not in origins
+
+
+def test_cors_origins_are_deduplicated_in_order() -> None:
+    settings = Settings(
+        cors_origins="http://localhost:5173, http://localhost:5173,tauri://localhost"
+    )
+
+    assert settings.cors_origin_list == [
+        "http://localhost:5173",
+        "tauri://localhost",
+    ]
+
+
+def test_cors_rejects_wildcard_with_credentials() -> None:
+    with pytest.raises(ValidationError, match="wildcard origins"):
+        Settings(cors_origins="*")
+
+
+def test_runtime_id_is_optional_and_requires_a_canonical_uuid() -> None:
+    assert Settings().dronedream_runtime_id is None
+    assert (
+        Settings(
+            dronedream_runtime_id="123E4567-E89B-12D3-A456-426614174000"
+        ).dronedream_runtime_id
+        == "123e4567-e89b-12d3-a456-426614174000"
+    )
+    with pytest.raises(ValidationError, match="canonical UUID"):
+        Settings(dronedream_runtime_id="runtime-development")
 
 
 def test_default_real_simulator_artifact_root_matches_cli_default(monkeypatch, tmp_path):

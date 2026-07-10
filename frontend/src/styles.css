@@ -2192,6 +2192,14 @@ a {
   color: var(--warning);
 }
 
+.desktop-stale-pill {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
 .desktop-runtime-facts,
 .desktop-plan-summary {
   display: grid;

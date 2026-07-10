@@ -1,5 +1,5 @@
 export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+  if (!Number.isSafeInteger(bytes) || bytes < 0) return "—";
   if (bytes === 0) return "0 B";
   const units = ["B", "KiB", "MiB", "GiB", "TiB"];
   const index = Math.min(

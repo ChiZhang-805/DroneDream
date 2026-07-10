@@ -18,6 +18,7 @@ def test_health_returns_ok_envelope() -> None:
     assert body["error"] is None
     assert body["data"]["status"] == "ok"
     assert body["data"]["service"] == "drone-dream-backend"
+    assert body["data"]["runtime_id"] is None
 
 
 def test_liveness_alias_returns_ok() -> None:
@@ -34,6 +35,21 @@ def test_readiness_checks_database_storage_and_optional_worker() -> None:
     assert data["components"]["database"]["ok"] is True
     assert data["components"]["storage"]["ok"] is True
     assert data["components"]["worker"]["status"] == "not_required"
+    assert data["runtime_id"] is None
+
+
+def test_readiness_reports_the_configured_desktop_runtime_identity(monkeypatch) -> None:
+    from app import config as config_module
+
+    runtime_id = "123e4567-e89b-12d3-a456-426614174000"
+    monkeypatch.setenv("DRONEDREAM_RUNTIME_ID", runtime_id)
+    config_module.get_settings.cache_clear()
+    try:
+        response = TestClient(app).get("/health/ready")
+        assert response.status_code == 200
+        assert response.json()["data"]["runtime_id"] == runtime_id
+    finally:
+        config_module.get_settings.cache_clear()
 
 
 def test_readiness_fails_when_required_worker_signal_is_not_configured(monkeypatch) -> None:

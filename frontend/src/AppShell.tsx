@@ -9,8 +9,9 @@ const NAV_ITEMS: {
   labelKey?: TranslationKey;
   label?: string;
   end?: boolean;
+  desktopTo?: string;
 }[] = [
-  { to: "/", labelKey: "app.dashboard", end: true },
+  { to: "/", desktopTo: "/dashboard", labelKey: "app.dashboard", end: true },
   { to: "/jobs/new", labelKey: "app.newExperiment" },
   { to: "/batches/new", labelKey: "app.newBatch", end: true },
   { to: "/batches", labelKey: "app.batches", end: true },
@@ -33,7 +34,10 @@ export function AppShell() {
         </Link>
         <nav className="app-nav" aria-label={t("app.primaryNav")}>
           {NAV_ITEMS.map((item) => {
-            const isBatchesItem = item.to === "/batches";
+            const destination = desktopRuntime && item.desktopTo
+              ? item.desktopTo
+              : item.to;
+            const isBatchesItem = destination === "/batches";
             const isBatchesActive =
               isBatchesItem &&
               location.pathname !== "/batches/new" &&
@@ -43,7 +47,7 @@ export function AppShell() {
             return (
               <NavLink
                 key={item.to}
-                to={item.to}
+                to={destination}
                 end={item.end}
                 className={({ isActive }) => {
                   if (isBatchesItem) {
@@ -58,14 +62,16 @@ export function AppShell() {
           })}
         </nav>
         <div className="app-sidebar-footer">
-          <span className="phase-pill">DroneDream V1.0</span>
+          <span className="phase-pill">{t("app.previewVersion")}</span>
         </div>
       </aside>
       <div className="app-body">
         <header className="app-header">
           <div className="app-header-title">DroneDream — {t("app.platform")}</div>
           <div className="app-header-meta">
-            <span className="env-chip">{desktopRuntime ? "desktop" : "live API"}</span>
+            <span className="env-chip">
+              {desktopRuntime ? t("app.desktopEnvironment") : t("app.webEnvironment")}
+            </span>
             <label className="language-switcher">
               <span className="sr-only">{t("app.language")}</span>
               <select

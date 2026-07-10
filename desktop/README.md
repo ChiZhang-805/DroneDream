@@ -23,13 +23,21 @@ commands under `frontend/` continue to work unchanged.
 - Branded application icons, a production CSP, and an enabled bilingual NSIS
   installer target.
 
-The current installer contains the Windows UI only. It deliberately does not
-reuse the developer's Ubuntu distribution or bundle personal files. Public
-simulation builds will download a separately versioned and signed
-`DroneDreamRuntime` WSL image during first-run setup.
+The current installer contains the Windows UI only. It does not start the
+FastAPI backend, a worker, PX4, or Gazebo, and therefore cannot run a tuning
+job by itself yet. It deliberately does not reuse the developer's Ubuntu
+distribution or bundle personal files. Public simulation builds will download
+a separately versioned and signed `DroneDreamRuntime` WSL image during
+first-run setup.
+
+The preview installer is unsigned. Windows may show a SmartScreen warning, so
+it must not be advertised as a production release. It uses a current-user NSIS
+installation and does not request administrator access. If Microsoft Edge
+WebView2 is missing, the installer downloads the official WebView2 bootstrapper
+and therefore needs an internet connection for that prerequisite.
 
 The probes use read-only CIM, current-user registry, fixed WSL commands, and a
-localhost TCP readiness check. From the desktop webview they can be called
+bounded localhost HTTP readiness check. From the desktop webview they can be called
 without adding Tauri packages to the shared web frontend:
 
 ```js
@@ -41,12 +49,14 @@ const runtime = await window.__TAURI__.core.invoke(
 );
 const plan = await window.__TAURI__.core.invoke(
   "get_runtime_install_plan",
+  { targetRoot: "E:\\DroneDream" },
 );
 ```
 
 The global API is available only inside Tauri. Browser builds remain ordinary
-web builds, so UI code must guard access with `window.__TAURI__` when the probe
-is wired into a page later.
+web builds, so UI code must guard access with `window.__TAURI__` before calling
+these commands. Omitting `targetRoot` asks the native probe to choose the fixed
+NTFS drive with the most free space.
 
 ## Developer prerequisites (Windows)
 
@@ -62,7 +72,7 @@ See the official Tauri 2 prerequisites:
 
 ```powershell
 cd desktop
-npm install
+npm ci
 npm run check:frontend
 npm run dev
 npm run build
@@ -76,8 +86,12 @@ executable and `DroneDream_<version>_x64-setup.exe` NSIS installer.
 `npm run build:llvm` is the no-administrator fallback for Windows development
 machines without a usable MSVC installation. It expects the official Rust
 `stable-x86_64-pc-windows-gnullvm` toolchain plus the portable LLVM-MinGW UCRT
-package available through WinGet. GitHub Actions and public releases continue
-to use the standard MSVC toolchain.
+package available through WinGet. The script also discovers Rust in the
+standard per-user `.cargo\bin` location when a newly installed toolchain is not
+yet on the terminal's `PATH`. GitHub Actions and public releases continue to
+use the standard MSVC toolchain. The standard installer is written below
+`src-tauri/target/release/bundle/nsis`; the LLVM fallback uses
+`src-tauri/target/x86_64-pc-windows-gnullvm/release/bundle/nsis`.
 
 For this 16 GB development machine, keep `CARGO_BUILD_JOBS=4` and never compile
 PX4 while a Gazebo GUI simulation is running. The future runtime defaults to a
@@ -94,8 +108,9 @@ Each image must contain `/opt/dronedream/runtime-manifest.json` with at least:
 {
   "schemaVersion": 1,
   "version": "0.1.0",
-  "runtimeId": "release-generated-uuid",
+  "runtimeId": "123e4567-e89b-12d3-a456-426614174000",
   "components": {
+    "backend": "0.1.0",
     "px4": "pinned-git-sha",
     "gazebo": "pinned-version"
   },
@@ -107,12 +122,24 @@ Each image must contain `/opt/dronedream/runtime-manifest.json` with at least:
 }
 ```
 
-The desktop app rejects manifests that omit the required component versions or
-the three successful release-time smoke tests. A future signed install receipt
-will additionally bind `runtimeId` to the downloaded image hash.
+The desktop app rejects manifests that omit the backend, PX4, or Gazebo version
+or the three successful release-time smoke tests. The distribution must be
+registered as WSL version 2 and launch the backend with
+`DRONEDREAM_RUNTIME_ID` set to the manifest's `runtimeId`. Runtime readiness
+requires `/health/ready` to return both that identity as `data.runtime_id` and
+the backend version declared by the manifest. This prevents a same-version
+development server on port 8000 from being mistaken for the packaged runtime.
+A future signed install receipt will additionally bind `runtimeId` to the
+downloaded image hash.
 
-The online installer will download the image with resume support, verify its
-published SHA-256/signature, import it to a user-selected fixed NTFS drive, and
-run backend, worker, PX4, Gazebo, and parameter-readback smoke tests. Until a
-signed runtime artifact is published, the setup page remains diagnostic and
-does not expose a destructive install action.
+The Windows target directory is also checked before any future import. An
+existing non-empty directory, file, junction, or symbolic link is blocked.
+Only DroneDream installation or repair tooling may create the reserved
+`.dronedream-runtime-root.json` ownership marker; users should never create
+that marker by hand.
+
+The future first-run runtime installer will download the image with resume
+support, verify its published SHA-256/signature, import it to a user-selected
+fixed NTFS drive, and run backend, worker, PX4, Gazebo, and parameter-readback
+smoke tests. Until a signed runtime artifact is published, the setup page
+remains diagnostic and does not expose a destructive install action.

@@ -1,11 +1,10 @@
+use crate::MINIMUM_WINDOWS_BUILD;
 use serde::Serialize;
 
 #[cfg(target_os = "windows")]
-use std::process::{Command, Stdio};
+use crate::process::{command_output, windows_command};
 #[cfg(target_os = "windows")]
 use std::time::Duration;
-#[cfg(target_os = "windows")]
-use wait_timeout::ChildExt;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,6 +72,7 @@ pub struct GpuInfo {
 #[serde(rename_all = "camelCase")]
 struct PowerShellReport {
     windows: Option<WindowsInfoInput>,
+    processor_architecture: String,
     wsl: WslInfoInput,
     memory: Option<MemoryInfoInput>,
     #[serde(default)]
@@ -168,6 +168,11 @@ fn probe() -> Result<PrerequisiteReport, String> {
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $probeErrors = [System.Collections.Generic.List[string]]::new()
+$processorArchitecture = if ($env:PROCESSOR_ARCHITEW6432) {
+  [string]$env:PROCESSOR_ARCHITEW6432
+} else {
+  [string]$env:PROCESSOR_ARCHITECTURE
+}
 $windows = $null
 $memory = $null
 $disks = @()
@@ -202,10 +207,14 @@ try {
 
 try {
   $gpus = @(Get-CimInstance -ClassName Win32_VideoController | Where-Object Name | ForEach-Object {
+    # AdapterRAM is a legacy UInt32 WMI field. Values close to 4 GiB are
+    # saturated/truncated on modern GPUs, so report unknown instead of a false
+    # 4 GiB value for an 8/12/16 GiB adapter.
+    $adapterRam = if ($null -eq $_.AdapterRAM) { $null } else { [UInt64]$_.AdapterRAM }
     [ordered]@{
       name = [string]$_.Name
       driverVersion = if ($null -eq $_.DriverVersion) { $null } else { [string]$_.DriverVersion }
-      adapterRamBytes = if ($null -eq $_.AdapterRAM) { $null } else { [UInt64]$_.AdapterRAM }
+      adapterRamBytes = if ($null -eq $adapterRam -or $adapterRam -ge 4227858432) { $null } else { $adapterRam }
     }
   })
 } catch { $probeErrors.Add("GPU probe: $($_.Exception.Message)") }
@@ -232,6 +241,7 @@ try {
 
 [ordered]@{
   windows = $windows
+  processorArchitecture = $processorArchitecture
   wsl = [ordered]@{
     executableAvailable = $wslAvailable
     distributions = $wslDistributions
@@ -243,7 +253,7 @@ try {
 } | ConvertTo-Json -Depth 6 -Compress
 "#;
 
-    let mut command = Command::new("powershell.exe");
+    let mut command = windows_command("powershell.exe");
     command.args([
         "-NoLogo",
         "-NoProfile",
@@ -251,21 +261,7 @@ try {
         "-Command",
         SCRIPT,
     ]);
-    command.stdout(Stdio::piped()).stderr(Stdio::piped());
-    let mut child = command
-        .spawn()
-        .map_err(|error| format!("Unable to start the read-only system probe: {error}"))?;
-    let status = child
-        .wait_timeout(Duration::from_secs(20))
-        .map_err(|error| format!("Unable to wait for the read-only system probe: {error}"))?;
-    if status.is_none() {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err("The read-only system probe timed out after 20 seconds.".to_string());
-    }
-    let output = child
-        .wait_with_output()
-        .map_err(|error| format!("Unable to collect the system probe output: {error}"))?;
+    let output = command_output(command, Duration::from_secs(20), "read-only system probe")?;
 
     if !output.status.success() {
         return Err(format!(
@@ -278,10 +274,13 @@ try {
         .map_err(|error| format!("The system probe returned invalid UTF-8: {error}"))?;
     let parsed: PowerShellReport = serde_json::from_str(raw.trim())
         .map_err(|error| format!("Unable to decode the system probe response: {error}"))?;
+    let supported = parsed.windows.as_ref().is_some_and(|windows| {
+        windows_platform_supported(&windows.build_number, &parsed.processor_architecture)
+    });
 
     Ok(PrerequisiteReport {
         platform: "windows".to_string(),
-        supported: true,
+        supported,
         windows: parsed.windows.map(|item| WindowsInfo {
             caption: item.caption,
             version: item.version,
@@ -326,4 +325,25 @@ try {
             .collect(),
         probe_errors: parsed.probe_errors,
     })
+}
+
+fn windows_platform_supported(build_number: &str, processor_architecture: &str) -> bool {
+    build_number
+        .parse::<u32>()
+        .is_ok_and(|build| build >= MINIMUM_WINDOWS_BUILD)
+        && processor_architecture.eq_ignore_ascii_case("AMD64")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::windows_platform_supported;
+
+    #[test]
+    fn requires_supported_windows_build_and_x86_64_processor() {
+        assert!(windows_platform_supported("19041", "AMD64"));
+        assert!(windows_platform_supported("26200", "amd64"));
+        assert!(!windows_platform_supported("19040", "AMD64"));
+        assert!(!windows_platform_supported("26200", "ARM64"));
+        assert!(!windows_platform_supported("invalid", "AMD64"));
+    }
 }

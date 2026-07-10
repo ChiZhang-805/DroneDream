@@ -215,6 +215,22 @@ describe("ECE498", () => {
     expect(screen.getByRole("link", { name: "ECE498" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New Batch" })).toHaveClass("active");
     expect(screen.getByRole("link", { name: "Batches" })).not.toHaveClass("active");
+    expect(screen.getByText("DroneDream 0.1 Preview")).toBeInTheDocument();
+    expect(screen.getByText("Web app")).toBeInTheDocument();
+  });
+
+  it("keeps the desktop dashboard reachable without returning to setup", () => {
+    window.__TAURI__ = { core: { invoke: vi.fn() } };
+    render(
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <AppShell />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "Dashboard" }))
+      .toHaveAttribute("href", "/dashboard");
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveClass("active");
+    expect(screen.getByText("Desktop app")).toBeInTheDocument();
   });
   it("sets batches nav active for /batches and /batches/:id", () => {
     const { rerender } = render(<MemoryRouter initialEntries={["/batches"]}><AppShell /></MemoryRouter>);

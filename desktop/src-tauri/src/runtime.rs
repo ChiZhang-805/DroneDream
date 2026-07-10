@@ -2,18 +2,21 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
-use std::process::{Command, Output, Stdio};
 use std::time::Duration;
-use wait_timeout::ChildExt;
+
+#[cfg(target_os = "windows")]
+use crate::process::{command_output, windows_command};
+use crate::MINIMUM_WINDOWS_BUILD;
 
 const RUNTIME_NAME: &str = "DroneDreamRuntime";
 const RUNTIME_MANIFEST: &str = "/opt/dronedream/runtime-manifest.json";
+const RUNTIME_ROOT_MARKER: &str = ".dronedream-runtime-root.json";
+const RUNTIME_ROOT_MARKER_OWNER: &str = "DroneDreamDesktop";
 const BACKEND_PORT: u16 = 8000;
 const ESTIMATED_DOWNLOAD_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 const ESTIMATED_INSTALLED_BYTES: u64 = 24 * 1024 * 1024 * 1024;
 const MINIMUM_FREE_BYTES: u64 = 40 * 1024 * 1024 * 1024;
 const MINIMUM_MEMORY_BYTES: u64 = 15 * 1024 * 1024 * 1024;
-const MINIMUM_WINDOWS_BUILD: u32 = 19041;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -41,7 +44,7 @@ pub struct RuntimeComponent {
     detail: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum ComponentStatus {
     Ready,
@@ -82,12 +85,21 @@ pub struct RuntimeInstallStep {
 struct RuntimeRegistryProbe {
     installed: bool,
     base_path: Option<String>,
+    version: Option<u8>,
 }
 
 #[cfg(target_os = "windows")]
 #[derive(Debug, Deserialize)]
 struct RuntimeRunningProbe {
     running: bool,
+}
+
+#[cfg(target_os = "windows")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WslStatusProbe {
+    status_ok: bool,
+    default_version: Option<u8>,
 }
 
 #[cfg(target_os = "windows")]
@@ -118,8 +130,10 @@ struct RuntimeSmokeTests {
 struct InstallPrerequisiteProbe {
     windows_build: u32,
     architecture: String,
+    processor_architecture: String,
     total_memory_bytes: u64,
     virtualization_ready: bool,
+    wsl_executable_available: bool,
 }
 
 #[cfg(target_os = "windows")]
@@ -131,6 +145,26 @@ struct DriveProbe {
     drive_type: u8,
     total_bytes: u64,
     free_bytes: u64,
+}
+
+#[cfg(target_os = "windows")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RuntimeRootMarker {
+    schema_version: u32,
+    owner: String,
+    runtime_name: String,
+}
+
+#[cfg(target_os = "windows")]
+#[derive(Debug, Default)]
+struct TargetDirectoryProbe {
+    exists: bool,
+    is_directory: bool,
+    is_reparse_point: bool,
+    is_empty: bool,
+    ownership_valid: bool,
+    ownership_error: Option<String>,
 }
 
 #[tauri::command]
@@ -173,44 +207,90 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
 #[cfg(target_os = "windows")]
 fn probe_runtime() -> Result<RuntimeStatusReport, String> {
     let mut diagnostics = Vec::new();
-    let registry_probe = probe_runtime_registry().unwrap_or_else(|error| {
-        diagnostics.push(error);
-        RuntimeRegistryProbe {
-            installed: false,
-            base_path: None,
+    let (registry_probe, registry_probe_failed) = match probe_runtime_registry() {
+        Ok(value) => (value, false),
+        Err(error) => {
+            diagnostics.push(error);
+            (
+                RuntimeRegistryProbe {
+                    installed: false,
+                    base_path: None,
+                    version: None,
+                },
+                true,
+            )
         }
-    });
+    };
 
-    let running = if registry_probe.installed {
+    let (running, running_probe_failed) = if registry_probe.installed {
         match probe_runtime_running() {
-            Ok(value) => value,
+            Ok(value) => (value, false),
             Err(error) => {
                 diagnostics.push(error);
-                false
+                (false, true)
             }
         }
     } else {
-        false
+        (false, false)
     };
 
-    let manifest = if running {
+    let runtime_is_wsl2 = registry_probe.version == Some(2);
+    if registry_probe.installed && !runtime_is_wsl2 {
+        diagnostics.push(match registry_probe.version {
+            Some(version) => format!(
+                "{RUNTIME_NAME} is registered as WSL {version}; the DroneDream runtime requires WSL 2."
+            ),
+            None => format!(
+                "Unable to verify that {RUNTIME_NAME} is registered as a WSL 2 distribution."
+            ),
+        });
+    }
+
+    let (manifest, manifest_status) = if running && runtime_is_wsl2 {
         match read_runtime_manifest() {
-            Ok(value) => value,
+            Ok(Some(value)) => (Some(value), ComponentStatus::Ready),
+            Ok(None) => {
+                diagnostics.push(format!(
+                    "Runtime manifest {RUNTIME_MANIFEST} was not found."
+                ));
+                (None, ComponentStatus::Missing)
+            }
             Err(error) => {
                 diagnostics.push(error);
-                None
+                (None, ComponentStatus::Unhealthy)
             }
         }
+    } else if registry_probe_failed
+        || running_probe_failed
+        || (registry_probe.installed && !runtime_is_wsl2)
+    {
+        (None, ComponentStatus::Unknown)
+    } else if registry_probe.installed {
+        (None, ComponentStatus::Stopped)
     } else {
-        None
+        (None, ComponentStatus::Missing)
     };
-    let backend_healthy = if running {
-        match verify_backend_ready() {
-            Ok(()) => true,
-            Err(error) => {
-                diagnostics.push(format!("Local backend readiness: {error}"));
-                false
+
+    let expected_backend_version = manifest
+        .as_ref()
+        .and_then(|value| value.components.get("backend"))
+        .map(String::as_str);
+    let backend_healthy = if running && runtime_is_wsl2 {
+        if let Some(manifest) = manifest.as_ref() {
+            // Manifest validation guarantees that the backend component exists.
+            let expected_version = manifest
+                .components
+                .get("backend")
+                .expect("validated manifest");
+            match verify_backend_ready(expected_version, &manifest.runtime_id) {
+                Ok(()) => true,
+                Err(error) => {
+                    diagnostics.push(format!("Local backend readiness: {error}"));
+                    false
+                }
             }
+        } else {
+            false
         }
     } else {
         false
@@ -221,27 +301,23 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
         RuntimeComponent {
             id: "wsl-runtime".to_string(),
             label: "Dedicated WSL2 runtime".to_string(),
-            status: if running {
-                ComponentStatus::Ready
-            } else if registry_probe.installed {
-                ComponentStatus::Stopped
-            } else {
-                ComponentStatus::Missing
-            },
+            status: wsl_runtime_component_status(
+                registry_probe.installed,
+                running,
+                registry_probe_failed,
+                running_probe_failed,
+                registry_probe.version,
+            ),
             required: true,
-            version: None,
+            version: registry_probe
+                .version
+                .map(|version| format!("WSL {version}")),
             detail: registry_probe.base_path.clone(),
         },
         RuntimeComponent {
             id: "runtime-manifest".to_string(),
             label: "Runtime manifest".to_string(),
-            status: if manifest.is_some() {
-                ComponentStatus::Ready
-            } else if registry_probe.installed && !running {
-                ComponentStatus::Stopped
-            } else {
-                ComponentStatus::Missing
-            },
+            status: manifest_status,
             required: true,
             version: version.clone(),
             detail: Some(RUNTIME_MANIFEST.to_string()),
@@ -253,14 +329,16 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
                 ComponentStatus::Ready
             } else if running {
                 ComponentStatus::Unhealthy
+            } else if registry_probe_failed || running_probe_failed {
+                ComponentStatus::Unknown
             } else if registry_probe.installed {
                 ComponentStatus::Stopped
             } else {
                 ComponentStatus::Missing
             },
             required: true,
-            version: None,
-            detail: Some(format!("http://127.0.0.1:{BACKEND_PORT}/health")),
+            version: expected_backend_version.map(str::to_string),
+            detail: Some(format!("http://127.0.0.1:{BACKEND_PORT}/health/ready")),
         },
     ];
 
@@ -274,7 +352,11 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
             label: label.to_string(),
             status: if component_version.is_some() {
                 ComponentStatus::Ready
-            } else if manifest.is_some() {
+            } else if registry_probe_failed || running_probe_failed {
+                ComponentStatus::Unknown
+            } else if registry_probe.installed && !running {
+                ComponentStatus::Stopped
+            } else if running {
                 ComponentStatus::Unknown
             } else {
                 ComponentStatus::Missing
@@ -289,12 +371,38 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
         runtime_name: RUNTIME_NAME.to_string(),
         installed: registry_probe.installed,
         running,
-        ready: registry_probe.installed && running && manifest.is_some() && backend_healthy,
+        ready: registry_probe.installed
+            && runtime_is_wsl2
+            && running
+            && manifest.is_some()
+            && backend_healthy,
         version,
         data_root: registry_probe.base_path,
         components,
         diagnostics,
     })
+}
+
+fn wsl_runtime_component_status(
+    installed: bool,
+    running: bool,
+    registry_probe_failed: bool,
+    running_probe_failed: bool,
+    version: Option<u8>,
+) -> ComponentStatus {
+    if registry_probe_failed || running_probe_failed {
+        ComponentStatus::Unknown
+    } else if !installed {
+        ComponentStatus::Missing
+    } else if version.is_none() {
+        ComponentStatus::Unknown
+    } else if version != Some(2) {
+        ComponentStatus::Unhealthy
+    } else if running {
+        ComponentStatus::Ready
+    } else {
+        ComponentStatus::Stopped
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -328,11 +436,17 @@ if (Test-Path $lxssPath) {
   $match = Get-ChildItem -Path $lxssPath | ForEach-Object {
     $properties = Get-ItemProperty -Path $_.PSPath
     if ([string]$properties.DistributionName -eq $env:DRONEDREAM_RUNTIME_NAME) {
-      [ordered]@{ installed = $true; basePath = [string]$properties.BasePath }
+      [ordered]@{
+        installed = $true
+        basePath = [string]$properties.BasePath
+        version = if ($null -eq $properties.Version) { $null } else { [byte]$properties.Version }
+      }
     }
   } | Select-Object -First 1
 }
-if ($null -eq $match) { $match = [ordered]@{ installed = $false; basePath = $null } }
+if ($null -eq $match) {
+  $match = [ordered]@{ installed = $false; basePath = $null; version = $null }
+}
 $match | ConvertTo-Json -Compress
 "#;
 
@@ -352,12 +466,21 @@ fn read_runtime_manifest() -> Result<Option<RuntimeManifest>, String> {
         "-u",
         "root",
         "--",
-        "cat",
-        RUNTIME_MANIFEST,
+        "/bin/sh",
+        "-c",
+        "if [ ! -f /opt/dronedream/runtime-manifest.json ]; then exit 44; fi; exec cat /opt/dronedream/runtime-manifest.json",
     ]);
     let output = command_output(command, COMMAND_TIMEOUT, "runtime manifest probe")?;
-    if !output.status.success() {
+    if output.status.code() == Some(44) {
         return Ok(None);
+    }
+    if !output.status.success() {
+        let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if detail.is_empty() {
+            "Runtime manifest probe failed without an error message.".to_string()
+        } else {
+            format!("Runtime manifest probe failed: {detail}")
+        });
     }
     let raw = String::from_utf8(output.stdout)
         .map_err(|error| format!("Runtime manifest is not UTF-8: {error}"))?;
@@ -375,17 +498,17 @@ fn validate_runtime_manifest(manifest: &RuntimeManifest) -> Result<(), String> {
             manifest.schema_version
         ));
     }
-    if manifest.version.trim().is_empty() {
-        return Err("Runtime manifest version is empty.".to_string());
+    if !is_safe_manifest_value(&manifest.version) {
+        return Err("Runtime manifest version is empty, too long, or unsafe.".to_string());
     }
-    if manifest.runtime_id.trim().is_empty() {
-        return Err("Runtime manifest identity is empty.".to_string());
+    if !is_uuid_like(&manifest.runtime_id) {
+        return Err("Runtime manifest identity is not a canonical UUID.".to_string());
     }
-    for component in ["px4", "gazebo"] {
+    for component in ["backend", "px4", "gazebo"] {
         let valid = manifest
             .components
             .get(component)
-            .is_some_and(|version| !version.trim().is_empty());
+            .is_some_and(|version| is_safe_manifest_value(version));
         if !valid {
             return Err(format!(
                 "Runtime manifest is missing the required {component} version."
@@ -404,7 +527,21 @@ fn validate_runtime_manifest(manifest: &RuntimeManifest) -> Result<(), String> {
     Ok(())
 }
 
-fn verify_backend_ready() -> Result<(), String> {
+fn is_safe_manifest_value(value: &str) -> bool {
+    let value = value.trim();
+    !value.is_empty() && value.len() <= 128 && !value.chars().any(char::is_control)
+}
+
+fn is_uuid_like(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 36
+        && bytes.iter().enumerate().all(|(index, byte)| match index {
+            8 | 13 | 18 | 23 => *byte == b'-',
+            _ => byte.is_ascii_digit() || (b'a'..=b'f').contains(byte),
+        })
+}
+
+fn verify_backend_ready(expected_version: &str, expected_runtime_id: &str) -> Result<(), String> {
     let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), BACKEND_PORT);
     let mut stream = TcpStream::connect_timeout(&address, HEALTH_TIMEOUT)
         .map_err(|error| format!("connection failed: {error}"))?;
@@ -414,10 +551,11 @@ fn verify_backend_ready() -> Result<(), String> {
     stream
         .set_write_timeout(Some(HEALTH_TIMEOUT))
         .map_err(|error| format!("could not set write timeout: {error}"))?;
+    let request = format!(
+        "GET /health/ready HTTP/1.1\r\nHost: 127.0.0.1:{BACKEND_PORT}\r\nAccept: application/json\r\nConnection: close\r\n\r\n"
+    );
     stream
-        .write_all(
-            b"GET /health/ready HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept: application/json\r\nConnection: close\r\n\r\n",
-        )
+        .write_all(request.as_bytes())
         .map_err(|error| format!("request failed: {error}"))?;
 
     let mut response = Vec::new();
@@ -425,16 +563,67 @@ fn verify_backend_ready() -> Result<(), String> {
         .take(256 * 1024)
         .read_to_end(&mut response)
         .map_err(|error| format!("response failed: {error}"))?;
+    validate_backend_ready_response(&response, expected_version, expected_runtime_id)
+}
+
+fn validate_backend_ready_response(
+    response: &[u8],
+    expected_version: &str,
+    expected_runtime_id: &str,
+) -> Result<(), String> {
     let header_end = response
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
         .ok_or_else(|| "backend returned an invalid HTTP response".to_string())?;
+    if header_end > 32 * 1024 {
+        return Err("backend returned oversized HTTP headers".to_string());
+    }
     let header = String::from_utf8_lossy(&response[..header_end]);
     let status_line = header.lines().next().unwrap_or_default();
-    if !status_line.contains(" 200 ") {
+    let mut status_parts = status_line.split_ascii_whitespace();
+    let protocol = status_parts.next().unwrap_or_default();
+    let status_code = status_parts.next().unwrap_or_default();
+    if !matches!(protocol, "HTTP/1.0" | "HTTP/1.1") || status_code != "200" {
         return Err(format!("backend returned {status_line}"));
     }
-    let body = &response[header_end + 4..];
+
+    let mut content_length = None;
+    let mut chunked = false;
+    for line in header.lines().skip(1) {
+        let Some((name, value)) = line.split_once(':') else {
+            return Err("backend returned a malformed HTTP header".to_string());
+        };
+        if name.eq_ignore_ascii_case("content-length") {
+            let parsed = value
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| "backend returned an invalid Content-Length".to_string())?;
+            if content_length
+                .replace(parsed)
+                .is_some_and(|prior| prior != parsed)
+            {
+                return Err("backend returned conflicting Content-Length headers".to_string());
+            }
+        } else if name.eq_ignore_ascii_case("transfer-encoding") {
+            chunked = value
+                .split(',')
+                .any(|encoding| encoding.trim().eq_ignore_ascii_case("chunked"));
+        }
+    }
+
+    let raw_body = &response[header_end + 4..];
+    let decoded_body;
+    let body = if chunked {
+        decoded_body = decode_chunked_body(raw_body)?;
+        decoded_body.as_slice()
+    } else if let Some(length) = content_length {
+        raw_body
+            .get(..length)
+            .ok_or_else(|| "backend returned a truncated HTTP body".to_string())?
+    } else {
+        raw_body
+    };
+
     let payload: serde_json::Value = serde_json::from_slice(body)
         .map_err(|error| format!("backend returned invalid JSON: {error}"))?;
     let data = payload
@@ -445,7 +634,70 @@ fn verify_backend_ready() -> Result<(), String> {
     {
         return Err("backend identity or readiness status did not match DroneDream".to_string());
     }
+    let actual_version = data
+        .get("version")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "backend response omitted its version".to_string())?;
+    if actual_version != expected_version {
+        return Err(format!(
+            "backend version {actual_version} does not match runtime manifest version {expected_version}"
+        ));
+    }
+    let actual_runtime_id = data
+        .get("runtime_id")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "backend response omitted its runtime identity".to_string())?;
+    if actual_runtime_id != expected_runtime_id {
+        return Err(format!(
+            "backend runtime identity {actual_runtime_id} does not match manifest identity {expected_runtime_id}"
+        ));
+    }
     Ok(())
+}
+
+fn decode_chunked_body(mut body: &[u8]) -> Result<Vec<u8>, String> {
+    let mut decoded = Vec::new();
+    loop {
+        let line_end = body
+            .windows(2)
+            .position(|window| window == b"\r\n")
+            .ok_or_else(|| "backend returned a malformed chunked body".to_string())?;
+        let size_text = std::str::from_utf8(&body[..line_end])
+            .map_err(|_| "backend returned a non-UTF-8 chunk size".to_string())?;
+        let size_text = size_text.split(';').next().unwrap_or_default().trim();
+        let size = usize::from_str_radix(size_text, 16)
+            .map_err(|_| "backend returned an invalid chunk size".to_string())?;
+        body = &body[line_end + 2..];
+        if size == 0 {
+            if body == b"\r\n" {
+                return Ok(decoded);
+            }
+            let trailer_end = body
+                .windows(4)
+                .position(|window| window == b"\r\n\r\n")
+                .ok_or_else(|| "backend returned an invalid final HTTP chunk".to_string())?;
+            let trailers = std::str::from_utf8(&body[..trailer_end])
+                .map_err(|_| "backend returned non-UTF-8 HTTP trailers".to_string())?;
+            if trailers.split("\r\n").any(|line| !line.contains(':')) {
+                return Err("backend returned a malformed HTTP trailer".to_string());
+            }
+            if body.len() != trailer_end + 4 {
+                return Err("backend returned data after its final HTTP chunk".to_string());
+            }
+            return Ok(decoded);
+        }
+        let chunk_end = size
+            .checked_add(2)
+            .ok_or_else(|| "backend returned an oversized HTTP chunk".to_string())?;
+        if body.len() < chunk_end || &body[size..chunk_end] != b"\r\n" {
+            return Err("backend returned a truncated HTTP chunk".to_string());
+        }
+        decoded.extend_from_slice(&body[..size]);
+        if decoded.len() > 256 * 1024 {
+            return Err("backend returned an oversized readiness response".to_string());
+        }
+        body = &body[chunk_end..];
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -469,16 +721,26 @@ fn build_install_plan(target_root: Option<String>) -> Result<RuntimeInstallPlan,
     let drive = normalized[..2].to_ascii_uppercase();
     let probe = probe_drive(&drive)?;
     let mut blockers = Vec::new();
+    let registry_probe = probe_runtime_registry()?;
+    if registry_probe.installed {
+        blockers.push(
+            "DroneDreamRuntime is already registered; a fresh import would conflict with the existing runtime. Use the repair or upgrade flow instead."
+                .to_string(),
+        );
+    }
     if prerequisites.windows_build < MINIMUM_WINDOWS_BUILD {
         blockers.push(format!(
             "Windows build {} is unsupported; build {} or newer is required for the WSL2 runtime.",
             prerequisites.windows_build, MINIMUM_WINDOWS_BUILD
         ));
     }
-    if !prerequisites.architecture.contains("64") {
+    if !prerequisites
+        .processor_architecture
+        .eq_ignore_ascii_case("AMD64")
+    {
         blockers.push(format!(
-            "The first desktop runtime requires 64-bit Windows; this system reports {}.",
-            prerequisites.architecture
+            "The first desktop runtime requires x86-64 Windows; this system reports {} ({}).",
+            prerequisites.architecture, prerequisites.processor_architecture
         ));
     }
     if prerequisites.total_memory_bytes < MINIMUM_MEMORY_BYTES {
@@ -511,7 +773,24 @@ fn build_install_plan(target_root: Option<String>) -> Result<RuntimeInstallPlan,
     if probe.total_bytes == 0 {
         blockers.push(format!("{} did not report a usable capacity.", probe.drive));
     }
-    let wsl_ready = wsl_is_ready();
+    match inspect_target_directory(&normalized) {
+        Ok(target_probe) => blockers.extend(target_directory_blockers(&target_probe, &normalized)),
+        Err(error) => blockers.push(format!(
+            "Unable to verify that {normalized} is safe to use: {error}"
+        )),
+    }
+
+    let wsl_ready = if prerequisites.wsl_executable_available {
+        match wsl_is_ready() {
+            Ok(value) => value,
+            Err(error) => {
+                blockers.push(error);
+                false
+            }
+        }
+    } else {
+        false
+    };
     Ok(base_plan(normalized, blockers, !wsl_ready, !wsl_ready))
 }
 
@@ -525,22 +804,48 @@ $computer = Get-CimInstance -ClassName Win32_ComputerSystem
 $processors = @(Get-CimInstance -ClassName Win32_Processor)
 $virtualizationReady = [bool]$computer.HypervisorPresent -or
   [bool]($processors | Where-Object { $_.VirtualizationFirmwareEnabled } | Select-Object -First 1)
+$processorArchitecture = if ($env:PROCESSOR_ARCHITEW6432) {
+  [string]$env:PROCESSOR_ARCHITEW6432
+} else {
+  [string]$env:PROCESSOR_ARCHITECTURE
+}
 [ordered]@{
   windowsBuild = [UInt32]$os.BuildNumber
   architecture = [string]$os.OSArchitecture
+  processorArchitecture = $processorArchitecture
   totalMemoryBytes = [UInt64]$computer.TotalPhysicalMemory
   virtualizationReady = $virtualizationReady
+  wslExecutableAvailable = [bool]($null -ne (Get-Command wsl.exe -ErrorAction SilentlyContinue))
 } | ConvertTo-Json -Compress
 "#;
     run_powershell_json(SCRIPT, &[], "runtime prerequisite probe")
 }
 
 #[cfg(target_os = "windows")]
-fn wsl_is_ready() -> bool {
-    let mut command = windows_command("wsl.exe");
-    command.arg("--status");
-    command_output(command, COMMAND_TIMEOUT, "WSL status probe")
-        .is_ok_and(|output| output.status.success())
+fn wsl_is_ready() -> Result<bool, String> {
+    const SCRIPT: &str = r#"
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$statusLines = @(& wsl.exe --status 2>$null)
+$statusOk = ($LASTEXITCODE -eq 0)
+$cleanStatus = ((@($statusLines) | ForEach-Object { [string]$_ }) -join "`n").Replace([string][char]0, '')
+$versionMatches = [regex]::Matches($cleanStatus, '(?m):\s*([12])\s*$')
+$defaultVersion = if ($versionMatches.Count -eq 1) {
+  [byte]$versionMatches[0].Groups[1].Value
+} else {
+  $null
+}
+[ordered]@{
+  statusOk = $statusOk
+  defaultVersion = $defaultVersion
+} | ConvertTo-Json -Compress
+"#;
+    let probe: WslStatusProbe = run_powershell_json(SCRIPT, &[], "WSL status probe")?;
+    Ok(wsl_status_is_ready(probe.status_ok, probe.default_version))
+}
+
+fn wsl_status_is_ready(status_ok: bool, default_version: Option<u8>) -> bool {
+    status_ok && default_version == Some(2)
 }
 
 fn base_plan(
@@ -549,6 +854,11 @@ fn base_plan(
     requires_administrator: bool,
     requires_restart: bool,
 ) -> RuntimeInstallPlan {
+    let wsl_description = if requires_administrator {
+        "Enable or update WSL2. Windows may request administrator approval and a restart."
+    } else {
+        "Verify the existing WSL2 installation; no administrator approval is expected."
+    };
     RuntimeInstallPlan {
         runtime_name: RUNTIME_NAME.to_string(),
         target_root,
@@ -569,9 +879,13 @@ fn base_plan(
             },
             RuntimeInstallStep {
                 id: "enable-wsl".to_string(),
-                title: "Enable or update WSL2".to_string(),
-                description: "Windows may request administrator approval and a restart on machines without WSL2.".to_string(),
-                requires_administrator: true,
+                title: if requires_administrator {
+                    "Enable or update WSL2".to_string()
+                } else {
+                    "Verify WSL2".to_string()
+                },
+                description: wsl_description.to_string(),
+                requires_administrator,
                 destructive: false,
                 estimated_bytes: None,
             },
@@ -645,6 +959,121 @@ if ($null -eq $drive) { throw "Drive $env:DRONEDREAM_DRIVE was not found." }
     )
 }
 
+#[cfg(target_os = "windows")]
+fn inspect_target_directory(target_root: &str) -> Result<TargetDirectoryProbe, String> {
+    use std::io::ErrorKind;
+    use std::os::windows::fs::MetadataExt;
+    use std::path::Path;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    const MAX_MARKER_BYTES: u64 = 16 * 1024;
+
+    let target = Path::new(target_root);
+    let metadata = match std::fs::symlink_metadata(target) {
+        Ok(value) => value,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            return Ok(TargetDirectoryProbe::default())
+        }
+        Err(error) => return Err(error.to_string()),
+    };
+    let is_reparse_point = metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
+    let mut probe = TargetDirectoryProbe {
+        exists: true,
+        is_directory: metadata.is_dir(),
+        is_reparse_point,
+        ..TargetDirectoryProbe::default()
+    };
+    if !probe.is_directory || is_reparse_point {
+        return Ok(probe);
+    }
+
+    let mut entries = std::fs::read_dir(target)
+        .map_err(|error| format!("unable to enumerate the directory: {error}"))?;
+    probe.is_empty = match entries.next() {
+        None => true,
+        Some(Ok(_)) => false,
+        Some(Err(error)) => return Err(format!("unable to inspect a directory entry: {error}")),
+    };
+    if probe.is_empty {
+        return Ok(probe);
+    }
+
+    let marker_path = target.join(RUNTIME_ROOT_MARKER);
+    let marker_metadata = match std::fs::symlink_metadata(&marker_path) {
+        Ok(value) => value,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(probe),
+        Err(error) => {
+            probe.ownership_error = Some(format!("unable to inspect ownership marker: {error}"));
+            return Ok(probe);
+        }
+    };
+    if marker_metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        probe.ownership_error = Some("the ownership marker is a reparse point".to_string());
+        return Ok(probe);
+    }
+    if !marker_metadata.is_file() {
+        probe.ownership_error = Some("the ownership marker is not a regular file".to_string());
+        return Ok(probe);
+    }
+    if marker_metadata.len() > MAX_MARKER_BYTES {
+        probe.ownership_error = Some("the ownership marker is oversized".to_string());
+        return Ok(probe);
+    }
+
+    let raw = match std::fs::read_to_string(&marker_path) {
+        Ok(value) => value,
+        Err(error) => {
+            probe.ownership_error = Some(format!("unable to read ownership marker: {error}"));
+            return Ok(probe);
+        }
+    };
+    match serde_json::from_str::<RuntimeRootMarker>(&raw) {
+        Ok(marker)
+            if marker.schema_version == 1
+                && marker.owner == RUNTIME_ROOT_MARKER_OWNER
+                && marker.runtime_name == RUNTIME_NAME =>
+        {
+            probe.ownership_valid = true;
+        }
+        Ok(_) => {
+            probe.ownership_error =
+                Some("the ownership marker identity does not match DroneDream".to_string());
+        }
+        Err(error) => {
+            probe.ownership_error = Some(format!("the ownership marker is invalid JSON: {error}"));
+        }
+    }
+    Ok(probe)
+}
+
+#[cfg(target_os = "windows")]
+fn target_directory_blockers(probe: &TargetDirectoryProbe, target_root: &str) -> Vec<String> {
+    if !probe.exists {
+        return Vec::new();
+    }
+    if !probe.is_directory {
+        return vec![format!(
+            "{target_root} already exists as a file; DroneDream will not replace it."
+        )];
+    }
+    if probe.is_reparse_point {
+        return vec![format!(
+            "{target_root} is a symbolic link, junction, or other reparse point; choose a real local directory."
+        )];
+    }
+    if probe.is_empty || probe.ownership_valid {
+        return Vec::new();
+    }
+    if let Some(error) = &probe.ownership_error {
+        return vec![format!(
+            "{target_root} is non-empty and its {RUNTIME_ROOT_MARKER} marker is not trusted: {error}."
+        )];
+    }
+    vec![format!(
+        "{target_root} is non-empty and is not marked as a DroneDream-managed runtime directory. Choose another drive; existing files will never be overwritten."
+    )]
+}
+
 fn normalize_windows_target(value: &str) -> Result<String, String> {
     let trimmed = value.trim().replace('/', "\\");
     let bytes = trimmed.as_bytes();
@@ -701,40 +1130,11 @@ fn run_powershell_json<T: for<'de> Deserialize<'de>>(
     serde_json::from_str(raw.trim()).map_err(|error| format!("Unable to decode {label}: {error}"))
 }
 
-#[cfg(target_os = "windows")]
-fn command_output(mut command: Command, timeout: Duration, label: &str) -> Result<Output, String> {
-    command.stdout(Stdio::piped()).stderr(Stdio::piped());
-    let mut child = command
-        .spawn()
-        .map_err(|error| format!("Unable to start {label}: {error}"))?;
-    let status = child
-        .wait_timeout(timeout)
-        .map_err(|error| format!("Unable to wait for {label}: {error}"))?;
-    if status.is_none() {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(format!(
-            "{label} timed out after {} seconds.",
-            timeout.as_secs()
-        ));
-    }
-    child
-        .wait_with_output()
-        .map_err(|error| format!("Unable to collect {label} output: {error}"))
-}
-
-#[cfg(target_os = "windows")]
-fn windows_command(program: &str) -> Command {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let mut command = Command::new(program);
-    command.creation_flags(CREATE_NO_WINDOW);
-    command
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TEST_RUNTIME_ID: &str = "123e4567-e89b-12d3-a456-426614174000";
 
     #[test]
     fn normalizes_absolute_windows_target() {
@@ -760,8 +1160,8 @@ mod tests {
             r#"{
               "schemaVersion": 1,
               "version": "0.1.0",
-              "runtimeId": "runtime-test",
-              "components": {"px4": "abc", "gazebo": "gz-harmonic"},
+              "runtimeId": "123e4567-e89b-12d3-a456-426614174000",
+              "components": {"backend": "0.1.0", "px4": "abc", "gazebo": "gz-harmonic"},
               "smokeTests": {"px4Sitl": true, "gazebo": true, "parameterReadback": true}
             }"#,
         )
@@ -772,8 +1172,8 @@ mod tests {
             r#"{
               "schemaVersion": 1,
               "version": "0.1.0",
-              "runtimeId": "runtime-test",
-              "components": {"px4": "abc"},
+              "runtimeId": "123e4567-e89b-12d3-a456-426614174000",
+              "components": {"backend": "0.1.0", "px4": "abc"},
               "smokeTests": {"px4Sitl": true, "gazebo": true, "parameterReadback": true}
             }"#,
         )
@@ -784,13 +1184,182 @@ mod tests {
             r#"{
               "schemaVersion": 1,
               "version": "0.1.0",
-              "runtimeId": "runtime-test",
-              "components": {"px4": "abc", "gazebo": "gz-harmonic"},
+              "runtimeId": "123e4567-e89b-12d3-a456-426614174000",
+              "components": {"backend": "0.1.0", "px4": "abc", "gazebo": "gz-harmonic"},
               "smokeTests": {"px4Sitl": false, "gazebo": true, "parameterReadback": true}
             }"#,
         )
         .unwrap();
         assert!(validate_runtime_manifest(&failed_smoke).is_err());
+
+        let invalid_identity: RuntimeManifest = serde_json::from_str(
+            r#"{
+              "schemaVersion": 1,
+              "version": "0.1.0",
+              "runtimeId": "not-a-release-uuid",
+              "components": {"backend": "0.1.0", "px4": "abc", "gazebo": "gz-harmonic"},
+              "smokeTests": {"px4Sitl": true, "gazebo": true, "parameterReadback": true}
+            }"#,
+        )
+        .unwrap();
+        assert!(validate_runtime_manifest(&invalid_identity).is_err());
+
+        let uppercase_identity: RuntimeManifest = serde_json::from_str(
+            r#"{
+              "schemaVersion": 1,
+              "version": "0.1.0",
+              "runtimeId": "123E4567-E89B-12D3-A456-426614174000",
+              "components": {"backend": "0.1.0", "px4": "abc", "gazebo": "gz-harmonic"},
+              "smokeTests": {"px4Sitl": true, "gazebo": true, "parameterReadback": true}
+            }"#,
+        )
+        .unwrap();
+        assert!(validate_runtime_manifest(&uppercase_identity).is_err());
+    }
+
+    #[test]
+    fn validates_content_length_and_chunked_backend_readiness() {
+        let body = br#"{"data":{"service":"drone-dream-backend","status":"ready","version":"0.1.0","runtime_id":"123e4567-e89b-12d3-a456-426614174000"}}"#;
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            std::str::from_utf8(body).unwrap()
+        );
+        assert!(
+            validate_backend_ready_response(response.as_bytes(), "0.1.0", TEST_RUNTIME_ID).is_ok()
+        );
+
+        let chunked = format!(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{:X}\r\n{}\r\n0\r\n\r\n",
+            body.len(),
+            std::str::from_utf8(body).unwrap()
+        );
+        assert!(
+            validate_backend_ready_response(chunked.as_bytes(), "0.1.0", TEST_RUNTIME_ID).is_ok()
+        );
+    }
+
+    #[test]
+    fn rejects_impostor_or_truncated_backend_readiness() {
+        let impostor = b"NOTHTTP 200 OK\r\nContent-Length: 2\r\n\r\n{}";
+        assert!(validate_backend_ready_response(impostor, "0.1.0", TEST_RUNTIME_ID).is_err());
+
+        let body = br#"{"data":{"service":"another-service","status":"ready","version":"9.9.9"}}"#;
+        let wrong_identity = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            std::str::from_utf8(body).unwrap()
+        );
+        assert!(validate_backend_ready_response(
+            wrong_identity.as_bytes(),
+            "0.1.0",
+            TEST_RUNTIME_ID
+        )
+        .is_err());
+
+        let version_body =
+            br#"{"data":{"service":"drone-dream-backend","status":"ready","version":"9.9.9"}}"#;
+        let wrong_version = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            version_body.len(),
+            std::str::from_utf8(version_body).unwrap()
+        );
+        assert!(validate_backend_ready_response(
+            wrong_version.as_bytes(),
+            "0.1.0",
+            TEST_RUNTIME_ID
+        )
+        .is_err());
+
+        let wrong_runtime_body = br#"{"data":{"service":"drone-dream-backend","status":"ready","version":"0.1.0","runtime_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}}"#;
+        let wrong_runtime = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            wrong_runtime_body.len(),
+            std::str::from_utf8(wrong_runtime_body).unwrap()
+        );
+        assert!(validate_backend_ready_response(
+            wrong_runtime.as_bytes(),
+            "0.1.0",
+            TEST_RUNTIME_ID
+        )
+        .is_err());
+
+        let missing_runtime_body =
+            br#"{"data":{"service":"drone-dream-backend","status":"ready","version":"0.1.0","runtime_id":null}}"#;
+        let missing_runtime = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            missing_runtime_body.len(),
+            std::str::from_utf8(missing_runtime_body).unwrap()
+        );
+        assert!(validate_backend_ready_response(
+            missing_runtime.as_bytes(),
+            "0.1.0",
+            TEST_RUNTIME_ID
+        )
+        .is_err());
+
+        let truncated = b"HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n{}";
+        assert!(validate_backend_ready_response(truncated, "0.1.0", TEST_RUNTIME_ID).is_err());
+    }
+
+    #[test]
+    fn requires_confirmed_wsl2_for_platform_and_runtime_readiness() {
+        assert!(wsl_status_is_ready(true, Some(2)));
+        assert!(!wsl_status_is_ready(true, Some(1)));
+        assert!(!wsl_status_is_ready(true, None));
+        assert!(!wsl_status_is_ready(false, Some(2)));
+
+        assert_eq!(
+            wsl_runtime_component_status(true, true, false, false, Some(2)),
+            ComponentStatus::Ready
+        );
+        assert_eq!(
+            wsl_runtime_component_status(true, true, false, false, Some(1)),
+            ComponentStatus::Unhealthy
+        );
+        assert_eq!(
+            wsl_runtime_component_status(true, true, false, false, None),
+            ComponentStatus::Unknown
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn blocks_existing_unmanaged_or_reparse_targets() {
+        let unmanaged = TargetDirectoryProbe {
+            exists: true,
+            is_directory: true,
+            is_empty: false,
+            ..TargetDirectoryProbe::default()
+        };
+        assert!(!target_directory_blockers(&unmanaged, "Z:\\DroneDream").is_empty());
+
+        let reparse = TargetDirectoryProbe {
+            exists: true,
+            is_directory: true,
+            is_reparse_point: true,
+            ..TargetDirectoryProbe::default()
+        };
+        assert!(!target_directory_blockers(&reparse, "E:\\DroneDream").is_empty());
+
+        let managed = TargetDirectoryProbe {
+            exists: true,
+            is_directory: true,
+            ownership_valid: true,
+            ..TargetDirectoryProbe::default()
+        };
+        assert!(target_directory_blockers(&managed, "E:\\DroneDream").is_empty());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn treats_the_source_workspace_as_unmanaged_user_data() {
+        let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..\\..");
+        let probe = inspect_target_directory(&workspace.to_string_lossy()).unwrap();
+        let blockers = target_directory_blockers(&probe, &workspace.to_string_lossy());
+        assert!(blockers
+            .iter()
+            .any(|blocker| blocker.contains("will never be overwritten")));
     }
 
     #[test]
@@ -804,5 +1373,20 @@ mod tests {
         assert!(!plan.can_install);
         assert_eq!(plan.steps.len(), 5);
         assert!(plan.steps.iter().all(|step| !step.destructive));
+        let wsl_step = plan
+            .steps
+            .iter()
+            .find(|step| step.id == "enable-wsl")
+            .unwrap();
+        assert_eq!(wsl_step.requires_administrator, plan.requires_administrator);
+
+        let ready_wsl_plan = base_plan("C:\\DroneDream".to_string(), Vec::new(), false, false);
+        let ready_wsl_step = ready_wsl_plan
+            .steps
+            .iter()
+            .find(|step| step.id == "enable-wsl")
+            .unwrap();
+        assert!(!ready_wsl_step.requires_administrator);
+        assert_eq!(ready_wsl_step.title, "Verify WSL2");
     }
 }

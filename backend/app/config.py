@@ -6,8 +6,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
+from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,7 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development")
     backend_host: str = Field(default="127.0.0.1")
     backend_port: int = Field(default=8000)
+    dronedream_runtime_id: str | None = Field(default=None)
     log_level: str = Field(default="info")
     database_url: str = Field(default="sqlite:///./drone_dream.db")
     database_auto_create: bool = Field(default=True)
@@ -68,11 +70,35 @@ class Settings(BaseSettings):
     oidc_name_claim: str = Field(default="name")
     oidc_clock_skew_seconds: int = Field(default=30, ge=0, le=300)
 
+    @field_validator("dronedream_runtime_id", mode="before")
+    @classmethod
+    def normalize_runtime_id(cls, value: object) -> str | None:
+        """Normalize the optional desktop-runtime identity to canonical UUID text."""
+
+        if value is None or not str(value).strip():
+            return None
+        raw = str(value).strip()
+        try:
+            parsed = UUID(raw)
+        except ValueError as error:
+            raise ValueError(
+                "DRONEDREAM_RUNTIME_ID must be a canonical UUID"
+            ) from error
+        canonical = str(parsed)
+        if canonical != raw.lower():
+            raise ValueError("DRONEDREAM_RUNTIME_ID must be a canonical UUID")
+        return canonical
+
     @model_validator(mode="after")
     def validate_production_safety(self) -> Settings:
         """Reject the development-only anonymous identity in production."""
 
         is_production = self.app_env.strip().lower() in {"prod", "production"}
+        if "*" in self.cors_origin_list:
+            raise ValueError(
+                "CORS_ORIGINS must list exact trusted origins; wildcard origins "
+                "are incompatible with credentialed CORS"
+            )
         if self.auth_mode == "oidc_jwt":
             missing = [
                 name
@@ -116,7 +142,12 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        origins: list[str] = []
+        for raw_origin in self.cors_origins.split(","):
+            origin = raw_origin.strip()
+            if origin and origin not in origins:
+                origins.append(origin)
+        return origins
 
     @property
     def real_artifact_root_path(self) -> Path:
