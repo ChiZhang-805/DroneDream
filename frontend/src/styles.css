@@ -58,6 +58,24 @@ code {
 
 /* ---------- Layout ---------- */
 
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1000;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  background: var(--bg-elev);
+  color: var(--text);
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+  box-shadow: var(--focus-ring);
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 240px 1fr;

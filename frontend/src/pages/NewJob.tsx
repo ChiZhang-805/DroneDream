@@ -183,6 +183,71 @@ const DEFAULTS: FormState = {
   common_random_numbers: true,
 };
 
+const DRAFT_ENUM_VALUES: Partial<Record<keyof FormState, readonly string[]>> = {
+  tuning_mode: ["basic", "advanced", "expert"],
+  track_type: TRACK_TYPES,
+  sensor_noise_level: SENSOR_NOISE_LEVELS,
+  objective_profile: OBJECTIVE_PROFILES,
+  robust_aggregation: ["mean", "worst", "cvar", "percentile"],
+  simulator_backend: SIMULATOR_BACKENDS,
+  optimizer_strategy: OPTIMIZER_STRATEGIES,
+  llm_provider: ["openai", "qwen", "deepseek", "custom"],
+};
+
+function isDraftRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeDraftForm(value: unknown): FormState | null {
+  if (!isDraftRecord(value)) return null;
+  const normalized: Record<string, unknown> = { ...DEFAULTS };
+  for (const key of Object.keys(DEFAULTS) as Array<keyof FormState>) {
+    const candidate = value[key];
+    if (typeof candidate === typeof DEFAULTS[key]) {
+      normalized[key] = candidate;
+    }
+  }
+  for (const [key, allowedValues] of Object.entries(DRAFT_ENUM_VALUES)) {
+    const candidate = value[key];
+    if (typeof candidate !== "string" || !allowedValues?.includes(candidate)) {
+      normalized[key] = DEFAULTS[key as keyof FormState];
+    }
+  }
+  // Secrets are never restored even if an older or manually edited draft
+  // contains one.
+  normalized.llm_api_key = "";
+  return normalized as unknown as FormState;
+}
+
+function normalizeDraftSelections(value: unknown): ParameterSelectionMap | null {
+  if (!isDraftRecord(value)) return null;
+  const normalized: ParameterSelectionMap = Object.create(null) as ParameterSelectionMap;
+  for (const [name, candidate] of Object.entries(value)) {
+    if (!/^[A-Z][A-Z0-9_]{0,63}$/u.test(name) || !isDraftRecord(candidate)) continue;
+    if (
+      typeof candidate.baseline !== "number" ||
+      !Number.isFinite(candidate.baseline) ||
+      typeof candidate.search_min !== "number" ||
+      !Number.isFinite(candidate.search_min) ||
+      typeof candidate.search_max !== "number" ||
+      !Number.isFinite(candidate.search_max) ||
+      (candidate.scale !== "linear" && candidate.scale !== "log") ||
+      typeof candidate.selected !== "boolean"
+    ) {
+      continue;
+    }
+    normalized[name] = {
+      name,
+      baseline: candidate.baseline,
+      search_min: candidate.search_min,
+      search_max: candidate.search_max,
+      scale: candidate.scale,
+      selected: candidate.selected,
+    };
+  }
+  return normalized;
+}
+
 type FieldErrors = Record<string, string>;
 
 const CUSTOM_REFERENCE_TRACK_EXAMPLE = `[
@@ -873,7 +938,11 @@ export function NewJob() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const initialDraft = useRef(
-    loadExperimentDraft<FormState, ParameterSelectionMap>(),
+    loadExperimentDraft({
+      maxActiveStep: 6,
+      normalizeForm: normalizeDraftForm,
+      normalizeSelections: normalizeDraftSelections,
+    }),
   ).current;
   const [form, setForm] = useState<FormState>(() => ({
     ...DEFAULTS,

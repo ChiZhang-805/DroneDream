@@ -171,8 +171,9 @@ cd /workspace/DroneDream/frontend
 which node
 node -v
 npm -v
-rm -rf node_modules package-lock.json
-npm install
+# Keep the committed lockfile: `npm ci` installs the reviewed dependency graph
+# exactly and removes a stale node_modules directory automatically.
+npm ci
 npm run build
 ```
 

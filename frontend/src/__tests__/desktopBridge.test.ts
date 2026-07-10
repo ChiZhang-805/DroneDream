@@ -53,7 +53,48 @@ const installPlan = {
   requiresRestart: false,
   canInstall: true,
   blockers: [],
-  steps: [],
+  steps: [
+    {
+      id: "preflight",
+      title: "Validate prerequisites",
+      description: "Check the computer.",
+      requiresAdministrator: false,
+      destructive: false,
+      estimatedBytes: null,
+    },
+    {
+      id: "enable-wsl",
+      title: "Verify WSL2",
+      description: "Check WSL2.",
+      requiresAdministrator: false,
+      destructive: false,
+      estimatedBytes: null,
+    },
+    {
+      id: "download",
+      title: "Download runtime",
+      description: "Download the runtime.",
+      requiresAdministrator: false,
+      destructive: false,
+      estimatedBytes: 1,
+    },
+    {
+      id: "import",
+      title: "Import runtime",
+      description: "Import the runtime.",
+      requiresAdministrator: false,
+      destructive: false,
+      estimatedBytes: 2,
+    },
+    {
+      id: "smoke-test",
+      title: "Verify runtime",
+      description: "Run smoke tests.",
+      requiresAdministrator: false,
+      destructive: false,
+      estimatedBytes: null,
+    },
+  ],
 };
 
 describe("desktop bridge", () => {
@@ -169,5 +210,75 @@ describe("desktop bridge", () => {
       version: "0.1.0",
     });
     await expect(probeRuntimeStatus()).rejects.toThrow(/required component .* is missing/i);
+  });
+
+  it("rejects an install plan for a different or non-canonical target", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce(installPlan);
+    await expect(getRuntimeInstallPlan("C:\\DroneDream")).rejects.toThrow(
+      /must match the requested target C:\\DroneDream/i,
+    );
+
+    invoke.mockResolvedValueOnce({ ...installPlan, targetRoot: "e:\\DroneDream" });
+    await expect(getRuntimeInstallPlan("E:\\DroneDream")).rejects.toThrow(
+      /must be a canonical path/i,
+    );
+
+    invoke.mockClear();
+    await expect(getRuntimeInstallPlan("E:\\Users")).rejects.toThrow(
+      /must be a drive root/i,
+    );
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("requires the complete ordered install workflow and safe display fields", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce({ ...installPlan, steps: installPlan.steps.slice(0, -1) });
+    await expect(getRuntimeInstallPlan("E:\\DroneDream")).rejects.toThrow(
+      /must contain preflight, enable-wsl, download, import, smoke-test/i,
+    );
+
+    invoke.mockResolvedValueOnce({
+      ...installPlan,
+      steps: installPlan.steps.map((step, index) =>
+        index === 0 ? { ...step, title: "" } : step,
+      ),
+    });
+    await expect(getRuntimeInstallPlan("E:\\DroneDream")).rejects.toThrow(
+      /title must not be empty/i,
+    );
+  });
+
+  it("requires blocker and administrator summaries to agree with the steps", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce({
+      ...installPlan,
+      canInstall: true,
+      blockers: ["Disk is unavailable."],
+    });
+    await expect(getRuntimeInstallPlan("E:\\DroneDream")).rejects.toThrow(
+      /canInstall must be true exactly when plan.blockers is empty/i,
+    );
+
+    invoke.mockResolvedValueOnce({ ...installPlan, requiresAdministrator: true });
+    await expect(getRuntimeInstallPlan("E:\\DroneDream")).rejects.toThrow(
+      /must match the enable-wsl step/i,
+    );
+
+    invoke.mockResolvedValueOnce({
+      ...installPlan,
+      steps: installPlan.steps.map((step) =>
+        step.id === "download" ? { ...step, requiresAdministrator: true } : step,
+      ),
+    });
+    await expect(getRuntimeInstallPlan("E:\\DroneDream")).rejects.toThrow(
+      /step download cannot require administrator approval/i,
+    );
   });
 });

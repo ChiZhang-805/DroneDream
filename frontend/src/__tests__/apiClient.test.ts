@@ -10,6 +10,37 @@ function mockFetchOnce(body: unknown, status = 200) {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
 }
 
+const desktopPrerequisites = {
+  platform: "windows",
+  supported: true,
+  windows: {
+    caption: "Windows 11 Pro",
+    version: "10.0.26100",
+    buildNumber: "26100",
+    architecture: "64-bit",
+  },
+  wsl: { executableAvailable: true, distributions: [] },
+  memory: { totalBytes: 16 * 1024 ** 3, availableBytes: 8 * 1024 ** 3 },
+  disks: [],
+  gpus: [],
+  probeErrors: [],
+};
+
+const runtimeComponents = [
+  "wsl-runtime",
+  "runtime-manifest",
+  "local-backend",
+  "px4",
+  "gazebo",
+].map((id) => ({
+  id,
+  label: id,
+  status: "ready",
+  required: true,
+  version: null,
+  detail: null,
+}));
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -185,6 +216,68 @@ describe("apiClient envelope handling", () => {
         body: JSON.stringify({ job_ids: ["job_1", "job_2"] }),
       }),
     );
+  });
+
+  it("rechecks desktop readiness before every mutation and blocks a stale unhealthy runtime", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const unhealthyRuntime = {
+      runtimeName: "DroneDreamRuntime",
+      installed: true,
+      running: true,
+      ready: false,
+      version: "2026.07",
+      dataRoot: "E:\\DroneDream",
+      components: runtimeComponents.map((component) =>
+        component.id === "local-backend"
+          ? { ...component, status: "unhealthy" }
+          : component,
+      ),
+      diagnostics: ["Backend stopped after the page was opened."],
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return desktopPrerequisites;
+      if (command === "probe_runtime_status") return unhealthyRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(apiClient.updateJob("job_1", { display_name: "unsafe write" }))
+      .rejects.toMatchObject({
+        code: "DESKTOP_RUNTIME_NOT_READY",
+        httpStatus: 0,
+      });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows a desktop mutation after the fresh readiness probe passes", async () => {
+    const readyRuntime = {
+      runtimeName: "DroneDreamRuntime",
+      installed: true,
+      running: true,
+      ready: true,
+      version: "2026.07",
+      dataRoot: "E:\\DroneDream",
+      components: runtimeComponents,
+      diagnostics: [],
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return desktopPrerequisites;
+      if (command === "probe_runtime_status") return readyRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    mockFetchOnce({
+      success: true,
+      data: { id: "job_1", display_name: "safe write" },
+      error: null,
+    });
+
+    await apiClient.updateJob("job_1", { display_name: "safe write" });
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledTimes(2);
   });
 
   it("loads the versioned parameter catalog from the advanced endpoint", async () => {

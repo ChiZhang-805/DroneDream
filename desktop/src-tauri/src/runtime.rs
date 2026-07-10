@@ -2,11 +2,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[cfg(target_os = "windows")]
 use crate::process::{command_output, windows_command};
 use crate::MINIMUM_WINDOWS_BUILD;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::Storage::FileSystem::{
+    CreateFileW, FILE_ADD_FILE, FILE_ADD_SUBDIRECTORY, FILE_FLAG_BACKUP_SEMANTICS,
+    FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+};
 
 const RUNTIME_NAME: &str = "DroneDreamRuntime";
 const RUNTIME_MANIFEST: &str = "/opt/dronedream/runtime-manifest.json";
@@ -19,6 +26,7 @@ const MINIMUM_FREE_BYTES: u64 = 40 * 1024 * 1024 * 1024;
 const MINIMUM_MEMORY_BYTES: u64 = 15 * 1024 * 1024 * 1024;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
+const MAX_BACKEND_RESPONSE_BYTES: usize = 256 * 1024;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -91,7 +99,10 @@ struct RuntimeRegistryProbe {
 #[cfg(target_os = "windows")]
 #[derive(Debug, Deserialize)]
 struct RuntimeRunningProbe {
-    running: bool,
+    #[serde(rename = "exitCode")]
+    exit_code: i32,
+    #[serde(default)]
+    names: Vec<String>,
 }
 
 #[cfg(target_os = "windows")]
@@ -167,6 +178,20 @@ struct TargetDirectoryProbe {
     ownership_error: Option<String>,
 }
 
+#[cfg(target_os = "windows")]
+struct DirectoryAccessHandle(HANDLE);
+
+#[cfg(target_os = "windows")]
+impl Drop for DirectoryAccessHandle {
+    fn drop(&mut self) {
+        // SAFETY: the tuple struct is constructed only from a successful
+        // CreateFileW call and uniquely owns the returned handle.
+        unsafe {
+            CloseHandle(self.0);
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn probe_runtime_status() -> Result<RuntimeStatusReport, String> {
     tauri::async_runtime::spawn_blocking(probe_runtime)
@@ -207,20 +232,11 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
 #[cfg(target_os = "windows")]
 fn probe_runtime() -> Result<RuntimeStatusReport, String> {
     let mut diagnostics = Vec::new();
-    let (registry_probe, registry_probe_failed) = match probe_runtime_registry() {
-        Ok(value) => (value, false),
-        Err(error) => {
-            diagnostics.push(error);
-            (
-                RuntimeRegistryProbe {
-                    installed: false,
-                    base_path: None,
-                    version: None,
-                },
-                true,
-            )
-        }
-    };
+    // Installation is a binary field in the desktop IPC contract. If the
+    // registry cannot be inspected, returning a fresh `installed: false`
+    // report would incorrectly unlock the installation planner. Treat that as
+    // a probe failure so the frontend can retain its last authoritative state.
+    let registry_probe = probe_runtime_registry()?;
 
     let (running, running_probe_failed) = if registry_probe.installed {
         match probe_runtime_running() {
@@ -260,10 +276,7 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
                 (None, ComponentStatus::Unhealthy)
             }
         }
-    } else if registry_probe_failed
-        || running_probe_failed
-        || (registry_probe.installed && !runtime_is_wsl2)
-    {
+    } else if running_probe_failed || (registry_probe.installed && !runtime_is_wsl2) {
         (None, ComponentStatus::Unknown)
     } else if registry_probe.installed {
         (None, ComponentStatus::Stopped)
@@ -304,7 +317,6 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
             status: wsl_runtime_component_status(
                 registry_probe.installed,
                 running,
-                registry_probe_failed,
                 running_probe_failed,
                 registry_probe.version,
             ),
@@ -329,7 +341,7 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
                 ComponentStatus::Ready
             } else if running {
                 ComponentStatus::Unhealthy
-            } else if registry_probe_failed || running_probe_failed {
+            } else if running_probe_failed {
                 ComponentStatus::Unknown
             } else if registry_probe.installed {
                 ComponentStatus::Stopped
@@ -350,17 +362,13 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
         components.push(RuntimeComponent {
             id: id.to_string(),
             label: label.to_string(),
-            status: if component_version.is_some() {
-                ComponentStatus::Ready
-            } else if registry_probe_failed || running_probe_failed {
-                ComponentStatus::Unknown
-            } else if registry_probe.installed && !running {
-                ComponentStatus::Stopped
-            } else if running {
-                ComponentStatus::Unknown
-            } else {
-                ComponentStatus::Missing
-            },
+            status: runtime_tool_component_status(
+                component_version.is_some(),
+                backend_healthy,
+                registry_probe.installed,
+                running,
+                running_probe_failed,
+            ),
             required: true,
             version: component_version,
             detail: None,
@@ -386,11 +394,10 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
 fn wsl_runtime_component_status(
     installed: bool,
     running: bool,
-    registry_probe_failed: bool,
     running_probe_failed: bool,
     version: Option<u8>,
 ) -> ComponentStatus {
-    if registry_probe_failed || running_probe_failed {
+    if running_probe_failed {
         ComponentStatus::Unknown
     } else if !installed {
         ComponentStatus::Missing
@@ -405,16 +412,43 @@ fn wsl_runtime_component_status(
     }
 }
 
+fn runtime_tool_component_status(
+    version_present: bool,
+    backend_healthy: bool,
+    installed: bool,
+    running: bool,
+    running_probe_failed: bool,
+) -> ComponentStatus {
+    if version_present && backend_healthy {
+        ComponentStatus::Ready
+    } else if version_present && running {
+        // PX4/Gazebo versions in the release manifest are necessary but not
+        // sufficient for live health. Backend readiness includes the runtime
+        // worker/tool checks, so a failed readiness probe must not leave these
+        // components falsely green.
+        ComponentStatus::Unhealthy
+    } else if running_probe_failed {
+        ComponentStatus::Unknown
+    } else if installed && !running {
+        ComponentStatus::Stopped
+    } else if running {
+        ComponentStatus::Unknown
+    } else {
+        ComponentStatus::Missing
+    }
+}
+
 #[cfg(target_os = "windows")]
 fn probe_runtime_running() -> Result<bool, String> {
     const SCRIPT: &str = r#"
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$names = @(& wsl.exe --list --running --quiet 2>$null) | ForEach-Object {
-  ([string]$_).Trim([char]0).Trim()
-} | Where-Object { $_ }
-[ordered]@{ running = [bool]($names -contains $env:DRONEDREAM_RUNTIME_NAME) } |
-  ConvertTo-Json -Compress
+$output = @(& wsl.exe --list --running --quiet 2>&1)
+$nativeExitCode = $LASTEXITCODE
+[ordered]@{
+  exitCode = [int]$nativeExitCode
+  names = @($output | ForEach-Object { [string]$_ })
+} | ConvertTo-Json -Compress
 "#;
 
     let probe: RuntimeRunningProbe = run_powershell_json(
@@ -422,7 +456,37 @@ $names = @(& wsl.exe --list --running --quiet 2>$null) | ForEach-Object {
         &[("DRONEDREAM_RUNTIME_NAME", RUNTIME_NAME)],
         "runtime running-state probe",
     )?;
-    Ok(probe.running)
+    runtime_running_from_probe(&probe)
+}
+
+#[cfg(target_os = "windows")]
+fn runtime_running_from_probe(probe: &RuntimeRunningProbe) -> Result<bool, String> {
+    if probe.exit_code != 0 {
+        let detail = probe
+            .names
+            .iter()
+            .map(|value| normalize_wsl_distribution_name(value))
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+        return Err(format!(
+            "wsl.exe --list --running failed with exit code {}: {}",
+            probe.exit_code,
+            if detail.is_empty() {
+                "no error output"
+            } else {
+                &detail
+            }
+        ));
+    }
+    Ok(probe
+        .names
+        .iter()
+        .any(|name| normalize_wsl_distribution_name(name) == RUNTIME_NAME))
+}
+
+fn normalize_wsl_distribution_name(value: &str) -> String {
+    value.replace('\0', "").trim().to_string()
 }
 
 #[cfg(target_os = "windows")]
@@ -450,11 +514,35 @@ if ($null -eq $match) {
 $match | ConvertTo-Json -Compress
 "#;
 
-    run_powershell_json(
+    let probe: RuntimeRegistryProbe = run_powershell_json(
         SCRIPT,
         &[("DRONEDREAM_RUNTIME_NAME", RUNTIME_NAME)],
         "runtime registry probe",
-    )
+    )?;
+    validate_runtime_registry_probe(probe)
+}
+
+#[cfg(target_os = "windows")]
+fn validate_runtime_registry_probe(
+    mut probe: RuntimeRegistryProbe,
+) -> Result<RuntimeRegistryProbe, String> {
+    if probe.installed {
+        let base_path = probe
+            .base_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                format!("The {RUNTIME_NAME} registry entry does not contain a usable BasePath.")
+            })?;
+        probe.base_path = Some(base_path.to_string());
+    } else {
+        // Keep the serialized runtime contract internally consistent even if a
+        // corrupt registry probe unexpectedly reports stale optional fields.
+        probe.base_path = None;
+        probe.version = None;
+    }
+    Ok(probe)
 }
 
 #[cfg(target_os = "windows")]
@@ -543,38 +631,123 @@ fn is_uuid_like(value: &str) -> bool {
 
 fn verify_backend_ready(expected_version: &str, expected_runtime_id: &str) -> Result<(), String> {
     let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), BACKEND_PORT);
-    let mut stream = TcpStream::connect_timeout(&address, HEALTH_TIMEOUT)
-        .map_err(|error| format!("connection failed: {error}"))?;
+    verify_backend_ready_at(
+        address,
+        expected_version,
+        expected_runtime_id,
+        HEALTH_TIMEOUT,
+    )
+}
+
+fn verify_backend_ready_at(
+    address: SocketAddr,
+    expected_version: &str,
+    expected_runtime_id: &str,
+    timeout: Duration,
+) -> Result<(), String> {
+    let started = Instant::now();
+    let deadline = started
+        .checked_add(timeout)
+        .ok_or_else(|| "backend readiness deadline overflowed".to_string())?;
+    let mut stream =
+        TcpStream::connect_timeout(&address, remaining_health_time(deadline, timeout)?)
+            .map_err(|error| format!("connection failed: {error}"))?;
     stream
-        .set_read_timeout(Some(HEALTH_TIMEOUT))
-        .map_err(|error| format!("could not set read timeout: {error}"))?;
-    stream
-        .set_write_timeout(Some(HEALTH_TIMEOUT))
+        .set_write_timeout(Some(remaining_health_time(deadline, timeout)?))
         .map_err(|error| format!("could not set write timeout: {error}"))?;
     let request = format!(
-        "GET /health/ready HTTP/1.1\r\nHost: 127.0.0.1:{BACKEND_PORT}\r\nAccept: application/json\r\nConnection: close\r\n\r\n"
+        "GET /health/ready HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nAccept: application/json\r\nConnection: close\r\n\r\n",
+        address.port()
     );
     stream
         .write_all(request.as_bytes())
         .map_err(|error| format!("request failed: {error}"))?;
 
-    let mut response = Vec::new();
-    stream
-        .take(256 * 1024)
-        .read_to_end(&mut response)
-        .map_err(|error| format!("response failed: {error}"))?;
+    let mut response = Vec::with_capacity(8192);
+    let mut buffer = [0_u8; 8192];
+    loop {
+        let remaining_capacity = MAX_BACKEND_RESPONSE_BYTES.saturating_sub(response.len());
+        if remaining_capacity == 0 {
+            return Err("backend returned an oversized readiness response".to_string());
+        }
+        stream
+            .set_read_timeout(Some(remaining_health_time(deadline, timeout)?))
+            .map_err(|error| format!("could not set read timeout: {error}"))?;
+        let read_size = remaining_capacity.min(buffer.len());
+        let count = match stream.read(&mut buffer[..read_size]) {
+            Ok(value) => value,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+                ) =>
+            {
+                return Err(health_timeout_error(timeout));
+            }
+            Err(error) => return Err(format!("response failed: {error}")),
+        };
+        if count == 0 {
+            break;
+        }
+        response.extend_from_slice(&buffer[..count]);
+
+        // A declared Content-Length lets us finish without trusting the server
+        // to close a keep-alive connection. Chunked and close-delimited bodies
+        // remain bounded by the same absolute deadline.
+        if let Some(framing) = try_parse_http_framing(&response)? {
+            if !framing.chunked {
+                if let Some(body_length) = framing.content_length {
+                    let expected_length = framing
+                        .header_end
+                        .checked_add(4)
+                        .and_then(|value| value.checked_add(body_length))
+                        .ok_or_else(|| {
+                            "backend returned an oversized Content-Length".to_string()
+                        })?;
+                    if expected_length > MAX_BACKEND_RESPONSE_BYTES {
+                        return Err("backend returned an oversized readiness response".to_string());
+                    }
+                    if response.len() >= expected_length {
+                        response.truncate(expected_length);
+                        break;
+                    }
+                }
+            }
+        }
+    }
     validate_backend_ready_response(&response, expected_version, expected_runtime_id)
 }
 
-fn validate_backend_ready_response(
-    response: &[u8],
-    expected_version: &str,
-    expected_runtime_id: &str,
-) -> Result<(), String> {
-    let header_end = response
-        .windows(4)
-        .position(|window| window == b"\r\n\r\n")
-        .ok_or_else(|| "backend returned an invalid HTTP response".to_string())?;
+fn remaining_health_time(deadline: Instant, timeout: Duration) -> Result<Duration, String> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        Err(health_timeout_error(timeout))
+    } else {
+        Ok(remaining)
+    }
+}
+
+fn health_timeout_error(timeout: Duration) -> String {
+    format!(
+        "backend readiness timed out after {} milliseconds",
+        timeout.as_millis()
+    )
+}
+
+#[derive(Clone, Copy)]
+struct HttpFraming {
+    header_end: usize,
+    content_length: Option<usize>,
+    chunked: bool,
+}
+
+fn try_parse_http_framing(response: &[u8]) -> Result<Option<HttpFraming>, String> {
+    let Some(header_end) = response.windows(4).position(|window| window == b"\r\n\r\n") else {
+        if response.len() > 32 * 1024 + 4 {
+            return Err("backend returned oversized HTTP headers".to_string());
+        }
+        return Ok(None);
+    };
     if header_end > 32 * 1024 {
         return Err("backend returned oversized HTTP headers".to_string());
     }
@@ -605,18 +778,32 @@ fn validate_backend_ready_response(
                 return Err("backend returned conflicting Content-Length headers".to_string());
             }
         } else if name.eq_ignore_ascii_case("transfer-encoding") {
-            chunked = value
+            chunked |= value
                 .split(',')
                 .any(|encoding| encoding.trim().eq_ignore_ascii_case("chunked"));
         }
     }
+    Ok(Some(HttpFraming {
+        header_end,
+        content_length,
+        chunked,
+    }))
+}
 
-    let raw_body = &response[header_end + 4..];
+fn validate_backend_ready_response(
+    response: &[u8],
+    expected_version: &str,
+    expected_runtime_id: &str,
+) -> Result<(), String> {
+    let framing = try_parse_http_framing(response)?
+        .ok_or_else(|| "backend returned an invalid HTTP response".to_string())?;
+
+    let raw_body = &response[framing.header_end + 4..];
     let decoded_body;
-    let body = if chunked {
+    let body = if framing.chunked {
         decoded_body = decode_chunked_body(raw_body)?;
         decoded_body.as_slice()
-    } else if let Some(length) = content_length {
+    } else if let Some(length) = framing.content_length {
         raw_body
             .get(..length)
             .ok_or_else(|| "backend returned a truncated HTTP body".to_string())?
@@ -774,7 +961,18 @@ fn build_install_plan(target_root: Option<String>) -> Result<RuntimeInstallPlan,
         blockers.push(format!("{} did not report a usable capacity.", probe.drive));
     }
     match inspect_target_directory(&normalized) {
-        Ok(target_probe) => blockers.extend(target_directory_blockers(&target_probe, &normalized)),
+        Ok(target_probe) => {
+            let directory_blockers = target_directory_blockers(&target_probe, &normalized);
+            if directory_blockers.is_empty() {
+                if let Err(error) = probe_target_directory_access(&normalized, target_probe.exists)
+                {
+                    blockers.push(format!(
+                        "The current Windows user cannot create or write the runtime at {normalized}: {error}"
+                    ));
+                }
+            }
+            blockers.extend(directory_blockers);
+        }
         Err(error) => blockers.push(format!(
             "Unable to verify that {normalized} is safe to use: {error}"
         )),
@@ -1074,6 +1272,102 @@ fn target_directory_blockers(probe: &TargetDirectoryProbe, target_root: &str) ->
     )]
 }
 
+/// Check the current user's directory creation rights without writing a probe
+/// file. For a missing X:\DroneDream target, opening the drive root with
+/// FILE_ADD_SUBDIRECTORY verifies that the target can be created. For an
+/// existing safe target, FILE_ADD_FILE/FILE_ADD_SUBDIRECTORY verifies that the
+/// runtime can populate it. We deliberately do not require FILE_DELETE_CHILD
+/// on the parent: Windows can delete a newly-created child through that
+/// child's own DELETE permission, and demanding delete-child rights on a drive
+/// root would incorrectly reject ordinary current-user installations.
+#[cfg(target_os = "windows")]
+fn probe_target_directory_access(target_root: &str, target_exists: bool) -> Result<(), String> {
+    use std::path::Path;
+
+    let target = Path::new(target_root);
+    if !target.is_absolute()
+        || !target
+            .file_name()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.eq_ignore_ascii_case("DroneDream"))
+    {
+        return Err("the runtime target is not an absolute DroneDream directory".to_string());
+    }
+    let directory = if target_exists {
+        target
+    } else {
+        target
+            .parent()
+            .ok_or_else(|| "the runtime target has no parent drive root".to_string())?
+    };
+    let metadata = std::fs::symlink_metadata(directory)
+        .map_err(|error| format!("unable to inspect {}: {error}", directory.display()))?;
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    if !metadata.is_dir() || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        return Err(format!(
+            "{} is not a real local directory",
+            directory.display()
+        ));
+    }
+
+    let desired_access = if target_exists {
+        FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY
+    } else {
+        FILE_ADD_SUBDIRECTORY
+    };
+    let _access = open_directory_for_creation(directory, desired_access)?;
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn open_directory_for_creation(
+    directory: &std::path::Path,
+    desired_access: u32,
+) -> Result<DirectoryAccessHandle, String> {
+    open_directory_handle(
+        directory,
+        desired_access,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn open_directory_handle(
+    directory: &std::path::Path,
+    desired_access: u32,
+    share_mode: u32,
+) -> Result<DirectoryAccessHandle, String> {
+    use std::os::windows::ffi::OsStrExt;
+
+    let mut wide: Vec<u16> = directory.as_os_str().encode_wide().collect();
+    if wide.contains(&0) {
+        return Err("the directory path contains an embedded NUL".to_string());
+    }
+    wide.push(0);
+    // SAFETY: `wide` is NUL-terminated and lives for the duration of the call.
+    // Null security/template handles request normal existing-directory access.
+    let handle = unsafe {
+        CreateFileW(
+            wide.as_ptr(),
+            desired_access,
+            share_mode,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            std::ptr::null_mut(),
+        )
+    };
+    if handle == INVALID_HANDLE_VALUE {
+        return Err(format!(
+            "Windows denied the required create/delete access to {}: {}",
+            directory.display(),
+            std::io::Error::last_os_error()
+        ));
+    }
+    Ok(DirectoryAccessHandle(handle))
+}
+
 fn normalize_windows_target(value: &str) -> Result<String, String> {
     let trimmed = value.trim().replace('/', "\\");
     let bytes = trimmed.as_bytes();
@@ -1135,6 +1429,34 @@ mod tests {
     use super::*;
 
     const TEST_RUNTIME_ID: &str = "123e4567-e89b-12d3-a456-426614174000";
+
+    #[test]
+    fn removes_interior_nuls_from_wsl_distribution_names() {
+        assert_eq!(
+            normalize_wsl_distribution_name(
+                " \0D\0r\0o\0n\0e\0D\0r\0e\0a\0m\0R\0u\0n\0t\0i\0m\0e\0 "
+            ),
+            RUNTIME_NAME
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn rejects_a_nonzero_native_wsl_list_exit_code() {
+        let running = RuntimeRunningProbe {
+            exit_code: 0,
+            names: vec!["D\0r\0o\0n\0e\0D\0r\0e\0a\0m\0R\0u\0n\0t\0i\0m\0e\0".to_string()],
+        };
+        assert!(runtime_running_from_probe(&running).unwrap());
+
+        let failed = RuntimeRunningProbe {
+            exit_code: 50,
+            names: vec!["W\0S\0L\0 \0s\0e\0r\0v\0i\0c\0e\0 \0f\0a\0i\0l\0e\0d\0".to_string()],
+        };
+        let error = runtime_running_from_probe(&failed).unwrap_err();
+        assert!(error.contains("exit code 50"));
+        assert!(error.contains("WSL service failed"));
+    }
 
     #[test]
     fn normalizes_absolute_windows_target() {
@@ -1215,6 +1537,36 @@ mod tests {
         )
         .unwrap();
         assert!(validate_runtime_manifest(&uppercase_identity).is_err());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn requires_a_non_empty_registry_base_path_for_an_installed_runtime() {
+        let valid = validate_runtime_registry_probe(RuntimeRegistryProbe {
+            installed: true,
+            base_path: Some("  E:\\DroneDream  ".to_string()),
+            version: Some(2),
+        })
+        .unwrap();
+        assert_eq!(valid.base_path.as_deref(), Some("E:\\DroneDream"));
+
+        for base_path in [None, Some(String::new()), Some("   ".to_string())] {
+            assert!(validate_runtime_registry_probe(RuntimeRegistryProbe {
+                installed: true,
+                base_path,
+                version: Some(2),
+            })
+            .is_err());
+        }
+
+        let absent = validate_runtime_registry_probe(RuntimeRegistryProbe {
+            installed: false,
+            base_path: Some("stale".to_string()),
+            version: Some(2),
+        })
+        .unwrap();
+        assert!(absent.base_path.is_none());
+        assert!(absent.version.is_none());
     }
 
     #[test]
@@ -1303,6 +1655,43 @@ mod tests {
     }
 
     #[test]
+    fn enforces_an_absolute_deadline_against_trickle_responses() {
+        let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(1)))
+                .unwrap();
+            let mut request = [0_u8; 1024];
+            let _ = socket.read(&mut request);
+            let response = b"HTTP/1.1 200 OK\r\nContent-Length: 1024\r\n\r\n{";
+            for byte in response {
+                if socket.write_all(&[*byte]).is_err() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(30));
+            }
+        });
+
+        let started = Instant::now();
+        let error = verify_backend_ready_at(
+            address,
+            "0.1.0",
+            TEST_RUNTIME_ID,
+            Duration::from_millis(180),
+        )
+        .unwrap_err();
+        assert!(error.contains("timed out"), "unexpected error: {error}");
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "absolute deadline was not enforced: {:?}",
+            started.elapsed()
+        );
+        server.join().unwrap();
+    }
+
+    #[test]
     fn requires_confirmed_wsl2_for_platform_and_runtime_readiness() {
         assert!(wsl_status_is_ready(true, Some(2)));
         assert!(!wsl_status_is_ready(true, Some(1)));
@@ -1310,15 +1699,31 @@ mod tests {
         assert!(!wsl_status_is_ready(false, Some(2)));
 
         assert_eq!(
-            wsl_runtime_component_status(true, true, false, false, Some(2)),
+            wsl_runtime_component_status(true, true, false, Some(2)),
             ComponentStatus::Ready
         );
         assert_eq!(
-            wsl_runtime_component_status(true, true, false, false, Some(1)),
+            wsl_runtime_component_status(true, true, false, Some(1)),
             ComponentStatus::Unhealthy
         );
         assert_eq!(
-            wsl_runtime_component_status(true, true, false, false, None),
+            wsl_runtime_component_status(true, true, false, None),
+            ComponentStatus::Unknown
+        );
+    }
+
+    #[test]
+    fn runtime_tools_are_not_ready_when_backend_readiness_fails() {
+        assert_eq!(
+            runtime_tool_component_status(true, true, true, true, false),
+            ComponentStatus::Ready
+        );
+        assert_eq!(
+            runtime_tool_component_status(true, false, true, true, false),
+            ComponentStatus::Unhealthy
+        );
+        assert_eq!(
+            runtime_tool_component_status(false, false, true, true, false),
             ComponentStatus::Unknown
         );
     }
@@ -1360,6 +1765,66 @@ mod tests {
         assert!(blockers
             .iter()
             .any(|blocker| blocker.contains("will never be overwritten")));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn checks_directory_access_without_creating_probe_files() {
+        let sandbox = std::env::temp_dir().join(format!(
+            "dronedream-access-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&sandbox).unwrap();
+        let target = sandbox.join("DroneDream");
+
+        probe_target_directory_access(&target.to_string_lossy(), false).unwrap();
+        assert!(!target.exists(), "the access probe created its target");
+
+        std::fs::create_dir(&target).unwrap();
+        probe_target_directory_access(&target.to_string_lossy(), true).unwrap();
+        assert!(std::fs::read_dir(&target).unwrap().next().is_none());
+
+        std::fs::remove_dir(&target).unwrap();
+        std::fs::remove_dir(&sandbox).unwrap();
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn blocks_a_target_whose_directory_access_cannot_be_opened() {
+        let sandbox = std::env::temp_dir().join(format!(
+            "dronedream-access-denied-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let target = sandbox.join("DroneDream");
+        std::fs::create_dir_all(&target).unwrap();
+
+        // An exclusive directory handle deterministically exercises the same
+        // CreateFileW failure path used for ACL/read-only access denials without
+        // changing the machine's ACLs or risking an uncleanable test directory.
+        let exclusive = open_directory_handle(
+            &target,
+            windows_sys::Win32::Foundation::GENERIC_READ
+                | windows_sys::Win32::Foundation::GENERIC_WRITE,
+            0,
+        )
+        .unwrap();
+        let error = probe_target_directory_access(&target.to_string_lossy(), true).unwrap_err();
+        assert!(
+            error.contains("Windows denied"),
+            "unexpected error: {error}"
+        );
+
+        drop(exclusive);
+        std::fs::remove_dir(&target).unwrap();
+        std::fs::remove_dir(&sandbox).unwrap();
     }
 
     #[test]

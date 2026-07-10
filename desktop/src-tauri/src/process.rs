@@ -1,8 +1,15 @@
 use std::io::{self, Read};
+use std::os::windows::io::AsRawHandle;
 use std::process::{Command, ExitStatus, Stdio};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use wait_timeout::ChildExt;
+use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+use windows_sys::Win32::System::JobObjects::{
+    AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+    SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const MAX_CAPTURE_BYTES: usize = 1024 * 1024;
@@ -18,6 +25,75 @@ pub(crate) struct CapturedOutput {
 struct LimitedOutput {
     bytes: Vec<u8>,
     truncated: bool,
+}
+
+/// Owns a Windows Job Object that terminates every assigned process when the
+/// handle is closed. Keeping short-lived probes in a job prevents a background
+/// descendant from retaining stdout/stderr pipe handles after its direct parent
+/// exits.
+struct KillOnCloseJob {
+    handle: HANDLE,
+}
+
+impl KillOnCloseJob {
+    fn new(label: &str) -> Result<Self, String> {
+        // SAFETY: null security attributes and name request an unnamed job with
+        // the caller's default security descriptor.
+        let handle = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
+        if handle.is_null() {
+            return Err(format!(
+                "Unable to create a process job for {label}: {}",
+                io::Error::last_os_error()
+            ));
+        }
+
+        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        // SAFETY: `handle` is a live job handle and `limits` has the exact
+        // layout required by JobObjectExtendedLimitInformation.
+        let configured = unsafe {
+            SetInformationJobObject(
+                handle,
+                JobObjectExtendedLimitInformation,
+                std::ptr::addr_of!(limits).cast(),
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            )
+        };
+        if configured == 0 {
+            let error = io::Error::last_os_error();
+            // SAFETY: this branch still owns the handle returned above.
+            unsafe {
+                CloseHandle(handle);
+            }
+            return Err(format!(
+                "Unable to configure the process job for {label}: {error}"
+            ));
+        }
+        Ok(Self { handle })
+    }
+
+    fn assign(&self, child: &std::process::Child, label: &str) -> Result<(), String> {
+        let process = child.as_raw_handle() as HANDLE;
+        // SAFETY: both handles remain valid for this call. The child is owned
+        // by the caller and the job is owned by `self`.
+        if unsafe { AssignProcessToJobObject(self.handle, process) } == 0 {
+            return Err(format!(
+                "Unable to contain {label} in its process job: {}",
+                io::Error::last_os_error()
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl Drop for KillOnCloseJob {
+    fn drop(&mut self) {
+        // SAFETY: `self` uniquely owns this handle. KILL_ON_JOB_CLOSE is what
+        // terminates any pipe-holding descendants before readers are joined.
+        unsafe {
+            CloseHandle(self.handle);
+        }
+    }
 }
 
 pub(crate) fn windows_command(program: &str) -> Command {
@@ -38,21 +114,26 @@ pub(crate) fn command_output(
     label: &str,
 ) -> Result<CapturedOutput, String> {
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let job = KillOnCloseJob::new(label)?;
     let mut child = command
         .spawn()
         .map_err(|error| format!("Unable to start {label}: {error}"))?;
+    if let Err(error) = job.assign(&child, label) {
+        terminate_process_tree(&mut child, None);
+        return Err(error);
+    }
 
     let stdout = match child.stdout.take() {
         Some(value) => value,
         None => {
-            terminate_process_tree(&mut child);
+            terminate_process_tree(&mut child, Some(job));
             return Err(format!("Unable to capture {label} standard output."));
         }
     };
     let stderr = match child.stderr.take() {
         Some(value) => value,
         None => {
-            terminate_process_tree(&mut child);
+            terminate_process_tree(&mut child, Some(job));
             return Err(format!("Unable to capture {label} error output."));
         }
     };
@@ -60,9 +141,14 @@ pub(crate) fn command_output(
     let stderr_reader = std::thread::spawn(move || read_limited(stderr));
 
     let status = match child.wait_timeout(timeout) {
-        Ok(Some(status)) => status,
+        Ok(Some(status)) => {
+            // The direct process has exited, but a descendant may still own a
+            // pipe. Closing the job terminates those descendants before join.
+            drop(job);
+            status
+        }
         Ok(None) => {
-            terminate_process_tree(&mut child);
+            terminate_process_tree(&mut child, Some(job));
             let _ = join_reader(stdout_reader, label, "standard output");
             let _ = join_reader(stderr_reader, label, "error output");
             return Err(format!(
@@ -71,7 +157,7 @@ pub(crate) fn command_output(
             ));
         }
         Err(error) => {
-            terminate_process_tree(&mut child);
+            terminate_process_tree(&mut child, Some(job));
             let _ = join_reader(stdout_reader, label, "standard output");
             let _ = join_reader(stderr_reader, label, "error output");
             return Err(format!("Unable to wait for {label}: {error}"));
@@ -122,9 +208,17 @@ fn join_reader(
         .map_err(|error| format!("Unable to read {label} {stream}: {error}"))
 }
 
-fn terminate_process_tree(child: &mut std::process::Child) {
+fn terminate_process_tree(child: &mut std::process::Child, job: Option<KillOnCloseJob>) {
+    // Closing an assigned KILL_ON_JOB_CLOSE job is the primary termination
+    // mechanism and covers descendants even after the direct child exits.
+    drop(job);
+    if matches!(child.wait_timeout(TERMINATION_TIMEOUT), Ok(Some(_))) {
+        return;
+    }
+
     // Child::kill only terminates PowerShell itself. taskkill /T also terminates
-    // a wsl.exe/CIM descendant that may otherwise survive a timed-out probe.
+    // an uncontained process tree if job assignment failed or Windows did not
+    // finish job termination within the grace period.
     let mut taskkill = windows_command("taskkill.exe");
     taskkill
         .args(["/PID", &child.id().to_string(), "/T", "/F"])
@@ -169,5 +263,26 @@ mod tests {
         ]);
         let error = command_output(command, Duration::from_millis(100), "slow test").unwrap_err();
         assert!(error.contains("timed out"));
+    }
+
+    #[test]
+    fn closes_inherited_pipes_after_the_direct_parent_exits() {
+        let mut command = windows_command("powershell.exe");
+        command.args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            r#"Start-Sleep -Milliseconds 250; $info = [Diagnostics.ProcessStartInfo]::new(); $info.FileName = 'ping.exe'; $info.Arguments = '-n 4 127.0.0.1'; $info.UseShellExecute = $false; [Diagnostics.Process]::Start($info) | Out-Null"#,
+        ]);
+        let started = std::time::Instant::now();
+        let output = command_output(command, Duration::from_secs(5), "descendant pipe test")
+            .expect("the direct parent should exit successfully");
+        assert!(output.status.success());
+        assert!(
+            started.elapsed() < Duration::from_millis(2500),
+            "the inherited pipe remained open for {:?}",
+            started.elapsed()
+        );
     }
 }

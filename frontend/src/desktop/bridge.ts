@@ -111,6 +111,13 @@ const REQUIRED_RUNTIME_COMPONENT_IDS = [
   "px4",
   "gazebo",
 ] as const;
+const REQUIRED_INSTALL_STEP_IDS = [
+  "preflight",
+  "enable-wsl",
+  "download",
+  "import",
+  "smoke-test",
+] as const;
 
 const COMPONENT_STATES = new Set<RuntimeComponentState>([
   "ready",
@@ -177,13 +184,16 @@ export function probeRuntimeStatus(): Promise<RuntimeStatusReport> {
   return invokeDesktop("probe_runtime_status", parseRuntimeStatus);
 }
 
-export function getRuntimeInstallPlan(
+export async function getRuntimeInstallPlan(
   targetRoot?: string,
 ): Promise<RuntimeInstallPlan> {
+  const expectedTargetRoot = targetRoot == null
+    ? undefined
+    : normalizeRequestedTargetRoot(targetRoot);
   return invokeDesktop(
     "get_runtime_install_plan",
-    parseInstallPlan,
-    targetRoot ? { targetRoot } : undefined,
+    (value) => parseInstallPlan(value, expectedTargetRoot),
+    expectedTargetRoot ? { targetRoot: expectedTargetRoot } : undefined,
   );
 }
 
@@ -368,15 +378,18 @@ function parseRuntimeComponent(value: unknown, index: number): RuntimeComponentS
   };
 }
 
-function parseInstallPlan(value: unknown): RuntimeInstallPlan {
+function parseInstallPlan(
+  value: unknown,
+  expectedTargetRoot?: string,
+): RuntimeInstallPlan {
   const record = expectRecord(value, "plan");
   const steps = expectArray(record.steps, "plan.steps").map((step, index) =>
     parseInstallStep(step, index),
   );
   assertUnique(steps.map((step) => step.id), "plan.steps ids");
   const plan: RuntimeInstallPlan = {
-    runtimeName: expectString(record.runtimeName, "plan.runtimeName"),
-    targetRoot: expectString(record.targetRoot, "plan.targetRoot"),
+    runtimeName: expectSafeNonEmptyString(record.runtimeName, "plan.runtimeName"),
+    targetRoot: expectCanonicalRuntimeTargetRoot(record.targetRoot, "plan.targetRoot"),
     estimatedDownloadBytes: expectNonNegativeNumber(
       record.estimatedDownloadBytes,
       "plan.estimatedDownloadBytes",
@@ -391,11 +404,41 @@ function parseInstallPlan(value: unknown): RuntimeInstallPlan {
     ),
     requiresRestart: expectBoolean(record.requiresRestart, "plan.requiresRestart"),
     canInstall: expectBoolean(record.canInstall, "plan.canInstall"),
-    blockers: parseStringArray(record.blockers, "plan.blockers"),
+    blockers: parseSafeNonEmptyStringArray(record.blockers, "plan.blockers"),
     steps,
   };
   if (plan.runtimeName !== RUNTIME_NAME) {
     throw new Error(`plan.runtimeName must equal ${RUNTIME_NAME}`);
+  }
+  if (expectedTargetRoot && plan.targetRoot !== expectedTargetRoot) {
+    throw new Error(
+      `plan.targetRoot must match the requested target ${expectedTargetRoot}`,
+    );
+  }
+  if (
+    plan.steps.length !== REQUIRED_INSTALL_STEP_IDS.length ||
+    REQUIRED_INSTALL_STEP_IDS.some((id, index) => plan.steps[index]?.id !== id)
+  ) {
+    throw new Error(
+      `plan.steps must contain ${REQUIRED_INSTALL_STEP_IDS.join(", ")} in that order`,
+    );
+  }
+  if (plan.canInstall !== (plan.blockers.length === 0)) {
+    throw new Error("plan.canInstall must be true exactly when plan.blockers is empty");
+  }
+  const enableWslStep = plan.steps.find((step) => step.id === "enable-wsl");
+  if (enableWslStep?.requiresAdministrator !== plan.requiresAdministrator) {
+    throw new Error(
+      "plan.requiresAdministrator must match the enable-wsl step",
+    );
+  }
+  const unexpectedAdministratorStep = plan.steps.find(
+    (step) => step.id !== "enable-wsl" && step.requiresAdministrator,
+  );
+  if (unexpectedAdministratorStep) {
+    throw new Error(
+      `plan step ${unexpectedAdministratorStep.id} cannot require administrator approval`,
+    );
   }
   return plan;
 }
@@ -404,9 +447,9 @@ function parseInstallStep(value: unknown, index: number): RuntimeInstallStep {
   const path = `plan.steps[${index}]`;
   const record = expectRecord(value, path);
   return {
-    id: expectString(record.id, `${path}.id`),
-    title: expectString(record.title, `${path}.title`),
-    description: expectString(record.description, `${path}.description`),
+    id: expectSafeNonEmptyString(record.id, `${path}.id`),
+    title: expectSafeNonEmptyString(record.title, `${path}.title`),
+    description: expectSafeNonEmptyString(record.description, `${path}.description`),
     requiresAdministrator: expectBoolean(
       record.requiresAdministrator,
       `${path}.requiresAdministrator`,
@@ -435,6 +478,35 @@ function expectString(value: unknown, path: string): string {
   return value;
 }
 
+function expectSafeNonEmptyString(value: unknown, path: string): string {
+  const string = expectString(value, path);
+  if (string.trim() === "") throw new Error(`${path} must not be empty`);
+  const hasControlCharacter = [...string].some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint < 32 || codePoint === 127;
+  });
+  if (string.length > 4096 || hasControlCharacter) {
+    throw new Error(`${path} contains unsafe control characters or is too long`);
+  }
+  return string;
+}
+
+function normalizeRequestedTargetRoot(value: string): string {
+  const match = /^([a-z]):\\DroneDream\\?$/iu.exec(value.trim());
+  if (!match) {
+    throw new Error("targetRoot must be a drive root such as E:\\DroneDream");
+  }
+  return `${match[1].toUpperCase()}:\\DroneDream`;
+}
+
+function expectCanonicalRuntimeTargetRoot(value: unknown, path: string): string {
+  const targetRoot = expectSafeNonEmptyString(value, path);
+  if (!/^[A-Z]:\\DroneDream$/u.test(targetRoot)) {
+    throw new Error(`${path} must be a canonical path such as E:\\DroneDream`);
+  }
+  return targetRoot;
+}
+
 function expectNullableString(value: unknown, path: string): string | null {
   if (value == null) return null;
   return expectString(value, path);
@@ -461,6 +533,12 @@ function expectNonNegativeInteger(value: unknown, path: string): number {
 function parseStringArray(value: unknown, path: string): string[] {
   return expectArray(value, path).map((item, index) =>
     expectString(item, `${path}[${index}]`),
+  );
+}
+
+function parseSafeNonEmptyStringArray(value: unknown, path: string): string[] {
+  return expectArray(value, path).map((item, index) =>
+    expectSafeNonEmptyString(item, `${path}[${index}]`),
   );
 }
 

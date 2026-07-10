@@ -61,7 +61,7 @@ NTFS drive with the most free space.
 ## Developer prerequisites (Windows)
 
 - Node.js and npm
-- Rust stable MSVC (`rustup` / `cargo`)
+- Rust 1.97.0 MSVC (`rustup` / `cargo`)
 - Microsoft C++ Build Tools with **Desktop development with C++**
 - Microsoft Edge WebView2 runtime (normally already present on Windows 10/11)
 
@@ -85,12 +85,16 @@ executable and `DroneDream_<version>_x64-setup.exe` NSIS installer.
 
 `npm run build:llvm` is the no-administrator fallback for Windows development
 machines without a usable MSVC installation. It expects the official Rust
-`stable-x86_64-pc-windows-gnullvm` toolchain plus the portable LLVM-MinGW UCRT
+`1.97.0-x86_64-pc-windows-gnullvm` toolchain plus the portable LLVM-MinGW UCRT
 package available through WinGet. The script also discovers Rust in the
 standard per-user `.cargo\bin` location when a newly installed toolchain is not
-yet on the terminal's `PATH`. GitHub Actions and public releases continue to
-use the standard MSVC toolchain. The standard installer is written below
-`src-tauri/target/release/bundle/nsis`; the LLVM fallback uses
+yet on the terminal's `PATH`. Pinning the fallback to Rust 1.97.0 keeps it
+aligned with GitHub Actions instead of silently moving with the `stable`
+channel. It statically links the LLVM runtime, stages the locked WebView2 loader
+for NSIS, and inspects both PE import tables so the installer cannot accidentally
+depend on toolchain DLLs from the developer's machine. GitHub Actions and public
+releases continue to use the standard MSVC toolchain. The standard installer is
+written below `src-tauri/target/release/bundle/nsis`; the LLVM fallback uses
 `src-tauri/target/x86_64-pc-windows-gnullvm/release/bundle/nsis`.
 
 For this 16 GB development machine, keep `CARGO_BUILD_JOBS=4` and never compile
@@ -129,6 +133,11 @@ registered as WSL version 2 and launch the backend with
 requires `/health/ready` to return both that identity as `data.runtime_id` and
 the backend version declared by the manifest. This prevents a same-version
 development server on port 8000 from being mistaken for the packaged runtime.
+A packaged runtime must also configure `DRONEDREAM_PX4_EXECUTABLE` and
+`DRONEDREAM_GAZEBO_EXECUTABLE` with executable files. Once a runtime identity
+is configured, `/health/ready` requires a live worker heartbeat through
+`REDIS_URL` even if ordinary web/development mode leaves worker heartbeats
+optional. Missing worker, PX4, or Gazebo readiness returns HTTP 503.
 A future signed install receipt will additionally bind `runtimeId` to the
 downloaded image hash.
 

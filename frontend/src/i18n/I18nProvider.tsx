@@ -24,6 +24,7 @@ const translations = {
     "app.previewVersion": "DroneDream 0.1 Preview",
     "app.desktopEnvironment": "Desktop app",
     "app.webEnvironment": "Web app",
+    "app.skipToContent": "Skip to main content",
     "desktop.eyebrow": "LOCAL RUNTIME",
     "desktop.title": "Desktop environment setup",
     "desktop.subtitle":
@@ -128,6 +129,7 @@ const translations = {
       "DroneDream is marked ready only after every required component passes.",
     "desktop.runtimeAlreadyReady": "The installed runtime is ready.",
     "desktop.runtimeNeedsRepair": "The installed runtime needs attention.",
+    "desktop.runtimeHealthy": "Runtime healthy",
     "desktop.installedStorageHint":
       "Storage selection and the first-install plan are hidden because DroneDreamRuntime is already installed. Review the diagnostics above instead of creating a second runtime.",
     "desktop.probeIssue": "Environment check issue",
@@ -253,6 +255,7 @@ const translations = {
     "app.previewVersion": "DroneDream 0.1 开发预览",
     "app.desktopEnvironment": "桌面软件",
     "app.webEnvironment": "网页版",
+    "app.skipToContent": "跳到主要内容",
     "desktop.eyebrow": "本地运行环境",
     "desktop.title": "桌面环境设置",
     "desktop.subtitle": "检查本机、DroneDream 专用运行环境，以及在本地执行 PX4/Gazebo 调优前需要完成的步骤。",
@@ -339,6 +342,7 @@ const translations = {
     "desktop.step.smokeTest.description": "只有所有必需组件均通过检查后，DroneDream 才会标记为可用。",
     "desktop.runtimeAlreadyReady": "已安装的运行环境可以正常使用。",
     "desktop.runtimeNeedsRepair": "已安装的运行环境需要处理。",
+    "desktop.runtimeHealthy": "运行环境正常",
     "desktop.installedStorageHint": "DroneDreamRuntime 已经安装，因此不再显示首次安装的磁盘选择和安装方案。请查看上方诊断，不要重复创建运行环境。",
     "desktop.probeIssue": "环境检查出现问题",
     "desktop.partialFailure": "部分桌面检查未能完成；界面可能保留上次成功结果，并会明确标记。",
@@ -466,8 +470,13 @@ const I18nContext = createContext<I18nValue>({
 
 function initialLocale(): Locale {
   if (typeof window === "undefined") return "en";
-  const saved = window.localStorage.getItem("drone-dream:locale");
-  if (saved === "en" || saved === "zh-CN") return saved;
+  try {
+    const saved = window.localStorage.getItem("drone-dream:locale");
+    if (saved === "en" || saved === "zh-CN") return saved;
+  } catch {
+    // Language preference storage is optional; the app must still start when
+    // browser or WebView policy denies access to localStorage.
+  }
   return window.navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
 
@@ -476,7 +485,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
-    window.localStorage.setItem("drone-dream:locale", next);
+    try {
+      window.localStorage.setItem("drone-dream:locale", next);
+    } catch {
+      // Keep the in-memory preference even when persistence is unavailable.
+    }
   }, []);
 
   useEffect(() => {

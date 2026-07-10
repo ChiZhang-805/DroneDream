@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider, useI18n } from "../i18n/I18nProvider";
 
@@ -21,6 +21,10 @@ describe("I18nProvider", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("switches the core product language and persists the choice", () => {
     render(
       <I18nProvider>
@@ -33,5 +37,35 @@ describe("I18nProvider", () => {
     expect(window.localStorage.getItem("drone-dream:locale")).toBe("zh-CN");
     expect(document.documentElement.lang).toBe("zh-CN");
   });
-});
 
+  it("still starts when reading the stored locale is denied", () => {
+    vi.spyOn(window.navigator, "language", "get").mockReturnValue("en-US");
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("Storage disabled", "SecurityError");
+    });
+
+    render(
+      <I18nProvider>
+        <LanguageProbe />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText("New Tuning Experiment")).toBeInTheDocument();
+  });
+
+  it("keeps the selected in-memory locale when persistence fails", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Storage disabled", "QuotaExceededError");
+    });
+
+    render(
+      <I18nProvider>
+        <LanguageProbe />
+      </I18nProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Switch language/i }));
+
+    expect(screen.getByText("新建调优实验")).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("zh-CN");
+  });
+});

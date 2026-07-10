@@ -165,12 +165,44 @@ const plan: RuntimeInstallPlan = {
   blockers: [],
   steps: [
     {
-      id: "storage",
-      title: "Prepare dedicated runtime storage",
-      description: "Create an isolated data directory.",
+      id: "preflight",
+      title: "Validate prerequisites",
+      description: "Check the computer.",
+      requiresAdministrator: false,
+      destructive: false,
+      estimatedBytes: null,
+    },
+    {
+      id: "enable-wsl",
+      title: "Enable WSL2",
+      description: "Prepare WSL2.",
+      requiresAdministrator: true,
+      destructive: false,
+      estimatedBytes: null,
+    },
+    {
+      id: "download",
+      title: "Download runtime",
+      description: "Download the runtime image.",
+      requiresAdministrator: false,
+      destructive: false,
+      estimatedBytes: 8 * 1024 ** 3,
+    },
+    {
+      id: "import",
+      title: "Import runtime",
+      description: "Import the dedicated distribution.",
       requiresAdministrator: false,
       destructive: false,
       estimatedBytes: 24 * 1024 ** 3,
+    },
+    {
+      id: "smoke-test",
+      title: "Verify runtime",
+      description: "Run smoke tests.",
+      requiresAdministrator: false,
+      destructive: false,
+      estimatedBytes: null,
     },
   ],
 };
@@ -210,7 +242,8 @@ describe("DesktopSetup", () => {
     expect(screen.getByText("DroneDreamRuntime · Installed · Running")).toBeInTheDocument();
     expect(screen.getByText("PX4 SITL")).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Runtime disk" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Prepare dedicated runtime storage")).not.toBeInTheDocument();
+    expect(screen.queryByText("Validate Windows, virtualization, memory, and disk"))
+      .not.toBeInTheDocument();
     expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Create a tuning experiment" })).toHaveAttribute(
       "href",
@@ -232,7 +265,9 @@ describe("DesktopSetup", () => {
     renderPage();
 
     expect(await screen.findByRole("combobox", { name: "Runtime disk" })).toHaveValue("E:");
-    expect(await screen.findByText("Prepare dedicated runtime storage")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Validate Windows, virtualization, memory, and disk"),
+    ).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith(
       "get_runtime_install_plan",
       { targetRoot: "E:\\DroneDream" },
@@ -366,6 +401,34 @@ describe("DesktopSetup", () => {
     renderPage();
 
     expect(await screen.findByText("Setup action required")).toBeInTheDocument();
+    expect(screen.getByText("Runtime healthy")).toBeInTheDocument();
+    expect(screen.queryByText("Ready for local tuning")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Create a tuning experiment" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("fails closed when required memory information is missing or insufficient", async () => {
+    let report: SystemPrerequisiteReport = { ...prerequisites, memory: null };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return report;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const page = renderPage();
+
+    expect(await screen.findByText("Setup action required")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Create a tuning experiment" }))
+      .not.toBeInTheDocument();
+
+    page.unmount();
+    report = {
+      ...prerequisites,
+      memory: { totalBytes: 14 * 1024 ** 3, availableBytes: 8 * 1024 ** 3 },
+    };
+    renderPage();
+
+    expect(await screen.findByText("Setup action required")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Create a tuning experiment" }))
       .not.toBeInTheDocument();
   });
@@ -412,6 +475,29 @@ describe("DesktopSetup", () => {
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
   });
 
+  it("does not offer first installation when the runtime probe is uncertain", async () => {
+    const uncertainRuntime: RuntimeStatusReport = {
+      ...missingRuntime,
+      components: missingRuntime.components.map((component) => ({
+        ...component,
+        status: "unknown",
+      })),
+      diagnostics: ["Unable to inspect the WSL registry."],
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return uncertainRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    renderPage();
+
+    expect(await screen.findByText("Unable to inspect the WSL registry.")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Runtime disk" })).not.toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
+  });
+
   it("shows attention for an installed runtime with an unhealthy required component", async () => {
     const contradictoryRuntime: RuntimeStatusReport = {
       ...runtime,
@@ -438,7 +524,7 @@ describe("DesktopSetup", () => {
       .not.toBeInTheDocument();
   });
 
-  it("does not trust canInstall when the native plan also reports blockers", async () => {
+  it("rejects a native plan whose canInstall flag contradicts its blockers", async () => {
     const contradictoryPlan = {
       ...plan,
       canInstall: true,
@@ -455,10 +541,9 @@ describe("DesktopSetup", () => {
     };
     renderPage();
 
-    expect(
-      await screen.findByText("Resolve the following blockers before installation."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("The selected disk is unavailable.")).toBeInTheDocument();
+    expect(await screen.findByText(/plan.canInstall must be true exactly/i))
+      .toBeInTheDocument();
+    expect(screen.queryByText("The selected disk is unavailable.")).not.toBeInTheDocument();
   });
 
   it("stops the request chain after the page is unmounted", async () => {
@@ -486,14 +571,15 @@ describe("DesktopSetup", () => {
   it("localizes stable native component and plan-step identifiers", async () => {
     const localizedPlan: RuntimeInstallPlan = {
       ...plan,
-      steps: [
-        {
-          ...plan.steps[0],
-          id: "preflight",
-          title: "Native English title",
-          description: "Native English description",
-        },
-      ],
+      steps: plan.steps.map((step) =>
+        step.id === "preflight"
+          ? {
+              ...step,
+              title: "Native English title",
+              description: "Native English description",
+            }
+          : step,
+      ),
     };
     window.__TAURI__ = {
       core: {

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -38,16 +40,49 @@ def test_readiness_checks_database_storage_and_optional_worker() -> None:
     assert data["runtime_id"] is None
 
 
-def test_readiness_reports_the_configured_desktop_runtime_identity(monkeypatch) -> None:
+def test_packaged_runtime_requires_worker_and_simulator_executables(monkeypatch) -> None:
     from app import config as config_module
 
     runtime_id = "123e4567-e89b-12d3-a456-426614174000"
     monkeypatch.setenv("DRONEDREAM_RUNTIME_ID", runtime_id)
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.delenv("DRONEDREAM_PX4_EXECUTABLE", raising=False)
+    monkeypatch.delenv("DRONEDREAM_GAZEBO_EXECUTABLE", raising=False)
+    config_module.get_settings.cache_clear()
+    try:
+        response = TestClient(app).get("/health/ready")
+        assert response.status_code == 503
+        data = response.json()["data"]
+        assert data["runtime_id"] == runtime_id
+        assert data["components"]["worker"]["status"] == "not_configured"
+        assert data["components"]["px4"]["status"] == "not_configured"
+        assert data["components"]["gazebo"]["status"] == "not_configured"
+    finally:
+        config_module.get_settings.cache_clear()
+
+
+def test_packaged_runtime_is_ready_with_live_worker_and_executables(monkeypatch) -> None:
+    from app import config as config_module
+    from app.orchestration import worker_presence as worker_presence_module
+
+    runtime_id = "123e4567-e89b-12d3-a456-426614174000"
+    monkeypatch.setenv("DRONEDREAM_RUNTIME_ID", runtime_id)
+    monkeypatch.setenv("DRONEDREAM_PX4_EXECUTABLE", sys.executable)
+    monkeypatch.setenv("DRONEDREAM_GAZEBO_EXECUTABLE", sys.executable)
+    monkeypatch.setattr(
+        worker_presence_module,
+        "worker_presence_health",
+        lambda: {"ok": True, "status": "available", "worker_id": "test-worker"},
+    )
     config_module.get_settings.cache_clear()
     try:
         response = TestClient(app).get("/health/ready")
         assert response.status_code == 200
-        assert response.json()["data"]["runtime_id"] == runtime_id
+        data = response.json()["data"]
+        assert data["runtime_id"] == runtime_id
+        assert data["components"]["worker"]["status"] == "available"
+        assert data["components"]["px4"]["status"] == "available"
+        assert data["components"]["gazebo"]["status"] == "available"
     finally:
         config_module.get_settings.cache_clear()
 

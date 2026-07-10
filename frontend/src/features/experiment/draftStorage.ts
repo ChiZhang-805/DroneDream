@@ -11,22 +11,59 @@ export interface ExperimentDraftEnvelope<TForm, TSelections> {
   selections: TSelections;
 }
 
-function storageAvailable(): boolean {
-  return typeof window !== "undefined" && Boolean(window.localStorage);
+export interface ExperimentDraftSchema<TForm, TSelections> {
+  maxActiveStep: number;
+  normalizeForm: (value: unknown) => TForm | null;
+  normalizeSelections: (value: unknown) => TSelections | null;
 }
 
-export function loadExperimentDraft<TForm, TSelections>():
+function safeStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function loadExperimentDraft<TForm, TSelections>(
+  schema: ExperimentDraftSchema<TForm, TSelections>,
+):
   | ExperimentDraftEnvelope<TForm, TSelections>
   | null {
-  if (!storageAvailable()) return null;
+  const storage = safeStorage();
+  if (!storage) return null;
   try {
-    const raw = window.localStorage.getItem(EXPERIMENT_DRAFT_KEY);
+    const raw = storage.getItem(EXPERIMENT_DRAFT_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as ExperimentDraftEnvelope<TForm, TSelections>;
-    if (parsed.schema_version !== 1 || !parsed.form || !parsed.selections) {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed) || parsed.schema_version !== 1) {
       return null;
     }
-    return parsed;
+    if (
+      typeof parsed.saved_at !== "string" ||
+      !Number.isFinite(Date.parse(parsed.saved_at)) ||
+      typeof parsed.active_step !== "number" ||
+      !Number.isSafeInteger(parsed.active_step) ||
+      parsed.active_step < 0 ||
+      parsed.active_step > schema.maxActiveStep
+    ) {
+      return null;
+    }
+    const form = schema.normalizeForm(parsed.form);
+    const selections = schema.normalizeSelections(parsed.selections);
+    if (!form || !selections) return null;
+    return {
+      schema_version: 1,
+      saved_at: parsed.saved_at,
+      active_step: parsed.active_step,
+      form,
+      selections,
+    };
   } catch {
     return null;
   }
@@ -35,10 +72,11 @@ export function loadExperimentDraft<TForm, TSelections>():
 export function saveExperimentDraft<TForm, TSelections>(
   envelope: Omit<ExperimentDraftEnvelope<TForm, TSelections>, "schema_version" | "saved_at">,
 ): string | null {
-  if (!storageAvailable()) return null;
+  const storage = safeStorage();
+  if (!storage) return null;
   const savedAt = new Date().toISOString();
   try {
-    window.localStorage.setItem(
+    storage.setItem(
       EXPERIMENT_DRAFT_KEY,
       JSON.stringify({
         schema_version: 1,
@@ -53,17 +91,23 @@ export function saveExperimentDraft<TForm, TSelections>(
 }
 
 export function clearExperimentDraft(): void {
-  if (!storageAvailable()) return;
-  window.localStorage.removeItem(EXPERIMENT_DRAFT_KEY);
+  const storage = safeStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(EXPERIMENT_DRAFT_KEY);
+  } catch {
+    // Optional draft storage must not block resetting or creating a job.
+  }
 }
 
 export function persistStudyForJob(
   jobId: string,
   study: ExperimentStudyConfig,
 ): void {
-  if (!storageAvailable()) return;
+  const storage = safeStorage();
+  if (!storage) return;
   try {
-    window.localStorage.setItem(
+    storage.setItem(
       `${JOB_STUDY_PREFIX}${jobId}`,
       JSON.stringify({ saved_at: new Date().toISOString(), study }),
     );
@@ -74,14 +118,17 @@ export function persistStudyForJob(
 }
 
 export function loadStudyForJob(jobId: string): ExperimentStudyConfig | null {
-  if (!storageAvailable()) return null;
+  const storage = safeStorage();
+  if (!storage) return null;
   try {
-    const raw = window.localStorage.getItem(`${JOB_STUDY_PREFIX}${jobId}`);
+    const raw = storage.getItem(`${JOB_STUDY_PREFIX}${jobId}`);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { study?: ExperimentStudyConfig };
-    return parsed.study?.schema_version === 1 ? parsed.study : null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed) || !isRecord(parsed.study)) return null;
+    return parsed.study.schema_version === 1
+      ? parsed.study as unknown as ExperimentStudyConfig
+      : null;
   } catch {
     return null;
   }
 }
-

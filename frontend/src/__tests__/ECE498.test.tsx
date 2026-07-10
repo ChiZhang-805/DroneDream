@@ -219,6 +219,21 @@ describe("ECE498", () => {
     expect(screen.getByText("Web app")).toBeInTheDocument();
   });
 
+  it("lets keyboard users skip repeated navigation without changing routes", () => {
+    render(
+      <MemoryRouter initialEntries={["/history"]}>
+        <AppShell />
+      </MemoryRouter>,
+    );
+    const skipLink = screen.getByRole("link", { name: "Skip to main content" });
+    const main = screen.getByRole("main");
+
+    fireEvent.click(skipLink);
+
+    expect(main).toHaveFocus();
+    expect(skipLink).toHaveAttribute("href", "#main-content");
+  });
+
   it("keeps the desktop dashboard reachable without returning to setup", () => {
     window.__TAURI__ = { core: { invoke: vi.fn() } };
     render(

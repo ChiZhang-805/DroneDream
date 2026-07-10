@@ -32,8 +32,8 @@
     "active": true,
     "targets": ["nsis"],
     "publisher": "DroneDream",
-    "shortDescription": "Automatic PX4 and Gazebo parameter tuning",
-    "longDescription": "DroneDream provides a local-first desktop workflow for configuring, running, comparing, and exporting PX4/Gazebo parameter optimization experiments.",
+    "shortDescription": "Development Preview for DroneDream desktop setup",
+    "longDescription": "Development Preview: this build provides the DroneDream desktop interface and local runtime diagnostics, but does not yet bundle or launch the PX4/Gazebo tuning runtime.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

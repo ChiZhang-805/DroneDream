@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     backend_host: str = Field(default="127.0.0.1")
     backend_port: int = Field(default=8000)
     dronedream_runtime_id: str | None = Field(default=None)
+    dronedream_px4_executable: str | None = Field(default=None)
+    dronedream_gazebo_executable: str | None = Field(default=None)
     log_level: str = Field(default="info")
     database_url: str = Field(default="sqlite:///./drone_dream.db")
     database_auto_create: bool = Field(default=True)

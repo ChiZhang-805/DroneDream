@@ -18,6 +18,12 @@ import type {
   SystemPrerequisiteReport,
 } from "../desktop/bridge";
 import { formatBytes } from "../desktop/format";
+import {
+  isOverallDesktopReady,
+  isRuntimeConfirmedMissing,
+  isRuntimeFullyReady,
+  MINIMUM_MEMORY_BYTES,
+} from "../desktop/readiness";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
 
@@ -52,9 +58,6 @@ const INITIAL_STATE: ProbeState = {
 };
 
 const GIB = 1024 ** 3;
-// Windows reserves a small part of a nominal 16 GB installation for hardware.
-// Treat 15 GiB of reported physical memory as a 16 GB-class machine.
-const MINIMUM_MEMORY_BYTES = 15 * GIB;
 
 function fixedDiskOptions(disks: DiskInfo[]): DiskInfo[] {
   // The prerequisite command returns only DriveType=3 disks. Keep the UI
@@ -111,17 +114,6 @@ function probeIssue(
   return { source, command, message: errorMessage(reason) };
 }
 
-function runtimeIsReady(report: RuntimeStatusReport | null): boolean {
-  const requiredComponents = report?.components.filter((component) => component.required) ?? [];
-  return Boolean(
-    report?.ready &&
-    report.installed &&
-    report.running &&
-    requiredComponents.length > 0 &&
-    requiredComponents.every((component) => component.status === "ready"),
-  );
-}
-
 export function DesktopSetup() {
   const { t } = useI18n();
   const desktopAvailable = isDesktopRuntime();
@@ -136,7 +128,7 @@ export function DesktopSetup() {
   const showInstallPlanner =
     state.prerequisitesFresh &&
     state.runtimeFresh &&
-    state.runtime?.installed === false;
+    isRuntimeConfirmedMissing(state.runtime);
 
   const refresh = useCallback(async () => {
     if (!desktopAvailable) return;
@@ -181,7 +173,7 @@ export function DesktopSetup() {
     const shouldRequestPlan =
       prerequisites.status === "fulfilled" &&
       runtime.status === "fulfilled" &&
-      !runtime.value.installed &&
+      isRuntimeConfirmedMissing(runtime.value) &&
       fixedDisks.length > 0 &&
       Boolean(nextDrive);
 
@@ -389,9 +381,8 @@ function ReadinessHero({
   const { t } = useI18n();
   const ready =
     prerequisitesFresh &&
-    prerequisites?.supported === true &&
     runtimeFresh &&
-    runtimeIsReady(runtime);
+    isOverallDesktopReady(prerequisites, runtime);
   const title = loading
     ? t("desktop.checking")
     : prerequisitesFresh && runtimeFresh && runtime
@@ -629,7 +620,7 @@ function RuntimeOverview({
   stale: boolean;
 }) {
   const { t } = useI18n();
-  const ready = !stale && runtimeIsReady(report);
+  const ready = !stale && isRuntimeFullyReady(report);
   return (
     <SectionCard
       title={t("desktop.runtimeTitle")}
@@ -639,7 +630,7 @@ function RuntimeOverview({
           <StaleResultBadge />
         ) : (
           <span className={`desktop-runtime-pill ${ready ? "ready" : "pending"}`}>
-            {ready ? t("desktop.ready") : t("desktop.needsAction")}
+            {ready ? t("desktop.runtimeHealthy") : t("desktop.needsAction")}
           </span>
         )
       }
@@ -709,7 +700,7 @@ function StaleResultBadge() {
 
 function InstalledRuntimeNotice({ report }: { report: RuntimeStatusReport }) {
   const { t } = useI18n();
-  const ready = runtimeIsReady(report);
+  const ready = isRuntimeFullyReady(report);
   return (
     <Alert
       tone={ready ? "success" : "warning"}

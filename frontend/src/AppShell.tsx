@@ -27,6 +27,16 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+      >
+        {t("app.skipToContent")}
+      </a>
       <aside className="app-sidebar">
         <Link to="/" className="app-title">
           <span className="app-title-mark" aria-hidden="true">◆</span>
@@ -87,7 +97,7 @@ export function AppShell() {
             </label>
           </div>
         </header>
-        <main className="app-main">
+        <main id="main-content" className="app-main" tabIndex={-1}>
           <Outlet />
         </main>
         <footer className="app-footer">

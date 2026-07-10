@@ -7,10 +7,7 @@ on:
       - ".github/workflows/desktop-installer.yml"
       - "desktop/**"
       - "frontend/**"
-      - "backend/app/config.py"
-      - "backend/app/routers/health.py"
-      - "backend/tests/test_config.py"
-      - "backend/tests/test_health.py"
+      - "backend/**"
   push:
     tags:
       - "desktop-v*"
@@ -30,7 +27,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Verify desktop version consistency
+      - name: Verify release version consistency
         shell: pwsh
         run: |
           $tauriVersion = (Get-Content -LiteralPath "desktop/src-tauri/tauri.conf.json" -Raw |
@@ -45,8 +42,25 @@ jobs:
           }
           $cargoVersion = $cargoVersionMatch.Matches[0].Groups[1].Value
 
+          $backendProjectVersionMatch = Select-String `
+            -LiteralPath "backend/pyproject.toml" `
+            -Pattern '^version\s*=\s*"([^"]+)"\s*$' |
+            Select-Object -First 1
+          $backendCodeVersionMatch = Select-String `
+            -LiteralPath "backend/app/__init__.py" `
+            -Pattern '^__version__\s*=\s*"([^"]+)"\s*$' |
+            Select-Object -First 1
+          if (-not $backendProjectVersionMatch -or -not $backendCodeVersionMatch) {
+            throw "Backend package or code version was not found"
+          }
+          $backendProjectVersion = $backendProjectVersionMatch.Matches[0].Groups[1].Value
+          $backendCodeVersion = $backendCodeVersionMatch.Matches[0].Groups[1].Value
+
           if ($tauriVersion -cne $packageVersion -or $tauriVersion -cne $cargoVersion) {
             throw "Desktop versions disagree: tauri=$tauriVersion package=$packageVersion cargo=$cargoVersion"
+          }
+          if ($backendProjectVersion -cne $backendCodeVersion) {
+            throw "Backend versions disagree: pyproject=$backendProjectVersion code=$backendCodeVersion"
           }
 
           if ($env:GITHUB_REF_TYPE -eq "tag") {
@@ -59,7 +73,7 @@ jobs:
               throw "Tag version $tagVersion does not match desktop version $tauriVersion"
             }
           }
-          Write-Host "Desktop version verified: $tauriVersion"
+          Write-Host "Versions verified: desktop=$tauriVersion backend=$backendCodeVersion"
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -86,44 +100,64 @@ jobs:
       - name: Install JavaScript dependencies
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           npm ci --prefix frontend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm ci --prefix desktop
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install backend test dependencies
         shell: pwsh
-        run: >-
-          python -m pip install -e "./backend[dev]"
-          "ruff==0.15.21" "mypy==2.2.0" "pytest==9.1.1"
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install -e "./backend[dev]" `
+            "ruff==0.15.21" "mypy==2.2.0" "pytest==9.1.1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Verify desktop backend configuration
+      - name: Verify backend
         shell: pwsh
         working-directory: backend
         run: |
-          python -m ruff check app/config.py app/routers/health.py tests/test_config.py tests/test_health.py
-          python -m mypy app/config.py app/routers/health.py
-          python -m pytest tests/test_config.py tests/test_health.py
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m ruff check app tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m mypy app
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify shared frontend
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           npm --prefix frontend run typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix frontend run lint
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # The Windows hosted runner is materially slower than local jsdom.
           # Keep assertions unchanged while allowing the existing wizard tests
           # enough time to finish under runner load.
           npm --prefix frontend run test -- --testTimeout 15000
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify desktop Rust
         shell: pwsh
         run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo clippy --release --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # Release-profile tests reuse most compiled artifacts in the NSIS build.
           cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build DroneDream setup executable
         shell: pwsh
-        run: npm --prefix desktop run build
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm --prefix desktop run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Write SHA-256 checksum
         shell: pwsh
@@ -138,6 +172,174 @@ jobs:
           $checksumPath = "$($installer.FullName).sha256"
           "$($hash.Hash.ToLowerInvariant())  $($installer.Name)" |
             Set-Content -Encoding ascii -LiteralPath $checksumPath
+
+      - name: Verify installer lifecycle and checksum
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          using System.Text;
+
+          public static class DroneDreamSmokeNative
+          {
+              [DllImport("kernel32.dll")]
+              public static extern uint SetErrorMode(uint mode);
+
+              [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+              public static extern int GetClassName(
+                  IntPtr window,
+                  StringBuilder className,
+                  int maximumCount
+              );
+
+              [DllImport("user32.dll", SetLastError = true)]
+              public static extern IntPtr SendMessageTimeout(
+                  IntPtr window,
+                  uint message,
+                  UIntPtr wParam,
+                  IntPtr lParam,
+                  uint flags,
+                  uint timeout,
+                  out UIntPtr result
+              );
+          }
+          '@
+          # Child processes inherit this mode. Loader failures therefore exit
+          # instead of leaving a modal Windows error dialog that looks alive.
+          [void][DroneDreamSmokeNative]::SetErrorMode(0x8003)
+
+          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $installers = @(Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS installer, found $($installers.Count)"
+          }
+          $installer = $installers[0]
+          $checksumPath = "$($installer.FullName).sha256"
+          $checksumLine = (Get-Content -LiteralPath $checksumPath -Raw).Trim()
+          $checksumMatch = [regex]::Match(
+            $checksumLine,
+            '^([0-9a-f]{64})  ([^\\/]+)$',
+            [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+          )
+          if (-not $checksumMatch.Success) {
+            throw "Installer checksum has an invalid format"
+          }
+          if ($checksumMatch.Groups[2].Value -cne $installer.Name) {
+            throw "Installer checksum names a different file"
+          }
+          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName).Hash
+          if ($checksumMatch.Groups[1].Value -cne $actualHash.ToLowerInvariant()) {
+            throw "Installer checksum verification failed"
+          }
+
+          $runnerTemp = [System.IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\', '/')
+          $installDir = Join-Path $runnerTemp ("DroneDream-Smoke-" + [guid]::NewGuid().ToString("N"))
+          $installDirFull = [System.IO.Path]::GetFullPath($installDir)
+          $runnerTempPrefix = $runnerTemp + [System.IO.Path]::DirectorySeparatorChar
+          if (-not $installDirFull.StartsWith(
+            $runnerTempPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+          )) {
+            throw "Refusing to test outside RUNNER_TEMP: $installDirFull"
+          }
+
+          $appProcess = $null
+          $uninstaller = Join-Path $installDirFull "uninstall.exe"
+          try {
+            $installProcess = Start-Process -FilePath $installer.FullName `
+              -ArgumentList @("/S", "/D=$installDirFull") -Wait -PassThru
+            if ($installProcess.ExitCode -ne 0) {
+              throw "Silent installer failed with exit code $($installProcess.ExitCode)"
+            }
+
+            $application = Join-Path $installDirFull "drone-dream-desktop.exe"
+            if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
+              throw "Installed application was not found at $application"
+            }
+            if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
+              throw "NSIS uninstaller was not found at $uninstaller"
+            }
+
+            $originalPath = $env:PATH
+            try {
+              $env:PATH = @(
+                (Join-Path $env:SystemRoot "System32"),
+                $env:SystemRoot,
+                (Join-Path $env:SystemRoot "System32\Wbem")
+              ) -join ";"
+              $appProcess = Start-Process -FilePath $application `
+                -WorkingDirectory $installDirFull -PassThru
+            }
+            finally {
+              $env:PATH = $originalPath
+            }
+            $launchDeadline = [DateTime]::UtcNow.AddSeconds(20)
+            do {
+              Start-Sleep -Milliseconds 500
+              $appProcess.Refresh()
+              if ($appProcess.HasExited) {
+                throw "Installed application exited during the launch smoke test with code $($appProcess.ExitCode)"
+              }
+            } until (
+              $appProcess.MainWindowTitle -ceq "DroneDream" -or
+              [DateTime]::UtcNow -ge $launchDeadline
+            )
+            if ($appProcess.MainWindowTitle -cne "DroneDream") {
+              throw "Installed application did not open its DroneDream window; observed title: '$($appProcess.MainWindowTitle)'"
+            }
+
+            $windowClass = [System.Text.StringBuilder]::new(256)
+            if ([DroneDreamSmokeNative]::GetClassName(
+              $appProcess.MainWindowHandle,
+              $windowClass,
+              $windowClass.Capacity
+            ) -le 0) {
+              throw "Could not inspect the installed application's main window"
+            }
+            if ($windowClass.ToString() -ceq "#32770") {
+              throw "The installed application opened an error dialog instead of its main window"
+            }
+            $messageResult = [UIntPtr]::Zero
+            $sendResult = [DroneDreamSmokeNative]::SendMessageTimeout(
+              $appProcess.MainWindowHandle,
+              0,
+              [UIntPtr]::Zero,
+              [IntPtr]::Zero,
+              0x0002,
+              2000,
+              [ref]$messageResult
+            )
+            if ($sendResult -eq [IntPtr]::Zero) {
+              throw "The installed application's main window is not responding"
+            }
+            Start-Sleep -Seconds 2
+            $appProcess.Refresh()
+            if ($appProcess.HasExited) {
+              throw "Installed application exited immediately after opening with code $($appProcess.ExitCode)"
+            }
+          }
+          finally {
+            if ($null -ne $appProcess) {
+              if (-not $appProcess.HasExited) {
+                Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+              }
+              if (-not $appProcess.WaitForExit(10000)) {
+                throw "Installed application did not stop before uninstall"
+              }
+            }
+            if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
+              $uninstallProcess = Start-Process -FilePath $uninstaller `
+                -ArgumentList "/S" -Wait -PassThru
+              if ($uninstallProcess.ExitCode -ne 0) {
+                throw "Silent uninstaller failed with exit code $($uninstallProcess.ExitCode)"
+              }
+            }
+          }
+          if (Test-Path -LiteralPath $installDirFull) {
+            throw "Silent uninstaller left the installation directory behind: $installDirFull"
+          }
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

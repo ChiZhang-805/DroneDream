@@ -138,6 +138,61 @@ describe("NewJob experiment wizard", () => {
     expect(screen.getByLabelText(/LLM API Key/i)).toHaveValue("");
   });
 
+  it("normalizes type-mismatched draft fields instead of crashing", () => {
+    window.localStorage.setItem(
+      "drone-dream:experiment-draft:v1",
+      JSON.stringify({
+        schema_version: 1,
+        saved_at: new Date().toISOString(),
+        active_step: 3,
+        form: {
+          display_name: "recovered-study",
+          tuning_mode: "unsafe-mode",
+          search_seeds: null,
+          advanced_enabled: "yes",
+          llm_api_key: "must-not-restore",
+        },
+        selections: {
+          MPC_XY_P: {
+            name: "MPC_XY_P",
+            baseline: "invalid",
+            search_min: 0.5,
+            search_max: 1.2,
+            scale: "linear",
+            selected: true,
+          },
+        },
+      }),
+    );
+
+    renderPage();
+
+    expect(screen.getByLabelText(/Experiment Name/i)).toHaveValue("recovered-study");
+    expect(screen.getByRole("radio", { name: /^Basic/i })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByLabelText(/Search seeds/i)).toHaveValue("101, 202, 303");
+  });
+
+  it("discards unsupported or structurally invalid draft envelopes", () => {
+    window.localStorage.setItem(
+      "drone-dream:experiment-draft:v1",
+      JSON.stringify({
+        schema_version: 2,
+        saved_at: "not-a-date",
+        active_step: "review",
+        form: { display_name: "must-not-load" },
+        selections: {},
+      }),
+    );
+
+    renderPage();
+
+    expect(screen.getByLabelText(/Experiment Name/i)).toHaveValue("");
+    expect(screen.queryByDisplayValue("must-not-load")).not.toBeInTheDocument();
+  });
+
   it("submits the advanced experiment contract with PX4, objectives and holdout scenarios", async () => {
     const createSpy = vi
       .spyOn(apiClient, "createJob")

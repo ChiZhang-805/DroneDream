@@ -2,6 +2,8 @@
 // use this module instead of the Phase 1 mock client. The call surface matches
 // the mock client deliberately so swapping was a one-line import change.
 
+import { isDesktopRuntime } from "../desktop/bridge";
+import { probeOverallDesktopReadiness } from "../desktop/readiness";
 import type {
   ApiEnvelope,
   Artifact,
@@ -49,6 +51,7 @@ const API_BASE_URL: string =
   "http://127.0.0.1:8000";
 const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function authHeaders(): Record<string, string> {
   if (!DEMO_AUTH_TOKEN) {
@@ -82,6 +85,26 @@ async function request<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (isDesktopRuntime() && MUTATING_METHODS.has(method)) {
+    try {
+      const readiness = await probeOverallDesktopReadiness();
+      if (!readiness.ready) {
+        throw new ApiClientError(
+          "DESKTOP_RUNTIME_NOT_READY",
+          "The local DroneDream runtime is no longer ready. Return to Desktop Setup and run the checks again.",
+        );
+      }
+    } catch (error) {
+      if (error instanceof ApiClientError) throw error;
+      throw new ApiClientError(
+        "DESKTOP_RUNTIME_NOT_READY",
+        "Unable to verify the local DroneDream runtime. Return to Desktop Setup and run the checks again.",
+        error instanceof Error ? error.message : null,
+      );
+    }
+  }
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}/api/v1${path}`, {

@@ -59,6 +59,12 @@ python3 -m venv .venv
   - `S3_REGION` (optional)
   - `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`
   - `S3_PREFIX` (optional, default `dronedream/`)
+- Packaged desktop runtime readiness:
+  - `DRONEDREAM_RUNTIME_ID` (canonical runtime-manifest UUID)
+  - `DRONEDREAM_PX4_EXECUTABLE` (executable PX4 path)
+  - `DRONEDREAM_GAZEBO_EXECUTABLE` (executable Gazebo path)
+  - `REDIS_URL` plus a live worker heartbeat; worker presence becomes mandatory
+    whenever `DRONEDREAM_RUNTIME_ID` is configured
 - Optional auth:
   - `AUTH_MODE=disabled|demo_token` (default `disabled`)
   - `DEMO_AUTH_TOKENS` format:
