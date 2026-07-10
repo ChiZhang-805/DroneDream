@@ -155,9 +155,21 @@ jobs:
       - name: Build DroneDream setup executable
         shell: pwsh
         run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          npm --prefix desktop run build
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Tauri downloads NSIS on the first hosted-runner build. Retry this
+          # one network-bearing step, while preserving the final native exit
+          # code so deterministic compiler or bundler failures still fail CI.
+          $PSNativeCommandUseErrorActionPreference = $false
+          $buildExitCode = 1
+          foreach ($attempt in 1..3) {
+            npm --prefix desktop run build
+            $buildExitCode = $LASTEXITCODE
+            if ($buildExitCode -eq 0) { break }
+            if ($attempt -lt 3) {
+              Write-Warning "Desktop build attempt $attempt failed with exit code $buildExitCode; retrying in 10 seconds"
+              Start-Sleep -Seconds 10
+            }
+          }
+          if ($buildExitCode -ne 0) { exit $buildExitCode }
 
       - name: Write SHA-256 checksum
         shell: pwsh
