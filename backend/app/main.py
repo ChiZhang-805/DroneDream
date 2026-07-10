@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -13,16 +16,38 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
 from app.config import get_settings
-from app.db import init_db
+from app.db import SessionLocal, init_db
 from app.response import err
 from app.routers import artifacts as artifacts_router
 from app.routers import batches as batches_router
+from app.routers import capabilities as capabilities_router
 from app.routers import health
 from app.routers import jobs as jobs_router
 from app.routers import parameter_catalog as parameter_catalog_router
 from app.routers import trials as trials_router
+from app.services.jobs import purge_expired_job_secrets
 
 logger = logging.getLogger("drone_dream.backend")
+
+
+async def _secret_housekeeping_loop(interval_seconds: int) -> None:
+    """Periodically wipe expired queued-job credentials without a worker."""
+
+    while True:
+        await asyncio.sleep(interval_seconds)
+
+        def purge_once() -> int:
+            with SessionLocal() as db:
+                return purge_expired_job_secrets(db)
+
+        try:
+            purged = await asyncio.to_thread(purge_once)
+            if purged:
+                logger.info("purged %d expired per-job secret(s)", purged)
+        except Exception:
+            # Housekeeping must never terminate the API, but failures are
+            # visible to operators and retried on the next interval.
+            logger.exception("expired-secret housekeeping failed")
 
 
 def create_app() -> FastAPI:
@@ -34,6 +59,18 @@ def create_app() -> FastAPI:
     # Initialize the database tables. Safe to call repeatedly.
     init_db()
 
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        task = asyncio.create_task(
+            _secret_housekeeping_loop(settings.job_secret_cleanup_interval_seconds)
+        )
+        try:
+            yield
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
     app = FastAPI(
         title="DroneDream API",
         version=__version__,
@@ -42,6 +79,7 @@ def create_app() -> FastAPI:
             "APIs backed by SQLAlchemy persistence and the standard "
             "response envelope."
         ),
+        lifespan=lifespan,
     )
 
     app.add_middleware(
@@ -62,6 +100,7 @@ def create_app() -> FastAPI:
     api_v1.include_router(trials_router.router)
     api_v1.include_router(artifacts_router.router)
     api_v1.include_router(parameter_catalog_router.router)
+    api_v1.include_router(capabilities_router.router)
 
     _register_exception_handlers(api_v1)
     app.mount("/api/v1", api_v1)

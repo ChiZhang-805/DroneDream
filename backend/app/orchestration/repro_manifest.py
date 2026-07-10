@@ -18,9 +18,16 @@ from app.orchestration.constants import BASELINE_PARAMETERS, PARAMETER_SAFE_RANG
 _SAFE_ENV_ALLOWLIST: tuple[str, ...] = (
     "PX4_GAZEBO_WORLD",
     "PX4_GAZEBO_VEHICLE",
+    "PX4_GAZEBO_HEADLESS",
+    "PX4_GAZEBO_TIMEOUT_SECONDS",
+    "PX4_GAZEBO_TELEMETRY_FORMAT",
+    "PX4_SIM_SPEED_FACTOR",
+    "PX4_INSTANCE",
     "PX4_RUN_SECONDS",
     "REAL_SIMULATOR_ARTIFACT_ROOT",
     "PX4_AUTOPILOT_DIR",
+    "DRONEDREAM_PX4_EXECUTABLE",
+    "DRONEDREAM_GAZEBO_EXECUTABLE",
 )
 _SENSITIVE_ENV_TOKENS: tuple[str, ...] = ("KEY", "TOKEN", "SECRET", "PASSWORD")
 
@@ -143,6 +150,7 @@ def _trial_summaries(job: models.Job) -> list[dict[str, Any]]:
             "trial_id": t.id,
             "candidate_id": t.candidate_id,
             "scenario_type": t.scenario_type,
+            "scenario_config_json": _sanitize_payload(t.scenario_config_json),
             "seed": t.seed,
             "status": t.status,
             "metrics_summary": {
@@ -179,16 +187,26 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
         },
         "sensor_noise_level": job.sensor_noise_level,
         "objective_profile": job.objective_profile,
+        "baseline_parameter_json": job.baseline_parameter_json,
         "reference_track_json": job.reference_track_json,
         "advanced_scenario_config_json": job.advanced_scenario_config_json,
+        "vehicle_profile_json": job.vehicle_profile_json,
+        "parameter_catalog_version": job.parameter_catalog_version,
+        "parameter_space_json": job.parameter_space_json,
+        "objective_config_json": job.objective_config_json,
+        "scenario_suite_json": job.scenario_suite_json,
         "simulator_backend_requested": job.simulator_backend_requested,
         "optimizer_strategy": job.optimizer_strategy,
         "max_iterations": job.max_iterations,
         "trials_per_candidate": job.trials_per_candidate,
         "max_total_trials": job.max_total_trials,
+        "llm_provider": job.llm_provider,
+        "llm_model": job.openai_model,
+        "llm_base_url": job.llm_base_url,
         "acceptance_criteria": acceptance_criteria,
     }
     return {
+        "manifest_schema_version": "dronedream.repro.v2",
         "project": {
             "app_version": _app_version(),
             "git_commit_hash": git["commit_hash"],
@@ -217,8 +235,7 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
         },
         "optimizer": {
             "parameter_safe_ranges": {
-                key: {"min": lo, "max": hi}
-                for key, (lo, hi) in PARAMETER_SAFE_RANGES.items()
+                key: {"min": lo, "max": hi} for key, (lo, hi) in PARAMETER_SAFE_RANGES.items()
             },
             "baseline_parameters": dict(BASELINE_PARAMETERS),
             "best_candidate_id": best.id,
@@ -229,7 +246,7 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
                 "source_type": best.source_type,
                 "aggregated_score": best.aggregated_score,
             },
-            "best_parameters": dict(best.parameter_json or {}),
+            "best_parameters": _sanitize_payload(dict(best.parameter_json or {})),
             "candidate_summaries": _candidate_summaries(job),
         },
         "simulator": {
@@ -237,6 +254,9 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
             "real_simulator_artifact_root": os.environ.get("REAL_SIMULATOR_ARTIFACT_ROOT"),
             "px4_autopilot_dir": px4_dir,
             "px4_git_commit": _px4_git_commit(px4_dir),
+            # Per-job values are authoritative for an experiment. Environment
+            # values below only describe the process that exported the report.
+            "effective_vehicle_profile": _sanitize_payload(job.vehicle_profile_json),
         },
         "llm": {
             "openai_model": job.openai_model,

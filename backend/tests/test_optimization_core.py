@@ -125,6 +125,41 @@ def test_candidate_evaluation_enforces_worst_case_hard_constraints() -> None:
     assert evaluation.total_violation == 1.0
 
 
+def test_objective_targets_apply_one_sided_aspiration_loss() -> None:
+    config = ObjectiveConfig(
+        objectives=[
+            ObjectiveSpec(
+                metric="rmse",
+                direction="minimize",
+                weight=1.0,
+                normalization=2.0,
+                target=1.0,
+            ),
+            ObjectiveSpec(
+                metric="pass_rate",
+                direction="maximize",
+                weight=1.0,
+                normalization=1.0,
+                target=0.9,
+            ),
+        ]
+    )
+
+    met = evaluate_candidate(
+        [{"rmse": 0.8, "pass_rate": 0.95}],
+        config,
+    )
+    missed = evaluate_candidate(
+        [{"rmse": 1.4, "pass_rate": 0.7}],
+        config,
+    )
+
+    assert met.scalar_loss == 0.0
+    # Equal objective weights: 0.5 * ((1.4 - 1.0) / 2) +
+    # 0.5 * ((0.9 - 0.7) / 1) = 0.2.
+    assert missed.scalar_loss == pytest.approx(0.2)
+
+
 def test_pareto_front_is_constraint_aware_and_recommendations_are_stable() -> None:
     directions = {"rmse": "minimize", "speed": "maximize"}
     points = [

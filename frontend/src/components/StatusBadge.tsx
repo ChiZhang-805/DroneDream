@@ -8,6 +8,7 @@ const STATUS_TONE: Record<AnyStatus, string> = {
   PENDING: "info",
   RUNNING: "active",
   AGGREGATING: "active",
+  FINALIZING: "active",
   COMPLETED: "success",
   FAILED: "danger",
   CANCELLED: "muted",

@@ -319,6 +319,9 @@ export function JobDetail() {
       <StatusSpecificTop job={job} report={report} />
 
       <MetricsCards job={job} report={report} />
+      {report?.optimized_metrics.holdout ? (
+        <HoldoutValidationSummary holdout={report.optimized_metrics.holdout} />
+      ) : null}
       <SectionCard
         title="Best candidate replay"
         description="Trajectory replay renders on Trial Detail using telemetry/trajectory artifacts."
@@ -712,11 +715,11 @@ function StatusSpecificTop({
       </Alert>
     );
   }
-  if (job.status === "AGGREGATING") {
+  if (job.status === "AGGREGATING" || job.status === "FINALIZING") {
     return (
-      <Alert tone="info" title="Aggregating results">
-        All trials have finished. The backend will select the best candidate and
-        emit a report.
+      <Alert tone="info" title="Finalizing results">
+        All trials have finished. The backend is selecting the best candidate,
+        checking stopping criteria, and preparing the report.
       </Alert>
     );
   }
@@ -818,9 +821,9 @@ function MetricsCards({
             tone="positive"
           />
           <MetricCard
-            label="Max error (optimized)"
-            value={`${formatNumber(o.max_error)} m`}
-            sub={`baseline ${formatNumber(b.max_error)} m`}
+            label="Worst max error (optimized)"
+            value={`${formatNumber(o.max_error_worst ?? o.max_error)} m`}
+            sub={`baseline ${formatNumber(b.max_error_worst ?? b.max_error)} m · mean ${formatNumber(o.max_error_mean ?? o.max_error)} m`}
             tone="positive"
           />
           <MetricCard
@@ -858,6 +861,23 @@ function MetricsCards({
         }
       />
     </SectionCard>
+  );
+}
+
+function HoldoutValidationSummary({
+  holdout,
+}: {
+  holdout: NonNullable<JobReport["optimized_metrics"]["holdout"]>;
+}) {
+  const tone = holdout.validation_status === "passed"
+    ? "success"
+    : holdout.validation_status === "incomplete"
+      ? "warning"
+      : "danger";
+  return (
+    <Alert tone={tone} title={`Holdout validation: ${holdout.validation_status}`}>
+      {holdout.completed_trial_count}/{holdout.trial_count} trials completed · {holdout.passing_trial_count} passed · pass rate {(holdout.pass_rate * 100).toFixed(1)}% · failure rate {(holdout.failure_rate * 100).toFixed(1)}%. Holdout evidence never participates in candidate selection.
+    </Alert>
   );
 }
 

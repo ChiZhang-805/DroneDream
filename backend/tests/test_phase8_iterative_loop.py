@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import threading
 from collections.abc import Iterator
 from typing import Any
 
@@ -70,6 +71,7 @@ def _create_job(
     strategy: str = "gpt",
     target_rmse: float | None = 0.5,
     max_iterations: int = 3,
+    min_pass_rate: float = 0.5,
 ) -> str:
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]
@@ -80,7 +82,7 @@ def _create_job(
         max_iterations=max_iterations,
         trials_per_candidate=2,
         acceptance_criteria=schemas.AcceptanceCriteria(
-            target_rmse=target_rmse, min_pass_rate=0.5
+            target_rmse=target_rmse, min_pass_rate=min_pass_rate
         ),
         openai=(
             schemas.OpenAIConfig(api_key="sk-iterative-test") if strategy == "gpt" else None
@@ -143,6 +145,11 @@ def test_gpt_loop_dispatches_generation_after_baseline(gpt_ctx):
         llm_candidates = [c for c in job.candidates if c.source_type == "llm_optimizer"]
         assert len(llm_candidates) >= 1
         assert all(c.trial_count == job.trials_per_candidate for c in llm_candidates)
+        assert all("_rationale" not in c.parameter_json for c in llm_candidates)
+        assert all(
+            all(isinstance(value, int | float) for value in c.parameter_json.values())
+            for c in llm_candidates
+        )
         event_types = [e.event_type for e in job.events]
         assert "llm_proposal_started" in event_types
         assert "generation_dispatched" in event_types
@@ -175,6 +182,67 @@ def test_gpt_failure_marks_job_failed_with_llm_failed_outcome(gpt_ctx):
         assert job.latest_error_code == "LLM_FAILED"
         event_types = [e.event_type for e in job.events]
         assert "llm_proposal_failed" in event_types
+
+
+def test_cancelling_during_llm_call_rolls_back_new_generation(gpt_ctx) -> None:
+    ctx = gpt_ctx
+    job_id = _create_job(ctx, strategy="gpt", target_rmse=0.001, max_iterations=2)
+
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+    while True:
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db, "blocking-llm-worker"
+            )
+        if trial_id is None:
+            break
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingClient:
+        def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
+            entered.set()
+            if not release.wait(timeout=10):
+                raise TimeoutError("test did not release the blocked LLM call")
+            return _gpt_proposal(1.5)
+
+    errors: list[BaseException] = []
+
+    def finalize_in_thread() -> None:
+        try:
+            with ctx["db_module"].SessionLocal() as db:
+                ctx["aggregation"].finalize_ready_jobs(db)
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    ctx["aggregation"].set_llm_client_override(BlockingClient())
+    worker = threading.Thread(target=finalize_in_thread, daemon=True)
+    worker.start()
+    try:
+        assert entered.wait(timeout=10), "finalizer never reached the LLM call"
+        with ctx["db_module"].SessionLocal() as db:
+            ctx["jobs_service"].cancel_job(db, job_id)
+        release.set()
+        worker.join(timeout=10)
+        assert not worker.is_alive(), "finalizer did not stop after cancellation"
+    finally:
+        release.set()
+        ctx["aggregation"].set_llm_client_override(None)
+        worker.join(timeout=10)
+
+    assert errors == []
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.status == "CANCELLED"
+        assert job.current_generation == 0
+        assert [candidate.source_type for candidate in job.candidates] == ["baseline"]
+        assert job.report is None
+        event_types = [event.event_type for event in job.events]
+        assert "job_cancelled" in event_types
+        assert "generation_dispatched" not in event_types
+        assert "llm_proposal_completed" not in event_types
 
 
 def test_heuristic_mode_still_finalizes_and_purges_secrets(gpt_ctx):
@@ -217,6 +285,29 @@ def test_cma_es_max_iterations_reached_yields_best_so_far(gpt_ctx):
         assert job.current_generation == 1
         assert job.optimization_outcome == "max_iterations_reached"
         assert job.report is not None
+
+
+@pytest.mark.parametrize("strategy", ["cma_es", "gpt"])
+def test_iterative_optimizer_without_stopping_target_uses_budget(gpt_ctx, strategy):
+    ctx = gpt_ctx
+    job_id = _create_job(
+        ctx,
+        strategy=strategy,
+        target_rmse=None,
+        min_pass_rate=0.0,
+        max_iterations=1,
+    )
+    client = (
+        FakeOpenAIClient([_gpt_proposal(1.5)])
+        if strategy == "gpt"
+        else None
+    )
+
+    assert _drive(ctx, job_id, client=client, max_ticks=80) == "COMPLETED"
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.current_generation == 1
+        assert len([candidate for candidate in job.candidates if not candidate.is_baseline]) == 1
 
 
 def test_acceptance_evaluator_checks_thresholds(gpt_ctx):

@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type {
+  ParameterApplyPolicy,
   PX4ParameterDefinition,
   TuningMode,
 } from "../types/api";
@@ -28,7 +29,14 @@ const GROUP_KEYS: Record<string, TranslationKey> = {
   attitude: "parameter.group.attitude",
   angular_rate: "parameter.group.rate",
   motion_limits: "parameter.group.limits",
+  thrust_and_authority: "parameter.group.thrust",
   filters: "parameter.group.filters",
+};
+
+const APPLY_POLICY_KEYS: Record<ParameterApplyPolicy, TranslationKey> = {
+  live: "parameter.apply.live",
+  disarmed: "parameter.apply.disarmed",
+  reboot: "parameter.apply.reboot",
 };
 
 export function ParameterSelector({
@@ -43,19 +51,95 @@ export function ParameterSelector({
 }: ParameterSelectorProps) {
   const { locale, t } = useI18n();
   const [query, setQuery] = useState("");
+  const [groupFilter, setGroupFilter] = useState("all");
+  const [riskFilter, setRiskFilter] = useState<"all" | PX4ParameterDefinition["risk"]>("all");
+  const [selectionFilter, setSelectionFilter] = useState<"all" | "selected" | "unselected">("all");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set(
+      catalog
+        .filter((parameter) => selections[parameter.name]?.selected)
+        .map((parameter) => parameter.group),
+    ),
+  );
   const normalizedQuery = query.trim().toLowerCase();
+  const groups = useMemo(
+    () => [...new Set(catalog.map((parameter) => parameter.group))],
+    [catalog],
+  );
   const filtered = useMemo(
     () =>
-      catalog.filter((parameter) =>
-        normalizedQuery === ""
-          ? true
-          : `${parameter.name} ${parameter.label} ${parameter.group}`
-              .toLowerCase()
-              .includes(normalizedQuery),
-      ),
-    [catalog, normalizedQuery],
+      catalog.filter((parameter) => {
+        const selection = selections[parameter.name];
+        const searchText = [
+          parameter.name,
+          parameter.label,
+          parameter.description,
+          parameter.group,
+          parameter.localized_label?.[locale],
+          parameter.localized_description?.[locale],
+          parameter.unit,
+          parameter.control_loop,
+          parameter.apply_policy,
+          parameter.risk_note?.[locale],
+          parameter.risk_note?.en,
+          ...parameter.dependencies,
+          ...(parameter.axes ?? []),
+          ...(parameter.preconditions ?? []),
+          ...(parameter.flight_modes ?? []),
+          ...(parameter.choices ?? []).flatMap((choice) => [
+            String(choice.value),
+            choice.label[locale],
+            choice.label.en,
+          ]),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return (
+          (normalizedQuery === "" || searchText.includes(normalizedQuery)) &&
+          (groupFilter === "all" || parameter.group === groupFilter) &&
+          (riskFilter === "all" || parameter.risk === riskFilter) &&
+          (selectionFilter === "all" ||
+            (selectionFilter === "selected" ? selection?.selected : !selection?.selected))
+        );
+      }),
+    [catalog, groupFilter, locale, normalizedQuery, riskFilter, selectionFilter, selections],
   );
-  const selectedCount = Object.values(selections).filter((item) => item.selected).length;
+  const selectedNames = useMemo(
+    () => new Set(Object.values(selections).filter((item) => item.selected).map((item) => item.name)),
+    [selections],
+  );
+  const selectedCount = selectedNames.size;
+  const selectedDefinitions = catalog.filter((parameter) => selectedNames.has(parameter.name));
+  const highRiskCount = selectedDefinitions.filter((parameter) => parameter.risk === "high").length;
+  const rebootCount = selectedDefinitions.filter((parameter) => parameter.requires_reboot).length;
+  const outsideSafeCount = selectedDefinitions.filter((parameter) => {
+    const selection = selections[parameter.name];
+    return selection && (
+      selection.search_min < parameter.safe_min || selection.search_max > parameter.safe_max
+    );
+  }).length;
+  const missingDependencies = useMemo(() => {
+    const missing = new Set<string>();
+    for (const parameter of catalog) {
+      if (!selectedNames.has(parameter.name)) continue;
+      for (const dependency of parameter.dependencies) {
+        if (selections[dependency] && !selectedNames.has(dependency)) missing.add(dependency);
+      }
+    }
+    return [...missing];
+  }, [catalog, selectedNames, selections]);
+  const filtersActive = normalizedQuery !== "" || groupFilter !== "all" || riskFilter !== "all" || selectionFilter !== "all";
+
+  useEffect(() => {
+    const selectedGroups = catalog
+      .filter((parameter) => selectedNames.has(parameter.name))
+      .map((parameter) => parameter.group);
+    setExpandedGroups((current) => {
+      if (selectedGroups.every((group) => current.has(group))) return current;
+      return new Set([...current, ...selectedGroups]);
+    });
+  }, [catalog, selectedNames]);
 
   function patchSelection(
     name: string,
@@ -72,6 +156,50 @@ export function ParameterSelector({
       if (next[parameter.name]) next[parameter.name] = { ...next[parameter.name], selected };
     }
     onChange(next);
+  }
+
+  function includeDependencies(): void {
+    const next = { ...selections };
+    const definitions = new Map(catalog.map((parameter) => [parameter.name, parameter]));
+    const pending = [...selectedNames];
+    const visited = new Set<string>();
+    while (pending.length > 0) {
+      const name = pending.pop();
+      if (!name || visited.has(name)) continue;
+      visited.add(name);
+      for (const dependency of definitions.get(name)?.dependencies ?? []) {
+        if (!next[dependency]) continue;
+        next[dependency] = { ...next[dependency], selected: true };
+        pending.push(dependency);
+      }
+    }
+    onChange(next);
+  }
+
+  function restoreSafeRange(parameter: PX4ParameterDefinition): void {
+    patchSelection(parameter.name, {
+      baseline: parameter.default_value,
+      search_min: parameter.safe_min,
+      search_max: parameter.safe_max,
+      scale: parameter.scale,
+    });
+  }
+
+  function parseNumericInput(raw: string): number {
+    return raw.trim() === "" ? Number.NaN : Number(raw);
+  }
+
+  function numericInputValue(value: number): number | "" {
+    return Number.isFinite(value) ? value : "";
+  }
+
+  function toggleGroup(group: string): void {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
   }
 
   return (
@@ -103,6 +231,40 @@ export function ParameterSelector({
             placeholder={t("parameter.placeholder")}
           />
         </label>
+        <label className="parameter-filter">
+          <span>{t("parameter.filterGroup")}</span>
+          <select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>
+            <option value="all">{t("parameter.allGroups")}</option>
+            {groups.map((group) => (
+              <option key={group} value={group}>
+                {GROUP_KEYS[group] ? t(GROUP_KEYS[group]) : group}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="parameter-filter">
+          <span>{t("parameter.filterRisk")}</span>
+          <select
+            value={riskFilter}
+            onChange={(event) => setRiskFilter(event.target.value as typeof riskFilter)}
+          >
+            <option value="all">{t("parameter.allRisks")}</option>
+            <option value="low">{t("parameter.riskLow")}</option>
+            <option value="medium">{t("parameter.riskMedium")}</option>
+            <option value="high">{t("parameter.riskHigh")}</option>
+          </select>
+        </label>
+        <label className="parameter-filter">
+          <span>{t("parameter.filterSelection")}</span>
+          <select
+            value={selectionFilter}
+            onChange={(event) => setSelectionFilter(event.target.value as typeof selectionFilter)}
+          >
+            <option value="all">{t("parameter.allParameters")}</option>
+            <option value="selected">{t("parameter.selectedOnly")}</option>
+            <option value="unselected">{t("parameter.unselectedOnly")}</option>
+          </select>
+        </label>
         <button type="button" className="btn btn-ghost btn-small" onClick={() => onApplyPreset(mode)}>
           {t("parameter.reapply")} · {t(`wizard.mode.${mode}` as TranslationKey)}
         </button>
@@ -118,16 +280,62 @@ export function ParameterSelector({
         ) : null}
       </div>
 
+      {highRiskCount > 0 || rebootCount > 0 || outsideSafeCount > 0 ? (
+        <div className="parameter-safety-summary" role="status">
+          <strong>{t("parameter.safetyReview")}</strong>
+          <span>
+            {highRiskCount} {t("parameter.highRiskSelected")} · {rebootCount} {t("parameter.restartSelected")} · {outsideSafeCount} {t("parameter.outsideSafeSelected")}
+          </span>
+        </div>
+      ) : null}
+      {missingDependencies.length > 0 ? (
+        <div className="parameter-dependency-summary" role="status">
+          <span>
+            {t("parameter.missingCompanions")}: <code>{missingDependencies.join(", ")}</code>
+          </span>
+          <button type="button" className="btn btn-ghost btn-small" onClick={includeDependencies}>
+            {t("parameter.includeCompanions")}
+          </button>
+        </div>
+      ) : null}
+
       {errors.parameters ? <div className="form-error" role="alert">{errors.parameters}</div> : null}
 
       <div className="parameter-groups">
-        {groupCatalog(filtered).map(([group, parameters]) => (
+        {groupCatalog(filtered).map(([group, parameters]) => {
+          const expanded = filtersActive || expandedGroups.has(group);
+          const groupLabel = GROUP_KEYS[group] ? t(GROUP_KEYS[group]) : group;
+          return (
           <section key={group} className="parameter-group">
             <header className="parameter-group-header">
-              <h3>{GROUP_KEYS[group] ? t(GROUP_KEYS[group]) : group}</h3>
-              <span>{parameters.filter((parameter) => selections[parameter.name]?.selected).length}/{parameters.length} {t("parameter.selected")}</span>
+              <div>
+                <h3>{groupLabel}</h3>
+                <span>{parameters.filter((parameter) => selections[parameter.name]?.selected).length}/{parameters.length} {t("parameter.selected")}</span>
+              </div>
+              <div className="parameter-group-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-small"
+                  aria-expanded={expanded}
+                  aria-label={`${expanded ? t("parameter.collapseGroup") : t("parameter.expandGroup")}: ${groupLabel}`}
+                  disabled={filtersActive}
+                  onClick={() => toggleGroup(group)}
+                >
+                  {expanded ? t("parameter.collapseGroup") : t("parameter.expandGroup")}
+                </button>
+                {mode !== "basic" ? (
+                  <>
+                  <button type="button" className="btn btn-ghost btn-small" aria-label={`${t("parameter.selectGroup")}: ${groupLabel}`} onClick={() => setGroupSelected(parameters, true)}>
+                    {t("parameter.selectGroup")}
+                  </button>
+                  <button type="button" className="btn btn-ghost btn-small" aria-label={`${t("parameter.clearGroup")}: ${groupLabel}`} onClick={() => setGroupSelected(parameters, false)}>
+                    {t("parameter.clearGroup")}
+                  </button>
+                  </>
+                ) : null}
+              </div>
             </header>
-            <div className="parameter-table-wrap">
+            {expanded ? <div className="parameter-table-wrap">
               <table className="parameter-table">
                 <thead>
                   <tr>
@@ -144,6 +352,12 @@ export function ParameterSelector({
                     const selection = selections[parameter.name];
                     if (!selection) return null;
                     const parameterError = errors[parameter.name];
+                    const outsideSafeRange = selection.selected && (
+                      selection.search_min < parameter.safe_min ||
+                      selection.search_max > parameter.safe_max
+                    );
+                    const riskNote = parameter.risk_note?.[locale] ?? parameter.risk_note?.en;
+                    const hasSafetyGuidance = Boolean(riskNote) || Boolean(parameter.preconditions?.length);
                     return (
                       <tr
                         key={parameter.name}
@@ -168,6 +382,20 @@ export function ParameterSelector({
                             {t("parameter.absolute")}: {parameter.absolute_min}–{parameter.absolute_max}{parameter.unit ? ` ${parameter.unit}` : ""}
                             {parameter.requires_reboot ? ` · ${t("parameter.restart")}` : ""}
                           </span>
+                          {parameter.apply_policy ? (
+                            <span className="parameter-metadata">
+                              <span className={`apply-policy-badge apply-policy-${parameter.apply_policy}`}>
+                                {t("parameter.applyPolicy")}: {t(APPLY_POLICY_KEYS[parameter.apply_policy])}
+                              </span>
+                            </span>
+                          ) : null}
+                          {parameter.choices?.length ? (
+                            <span className="parameter-choices">
+                              {t("parameter.discreteChoices")}: {parameter.choices.map((choice) => (
+                                `${choice.value}: ${choice.label[locale] ?? choice.label.en}`
+                              )).join(" · ")}
+                            </span>
+                          ) : null}
                         </td>
                         <td>
                           <label className="sr-only" htmlFor={`parameter-${parameter.name}-baseline`}>
@@ -179,10 +407,10 @@ export function ParameterSelector({
                             step={parameter.step}
                             min={parameter.absolute_min}
                             max={parameter.absolute_max}
-                            value={selection.baseline}
+                            value={numericInputValue(selection.baseline)}
                             disabled={!selection.selected}
                             onChange={(event) =>
-                              patchSelection(parameter.name, { baseline: Number(event.target.value) })
+                              patchSelection(parameter.name, { baseline: parseNumericInput(event.target.value) })
                             }
                           />
                         </td>
@@ -197,10 +425,10 @@ export function ParameterSelector({
                               step={parameter.step}
                               min={parameter.absolute_min}
                               max={parameter.absolute_max}
-                              value={selection.search_min}
+                              value={numericInputValue(selection.search_min)}
                               disabled={!selection.selected}
                               onChange={(event) =>
-                                patchSelection(parameter.name, { search_min: Number(event.target.value) })
+                                patchSelection(parameter.name, { search_min: parseNumericInput(event.target.value) })
                               }
                             />
                           </td>
@@ -216,10 +444,10 @@ export function ParameterSelector({
                               step={parameter.step}
                               min={parameter.absolute_min}
                               max={parameter.absolute_max}
-                              value={selection.search_max}
+                              value={numericInputValue(selection.search_max)}
                               disabled={!selection.selected}
                               onChange={(event) =>
-                                patchSelection(parameter.name, { search_max: Number(event.target.value) })
+                                patchSelection(parameter.name, { search_max: parseNumericInput(event.target.value) })
                               }
                             />
                           </td>
@@ -233,6 +461,35 @@ export function ParameterSelector({
                           ) : (
                             <span className="parameter-dependencies">{t("parameter.independent")}</span>
                           )}
+                          {selection.selected && parameter.dependencies.some((name) => selections[name] && !selections[name].selected) ? (
+                            <span className="parameter-dependency-missing">{t("parameter.companionNotSelected")}</span>
+                          ) : null}
+                          {outsideSafeRange ? (
+                            <span className="parameter-dependency-missing">{t("parameter.outsideSafeRange")}</span>
+                          ) : null}
+                          {hasSafetyGuidance ? (
+                            <details className="parameter-guidance">
+                              <summary>{t("parameter.safetyGuidance")}</summary>
+                              {riskNote ? <p>{riskNote}</p> : null}
+                              {parameter.preconditions?.length ? (
+                                <ul>
+                                  {parameter.preconditions.map((precondition) => (
+                                    <li key={precondition}>{precondition}</li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </details>
+                          ) : null}
+                          {mode !== "basic" ? (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-small parameter-safe-reset"
+                              disabled={!selection.selected}
+                              onClick={() => restoreSafeRange(parameter)}
+                            >
+                              {t("parameter.restoreSafe")}
+                            </button>
+                          ) : null}
                           {parameterError ? <span className="form-error" role="alert">{parameterError}</span> : null}
                         </td>
                       </tr>
@@ -240,9 +497,10 @@ export function ParameterSelector({
                   })}
                 </tbody>
               </table>
-            </div>
+            </div> : null}
           </section>
-        ))}
+          );
+        })}
       </div>
       {filtered.length === 0 ? <div className="insight-empty">{t("parameter.noMatches")}</div> : null}
     </div>

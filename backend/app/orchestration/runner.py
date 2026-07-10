@@ -29,6 +29,7 @@ from app.orchestration.aggregation import finalize_ready_jobs
 from app.orchestration.job_manager import start_queued_jobs
 from app.orchestration.trial_executor import claim_and_run_one_pending_trial
 from app.orchestration.worker_presence import WorkerPresenceHeartbeat
+from app.services.jobs import purge_expired_job_secrets
 
 logger = logging.getLogger("drone_dream.orchestration.runner")
 
@@ -58,6 +59,9 @@ def tick(worker_id: str) -> dict[str, object]:
     """
 
     with SessionLocal() as db:
+        expired_secrets = purge_expired_job_secrets(db)
+
+    with SessionLocal() as db:
         started = start_queued_jobs(db)
 
     with SessionLocal() as db:
@@ -66,7 +70,12 @@ def tick(worker_id: str) -> dict[str, object]:
     with SessionLocal() as db:
         finalized = finalize_ready_jobs(db)
 
-    return {"started": started, "trial_id": trial_id, "finalized": finalized}
+    return {
+        "started": started,
+        "trial_id": trial_id,
+        "finalized": finalized,
+        "expired_secrets": expired_secrets,
+    }
 
 
 def run_forever(

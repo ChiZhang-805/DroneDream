@@ -11,8 +11,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
 from app import models
+from app.orchestration.acceptance import criteria_for_job, evaluate_candidate
 
 _SECRET_TOKENS = ("secret", "api_key", "token", "password", "key")
+
+
+def _worst_max_error(aggregate: dict[str, Any]) -> Any:
+    return aggregate.get("max_error_worst", aggregate.get("max_error"))
 
 
 def _fmt_dt(value: datetime | None) -> str:
@@ -248,8 +253,8 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         f"{_pct_change(baseline_agg.get('rmse'), best_agg.get('rmse'))}"
     )
     add(
-        "- Baseline vs best max_error change: "
-        f"{_pct_change(baseline_agg.get('max_error'), best_agg.get('max_error'))}"
+        "- Baseline vs best worst max_error change: "
+        f"{_pct_change(_worst_max_error(baseline_agg), _worst_max_error(best_agg))}"
     )
     add(
         "- Baseline vs best completion_time change: "
@@ -310,49 +315,32 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- target_rmse: {_fmt_num(job.target_rmse, digits=3)}")
     add(f"- target_max_error: {_fmt_num(job.target_max_error, digits=3)}")
     add(f"- min_pass_rate: {_fmt_num(job.min_pass_rate, digits=3)}")
-    pass_count = 0
-    completed_count = 0
-    for trial in best.trials if best is not None else []:
-        if trial.status != "COMPLETED" or trial.metric is None:
-            continue
-        completed_count += 1
-        if trial.metric.pass_flag:
-            pass_count += 1
-    pass_rate = (pass_count / completed_count) if completed_count else None
-    reasons: list[str] = []
-    if isinstance(job.target_rmse, (int, float)):
-        rmse_value = best_agg.get("rmse")
-        if not isinstance(rmse_value, (int, float)) or rmse_value > job.target_rmse:
-            reasons.append(
-                "rmse="
-                f"{_fmt_num(rmse_value, digits=3)} > "
-                f"target={_fmt_num(job.target_rmse, digits=3)}"
-            )
-    if isinstance(job.target_max_error, (int, float)):
-        max_error_value = best_agg.get("max_error")
-        if (
-            not isinstance(max_error_value, (int, float))
-            or max_error_value > job.target_max_error
-        ):
-            reasons.append(
-                "max_error="
-                f"{_fmt_num(max_error_value, digits=3)} > "
-                f"target={_fmt_num(job.target_max_error, digits=3)}"
-            )
-    if isinstance(job.min_pass_rate, (int, float)) and (
-        pass_rate is None or pass_rate < job.min_pass_rate
-    ):
-        reasons.append(
-            f"pass_rate={_fmt_num(pass_rate, digits=3)} < "
-            f"min={_fmt_num(job.min_pass_rate, digits=3)}"
+    acceptance = (
+        evaluate_candidate(best, criteria_for_job(job)) if best is not None else None
+    )
+    add(
+        "- Best candidate meets acceptance: "
+        f"{'yes' if acceptance is not None and acceptance.passed else 'no'}"
+    )
+    if acceptance is not None:
+        add(
+            "  - evaluator="
+            f"{acceptance.reason}, pass_rate={_fmt_num(acceptance.pass_rate, digits=3)}, "
+            f"completion_rate={_fmt_num(acceptance.completion_rate, digits=3)}, "
+            f"rmse={_fmt_num(acceptance.rmse, digits=3)}, "
+            f"worst_max_error={_fmt_num(acceptance.max_error, digits=3)}"
         )
-    add(f"- Best candidate meets acceptance: {'yes' if not reasons else 'no'}")
-    if reasons:
-        add("- Rejection reasons:")
-        for reason in reasons:
-            add(f"  - {reason}")
-    else:
-        add("- Rejection reasons: —")
+    holdout = best_agg.get("holdout")
+    if isinstance(holdout, dict):
+        add(
+            "- Holdout validation: "
+            f"status={holdout.get('validation_status', 'unknown')}, "
+            f"feasible={_fmt_num(holdout.get('feasible'))}, "
+            f"completed={holdout.get('completed_trial_count', 0)}/"
+            f"{holdout.get('trial_count', 0)}, "
+            f"pass_rate={_fmt_num(holdout.get('pass_rate'), digits=3)}, "
+            f"failure_rate={_fmt_num(holdout.get('failure_rate'), digits=3)}"
+        )
 
     add("")
     add("5) Baseline metrics")
@@ -368,7 +356,8 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     else:
         add("- Baseline parameters: —")
     add(f"- Aggregated RMSE: {_fmt_num(baseline_agg.get('rmse'), digits=3)} m")
-    add(f"- Aggregated max_error: {_fmt_num(baseline_agg.get('max_error'), digits=3)} m")
+    add(f"- Mean max_error: {_fmt_num(baseline_agg.get('max_error'), digits=3)} m")
+    add(f"- Worst max_error: {_fmt_num(_worst_max_error(baseline_agg), digits=3)} m")
     add(f"- Completion time: {_fmt_num(baseline_agg.get('completion_time'), digits=2)} s")
     score = baseline_agg.get("aggregated_score") or baseline_agg.get("score")
     add(f"- Score: {_fmt_num(score, digits=4)}")
@@ -403,7 +392,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         add(f"  params {_truncate(json.dumps(focus_params, ensure_ascii=False), limit=220)}")
         metrics_text = (
             f"  metrics rmse={_fmt_num(agg.get('rmse'), digits=3)} "
-            f"max_error={_fmt_num(agg.get('max_error'), digits=3)} "
+            f"worst_max_error={_fmt_num(_worst_max_error(agg), digits=3)} "
             f"completion={_fmt_num(agg.get('completion_time'), digits=2)}s "
             f"score={_fmt_num(agg.get('aggregated_score') or candidate.aggregated_score, digits=4)}"
         )
@@ -445,7 +434,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- best generation index: {best.generation_index if best else '—'}")
     metric_summary = (
         f"- best aggregated metrics: rmse={_fmt_num(best_agg.get('rmse'), digits=3)} m, "
-        f"max_error={_fmt_num(best_agg.get('max_error'), digits=3)} m, "
+        f"worst_max_error={_fmt_num(_worst_max_error(best_agg), digits=3)} m, "
         f"completion={_fmt_num(best_agg.get('completion_time'), digits=2)} s, "
         f"score={_fmt_num(best_agg.get('aggregated_score'), digits=4)}"
     )

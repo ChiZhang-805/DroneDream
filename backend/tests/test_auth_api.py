@@ -90,6 +90,13 @@ def test_auth_mode_disabled_allows_requests_without_token(client: TestClient, mo
     created = client.post("/api/v1/jobs", json=PAYLOAD)
     assert created.status_code == 200
 
+    with db.SessionLocal() as session:
+        local_user = session.query(models.User).filter_by(
+            email="default@drone-dream.local"
+        ).one()
+        assert local_user.identity_provider == "urn:dronedream:local"
+        assert local_user.external_subject == "default@drone-dream.local"
+
 
 def test_demo_token_artifact_isolation_for_trial_owner(
     client: TestClient, monkeypatch: object, tmp_path: Path
@@ -199,6 +206,102 @@ def test_oidc_subjects_are_isolated_even_when_email_matches(
         f"/api/v1/jobs/{job_id}", headers={"Authorization": "Bearer token-b"}
     )
     assert denied.status_code == 404
+
+
+def test_demo_identity_does_not_adopt_oidc_user_with_same_email(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("AUTH_MODE", "oidc_jwt")
+    monkeypatch.setenv("OIDC_ISSUER", "https://identity.example.test/")
+    monkeypatch.setenv("OIDC_AUDIENCE", "dronedream-api")
+    monkeypatch.setenv("OIDC_JWKS_URL", "https://identity.example.test/jwks.json")
+    get_settings.cache_clear()
+
+    monkeypatch.setattr(
+        "app.auth._decode_oidc_token",
+        lambda _token, _settings: {
+            "sub": "oidc-subject",
+            "email": "shared@example.com",
+            "name": "OIDC User",
+        },
+    )
+    oidc_job = client.post(
+        "/api/v1/jobs",
+        headers={"Authorization": "Bearer oidc-token"},
+        json=PAYLOAD,
+    )
+    assert oidc_job.status_code == 200, oidc_job.text
+    oidc_job_id = oidc_job.json()["data"]["id"]
+
+    monkeypatch.setenv("AUTH_MODE", "demo_token")
+    monkeypatch.setenv("DEMO_AUTH_TOKENS", "shared@example.com:demo-token")
+    get_settings.cache_clear()
+    demo_job = client.post(
+        "/api/v1/jobs",
+        headers={"Authorization": "Bearer demo-token"},
+        json=PAYLOAD,
+    )
+    assert demo_job.status_code == 200, demo_job.text
+
+    denied = client.get(
+        f"/api/v1/jobs/{oidc_job_id}",
+        headers={"Authorization": "Bearer demo-token"},
+    )
+    assert denied.status_code == 404
+
+    with db.SessionLocal() as session:
+        users = list(
+            session.query(models.User)
+            .filter(models.User.email == "shared@example.com")
+            .all()
+        )
+        assert len(users) == 2
+        assert {user.identity_provider for user in users} == {
+            "https://identity.example.test/",
+            "urn:dronedream:local",
+        }
+
+
+def test_demo_token_hides_other_and_legacy_unowned_batches(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("AUTH_MODE", "demo_token")
+    monkeypatch.setenv("DEMO_AUTH_TOKENS", "a@example.com:token-a,b@example.com:token-b")
+    get_settings.cache_clear()
+
+    created = client.post(
+        "/api/v1/batches",
+        headers={"Authorization": "Bearer token-a"},
+        json={"name": "owned-by-a", "jobs": [PAYLOAD]},
+    )
+    assert created.status_code == 200, created.text
+    owned_id = created.json()["data"]["id"]
+
+    with db.SessionLocal() as session:
+        legacy = models.BatchJob(user_id=None, name="legacy-unowned", status="QUEUED")
+        session.add(legacy)
+        session.commit()
+        legacy_id = legacy.id
+
+    listing = client.get(
+        "/api/v1/batches", headers={"Authorization": "Bearer token-b"}
+    )
+    assert listing.status_code == 200
+    assert listing.json()["data"]["items"] == []
+    assert (
+        client.get(
+            f"/api/v1/batches/{owned_id}",
+            headers={"Authorization": "Bearer token-b"},
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/batches/{legacy_id}",
+            headers={"Authorization": "Bearer token-b"},
+        ).status_code
+        == 404
+    )
 
 
 def test_oidc_invalid_token_returns_bearer_challenge(

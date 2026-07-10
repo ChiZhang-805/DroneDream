@@ -222,6 +222,37 @@ def _readback_mismatches(
     return mismatches
 
 
+def _reject_reboot_required_live_parameters(
+    requested: Mapping[str, Number],
+    *,
+    px4_version: str,
+) -> None:
+    """Prevent a live write from masquerading as an applied reboot parameter.
+
+    ``PX4ParameterClient`` intentionally exposes only get/set operations.  It
+    cannot restart PX4 and re-establish the vehicle connection, so accepting a
+    reboot-policy parameter here would let the same flight continue with an
+    unverified old value.  Startup-environment injection remains supported by
+    :func:`build_px4_parameter_environment` and is verified separately after
+    the new SITL process connects.
+    """
+
+    requires_restart: list[str] = []
+    for name in requested:
+        definition = get_parameter(name, px4_version=px4_version)
+        assert definition is not None
+        if definition.requires_reboot or definition.apply_policy == "reboot":
+            requires_restart.append(name)
+    if not requires_restart:
+        return
+    rendered = ", ".join(sorted(requires_restart))
+    raise ParameterApplicationError(
+        "PX4 live parameter application cannot safely apply reboot-required "
+        f"parameters: {rendered}. Start a fresh SITL process with PX4_PARAM_* "
+        "startup overrides, then perform readback verification before flight."
+    )
+
+
 async def apply_and_verify_parameters(
     requested: Mapping[str, object],
     client: PX4ParameterClient,
@@ -254,6 +285,10 @@ async def apply_and_verify_parameters(
     before: dict[str, Number] = {}
     applied: dict[str, Number] = {}
     try:
+        _reject_reboot_required_live_parameters(
+            normalized,
+            px4_version=normalized_version,
+        )
         before = await _read_all(client, names, px4_version=normalized_version)
         _write_evidence(
             evidence_dir,

@@ -225,12 +225,12 @@ updates = {
     'REAL_SIMULATOR_TIMEOUT_SECONDS': '900',
     'REAL_SIMULATOR_KEEP_RUN_DIRS': 'true',
     'PX4_GAZEBO_DRY_RUN': 'false',
-    'PX4_GAZEBO_LAUNCH_COMMAND': f'"{px4}/.venv/bin/python {repo}/scripts/simulators/local_px4_launch_wrapper.py --run-dir {{run_dir}} --input {{trial_input}} --params {{params_json}} --track {{track_json}} --telemetry {{telemetry_json}} --stdout-log {{stdout_log}} --stderr-log {{stderr_log}} --vehicle {{vehicle}} --world {{world}} --headless {{headless}}"',
+    'PX4_GAZEBO_LAUNCH_COMMAND': f'"{px4}/.venv/bin/python {repo}/scripts/simulators/local_px4_launch_wrapper.py --run-dir {{run_dir}} --input {{trial_input}} --params {{params_json}} --px4-params {{px4_params_json}} --track {{track_json}} --telemetry {{telemetry_json}} --stdout-log {{stdout_log}} --stderr-log {{stderr_log}} --vehicle {{vehicle}} --world {{world}} --headless {{headless}}"',
     'PX4_GAZEBO_TIMEOUT_SECONDS': '900',
     'PX4_GAZEBO_HEADLESS': 'false',
     'PX4_GAZEBO_KEEP_RAW_LOGS': 'true',
-    'PX4_GAZEBO_VEHICLE': 'x500',
-    'PX4_GAZEBO_WORLD': 'default',
+    'PX4_GAZEBO_VEHICLE': '',
+    'PX4_GAZEBO_WORLD': '',
     'PX4_SITE_DRY_RUN': 'false',
     'PX4_AUTOPILOT_DIR': str(px4),
     'PX4_SETUP_COMMANDS': f'"source {px4}/.venv/bin/activate"',
@@ -452,6 +452,7 @@ Sensor Noise Level: medium
 Objective Profile: robust
 Simulator Backend: real_cli
 Optimizer Strategy: heuristic
+Scenario matrix: click "Use bundled nominal-only matrix"
 Target RMSE: 0.50
 Min Pass Rate: 0.80
 ```
@@ -478,6 +479,7 @@ Score lower-is-better
 ```text
 Simulator Backend: real_cli
 Optimizer Strategy: gpt
+Scenario matrix: click "Use bundled nominal-only matrix"
 Max Iterations: 2
 Trials per Candidate: 1
 Target RMSE: 0.30

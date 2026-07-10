@@ -41,20 +41,32 @@ def _comparison_points(
     """Build the baseline-vs-optimized comparison list used by the frontend."""
 
     def _point(
-        key: str, label: str, unit: str | None, *, lower_is_better: bool
+        key: str,
+        label: str,
+        unit: str | None,
+        *,
+        lower_is_better: bool,
+        source_key: str | None = None,
     ) -> dict[str, Any]:
+        value_key = source_key or key
         return {
             "metric": key,
             "label": label,
-            "baseline": baseline_agg[key],
-            "optimized": best_agg[key],
+            "baseline": baseline_agg.get(value_key, baseline_agg.get("max_error")),
+            "optimized": best_agg.get(value_key, best_agg.get("max_error")),
             "lower_is_better": lower_is_better,
             "unit": unit,
         }
 
     return [
         _point("rmse", "RMSE", "m", lower_is_better=True),
-        _point("max_error", "Max error", "m", lower_is_better=True),
+        _point(
+            "max_error_worst",
+            "Worst max error",
+            "m",
+            lower_is_better=True,
+            source_key="max_error_worst",
+        ),
         _point("overshoot_count", "Overshoot", None, lower_is_better=True),
         _point("completion_time", "Completion time", "s", lower_is_better=True),
         _point("score", "Score", None, lower_is_better=True),
@@ -64,13 +76,19 @@ def _comparison_points(
 def _report_metrics(agg: dict[str, Any]) -> dict[str, Any]:
     """Narrow an aggregate dict to the :class:`AggregatedMetrics` schema shape."""
 
-    return {
+    result: dict[str, Any] = {
         "rmse": agg["rmse"],
         "max_error": agg["max_error"],
+        "max_error_mean": agg.get("max_error_mean", agg["max_error"]),
+        "max_error_worst": agg.get("max_error_worst", agg["max_error"]),
         "overshoot_count": agg["overshoot_count"],
         "completion_time": agg["completion_time"],
         "score": agg["score"],
     }
+    for key in ("completion_rate", "failure_rate", "pass_rate", "holdout"):
+        if key in agg:
+            result[key] = agg[key]
+    return result
 
 
 # --- Summary text ----------------------------------------------------------

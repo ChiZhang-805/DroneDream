@@ -19,6 +19,7 @@ module.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -151,14 +152,14 @@ def generate_candidates(
     Raises
     ------
     ValueError
-        If ``count`` is out of the [2, 5] range, or the baseline is missing
+        If ``count`` is out of the [1, 5] range, or the baseline is missing
         any tunable key.
     """
 
     target = constants.OPTIMIZER_CANDIDATE_COUNT if count is None else count
-    if target < 2 or target > 5:
+    if target < 1 or target > 5:
         raise ValueError(
-            f"Optimizer candidate count must be in [2, 5], got {target}."
+            f"Optimizer candidate count must be in [1, 5], got {target}."
         )
     if target > len(_PERTURBATIONS):
         raise ValueError(
@@ -195,17 +196,21 @@ def generate_selected_parameter_candidates(
     parameter_space_json: list[dict[str, Any]],
     *,
     count: int = 3,
+    candidate_validator: Callable[[Mapping[str, float]], None] | None = None,
 ) -> list[CandidateProposal]:
     """Generate a space-filling first generation for arbitrary PX4 parameters."""
 
-    if count < 1 or count > 32:
-        raise ValueError("selected-parameter candidate count must be in [1, 32]")
+    if count < 1 or count > 100:
+        raise ValueError("selected-parameter candidate count must be in [1, 100]")
     selections = [
         schemas.ParameterSelection(**item)
         for item in parameter_space_json
         if item.get("enabled", True)
     ]
-    search_space = SearchSpace.from_schema(selections)
+    search_space = SearchSpace.from_schema(
+        selections,
+        candidate_validator=candidate_validator,
+    )
     design = halton_design(search_space, count + 1, include_baseline=True)
     non_baseline = design[1 : count + 1]
     return [

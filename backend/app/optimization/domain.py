@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from app.schemas import ParameterSelection
@@ -93,7 +93,12 @@ class ParameterDomain:
 class SearchSpace:
     """Ordered collection of independent numeric PX4 parameter domains."""
 
-    def __init__(self, domains: Sequence[ParameterDomain]) -> None:
+    def __init__(
+        self,
+        domains: Sequence[ParameterDomain],
+        *,
+        candidate_validator: Callable[[Mapping[str, float]], None] | None = None,
+    ) -> None:
         if not domains:
             raise ValueError("search space requires at least one parameter")
         names = [domain.name for domain in domains]
@@ -101,17 +106,30 @@ class SearchSpace:
             raise ValueError("parameter names must be unique")
         self.domains = tuple(domains)
         self._by_name = {domain.name: domain for domain in self.domains}
+        self._candidate_validator = candidate_validator
 
     @classmethod
-    def from_schema(cls, parameters: Sequence[ParameterSelection]) -> SearchSpace:
-        return cls([ParameterDomain.from_schema(parameter) for parameter in parameters])
+    def from_schema(
+        cls,
+        parameters: Sequence[ParameterSelection],
+        *,
+        candidate_validator: Callable[[Mapping[str, float]], None] | None = None,
+    ) -> SearchSpace:
+        return cls(
+            [ParameterDomain.from_schema(parameter) for parameter in parameters],
+            candidate_validator=candidate_validator,
+        )
 
     @property
     def tunable(self) -> tuple[ParameterDomain, ...]:
         return tuple(domain for domain in self.domains if domain.tunable)
 
     def baseline(self) -> dict[str, float]:
-        return {domain.name: domain.project(domain.baseline) for domain in self.domains}
+        candidate = {
+            domain.name: domain.project(domain.baseline) for domain in self.domains
+        }
+        self._validate(candidate)
+        return candidate
 
     def from_unit_vector(self, values: Sequence[float]) -> dict[str, float]:
         if len(values) != len(self.tunable):
@@ -121,6 +139,7 @@ class SearchSpace:
         candidate = self.baseline()
         for domain, unit_value in zip(self.tunable, values, strict=True):
             candidate[domain.name] = domain.from_unit(unit_value)
+        self._validate(candidate)
         return candidate
 
     def to_unit_vector(self, candidate: Mapping[str, float]) -> tuple[float, ...]:
@@ -133,7 +152,7 @@ class SearchSpace:
         unknown = set(candidate).difference(self._by_name)
         if unknown:
             raise ValueError(f"unknown parameters: {', '.join(sorted(unknown))}")
-        return {
+        projected = {
             domain.name: domain.project(
                 domain.baseline
                 if not domain.tunable
@@ -141,6 +160,12 @@ class SearchSpace:
             )
             for domain in self.domains
         }
+        self._validate(projected)
+        return projected
+
+    def _validate(self, candidate: Mapping[str, float]) -> None:
+        if self._candidate_validator is not None:
+            self._candidate_validator(candidate)
 
     def normalized_distance(
         self, first: Mapping[str, float], second: Mapping[str, float]

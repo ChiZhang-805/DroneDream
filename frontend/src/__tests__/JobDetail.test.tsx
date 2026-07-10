@@ -171,6 +171,37 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     );
   });
 
+  it("surfaces worst-case max error and incomplete holdout evidence", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    const report = makeReport();
+    report.baseline_metrics.max_error_worst = 3.5;
+    report.optimized_metrics.max_error_mean = 1.5;
+    report.optimized_metrics.max_error_worst = 4.2;
+    report.optimized_metrics.holdout = {
+      validation_status: "incomplete",
+      feasible: false,
+      objective_feasible: true,
+      trial_count: 4,
+      completed_trial_count: 3,
+      failed_trial_count: 1,
+      passing_trial_count: 2,
+      completion_rate: 0.75,
+      failure_rate: 0.25,
+      pass_rate: 0.5,
+    };
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(report);
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByText("4.20 m")).toBeInTheDocument();
+    expect(screen.getByText(/Holdout validation: incomplete/i)).toBeInTheDocument();
+    expect(screen.getByText(/3\/4 trials completed/)).toBeInTheDocument();
+    expect(screen.getByText(/failure rate 25.0%/)).toBeInTheDocument();
+  });
+
   it("labels llm_optimizer rows as 'GPT Gen N' and heuristic as 'Heuristic #N'", async () => {
     const job = makeJob({ status: "COMPLETED", optimizer_strategy: "gpt" });
     const trials: TrialSummary[] = [

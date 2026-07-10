@@ -53,6 +53,12 @@ def test_environment_builder_uses_real_px4_names_and_stable_values() -> None:
     }
 
 
+def test_environment_builder_supports_reboot_parameters_at_process_start() -> None:
+    assert build_px4_parameter_environment({"IMU_GYRO_CUTOFF": 40.0}) == {
+        "PX4_PARAM_IMU_GYRO_CUTOFF": "40"
+    }
+
+
 def test_environment_builder_enforces_safe_bounds_by_default() -> None:
     with pytest.raises(ParameterValueValidationError):
         build_px4_parameter_environment({"MPC_XY_VEL_I_ACC": 5.0})
@@ -82,6 +88,28 @@ def test_mavsdk_style_client_transaction_writes_before_requested_applied(tmp_pat
     assert applied["values"] == result.applied
     assert applied["verification"] == {"mismatches": {}, "verified": True}
     assert applied["context"]["trial_id"] == "trial-1"
+
+
+def test_live_transaction_rejects_reboot_parameter_before_contacting_px4(
+    tmp_path: Path,
+) -> None:
+    client = FakeParameterClient({"IMU_GYRO_CUTOFF": 40.0})
+
+    with pytest.raises(ParameterApplicationError, match="Start a fresh SITL process"):
+        asyncio.run(
+            apply_and_verify_parameters(
+                {"IMU_GYRO_CUTOFF": 45.0},
+                client,
+                tmp_path,
+            )
+        )
+
+    assert client.set_calls == []
+    assert _read(tmp_path / REQUESTED_EVIDENCE_NAME)["values"] == {"IMU_GYRO_CUTOFF": 45.0}
+    assert _read(tmp_path / BEFORE_EVIDENCE_NAME)["status"] == "error"
+    applied = _read(tmp_path / APPLIED_EVIDENCE_NAME)
+    assert applied["status"] == "error"
+    assert "reboot-required" in applied["verification"]["error"]
 
 
 def test_readback_mismatch_is_fatal_but_preserves_evidence(tmp_path: Path) -> None:
@@ -116,6 +144,24 @@ def test_environment_transport_readback_does_not_set_again(tmp_path: Path) -> No
     assert result.before == {"MPC_XY_P": "0.95"}
     assert client.set_calls == []
     assert _read(tmp_path / BEFORE_EVIDENCE_NAME)["kind"] == "before_environment_override"
+
+
+def test_reboot_parameter_is_verified_after_startup_environment_injection(
+    tmp_path: Path,
+) -> None:
+    client = FakeParameterClient({"IMU_GYRO_CUTOFF": 45.0})
+    result = asyncio.run(
+        verify_environment_parameters(
+            {"IMU_GYRO_CUTOFF": 45.0},
+            client,
+            tmp_path,
+            previous_environment={"PX4_PARAM_IMU_GYRO_CUTOFF": "40"},
+        )
+    )
+
+    assert result.verified is True
+    assert result.applied == {"IMU_GYRO_CUTOFF": 45.0}
+    assert client.set_calls == []
 
 
 def test_site_dry_run_evidence_is_explicitly_marked_simulated(tmp_path: Path) -> None:

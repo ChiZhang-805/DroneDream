@@ -20,6 +20,7 @@ import csv
 import json
 import math
 import os
+import random
 import re
 import shlex
 import shutil
@@ -48,6 +49,18 @@ from app.simulator.px4_parameters import (
 FAILURE_ADAPTER_UNAVAILABLE = "ADAPTER_UNAVAILABLE"
 FAILURE_TIMEOUT = "TIMEOUT"
 FAILURE_SIMULATION = "SIMULATION_FAILED"
+FAILURE_UNSUPPORTED_SCENARIO_EFFECT = "UNSUPPORTED_SCENARIO_EFFECT"
+_MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER = 10.0
+_MAX_TELEMETRY_BYTES = 16 * 1024 * 1024
+_MAX_TELEMETRY_SAMPLES = 50_000
+_MAX_REFERENCE_TRACK_POINTS = 10_000
+_PROJECTION_BACKTRACK_SEGMENTS = 16
+_PROJECTION_FORWARD_SEGMENTS = 64
+_PROJECTION_GLOBAL_RESCAN_INTERVAL = 256
+_PROJECTION_GLOBAL_RESCAN_DISTANCE_M = 2.0
+_PROJECTION_LOCAL_ERROR_FALLBACK_M = 5.0
+_MAX_PROJECTION_SEGMENT_COMPARISONS = 10_000_000
+_MAX_COVERAGE_PROGRESS_STEP_FRACTION = 0.2
 
 _REQUIRED_PARAM_KEYS = (
     "kp_xy",
@@ -81,6 +94,11 @@ _TEMPLATE_TOKENS = (
     "px4_version",
     "headless",
     "extra_args",
+    "scenario_config_json",
+    "instance_id",
+    "simulation_speed_factor",
+    "px4_executable",
+    "gazebo_executable",
 )
 
 
@@ -106,6 +124,7 @@ class RunnerEnv:
     eval_collapse_altitude_fraction: float
     px4_version: str
     enforce_safe_parameter_bounds: bool
+    allow_unverified_advanced_effects: bool
 
 
 @dataclass(frozen=True)
@@ -121,6 +140,42 @@ class EvaluationWindow:
     trimmed_landing_samples: int
 
 
+@dataclass(frozen=True)
+class TrackSegment:
+    start: tuple[float, float, float]
+    delta: tuple[float, float, float]
+    length: float
+    start_progress: float
+
+
+@dataclass(frozen=True)
+class TrackGeometry:
+    segments: tuple[TrackSegment, ...]
+    total_length: float
+    closed: bool
+
+
+@dataclass(frozen=True)
+class TrackProjection:
+    error: float
+    segment_index: int
+    segment_fraction: float
+    progress: float
+    reference_x: float
+    reference_y: float
+    reference_z: float
+
+
+@dataclass(frozen=True)
+class TrackProgressEvaluation:
+    coverage: float
+    directed_progress_fraction: float
+    backward_distance: float
+    discontinuity_count: int
+    start_progress: float | None
+    end_progress: float | None
+
+
 class RunnerError(Exception):
     """Expected runner-level exception that maps to SIMULATION_FAILED."""
 
@@ -129,7 +184,17 @@ class TimeoutRunnerError(RunnerError):
     """Raised when lower-level simulator exceeds timeout."""
 
 
+class ConfigurationRunnerError(RunnerError):
+    """Raised when worker-level PX4/Gazebo configuration is invalid."""
+
+
+class UnsupportedScenarioEffectRunnerError(RunnerError):
+    """Raised before launch when requested physics are not implemented."""
+
+
 _SAFE_PROFILE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+_REQUESTED_FIRMWARE_SHA = re.compile(r"^[0-9a-fA-F]{7,40}$")
+_OBSERVED_FIRMWARE_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 
 
 def _profile_token(name: str, value: Any, *, default: str) -> str:
@@ -143,10 +208,290 @@ def _profile_token(name: str, value: Any, *, default: str) -> str:
     return normalized
 
 
+def _profile_bool(name: str, value: Any, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        raise RunnerError(f"vehicle_profile.{name} must be a boolean")
+    return value
+
+
+def _profile_positive_float(name: str, value: Any, *, default: float) -> float:
+    if value is None:
+        return default
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise RunnerError(f"vehicle_profile.{name} must be numeric")
+    normalized = float(value)
+    if not math.isfinite(normalized) or not 0.1 <= normalized <= 100:
+        raise RunnerError(f"vehicle_profile.{name} must be finite and in [0.1, 100]")
+    return normalized
+
+
+def _profile_instance_id(value: Any) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 255:
+        raise RunnerError("vehicle_profile.instance_id must be an integer from 0 to 255")
+    return value
+
+
+def _effective_timeout_seconds(
+    baseline_seconds: float,
+    simulation_speed_factor: float,
+) -> float:
+    """Scale a 1x simulation wall budget for slower-than-real-time execution."""
+
+    if not math.isfinite(baseline_seconds) or baseline_seconds <= 0:
+        raise ConfigurationRunnerError("timeout baseline must be finite and greater than zero")
+    if not math.isfinite(simulation_speed_factor) or simulation_speed_factor <= 0:
+        raise RunnerError("simulation speed factor must be finite and greater than zero")
+    multiplier = min(
+        max(1.0, 1.0 / simulation_speed_factor),
+        _MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER,
+    )
+    return baseline_seconds * multiplier
+
+
+def _firmware_identity(requested_commit: str | None) -> dict[str, Any]:
+    """Observe PX4 source HEAD and compare it with the requested identity.
+
+    A site-specific launcher that does not expose a local checkout may provide
+    the full observed SHA through ``PX4_FIRMWARE_COMMIT_OBSERVED``. When both
+    sources are present they must agree; this variable is evidence, never an
+    instruction to checkout or mutate the PX4 repository.
+    """
+
+    explicit_raw = os.environ.get("PX4_FIRMWARE_COMMIT_OBSERVED", "").strip()
+    explicit = explicit_raw.lower() or None
+    observation_error: str | None = None
+    if explicit is not None and not _OBSERVED_FIRMWARE_SHA.fullmatch(explicit):
+        observation_error = "PX4_FIRMWARE_COMMIT_OBSERVED must be a full 40-character Git SHA"
+        explicit = None
+
+    checkout_raw = os.environ.get("PX4_AUTOPILOT_DIR", "").strip()
+    checkout = Path(checkout_raw).expanduser().resolve() if checkout_raw else None
+    observed_from_git: str | None = None
+    if checkout is not None:
+        if not checkout.is_dir():
+            observation_error = f"PX4_AUTOPILOT_DIR is not a directory: {checkout}"
+        else:
+            try:
+                completed = subprocess.run(  # noqa: S603, S607 - fixed git argv, no shell.
+                    ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                    timeout=10,
+                )
+            except (OSError, subprocess.SubprocessError) as exc:
+                observation_error = f"could not inspect PX4_AUTOPILOT_DIR Git HEAD: {exc}"
+            else:
+                candidate = completed.stdout.strip().lower()
+                if completed.returncode != 0 or not _OBSERVED_FIRMWARE_SHA.fullmatch(candidate):
+                    detail = completed.stderr.strip() or "git rev-parse HEAD returned no full SHA"
+                    observation_error = f"could not inspect PX4_AUTOPILOT_DIR Git HEAD: {detail}"
+                else:
+                    observed_from_git = candidate
+
+    if explicit is not None and observed_from_git is not None and explicit != observed_from_git:
+        observation_error = "PX4_FIRMWARE_COMMIT_OBSERVED does not match PX4_AUTOPILOT_DIR Git HEAD"
+    observed = observed_from_git or explicit
+    source = "git_head" if observed_from_git is not None else ("environment" if explicit else None)
+    if requested_commit is None:
+        status = "not_requested"
+    elif observed is None:
+        status = "unavailable"
+    elif observed.startswith(requested_commit.lower()):
+        status = "verified"
+    else:
+        status = "mismatch"
+    return {
+        "requested_commit": requested_commit,
+        "observed_commit": observed,
+        "observed_source": source,
+        "px4_autopilot_dir": str(checkout) if checkout is not None else None,
+        "status": status,
+        "error": observation_error,
+    }
+
+
+def _enforce_firmware_identity(identity: dict[str, Any]) -> None:
+    requested = identity.get("requested_commit")
+    if requested is None:
+        return
+    status = identity.get("status")
+    if status == "verified" and identity.get("error") is None:
+        return
+    observed = identity.get("observed_commit")
+    error = identity.get("error")
+    if status == "mismatch":
+        raise RunnerError(
+            f"requested PX4 firmware commit {requested} does not match observed HEAD {observed}"
+        )
+    raise RunnerError(
+        "vehicle_profile.firmware_commit was requested but PX4 firmware identity "
+        f"could not be verified: {error or 'no PX4_AUTOPILOT_DIR or observed SHA was provided'}"
+    )
+
+
+def _advanced_number(
+    section: dict[str, Any],
+    name: str,
+    *,
+    default: float,
+) -> float:
+    value = section.get(name, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise RunnerError(f"advanced_scenario_config.{name} must be numeric")
+    normalized = float(value)
+    if not math.isfinite(normalized):
+        raise RunnerError(f"advanced_scenario_config.{name} must be finite")
+    return normalized
+
+
+def _scenario_effect_contract(
+    advanced_config: object,
+    *,
+    scenario_type: str,
+    scenario_config: object,
+    job_config: dict[str, Any],
+    dry_run: bool,
+    allow_unverified_passthrough: bool,
+) -> dict[str, Any]:
+    if advanced_config is None:
+        advanced: dict[str, Any] = {}
+    elif isinstance(advanced_config, dict):
+        advanced = advanced_config
+    else:
+        raise RunnerError("advanced_scenario_config must be an object")
+
+    surrogate_supported: list[str] = []
+    if scenario_type != "nominal":
+        surrogate_supported.append(f"scenario_type.{scenario_type}")
+    if scenario_config is not None and not isinstance(scenario_config, dict):
+        raise RunnerError("scenario_config must be an object")
+    normalized_scenario_config = scenario_config if isinstance(scenario_config, dict) else {}
+    if "wind_mps" in normalized_scenario_config:
+        wind_mps = normalized_scenario_config["wind_mps"]
+        if isinstance(wind_mps, bool) or not isinstance(wind_mps, (int, float)):
+            raise RunnerError("scenario_config.wind_mps must be numeric")
+        if not math.isfinite(float(wind_mps)) or float(wind_mps) < 0:
+            raise RunnerError("scenario_config.wind_mps must be finite and non-negative")
+        if float(wind_mps) > 0:
+            surrogate_supported.append("scenario_config.wind_mps")
+    wind = job_config.get("wind") if isinstance(job_config.get("wind"), dict) else {}
+    if any(abs(float(wind.get(direction, 0.0))) > 1e-12 for direction in wind):
+        surrogate_supported.append("job_config.wind")
+    if job_config.get("sensor_noise_level", "medium") != "medium":
+        surrogate_supported.append("job_config.sensor_noise_level")
+
+    advanced_requested: list[str] = []
+    wind_gusts_raw = advanced.get("wind_gusts", {})
+    if not isinstance(wind_gusts_raw, dict):
+        raise RunnerError("advanced_scenario_config.wind_gusts must be an object")
+    wind_enabled = wind_gusts_raw.get("enabled", False)
+    if not isinstance(wind_enabled, bool):
+        raise RunnerError("advanced_scenario_config.wind_gusts.enabled must be boolean")
+    if wind_enabled:
+        advanced_requested.append("wind_gusts")
+
+    obstacles = advanced.get("obstacles", [])
+    if not isinstance(obstacles, list):
+        raise RunnerError("advanced_scenario_config.obstacles must be an array")
+    if obstacles:
+        advanced_requested.append("obstacles")
+
+    sensor_raw = advanced.get("sensor_degradation", {})
+    if not isinstance(sensor_raw, dict):
+        raise RunnerError("advanced_scenario_config.sensor_degradation must be an object")
+    sensor_values = {
+        "gps_noise_m": _advanced_number(sensor_raw, "gps_noise_m", default=0.0),
+        "baro_noise_m": _advanced_number(sensor_raw, "baro_noise_m", default=0.0),
+        "imu_noise_scale": _advanced_number(sensor_raw, "imu_noise_scale", default=1.0),
+        "dropout_rate": _advanced_number(sensor_raw, "dropout_rate", default=0.0),
+    }
+    for name, value in sensor_values.items():
+        default = 1.0 if name == "imu_noise_scale" else 0.0
+        if not math.isclose(value, default, rel_tol=0.0, abs_tol=1e-12):
+            advanced_requested.append(f"sensor_degradation.{name}")
+
+    battery_raw = advanced.get("battery", {})
+    if not isinstance(battery_raw, dict):
+        raise RunnerError("advanced_scenario_config.battery must be an object")
+    initial_percent = _advanced_number(battery_raw, "initial_percent", default=100.0)
+    voltage_sag = battery_raw.get("voltage_sag", False)
+    if not isinstance(voltage_sag, bool):
+        raise RunnerError("advanced_scenario_config.battery.voltage_sag must be boolean")
+    mass_payload_raw = battery_raw.get("mass_payload_kg")
+    mass_payload = (
+        0.0
+        if mass_payload_raw is None
+        else _advanced_number(battery_raw, "mass_payload_kg", default=0.0)
+    )
+    if not math.isclose(initial_percent, 100.0, rel_tol=0.0, abs_tol=1e-12):
+        advanced_requested.append("battery.initial_percent")
+    if voltage_sag:
+        advanced_requested.append("battery.voltage_sag")
+    if mass_payload > 0.0:
+        advanced_requested.append("battery.mass_payload_kg")
+
+    requested = sorted(set(surrogate_supported + advanced_requested))
+    applied = sorted(set(surrogate_supported)) if dry_run else []
+    unsupported = sorted(set(advanced_requested if dry_run else requested))
+    return {
+        "requested_effects": requested,
+        "applied_effects": applied,
+        "unsupported_effects": unsupported,
+        "unverified_passthrough_enabled": allow_unverified_passthrough,
+        "application_mode": "dry_run_surrogate" if dry_run else "real_physics",
+        "verification_status": (
+            "not_requested"
+            if not requested
+            else (
+                "unverified_passthrough"
+                if unsupported and allow_unverified_passthrough
+                else ("unsupported" if unsupported else "dry_run_surrogate_applied")
+            )
+        ),
+    }
+
+
+def _enforce_scenario_effect_contract(contract: dict[str, Any]) -> None:
+    unsupported = contract.get("unsupported_effects")
+    if not unsupported or contract.get("unverified_passthrough_enabled") is True:
+        return
+    rendered = ", ".join(str(item) for item in unsupported)
+    raise UnsupportedScenarioEffectRunnerError(
+        "bundled PX4/Gazebo runner cannot verify requested advanced scenario effects: "
+        f"{rendered}. Configure a launcher that applies them, or explicitly set "
+        "PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS=true for metadata-only "
+        "passthrough (pass_flag will remain false)."
+    )
+
+
 def _parse_bool(raw: str | None, *, default: bool) -> bool:
     if raw is None:
         return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"invalid boolean value: {raw!r}")
+
+
+def _telemetry_bool(value: Any, *, field: str, sample_index: int) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    raise RunnerError(f"telemetry sample {sample_index} field {field!r} must be boolean")
 
 
 def _parse_float(raw: str | None, *, default: float) -> float:
@@ -162,23 +507,32 @@ def _parse_int(raw: str | None, *, default: int) -> int:
 
 
 def _load_env() -> RunnerEnv:
-    return RunnerEnv(
+    timeout_seconds = _parse_int(os.environ.get("PX4_GAZEBO_TIMEOUT_SECONDS"), default=300)
+    if timeout_seconds <= 0:
+        raise ConfigurationRunnerError("PX4_GAZEBO_TIMEOUT_SECONDS must be greater than zero")
+    telemetry_format = (
+        os.environ.get("PX4_GAZEBO_TELEMETRY_FORMAT", "json").strip().lower() or "json"
+    )
+    if telemetry_format not in {"json", "csv"}:
+        raise ConfigurationRunnerError("PX4_GAZEBO_TELEMETRY_FORMAT must be either json or csv")
+    allow_csv = _parse_bool(os.environ.get("PX4_GAZEBO_ALLOW_CSV_TELEMETRY"), default=False)
+    result = RunnerEnv(
         launch_command=os.environ.get("PX4_GAZEBO_LAUNCH_COMMAND", "").strip(),
         workdir=os.environ.get("PX4_GAZEBO_WORKDIR") or None,
-        timeout_seconds=max(1, _parse_int(os.environ.get("PX4_GAZEBO_TIMEOUT_SECONDS"), default=300)),
+        timeout_seconds=timeout_seconds,
         headless=_parse_bool(os.environ.get("PX4_GAZEBO_HEADLESS"), default=True),
         keep_raw_logs=_parse_bool(os.environ.get("PX4_GAZEBO_KEEP_RAW_LOGS"), default=True),
         dry_run=_parse_bool(os.environ.get("PX4_GAZEBO_DRY_RUN"), default=False),
         pass_rmse=_parse_float(os.environ.get("PX4_GAZEBO_PASS_RMSE"), default=0.75),
         pass_max_error=_parse_float(os.environ.get("PX4_GAZEBO_PASS_MAX_ERROR"), default=2.0),
-        min_track_coverage=_parse_float(os.environ.get("PX4_GAZEBO_MIN_TRACK_COVERAGE"), default=0.9),
+        min_track_coverage=_parse_float(
+            os.environ.get("PX4_GAZEBO_MIN_TRACK_COVERAGE"), default=0.9
+        ),
         vehicle=os.environ.get("PX4_GAZEBO_VEHICLE", "").strip() or "x500",
         world=os.environ.get("PX4_GAZEBO_WORLD", "").strip() or "default",
         extra_args=os.environ.get("PX4_GAZEBO_EXTRA_ARGS", "").strip(),
-        telemetry_format=os.environ.get("PX4_GAZEBO_TELEMETRY_FORMAT", "json").strip().lower() or "json",
-        allow_csv_telemetry=_parse_bool(
-            os.environ.get("PX4_GAZEBO_ALLOW_CSV_TELEMETRY"), default=False
-        ),
+        telemetry_format=telemetry_format,
+        allow_csv_telemetry=allow_csv or telemetry_format == "csv",
         eval_altitude_fraction=_parse_float(
             os.environ.get("PX4_GAZEBO_EVAL_ALTITUDE_FRACTION"), default=0.9
         ),
@@ -195,7 +549,35 @@ def _load_env() -> RunnerEnv:
         enforce_safe_parameter_bounds=_parse_bool(
             os.environ.get("PX4_ENFORCE_SAFE_PARAMETER_BOUNDS"), default=True
         ),
+        allow_unverified_advanced_effects=_parse_bool(
+            os.environ.get("PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS"),
+            default=False,
+        ),
     )
+    finite_fields = {
+        "PX4_GAZEBO_PASS_RMSE": result.pass_rmse,
+        "PX4_GAZEBO_PASS_MAX_ERROR": result.pass_max_error,
+        "PX4_GAZEBO_MIN_TRACK_COVERAGE": result.min_track_coverage,
+        "PX4_GAZEBO_EVAL_ALTITUDE_FRACTION": result.eval_altitude_fraction,
+        "PX4_GAZEBO_EVAL_NEAR_TRACK_THRESHOLD_M": result.eval_near_track_threshold_m,
+        "PX4_GAZEBO_EVAL_COLLAPSE_ALTITUDE_FRACTION": result.eval_collapse_altitude_fraction,
+    }
+    for name, value in finite_fields.items():
+        if not math.isfinite(value):
+            raise ConfigurationRunnerError(f"{name} must be finite")
+    if result.pass_rmse < 0 or result.pass_max_error < 0:
+        raise ConfigurationRunnerError("PX4/Gazebo pass thresholds must be non-negative")
+    if not 0 <= result.min_track_coverage <= 1:
+        raise ConfigurationRunnerError("PX4_GAZEBO_MIN_TRACK_COVERAGE must be between 0 and 1")
+    if not 0 < result.eval_altitude_fraction <= 1:
+        raise ConfigurationRunnerError("PX4_GAZEBO_EVAL_ALTITUDE_FRACTION must be in (0, 1]")
+    if result.eval_near_track_threshold_m <= 0:
+        raise ConfigurationRunnerError("PX4_GAZEBO_EVAL_NEAR_TRACK_THRESHOLD_M must be positive")
+    if not 0 < result.eval_collapse_altitude_fraction <= 1:
+        raise ConfigurationRunnerError(
+            "PX4_GAZEBO_EVAL_COLLAPSE_ALTITUDE_FRACTION must be in (0, 1]"
+        )
+    return result
 
 
 def _parse_args() -> argparse.Namespace:
@@ -207,7 +589,36 @@ def _parse_args() -> argparse.Namespace:
 
 def _json_dump(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(payload, indent=2, sort_keys=True, allow_nan=False),
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+    finally:
+        with contextlib.suppress(OSError):
+            temporary.unlink()
+
+
+def _merge_json_object(path: Path, authoritative: dict[str, Any]) -> None:
+    """Preserve lower-wrapper details while restoring runner-owned evidence."""
+
+    existing: dict[str, Any] = {}
+    if path.is_file():
+        with contextlib.suppress(OSError, UnicodeError, json.JSONDecodeError, ValueError):
+            loaded = json.loads(
+                path.read_text(encoding="utf-8"),
+                parse_constant=_reject_nonfinite_json,
+            )
+            if isinstance(loaded, dict):
+                existing = loaded
+    existing.update(authoritative)
+    _json_dump(path, existing)
+
+
+def _reject_nonfinite_json(value: str) -> None:
+    raise ValueError(f"non-standard JSON numeric constant is forbidden: {value}")
 
 
 def _safe_excerpt(text: str, *, limit: int = 1800) -> str:
@@ -222,12 +633,59 @@ def _validate_trial_input(
     default_px4_version: str = "main",
     default_vehicle: str = "x500",
     default_world: str = "default",
+    default_headless: bool = True,
     enforce_safe_parameter_bounds: bool = True,
 ) -> tuple[dict[str, Any], dict[str, float], dict[str, int | float], dict[str, Any]]:
     required_ids = ("trial_id", "job_id", "candidate_id", "seed", "scenario_type")
     missing = [key for key in required_ids if key not in payload]
     if missing:
         raise RunnerError(f"trial_input missing required keys: {missing}")
+    schema_version = payload.get("schema_version")
+    if schema_version is not None and schema_version not in {
+        "dronedream.trial_input.v1",
+        "dronedream.trial_input.v2",
+    }:
+        raise RunnerError(f"unsupported trial_input.schema_version: {schema_version!r}")
+    for key in ("trial_id", "job_id", "candidate_id", "scenario_type"):
+        if not isinstance(payload[key], str) or not payload[key].strip():
+            raise RunnerError(f"trial_input.{key} must be a non-empty string")
+    scenario_type = str(payload["scenario_type"]).strip()
+    supported_scenarios = {
+        "nominal",
+        "noise_perturbed",
+        "wind_perturbed",
+        "combined_perturbed",
+        "turbulence",
+        "gps_dropout",
+        "payload_changed",
+        "battery_degraded",
+        "actuator_delay",
+        "custom",
+    }
+    if scenario_type not in supported_scenarios:
+        raise RunnerError(
+            "trial_input.scenario_type is unsupported; expected one of: "
+            + ", ".join(sorted(supported_scenarios))
+        )
+    seed_raw = payload["seed"]
+    if isinstance(seed_raw, bool) or not isinstance(seed_raw, int):
+        raise RunnerError("trial_input.seed must be an integer")
+    attempt_raw = payload.get("attempt_count", 1)
+    if isinstance(attempt_raw, bool) or not isinstance(attempt_raw, int) or attempt_raw < 1:
+        raise RunnerError("trial_input.attempt_count must be a positive integer")
+    identity_raw = payload.get("execution_identity")
+    if identity_raw is not None:
+        if not isinstance(identity_raw, dict):
+            raise RunnerError("trial_input.execution_identity must be an object")
+        expected_identity = {
+            "trial_id": payload["trial_id"],
+            "job_id": payload["job_id"],
+            "candidate_id": payload["candidate_id"],
+            "seed": seed_raw,
+            "attempt_count": attempt_raw,
+        }
+        if identity_raw != expected_identity:
+            raise RunnerError("trial_input.execution_identity does not match top-level fields")
 
     job_cfg_raw = payload.get("job_config") if isinstance(payload.get("job_config"), dict) else {}
 
@@ -255,27 +713,45 @@ def _validate_trial_input(
         altitude = float(altitude_m)
     except (TypeError, ValueError):
         raise RunnerError("start_point.x/y and altitude_m must be numeric") from None
+    if not all(math.isfinite(value) for value in (start_x, start_y, altitude)):
+        raise RunnerError("start_point.x/y and altitude_m must be finite")
+    if altitude <= 0:
+        raise RunnerError("altitude_m must be greater than zero")
 
     if not isinstance(wind, dict):
         wind = {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0}
+    try:
+        normalized_wind = {
+            direction: float(wind.get(direction, 0.0))
+            for direction in ("north", "east", "south", "west")
+        }
+    except (TypeError, ValueError):
+        raise RunnerError("wind components must be numeric") from None
+    if not all(math.isfinite(value) for value in normalized_wind.values()):
+        raise RunnerError("wind components must be finite")
+    normalized_noise = str(sensor_noise_level or "medium").strip().lower()
+    if normalized_noise not in {"low", "medium", "high"}:
+        raise RunnerError("sensor_noise_level must be one of: low, medium, high")
+    normalized_objective = str(objective_profile or "robust").strip().lower()
+    if normalized_objective not in {"stable", "fast", "smooth", "robust", "custom"}:
+        raise RunnerError("objective_profile must be one of: stable, fast, smooth, robust, custom")
 
     normalized_job_cfg = {
         "track_type": track_type,
         "start_point": {"x": start_x, "y": start_y},
         "altitude_m": altitude,
-        "wind": {
-            "north": float(wind.get("north", 0.0)),
-            "east": float(wind.get("east", 0.0)),
-            "south": float(wind.get("south", 0.0)),
-            "west": float(wind.get("west", 0.0)),
-        },
-        "sensor_noise_level": str(sensor_noise_level or "medium"),
-        "objective_profile": str(objective_profile or "robust"),
+        "wind": normalized_wind,
+        "sensor_noise_level": normalized_noise,
+        "objective_profile": normalized_objective,
         "reference_track": [],
     }
     if reference_track_raw is not None:
         if not isinstance(reference_track_raw, list):
             raise RunnerError("reference_track must be an array when provided")
+        if len(reference_track_raw) > _MAX_REFERENCE_TRACK_POINTS:
+            raise RunnerError(
+                f"reference_track exceeds the {_MAX_REFERENCE_TRACK_POINTS}-point limit"
+            )
         normalized_points: list[dict[str, float]] = []
         for idx, point in enumerate(reference_track_raw):
             if not isinstance(point, dict):
@@ -289,7 +765,11 @@ def _validate_trial_input(
             try:
                 z = float(altitude if z_raw is None else z_raw)
             except (TypeError, ValueError):
-                raise RunnerError(f"reference_track[{idx}].z must be numeric when provided") from None
+                raise RunnerError(
+                    f"reference_track[{idx}].z must be numeric when provided"
+                ) from None
+            if not all(math.isfinite(value) for value in (x, y, z)):
+                raise RunnerError(f"reference_track[{idx}] coordinates must be finite")
             normalized_points.append({"x": x, "y": y, "z": z})
         normalized_job_cfg["reference_track"] = normalized_points
     if track_type == "custom" and len(normalized_job_cfg["reference_track"]) < 2:
@@ -318,9 +798,7 @@ def _validate_trial_input(
     if not isinstance(profile_raw, dict):
         nested_profile = job_cfg_raw.get("vehicle_profile")
         profile_raw = nested_profile if isinstance(nested_profile, dict) else {}
-    airframe = _profile_token(
-        "airframe", profile_raw.get("airframe"), default=default_vehicle
-    )
+    airframe = _profile_token("airframe", profile_raw.get("airframe"), default=default_vehicle)
     simulator_model = _profile_token(
         "simulator_model",
         profile_raw.get("simulator_model"),
@@ -330,6 +808,24 @@ def _validate_trial_input(
     vehicle_type = _profile_token(
         "vehicle_type", profile_raw.get("vehicle_type"), default="multicopter"
     )
+    headless = _profile_bool("headless", profile_raw.get("headless"), default=default_headless)
+    simulation_speed_factor = _profile_positive_float(
+        "simulation_speed_factor",
+        profile_raw.get("simulation_speed_factor"),
+        default=1.0,
+    )
+    instance_id = _profile_instance_id(profile_raw.get("instance_id"))
+    firmware_commit_raw = profile_raw.get("firmware_commit")
+    if firmware_commit_raw is None or firmware_commit_raw == "":
+        firmware_commit = None
+    elif not isinstance(firmware_commit_raw, str) or not _REQUESTED_FIRMWARE_SHA.fullmatch(
+        firmware_commit_raw.strip()
+    ):
+        raise RunnerError(
+            "vehicle_profile.firmware_commit must be a 7-40 character Git SHA when provided"
+        )
+    else:
+        firmware_commit = firmware_commit_raw.strip().lower()
 
     raw_px4_version = str(
         payload.get("px4_version")
@@ -341,6 +837,14 @@ def _validate_trial_input(
         px4_version = normalize_px4_version(raw_px4_version)
     except ValueError as exc:
         raise RunnerError(f"vehicle_profile.px4_version is invalid: {exc}") from exc
+    catalog_version_raw = payload.get("parameter_catalog_version")
+    if catalog_version_raw is None:
+        catalog_version_raw = job_cfg_raw.get("parameter_catalog_version")
+    if catalog_version_raw is not None and not isinstance(catalog_version_raw, str):
+        raise RunnerError("parameter_catalog_version must be a string when provided")
+    parameter_catalog_version = (
+        catalog_version_raw.strip() if isinstance(catalog_version_raw, str) else None
+    )
     explicit_px4_params = payload.get("px4_parameters")
     if explicit_px4_params is None:
         explicit_px4_params = job_cfg_raw.get("px4_parameters")
@@ -350,7 +854,8 @@ def _validate_trial_input(
         explicit_px4_params = {
             str(key): value
             for key, value in params_raw.items()
-            if str(key).startswith(("MC_", "MPC_"))
+            if get_parameter(str(key), px4_version=px4_version) is not None
+            or get_parameter(str(key), px4_version="main") is not None
         }
     if not isinstance(explicit_px4_params, dict):
         raise RunnerError("px4_parameters must be an object when provided")
@@ -358,6 +863,9 @@ def _validate_trial_input(
         px4_params = validate_parameter_values(
             explicit_px4_params,
             px4_version=px4_version,
+            catalog_version=parameter_catalog_version,
+            vehicle_type=vehicle_type,
+            airframe=airframe,
             enforce_safe_bounds=enforce_safe_parameter_bounds,
         )
     except (ParameterValueValidationError, ValueError) as exc:
@@ -365,14 +873,20 @@ def _validate_trial_input(
 
     normalized_job_cfg["vehicle_profile"] = {
         "px4_version": px4_version,
-        "firmware_commit": profile_raw.get("firmware_commit"),
+        "firmware_commit": firmware_commit,
         "vehicle_type": vehicle_type,
         "airframe": airframe,
         "simulator_model": simulator_model,
         "world": world,
+        "headless": headless,
+        "simulation_speed_factor": simulation_speed_factor,
+        "instance_id": instance_id,
     }
+    normalized_job_cfg["parameter_catalog_version"] = parameter_catalog_version
 
-    scenario_config = payload.get("scenario_config") if isinstance(payload.get("scenario_config"), dict) else {}
+    scenario_config = (
+        payload.get("scenario_config") if isinstance(payload.get("scenario_config"), dict) else {}
+    )
     advanced = payload.get("advanced_scenario_config")
     if not isinstance(advanced, dict):
         nested_advanced = scenario_config.get("advanced_scenario_config")
@@ -381,17 +895,23 @@ def _validate_trial_input(
         "trial_id": str(payload["trial_id"]),
         "job_id": str(payload["job_id"]),
         "candidate_id": str(payload["candidate_id"]),
-        "seed": int(payload["seed"]),
-        "scenario_type": str(payload["scenario_type"]),
+        "seed": seed_raw,
+        "attempt_count": attempt_raw,
+        "scenario_type": scenario_type,
         "scenario_config": scenario_config,
         "advanced_scenario_config": advanced,
         "px4_version": px4_version,
+        "firmware_commit": firmware_commit,
+        "parameter_catalog_version": parameter_catalog_version,
         "airframe": airframe,
         "simulator_model": simulator_model,
         # ``vehicle`` is the backwards-compatible launcher alias. PX4/Gazebo
         # launchers historically interpreted it as the simulator model.
         "vehicle": simulator_model,
         "world": world,
+        "headless": headless,
+        "simulation_speed_factor": simulation_speed_factor,
+        "instance_id": instance_id,
     }
     return normalized_job_cfg, params, px4_params, meta
 
@@ -413,7 +933,13 @@ def _make_reference_track(
         n = 180
         for i in range(n + 1):
             theta = 2.0 * math.pi * (i / n)
-            points.append({"x": start_x + radius * math.cos(theta), "y": start_y + radius * math.sin(theta), "z": altitude})
+            points.append(
+                {
+                    "x": start_x + radius * math.cos(theta),
+                    "y": start_y + radius * math.sin(theta),
+                    "z": altitude,
+                }
+            )
     elif track_type == "u_turn":
         lane_half = 5.0
         turn_radius = 3.0
@@ -425,7 +951,13 @@ def _make_reference_track(
         cx, cy = start_x + lane_half, start_y + turn_radius
         for i in range(n_arc):
             theta = -math.pi / 2 + math.pi * (i / max(1, n_arc - 1))
-            points.append({"x": cx + turn_radius * math.cos(theta), "y": cy + turn_radius * math.sin(theta), "z": altitude})
+            points.append(
+                {
+                    "x": cx + turn_radius * math.cos(theta),
+                    "y": cy + turn_radius * math.sin(theta),
+                    "z": altitude,
+                }
+            )
         for i in range(n_straight):
             x = start_x + lane_half - (2 * lane_half) * (i / max(1, n_straight - 1))
             points.append({"x": x, "y": start_y + 2 * turn_radius, "z": altitude})
@@ -442,7 +974,10 @@ def _make_reference_track(
 
 
 def _wind_vec(wind: dict[str, float]) -> tuple[float, float]:
-    return (float(wind.get("east", 0.0)) - float(wind.get("west", 0.0)), float(wind.get("north", 0.0)) - float(wind.get("south", 0.0)))
+    return (
+        float(wind.get("east", 0.0)) - float(wind.get("west", 0.0)),
+        float(wind.get("north", 0.0)) - float(wind.get("south", 0.0)),
+    )
 
 
 def _make_dry_run_telemetry(
@@ -457,8 +992,25 @@ def _make_dry_run_telemetry(
         "noise_perturbed": 0.25,
         "wind_perturbed": 0.35,
         "combined_perturbed": 0.55,
+        "turbulence": 0.45,
+        "gps_dropout": 0.4,
+        "payload_changed": 0.3,
+        "battery_degraded": 0.35,
+        "actuator_delay": 0.3,
+        "custom": 0.2,
     }.get(meta["scenario_type"], 0.1)
-    noise_penalty = {"low": 0.0, "medium": 0.05, "high": 0.12}.get(job_cfg["sensor_noise_level"], 0.06)
+    noise_penalty = {"low": 0.0, "medium": 0.05, "high": 0.12}.get(
+        job_cfg["sensor_noise_level"], 0.06
+    )
+    scenario_config = meta.get("scenario_config", {})
+    scenario_wind_mps = 0.0
+    if isinstance(scenario_config, dict) and "wind_mps" in scenario_config:
+        value = scenario_config["wind_mps"]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise RunnerError("scenario_config.wind_mps must be numeric")
+        scenario_wind_mps = float(value)
+        if not math.isfinite(scenario_wind_mps) or scenario_wind_mps < 0:
+            raise RunnerError("scenario_config.wind_mps must be finite and non-negative")
 
     base_err = (
         abs(params["kp_xy"] - 1.1) * 0.15
@@ -469,16 +1021,31 @@ def _make_dry_run_telemetry(
         + (1.0 - min(1.0, max(0.0, params["disturbance_rejection"]))) * 0.12
         + scenario_penalty
         + noise_penalty
+        + min(20.0, scenario_wind_mps) * 0.03
     )
 
     wx, wy = _wind_vec(job_cfg["wind"])
     wobble_mag = min(1.8, 0.15 + base_err + (abs(wx) + abs(wy)) * 0.02)
+    rng = random.Random(int(meta["seed"]))
+    x_phase = rng.uniform(-math.pi, math.pi)
+    y_phase = rng.uniform(-math.pi, math.pi)
+    noise_std = 0.01 + 0.04 * noise_penalty + 0.01 * scenario_penalty
     samples: list[dict[str, Any]] = []
     dt = 0.1
     for i, ref in enumerate(reference_track):
         theta = 2 * math.pi * i / max(1, len(reference_track) - 1)
-        x = ref["x"] + wobble_mag * math.sin(theta * 2 + 0.3) + wx * 0.02
-        y = ref["y"] + wobble_mag * math.cos(theta * 2 - 0.2) + wy * 0.02
+        x = (
+            ref["x"]
+            + wobble_mag * math.sin(theta * 2 + x_phase)
+            + wx * 0.02
+            + rng.gauss(0.0, noise_std)
+        )
+        y = (
+            ref["y"]
+            + wobble_mag * math.cos(theta * 2 + y_phase)
+            + wy * 0.02
+            + rng.gauss(0.0, noise_std)
+        )
         z = ref["z"]
         if meta["scenario_type"] == "combined_perturbed" and params["disturbance_rejection"] < 0.1:
             z = max(0.0, z - 0.015 * i)
@@ -517,6 +1084,8 @@ def _make_dry_run_telemetry(
 
 
 def _normalize_samples(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if len(samples) > _MAX_TELEMETRY_SAMPLES:
+        raise RunnerError(f"telemetry exceeds the {_MAX_TELEMETRY_SAMPLES}-sample contract limit")
     normalized: list[dict[str, Any]] = []
     for idx, raw in enumerate(samples):
         try:
@@ -529,98 +1098,413 @@ def _normalize_samples(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "vy": float(raw.get("vy", 0.0)),
                 "vz": float(raw.get("vz", 0.0)),
                 "yaw": float(raw.get("yaw", 0.0)),
-                "armed": bool(raw.get("armed", True)),
+                "armed": _telemetry_bool(raw.get("armed", True), field="armed", sample_index=idx),
                 "mode": str(raw.get("mode", "unknown")),
-                "crashed": bool(raw.get("crashed", False)),
+                "crashed": _telemetry_bool(
+                    raw.get("crashed", False), field="crashed", sample_index=idx
+                ),
             }
         except (KeyError, TypeError, ValueError):
-            raise RunnerError(f"telemetry sample {idx} missing or invalid required fields") from None
+            raise RunnerError(
+                f"telemetry sample {idx} missing or invalid required fields"
+            ) from None
         for key in ("t", "x", "y", "z", "vx", "vy", "vz", "yaw"):
             if not math.isfinite(s[key]):
                 raise RunnerError(f"telemetry sample {idx} contains non-finite {key}")
+        if len(s["mode"]) > 128 or any(ord(char) < 32 for char in s["mode"]):
+            raise RunnerError(f"telemetry sample {idx} mode is too long or contains controls")
         normalized.append(s)
 
     if not normalized:
         raise RunnerError("telemetry samples are empty")
+    for idx in range(1, len(normalized)):
+        if normalized[idx]["t"] <= normalized[idx - 1]["t"]:
+            raise RunnerError(f"telemetry sample {idx} timestamp must be strictly increasing")
     return normalized
 
 
 def _load_telemetry(path: Path, *, allow_csv: bool) -> dict[str, Any]:
     if path.exists():
+        size = path.stat().st_size
+        if size > _MAX_TELEMETRY_BYTES:
+            raise RunnerError(
+                f"telemetry JSON exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
+            )
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
+            with path.open("rb") as stream:
+                encoded = stream.read(_MAX_TELEMETRY_BYTES + 1)
+            if len(encoded) > _MAX_TELEMETRY_BYTES:
+                raise RunnerError(
+                    f"telemetry JSON exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
+                )
+            payload = json.loads(
+                encoded.decode("utf-8"),
+                parse_constant=_reject_nonfinite_json,
+            )
+        except (UnicodeError, json.JSONDecodeError) as exc:
             raise RunnerError(f"telemetry JSON is malformed: {exc}") from None
         if not isinstance(payload, dict) or not isinstance(payload.get("samples"), list):
             raise RunnerError("telemetry.json must contain an object with samples[]")
         payload["samples"] = _normalize_samples(payload["samples"])
-        payload.setdefault("meta", {})
+        if payload.get("meta") is None:
+            payload["meta"] = {}
+        elif not isinstance(payload.get("meta"), dict):
+            raise RunnerError("telemetry.meta must be an object when present")
         return payload
 
     csv_path = path.with_suffix(".csv")
     if allow_csv and csv_path.exists():
-        rows: list[dict[str, Any]] = []
+        if csv_path.stat().st_size > _MAX_TELEMETRY_BYTES:
+            raise RunnerError(
+                f"telemetry CSV exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
+            )
+        samples: list[dict[str, Any]] = []
         with csv_path.open("r", encoding="utf-8", newline="") as f:
             reader = csv.DictReader(f)
-            for row in reader:
-                rows.append(row)
-        samples: list[dict[str, Any]] = []
-        for row in rows:
-            samples.append(
-                {
-                    "t": row.get("t", row.get("timestamp", 0.0)),
-                    "x": row.get("x", 0.0),
-                    "y": row.get("y", 0.0),
-                    "z": row.get("z", 0.0),
-                    "vx": row.get("vx", 0.0),
-                    "vy": row.get("vy", 0.0),
-                    "vz": row.get("vz", 0.0),
-                    "yaw": row.get("yaw", 0.0),
-                    "armed": row.get("armed", True),
-                    "mode": row.get("mode", "unknown"),
-                    "crashed": row.get("crashed", False),
-                }
-            )
+            for row_index, row in enumerate(reader):
+                if row_index >= _MAX_TELEMETRY_SAMPLES:
+                    raise RunnerError(
+                        f"telemetry exceeds the {_MAX_TELEMETRY_SAMPLES}-sample contract limit"
+                    )
+                samples.append(
+                    {
+                        "t": row.get("t", row.get("timestamp", 0.0)),
+                        "x": row.get("x", 0.0),
+                        "y": row.get("y", 0.0),
+                        "z": row.get("z", 0.0),
+                        "vx": row.get("vx", 0.0),
+                        "vy": row.get("vy", 0.0),
+                        "vz": row.get("vz", 0.0),
+                        "yaw": row.get("yaw", 0.0),
+                        "armed": row.get("armed", True),
+                        "mode": row.get("mode", "unknown"),
+                        "crashed": row.get("crashed", False),
+                    }
+                )
         return {"samples": _normalize_samples(samples), "meta": {"format": "csv"}}
 
     raise RunnerError("telemetry output is missing")
 
 
-def _nearest_error(sample: dict[str, Any], ref_points: list[dict[str, float]]) -> tuple[float, int]:
-    best = float("inf")
-    best_idx = 0
-    sx, sy = sample["x"], sample["y"]
-    for i, rp in enumerate(ref_points):
-        d = math.hypot(sx - rp["x"], sy - rp["y"])
-        if d < best:
-            best, best_idx = d, i
-    return best, best_idx
+def _build_track_geometry(ref_points: list[dict[str, float]]) -> TrackGeometry:
+    if len(ref_points) < 2:
+        raise RunnerError("reference track must contain at least two points")
+    segments: list[TrackSegment] = []
+    progress = 0.0
+    for start, end in zip(ref_points, ref_points[1:], strict=False):
+        start_xyz = (float(start["x"]), float(start["y"]), float(start["z"]))
+        delta = (
+            float(end["x"]) - start_xyz[0],
+            float(end["y"]) - start_xyz[1],
+            float(end["z"]) - start_xyz[2],
+        )
+        length = math.sqrt(sum(component * component for component in delta))
+        if length <= 1e-12:
+            continue
+        segments.append(
+            TrackSegment(
+                start=start_xyz,
+                delta=delta,
+                length=length,
+                start_progress=progress,
+            )
+        )
+        progress += length
+    if not segments or progress <= 1e-12:
+        raise RunnerError("reference track must have non-zero three-dimensional length")
+    first = ref_points[0]
+    last = ref_points[-1]
+    endpoint_distance = math.sqrt(
+        (float(first["x"]) - float(last["x"])) ** 2
+        + (float(first["y"]) - float(last["y"])) ** 2
+        + (float(first["z"]) - float(last["z"])) ** 2
+    )
+    return TrackGeometry(
+        segments=tuple(segments),
+        total_length=progress,
+        closed=endpoint_distance <= max(1e-6, progress * 1e-6),
+    )
+
+
+def _project_sample_to_segment(
+    sample: dict[str, Any],
+    segment: TrackSegment,
+    segment_index: int,
+) -> TrackProjection:
+    offset = (
+        float(sample["x"]) - segment.start[0],
+        float(sample["y"]) - segment.start[1],
+        float(sample["z"]) - segment.start[2],
+    )
+    length_squared = segment.length * segment.length
+    fraction = min(
+        1.0,
+        max(
+            0.0,
+            sum(offset[i] * segment.delta[i] for i in range(3)) / length_squared,
+        ),
+    )
+    reference = tuple(segment.start[i] + fraction * segment.delta[i] for i in range(3))
+    error = math.sqrt(
+        (float(sample["x"]) - reference[0]) ** 2
+        + (float(sample["y"]) - reference[1]) ** 2
+        + (float(sample["z"]) - reference[2]) ** 2
+    )
+    return TrackProjection(
+        error=error,
+        segment_index=segment_index,
+        segment_fraction=fraction,
+        progress=segment.start_progress + fraction * segment.length,
+        reference_x=reference[0],
+        reference_y=reference[1],
+        reference_z=reference[2],
+    )
+
+
+def _best_track_projection(
+    sample: dict[str, Any],
+    geometry: TrackGeometry,
+    candidate_indices: list[int] | range,
+    comparison_budget: list[int],
+) -> TrackProjection:
+    candidate_count = len(candidate_indices)
+    if candidate_count > comparison_budget[0]:
+        raise RunnerError(
+            "track projection exceeds the bounded comparison budget; "
+            "downsample telemetry/reference points or remove discontinuous jumps"
+        )
+    comparison_budget[0] -= candidate_count
+    best: TrackProjection | None = None
+    for segment_index in candidate_indices:
+        projection = _project_sample_to_segment(
+            sample,
+            geometry.segments[segment_index],
+            segment_index,
+        )
+        if best is None or projection.error < best.error:
+            best = projection
+    assert best is not None
+    return best
+
+
+def _local_segment_indices(
+    previous_index: int,
+    segment_count: int,
+    *,
+    closed: bool,
+) -> list[int]:
+    if segment_count <= _PROJECTION_BACKTRACK_SEGMENTS + _PROJECTION_FORWARD_SEGMENTS + 1:
+        return list(range(segment_count))
+    lower = previous_index - _PROJECTION_BACKTRACK_SEGMENTS
+    upper = previous_index + _PROJECTION_FORWARD_SEGMENTS
+    # Closed tracks wrap around their seam. Open tracks clamp to their ends.
+    if closed and (lower < 0 or upper >= segment_count):
+        wrapped = [index % segment_count for index in range(lower, upper + 1)]
+        return list(dict.fromkeys(wrapped))
+    return list(range(max(0, lower), min(segment_count - 1, upper) + 1))
+
+
+def _project_samples_to_track(
+    samples: list[dict[str, Any]],
+    geometry: TrackGeometry,
+) -> list[TrackProjection]:
+    """Project an ordered telemetry stream with bounded local search.
+
+    A full scan establishes the first match. Subsequent samples search near the
+    previous segment, with periodic/global recovery when the aircraft has moved
+    far while the local match is poor. This makes normal work proportional to
+    telemetry size rather than telemetry multiplied by reference density while
+    retaining recovery from resets and large jumps.
+    """
+
+    segment_count = len(geometry.segments)
+    all_indices = range(segment_count)
+    comparison_budget = [_MAX_PROJECTION_SEGMENT_COMPARISONS]
+    projections: list[TrackProjection] = []
+    previous_index = 0
+    last_global_position: tuple[float, float, float] | None = None
+    for sample_index, sample in enumerate(samples):
+        position = (float(sample["x"]), float(sample["y"]), float(sample["z"]))
+        if sample_index == 0:
+            best = _best_track_projection(
+                sample,
+                geometry,
+                all_indices,
+                comparison_budget,
+            )
+            last_global_position = position
+        else:
+            local_indices = _local_segment_indices(
+                previous_index,
+                segment_count,
+                closed=geometry.closed,
+            )
+            best = _best_track_projection(
+                sample,
+                geometry,
+                local_indices,
+                comparison_budget,
+            )
+            moved_since_global = (
+                float("inf")
+                if last_global_position is None
+                else math.dist(position, last_global_position)
+            )
+            local_boundary_hit = len(local_indices) < segment_count and (
+                (geometry.closed and best.segment_index in {local_indices[0], local_indices[-1]})
+                or (
+                    not geometry.closed
+                    and (
+                        (local_indices[0] > 0 and best.segment_index == local_indices[0])
+                        or (
+                            local_indices[-1] < segment_count - 1
+                            and best.segment_index == local_indices[-1]
+                        )
+                    )
+                )
+            )
+            needs_global = (
+                sample_index % _PROJECTION_GLOBAL_RESCAN_INTERVAL == 0
+                or local_boundary_hit
+                or (
+                    best.error > _PROJECTION_LOCAL_ERROR_FALLBACK_M
+                    and moved_since_global >= _PROJECTION_GLOBAL_RESCAN_DISTANCE_M
+                )
+            )
+            if needs_global:
+                global_best = _best_track_projection(
+                    sample,
+                    geometry,
+                    all_indices,
+                    comparison_budget,
+                )
+                # Preserve ordered continuity at exactly equidistant
+                # self-intersections; otherwise accept the globally closer arc.
+                if global_best.error + 1e-9 < best.error:
+                    best = global_best
+                last_global_position = position
+        projections.append(best)
+        previous_index = best.segment_index
+    return projections
+
+
+def _merged_interval_length(intervals: list[tuple[float, float]]) -> float:
+    if not intervals:
+        return 0.0
+    ordered = sorted(intervals)
+    total = 0.0
+    start, end = ordered[0]
+    for next_start, next_end in ordered[1:]:
+        if next_start <= end:
+            end = max(end, next_end)
+        else:
+            total += end - start
+            start, end = next_start, next_end
+    return total + (end - start)
+
+
+def _evaluate_track_progress(
+    samples: list[dict[str, Any]],
+    projections: list[TrackProjection],
+    geometry: TrackGeometry,
+    *,
+    max_track_error: float,
+) -> TrackProgressEvaluation:
+    """Evaluate directed, continuous progress independent of waypoint density."""
+
+    intervals: list[tuple[float, float]] = []
+    previous: tuple[dict[str, Any], TrackProjection] | None = None
+    first_progress: float | None = None
+    last_progress: float | None = None
+    forward_distance = 0.0
+    backward_distance = 0.0
+    discontinuity_count = 0
+    for sample, projection in zip(samples, projections, strict=True):
+        if projection.error > max_track_error:
+            previous = None
+            continue
+        if first_progress is None:
+            first_progress = projection.progress
+        last_progress = projection.progress
+        if previous is not None:
+            previous_sample, previous_projection = previous
+            delta = projection.progress - previous_projection.progress
+            if geometry.closed:
+                half_length = geometry.total_length / 2.0
+                if delta > half_length:
+                    delta -= geometry.total_length
+                elif delta < -half_length:
+                    delta += geometry.total_length
+            sample_distance = math.dist(
+                (sample["x"], sample["y"], sample["z"]),
+                (
+                    previous_sample["x"],
+                    previous_sample["y"],
+                    previous_sample["z"],
+                ),
+            )
+            maximum_continuous_step = min(
+                geometry.total_length * _MAX_COVERAGE_PROGRESS_STEP_FRACTION,
+                max(0.25, sample_distance * 4.0 + 0.1),
+            )
+            if abs(delta) > maximum_continuous_step + 1e-9:
+                discontinuity_count += 1
+                previous = (sample, projection)
+                continue
+            if delta < -1e-12:
+                backward_distance += -delta
+                previous = (sample, projection)
+                continue
+            if delta > 1e-12:
+                forward_distance += delta
+                if geometry.closed:
+                    start = previous_projection.progress
+                    normalized_start = start % geometry.total_length
+                    normalized_end = normalized_start + delta
+                    if normalized_end <= geometry.total_length:
+                        intervals.append((normalized_start, normalized_end))
+                    else:
+                        intervals.append((normalized_start, geometry.total_length))
+                        intervals.append((0.0, normalized_end - geometry.total_length))
+                else:
+                    intervals.append((previous_projection.progress, projection.progress))
+        previous = (sample, projection)
+    return TrackProgressEvaluation(
+        coverage=min(1.0, _merged_interval_length(intervals) / geometry.total_length),
+        directed_progress_fraction=min(
+            1.0,
+            max(0.0, (forward_distance - backward_distance) / geometry.total_length),
+        ),
+        backward_distance=backward_distance,
+        discontinuity_count=discontinuity_count,
+        start_progress=first_progress,
+        end_progress=last_progress,
+    )
 
 
 def _sample_meets_track_entry_condition(
     sample: dict[str, Any],
-    ref_points: list[dict[str, float]],
-    target_altitude: float,
+    projection: TrackProjection,
     altitude_fraction: float,
     near_track_threshold: float,
 ) -> bool:
-    if sample["z"] < altitude_fraction * target_altitude:
+    target_altitude = max(0.0, projection.reference_z)
+    if target_altitude > 0.0 and sample["z"] < altitude_fraction * target_altitude:
         return False
-    err, _ = _nearest_error(sample, ref_points)
-    return err <= near_track_threshold
+    return projection.error <= near_track_threshold
 
 
 def _first_consecutive_index(
     samples: list[dict[str, Any]],
     start_idx: int,
     end_idx: int,
-    predicate: Callable[[dict[str, Any]], bool],
+    predicate: Callable[[int, dict[str, Any]], bool],
     consecutive_count: int,
 ) -> int | None:
     count = 0
     run_start: int | None = None
     for i in range(start_idx, end_idx + 1):
-        if predicate(samples[i]):
+        if predicate(i, samples[i]):
             if count == 0:
                 run_start = i
             count += 1
@@ -634,16 +1518,17 @@ def _first_consecutive_index(
 
 def _last_before_landing_index(
     samples: list[dict[str, Any]],
+    projections: list[TrackProjection],
     start_idx: int,
     end_idx: int,
-    target_altitude: float,
     altitude_fraction: float,
     consecutive_count: int,
 ) -> int:
-    threshold = altitude_fraction * target_altitude
     count = 0
     run_start: int | None = None
     for i in range(start_idx + 1, end_idx + 1):
+        target_altitude = max(0.0, projections[i].reference_z)
+        threshold = altitude_fraction * target_altitude
         if samples[i]["z"] < threshold:
             if count == 0:
                 run_start = i
@@ -658,12 +1543,11 @@ def _last_before_landing_index(
 
 def _refine_candidate_window(
     samples: list[dict[str, Any]],
-    reference_track: list[dict[str, float]],
+    projections: list[TrackProjection],
     raw_start_idx: int,
     raw_end_idx: int,
     *,
     raw_source: str,
-    target_altitude: float,
     altitude_fraction: float,
     near_track_threshold: float,
     consecutive_samples: int,
@@ -676,10 +1560,9 @@ def _refine_candidate_window(
         samples,
         raw_start_idx,
         raw_end_idx,
-        lambda sample: _sample_meets_track_entry_condition(
+        lambda index, sample: _sample_meets_track_entry_condition(
             sample,
-            reference_track,
-            target_altitude,
+            projections[index],
             altitude_fraction,
             near_track_threshold,
         ),
@@ -689,9 +1572,9 @@ def _refine_candidate_window(
         return None
     refined_end = _last_before_landing_index(
         samples,
+        projections,
         refined_start,
         raw_end_idx,
-        target_altitude,
         altitude_fraction,
         consecutive_samples,
     )
@@ -712,10 +1595,9 @@ def _refine_candidate_window(
 
 def _find_eval_window_from_timing(
     samples: list[dict[str, Any]],
-    reference_track: list[dict[str, float]],
+    projections: list[TrackProjection],
     timing: dict[str, Any],
     *,
-    target_altitude: float,
     altitude_fraction: float,
     near_track_threshold: float,
     consecutive_samples: int,
@@ -737,11 +1619,10 @@ def _find_eval_window_from_timing(
         return None
     return _refine_candidate_window(
         samples,
-        reference_track,
+        projections,
         idx_start,
         idx_end,
         raw_source="offboard_timing",
-        target_altitude=target_altitude,
         altitude_fraction=altitude_fraction,
         near_track_threshold=near_track_threshold,
         consecutive_samples=consecutive_samples,
@@ -750,9 +1631,8 @@ def _find_eval_window_from_timing(
 
 def _find_eval_window_from_telemetry(
     samples: list[dict[str, Any]],
-    reference_track: list[dict[str, float]],
+    projections: list[TrackProjection],
     *,
-    target_altitude: float,
     altitude_fraction: float,
     near_track_threshold: float,
     consecutive_samples: int,
@@ -763,10 +1643,9 @@ def _find_eval_window_from_telemetry(
         samples,
         raw_start_idx,
         raw_end_idx,
-        lambda sample: _sample_meets_track_entry_condition(
+        lambda index, sample: _sample_meets_track_entry_condition(
             sample,
-            reference_track,
-            target_altitude,
+            projections[index],
             altitude_fraction,
             near_track_threshold,
         ),
@@ -776,9 +1655,9 @@ def _find_eval_window_from_telemetry(
         return None
     end_idx = _last_before_landing_index(
         samples,
+        projections,
         start_idx,
         raw_end_idx,
-        target_altitude,
         altitude_fraction,
         consecutive_samples,
     )
@@ -799,29 +1678,29 @@ def _find_eval_window_from_telemetry(
 
 def _find_altitude_only_window(
     samples: list[dict[str, Any]],
-    reference_track: list[dict[str, float]],
+    projections: list[TrackProjection],
     *,
-    target_altitude: float,
     altitude_fraction: float,
     consecutive_samples: int,
 ) -> EvaluationWindow | None:
     raw_start_idx = 0
     raw_end_idx = len(samples) - 1
-    threshold = altitude_fraction * target_altitude
     start_idx = _first_consecutive_index(
         samples,
         raw_start_idx,
         raw_end_idx,
-        lambda sample: sample["z"] >= threshold,
+        lambda index, sample: (
+            sample["z"] >= altitude_fraction * max(0.0, projections[index].reference_z)
+        ),
         consecutive_samples,
     )
     if start_idx is None:
         return None
     end_idx = _last_before_landing_index(
         samples,
+        projections,
         start_idx,
         raw_end_idx,
-        target_altitude,
         altitude_fraction,
         consecutive_samples,
     )
@@ -849,15 +1728,19 @@ def _compute_metrics(
     timeout_flag: bool,
     dry_run: bool,
     advanced_scenario_config: dict[str, Any] | None = None,
+    scenario_effect_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     samples = telemetry["samples"]
-    target_altitude = float(reference_track[0]["z"])
+    track_geometry = _build_track_geometry(reference_track)
+    projections = _project_samples_to_track(samples, track_geometry)
     altitude_fraction = env.eval_altitude_fraction
     near_track_threshold = env.eval_near_track_threshold_m
     consecutive_samples = env.eval_consecutive_samples
     total_sample_count = len(samples)
 
-    offboard_timing_path = Path(str(telemetry.get("meta", {}).get("offboard_timing_path", ""))).expanduser()
+    offboard_timing_path = Path(
+        str(telemetry.get("meta", {}).get("offboard_timing_path", ""))
+    ).expanduser()
     offboard_timing: dict[str, Any] | None = None
     if offboard_timing_path and offboard_timing_path.exists():
         try:
@@ -871,9 +1754,8 @@ def _compute_metrics(
     if offboard_timing is not None:
         eval_window = _find_eval_window_from_timing(
             samples,
-            reference_track,
+            projections,
             offboard_timing,
-            target_altitude=target_altitude,
             altitude_fraction=altitude_fraction,
             near_track_threshold=near_track_threshold,
             consecutive_samples=consecutive_samples,
@@ -881,8 +1763,7 @@ def _compute_metrics(
     if eval_window is None:
         eval_window = _find_eval_window_from_telemetry(
             samples,
-            reference_track,
-            target_altitude=target_altitude,
+            projections,
             altitude_fraction=altitude_fraction,
             near_track_threshold=near_track_threshold,
             consecutive_samples=consecutive_samples,
@@ -890,8 +1771,7 @@ def _compute_metrics(
     if eval_window is None:
         eval_window = _find_altitude_only_window(
             samples,
-            reference_track,
-            target_altitude=target_altitude,
+            projections,
             altitude_fraction=altitude_fraction,
             consecutive_samples=consecutive_samples,
         )
@@ -909,57 +1789,65 @@ def _compute_metrics(
         )
 
     evaluation_samples = samples[eval_window.start_idx : eval_window.end_idx + 1]
+    evaluation_projections = projections[eval_window.start_idx : eval_window.end_idx + 1]
 
-    errors: list[float] = []
-    ref_hits: set[int] = set()
-    eval_errors: list[float] = []
-    eval_ref_hits: set[int] = set()
-    radial_errors: list[float] = []
-    center_x = job_cfg["start_point"]["x"]
-    center_y = job_cfg["start_point"]["y"]
-
-    for s in samples:
-        err, idx = _nearest_error(s, reference_track)
-        errors.append(err)
-        ref_hits.add(idx)
-        radial_errors.append(math.hypot(s["x"] - center_x, s["y"] - center_y))
-    for s in evaluation_samples:
-        err, idx = _nearest_error(s, reference_track)
-        eval_errors.append(err)
-        eval_ref_hits.add(idx)
+    errors = [projection.error for projection in projections]
+    eval_errors = [projection.error for projection in evaluation_projections]
 
     rmse = math.sqrt(sum(e * e for e in eval_errors) / len(eval_errors))
     max_error = max(eval_errors)
     max_error_idx = eval_errors.index(max_error)
     completion_time = max(0.0, evaluation_samples[-1]["t"] - evaluation_samples[0]["t"])
     final_ref = reference_track[-1]
-    final_error = math.hypot(evaluation_samples[-1]["x"] - final_ref["x"], evaluation_samples[-1]["y"] - final_ref["y"])
+    final_error = math.sqrt(
+        (evaluation_samples[-1]["x"] - final_ref["x"]) ** 2
+        + (evaluation_samples[-1]["y"] - final_ref["y"]) ** 2
+        + (evaluation_samples[-1]["z"] - final_ref["z"]) ** 2
+    )
 
     overshoot_count = 0
-    for i in range(2, len(radial_errors)):
-        a = radial_errors[i - 2]
-        b = radial_errors[i - 1]
-        c = radial_errors[i]
-        if (b > a and b > c and b - max(a, c) > 0.25) or (b < a and b < c and min(a, c) - b > 0.25):
+    for i in range(2, len(eval_errors)):
+        a = eval_errors[i - 2]
+        b = eval_errors[i - 1]
+        c = eval_errors[i]
+        if b > a and b > c and b - max(a, c) > 0.25:
             overshoot_count += 1
 
     if eval_window.source == "all_samples_fallback":
         crash_flag = any(bool(s.get("crashed", False)) for s in samples)
         crash_reason = "telemetry_crashed_flag" if crash_flag else "none"
-        if not crash_flag and job_cfg["altitude_m"] > 0.5:
-            crash_flag = min(s["z"] for s in samples) < 0.2
+        if not crash_flag:
+            crash_flag = any(
+                projection.reference_z > 0.5 and sample["z"] < 0.2
+                for sample, projection in zip(samples, projections, strict=True)
+            )
             crash_reason = "all_samples_fallback_low_altitude" if crash_flag else "none"
     else:
         crash_flag = any(bool(s.get("crashed", False)) for s in evaluation_samples)
         crash_reason = "telemetry_crashed_flag" if crash_flag else "none"
-        collapse_threshold = max(0.2, env.eval_collapse_altitude_fraction * target_altitude)
-        stable_threshold = altitude_fraction * target_altitude
-        stable_altitude_seen = any(s["z"] >= stable_threshold for s in evaluation_samples)
-        if not crash_flag and stable_altitude_seen and len(evaluation_samples) > consecutive_samples:
+        stable_altitude_seen = any(
+            projection.reference_z > 0.5
+            and sample["z"] >= altitude_fraction * projection.reference_z
+            for sample, projection in zip(
+                evaluation_samples,
+                evaluation_projections,
+                strict=True,
+            )
+        )
+        if (
+            not crash_flag
+            and stable_altitude_seen
+            and len(evaluation_samples) > consecutive_samples
+        ):
             first_check_idx = consecutive_samples
             run = 0
             for i in range(first_check_idx, len(evaluation_samples)):
-                if evaluation_samples[i]["z"] < collapse_threshold:
+                reference_z = evaluation_projections[i].reference_z
+                collapse_threshold = max(
+                    0.2,
+                    env.eval_collapse_altitude_fraction * reference_z,
+                )
+                if reference_z > 0.5 and evaluation_samples[i]["z"] < collapse_threshold:
                     run += 1
                     if run >= consecutive_samples:
                         crash_flag = True
@@ -969,12 +1857,17 @@ def _compute_metrics(
                     run = 0
 
     instability_flag = False
-    instability_series = samples if eval_window.source == "all_samples_fallback" else evaluation_samples
+    instability_series = (
+        samples if eval_window.source == "all_samples_fallback" else evaluation_samples
+    )
     for i in range(1, len(instability_series)):
         dt = max(1e-6, instability_series[i]["t"] - instability_series[i - 1]["t"])
         jump = math.hypot(
-            instability_series[i]["x"] - instability_series[i - 1]["x"],
-            instability_series[i]["y"] - instability_series[i - 1]["y"],
+            math.hypot(
+                instability_series[i]["x"] - instability_series[i - 1]["x"],
+                instability_series[i]["y"] - instability_series[i - 1]["y"],
+            ),
+            instability_series[i]["z"] - instability_series[i - 1]["z"],
         )
         if jump / dt > 25.0:
             instability_flag = True
@@ -982,8 +1875,51 @@ def _compute_metrics(
     if max_error > 30.0:
         instability_flag = True
 
-    track_coverage = len(ref_hits) / max(1, len(reference_track))
-    evaluation_track_coverage = len(eval_ref_hits) / max(1, len(reference_track))
+    full_progress = _evaluate_track_progress(
+        samples,
+        projections,
+        track_geometry,
+        max_track_error=near_track_threshold,
+    )
+    evaluation_progress = _evaluate_track_progress(
+        evaluation_samples,
+        evaluation_projections,
+        track_geometry,
+        max_track_error=near_track_threshold,
+    )
+    track_coverage = full_progress.coverage
+    evaluation_track_coverage = evaluation_progress.coverage
+    backward_tolerance = max(0.1, track_geometry.total_length * 0.02)
+    endpoint_tolerance = max(0.25, track_geometry.total_length * 0.01)
+    start_progress = evaluation_progress.start_progress
+    end_progress = evaluation_progress.end_progress
+    if track_geometry.closed:
+        start_reached = (
+            start_progress is not None
+            and min(
+                start_progress,
+                abs(track_geometry.total_length - start_progress),
+            )
+            <= endpoint_tolerance
+        )
+        endpoint_reached = final_error <= env.pass_max_error
+    else:
+        start_reached = start_progress is not None and start_progress <= endpoint_tolerance
+        endpoint_reached = (
+            end_progress is not None
+            and end_progress >= track_geometry.total_length - endpoint_tolerance
+            and final_error <= env.pass_max_error
+        )
+    direction_valid = evaluation_progress.backward_distance <= backward_tolerance
+    progress_contract_ok = (
+        direction_valid
+        and evaluation_progress.discontinuity_count == 0
+        and evaluation_progress.directed_progress_fraction >= env.min_track_coverage
+        and start_reached
+        and endpoint_reached
+    )
+    effect_contract = dict(scenario_effect_contract or {})
+    unsupported_effects = list(effect_contract.get("unsupported_effects") or [])
     pass_flag = (
         (not crash_flag)
         and (not timeout_flag)
@@ -991,6 +1927,8 @@ def _compute_metrics(
         and rmse <= env.pass_rmse
         and max_error <= env.pass_max_error
         and evaluation_track_coverage >= env.min_track_coverage
+        and progress_contract_ok
+        and not unsupported_effects
     )
 
     penalty = 0.0
@@ -1000,29 +1938,33 @@ def _compute_metrics(
         penalty += 120.0
     if instability_flag:
         penalty += 80.0
-    if evaluation_track_coverage < env.min_track_coverage:
+    if evaluation_track_coverage < env.min_track_coverage or not progress_contract_ok:
         penalty += 20.0
     score = rmse + (0.5 * max_error) + (0.05 * completion_time) + penalty
 
     advanced = dict(advanced_scenario_config or {})
-    sensor_deg = advanced.get("sensor_degradation") if isinstance(advanced.get("sensor_degradation"), dict) else {}
+    sensor_deg = (
+        advanced.get("sensor_degradation")
+        if isinstance(advanced.get("sensor_degradation"), dict)
+        else {}
+    )
     obstacle_count = (
-        len(advanced.get("obstacles", []))
-        if isinstance(advanced.get("obstacles"), list)
-        else 0
+        len(advanced.get("obstacles", [])) if isinstance(advanced.get("obstacles"), list) else 0
     )
-    wind_gust_enabled = bool(
-        isinstance(advanced.get("wind_gusts"), dict)
-        and advanced.get("wind_gusts", {}).get("enabled")
-    )
-    advanced_warnings: list[str] = []
-    if obstacle_count > 0:
-        advanced_warnings.append(
-            "TODO: native Gazebo obstacle injection not implemented yet; continuing without obstacle physics."
+    wind_gusts = advanced.get("wind_gusts") if isinstance(advanced.get("wind_gusts"), dict) else {}
+    wind_gust_enabled_raw = wind_gusts.get("enabled", False)
+    if not isinstance(wind_gust_enabled_raw, bool):
+        raise RunnerError("advanced_scenario_config.wind_gusts.enabled must be boolean")
+    wind_gust_enabled = wind_gust_enabled_raw
+    dropout_rate_raw = sensor_deg.get("dropout_rate", 0.0) if sensor_deg else 0.0
+    if isinstance(dropout_rate_raw, bool) or not isinstance(dropout_rate_raw, (int, float)):
+        raise RunnerError(
+            "advanced_scenario_config.sensor_degradation.dropout_rate must be numeric"
         )
-    if wind_gust_enabled:
-        advanced_warnings.append(
-            "TODO: native Gazebo gust model wiring not implemented yet; continuing with baseline wind only."
+    dropout_rate = float(dropout_rate_raw)
+    if not math.isfinite(dropout_rate) or not 0 <= dropout_rate <= 1:
+        raise RunnerError(
+            "advanced_scenario_config.sensor_degradation.dropout_rate must be in [0, 1]"
         )
     return {
         "rmse": round(rmse, 6),
@@ -1039,6 +1981,20 @@ def _compute_metrics(
             "simulator": "px4_gazebo",
             "track_coverage": round(track_coverage, 6),
             "evaluation_track_coverage": round(evaluation_track_coverage, 6),
+            "evaluation_directed_progress_fraction": round(
+                evaluation_progress.directed_progress_fraction, 6
+            ),
+            "evaluation_backward_distance_m": round(evaluation_progress.backward_distance, 6),
+            "evaluation_progress_discontinuity_count": (evaluation_progress.discontinuity_count),
+            "evaluation_direction_valid": direction_valid,
+            "evaluation_start_reached": start_reached,
+            "evaluation_endpoint_reached": endpoint_reached,
+            "evaluation_progress_contract_ok": progress_contract_ok,
+            "track_length_3d_m": round(track_geometry.total_length, 6),
+            "track_is_closed": track_geometry.closed,
+            "track_projection": "ordered_local_3d_segment_projection",
+            "track_projection_comparison_limit": _MAX_PROJECTION_SEGMENT_COMPARISONS,
+            "coverage_basis": "union_of_traversed_polyline_arc_length",
             "full_log_rmse": round(math.sqrt(sum(e * e for e in errors) / len(errors)), 6),
             "full_log_max_error": round(max(errors), 6),
             "pass_thresholds": {
@@ -1049,10 +2005,14 @@ def _compute_metrics(
             "evaluation_window_source": eval_window.source,
             "evaluation_window_raw_source": eval_window.raw_source,
             "raw_track_start_t": (
-                round(float(eval_window.raw_start_t), 6) if eval_window.raw_start_t is not None else None
+                round(float(eval_window.raw_start_t), 6)
+                if eval_window.raw_start_t is not None
+                else None
             ),
             "raw_track_end_t": (
-                round(float(eval_window.raw_end_t), 6) if eval_window.raw_end_t is not None else None
+                round(float(eval_window.raw_end_t), 6)
+                if eval_window.raw_end_t is not None
+                else None
             ),
             "evaluation_start_t": round(float(evaluation_samples[0]["t"]), 6),
             "evaluation_end_t": round(float(evaluation_samples[-1]["t"]), 6),
@@ -1068,6 +2028,10 @@ def _compute_metrics(
                 "x": round(float(evaluation_samples[max_error_idx]["x"]), 6),
                 "y": round(float(evaluation_samples[max_error_idx]["y"]), 6),
                 "z": round(float(evaluation_samples[max_error_idx]["z"]), 6),
+                "reference_x": round(float(evaluation_projections[max_error_idx].reference_x), 6),
+                "reference_y": round(float(evaluation_projections[max_error_idx].reference_y), 6),
+                "reference_z": round(float(evaluation_projections[max_error_idx].reference_z), 6),
+                "track_progress_m": round(float(evaluation_projections[max_error_idx].progress), 6),
                 "error": round(float(max_error), 6),
             },
             "crash_reason": crash_reason,
@@ -1078,13 +2042,17 @@ def _compute_metrics(
             "world": job_cfg["vehicle_profile"]["world"],
             "px4_version": job_cfg["vehicle_profile"]["px4_version"],
             "advanced_scenario_summary": {
-                "enabled": bool(advanced),
+                "enabled": bool(effect_contract.get("requested_effects")),
                 "obstacle_count": obstacle_count,
-                "dropout_rate": float(sensor_deg.get("dropout_rate", 0.0))
-                if sensor_deg
-                else 0.0,
+                "dropout_rate": dropout_rate,
                 "wind_gust_enabled": wind_gust_enabled,
-                "warnings": advanced_warnings,
+                "requested_effects": list(effect_contract.get("requested_effects") or []),
+                "applied_effects": list(effect_contract.get("applied_effects") or []),
+                "unsupported_effects": unsupported_effects,
+                "verification_status": effect_contract.get("verification_status", "not_requested"),
+                "unverified_passthrough_enabled": bool(
+                    effect_contract.get("unverified_passthrough_enabled", False)
+                ),
             },
         },
     }
@@ -1096,7 +2064,9 @@ def _write_trajectory_json(telemetry: dict[str, Any], path: Path) -> None:
     _json_dump(path, {"schema_version": "dronedream.telemetry.v1", "samples": simplified})
 
 
-def _artifact_record(path: Path, artifact_type: str, display_name: str, mime_type: str) -> dict[str, Any]:
+def _artifact_record(
+    path: Path, artifact_type: str, display_name: str, mime_type: str
+) -> dict[str, Any]:
     if not path.exists():
         return {}
     return {
@@ -1113,6 +2083,14 @@ def _command_is_executable(command: str) -> bool:
     if not argv:
         return False
     first = argv[0]
+    executable_tokens = {
+        "{px4_executable}": "DRONEDREAM_PX4_EXECUTABLE",
+        "{gazebo_executable}": "DRONEDREAM_GAZEBO_EXECUTABLE",
+    }
+    if first in executable_tokens:
+        first = os.environ.get(executable_tokens[first], "").strip()
+        if not first:
+            return False
     if os.path.isabs(first) or first.startswith("."):
         return Path(first).exists() and os.access(first, os.X_OK)
     return shutil.which(first) is not None
@@ -1124,9 +2102,7 @@ def _split_command(command: str) -> list[str]:
     argv = shlex.split(command, posix=os.name != "nt")
     if os.name == "nt":
         return [
-            item[1:-1]
-            if len(item) >= 2 and item[0] == item[-1] and item[0] in {'"', "'"}
-            else item
+            item[1:-1] if len(item) >= 2 and item[0] == item[-1] and item[0] in {'"', "'"} else item
             for item in argv
         ]
     return argv
@@ -1135,10 +2111,20 @@ def _split_command(command: str) -> list[str]:
 def _build_launch_argv(command_template: str, values: dict[str, str]) -> list[str]:
     has_token = any("{" + token + "}" in command_template for token in _TEMPLATE_TOKENS)
     if has_token:
-        rendered = command_template
-        for token, value in values.items():
-            rendered = rendered.replace("{" + token + "}", value)
-        return _split_command(rendered)
+        template_argv = _split_command(command_template)
+        rendered_argv: list[str] = []
+        for item in template_argv:
+            # ``extra_args`` is the only intentionally multi-argument token.
+            # Every path/value token is substituted *after* splitting so a
+            # workspace path containing spaces remains exactly one argv item.
+            if item == "{extra_args}":
+                rendered_argv.extend(_split_command(values.get("extra_args", "")))
+                continue
+            rendered = item
+            for token, value in values.items():
+                rendered = rendered.replace("{" + token + "}", value)
+            rendered_argv.append(rendered)
+        return rendered_argv
 
     argv = _split_command(command_template)
     argv.extend(
@@ -1159,31 +2145,51 @@ def _build_launch_argv(command_template: str, values: dict[str, str]) -> list[st
 
 
 def _run_lower_level_launcher(
-    env: RunnerEnv,
     *,
     launch_argv: list[str],
     cwd: Path,
     stdout_log: Path,
     stderr_log: Path,
+    timeout_seconds: float,
     launch_env: dict[str, str] | None = None,
 ) -> int:
-    with stdout_log.open("w", encoding="utf-8") as out, stderr_log.open("w", encoding="utf-8") as err:
+    with (
+        stdout_log.open("w", encoding="utf-8") as out,
+        stderr_log.open("w", encoding="utf-8") as err,
+    ):
+        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
         proc = subprocess.Popen(  # noqa: S603
             launch_argv,
             cwd=str(cwd),
             stdout=out,
             stderr=err,
             text=True,
-            start_new_session=True,
+            start_new_session=os.name != "nt",
+            creationflags=creationflags,
             env=launch_env,
         )
+        previous_signal_handlers: dict[int, Any] = {}
+
+        def _forward_shutdown(signum: int, _frame: Any) -> None:
+            _terminate_subprocess_tree(proc, force=True)
+            raise SystemExit(128 + signum)
+
+        if os.name != "nt":
+            for shutdown_signal in (signal.SIGINT, signal.SIGTERM):
+                previous_signal_handlers[int(shutdown_signal)] = signal.getsignal(shutdown_signal)
+                signal.signal(shutdown_signal, _forward_shutdown)
         try:
-            return proc.wait(timeout=env.timeout_seconds)
+            return proc.wait(timeout=timeout_seconds)
         except subprocess.TimeoutExpired as exc:
             _terminate_subprocess_tree(proc, force=False)
             time.sleep(0.2)
             _terminate_subprocess_tree(proc, force=True)
-            raise TimeoutRunnerError(f"lower-level launcher timed out after {env.timeout_seconds}s") from exc
+            raise TimeoutRunnerError(
+                f"lower-level launcher timed out after {timeout_seconds:g}s"
+            ) from exc
+        finally:
+            for shutdown_signal, previous_handler in previous_signal_handlers.items():
+                signal.signal(shutdown_signal, previous_handler)
 
 
 def _terminate_subprocess_tree(proc: subprocess.Popen[str], *, force: bool) -> None:
@@ -1192,14 +2198,27 @@ def _terminate_subprocess_tree(proc: subprocess.Popen[str], *, force: bool) -> N
     if proc.poll() is not None:
         return
     if os.name == "nt":
-        with contextlib.suppress(OSError):
-            proc.kill() if force else proc.terminate()
+        taskkill = ["taskkill", "/PID", str(proc.pid), "/T"]
+        if force:
+            taskkill.append("/F")
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            subprocess.run(  # noqa: S603, S607 - fixed system utility.
+                taskkill,
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+        if proc.poll() is None:
+            with contextlib.suppress(OSError):
+                proc.kill() if force else proc.terminate()
         return
     with contextlib.suppress(OSError):
         os.killpg(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
 
 
-def _failure_result(reason: str, code: str, artifacts: list[dict[str, Any]], log_excerpt: str) -> dict[str, Any]:
+def _failure_result(
+    reason: str, code: str, artifacts: list[dict[str, Any]], log_excerpt: str
+) -> dict[str, Any]:
     return {
         "success": False,
         "failure": {"code": code, "reason": reason},
@@ -1210,17 +2229,55 @@ def _failure_result(reason: str, code: str, artifacts: list[dict[str, Any]], log
 
 def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
     records = [
-        _artifact_record(run_dir / "telemetry.json", "telemetry_json", "Telemetry", "application/json"),
+        _artifact_record(
+            run_dir / "telemetry.json", "telemetry_json", "Telemetry", "application/json"
+        ),
         _artifact_record(
             run_dir / "reference_track.json",
             "reference_track_json",
             "Reference Track",
             "application/json",
         ),
-        _artifact_record(run_dir / "trajectory.json", "trajectory_json", "Trajectory Samples", "application/json"),
+        _artifact_record(
+            run_dir / "scenario_config.json",
+            "scenario_config_json",
+            "Scenario Configuration",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "controller_params.json",
+            "controller_parameters_json",
+            "Controller Parameters",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "px4_parameters.input.json",
+            "px4_parameters_input_json",
+            "PX4 Parameter Input",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "launch_config.json",
+            "simulator_launch_config_json",
+            "Simulator Launch Configuration",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "simulator_runtime_manifest.json",
+            "simulator_runtime_manifest_json",
+            "Simulator Runtime Manifest",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "trajectory.json", "trajectory_json", "Trajectory Samples", "application/json"
+        ),
         _artifact_record(run_dir / "runner.log", "worker_log", "Runner Log", "text/plain"),
-        _artifact_record(run_dir / "stdout.log", "simulator_stdout", "Simulator stdout", "text/plain"),
-        _artifact_record(run_dir / "stderr.log", "simulator_stderr", "Simulator stderr", "text/plain"),
+        _artifact_record(
+            run_dir / "stdout.log", "simulator_stdout", "Simulator stdout", "text/plain"
+        ),
+        _artifact_record(
+            run_dir / "stderr.log", "simulator_stderr", "Simulator stderr", "text/plain"
+        ),
         _artifact_record(
             run_dir / "offboard_executor.log",
             "offboard_executor_log",
@@ -1279,6 +2336,21 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
     return [r for r in records if r]
 
 
+def _remove_success_raw_logs(run_dir: Path) -> None:
+    """Honor KEEP_RAW_LOGS only after successful metric computation."""
+
+    for name in (
+        "stdout.log",
+        "stderr.log",
+        "gui_stdout.log",
+        "gui_stderr.log",
+        "track_marker_stdout.log",
+        "track_marker_stderr.log",
+    ):
+        with contextlib.suppress(OSError):
+            (run_dir / name).unlink(missing_ok=True)
+
+
 def _require_verified_px4_parameter_evidence(
     run_dir: Path,
     requested: dict[str, int | float],
@@ -1294,7 +2366,10 @@ def _require_verified_px4_parameter_evidence(
         path = run_dir / filename
         if not path.is_file():
             raise RunnerError(f"PX4 parameter evidence missing: {filename}")
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(
+            path.read_text(encoding="utf-8"),
+            parse_constant=_reject_nonfinite_json,
+        )
         if not isinstance(payload, dict):
             raise RunnerError(f"PX4 parameter evidence must be an object: {filename}")
         try:
@@ -1324,9 +2399,7 @@ def _require_verified_px4_parameter_evidence(
         if definition is None:
             raise RunnerError(f"PX4 applied-parameter evidence contains unknown parameter: {name}")
         tolerance = (
-            0.0
-            if definition.value_type == "int"
-            else max(float(definition.step) / 10.0, 1e-6)
+            0.0 if definition.value_type == "int" else max(float(definition.step) / 10.0, 1e-6)
         )
         if not math.isfinite(float(actual)) or not math.isclose(
             float(actual),
@@ -1334,13 +2407,10 @@ def _require_verified_px4_parameter_evidence(
             rel_tol=0.0,
             abs_tol=tolerance,
         ):
-            raise RunnerError(
-                f"PX4 applied-parameter evidence does not match request for {name}"
-            )
+            raise RunnerError(f"PX4 applied-parameter evidence does not match request for {name}")
 
 
 def run_once(input_path: Path, output_path: Path) -> int:
-    env = _load_env()
     run_dir = output_path.parent
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1352,13 +2422,42 @@ def run_once(input_path: Path, output_path: Path) -> int:
     params_json = run_dir / "controller_params.json"
     px4_params_json = run_dir / "px4_parameters.input.json"
     track_json = run_dir / "reference_track.json"
+    scenario_config_json = run_dir / "scenario_config.json"
+    meta: dict[str, Any] | None = None
 
     def log(msg: str) -> None:
         with runner_log.open("a", encoding="utf-8") as f:
             f.write(msg + "\n")
 
+    def write_result(result: dict[str, Any]) -> None:
+        payload = dict(result)
+        if meta is not None:
+            payload["schema_version"] = "dronedream.trial_result.v2"
+            payload["execution_identity"] = {
+                "trial_id": meta["trial_id"],
+                "job_id": meta["job_id"],
+                "candidate_id": meta["candidate_id"],
+                "seed": meta["seed"],
+                "attempt_count": meta["attempt_count"],
+            }
+        _json_dump(output_path, payload)
+
     try:
-        payload = json.loads(input_path.read_text(encoding="utf-8"))
+        try:
+            env = _load_env()
+        except (ConfigurationRunnerError, ValueError) as exc:
+            result = _failure_result(
+                f"Invalid PX4/Gazebo runner configuration: {exc}",
+                FAILURE_ADAPTER_UNAVAILABLE,
+                _collect_artifacts(run_dir),
+                f"runner configuration error: {exc}",
+            )
+            write_result(result)
+            return 0
+        payload = json.loads(
+            input_path.read_text(encoding="utf-8"),
+            parse_constant=_reject_nonfinite_json,
+        )
         if not isinstance(payload, dict):
             raise RunnerError("trial_input must be a JSON object")
 
@@ -1367,8 +2466,75 @@ def run_once(input_path: Path, output_path: Path) -> int:
             default_px4_version=env.px4_version,
             default_vehicle=env.vehicle,
             default_world=env.world,
+            default_headless=env.headless,
             enforce_safe_parameter_bounds=env.enforce_safe_parameter_bounds,
         )
+        effective_launcher_timeout = _effective_timeout_seconds(
+            float(env.timeout_seconds),
+            float(meta["simulation_speed_factor"]),
+        )
+        firmware_identity = _firmware_identity(meta.get("firmware_commit"))
+        scenario_effect_contract = _scenario_effect_contract(
+            meta.get("advanced_scenario_config"),
+            scenario_type=str(meta["scenario_type"]),
+            scenario_config=meta.get("scenario_config"),
+            job_config=job_cfg,
+            dry_run=env.dry_run,
+            allow_unverified_passthrough=env.allow_unverified_advanced_effects,
+        )
+        runner_launch_config = {
+            "vehicle": meta["vehicle"],
+            "airframe": meta["airframe"],
+            "simulator_model": meta["simulator_model"],
+            "world": meta["world"],
+            "headless": meta["headless"],
+            "simulation_speed_factor": meta["simulation_speed_factor"],
+            "instance_id": meta["instance_id"],
+            "instance_management": "operator_managed",
+            "timeout_base_1x_seconds": env.timeout_seconds,
+            "timeout_effective_seconds": effective_launcher_timeout,
+            "timeout_slow_simulation_multiplier_cap": (_MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER),
+            "extra_args": env.extra_args,
+            "scenario_type": meta["scenario_type"],
+            "advanced_scenario_config": meta.get("advanced_scenario_config", {}),
+            "px4_version": meta["px4_version"],
+            "firmware_identity": firmware_identity,
+            "scenario_effect_contract": scenario_effect_contract,
+            "parameter_catalog_version": meta["parameter_catalog_version"],
+            "px4_parameter_names": sorted(px4_params),
+        }
+        _json_dump(run_dir / "launch_config.json", runner_launch_config)
+        _json_dump(
+            run_dir / "simulator_runtime_manifest.json",
+            {
+                "schema_version": "dronedream.simulator_runtime_manifest.v1",
+                "execution_identity": {
+                    "trial_id": meta["trial_id"],
+                    "job_id": meta["job_id"],
+                    "candidate_id": meta["candidate_id"],
+                    "seed": meta["seed"],
+                    "attempt_count": meta["attempt_count"],
+                },
+                "px4_version": meta["px4_version"],
+                "firmware_identity": firmware_identity,
+                "scenario_effect_contract": scenario_effect_contract,
+                "simulator": {
+                    "airframe": meta["airframe"],
+                    "simulator_model": meta["simulator_model"],
+                    "world": meta["world"],
+                    "headless": meta["headless"],
+                    "simulation_speed_factor": meta["simulation_speed_factor"],
+                    "instance_id": meta["instance_id"],
+                },
+                "timeout": {
+                    "base_1x_seconds": env.timeout_seconds,
+                    "effective_seconds": effective_launcher_timeout,
+                    "slow_simulation_multiplier_cap": (_MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER),
+                },
+            },
+        )
+        _enforce_firmware_identity(firmware_identity)
+        _enforce_scenario_effect_contract(scenario_effect_contract)
 
         reference_track = _make_reference_track(
             job_cfg["track_type"],
@@ -1388,6 +2554,18 @@ def run_once(input_path: Path, output_path: Path) -> int:
         )
         _json_dump(params_json, params)
         _json_dump(px4_params_json, px4_params)
+        _json_dump(
+            scenario_config_json,
+            {
+                "schema_version": "dronedream.scenario_config.v1",
+                "scenario_type": meta["scenario_type"],
+                "seed": meta["seed"],
+                "wind": job_cfg["wind"],
+                "sensor_noise_level": job_cfg["sensor_noise_level"],
+                "scenario_config": meta.get("scenario_config", {}),
+                "advanced_scenario_config": meta.get("advanced_scenario_config", {}),
+            },
+        )
 
         timeout_flag = False
         if env.dry_run:
@@ -1416,7 +2594,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     _collect_artifacts(run_dir),
                     "PX4_GAZEBO_LAUNCH_COMMAND missing in non-dry-run mode",
                 )
-                _json_dump(output_path, result)
+                write_result(result)
                 return 0
             if not _command_is_executable(env.launch_command):
                 result = _failure_result(
@@ -1425,8 +2603,33 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     _collect_artifacts(run_dir),
                     f"command not executable: {env.launch_command}",
                 )
-                _json_dump(output_path, result)
+                write_result(result)
                 return 0
+
+            configured_executables: dict[str, str] = {}
+            for token, environment_name in (
+                ("px4_executable", "DRONEDREAM_PX4_EXECUTABLE"),
+                ("gazebo_executable", "DRONEDREAM_GAZEBO_EXECUTABLE"),
+            ):
+                configured = os.environ.get(environment_name, "").strip()
+                configured_executables[token] = configured
+                if "{" + token + "}" not in env.launch_command:
+                    continue
+                executable_path = Path(configured).expanduser() if configured else None
+                if (
+                    executable_path is None
+                    or not executable_path.is_file()
+                    or not os.access(executable_path, os.X_OK)
+                ):
+                    result = _failure_result(
+                        f"{environment_name} must point to an executable file when "
+                        f"{{{token}}} is used",
+                        FAILURE_ADAPTER_UNAVAILABLE,
+                        _collect_artifacts(run_dir),
+                        f"invalid configured executable: {environment_name}",
+                    )
+                    write_result(result)
+                    return 0
 
             values = {
                 "run_dir": str(run_dir),
@@ -1434,6 +2637,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 "trial_output": str(output_path),
                 "params_json": str(params_json),
                 "px4_params_json": str(px4_params_json),
+                "scenario_config_json": str(scenario_config_json),
                 "track_json": str(track_json),
                 "telemetry_json": str(telemetry_json),
                 "trajectory_json": str(trajectory_json),
@@ -1449,26 +2653,23 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 "simulator_model": meta["simulator_model"],
                 "world": meta["world"],
                 "px4_version": meta["px4_version"],
-                "headless": "true" if env.headless else "false",
+                "headless": "true" if meta["headless"] else "false",
                 "extra_args": env.extra_args,
+                "instance_id": str(meta["instance_id"]),
+                "simulation_speed_factor": str(meta["simulation_speed_factor"]),
+                **configured_executables,
             }
-            _json_dump(
-                run_dir / "launch_config.json",
-                {
-                    "vehicle": meta["vehicle"],
-                    "airframe": meta["airframe"],
-                    "simulator_model": meta["simulator_model"],
-                    "world": meta["world"],
-                    "headless": env.headless,
-                    "extra_args": env.extra_args,
-                    "scenario_type": meta["scenario_type"],
-                    "advanced_scenario_config": meta.get("advanced_scenario_config", {}),
-                    "px4_version": meta["px4_version"],
-                    "px4_parameter_names": sorted(px4_params),
-                },
-            )
             argv = _build_launch_argv(env.launch_command, values)
-            cwd = Path(env.workdir) if env.workdir else run_dir
+            cwd = Path(env.workdir).expanduser().resolve() if env.workdir else run_dir
+            if not cwd.is_dir():
+                result = _failure_result(
+                    f"PX4_GAZEBO_WORKDIR is not a directory: {cwd}",
+                    FAILURE_ADAPTER_UNAVAILABLE,
+                    _collect_artifacts(run_dir),
+                    "invalid PX4_GAZEBO_WORKDIR",
+                )
+                write_result(result)
+                return 0
             launch_env = os.environ.copy()
             launch_env.update(
                 {
@@ -1476,6 +2677,25 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     "PX4_TRIAL_SIMULATOR_MODEL": str(meta["simulator_model"]),
                     "PX4_TRIAL_WORLD": str(meta["world"]),
                     "PX4_TRIAL_PX4_VERSION": str(meta["px4_version"]),
+                    "PX4_TRIAL_SEED": str(meta["seed"]),
+                    "PX4_TRIAL_ATTEMPT": str(meta["attempt_count"]),
+                    "PX4_TRIAL_SCENARIO_TYPE": str(meta["scenario_type"]),
+                    "PX4_TRIAL_SCENARIO_CONFIG_PATH": str(scenario_config_json),
+                    "PX4_TRIAL_WIND_JSON": json.dumps(job_cfg["wind"], sort_keys=True),
+                    "PX4_TRIAL_SENSOR_NOISE_LEVEL": str(job_cfg["sensor_noise_level"]),
+                    "PX4_TRIAL_HEADLESS": "true" if meta["headless"] else "false",
+                    "PX4_INSTANCE": str(meta["instance_id"]),
+                    # Official PX4 SITL speed-factor environment variable.
+                    "PX4_SIM_SPEED_FACTOR": str(meta["simulation_speed_factor"]),
+                    "PX4_GAZEBO_TIMEOUT_BASE_1X_SECONDS": str(env.timeout_seconds),
+                    "PX4_GAZEBO_TIMEOUT_EFFECTIVE_SECONDS": str(effective_launcher_timeout),
+                    "PX4_FIRMWARE_COMMIT_REQUESTED": str(
+                        firmware_identity.get("requested_commit") or ""
+                    ),
+                    "PX4_FIRMWARE_COMMIT_OBSERVED": str(
+                        firmware_identity.get("observed_commit") or ""
+                    ),
+                    "PX4_FIRMWARE_VERIFICATION_STATUS": str(firmware_identity.get("status") or ""),
                 }
             )
             if px4_params:
@@ -1491,18 +2711,25 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 launch_env["PX4_PARAMETER_ENFORCE_SAFE_BOUNDS"] = (
                     "true" if env.enforce_safe_parameter_bounds else "false"
                 )
-            log(f"launch argv: {argv}")
+            log(f"launch executable: {argv[0]} (argc={len(argv)})")
             log(f"launch cwd: {cwd}")
+            log(
+                "launch timeout: "
+                f"base_1x={env.timeout_seconds}s "
+                f"speed_factor={meta['simulation_speed_factor']} "
+                f"effective={effective_launcher_timeout:g}s"
+            )
             try:
                 exit_code = _run_lower_level_launcher(
-                    env,
                     launch_argv=argv,
                     cwd=cwd,
                     stdout_log=stdout_log,
                     stderr_log=stderr_log,
+                    timeout_seconds=effective_launcher_timeout,
                     launch_env=launch_env,
                 )
             except TimeoutRunnerError as exc:
+                _merge_json_object(run_dir / "launch_config.json", runner_launch_config)
                 timeout_flag = True
                 result = _failure_result(
                     str(exc),
@@ -1510,8 +2737,9 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     _collect_artifacts(run_dir),
                     str(exc),
                 )
-                _json_dump(output_path, result)
+                write_result(result)
                 return 0
+            _merge_json_object(run_dir / "launch_config.json", runner_launch_config)
             log(f"launcher exit code: {exit_code}")
             if exit_code != 0:
                 result = _failure_result(
@@ -1520,7 +2748,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     _collect_artifacts(run_dir),
                     f"lower-level launcher exited with code {exit_code}",
                 )
-                _json_dump(output_path, result)
+                write_result(result)
                 return 0
 
         _require_verified_px4_parameter_evidence(
@@ -1533,6 +2761,13 @@ def run_once(input_path: Path, output_path: Path) -> int:
         telemetry.setdefault("schema_version", "dronedream.telemetry.v1")
         telemetry.setdefault("meta", {})
         telemetry["meta"]["offboard_timing_path"] = str(run_dir / "offboard_timing.json")
+        # Persist the normalized contract, not the launcher's potentially
+        # legacy shape, because this exact file is exposed as telemetry_json.
+        _json_dump(telemetry_json, telemetry)
+        if telemetry_json.stat().st_size > _MAX_TELEMETRY_BYTES:
+            raise RunnerError(
+                f"normalized telemetry JSON exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
+            )
         _write_trajectory_json(telemetry, trajectory_json)
 
         metrics = _compute_metrics(
@@ -1547,7 +2782,10 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 if isinstance(meta.get("advanced_scenario_config"), dict)
                 else {}
             ),
+            scenario_effect_contract=scenario_effect_contract,
         )
+        if not env.keep_raw_logs:
+            _remove_success_raw_logs(run_dir)
 
         result = {
             "success": True,
@@ -1558,7 +2796,17 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 f"trial={meta['trial_id']} rmse={metrics['rmse']} score={metrics['score']}"
             ),
         }
-        _json_dump(output_path, result)
+        write_result(result)
+        return 0
+    except UnsupportedScenarioEffectRunnerError as exc:
+        log(f"UnsupportedScenarioEffectRunnerError: {exc}")
+        result = _failure_result(
+            str(exc),
+            FAILURE_UNSUPPORTED_SCENARIO_EFFECT,
+            _collect_artifacts(run_dir),
+            f"px4_gazebo_runner unsupported scenario effect: {exc}",
+        )
+        write_result(result)
         return 0
     except RunnerError as exc:
         log(f"RunnerError: {exc}")
@@ -1568,7 +2816,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             _collect_artifacts(run_dir),
             f"px4_gazebo_runner simulation failure: {exc}",
         )
-        _json_dump(output_path, result)
+        write_result(result)
         return 0
     except Exception as exc:  # pragma: no cover - defensive guardrail
         try:
@@ -1579,7 +2827,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 _collect_artifacts(run_dir),
                 f"Unexpected exception: {exc}",
             )
-            _json_dump(output_path, result)
+            write_result(result)
             return 0
         except Exception:
             print(f"[px4_gazebo_runner] fatal crash: {exc}", file=sys.stderr)

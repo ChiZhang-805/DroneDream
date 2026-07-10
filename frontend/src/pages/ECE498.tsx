@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- This project page intentionally exports deterministic analysis helpers used by its tests. */
 import { useMemo, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { Link } from "react-router-dom";

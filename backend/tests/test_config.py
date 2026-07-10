@@ -34,6 +34,22 @@ def test_cors_rejects_wildcard_with_credentials() -> None:
         Settings(cors_origins="*")
 
 
+def test_finalization_lease_covers_llm_retry_window() -> None:
+    with pytest.raises(ValidationError, match="FINALIZATION_LEASE_SECONDS"):
+        Settings(
+            llm_request_timeout_seconds=600,
+            llm_max_retries=5,
+            finalization_lease_seconds=900,
+        )
+
+    settings = Settings(
+        llm_request_timeout_seconds=600,
+        llm_max_retries=5,
+        finalization_lease_seconds=3700,
+    )
+    assert settings.finalization_lease_seconds == 3700
+
+
 def test_runtime_id_is_optional_and_requires_a_canonical_uuid() -> None:
     assert Settings().dronedream_runtime_id is None
     assert (

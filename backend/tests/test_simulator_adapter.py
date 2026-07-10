@@ -93,6 +93,47 @@ def test_mock_adapter_is_deterministic_for_same_inputs():
     assert r1.metrics.as_dict() == r2.metrics.as_dict()
 
 
+def test_mock_adapter_catalog_parameters_have_explicit_synthetic_effect():
+    adapter = MockSimulatorAdapter()
+    low = adapter.run_trial(_make_ctx(parameters={"MPC_XY_P": 0.6}, seed=77))
+    high = adapter.run_trial(_make_ctx(parameters={"MPC_XY_P": 1.3}, seed=77))
+
+    assert low.metrics is not None and high.metrics is not None
+    assert low.metrics.rmse != high.metrics.rmse
+    assert low.metrics.raw_metric_json["mock_landscape_schema"] == (
+        "dronedream.mock.synthetic.v1"
+    )
+    assert low.metrics.raw_metric_json["physical_fidelity"] is False
+    assert low.metrics.raw_metric_json["catalog_parameter_count"] == 1
+    # The score contract is consistent across adapters: lower error => lower score.
+    better, worse = sorted((low.metrics, high.metrics), key=lambda metric: metric.rmse)
+    assert better.score < worse.score
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "turbulence",
+        "gps_dropout",
+        "payload_changed",
+        "battery_degraded",
+        "actuator_delay",
+        "custom",
+    ],
+)
+def test_mock_adapter_models_every_declared_scenario(scenario: str):
+    result = MockSimulatorAdapter().run_trial(_make_ctx(scenario=scenario))
+    assert result.success is True
+    assert result.metrics is not None
+
+
+def test_mock_adapter_rejects_unknown_scenario_instead_of_treating_it_as_nominal():
+    result = MockSimulatorAdapter().run_trial(_make_ctx(scenario="future_unknown"))
+    assert result.success is False
+    assert result.failure is not None
+    assert result.failure.code == FAILURE_SIMULATION
+
+
 def test_mock_adapter_scenario_worsens_rmse():
     adapter = MockSimulatorAdapter()
     nominal = adapter.run_trial(_make_ctx(scenario="nominal", seed=101))

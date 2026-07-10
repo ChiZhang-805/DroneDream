@@ -7,6 +7,7 @@ export type JobStatus =
   | "QUEUED"
   | "RUNNING"
   | "AGGREGATING"
+  | "FINALIZING"
   | "COMPLETED"
   | "FAILED"
   | "CANCELLED";
@@ -23,6 +24,7 @@ export const JOB_STATUSES: readonly JobStatus[] = [
   "QUEUED",
   "RUNNING",
   "AGGREGATING",
+  "FINALIZING",
   "COMPLETED",
   "FAILED",
   "CANCELLED",
@@ -327,6 +329,9 @@ export interface VehicleProfileConfig {
   airframe: string;
   simulator_model: string;
   world: string;
+  headless: boolean;
+  simulation_speed_factor: number;
+  instance_id: number;
 }
 
 export type ParameterValueType = "float" | "integer" | "boolean" | "enum";
@@ -394,6 +399,24 @@ export interface ScenarioSuiteConfig {
 export type TuningMode = "basic" | "advanced" | "expert";
 export type ParameterRisk = "low" | "medium" | "high";
 export type ParameterScale = "linear" | "log";
+export type ParameterExpertise = "guided" | "advanced" | "expert";
+export type ParameterApplyPolicy = "live" | "disarmed" | "reboot";
+
+export interface LocalizedParameterText {
+  en: string;
+  "zh-CN": string;
+}
+
+export interface ParameterChoiceDefinition {
+  value: number;
+  label: LocalizedParameterText;
+}
+
+export interface ParameterCompatibilityDefinition {
+  px4_versions: string[];
+  vehicle_types: string[];
+  airframe_families: string[];
+}
 
 export interface PX4ParameterDefinition {
   name: string;
@@ -415,6 +438,21 @@ export interface PX4ParameterDefinition {
   requires_reboot: boolean;
   dependencies: string[];
   supported_airframes: string[];
+  control_loop?: string;
+  axes?: string[];
+  tuning_stage?: number;
+  expertise?: ParameterExpertise;
+  apply_policy?: ParameterApplyPolicy;
+  compatibility?: ParameterCompatibilityDefinition;
+  application_interfaces?: string[];
+  recommended_metrics?: string[];
+  evidence_signals?: string[];
+  flight_modes?: string[];
+  preconditions?: string[];
+  risk_note?: LocalizedParameterText | null;
+  source_url?: string | null;
+  bounds_source?: "px4" | "px4_and_dronedream_guardrail";
+  choices?: ParameterChoiceDefinition[];
   legacy_key?: keyof BaselineParameters | null;
 }
 
@@ -443,6 +481,21 @@ export interface ParameterCatalogApiItem {
     parameter: string;
     description: { en: string; "zh-CN": string };
   }>;
+  control_loop?: string;
+  axes?: string[];
+  tuning_stage?: number;
+  expertise?: ParameterExpertise;
+  apply_policy?: ParameterApplyPolicy;
+  compatibility?: ParameterCompatibilityDefinition;
+  application_interfaces?: string[];
+  recommended_metrics?: string[];
+  evidence_signals?: string[];
+  flight_modes?: string[];
+  preconditions?: string[];
+  risk_note?: LocalizedParameterText | null;
+  source_url?: string | null;
+  bounds_source?: "px4" | "px4_and_dronedream_guardrail";
+  choices?: ParameterChoiceDefinition[];
 }
 
 export interface ParameterCatalogApiResponse {
@@ -453,6 +506,46 @@ export interface ParameterCatalogApiResponse {
   vehicle_type: string;
   parameter_count: number;
   parameters: ParameterCatalogApiItem[];
+}
+
+export interface BackendCapabilityItem {
+  ready: boolean;
+  status: string;
+  reason?: string | null;
+  selectable?: boolean;
+  configured?: boolean;
+  requires_external_runtime?: boolean;
+  requires_user_api_key?: boolean;
+  result_protocol?: string;
+  custom_base_url_allowlist_configured?: boolean;
+  max_concurrency_per_host_without_instance_allocator?: number;
+  instance_allocation?: string;
+  physical_fidelity?: boolean;
+  purpose?: string;
+  catalog_parameter_effects?: string;
+  supported_scenarios?: string[];
+  bundled_runner_advanced_effects?: string[];
+  unverified_effect_passthrough_opt_in?: boolean;
+}
+
+export interface BackendCapabilitiesResponse {
+  service_version: string;
+  simulators: {
+    configuration_scope: "api_process" | string;
+    authoritative: boolean;
+    worker_override: string | null;
+    worker_override_supported: boolean;
+    items: Record<string, BackendCapabilityItem>;
+  };
+  optimizers: {
+    configuration_scope?: "api_process" | string;
+    authoritative: boolean;
+    items: Record<string, BackendCapabilityItem>;
+  };
+  parameter_catalog: {
+    catalog_version: string;
+    supported_px4_versions: string[];
+  };
 }
 
 export interface StudyParameterSelection {
@@ -536,9 +629,28 @@ export interface Trial extends TrialSummary {
 export interface AggregatedMetrics {
   rmse: number;
   max_error: number;
+  max_error_mean?: number | null;
+  max_error_worst?: number | null;
   overshoot_count: number;
   completion_time: number;
   score: number;
+  completion_rate?: number | null;
+  failure_rate?: number | null;
+  pass_rate?: number | null;
+  holdout?: HoldoutValidationMetrics | null;
+}
+
+export interface HoldoutValidationMetrics {
+  validation_status: "passed" | "failed" | "incomplete" | "error";
+  feasible: boolean;
+  objective_feasible: boolean | null;
+  trial_count: number;
+  completed_trial_count: number;
+  failed_trial_count: number;
+  passing_trial_count: number;
+  completion_rate: number;
+  failure_rate: number;
+  pass_rate: number;
 }
 
 export interface ComparisonPoint {
@@ -686,4 +798,5 @@ export const JOB_ACTIVE_STATUSES: readonly JobStatus[] = [
   "QUEUED",
   "RUNNING",
   "AGGREGATING",
+  "FINALIZING",
 ];

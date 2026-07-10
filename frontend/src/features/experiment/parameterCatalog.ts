@@ -23,6 +23,10 @@ interface BuiltinParameterOptions {
   valueType?: PX4ParameterDefinition["value_type"];
   requiresReboot?: boolean;
   dependencies?: string[];
+  applyPolicy?: PX4ParameterDefinition["apply_policy"];
+  preconditions?: string[];
+  riskNote?: PX4ParameterDefinition["risk_note"];
+  choices?: PX4ParameterDefinition["choices"];
 }
 
 function builtinParameter(
@@ -54,13 +58,17 @@ function builtinParameter(
     requires_reboot: options.requiresReboot ?? false,
     dependencies: options.dependencies ?? [],
     supported_airframes: ALL_MULTICOPTERS,
+    apply_policy: options.applyPolicy ?? (options.requiresReboot ? "reboot" : "disarmed"),
+    preconditions: options.preconditions ?? [],
+    risk_note: options.riskNote ?? null,
+    choices: options.choices ?? [],
     legacy_key: LEGACY_KEYS[name] ?? null,
   };
 }
 
-// Full offline fallback for the same 28-parameter PX4 snapshot exposed by the
-// backend. This keeps the wizard useful when the read-only catalog endpoint is
-// temporarily unavailable; the server still validates the submitted ranges.
+// Curated 28-parameter offline core subset. The backend r2 catalog exposes a
+// broader 45-parameter set when reachable; the server always performs the
+// authoritative version, applicability, coupling, and range validation.
 export const BUILTIN_PARAMETER_CATALOG: ParameterCatalogResponse = {
   catalog_version: "dronedream.px4.multicopter.2026-07-r1",
   px4_version: "v1.16",
@@ -92,13 +100,25 @@ export const BUILTIN_PARAMETER_CATALOG: ParameterCatalogResponse = {
     builtinParameter("MPC_ACC_HOR_MAX", "Maximum horizontal acceleration", "motion_limits", "Upper horizontal acceleration limit where applicable.", [2, 15], [3, 10], 5, 1, { unit: "m/s²" }),
     builtinParameter("MPC_JERK_AUTO", "Autonomous jerk limit", "motion_limits", "Maximum acceleration slew in autonomous modes.", [1, 80], [2, 20], 4, 1, { unit: "m/s³" }),
     builtinParameter("MPC_TILTMAX_AIR", "Maximum in-air tilt", "motion_limits", "Maximum tilt used by velocity and acceleration controlled flight modes.", [20, 89], [25, 60], 45, 1, { unit: "deg", risk: "high" }),
-    builtinParameter("MC_AIRMODE", "Multicopter air-mode", "motion_limits", "Mixer control-authority policy at very low and high throttle (0, 1, or 2).", [0, 2], [0, 2], 0, 1, { valueType: "integer", risk: "high" }),
+    builtinParameter("MC_AIRMODE", "Multicopter air-mode", "motion_limits", "Mixer control-authority policy at very low and high throttle (0, 1, or 2).", [0, 2], [0, 2], 0, 1, {
+      valueType: "integer",
+      risk: "high",
+      choices: [
+        { value: 0, label: { en: "Disabled", "zh-CN": "关闭" } },
+        { value: 1, label: { en: "Roll/pitch", "zh-CN": "横滚/俯仰" } },
+        { value: 2, label: { en: "Roll/pitch/yaw", "zh-CN": "横滚/俯仰/偏航" } },
+      ],
+      riskNote: {
+        en: "Changing air-mode changes mixer authority close to actuator saturation.",
+        "zh-CN": "修改空中模式会改变执行器接近饱和时的混控权限。",
+      },
+    }),
     builtinParameter("IMU_GYRO_CUTOFF", "Gyroscope low-pass cutoff", "filters", "Second-order low-pass cutoff for gyro data sent to the controllers.", [0, 1000], [20, 80], 40, 1, { unit: "Hz", risk: "high", requiresReboot: true, dependencies: ["MC_ROLLRATE_D"] }),
   ],
 };
 
 const MODE_PRESETS: Record<TuningMode, string[]> = {
-  basic: ["MPC_XY_P", "MPC_XY_VEL_MAX", "MPC_ACC_HOR"],
+  basic: ["MPC_XY_P", "MPC_XY_VEL_MAX", "MPC_ACC_HOR", "MPC_ACC_HOR_MAX"],
   advanced: [
     "MPC_XY_P",
     "MPC_XY_VEL_P_ACC",
@@ -106,6 +126,7 @@ const MODE_PRESETS: Record<TuningMode, string[]> = {
     "MPC_XY_VEL_D_ACC",
     "MPC_XY_VEL_MAX",
     "MPC_ACC_HOR",
+    "MPC_ACC_HOR_MAX",
   ],
   expert: [
     "MPC_XY_P",
@@ -114,6 +135,7 @@ const MODE_PRESETS: Record<TuningMode, string[]> = {
     "MPC_XY_VEL_D_ACC",
     "MPC_XY_VEL_MAX",
     "MPC_ACC_HOR",
+    "MPC_ACC_HOR_MAX",
   ],
 };
 
@@ -148,14 +170,52 @@ export function normalizeCatalog(
   if (!response || !Array.isArray(response.parameters) || response.parameters.length === 0) {
     return BUILTIN_PARAMETER_CATALOG;
   }
-  const valid = response.parameters.filter(
-    (item) =>
-      item &&
-      typeof item.name === "string" &&
-      Number.isFinite(item.default_value) &&
-      Number.isFinite(item.safe_min) &&
-      Number.isFinite(item.safe_max),
-  );
+  const names = new Set<string>();
+  const valid = response.parameters.filter((item) => {
+    if (
+      !item ||
+      typeof item.name !== "string" ||
+      !/^[A-Z][A-Z0-9_]{0,63}$/u.test(item.name) ||
+      names.has(item.name) ||
+      typeof item.label !== "string" ||
+      typeof item.description !== "string" ||
+      typeof item.group !== "string" ||
+      item.group.trim() === "" ||
+      !["float", "integer"].includes(item.value_type) ||
+      !["linear", "log"].includes(item.scale) ||
+      !["low", "medium", "high"].includes(item.risk) ||
+      !Number.isFinite(item.default_value) ||
+      !Number.isFinite(item.absolute_min) ||
+      !Number.isFinite(item.absolute_max) ||
+      !Number.isFinite(item.safe_min) ||
+      !Number.isFinite(item.safe_max) ||
+      !Number.isFinite(item.step) ||
+      item.absolute_min >= item.absolute_max ||
+      item.safe_min >= item.safe_max ||
+      item.safe_min < item.absolute_min ||
+      item.safe_max > item.absolute_max ||
+      item.default_value < item.absolute_min ||
+      item.default_value > item.absolute_max ||
+      item.default_value < item.safe_min ||
+      item.default_value > item.safe_max ||
+      item.step <= 0 ||
+      (item.scale === "log" && item.safe_min <= 0) ||
+      (item.value_type === "integer" && ![
+        item.default_value,
+        item.absolute_min,
+        item.absolute_max,
+        item.safe_min,
+        item.safe_max,
+        item.step,
+      ].every(Number.isInteger)) ||
+      !Array.isArray(item.dependencies) ||
+      item.dependencies.some((dependency) => typeof dependency !== "string")
+    ) {
+      return false;
+    }
+    names.add(item.name);
+    return true;
+  });
   return valid.length === 0
     ? BUILTIN_PARAMETER_CATALOG
     : { ...response, parameters: valid };
@@ -164,32 +224,114 @@ export function normalizeCatalog(
 export function normalizeApiCatalog(
   response: ParameterCatalogApiResponse,
 ): ParameterCatalogResponse {
-  const parameters: PX4ParameterDefinition[] = response.parameters.map((item) => ({
-    name: item.name,
-    label: item.label.en,
-    localized_label: item.label,
-    group: item.group,
-    description: item.description.en,
-    localized_description: item.description,
-    unit: item.unit || null,
-    // The catalog wire format uses PX4's `int`; Job.parameter_space uses the
-    // schema value `integer`. This is especially important for MC_AIRMODE.
-    value_type: item.type === "int" || item.type === "integer" ? "integer" : "float",
-    default_value: item.default,
-    absolute_min: item.hard_bounds.min,
-    absolute_max: item.hard_bounds.max,
-    safe_min: item.safe_bounds.min,
-    safe_max: item.safe_bounds.max,
-    step: item.step,
-    scale: item.safe_bounds.min > 0 && item.safe_bounds.max / item.safe_bounds.min >= 100
-      ? "log"
-      : "linear",
-    risk: item.risk,
-    requires_reboot: item.requires_reboot,
-    dependencies: item.dependencies.map((dependency) => dependency.parameter),
-    supported_airframes: ALL_MULTICOPTERS,
-    legacy_key: LEGACY_KEYS[item.name] ?? null,
-  }));
+  const parameters: PX4ParameterDefinition[] = (
+    Array.isArray(response.parameters) ? response.parameters : []
+  ).flatMap((item) => {
+    try {
+      const dependencies = Array.isArray(item.dependencies)
+        ? item.dependencies
+            .map((dependency) => dependency?.parameter)
+            .filter((name): name is string => typeof name === "string" && name !== item.name)
+        : [];
+      const label = item.label && typeof item.label.en === "string"
+        ? item.label
+        : { en: item.name, "zh-CN": item.name };
+      const description = item.description && typeof item.description.en === "string"
+        ? item.description
+        : { en: "", "zh-CN": "" };
+      const stringArray = (value: unknown): string[] => Array.isArray(value)
+        ? [...new Set(value
+            .filter((entry): entry is string => typeof entry === "string")
+            .map((entry) => entry.trim())
+            .filter(Boolean))]
+        : [];
+      const compatibility = item.compatibility && typeof item.compatibility === "object"
+        ? {
+            px4_versions: stringArray(item.compatibility.px4_versions),
+            vehicle_types: stringArray(item.compatibility.vehicle_types),
+            airframe_families: stringArray(item.compatibility.airframe_families),
+          }
+        : undefined;
+      const choices = Array.isArray(item.choices)
+        ? item.choices.flatMap((choice) => {
+            if (!choice || !Number.isFinite(choice.value) || !choice.label) return [];
+            const choiceLabel = typeof choice.label.en === "string" && choice.label.en.trim() !== ""
+              ? {
+                  en: choice.label.en.trim(),
+                  "zh-CN": typeof choice.label["zh-CN"] === "string" && choice.label["zh-CN"].trim() !== ""
+                    ? choice.label["zh-CN"].trim()
+                    : choice.label.en.trim(),
+                }
+              : null;
+            return choiceLabel ? [{ value: choice.value, label: choiceLabel }] : [];
+          })
+        : [];
+      const riskNote = item.risk_note && typeof item.risk_note.en === "string"
+        ? {
+            en: item.risk_note.en,
+            "zh-CN": typeof item.risk_note["zh-CN"] === "string"
+              ? item.risk_note["zh-CN"]
+              : item.risk_note.en,
+          }
+        : null;
+      return [{
+        name: item.name,
+        label: label.en,
+        localized_label: label,
+        group: item.group,
+        description: description.en,
+        localized_description: description,
+        unit: typeof item.unit === "string" && item.unit !== "" ? item.unit : null,
+        // The catalog wire format uses PX4's `int`; Job.parameter_space uses the
+        // schema value `integer`. This is especially important for MC_AIRMODE.
+        value_type: item.type === "int" || item.type === "integer" ? "integer" as const : "float" as const,
+        default_value: item.default,
+        absolute_min: item.hard_bounds.min,
+        absolute_max: item.hard_bounds.max,
+        safe_min: item.safe_bounds.min,
+        safe_max: item.safe_bounds.max,
+        step: item.step,
+        scale: item.safe_bounds.min > 0 && item.safe_bounds.max / item.safe_bounds.min >= 100
+          ? "log" as const
+          : "linear" as const,
+        risk: item.risk,
+        requires_reboot: Boolean(item.requires_reboot),
+        dependencies: [...new Set(dependencies)],
+        supported_airframes: compatibility?.airframe_families.length
+          ? compatibility.airframe_families
+          : ALL_MULTICOPTERS,
+        control_loop: typeof item.control_loop === "string" ? item.control_loop : undefined,
+        axes: stringArray(item.axes),
+        tuning_stage: Number.isFinite(item.tuning_stage) ? item.tuning_stage : undefined,
+        expertise: ["guided", "advanced", "expert"].includes(item.expertise ?? "")
+          ? item.expertise
+          : undefined,
+        apply_policy: ["live", "disarmed", "reboot"].includes(item.apply_policy ?? "")
+          ? item.apply_policy
+          : undefined,
+        compatibility,
+        application_interfaces: stringArray(item.application_interfaces),
+        recommended_metrics: stringArray(item.recommended_metrics),
+        evidence_signals: stringArray(item.evidence_signals),
+        flight_modes: stringArray(item.flight_modes),
+        preconditions: stringArray(item.preconditions),
+        risk_note: riskNote,
+        source_url: typeof item.source_url === "string" && item.source_url.trim() !== ""
+          ? item.source_url
+          : null,
+        bounds_source: item.bounds_source === "px4" || item.bounds_source === "px4_and_dronedream_guardrail"
+          ? item.bounds_source
+          : undefined,
+        choices,
+        legacy_key: LEGACY_KEYS[item.name] ?? null,
+      }];
+    } catch {
+      // Treat the catalog endpoint as untrusted input. A malformed row must not
+      // crash the entire experiment wizard; valid rows remain usable and an
+      // entirely invalid response falls back to the bundled snapshot.
+      return [];
+    }
+  });
   return normalizeCatalog({
     catalog_version: response.catalog_version,
     px4_version: response.px4_version,

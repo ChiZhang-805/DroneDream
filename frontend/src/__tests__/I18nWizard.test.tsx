@@ -43,7 +43,7 @@ describe("Chinese experiment wizard", () => {
     expect(screen.getByRole("heading", { name: "控制参数搜索空间" })).toBeVisible();
     expect(screen.getByText("查找 PX4 参数")).toBeVisible();
     expect(screen.getByRole("button", { name: /重新应用预设/ })).toBeVisible();
-    expect(screen.getByText("XY 位置与速度环")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "XY 位置与速度环" })).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: /飞行航迹/ }));
     fireEvent.change(screen.getByLabelText(/Track Type/i), {

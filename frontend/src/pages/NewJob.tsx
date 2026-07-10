@@ -16,6 +16,7 @@ import {
 } from "../types/api";
 import type {
   BaselineParameters,
+  BackendCapabilitiesResponse,
   ExperimentStudyConfig,
   JobCreateRequest,
   ObjectiveConfig,
@@ -25,6 +26,7 @@ import type {
   ParameterSpaceSelection,
   RobustAggregation,
   ScenarioAdvancedConfig,
+  ScenarioObstacle,
   ScenarioSuiteConfig,
   SensorNoiseLevel,
   SimulatorBackend,
@@ -39,6 +41,7 @@ import {
   selectedParameters,
   type ParameterSelectionMap,
 } from "../features/experiment/parameterCatalog";
+import { runtimeCapabilityErrors } from "../features/experiment/capabilities";
 import {
   clearExperimentDraft,
   loadExperimentDraft,
@@ -58,6 +61,9 @@ interface FormState {
   airframe: string;
   simulator_model: string;
   simulator_world: string;
+  simulator_headless: boolean;
+  simulation_speed_factor: string;
+  instance_id: string;
   track_type: TrackType;
   baseline_kp_xy: string;
   baseline_kd_xy: string;
@@ -113,6 +119,11 @@ interface FormState {
   obstacles_json: string;
   search_seeds: string;
   holdout_seeds: string;
+  nominal_search_enabled: boolean;
+  wind_search_enabled: boolean;
+  noise_search_enabled: boolean;
+  nominal_holdout_enabled: boolean;
+  combined_holdout_enabled: boolean;
   common_random_numbers: boolean;
 }
 
@@ -125,6 +136,9 @@ const DEFAULTS: FormState = {
   airframe: "x500",
   simulator_model: "gz_x500",
   simulator_world: "default",
+  simulator_headless: true,
+  simulation_speed_factor: "1",
+  instance_id: "0",
   track_type: "circle",
   baseline_kp_xy: "1",
   baseline_kd_xy: "0.2",
@@ -180,6 +194,11 @@ const DEFAULTS: FormState = {
   obstacles_json: "[]",
   search_seeds: "101, 202, 303",
   holdout_seeds: "901, 902",
+  nominal_search_enabled: true,
+  wind_search_enabled: true,
+  noise_search_enabled: true,
+  nominal_holdout_enabled: false,
+  combined_holdout_enabled: true,
   common_random_numbers: true,
 };
 
@@ -271,6 +290,49 @@ const WIZARD_STEPS: Array<{ key: TranslationKey; short: string }> = [
   { key: "wizard.step.review", short: "Review" },
 ];
 
+const OBJECTIVE_WEIGHT_PRESETS: Record<
+  Exclude<ObjectiveProfile, "custom">,
+  Pick<
+    FormState,
+    | "objective_weight_tracking"
+    | "objective_weight_speed"
+    | "objective_weight_smoothness"
+    | "objective_weight_robustness"
+    | "robust_aggregation"
+  >
+> = {
+  stable: {
+    objective_weight_tracking: "1",
+    objective_weight_speed: "0.15",
+    objective_weight_smoothness: "0.75",
+    objective_weight_robustness: "0.8",
+    robust_aggregation: "mean",
+  },
+  fast: {
+    objective_weight_tracking: "0.75",
+    objective_weight_speed: "1",
+    objective_weight_smoothness: "0.2",
+    objective_weight_robustness: "0.4",
+    robust_aggregation: "mean",
+  },
+  smooth: {
+    objective_weight_tracking: "0.75",
+    objective_weight_speed: "0.2",
+    objective_weight_smoothness: "1",
+    objective_weight_robustness: "0.65",
+    robust_aggregation: "mean",
+  },
+  robust: {
+    objective_weight_tracking: "1",
+    objective_weight_speed: "0.25",
+    objective_weight_smoothness: "0.35",
+    objective_weight_robustness: "1",
+    robust_aggregation: "cvar",
+  },
+};
+
+type ScenarioPreset = "nominal" | "wind" | "sensor" | "stress";
+
 const FIELD_STEPS: Record<string, number> = {
   display_name: 0,
   px4_version: 0,
@@ -279,6 +341,8 @@ const FIELD_STEPS: Record<string, number> = {
   airframe: 0,
   simulator_model: 0,
   simulator_world: 0,
+  simulation_speed_factor: 0,
+  instance_id: 0,
   objective_profile: 1,
   objective_weights: 1,
   robust_aggregation: 1,
@@ -299,6 +363,7 @@ const FIELD_STEPS: Record<string, number> = {
   search_seeds: 3,
   holdout_seeds: 3,
   seed_overlap: 3,
+  scenario_cases: 3,
   advanced_enabled: 3,
   gps_noise_m: 3,
   baro_noise_m: 3,
@@ -400,14 +465,132 @@ function parseReferenceTrackInput(raw: string): {
   return { points, error: null };
 }
 
-function parseObstacles(raw: string): { value: ScenarioAdvancedConfig["obstacles"]; error: string | null } {
+function finiteObstacleNumber(
+  value: unknown,
+  field: string,
+  index: number,
+): { value: number; error: string | null } {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return { value: 0, error: `Obstacle #${index + 1} ${field} must be a finite number` };
+  }
+  return { value, error: null };
+}
+
+function positiveObstacleNumber(
+  value: unknown,
+  field: string,
+  index: number,
+): { value: number; error: string | null } {
+  const parsed = finiteObstacleNumber(value, field, index);
+  if (parsed.error) return parsed;
+  return parsed.value > 0
+    ? parsed
+    : { value: 0, error: `Obstacle #${index + 1} ${field} must be greater than 0` };
+}
+
+function parseObstacles(raw: string): { value: ScenarioObstacle[]; error: string | null } {
   try {
-    const value = JSON.parse(raw) as unknown;
-    if (!Array.isArray(value)) return { value: [], error: "Must be JSON array" };
-    return { value: value as ScenarioAdvancedConfig["obstacles"], error: null };
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return { value: [], error: "Must be JSON array" };
+    if (parsed.length > 100) return { value: [], error: "A scenario supports at most 100 obstacles" };
+    const obstacles: ScenarioObstacle[] = [];
+    for (let index = 0; index < parsed.length; index += 1) {
+      const item = parsed[index];
+      if (!isDraftRecord(item)) {
+        return { value: [], error: `Obstacle #${index + 1} must be an object` };
+      }
+      if (item.type !== "cylinder" && item.type !== "box") {
+        return { value: [], error: `Obstacle #${index + 1} type must be cylinder or box` };
+      }
+      const x = finiteObstacleNumber(item.x, "x", index);
+      const y = finiteObstacleNumber(item.y, "y", index);
+      const z = finiteObstacleNumber(item.z, "z", index);
+      const coordinateError = x.error ?? y.error ?? z.error;
+      if (coordinateError) return { value: [], error: coordinateError };
+      if (item.type === "cylinder") {
+        const radius = positiveObstacleNumber(item.radius, "radius", index);
+        const height = positiveObstacleNumber(item.height, "height", index);
+        if (radius.error ?? height.error) {
+          return { value: [], error: radius.error ?? height.error };
+        }
+        obstacles.push({
+          type: "cylinder",
+          x: x.value,
+          y: y.value,
+          z: z.value,
+          radius: radius.value,
+          height: height.value,
+        });
+      } else {
+        const sizeX = positiveObstacleNumber(item.size_x, "size_x", index);
+        const sizeY = positiveObstacleNumber(item.size_y, "size_y", index);
+        const sizeZ = positiveObstacleNumber(item.size_z, "size_z", index);
+        const sizeError = sizeX.error ?? sizeY.error ?? sizeZ.error;
+        if (sizeError) return { value: [], error: sizeError };
+        obstacles.push({
+          type: "box",
+          x: x.value,
+          y: y.value,
+          z: z.value,
+          size_x: sizeX.value,
+          size_y: sizeY.value,
+          size_z: sizeZ.value,
+        });
+      }
+    }
+    return { value: obstacles, error: null };
   } catch {
     return { value: [], error: "Must be valid JSON array" };
   }
+}
+
+interface TrialPlan {
+  scenarioTrialsPerCandidate: number;
+  candidateCount: number;
+  plannedTrials: number;
+  scheduledTrials: number;
+  minimumRequiredTrials: number;
+  capped: boolean;
+}
+
+function calculateTrialPlan(form: FormState): TrialPlan {
+  const search = parseSeedList(form.search_seeds);
+  const holdout = parseSeedList(form.holdout_seeds);
+  const searchCaseCount = [
+    form.nominal_search_enabled,
+    form.wind_search_enabled,
+    form.noise_search_enabled,
+  ].filter(Boolean).length;
+  const holdoutCaseCount = [
+    form.nominal_holdout_enabled,
+    form.combined_holdout_enabled,
+  ].filter(Boolean).length;
+  const invalidSearch = search.error || searchCaseCount === 0;
+  const invalidHoldout = holdoutCaseCount > 0 && holdout.error;
+  const scenarioTrialsPerCandidate = invalidSearch || invalidHoldout
+    ? 0
+    : search.values.length * searchCaseCount + holdout.values.length * holdoutCaseCount;
+  const iterations = parseNumber(form.max_iterations);
+  const maxTotal = parseNumber(form.max_total_trials);
+  const candidateCount = form.optimizer_strategy === "none"
+    ? 1
+    : 1 + (iterations && Number.isInteger(iterations) && iterations > 0 ? iterations : 0);
+  const plannedTrials = scenarioTrialsPerCandidate * candidateCount;
+  const budgetedCompleteTrials = maxTotal && maxTotal > 0 && scenarioTrialsPerCandidate > 0
+    ? scenarioTrialsPerCandidate * Math.floor(maxTotal / scenarioTrialsPerCandidate)
+    : 0;
+  const scheduledTrials = Math.min(plannedTrials, budgetedCompleteTrials);
+  const minimumRequiredTrials = scenarioTrialsPerCandidate * (
+    form.optimizer_strategy === "none" ? 1 : 2
+  );
+  return {
+    scenarioTrialsPerCandidate,
+    candidateCount,
+    plannedTrials,
+    scheduledTrials,
+    minimumRequiredTrials,
+    capped: plannedTrials > scheduledTrials,
+  };
 }
 
 function errorStep(key: string, catalog: ParameterCatalogResponse): number {
@@ -431,11 +614,44 @@ function validate(
   form: FormState,
   selections: ParameterSelectionMap,
   catalog: ParameterCatalogResponse,
+  capabilities: BackendCapabilitiesResponse | null = null,
 ): FieldErrors {
   const errors: FieldErrors = {};
+  if (form.display_name.trim().length > 255) {
+    errors.display_name = "Experiment name must be at most 255 characters";
+  }
   (["px4_version", "vehicle_type", "airframe", "simulator_model", "simulator_world"] as const).forEach((key) => {
     if (form[key].trim() === "") errors[key] = "Required";
   });
+  if (
+    form.px4_version.trim() !== "" &&
+    catalog.px4_version !== form.px4_version
+  ) {
+    errors.px4_version = `No compatible parameter catalog is loaded for PX4 ${form.px4_version}`;
+  }
+  if (
+    form.firmware_commit.trim() !== "" &&
+    !/^[0-9a-f]{7,40}$/iu.test(form.firmware_commit.trim())
+  ) {
+    errors.firmware_commit = "Use a 7 to 40 character Git commit SHA";
+  }
+  const simulationSpeedFactor = parseNumber(form.simulation_speed_factor);
+  if (
+    simulationSpeedFactor === null ||
+    simulationSpeedFactor < 0.1 ||
+    simulationSpeedFactor > 100
+  ) {
+    errors.simulation_speed_factor = "Must be between 0.1 and 100";
+  }
+  const instanceId = parseNumber(form.instance_id);
+  if (
+    instanceId === null ||
+    !Number.isInteger(instanceId) ||
+    instanceId < 0 ||
+    instanceId > 255
+  ) {
+    errors.instance_id = "Must be an integer between 0 and 255";
+  }
   if (!OBJECTIVE_PROFILES.includes(form.objective_profile)) {
     errors.objective_profile = "Select a valid objective profile";
   }
@@ -450,17 +666,25 @@ function validate(
   } else if (weights.reduce<number>((sum, weight) => sum + Number(weight), 0) <= 0) {
     errors.objective_weights = "At least one objective must have a positive weight";
   }
-  const cvarAlpha = parseNumber(form.cvar_alpha);
-  if (cvarAlpha === null || cvarAlpha <= 0 || cvarAlpha >= 1) {
-    errors.cvar_alpha = "Must be greater than 0 and less than 1";
+  if (!["mean", "worst", "cvar", "percentile"].includes(form.robust_aggregation)) {
+    errors.robust_aggregation = "Select a valid robust aggregation";
   }
-  const percentile = parseNumber(form.percentile);
-  if (percentile === null || percentile <= 0 || percentile > 100) {
-    errors.percentile = "Must be greater than 0 and at most 100";
+  if (form.robust_aggregation === "cvar") {
+    const cvarAlpha = parseNumber(form.cvar_alpha);
+    if (cvarAlpha === null || cvarAlpha <= 0 || cvarAlpha >= 1) {
+      errors.cvar_alpha = "Must be greater than 0 and less than 1";
+    }
+  }
+  if (form.robust_aggregation === "percentile") {
+    const percentile = parseNumber(form.percentile);
+    if (percentile === null || percentile <= 0 || percentile > 100) {
+      errors.percentile = "Must be greater than 0 and at most 100";
+    }
   }
 
   const selected = Object.values(selections).filter((selection) => selection.selected);
   if (selected.length === 0) errors.parameters = "Select at least one parameter to tune";
+  else if (selected.length > 64) errors.parameters = "A study supports at most 64 selected parameters";
   for (const parameter of catalog.parameters) {
     const selection = selections[parameter.name];
     if (!selection?.selected) continue;
@@ -548,9 +772,13 @@ function validate(
   const searchSeeds = parseSeedList(form.search_seeds);
   const holdoutSeeds = parseSeedList(form.holdout_seeds);
   if (searchSeeds.error) errors.search_seeds = searchSeeds.error;
-  if (holdoutSeeds.error) errors.holdout_seeds = holdoutSeeds.error;
+  const hasTrainingCase = form.nominal_search_enabled || form.wind_search_enabled || form.noise_search_enabled;
+  const hasHoldoutCase = form.nominal_holdout_enabled || form.combined_holdout_enabled;
+  if (!hasTrainingCase) errors.scenario_cases = "Enable at least one search scenario";
+  if (hasHoldoutCase && holdoutSeeds.error) errors.holdout_seeds = holdoutSeeds.error;
   if (
     !searchSeeds.error &&
+    hasHoldoutCase &&
     !holdoutSeeds.error &&
     holdoutSeeds.values.some((seed) => searchSeeds.values.includes(seed))
   ) {
@@ -585,8 +813,30 @@ function validate(
     if (obstacleResult.error) errors.obstacles_json = obstacleResult.error;
   }
 
-  if (!SIMULATOR_BACKENDS.includes(form.simulator_backend)) errors.simulator_backend = "Select a valid simulator backend";
-  if (!OPTIMIZER_STRATEGIES.includes(form.optimizer_strategy)) errors.optimizer_strategy = "Select a valid optimizer strategy";
+  if (!SIMULATOR_BACKENDS.includes(form.simulator_backend)) {
+    errors.simulator_backend = "Select a valid simulator backend";
+  } else if (form.simulator_backend === "real_cli") {
+    Object.assign(
+      errors,
+      runtimeCapabilityErrors(
+        form.simulator_backend,
+        form.optimizer_strategy,
+        capabilities,
+      ),
+    );
+  }
+  if (!OPTIMIZER_STRATEGIES.includes(form.optimizer_strategy)) {
+    errors.optimizer_strategy = "Select a valid optimizer strategy";
+  } else if (form.optimizer_strategy === "gpt") {
+    Object.assign(
+      errors,
+      runtimeCapabilityErrors(
+        form.simulator_backend,
+        form.optimizer_strategy,
+        capabilities,
+      ),
+    );
+  }
   const maxIterations = parseNumber(form.max_iterations);
   if (maxIterations === null || !Number.isInteger(maxIterations) || maxIterations < 1 || maxIterations > 100) {
     errors.max_iterations = "Integer between 1 and 100";
@@ -598,6 +848,13 @@ function validate(
   const maxTotal = parseNumber(form.max_total_trials);
   if (maxTotal === null || !Number.isInteger(maxTotal) || maxTotal < 1 || maxTotal > 10000) {
     errors.max_total_trials = "Integer between 1 and 10000";
+  } else {
+    const trialPlan = calculateTrialPlan(form);
+    if (trialPlan.minimumRequiredTrials > 0 && maxTotal < trialPlan.minimumRequiredTrials) {
+      errors.max_total_trials = `Requires at least ${trialPlan.minimumRequiredTrials} trials for the baseline matrix${
+        form.optimizer_strategy === "none" ? "" : " and one optimizer candidate"
+      }`;
+    }
   }
   if (form.target_rmse.trim() !== "") {
     const value = parseNumber(form.target_rmse);
@@ -609,28 +866,27 @@ function validate(
   }
   const passRate = parseNumber(form.min_pass_rate);
   if (passRate === null || passRate < 0 || passRate > 1) errors.min_pass_rate = "Must be between 0 and 1";
-  if (form.optimizer_strategy === "gpt" && form.llm_api_key.trim() === "") {
-    errors.llm_api_key = "API key required when strategy is gpt";
-  }
-  if (
-    form.optimizer_strategy === "gpt" &&
-    form.llm_provider !== "openai" &&
-    form.llm_model.trim() === ""
-  ) {
-    errors.llm_model = "Model is required for non-OpenAI providers";
-  }
-  if (
-    form.optimizer_strategy === "gpt" &&
-    form.llm_provider !== "openai" &&
-    form.llm_base_url.trim() === ""
-  ) {
-    errors.llm_base_url = "Base URL is required for non-OpenAI providers";
-  } else if (
-    form.optimizer_strategy === "gpt" &&
-    form.llm_base_url.trim() !== "" &&
-    !isValidLlmBaseUrl(form.llm_base_url.trim())
-  ) {
-    errors.llm_base_url = "Use an absolute HTTP(S) URL without credentials, query, or fragment";
+  if (form.optimizer_strategy === "gpt") {
+    if (form.llm_api_key.trim() === "") {
+      errors.llm_api_key = "API key required when strategy is gpt";
+    } else if (form.llm_api_key.length > 512) {
+      errors.llm_api_key = "API key must be at most 512 characters";
+    }
+    if (form.llm_provider !== "openai" && form.llm_model.trim() === "") {
+      errors.llm_model = "Model is required for non-OpenAI providers";
+    } else if (form.llm_model.length > 128) {
+      errors.llm_model = "Model name must be at most 128 characters";
+    }
+    if (form.llm_provider !== "openai" && form.llm_base_url.trim() === "") {
+      errors.llm_base_url = "Base URL is required for non-OpenAI providers";
+    } else if (
+      form.llm_base_url.trim() !== "" &&
+      !isValidLlmBaseUrl(form.llm_base_url.trim())
+    ) {
+      errors.llm_base_url = "Use an absolute HTTP(S) URL without credentials, query, or fragment";
+    } else if (form.llm_base_url.length > 2048) {
+      errors.llm_base_url = "Base URL must be at most 2048 characters";
+    }
   }
   return errors;
 }
@@ -681,8 +937,8 @@ function objectiveConfig(form: FormState): ObjectiveConfig {
     objectives: objectiveEntries,
     constraints,
     robust_aggregation: form.robust_aggregation,
-    cvar_alpha: Number(form.cvar_alpha),
-    percentile: Number(form.percentile),
+    cvar_alpha: form.robust_aggregation === "cvar" ? Number(form.cvar_alpha) : 0.2,
+    percentile: form.robust_aggregation === "percentile" ? Number(form.percentile) : 95,
   };
 }
 
@@ -703,10 +959,21 @@ function scenarioSuite(form: FormState): ScenarioSuiteConfig {
   return {
     common_random_numbers: form.common_random_numbers,
     cases: [
-      { id: "nominal-search", scenario_type: "nominal", seeds: searchSeeds, weight: 1, enabled: true, holdout: false, config: commonConfig },
-      { id: "wind-search", scenario_type: "wind_perturbed", seeds: searchSeeds, weight: 1.2, enabled: true, holdout: false, config: commonConfig },
-      { id: "noise-search", scenario_type: "noise_perturbed", seeds: searchSeeds, weight: 1, enabled: true, holdout: false, config: commonConfig },
-      { id: "combined-holdout", scenario_type: "combined_perturbed", seeds: holdoutSeeds, weight: 1.5, enabled: true, holdout: true, config: commonConfig },
+      ...(form.nominal_search_enabled
+        ? [{ id: "nominal-search", scenario_type: "nominal" as const, seeds: searchSeeds, weight: 1, enabled: true, holdout: false, config: commonConfig }]
+        : []),
+      ...(form.wind_search_enabled
+        ? [{ id: "wind-search", scenario_type: "wind_perturbed" as const, seeds: searchSeeds, weight: 1.2, enabled: true, holdout: false, config: commonConfig }]
+        : []),
+      ...(form.noise_search_enabled
+        ? [{ id: "noise-search", scenario_type: "noise_perturbed" as const, seeds: searchSeeds, weight: 1, enabled: true, holdout: false, config: commonConfig }]
+        : []),
+      ...(form.nominal_holdout_enabled
+        ? [{ id: "nominal-holdout", scenario_type: "nominal" as const, seeds: holdoutSeeds, weight: 1, enabled: true, holdout: true, config: commonConfig }]
+        : []),
+      ...(form.combined_holdout_enabled
+        ? [{ id: "combined-holdout", scenario_type: "combined_perturbed" as const, seeds: holdoutSeeds, weight: 1.5, enabled: true, holdout: true, config: commonConfig }]
+        : []),
     ],
   };
 }
@@ -725,7 +992,7 @@ function baselineParameters(
     disturbance_rejection: Number(form.baseline_disturbance_rejection),
   };
   for (const parameter of catalog.parameters) {
-    if (parameter.legacy_key && selections[parameter.name]) {
+    if (parameter.legacy_key && selections[parameter.name]?.selected) {
       fallback[parameter.legacy_key] = selections[parameter.name].baseline;
     }
   }
@@ -775,7 +1042,9 @@ function formToRequest(
       step: definition?.step ?? null,
       scale: selection.scale,
       value_type: definition?.value_type ?? "float",
-      choices: null,
+      choices: definition?.choices?.length
+        ? definition.choices.map((choice) => choice.value)
+        : null,
       enabled: true,
       locked: false,
     };
@@ -803,6 +1072,9 @@ function formToRequest(
       airframe: form.airframe,
       simulator_model: form.simulator_model,
       world: form.simulator_world,
+      headless: form.simulator_headless,
+      simulation_speed_factor: Number(form.simulation_speed_factor),
+      instance_id: Number(form.instance_id),
     },
     parameter_catalog_version: catalog.catalog_version ?? `builtin-${catalog.px4_version}`,
     parameter_space: parameterSpace,
@@ -907,17 +1179,23 @@ function isLegacyContractRejection(
   }
   if (request.llm && request.llm.provider !== "openai") return false;
   const evidence = `${error.message} ${JSON.stringify(error.details ?? "")}`.toLowerCase();
-  return [
-    "unknown",
-    "extra",
-    "unexpected",
+  const advancedFields = [
     "vehicle_profile",
     "parameter_space",
     "objective_config",
     "scenario_suite",
     "max_total_trials",
     "llm",
-  ].some((token) => evidence.includes(token));
+  ];
+  const rejectionSignal =
+    /\b(extra (fields?|inputs?)|unexpected (fields?|arguments?|properties?)|unknown (fields?|properties?)|unrecognized (fields?|properties?)|unsupported (fields?|properties?)|inputs? (are|is) not permitted)\b/u.test(
+      evidence,
+    );
+  const explicitlyRejectsAdvancedFields =
+    /\b(extra|unexpected|unknown|unrecognized|unsupported) advanced fields?\b/u.test(evidence);
+  return explicitlyRejectsAdvancedFields || (
+    rejectionSignal && advancedFields.some((field) => evidence.includes(field))
+  );
 }
 
 function mergeSelections(
@@ -963,15 +1241,15 @@ export function NewJob() {
   const [showAdvancedScenario, setShowAdvancedScenario] = useState(
     Boolean(initialDraft?.form.advanced_enabled),
   );
+  const [draftRestored, setDraftRestored] = useState(Boolean(initialDraft));
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(initialDraft?.saved_at ?? null);
   const [catalogMessage, setCatalogMessage] = useState<string | null>(null);
+  const [capabilities, setCapabilities] = useState<BackendCapabilitiesResponse | null>(null);
+  const [capabilitiesUnavailable, setCapabilitiesUnavailable] = useState(false);
 
   const searchSeedCount = parseSeedList(form.search_seeds).values.length;
-  const estimatedTrials = Math.min(
-    Number(form.max_total_trials) || 0,
-    (1 + (Number(form.max_iterations) || 0)) *
-      Math.max(Number(form.trials_per_candidate) || 0, searchSeedCount * 3),
-  );
+  const trialPlan = calculateTrialPlan(form);
+  const estimatedTrials = trialPlan.scheduledTrials;
 
   useEffect(() => {
     if (import.meta.env.MODE === "test" || import.meta.env.VITE_PARAMETER_CATALOG_API === "false") {
@@ -996,6 +1274,30 @@ export function NewJob() {
       active = false;
     };
   }, [form.px4_version, form.tuning_mode, t]);
+
+  useEffect(() => {
+    if (import.meta.env.MODE === "test" || import.meta.env.VITE_CAPABILITIES_API === "false") {
+      return undefined;
+    }
+    let active = true;
+    apiClient
+      .getCapabilities()
+      .then((response) => {
+        if (!active) return;
+        setCapabilities(response);
+        setCapabilitiesUnavailable(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        // Compatibility with an older backend: keep the existing advisory
+        // prompts and let the create endpoint remain authoritative.
+        setCapabilities(null);
+        setCapabilitiesUnavailable(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1024,6 +1326,150 @@ export function NewJob() {
       update(key, event.target.value as FormState[typeof key]);
   }
 
+  function applyObjectiveProfile(profile: ObjectiveProfile): void {
+    setForm((previous) => ({
+      ...previous,
+      objective_profile: profile,
+      ...(profile === "custom" ? {} : OBJECTIVE_WEIGHT_PRESETS[profile]),
+    }));
+    setErrors((previous) => {
+      const next = { ...previous };
+      delete next.objective_profile;
+      delete next.objective_weights;
+      delete next.robust_aggregation;
+      delete next.cvar_alpha;
+      delete next.percentile;
+      return next;
+    });
+  }
+
+  function handleObjectiveWeightChange(
+    key:
+      | "objective_weight_tracking"
+      | "objective_weight_speed"
+      | "objective_weight_smoothness"
+      | "objective_weight_robustness",
+  ) {
+    return (event: ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+      setForm((previous) => ({
+        ...previous,
+        [key]: value,
+        objective_profile: "custom",
+      }));
+      setErrors((previous) => {
+        if (!previous.objective_weights) return previous;
+        const next = { ...previous };
+        delete next.objective_weights;
+        return next;
+      });
+    };
+  }
+
+  function applyScenarioPreset(preset: ScenarioPreset): void {
+    const cleanEnvironment: Partial<FormState> = {
+      wind_north: "0",
+      wind_east: "0",
+      wind_south: "0",
+      wind_west: "0",
+      sensor_noise_level: "medium",
+      advanced_enabled: false,
+      gust_enabled: false,
+      gust_magnitude_mps: "0",
+      gust_direction_deg: "0",
+      gust_period_s: "10",
+      gps_noise_m: "0",
+      baro_noise_m: "0",
+      imu_noise_scale: "1",
+      dropout_rate: "0",
+      battery_initial_percent: "100",
+      battery_voltage_sag: false,
+      mass_payload_kg: "",
+      obstacles_json: "[]",
+      nominal_search_enabled: true,
+      wind_search_enabled: false,
+      noise_search_enabled: false,
+      nominal_holdout_enabled: true,
+      combined_holdout_enabled: false,
+    };
+    const presetValues: Record<ScenarioPreset, Partial<FormState>> = {
+      nominal: {
+        ...cleanEnvironment,
+      },
+      wind: {
+        ...cleanEnvironment,
+        wind_search_enabled: true,
+        wind_north: "4",
+        wind_east: "2",
+        sensor_noise_level: "medium",
+        advanced_enabled: true,
+        gust_enabled: true,
+        gust_magnitude_mps: "6",
+        gust_direction_deg: "45",
+        gust_period_s: "12",
+      },
+      sensor: {
+        ...cleanEnvironment,
+        noise_search_enabled: true,
+        sensor_noise_level: "high",
+        advanced_enabled: true,
+        gps_noise_m: "0.8",
+        baro_noise_m: "0.5",
+        imu_noise_scale: "1.4",
+        dropout_rate: "0.05",
+      },
+      stress: {
+        ...cleanEnvironment,
+        wind_search_enabled: true,
+        noise_search_enabled: true,
+        nominal_holdout_enabled: false,
+        combined_holdout_enabled: true,
+        wind_north: "6",
+        wind_east: "3",
+        sensor_noise_level: "high",
+        advanced_enabled: true,
+        gust_enabled: true,
+        gust_magnitude_mps: "10",
+        gust_direction_deg: "70",
+        gust_period_s: "8",
+        gps_noise_m: "1.2",
+        baro_noise_m: "0.8",
+        imu_noise_scale: "1.8",
+        dropout_rate: "0.1",
+        battery_initial_percent: "80",
+        battery_voltage_sag: true,
+        mass_payload_kg: "0.5",
+      },
+    };
+    setForm((previous) => ({ ...previous, ...presetValues[preset] }));
+    setShowAdvancedScenario(preset !== "nominal");
+    setErrors((previous) => Object.fromEntries(
+      Object.entries(previous).filter(([key]) => errorStep(key, catalog) !== 3),
+    ));
+  }
+
+  function applyBundledNominalProfile(): void {
+    setForm((previous) => ({
+      ...previous,
+      nominal_search_enabled: true,
+      wind_search_enabled: false,
+      noise_search_enabled: false,
+      nominal_holdout_enabled: true,
+      combined_holdout_enabled: false,
+      wind_north: "0",
+      wind_east: "0",
+      wind_south: "0",
+      wind_west: "0",
+      sensor_noise_level: "medium",
+      advanced_enabled: false,
+      gust_enabled: false,
+    }));
+    setShowAdvancedScenario(false);
+    setErrors((previous) => Object.fromEntries(
+      Object.entries(previous).filter(([key]) => errorStep(key, catalog) !== 3),
+    ));
+  }
+
   function applyModePreset(mode: TuningMode): void {
     const preset = createParameterSelections(catalog.parameters, mode);
     setSelections((current) => {
@@ -1050,7 +1496,6 @@ export function NewJob() {
       baseline_accel_limit: DEFAULTS.baseline_accel_limit,
       baseline_disturbance_rejection: DEFAULTS.baseline_disturbance_rejection,
     }));
-    setSelections(createParameterSelections(catalog.parameters, form.tuning_mode));
   }
 
   function saveDraftNow(): void {
@@ -1068,12 +1513,13 @@ export function NewJob() {
     setSelections(createParameterSelections(catalog.parameters, DEFAULTS.tuning_mode));
     setErrors({});
     setSubmitError(null);
+    setDraftRestored(false);
     setDraftSavedAt(null);
     setStep(0);
   }
 
   function errorsForStep(targetStep: number): FieldErrors {
-    const all = validate(form, selections, catalog);
+    const all = validate(form, selections, catalog, capabilities);
     return Object.fromEntries(
       Object.entries(all).filter(([key]) => errorStep(key, catalog) === targetStep),
     );
@@ -1083,6 +1529,7 @@ export function NewJob() {
     const nextErrors = errorsForStep(step);
     if (Object.keys(nextErrors).length > 0) {
       setErrors((previous) => ({ ...previous, ...nextErrors }));
+      if (step === 3) setShowAdvancedScenario(true);
       focusErrorField(Object.keys(nextErrors)[0], catalog);
       return;
     }
@@ -1092,12 +1539,13 @@ export function NewJob() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setSubmitError(null);
-    const nextErrors = validate(form, selections, catalog);
+    const nextErrors = validate(form, selections, catalog, capabilities);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       const firstStep = Math.min(...Object.keys(nextErrors).map((key) => errorStep(key, catalog)));
       const firstKey = Object.keys(nextErrors).find((key) => errorStep(key, catalog) === firstStep) ?? Object.keys(nextErrors)[0];
       setStep(firstStep);
+      if (firstStep === 3) setShowAdvancedScenario(true);
       focusErrorField(firstKey, catalog);
       return;
     }
@@ -1132,6 +1580,34 @@ export function NewJob() {
 
   const customTrack = parseReferenceTrackInput(form.reference_track_json).points ?? [];
   const selectedCount = Object.values(selections).filter((selection) => selection.selected).length;
+  const selectedDefinitions = catalog.parameters.filter(
+    (parameter) => selections[parameter.name]?.selected,
+  );
+  const selectedHighRiskCount = selectedDefinitions.filter(
+    (parameter) => parameter.risk === "high",
+  ).length;
+  const selectedRestartCount = selectedDefinitions.filter(
+    (parameter) => parameter.requires_reboot,
+  ).length;
+  const scenarioSearchCaseCount = [
+    form.nominal_search_enabled,
+    form.wind_search_enabled,
+    form.noise_search_enabled,
+  ].filter(Boolean).length;
+  const scenarioHoldoutCaseCount = [
+    form.nominal_holdout_enabled,
+    form.combined_holdout_enabled,
+  ].filter(Boolean).length;
+  const realScenarioNeedsEvidence = form.advanced_enabled
+    || form.wind_search_enabled
+    || form.noise_search_enabled
+    || form.combined_holdout_enabled;
+  const realCliCapability = capabilities?.simulators.items.real_cli;
+  const gptCapability = capabilities?.optimizers.items.gpt;
+  const preflightErrors = validate(form, selections, catalog, capabilities);
+  const preflightSteps = [...new Set(
+    Object.keys(preflightErrors).map((key) => errorStep(key, catalog)),
+  )].sort((left, right) => left - right);
 
   return (
     <section className="stack-md experiment-wizard-page">
@@ -1169,7 +1645,7 @@ export function NewJob() {
           <button
             key={wizardStep.key}
             type="button"
-            className={`${step === index ? "wizard-step-active" : ""}${step > index ? " wizard-step-complete" : ""}`}
+            className={`${step === index ? "wizard-step-active" : ""}${step > index ? " wizard-step-complete" : ""}${preflightSteps.includes(index) ? " wizard-step-error" : ""}`}
             aria-current={step === index ? "step" : undefined}
             onClick={() => setStep(index)}
           >
@@ -1182,11 +1658,19 @@ export function NewJob() {
       <form onSubmit={handleSubmit} noValidate className="experiment-form">
         {submitError ? <Alert tone="danger" title={t("wizard.submissionFailed")}>{submitError}</Alert> : null}
         {catalogMessage ? <Alert tone="info" title={t("wizard.catalogTitle")}>{catalogMessage}</Alert> : null}
+        {draftRestored ? (
+          <Alert tone="info" title={t("wizard.restoredTitle")}>
+            <span>{t("wizard.restoredText")}</span>{" "}
+            <button type="button" className="btn btn-ghost btn-small" onClick={() => setDraftRestored(false)}>
+              {t("wizard.dismiss")}
+            </button>
+          </Alert>
+        ) : null}
 
         <div hidden={step !== 0} className="wizard-panel">
           <SectionCard title={t("wizard.section.vehicle")} description={t("wizard.section.vehicleDesc")}>
             <div className="form-grid">
-              <Field label="Experiment Name" htmlFor="display_name">
+              <Field label="Experiment Name" htmlFor="display_name" error={errors.display_name}>
                 <input id="display_name" value={form.display_name} onChange={handleTextChange("display_name")} placeholder="e.g. x500 anti-wind XY study" />
               </Field>
               <Field label="PX4 Version" required error={errors.px4_version} htmlFor="px4_version">
@@ -1196,8 +1680,8 @@ export function NewJob() {
                   <option value="main">main</option>
                 </select>
               </Field>
-              {form.tuning_mode === "expert" ? (
-                <Field label="Firmware Commit" htmlFor="firmware_commit" hint="Optional immutable commit SHA for exact replay.">
+              {form.tuning_mode === "expert" || form.firmware_commit.trim() !== "" ? (
+                <Field label="Firmware Commit" htmlFor="firmware_commit" error={errors.firmware_commit} hint="Optional immutable commit SHA for exact replay.">
                   <input id="firmware_commit" value={form.firmware_commit} onChange={handleTextChange("firmware_commit")} />
                 </Field>
               ) : null}
@@ -1217,15 +1701,41 @@ export function NewJob() {
                   <option value="gz_x500">gz_x500</option>
                   <option value="gz_x500_depth">gz_x500_depth</option>
                   <option value="gz_x500_vision">gz_x500_vision</option>
+                  <option value="gz_x500_mono_cam">gz_x500_mono_cam</option>
+                  <option value="gz_x500_mono_cam_down">gz_x500_mono_cam_down</option>
+                  <option value="gz_x500_lidar_down">gz_x500_lidar_down</option>
+                  <option value="gz_x500_lidar_front">gz_x500_lidar_front</option>
+                  <option value="gz_x500_lidar_2d">gz_x500_lidar_2d</option>
+                  <option value="gz_x500_gimbal">gz_x500_gimbal</option>
                 </select>
               </Field>
               <Field label="Gazebo World" required error={errors.simulator_world} htmlFor="simulator_world">
                 <select id="simulator_world" value={form.simulator_world} onChange={(event) => update("simulator_world", event.target.value)}>
                   <option value="default">default</option>
+                  <option value="aruco">aruco</option>
+                  <option value="baylands">baylands</option>
+                  <option value="ridge">ridge</option>
+                  <option value="walls">walls</option>
                   <option value="windy">windy</option>
-                  <option value="warehouse">warehouse</option>
+                  <option value="moving_platform">moving_platform</option>
                 </select>
               </Field>
+              <Field label="Headless simulation" htmlFor="simulator_headless" hint="Recommended for automated tuning and parallel runs.">
+                <label className="toggle-row" htmlFor="simulator_headless">
+                  <input id="simulator_headless" type="checkbox" checked={form.simulator_headless} onChange={(event) => update("simulator_headless", event.target.checked)} />
+                  <span>Disable Gazebo rendering for this job</span>
+                </label>
+              </Field>
+              {form.tuning_mode !== "basic" ? (
+                <>
+                  <Field label="Simulation speed factor" required htmlFor="simulation_speed_factor" error={errors.simulation_speed_factor} hint="PX4_SIM_SPEED_FACTOR; use 1 for real time.">
+                    <input id="simulation_speed_factor" type="number" min="0.1" max="100" step="0.1" value={form.simulation_speed_factor} onChange={handleTextChange("simulation_speed_factor")} />
+                  </Field>
+                  <Field label="PX4 instance ID" required htmlFor="instance_id" error={errors.instance_id} hint={t("wizard.instanceIdHint")}>
+                    <input id="instance_id" type="number" min="0" max="255" step="1" value={form.instance_id} onChange={handleTextChange("instance_id")} />
+                  </Field>
+                </>
+              ) : null}
             </div>
           </SectionCard>
         </div>
@@ -1238,7 +1748,7 @@ export function NewJob() {
                   type="button"
                   key={profile}
                   className={`objective-card${form.objective_profile === profile ? " objective-card-active" : ""}`}
-                  onClick={() => update("objective_profile", profile)}
+                  onClick={() => applyObjectiveProfile(profile)}
                 >
                   <strong>{t(`wizard.objective.${profile}` as TranslationKey)}</strong>
                   <span>{profile === "robust" ? t("wizard.objective.robustDesc") : t("wizard.objective.genericDesc")}</span>
@@ -1246,7 +1756,7 @@ export function NewJob() {
               ))}
             </div>
             <Field label="Objective Profile" required error={errors.objective_profile} htmlFor="objective_profile">
-              <select id="objective_profile" value={form.objective_profile} onChange={(event) => update("objective_profile", event.target.value as ObjectiveProfile)}>
+              <select id="objective_profile" value={form.objective_profile} onChange={(event) => applyObjectiveProfile(event.target.value as ObjectiveProfile)}>
                 {OBJECTIVE_PROFILES.map((profile) => <option key={profile} value={profile}>{t(`wizard.objective.${profile}` as TranslationKey)}</option>)}
               </select>
             </Field>
@@ -1254,16 +1764,16 @@ export function NewJob() {
               <>
                 <div className="form-grid objective-weight-grid">
                   <Field label="Tracking accuracy weight" htmlFor="objective_weight_tracking" error={errors.objective_weights}>
-                    <input id="objective_weight_tracking" type="number" min="0" max="100" step="0.05" value={form.objective_weight_tracking} onChange={handleTextChange("objective_weight_tracking")} />
+                    <input id="objective_weight_tracking" type="number" min="0" max="100" step="0.05" value={form.objective_weight_tracking} onChange={handleObjectiveWeightChange("objective_weight_tracking")} />
                   </Field>
                   <Field label="Completion speed weight" htmlFor="objective_weight_speed">
-                    <input id="objective_weight_speed" type="number" min="0" max="100" step="0.05" value={form.objective_weight_speed} onChange={handleTextChange("objective_weight_speed")} />
+                    <input id="objective_weight_speed" type="number" min="0" max="100" step="0.05" value={form.objective_weight_speed} onChange={handleObjectiveWeightChange("objective_weight_speed")} />
                   </Field>
                   <Field label="Smoothness weight" htmlFor="objective_weight_smoothness">
-                    <input id="objective_weight_smoothness" type="number" min="0" max="100" step="0.05" value={form.objective_weight_smoothness} onChange={handleTextChange("objective_weight_smoothness")} />
+                    <input id="objective_weight_smoothness" type="number" min="0" max="100" step="0.05" value={form.objective_weight_smoothness} onChange={handleObjectiveWeightChange("objective_weight_smoothness")} />
                   </Field>
                   <Field label="Robust pass-rate weight" htmlFor="objective_weight_robustness">
-                    <input id="objective_weight_robustness" type="number" min="0" max="100" step="0.05" value={form.objective_weight_robustness} onChange={handleTextChange("objective_weight_robustness")} />
+                    <input id="objective_weight_robustness" type="number" min="0" max="100" step="0.05" value={form.objective_weight_robustness} onChange={handleObjectiveWeightChange("objective_weight_robustness")} />
                   </Field>
                 </div>
                 <div className="form-grid">
@@ -1284,7 +1794,8 @@ export function NewJob() {
         </div>
 
         <div hidden={step !== 2} className="wizard-panel">
-          <SectionCard title={t("wizard.section.parameters")} description={t("wizard.section.parametersDesc")}>
+          {step === 2 ? (
+            <SectionCard title={t("wizard.section.parameters")} description={t("wizard.section.parametersDesc")}>
             <ParameterSelector
               catalog={catalog.parameters}
               catalogSource={catalog.source}
@@ -1314,11 +1825,46 @@ export function NewJob() {
               </div>
               <button type="button" className="btn btn-ghost btn-small" onClick={resetBaselineDefaults}>{t("wizard.resetBaseline")}</button>
             </details>
-          </SectionCard>
+            </SectionCard>
+          ) : null}
         </div>
 
         <div hidden={step !== 3} className="wizard-panel">
           <SectionCard title={t("wizard.section.scenarios")} description={t("wizard.section.scenariosDesc")}>
+            <div className="scenario-preset-bar" aria-label={t("wizard.scenarioPresets")}>
+              <span>{t("wizard.scenarioPresets")}</span>
+              {(["nominal", "wind", "sensor", "stress"] as const).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className="btn btn-ghost btn-small"
+                  onClick={() => applyScenarioPreset(preset)}
+                >
+                  {t(`wizard.scenarioPreset.${preset}` as TranslationKey)}
+                </button>
+              ))}
+            </div>
+            <div className="scenario-case-selector" aria-describedby={errors.scenario_cases ? "scenario_cases_error" : undefined}>
+              <div>
+                <h3>{t("wizard.caseMatrix")}</h3>
+                <p className="form-hint">{t("wizard.caseMatrixDesc")}</p>
+              </div>
+              <div className="scenario-case-grid">
+                {([
+                  ["nominal_search_enabled", t("wizard.case.nominalSearch"), t("wizard.case.nominalSearchHint")],
+                  ["wind_search_enabled", t("wizard.case.windSearch"), t("wizard.case.windSearchHint")],
+                  ["noise_search_enabled", t("wizard.case.noiseSearch"), t("wizard.case.noiseSearchHint")],
+                  ["nominal_holdout_enabled", t("wizard.case.nominalHoldout"), t("wizard.case.nominalHoldoutHint")],
+                  ["combined_holdout_enabled", t("wizard.case.combinedHoldout"), t("wizard.case.combinedHoldoutHint")],
+                ] as const).map(([key, label, hint]) => (
+                  <label className="toggle-row scenario-case-option" htmlFor={key} key={key}>
+                    <input id={key} aria-label={label} type="checkbox" checked={form[key]} onChange={(event) => update(key, event.target.checked)} />
+                    <span><strong>{label}</strong><small>{hint}</small></span>
+                  </label>
+                ))}
+              </div>
+              {errors.scenario_cases ? <p id="scenario_cases_error" className="form-error">{errors.scenario_cases}</p> : null}
+            </div>
             <div className="form-grid">
               {(["north", "east", "south", "west"] as const).map((direction) => {
                 const key = `wind_${direction}` as const;
@@ -1332,7 +1878,7 @@ export function NewJob() {
               <Field label="Search seeds" required htmlFor="search_seeds" error={errors.search_seeds} hint="Common seeds shared by every candidate.">
                 <input id="search_seeds" value={form.search_seeds} onChange={handleTextChange("search_seeds")} />
               </Field>
-              <Field label="Holdout seeds" required htmlFor="holdout_seeds" error={errors.holdout_seeds ?? errors.seed_overlap} hint="Never used to propose candidates.">
+              <Field label="Holdout seeds" required={form.nominal_holdout_enabled || form.combined_holdout_enabled} htmlFor="holdout_seeds" error={errors.holdout_seeds ?? errors.seed_overlap} hint="Never used to propose candidates; ignored when all holdout cases are disabled.">
                 <input id="holdout_seeds" value={form.holdout_seeds} onChange={handleTextChange("holdout_seeds")} />
               </Field>
               <Field label="Common random numbers" htmlFor="common_random_numbers" hint="Makes candidate comparisons use matched stochastic conditions.">
@@ -1423,14 +1969,60 @@ export function NewJob() {
               <Field label="Optimizer Strategy" required htmlFor="optimizer_strategy" error={errors.optimizer_strategy}>
                 <select id="optimizer_strategy" value={form.optimizer_strategy} onChange={(event) => update("optimizer_strategy", event.target.value as OptimizerStrategy)}>{OPTIMIZER_STRATEGIES.map((strategy) => <option key={strategy} value={strategy}>{strategy}</option>)}</select>
               </Field>
-              <Field label="Max Iterations" required htmlFor="max_iterations" error={errors.max_iterations}><input id="max_iterations" type="number" min="1" max="100" step="1" value={form.max_iterations} onChange={handleTextChange("max_iterations")} /></Field>
-              <Field label="Trials per Candidate" required htmlFor="trials_per_candidate" error={errors.trials_per_candidate}><input id="trials_per_candidate" type="number" min="1" max="10" step="1" value={form.trials_per_candidate} onChange={handleTextChange("trials_per_candidate")} /></Field>
+              <Field label="Max Iterations" required htmlFor="max_iterations" error={errors.max_iterations} hint={form.optimizer_strategy === "none" ? "No optimizer candidates will be generated; this value is retained for later strategy changes." : undefined}><input id="max_iterations" type="number" min="1" max="100" step="1" value={form.max_iterations} onChange={handleTextChange("max_iterations")} /></Field>
+              <Field label="Trials per Candidate" required htmlFor="trials_per_candidate" error={errors.trials_per_candidate} hint="Used by legacy workers; the current scenario suite runs every enabled seed matrix."><input id="trials_per_candidate" type="number" min="1" max="10" step="1" value={form.trials_per_candidate} onChange={handleTextChange("trials_per_candidate")} /></Field>
               <Field label="Maximum total trials" required htmlFor="max_total_trials" error={errors.max_total_trials} hint="Absolute queue and cost guardrail, including baseline and failures."><input id="max_total_trials" type="number" min="1" max="10000" step="1" value={form.max_total_trials} onChange={handleTextChange("max_total_trials")} /></Field>
               <Field label="Target RMSE" htmlFor="target_rmse" error={errors.target_rmse}><input id="target_rmse" type="number" step="0.01" value={form.target_rmse} onChange={handleTextChange("target_rmse")} /></Field>
               <Field label="Target Max Error" htmlFor="target_max_error" error={errors.target_max_error}><input id="target_max_error" type="number" step="0.01" value={form.target_max_error} onChange={handleTextChange("target_max_error")} /></Field>
               <Field label="Min Pass Rate" required htmlFor="min_pass_rate" error={errors.min_pass_rate}><input id="min_pass_rate" type="number" min="0" max="1" step="0.05" value={form.min_pass_rate} onChange={handleTextChange("min_pass_rate")} /></Field>
             </div>
-            <div className="budget-estimate"><strong>{t("wizard.estimate")}: {estimatedTrials} trials</strong><span>{selectedCount} dimensions · {form.max_iterations} generations · {searchSeedCount} matched search seeds · hard cap {form.max_total_trials}</span></div>
+            {form.simulator_backend === "real_cli" ? (
+              <Alert
+                tone={realCliCapability?.ready ? "success" : capabilities?.simulators.authoritative ? "danger" : "warning"}
+                title={t("wizard.realCliTitle")}
+              >
+                {realCliCapability?.reason ?? t("wizard.realCliText")}
+              </Alert>
+            ) : null}
+            {form.simulator_backend === "mock" ? (
+              <Alert tone="warning" title={t("wizard.mockTitle")}>
+                {t("wizard.mockText")}
+              </Alert>
+            ) : null}
+            {form.simulator_backend === "real_cli" && realScenarioNeedsEvidence ? (
+              <Alert tone="warning" title={t("wizard.realAdvancedTitle")}>
+                <div className="stack-sm">
+                  <span>{t("wizard.realAdvancedText")}</span>
+                  <button type="button" className="btn btn-ghost btn-small" onClick={applyBundledNominalProfile}>
+                    {t("wizard.useBundledNominal")}
+                  </button>
+                </div>
+              </Alert>
+            ) : null}
+            {form.optimizer_strategy === "gpt" ? (
+              <Alert
+                tone={gptCapability?.ready ? "success" : capabilities?.optimizers.authoritative ? "danger" : "warning"}
+                title={t("wizard.gptPreflightTitle")}
+              >
+                {gptCapability?.reason ?? t("wizard.gptPreflightText")}
+              </Alert>
+            ) : null}
+            {capabilitiesUnavailable ? (
+              <Alert tone="warning" title="Runtime preflight unavailable">
+                The backend does not expose capability discovery. Job creation will still perform authoritative validation.
+              </Alert>
+            ) : null}
+            <div className={`budget-estimate${trialPlan.capped ? " budget-estimate-capped" : ""}`}>
+              <strong>{t("wizard.estimate")}: {estimatedTrials} trials</strong>
+              <span>
+                {selectedCount} dimensions · {trialPlan.candidateCount} candidates · {trialPlan.scenarioTrialsPerCandidate} scenario runs per candidate · hard cap {form.max_total_trials}
+              </span>
+              {trialPlan.capped ? (
+                <span className="budget-warning">
+                  The complete {trialPlan.plannedTrials}-trial plan exceeds the hard cap; optimization will stop early.
+                </span>
+              ) : null}
+            </div>
             {form.optimizer_strategy === "gpt" ? (
               <div className="llm-config-panel">
                 <h3>{t("wizard.providerTitle")}</h3>
@@ -1463,12 +2055,41 @@ export function NewJob() {
 
         <div hidden={step !== 6} className="wizard-panel">
           <SectionCard title={t("wizard.section.review")} description={t("wizard.section.reviewDesc")}>
+            {preflightSteps.length === 0 ? (
+              <Alert tone="success" title={t("wizard.preflightReadyTitle")}>
+                {t("wizard.preflightReadyText")}
+              </Alert>
+            ) : (
+              <Alert tone="danger" title={t("wizard.preflightIssuesTitle")}>
+                <div className="review-issue-links">
+                  {preflightSteps.map((issueStep) => (
+                    <button
+                      key={issueStep}
+                      type="button"
+                      className="btn btn-ghost btn-small"
+                      onClick={() => {
+                        setErrors(preflightErrors);
+                        setStep(issueStep);
+                        if (issueStep === 3) setShowAdvancedScenario(true);
+                      }}
+                    >
+                      {t(WIZARD_STEPS[issueStep].key)} ({Object.keys(preflightErrors).filter((key) => errorStep(key, catalog) === issueStep).length})
+                    </button>
+                  ))}
+                </div>
+              </Alert>
+            )}
             <div className="review-grid">
-              <ReviewBlock title={t("wizard.reviewVehicle")}><strong>{form.airframe} · {form.simulator_model}</strong><span>PX4 {form.px4_version}{form.firmware_commit ? ` @ ${form.firmware_commit}` : ""}</span><span>World: {form.simulator_world}</span></ReviewBlock>
+              <ReviewBlock title={t("wizard.reviewVehicle")}><strong>{form.airframe} · {form.simulator_model}</strong><span>PX4 {form.px4_version}{form.firmware_commit ? ` @ ${form.firmware_commit}` : ""}</span><span>World: {form.simulator_world} · {form.simulator_headless ? "headless" : "GUI"}</span><span>Speed ×{form.simulation_speed_factor} · instance {form.instance_id}</span></ReviewBlock>
               <ReviewBlock title={t("wizard.reviewSearch")}><strong>{selectedCount} tunable parameters</strong><span>{form.optimizer_strategy} · {form.robust_aggregation}</span><span>{catalog.catalog_version ?? "built-in catalog"}</span></ReviewBlock>
-              <ReviewBlock title={t("wizard.reviewScenarios")}><strong>{searchSeedCount} matched search seeds</strong><span>{parseSeedList(form.holdout_seeds).values.length} independent holdout seeds</span><span>{form.advanced_enabled ? "Advanced environment enabled" : "Standard environment"}</span></ReviewBlock>
-              <ReviewBlock title={t("wizard.reviewBudget")}><strong>At most {form.max_total_trials} trials</strong><span>Estimated plan: {estimatedTrials}</span><span>{form.trials_per_candidate} trials per candidate</span></ReviewBlock>
+              <ReviewBlock title={t("wizard.reviewScenarios")}><strong>{scenarioSearchCaseCount} search cases × {searchSeedCount} matched seeds</strong><span>{scenarioHoldoutCaseCount} holdout cases × {scenarioHoldoutCaseCount > 0 ? parseSeedList(form.holdout_seeds).values.length : 0} independent seeds</span><span>{form.advanced_enabled ? "Advanced environment enabled" : "Standard environment"}</span></ReviewBlock>
+              <ReviewBlock title={t("wizard.reviewBudget")}><strong>At most {form.max_total_trials} trials</strong><span>Scheduled plan: {estimatedTrials} of {trialPlan.plannedTrials}</span><span>{trialPlan.scenarioTrialsPerCandidate} scenario runs per candidate</span></ReviewBlock>
             </div>
+            {selectedHighRiskCount > 0 || selectedRestartCount > 0 ? (
+              <Alert tone="warning" title={t("wizard.parameterRiskTitle")}>
+                {selectedHighRiskCount} high-risk parameters and {selectedRestartCount} restart-required parameters are selected. Validate the final candidate in SITL before any hardware flight.
+              </Alert>
+            ) : null}
             <div className="review-parameter-list">
               <h3>{t("wizard.selectedParameters")}</h3>
               {selectedParameters(selections).map((parameter) => <code key={parameter.name}>{parameter.name} [{parameter.search_min}, {parameter.search_max}]</code>)}

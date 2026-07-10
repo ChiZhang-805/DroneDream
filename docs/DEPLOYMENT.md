@@ -83,9 +83,11 @@ and MinIO before applying a destructive migration.
 - Result persistence is fenced by `(trial_id, lease_owner, attempt_count)`.
   If an expired Trial has been reclaimed, an old simulator process may finish
   but its stale metrics and artifacts are discarded.
-- Job finalization uses a transaction-scoped `FINALIZING` claim. Reports and
-  terminal state are committed together; iterative optimizers instead return
-  the Job to `RUNNING` with their next generation.
+- Job finalization uses a committed, time-bounded `FINALIZING` lease. The
+  database transaction is released before report storage or LLM network I/O;
+  cancellation is fenced before any new generation/terminal commit, and a
+  crashed worker's stale lease can be reclaimed. One job's finalization error
+  is isolated and cannot stop other ready jobs.
 - Artifact object keys are deterministic per Job/Trial/type/name. Retrying
   after an object-upload/database boundary overwrites the same private object
   rather than creating an unbounded duplicate.
@@ -97,19 +99,22 @@ lease. The code clamps an oversized heartbeat interval at runtime.
 ## Scaling for the initial 20-user service
 
 Start with one API replica and one simulation worker on a 16-core/32-GB host.
-Limit the worker to roughly two to four concurrent headless simulations; the
-current worker process executes one Trial at a time, so concurrency is added
-by running more worker replicas:
+The current worker process executes one Trial at a time. For the mock backend,
+additional worker replicas can drain independent trials:
 
 ```powershell
 docker compose up -d --scale worker=3
 ```
 
-PostgreSQL conditional claims make multiple workers safe. Measure CPU, peak
-RSS, simulation wall time, object volume, and failure recovery before choosing
-the worker count. For higher load, keep the control plane small and place
-PX4/Gazebo workers on separate compute nodes with the same database, Valkey,
-and S3-compatible endpoints.
+PostgreSQL conditional claims make database work ownership safe, but the bundled
+PX4/Gazebo wrapper still defaults MAVSDK to UDP 14540 and does not allocate a
+complete per-instance port set. Therefore run at most **one `real_cli` trial per
+host**. Do not use `--scale worker=3` for real simulations on one host until an
+operator supplies a matching PX4/Gazebo/MAVSDK instance-and-port allocator.
+For higher real load, place one worker on each compute node with the same
+database, Valkey, and S3-compatible endpoints. Measure CPU, peak RSS,
+simulation wall time, object volume, and failure recovery before increasing the
+fleet.
 
 ## Production checklist
 

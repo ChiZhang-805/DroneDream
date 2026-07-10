@@ -24,6 +24,7 @@ def _build_engine(database_url: str) -> Engine:
     if database_url.startswith("sqlite"):
         # SQLite in a multi-threaded test/dev server needs this.
         connect_args["check_same_thread"] = False
+        connect_args["timeout"] = get_settings().sqlite_busy_timeout_seconds
     return create_engine(database_url, connect_args=connect_args, future=True)
 
 
@@ -119,6 +120,17 @@ def _apply_sqlite_lightweight_migrations() -> None:
             }
             if "cancelled_at" not in batch_columns:
                 conn.execute(text("ALTER TABLE batch_jobs ADD COLUMN cancelled_at DATETIME"))
+        if "job_secrets" in table_names:
+            secret_columns = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info('job_secrets')")
+                ).fetchall()
+            }
+            if "expires_at" not in secret_columns:
+                conn.execute(
+                    text("ALTER TABLE job_secrets ADD COLUMN expires_at DATETIME")
+                )
         columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()

@@ -51,8 +51,12 @@ The runner validates concrete values again before launch and requires PX4
 ## Objectives and constraints
 
 `objective_config.objectives` supports up to 16 weighted objectives with
-`minimize`/`maximize` direction, normalization, and an optional target. Constraints
-support `lt`, `lte`, `gt`, `gte`, and `eq`, with hard or soft handling.
+`minimize`/`maximize` direction, normalization, and an optional aspiration
+target. A target contributes a one-sided normalized loss: minimize values at or
+below the target, and maximize values at or above the target, contribute zero;
+only the unmet gap is penalized. Raw objective values are still retained for
+Pareto analysis. Constraints support `lt`, `lte`, `gt`, `gte`, and `eq`, with
+hard or soft handling.
 
 Robust aggregation modes are:
 
@@ -65,6 +69,11 @@ Hard-constraint violations make a candidate infeasible. The candidate endpoint
 returns feasible state, objective values, violations, Pareto membership, and
 representative recommendations (`balanced`, plus the best point for each objective).
 
+`target_max_error` is a safety threshold and is evaluated against the worst
+completed training-trial maximum error. Reports preserve both
+`max_error_mean` and `max_error_worst`; the headline and acceptance evidence use
+the worst value so one severe excursion cannot be hidden by quieter scenarios.
+
 ## Fair scenario matrix
 
 `scenario_suite.cases` defines named, weighted cases. Each case has a scenario type,
@@ -73,8 +82,16 @@ one or more seeds, arbitrary validated configuration, and a `holdout` flag. With
 
 At least one enabled non-holdout case is required. The trial budget must cover the
 whole baseline matrix and, when optimization is enabled, at least one complete
-candidate matrix. Holdout metrics are persisted under the aggregate's `holdout`
-section only.
+candidate matrix. The wizard lets users enable nominal, wind, and sensor-noise
+search cases independently, plus nominal and combined-stress holdout cases.
+
+Rates are reduced in two levels: all dispatched seeds (including failed seeds)
+first contribute to their case's completion, failure, and pass rates; configured
+case weights are then applied. Seed-rich cases therefore cannot drown out a
+high-priority case. Holdout metrics are persisted under the aggregate's `holdout`
+section with counts, weighted rates, and `passed`, `failed`, `incomplete`, or
+`error` validation status. Holdout evidence never influences training selection,
+but any missing/failed holdout execution prevents it from being reported feasible.
 
 ## Provider-neutral LLM configuration
 
@@ -118,5 +135,9 @@ Pin `vehicle_profile.px4_version`; for strict replay also pin
 configuration, parameters, simulator artifacts, and parameter-application evidence.
 
 `mock` and PX4 runner dry-run modes are deterministic development tools. They are
-not evidence that real PX4/Gazebo physics has passed. Production acceptance requires
-a Linux worker with the selected PX4/Gazebo assets and a real SITL smoke test.
+not evidence that real PX4/Gazebo physics has passed. Mock uses an explicitly
+synthetic, lower-is-better landscape in which every catalog parameter affects the
+workflow score. Production acceptance requires a Linux worker with the selected
+PX4/Gazebo assets and a real SITL smoke test. The bundled real runner currently
+fails closed for non-nominal or advanced effects; use its nominal-only wizard
+profile or a custom launcher that emits truthful applied-effect evidence.

@@ -35,7 +35,9 @@ DEFAULT_OFFBOARD_SETPOINT_RATE_HZ = 10.0
 DEFAULT_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS = 30.0
 DEFAULT_OFFBOARD_TRACK_TIMEOUT_SECONDS = 120.0
 DEFAULT_LAUNCH_GUI_CLIENT = False
-DEFAULT_GUI_COMMAND = f"{shlex.quote(str(Path(__file__).resolve().parent / 'gazebo_gui_client.sh'))}"
+DEFAULT_GUI_COMMAND = (
+    f"{shlex.quote(str(Path(__file__).resolve().parent / 'gazebo_gui_client.sh'))}"
+)
 DEFAULT_GUI_START_DELAY_SECONDS = 5.0
 DEFAULT_GUI_WAIT_TIMEOUT_SECONDS = 15.0
 DEFAULT_REQUIRE_GUI_CLIENT = False
@@ -65,7 +67,12 @@ REQUIRED_SAMPLE_KEYS = (
 def _parse_bool(raw: str | None, *, default: bool) -> bool:
     if raw is None:
         return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"invalid boolean value: {raw!r}")
 
 
 def _make_target_for_vehicle(vehicle: str) -> str:
@@ -201,11 +208,7 @@ def _prepare_px4_launch_environment(
     """Return launch environment and the previous override values for evidence."""
 
     launch_env = os.environ.copy()
-    previous = {
-        key: value
-        for key, value in launch_env.items()
-        if key.startswith("PX4_PARAM_")
-    }
+    previous = {key: value for key, value in launch_env.items() if key.startswith("PX4_PARAM_")}
     if requested and _parameter_transport() == "environment":
         engine = _load_parameter_engine()
         launch_env.update(
@@ -234,14 +237,10 @@ def _apply_or_verify_px4_parameters(
         "PX4_PARAMETER_CONNECTION",
         os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION),
     ).strip()
-    timeout_seconds = _parse_float(
-        os.environ.get("PX4_PARAMETER_TIMEOUT_SECONDS"), default=15.0
-    )
+    timeout_seconds = _parse_float(os.environ.get("PX4_PARAMETER_TIMEOUT_SECONDS"), default=15.0)
     px4_version = os.environ.get("PX4_PARAMETER_PX4_VERSION", "main")
     context = _parameter_context()
-    enforce_safe = _parse_bool(
-        os.environ.get("PX4_PARAMETER_ENFORCE_SAFE_BOUNDS"), default=True
-    )
+    enforce_safe = _parse_bool(os.environ.get("PX4_PARAMETER_ENFORCE_SAFE_BOUNDS"), default=True)
     if transport == "environment":
         asyncio.run(
             engine.verify_environment_parameters_with_mavsdk(
@@ -292,21 +291,29 @@ def _normalize_telemetry_payload(payload: Any) -> dict[str, Any]:
             "vy": float(sample["vy"]),
             "vz": float(sample["vz"]),
             "yaw": float(sample["yaw"]),
-            "armed": bool(sample["armed"]),
+            "armed": _bool_from_value(sample["armed"]),
             "mode": str(sample["mode"]),
-            "crashed": bool(sample["crashed"]),
+            "crashed": _bool_from_value(sample["crashed"]),
         }
         for numeric_key in ("t", "x", "y", "z", "vx", "vy", "vz", "yaw"):
             if not math.isfinite(cleaned[numeric_key]):
                 raise ValueError(f"telemetry sample {idx} contains non-finite {numeric_key}")
         normalized.append(cleaned)
+    for idx in range(1, len(normalized)):
+        if normalized[idx]["t"] <= normalized[idx - 1]["t"]:
+            raise ValueError(f"telemetry sample {idx} timestamp must be strictly increasing")
 
     meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
-    return {"samples": normalized, "meta": meta}
+    return {
+        "schema_version": "dronedream.telemetry.v1",
+        "samples": normalized,
+        "meta": meta,
+    }
 
 
 def _write_dry_run_telemetry(path: Path, *, vehicle: str, world: str) -> None:
     payload = {
+        "schema_version": "dronedream.telemetry.v1",
         "samples": [
             {
                 "t": 0.0,
@@ -350,28 +357,47 @@ def _to_float_list(values: Any, length: int, *, default: float = 0.0) -> list[fl
 
 
 def _bool_from_value(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
     if isinstance(value, str):
-        return value.strip().lower() in {"1", "true", "yes", "on"}
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        normalized_number = float(value)
+        if math.isfinite(normalized_number) and normalized_number in {0.0, 1.0}:
+            return normalized_number == 1.0
+    raise ValueError(f"invalid boolean telemetry value: {value!r}")
+
+
+def _armed_from_px4_state(value: Any) -> bool:
+    """PX4 vehicle_status.arming_state uses enum value 2 for ARMED."""
+
     try:
-        return bool(int(value))
-    except Exception:
-        return bool(value)
+        numeric = int(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"invalid PX4 arming_state value: {value!r}") from None
+    return numeric == 2
 
 
-def _extract_vehicle_status(dataset_map: dict[str, Any], sample_count: int) -> tuple[list[bool], list[str]]:
+def _extract_vehicle_status(
+    dataset_map: dict[str, Any], sample_count: int
+) -> tuple[list[bool], list[str]]:
     status = dataset_map.get("vehicle_status")
     if status is None:
         return [True] * sample_count, ["unknown"] * sample_count
 
     data = status.data
-    armed_values = data.get("arming_state")
-    if armed_values is None:
-        armed_values = data.get("armed")
-    armed = (
-        [_bool_from_value(value) for value in armed_values[:sample_count]]
-        if armed_values is not None
-        else [True] * sample_count
-    )
+    arming_state_values = data.get("arming_state")
+    armed_values = data.get("armed")
+    if arming_state_values is not None:
+        armed = [_armed_from_px4_state(value) for value in arming_state_values[:sample_count]]
+    elif armed_values is not None:
+        armed = [_bool_from_value(value) for value in armed_values[:sample_count]]
+    else:
+        armed = [True] * sample_count
     if len(armed) < sample_count:
         armed.extend([armed[-1] if armed else True] * (sample_count - len(armed)))
 
@@ -379,7 +405,9 @@ def _extract_vehicle_status(dataset_map: dict[str, Any], sample_count: int) -> t
     if nav_state_values is None:
         mode = ["unknown"] * sample_count
     else:
-        mode = [str(nav_state_values[idx]) for idx in range(min(sample_count, len(nav_state_values)))]
+        mode = [
+            str(nav_state_values[idx]) for idx in range(min(sample_count, len(nav_state_values)))
+        ]
         if len(mode) < sample_count:
             mode.extend([mode[-1] if mode else "unknown"] * (sample_count - len(mode)))
     return armed, mode
@@ -400,13 +428,21 @@ def _extract_crash_flags(dataset_map: dict[str, Any], sample_count: int) -> list
         "fd_pitch",
         "fd_roll",
     )
-    flags_by_field: list[Any] = [failure.data.get(field) for field in fields if failure.data.get(field) is not None]
+    flags_by_field: list[Any] = [
+        failure.data.get(field) for field in fields if failure.data.get(field) is not None
+    ]
     if not flags_by_field:
         return [False] * sample_count
 
     crashed: list[bool] = []
     for idx in range(sample_count):
-        crashed.append(any(_bool_from_value(field_values[idx]) for field_values in flags_by_field if idx < len(field_values)))
+        crashed.append(
+            any(
+                _bool_from_value(field_values[idx])
+                for field_values in flags_by_field
+                if idx < len(field_values)
+            )
+        )
     return crashed
 
 
@@ -419,7 +455,11 @@ def _quat_to_yaw(q0: float, q1: float, q2: float, q3: float) -> float:
 def _extract_yaw_values(
     dataset_map: dict[str, Any], vx_values: list[float], vy_values: list[float], sample_count: int
 ) -> list[float]:
-    for attitude_name in ("vehicle_attitude", "vehicle_attitude_groundtruth", "vehicle_attitude_setpoint"):
+    for attitude_name in (
+        "vehicle_attitude",
+        "vehicle_attitude_groundtruth",
+        "vehicle_attitude_setpoint",
+    ):
         attitude_dataset = dataset_map.get(attitude_name)
         if attitude_dataset is None:
             continue
@@ -432,7 +472,10 @@ def _extract_yaw_values(
         size = min(sample_count, len(q0), len(q1), len(q2), len(q3))
         if size <= 0:
             continue
-        yaw_values = [_quat_to_yaw(float(q0[idx]), float(q1[idx]), float(q2[idx]), float(q3[idx])) for idx in range(size)]
+        yaw_values = [
+            _quat_to_yaw(float(q0[idx]), float(q1[idx]), float(q2[idx]), float(q3[idx]))
+            for idx in range(size)
+        ]
         if size < sample_count:
             yaw_values.extend([yaw_values[-1]] * (sample_count - size))
         return yaw_values
@@ -524,9 +567,7 @@ def _split_command(command: str) -> list[str]:
     argv = shlex.split(command, posix=os.name != "nt")
     if os.name == "nt":
         return [
-            item[1:-1]
-            if len(item) >= 2 and item[0] == item[-1] and item[0] in {'"', "'"}
-            else item
+            item[1:-1] if len(item) >= 2 and item[0] == item[-1] and item[0] in {'"', "'"} else item
             for item in argv
         ]
     return argv
@@ -648,14 +689,30 @@ def _default_offboard_executor_command() -> str:
 
 def _default_track_marker_command(args: argparse.Namespace) -> str:
     script_path = Path(__file__).resolve().parent / "gazebo_track_marker.py"
+    z_offset = _parse_float(
+        os.environ.get("PX4_GAZEBO_TRACK_MARKER_Z_OFFSET"),
+        default=DEFAULT_TRACK_MARKER_Z_OFFSET,
+    )
+    color = (
+        os.environ.get("PX4_GAZEBO_TRACK_MARKER_COLOR", DEFAULT_TRACK_MARKER_COLOR).strip()
+        or DEFAULT_TRACK_MARKER_COLOR
+    )
+    line_width = _parse_float(
+        os.environ.get("PX4_GAZEBO_TRACK_MARKER_LINE_WIDTH"),
+        default=DEFAULT_TRACK_MARKER_LINE_WIDTH,
+    )
+    mode = (
+        os.environ.get("PX4_GAZEBO_TRACK_MARKER_MODE", DEFAULT_TRACK_MARKER_MODE).strip()
+        or DEFAULT_TRACK_MARKER_MODE
+    ).lower()
     return (
         f"{shlex.quote(sys.executable)} {shlex.quote(str(script_path))} "
         f"--track {shlex.quote(str(args.track))} "
         f"--world {shlex.quote(args.world)} "
-        f"--z-offset {shlex.quote(str(_parse_float(os.environ.get('PX4_GAZEBO_TRACK_MARKER_Z_OFFSET'), default=DEFAULT_TRACK_MARKER_Z_OFFSET)))} "
-        f"--color {shlex.quote(os.environ.get('PX4_GAZEBO_TRACK_MARKER_COLOR', DEFAULT_TRACK_MARKER_COLOR).strip() or DEFAULT_TRACK_MARKER_COLOR)} "
-        f"--line-width {shlex.quote(str(_parse_float(os.environ.get('PX4_GAZEBO_TRACK_MARKER_LINE_WIDTH'), default=DEFAULT_TRACK_MARKER_LINE_WIDTH)))} "
-        f"--mode {shlex.quote((os.environ.get('PX4_GAZEBO_TRACK_MARKER_MODE', DEFAULT_TRACK_MARKER_MODE).strip() or DEFAULT_TRACK_MARKER_MODE).lower())}"
+        f"--z-offset {shlex.quote(str(z_offset))} "
+        f"--color {shlex.quote(color)} "
+        f"--line-width {shlex.quote(str(line_width))} "
+        f"--mode {shlex.quote(mode)}"
     )
 
 
@@ -679,7 +736,9 @@ def _run_track_marker(args: argparse.Namespace, stderr_log: Path) -> int:
     )
     stdout_log.write_text(proc.stdout or "", encoding="utf-8")
     stderr_marker_log.write_text(proc.stderr or "", encoding="utf-8")
-    _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Track marker exit code: {proc.returncode}")
+    _append_log(
+        args.stdout_log, f"[local_px4_launch_wrapper] Track marker exit code: {proc.returncode}"
+    )
     if proc.returncode != 0:
         _append_log(
             stderr_log,
@@ -690,17 +749,25 @@ def _run_track_marker(args: argparse.Namespace, stderr_log: Path) -> int:
 
 
 def _build_offboard_executor_argv(args: argparse.Namespace) -> list[str]:
-    command = os.environ.get("PX4_OFFBOARD_EXECUTOR_COMMAND", "").strip() or _default_offboard_executor_command()
+    command = (
+        os.environ.get("PX4_OFFBOARD_EXECUTOR_COMMAND", "").strip()
+        or _default_offboard_executor_command()
+    )
     setpoint_rate_hz = _parse_float(
         os.environ.get("PX4_OFFBOARD_SETPOINT_RATE_HZ"), default=DEFAULT_OFFBOARD_SETPOINT_RATE_HZ
     )
     takeoff_timeout = _parse_float(
-        os.environ.get("PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS"), default=DEFAULT_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS
+        os.environ.get("PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS"),
+        default=DEFAULT_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS,
     )
     track_timeout = _parse_float(
-        os.environ.get("PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS"), default=DEFAULT_OFFBOARD_TRACK_TIMEOUT_SECONDS
+        os.environ.get("PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS"),
+        default=DEFAULT_OFFBOARD_TRACK_TIMEOUT_SECONDS,
     )
-    connection = os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION).strip() or DEFAULT_OFFBOARD_CONNECTION
+    connection = (
+        os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION).strip()
+        or DEFAULT_OFFBOARD_CONNECTION
+    )
     offboard_log = args.run_dir / "offboard_executor.log"
 
     argv = _split_command(command)
@@ -733,7 +800,9 @@ def _build_offboard_executor_argv(args: argparse.Namespace) -> list[str]:
 
 def _run_offboard_executor(args: argparse.Namespace, stderr_log: Path) -> int:
     argv = _build_offboard_executor_argv(args)
-    _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Offboard executor command: {shlex.join(argv)}")
+    _append_log(
+        args.stdout_log, f"[local_px4_launch_wrapper] Offboard executor command: {shlex.join(argv)}"
+    )
     proc = subprocess.run(  # noqa: S603
         argv,
         text=True,
@@ -778,7 +847,9 @@ def _resolve_real_launch_command(args: argparse.Namespace) -> tuple[str, str | N
         return _render_launch_command(launch_template, values), autopilot_dir or None
 
     if not autopilot_dir:
-        raise ValueError("PX4_AUTOPILOT_DIR is required in real mode when PX4_LAUNCH_COMMAND_TEMPLATE is unset")
+        raise ValueError(
+            "PX4_AUTOPILOT_DIR is required in real mode when PX4_LAUNCH_COMMAND_TEMPLATE is unset"
+        )
 
     autopilot_path = Path(autopilot_dir)
     if not autopilot_path.exists() or not autopilot_path.is_dir():
@@ -800,7 +871,9 @@ def _write_launch_config(
     make_target: str,
     px4_parameters: dict[str, object],
 ) -> None:
-    gui_command = os.environ.get("PX4_GAZEBO_GUI_COMMAND", DEFAULT_GUI_COMMAND).strip() or DEFAULT_GUI_COMMAND
+    gui_command = (
+        os.environ.get("PX4_GAZEBO_GUI_COMMAND", DEFAULT_GUI_COMMAND).strip() or DEFAULT_GUI_COMMAND
+    )
     track_marker_command = _build_track_marker_command(args)
     track_marker_stdout_log = args.run_dir / "track_marker_stdout.log"
     track_marker_stderr_log = args.run_dir / "track_marker_stderr.log"
@@ -821,24 +894,30 @@ def _write_launch_config(
         "PX4_ENABLE_OFFBOARD_EXECUTOR": _parse_bool(
             os.environ.get("PX4_ENABLE_OFFBOARD_EXECUTOR"), default=DEFAULT_ENABLE_OFFBOARD_EXECUTOR
         ),
-        "PX4_OFFBOARD_CONNECTION": os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION),
+        "PX4_OFFBOARD_CONNECTION": os.environ.get(
+            "PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION
+        ),
         "gui_client_enabled": _parse_bool(
             os.environ.get("PX4_GAZEBO_LAUNCH_GUI_CLIENT"), default=DEFAULT_LAUNCH_GUI_CLIENT
         ),
         "gui_command": gui_command,
         "PX4_GAZEBO_RAW_GUI_COMMAND": os.environ.get("PX4_GAZEBO_RAW_GUI_COMMAND", "").strip(),
         "PX4_GAZEBO_GUI_WINDOW_MODE": os.environ.get("PX4_GAZEBO_GUI_WINDOW_MODE", "").strip(),
-        "PX4_GAZEBO_GUI_WINDOW_GEOMETRY": os.environ.get("PX4_GAZEBO_GUI_WINDOW_GEOMETRY", "").strip(),
+        "PX4_GAZEBO_GUI_WINDOW_GEOMETRY": os.environ.get(
+            "PX4_GAZEBO_GUI_WINDOW_GEOMETRY", ""
+        ).strip(),
         "PX4_GAZEBO_GUI_WINDOW_WIDTH": os.environ.get("PX4_GAZEBO_GUI_WINDOW_WIDTH", "").strip(),
         "PX4_GAZEBO_GUI_WINDOW_HEIGHT": os.environ.get("PX4_GAZEBO_GUI_WINDOW_HEIGHT", "").strip(),
         "gui_require_client": _parse_bool(
             os.environ.get("PX4_GAZEBO_REQUIRE_GUI_CLIENT"), default=DEFAULT_REQUIRE_GUI_CLIENT
         ),
         "gui_start_delay_seconds": _parse_float(
-            os.environ.get("PX4_GAZEBO_GUI_START_DELAY_SECONDS"), default=DEFAULT_GUI_START_DELAY_SECONDS
+            os.environ.get("PX4_GAZEBO_GUI_START_DELAY_SECONDS"),
+            default=DEFAULT_GUI_START_DELAY_SECONDS,
         ),
         "gui_wait_timeout_seconds": _parse_float(
-            os.environ.get("PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS"), default=DEFAULT_GUI_WAIT_TIMEOUT_SECONDS
+            os.environ.get("PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS"),
+            default=DEFAULT_GUI_WAIT_TIMEOUT_SECONDS,
         ),
         "track_marker_enabled": _parse_bool(
             os.environ.get("PX4_GAZEBO_DRAW_TRACK_MARKER"), default=DEFAULT_DRAW_TRACK_MARKER
@@ -852,14 +931,16 @@ def _write_launch_config(
             os.environ.get("PX4_GAZEBO_REQUIRE_TRACK_MARKER"), default=DEFAULT_REQUIRE_TRACK_MARKER
         ),
         "track_marker_z_offset": _parse_float(
-            os.environ.get("PX4_GAZEBO_TRACK_MARKER_Z_OFFSET"), default=DEFAULT_TRACK_MARKER_Z_OFFSET
+            os.environ.get("PX4_GAZEBO_TRACK_MARKER_Z_OFFSET"),
+            default=DEFAULT_TRACK_MARKER_Z_OFFSET,
         ),
         "track_marker_color": os.environ.get(
             "PX4_GAZEBO_TRACK_MARKER_COLOR", DEFAULT_TRACK_MARKER_COLOR
         ).strip()
         or DEFAULT_TRACK_MARKER_COLOR,
         "track_marker_line_width": _parse_float(
-            os.environ.get("PX4_GAZEBO_TRACK_MARKER_LINE_WIDTH"), default=DEFAULT_TRACK_MARKER_LINE_WIDTH
+            os.environ.get("PX4_GAZEBO_TRACK_MARKER_LINE_WIDTH"),
+            default=DEFAULT_TRACK_MARKER_LINE_WIDTH,
         ),
         "track_marker_mode": os.environ.get(
             "PX4_GAZEBO_TRACK_MARKER_MODE", DEFAULT_TRACK_MARKER_MODE
@@ -880,12 +961,26 @@ def _write_launch_config(
             "track_marker_stderr_log": str(track_marker_stderr_log),
         },
     }
-    _json_dump(args.run_dir / "launch_config.json", payload)
+    launch_config_path = args.run_dir / "launch_config.json"
+    existing: dict[str, Any] = {}
+    if launch_config_path.is_file():
+        with contextlib.suppress(OSError, UnicodeError, json.JSONDecodeError, ValueError):
+            loaded = _json_load(launch_config_path)
+            if isinstance(loaded, dict):
+                existing = loaded
+    # The outer runner owns execution identity, firmware verification and
+    # timeout semantics. Preserve those fields while adding this wrapper's
+    # concrete launch/process details.
+    existing.update(payload)
+    _json_dump(launch_config_path, existing)
 
 
 def _finalize_real_telemetry(args: argparse.Namespace) -> None:
     telemetry_source = os.environ.get("PX4_TELEMETRY_SOURCE_JSON", "").strip()
-    telemetry_mode = os.environ.get("PX4_TELEMETRY_MODE", DEFAULT_TELEMETRY_MODE).strip().lower() or DEFAULT_TELEMETRY_MODE
+    telemetry_mode = (
+        os.environ.get("PX4_TELEMETRY_MODE", DEFAULT_TELEMETRY_MODE).strip().lower()
+        or DEFAULT_TELEMETRY_MODE
+    )
 
     if telemetry_source:
         source_path = Path(telemetry_source)
@@ -906,7 +1001,9 @@ def _finalize_real_telemetry(args: argparse.Namespace) -> None:
         if ulog_path_raw:
             ulog_path = Path(ulog_path_raw)
             if not ulog_path.is_file():
-                raise FileNotFoundError(f"PX4_ULOG_PATH does not exist or is not a file: {ulog_path_raw}")
+                raise FileNotFoundError(
+                    f"PX4_ULOG_PATH does not exist or is not a file: {ulog_path_raw}"
+                )
         else:
             ulog_root_raw = os.environ.get("PX4_ULOG_ROOT", "").strip()
             if ulog_root_raw:
@@ -914,12 +1011,16 @@ def _finalize_real_telemetry(args: argparse.Namespace) -> None:
             else:
                 autopilot_dir = os.environ.get("PX4_AUTOPILOT_DIR", "").strip()
                 if not autopilot_dir:
-                    raise ValueError("PX4_AUTOPILOT_DIR is required to locate default PX4 ULog root")
+                    raise ValueError(
+                        "PX4_AUTOPILOT_DIR is required to locate default PX4 ULog root"
+                    )
                 ulog_root = Path(autopilot_dir) / "build" / "px4_sitl_default" / "rootfs" / "log"
             try:
                 ulog_path = find_latest_ulog(ulog_root)
             except FileNotFoundError as exc:
-                raise FileNotFoundError(f"No ULog files found for PX4_TELEMETRY_MODE=ulog under: {ulog_root}") from exc
+                raise FileNotFoundError(
+                    f"No ULog files found for PX4_TELEMETRY_MODE=ulog under: {ulog_root}"
+                ) from exc
 
         ulog_to_telemetry_json(
             ulog_path,
@@ -943,7 +1044,10 @@ def main() -> int:
     setup_commands = os.environ.get("PX4_SETUP_COMMANDS", "").strip()
     run_seconds = max(1, _parse_int(os.environ.get("PX4_RUN_SECONDS"), default=DEFAULT_RUN_SECONDS))
     ready_timeout_seconds = max(
-        1, _parse_int(os.environ.get("PX4_READY_TIMEOUT_SECONDS"), default=DEFAULT_READY_TIMEOUT_SECONDS)
+        1,
+        _parse_int(
+            os.environ.get("PX4_READY_TIMEOUT_SECONDS"), default=DEFAULT_READY_TIMEOUT_SECONDS
+        ),
     )
     site_dry_run = _parse_bool(os.environ.get("PX4_SITE_DRY_RUN"), default=DEFAULT_SITE_DRY_RUN)
     enable_offboard_executor = _parse_bool(
@@ -956,7 +1060,9 @@ def main() -> int:
     require_gui_client = _parse_bool(
         os.environ.get("PX4_GAZEBO_REQUIRE_GUI_CLIENT"), default=DEFAULT_REQUIRE_GUI_CLIENT
     )
-    gui_command = os.environ.get("PX4_GAZEBO_GUI_COMMAND", DEFAULT_GUI_COMMAND).strip() or DEFAULT_GUI_COMMAND
+    gui_command = (
+        os.environ.get("PX4_GAZEBO_GUI_COMMAND", DEFAULT_GUI_COMMAND).strip() or DEFAULT_GUI_COMMAND
+    )
     gui_start_delay_seconds = max(
         0.0,
         _parse_float(
@@ -991,9 +1097,7 @@ def main() -> int:
     try:
         _copy_used_inputs(args.run_dir, args.params, args.track)
         px4_parameters = _load_px4_parameter_request(args)
-        launch_env, previous_parameter_environment = _prepare_px4_launch_environment(
-            px4_parameters
-        )
+        launch_env, previous_parameter_environment = _prepare_px4_launch_environment(px4_parameters)
         launch_env["PX4_GZ_WORLD"] = args.world
     except Exception as exc:
         _append_log(
@@ -1022,12 +1126,24 @@ def main() -> int:
                 ),
             )
         _write_dry_run_telemetry(args.telemetry, vehicle=args.vehicle, world=args.world)
-        _append_log(args.stdout_log, "[local_px4_launch_wrapper] site dry-run enabled; no PX4 process launched")
+        _append_log(
+            args.stdout_log,
+            "[local_px4_launch_wrapper] site dry-run enabled; no PX4 process launched",
+        )
         _append_log(args.stderr_log, "")
         return 0
 
     px4_proc: subprocess.Popen[str] | None = None
     gui_proc: subprocess.Popen[str] | None = None
+    previous_signal_handlers: dict[int, Any] = {}
+
+    def _raise_shutdown(signum: int, _frame: Any) -> None:
+        raise RuntimeError(f"received shutdown signal {signum}")
+
+    if os.name != "nt":
+        for shutdown_signal in (signal.SIGINT, signal.SIGTERM):
+            previous_signal_handlers[int(shutdown_signal)] = signal.getsignal(shutdown_signal)
+            signal.signal(shutdown_signal, _raise_shutdown)
     try:
         command, resolved_autopilot_dir = _resolve_real_launch_command(args)
         _write_launch_config(
@@ -1046,7 +1162,8 @@ def main() -> int:
         )
         _append_log(
             args.stdout_log,
-            f"[local_px4_launch_wrapper] Waiting {ready_timeout_seconds}s for PX4 readiness (simple fixed wait)",
+            f"[local_px4_launch_wrapper] Waiting {ready_timeout_seconds}s "
+            "for PX4 readiness (simple fixed wait)",
         )
         ready_deadline = time.time() + float(ready_timeout_seconds)
         while time.time() < ready_deadline:
@@ -1078,7 +1195,8 @@ def main() -> int:
             if gui_start_delay_seconds > 0:
                 _append_log(
                     args.stdout_log,
-                    f"[local_px4_launch_wrapper] Waiting {gui_start_delay_seconds}s before launching GUI client",
+                    f"[local_px4_launch_wrapper] Waiting {gui_start_delay_seconds}s "
+                    "before launching GUI client",
                 )
                 time.sleep(gui_start_delay_seconds)
 
@@ -1088,7 +1206,10 @@ def main() -> int:
                 stderr_log=gui_stderr_log,
                 launch_env=os.environ.copy(),
             )
-            _append_log(args.stdout_log, f"[local_px4_launch_wrapper] GUI client launch command: {gui_command}")
+            _append_log(
+                args.stdout_log,
+                f"[local_px4_launch_wrapper] GUI client launch command: {gui_command}",
+            )
 
             startup_deadline = time.time() + gui_wait_timeout_seconds
             while time.time() < startup_deadline:
@@ -1105,11 +1226,14 @@ def main() -> int:
                 _close_launch_handles(gui_proc)
                 gui_proc = None
                 if require_gui_client:
-                    raise RuntimeError("GUI client failed to start and PX4_GAZEBO_REQUIRE_GUI_CLIENT=true")
+                    raise RuntimeError(
+                        "GUI client failed to start and PX4_GAZEBO_REQUIRE_GUI_CLIENT=true"
+                    )
             else:
                 _append_log(
                     args.stdout_log,
-                    f"[local_px4_launch_wrapper] GUI client running after {gui_wait_timeout_seconds}s startup window",
+                    f"[local_px4_launch_wrapper] GUI client running after "
+                    f"{gui_wait_timeout_seconds}s startup window",
                 )
         else:
             reason_bits: list[str] = []
@@ -1125,7 +1249,9 @@ def main() -> int:
             )
 
         if px4_proc.poll() is not None and enable_offboard_executor:
-            raise RuntimeError(f"PX4 process exited before offboard execution with code {px4_proc.returncode}")
+            raise RuntimeError(
+                f"PX4 process exited before offboard execution with code {px4_proc.returncode}"
+            )
 
         should_draw_track_marker = (not headless) and bool(display) and draw_track_marker
         if should_draw_track_marker:
@@ -1159,13 +1285,17 @@ def main() -> int:
 
         if enable_offboard_executor:
             executor_exit = _run_offboard_executor(args, args.stderr_log)
-            _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Offboard executor exit code: {executor_exit}")
+            _append_log(
+                args.stdout_log,
+                f"[local_px4_launch_wrapper] Offboard executor exit code: {executor_exit}",
+            )
             if executor_exit != 0:
                 raise RuntimeError(f"offboard executor failed with code {executor_exit}")
         else:
             _append_log(
                 args.stdout_log,
-                "[local_px4_launch_wrapper] PX4_ENABLE_OFFBOARD_EXECUTOR=false; preserving launcher-only behavior",
+                "[local_px4_launch_wrapper] PX4_ENABLE_OFFBOARD_EXECUTOR=false; "
+                "preserving launcher-only behavior",
             )
             if px4_proc.poll() is None:
                 time.sleep(float(run_seconds))
@@ -1174,7 +1304,10 @@ def main() -> int:
         gui_proc = None
         _cleanup_process(px4_proc, args.stderr_log, label="PX4")
         px4_proc = None
-        _append_log(args.stdout_log, "[local_px4_launch_wrapper] PX4 process terminated after execution window")
+        _append_log(
+            args.stdout_log,
+            "[local_px4_launch_wrapper] PX4 process terminated after execution window",
+        )
         _finalize_real_telemetry(args)
         return 0
     except Exception as exc:
@@ -1182,6 +1315,9 @@ def main() -> int:
         _cleanup_process(px4_proc, args.stderr_log, label="PX4")
         _append_log(args.stderr_log, f"[local_px4_launch_wrapper] Real mode failure: {exc}")
         return 1
+    finally:
+        for shutdown_signal, previous_handler in previous_signal_handlers.items():
+            signal.signal(shutdown_signal, previous_handler)
 
 
 if __name__ == "__main__":

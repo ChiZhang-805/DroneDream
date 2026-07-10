@@ -7,6 +7,7 @@ import { probeOverallDesktopReadiness } from "../desktop/readiness";
 import type {
   ApiEnvelope,
   Artifact,
+  BackendCapabilitiesResponse,
   BatchCreateRequest,
   BatchJob,
   Job,
@@ -139,12 +140,15 @@ async function request<T>(
     );
   }
 
-  if (envelope && envelope.success === true) {
+  // The HTTP status remains authoritative. A proxy, stale service worker, or
+  // malformed backend must not turn a 4xx/5xx response into a successful
+  // mutation merely by returning a body with `success: true`.
+  if (response.ok && envelope && envelope.success === true) {
     return envelope.data;
   }
   const error = envelope?.error;
   throw new ApiClientError(
-    error?.code ?? "INTERNAL_ERROR",
+    error?.code ?? (response.ok ? "INTERNAL_ERROR" : "HTTP_ERROR"),
     error?.message ?? `Request failed with HTTP ${response.status}`,
     error?.details ?? null,
     response.status,
@@ -162,6 +166,10 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async getCapabilities(): Promise<BackendCapabilitiesResponse> {
+    return request<BackendCapabilitiesResponse>("/capabilities");
+  },
+
   async getParameterCatalog(px4Version: string): Promise<ParameterCatalogApiResponse> {
     const qs = buildQuery({ px4_version: px4Version });
     return request<ParameterCatalogApiResponse>(`/parameter-catalog${qs}`);
@@ -335,9 +343,21 @@ export const apiClient = {
   },
 
   async downloadCompareJobsCsv(jobIds: string[]): Promise<void> {
-    const response = await fetch(this.compareJobsCsvUrl(jobIds), {
-      headers: { ...authHeaders() },
-    });
+    let response: Response;
+    try {
+      response = await fetch(this.compareJobsCsvUrl(jobIds), {
+        headers: { ...authHeaders() },
+      });
+    } catch (networkError) {
+      throw new ApiClientError(
+        "NETWORK_ERROR",
+        networkError instanceof Error
+          ? networkError.message
+          : "Failed to download comparison CSV.",
+        null,
+        0,
+      );
+    }
     if (!response.ok) {
       throw new ApiClientError(
         "COMPARE_CSV_DOWNLOAD_FAILED",

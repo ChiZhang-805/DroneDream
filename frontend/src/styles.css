@@ -1411,6 +1411,12 @@ a {
   background: linear-gradient(135deg, #a855f7, #ff73d5);
 }
 
+.wizard-step-error .wizard-step-number {
+  color: #fff;
+  border-color: var(--danger);
+  background: rgba(255, 92, 126, 0.24);
+}
+
 .wizard-step-label {
   overflow: hidden;
   font-size: 0.72rem;
@@ -1542,22 +1548,52 @@ a {
   gap: 0.55rem;
 }
 
-.parameter-search {
+.parameter-search,
+.parameter-filter {
   display: flex;
-  flex: 1 1 280px;
   flex-direction: column;
   gap: 0.3rem;
   color: var(--text-dim);
   font-size: 0.77rem;
 }
 
-.parameter-search input {
+.parameter-search {
+  flex: 1 1 280px;
+}
+
+.parameter-filter {
+  flex: 0 1 165px;
+}
+
+.parameter-search input,
+.parameter-filter select {
   width: 100%;
   padding: 0.55rem 0.65rem;
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 7px;
   background: rgba(18, 5, 31, 0.84);
+}
+
+.parameter-safety-summary,
+.parameter-dependency-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(255, 190, 92, 0.35);
+  border-radius: 9px;
+  color: var(--warning);
+  background: rgba(255, 190, 92, 0.08);
+  font-size: 0.76rem;
+}
+
+.parameter-dependency-summary {
+  color: var(--text-dim);
+  border-color: var(--border-strong);
+  background: rgba(168, 85, 247, 0.08);
 }
 
 .parameter-groups {
@@ -1584,6 +1620,17 @@ a {
 .parameter-group-header h3 {
   margin: 0;
   font-size: 0.93rem;
+}
+
+.parameter-group-header > div:first-child {
+  min-width: 0;
+}
+
+.parameter-group-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
 }
 
 .parameter-group-header span {
@@ -1653,8 +1700,22 @@ a {
 .parameter-label,
 .parameter-description,
 .parameter-bounds,
-.parameter-dependencies {
+.parameter-dependencies,
+.parameter-metadata,
+.parameter-choices {
   display: block;
+}
+
+.parameter-dependency-missing {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--warning);
+  font-size: 0.68rem;
+}
+
+.parameter-safe-reset {
+  margin-top: 0.35rem;
+  white-space: nowrap;
 }
 
 .parameter-name {
@@ -1670,11 +1731,50 @@ a {
 
 .parameter-description,
 .parameter-bounds,
-.parameter-dependencies {
+.parameter-dependencies,
+.parameter-choices {
   margin-top: 0.15rem;
   max-width: 360px;
   color: var(--text-muted);
   font-size: 0.68rem;
+}
+
+.parameter-metadata {
+  margin-top: 0.25rem;
+}
+
+.apply-policy-badge {
+  display: inline-block;
+  padding: 0.08rem 0.32rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 0.62rem;
+}
+
+.apply-policy-reboot {
+  color: var(--warning);
+}
+
+.parameter-guidance {
+  margin-top: 0.35rem;
+  max-width: 230px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.parameter-guidance summary {
+  color: var(--warning);
+  cursor: pointer;
+}
+
+.parameter-guidance p,
+.parameter-guidance ul {
+  margin: 0.3rem 0 0;
+}
+
+.parameter-guidance ul {
+  padding-left: 1rem;
 }
 
 .risk-badge {
@@ -1714,6 +1814,76 @@ a {
   background: rgba(18, 5, 31, 0.5);
 }
 
+.scenario-preset-bar,
+.review-issue-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.9rem;
+}
+
+.scenario-preset-bar > span {
+  margin-right: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.scenario-case-selector {
+  margin-bottom: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(168, 85, 247, 0.05);
+}
+
+.scenario-case-selector h3,
+.scenario-case-selector p {
+  margin: 0;
+}
+
+.scenario-case-selector .form-hint {
+  margin-top: 0.2rem;
+}
+
+.scenario-case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.scenario-case-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(18, 5, 31, 0.46);
+  cursor: pointer;
+}
+
+.scenario-case-option input {
+  margin-top: 0.2rem;
+}
+
+.scenario-case-option span,
+.scenario-case-option small {
+  display: block;
+}
+
+.scenario-case-option small {
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.scenario-case-selector .form-error {
+  margin-top: 0.6rem;
+}
+
 .generated-track-callout,
 .budget-estimate,
 .recommendation-strip {
@@ -1737,6 +1907,23 @@ a {
 .budget-estimate span {
   color: var(--text-muted);
   font-size: 0.78rem;
+}
+
+.budget-estimate-capped {
+  border-color: rgba(255, 190, 92, 0.38);
+  background: rgba(255, 190, 92, 0.08);
+}
+
+.budget-estimate .budget-warning {
+  color: var(--warning);
+  font-weight: 650;
+}
+
+.wizard-panel .alert + .review-grid,
+.review-grid + .alert,
+.wizard-panel .form-grid + .alert,
+.wizard-panel .alert + .alert {
+  margin-top: 0.85rem;
 }
 
 .constraint-badges {

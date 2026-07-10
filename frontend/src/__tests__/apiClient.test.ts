@@ -73,6 +73,39 @@ describe("apiClient envelope handling", () => {
     expect(job.status).toBe("QUEUED");
   });
 
+  it("loads runtime capability preflight metadata", async () => {
+    mockFetchOnce({
+      success: true,
+      data: {
+        service_version: "0.1.0",
+        simulators: {
+          configuration_scope: "api_process",
+          authoritative: false,
+          worker_override: null,
+          worker_override_supported: true,
+          items: { mock: { ready: true, status: "available" } },
+        },
+        optimizers: {
+          authoritative: true,
+          items: { heuristic: { ready: true, status: "available" } },
+        },
+        parameter_catalog: {
+          catalog_version: "px4-mc-v3",
+          supported_px4_versions: ["v1.16"],
+        },
+      },
+      error: null,
+    });
+
+    const capabilities = await apiClient.getCapabilities();
+
+    expect(capabilities.simulators.items.mock.ready).toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/capabilities",
+      expect.any(Object),
+    );
+  });
+
   it("throws ApiClientError with the server-provided code on a structured error envelope", async () => {
     mockFetchOnce(
       {
@@ -100,6 +133,23 @@ describe("apiClient envelope handling", () => {
       name: "ApiClientError",
       code: "INVALID_INPUT",
       httpStatus: 422,
+    });
+  });
+
+  it("does not accept a success envelope carried by an HTTP error response", async () => {
+    mockFetchOnce(
+      {
+        success: true,
+        data: { id: "job_should_not_exist", status: "QUEUED" },
+        error: null,
+      },
+      503,
+    );
+
+    await expect(apiClient.getJob("job_x")).rejects.toMatchObject({
+      name: "ApiClientError",
+      code: "HTTP_ERROR",
+      httpStatus: 503,
     });
   });
 
@@ -299,6 +349,18 @@ describe("apiClient envelope handling", () => {
       "http://127.0.0.1:8000/api/v1/parameter-catalog?px4_version=v1.16",
       expect.any(Object),
     );
+  });
+
+  it("normalizes comparison CSV network failures", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+
+    await expect(
+      apiClient.downloadCompareJobsCsv(["job_a", "job_b"]),
+    ).rejects.toMatchObject({
+      name: "ApiClientError",
+      code: "NETWORK_ERROR",
+      httpStatus: 0,
+    });
   });
 
   it("loads constraint-aware candidate and Pareto history for a job", async () => {

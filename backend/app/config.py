@@ -58,8 +58,22 @@ class Settings(BaseSettings):
     s3_access_key_id: str | None = Field(default=None)
     s3_secret_access_key: str | None = Field(default=None)
     s3_prefix: str = Field(default="dronedream/")
+    s3_connect_timeout_seconds: float = Field(default=10.0, ge=1.0, le=120.0)
+    s3_read_timeout_seconds: float = Field(default=60.0, ge=1.0, le=600.0)
+    s3_max_attempts: int = Field(default=3, ge=1, le=10)
     artifact_presign_expiry_seconds: int = Field(default=900, ge=60, le=86400)
     llm_allowed_base_urls: str = Field(default="")
+    llm_request_timeout_seconds: float = Field(default=60.0, ge=5.0, le=600.0)
+    llm_max_retries: int = Field(default=1, ge=0, le=5)
+    llm_max_response_bytes: int = Field(default=1_000_000, ge=1024, le=10_000_000)
+    llm_max_prompt_bytes: int = Field(default=262_144, ge=32_768, le=2_000_000)
+    # User-supplied LLM credentials are deliberately short-lived even if a job
+    # remains queued because no worker is available.  Terminal jobs purge them
+    # earlier through the normal lifecycle hooks.
+    job_secret_ttl_seconds: int = Field(default=86400, ge=300, le=604800)
+    job_secret_cleanup_interval_seconds: int = Field(default=60, ge=10, le=3600)
+    finalization_lease_seconds: int = Field(default=900, ge=60, le=7200)
+    sqlite_busy_timeout_seconds: int = Field(default=30, ge=1, le=300)
     auth_mode: Literal["disabled", "demo_token", "oidc_jwt"] = Field(
         default="disabled"
     )
@@ -96,6 +110,15 @@ class Settings(BaseSettings):
         """Reject the development-only anonymous identity in production."""
 
         is_production = self.app_env.strip().lower() in {"prod", "production"}
+        minimum_finalization_lease = (
+            self.llm_request_timeout_seconds * (self.llm_max_retries + 1) + 60
+        )
+        if self.finalization_lease_seconds < minimum_finalization_lease:
+            raise ValueError(
+                "FINALIZATION_LEASE_SECONDS must be at least "
+                "LLM_REQUEST_TIMEOUT_SECONDS * (LLM_MAX_RETRIES + 1) + 60 "
+                "to prevent duplicate finalization and LLM calls"
+            )
         if "*" in self.cors_origin_list:
             raise ValueError(
                 "CORS_ORIGINS must list exact trusted origins; wildcard origins "

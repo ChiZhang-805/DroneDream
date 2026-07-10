@@ -9,7 +9,7 @@ process — never inside a request handler.
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +23,11 @@ from app.optimization.pareto import ParetoPoint, nondominated_front, representat
 from app.optimization.robust import CandidateEvaluation, evaluate_candidate
 from app.orchestration.events import record_event
 from app.parameters import (
+    classify_airframe,
     get_parameter,
     normalize_px4_version,
+    normalize_vehicle_type,
+    resolve_catalog_version,
     validate_parameter_values,
     validate_search_selections,
 )
@@ -84,42 +87,109 @@ def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
 
 
 def _validate_parameter_space(req: schemas.JobCreateRequest) -> None:
-    if not req.parameter_space:
-        return
     try:
         px4_version = normalize_px4_version(req.vehicle_profile.px4_version)
     except ValueError as exc:
         raise JobServiceError("UNSUPPORTED_PX4_VERSION", str(exc), http_status=422) from exc
+    try:
+        canonical_catalog_version = resolve_catalog_version(
+            req.parameter_catalog_version,
+            px4_version=px4_version,
+        )
+    except ValueError as exc:
+        raise JobServiceError(
+            "UNSUPPORTED_PARAMETER_CATALOG",
+            str(exc),
+            http_status=422,
+        ) from exc
+    # Aliases are accepted only at the input boundary. Persisting the resolved
+    # immutable id keeps reports, reruns, LLM prompts, and repro manifests from
+    # claiming an alias while validation used a different installed revision.
+    req.parameter_catalog_version = canonical_catalog_version
+    try:
+        vehicle_type = normalize_vehicle_type(req.vehicle_profile.vehicle_type)
+    except ValueError as exc:
+        raise JobServiceError("UNSUPPORTED_VEHICLE_TYPE", str(exc), http_status=422) from exc
+    try:
+        classify_airframe(req.vehicle_profile.airframe)
+    except ValueError as exc:
+        raise JobServiceError("UNSUPPORTED_AIRFRAME", str(exc), http_status=422) from exc
+    if not req.parameter_space:
+        return
 
     active = [selection for selection in req.parameter_space if selection.enabled]
     tunable = [selection for selection in active if not selection.locked]
-    result = validate_search_selections(
-        (
-            {
-                "name": selection.name,
-                "search_min": selection.minimum,
-                "search_max": selection.maximum,
-                "initial_value": selection.baseline,
-            }
-            for selection in tunable
-        ),
-        px4_version=px4_version,
-        enforce_safe_bounds=True,
-    )
-    if not result.valid:
-        messages = "; ".join(issue.message for issue in result.errors)
-        raise JobServiceError("INVALID_PARAMETER_SPACE", messages, http_status=422)
+    active_names = {selection.name for selection in active}
+    for selection in active:
+        definition = get_parameter(
+            selection.name,
+            px4_version=px4_version,
+            vehicle_type=vehicle_type,
+            airframe=req.vehicle_profile.airframe,
+        )
+        if definition is None:
+            continue
+        missing_hard_dependencies = sorted(
+            dependency.parameter
+            for dependency in definition.dependencies
+            if dependency.kind != "recommended_with"
+            and dependency.parameter not in active_names
+        )
+        if missing_hard_dependencies:
+            raise JobServiceError(
+                "INVALID_PARAMETER_SPACE",
+                (
+                    f"{selection.name} requires coupled parameter(s) "
+                    f"{', '.join(missing_hard_dependencies)} to be enabled or locked "
+                    "in the same job"
+                ),
+                http_status=422,
+            )
+    if tunable:
+        result = validate_search_selections(
+            (
+                {
+                    "name": selection.name,
+                    "search_min": selection.minimum,
+                    "search_max": selection.maximum,
+                    "initial_value": selection.baseline,
+                    "step": selection.step,
+                    "scale": selection.scale,
+                    "choices": selection.choices,
+                }
+                for selection in tunable
+            ),
+            px4_version=px4_version,
+            catalog_version=req.parameter_catalog_version,
+            vehicle_type=vehicle_type,
+            airframe=req.vehicle_profile.airframe,
+            enforce_safe_bounds=True,
+        )
+        if not result.valid:
+            messages = "; ".join(issue.message for issue in result.errors)
+            raise JobServiceError("INVALID_PARAMETER_SPACE", messages, http_status=422)
     try:
         validate_parameter_values(
             {selection.name: selection.baseline for selection in active},
             px4_version=px4_version,
+            catalog_version=req.parameter_catalog_version,
+            vehicle_type=vehicle_type,
+            airframe=req.vehicle_profile.airframe,
             enforce_safe_bounds=True,
         )
     except ValueError as exc:
         raise JobServiceError("INVALID_PARAMETER_SPACE", str(exc), http_status=422) from exc
 
-    for selection in active:
-        definition = get_parameter(selection.name, px4_version=px4_version)
+    # Disabled/locked entries are still part of the persisted contract. Resolve
+    # and normalize every name now so a later enable/unlock cannot revive an
+    # arbitrary or version-incompatible parameter without revalidation.
+    for selection in req.parameter_space:
+        definition = get_parameter(
+            selection.name,
+            px4_version=px4_version,
+            vehicle_type=vehicle_type,
+            airframe=req.vehicle_profile.airframe,
+        )
         if definition is None:
             raise JobServiceError(
                 "INVALID_PARAMETER_SPACE",
@@ -129,6 +199,38 @@ def _validate_parameter_space(req: schemas.JobCreateRequest) -> None:
         selection.value_type = (
             "integer" if definition.value_type == "int" else "float"
         )
+        if definition.choices:
+            allowed_choices = {float(choice.value) for choice in definition.choices}
+            if selection.choices is not None and not set(selection.choices).issubset(
+                allowed_choices
+            ):
+                raise JobServiceError(
+                    "INVALID_PARAMETER_SPACE",
+                    f"{selection.name} choices contain values not defined by the catalog",
+                    http_status=422,
+                )
+            if selection.choices is None:
+                applicable_choices = sorted(
+                    value
+                    for value in allowed_choices
+                    if selection.minimum <= value <= selection.maximum
+                )
+                if not applicable_choices:
+                    raise JobServiceError(
+                        "INVALID_PARAMETER_SPACE",
+                        f"{selection.name} bounds contain no catalog choice",
+                        http_status=422,
+                    )
+                selection.choices = applicable_choices
+            if selection.enabled and not selection.locked and len(selection.choices) < 2:
+                raise JobServiceError(
+                    "INVALID_PARAMETER_SPACE",
+                    (
+                        f"{selection.name} has fewer than two reachable catalog choices; "
+                        "widen its bounds or set locked=true"
+                    ),
+                    http_status=422,
+                )
         catalog_step = float(definition.step)
         if selection.step is None:
             selection.step = catalog_step
@@ -235,6 +337,9 @@ def _create_job_from_config(
     db.add(job)
     db.flush()
     if llm_api_key:
+        secret_expires_at = now + timedelta(
+            seconds=get_settings().job_secret_ttl_seconds
+        )
         db.add(
             models.JobSecret(
                 job_id=job.id,
@@ -242,6 +347,7 @@ def _create_job_from_config(
                 # Actual provider identity is retained on Job metadata.
                 provider="openai",
                 encrypted_api_key=job_secrets.encrypt_secret(llm_api_key),
+                expires_at=secret_expires_at,
             )
         )
     db.add(
@@ -336,6 +442,43 @@ def purge_job_secrets(db: Session, job: models.Job, *, reason: str = "job_termin
     return deleted
 
 
+def purge_expired_job_secrets(
+    db: Session, *, now: datetime | None = None
+) -> int:
+    """Wipe expired credentials even when jobs remain queued without a worker.
+
+    ``expires_at`` was introduced after the first secret-store revision.  Old
+    rows without it are treated as expired once ``created_at + configured TTL``
+    has elapsed, so upgrades cannot leave legacy ciphertext indefinitely.
+    """
+
+    current = now or _now()
+    legacy_cutoff = current - timedelta(
+        seconds=get_settings().job_secret_ttl_seconds
+    )
+    expired = list(
+        db.scalars(
+            select(models.JobSecret).where(
+                models.JobSecret.deleted_at.is_(None),
+                models.JobSecret.encrypted_api_key != "",
+                or_(
+                    models.JobSecret.expires_at <= current,
+                    (
+                        models.JobSecret.expires_at.is_(None)
+                        & (models.JobSecret.created_at <= legacy_cutoff)
+                    ),
+                ),
+            )
+        )
+    )
+    for secret in expired:
+        secret.deleted_at = current
+        secret.encrypted_api_key = ""
+    if expired:
+        db.commit()
+    return len(expired)
+
+
 def list_jobs(
     db: Session,
     *,
@@ -393,6 +536,12 @@ def rerun_job(
 ) -> models.Job:
     resolved_user = _resolve_user(db, user)
     source = get_job(db, job_id, user=resolved_user)
+    rerun_suffix = " (rerun)"
+    rerun_display_name = (
+        f"{source.display_name[: 255 - len(rerun_suffix)]}{rerun_suffix}"
+        if source.display_name
+        else None
+    )
     strategy: schemas.OptimizerStrategy = source.optimizer_strategy  # type: ignore[assignment]
     rerun_openai: schemas.OpenAIConfig | None = None
     rerun_llm: schemas.LLMProviderConfig | None = None
@@ -457,7 +606,7 @@ def rerun_job(
             min_pass_rate=source.min_pass_rate,
         ),
         openai=rerun_openai,
-        display_name=(f"{source.display_name} (rerun)" if source.display_name else None),
+        display_name=rerun_display_name,
         baseline_parameters=(
             schemas.BaselineParameters(**source.baseline_parameter_json)
             if source.baseline_parameter_json
@@ -493,6 +642,7 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
         "QUEUED": 0,
         "RUNNING": 0,
         "AGGREGATING": 0,
+        "FINALIZING": 0,
         "COMPLETED": 0,
         "FAILED": 0,
         "CANCELLED": 0,
@@ -509,7 +659,11 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
             status = "CANCELLED"
         else:
             status = "COMPLETED"
-    elif by_status["RUNNING"] > 0 or by_status["AGGREGATING"] > 0:
+    elif (
+        by_status["RUNNING"] > 0
+        or by_status["AGGREGATING"] > 0
+        or by_status["FINALIZING"] > 0
+    ):
         status = "RUNNING"
     elif by_status["QUEUED"] > 0:
         status = "QUEUED"
@@ -521,7 +675,11 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
             completed_jobs=by_status["COMPLETED"],
             failed_jobs=by_status["FAILED"],
             cancelled_jobs=by_status["CANCELLED"],
-            running_jobs=by_status["RUNNING"],
+            running_jobs=(
+                by_status["RUNNING"]
+                + by_status["AGGREGATING"]
+                + by_status["FINALIZING"]
+            ),
             queued_jobs=by_status["QUEUED"],
             created_jobs=by_status["CREATED"],
             terminal_jobs=terminal_jobs,
@@ -581,15 +739,13 @@ def create_batch(
 
 def list_batches(db: Session, *, user: models.User | None = None) -> list[models.BatchJob]:
     resolved_user = _resolve_user(db, user)
+    owner_filter = models.BatchJob.user_id == resolved_user.id
+    if get_settings().auth_mode == "disabled":
+        owner_filter = or_(owner_filter, models.BatchJob.user_id.is_(None))
     return list(
         db.scalars(
             select(models.BatchJob)
-            .where(
-                or_(
-                    models.BatchJob.user_id == resolved_user.id,
-                    models.BatchJob.user_id.is_(None),
-                )
-            )
+            .where(owner_filter)
             .order_by(models.BatchJob.created_at.desc())
         )
     )
@@ -598,7 +754,14 @@ def list_batches(db: Session, *, user: models.User | None = None) -> list[models
 def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
     batch = db.get(models.BatchJob, batch_id)
     resolved_user = _resolve_user(db, user)
-    if batch is None or (batch.user_id is not None and batch.user_id != resolved_user.id):
+    auth_disabled_owned_null = (
+        get_settings().auth_mode == "disabled"
+        and batch is not None
+        and batch.user_id is None
+    )
+    if batch is None or (
+        batch.user_id != resolved_user.id and not auth_disabled_owned_null
+    ):
         raise JobServiceError(
             "BATCH_NOT_FOUND",
             f"Batch {batch_id} was not found.",
@@ -609,10 +772,22 @@ def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) ->
 
 def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
     batch = get_batch(db, batch_id, user=user)
+    if batch.jobs and all(
+        child.status in schemas.JOB_TERMINAL_STATUSES for child in batch.jobs
+    ):
+        _, terminal_status = _aggregate_batch_progress(batch.jobs)
+        raise JobServiceError(
+            "BATCH_ALREADY_TERMINAL",
+            f"Batch {batch.id} is already in terminal state {terminal_status}.",
+            http_status=409,
+        )
     now = _now()
     terminal_trials = {"COMPLETED", "FAILED", "CANCELLED"}
     for child in batch.jobs:
         if child.status in schemas.JOB_TERMINAL_STATUSES:
+            # Sweep stale credentials too: an older worker/version may have
+            # terminalized this child without performing the invariant cleanup.
+            purge_job_secrets(db, child, reason="batch_cancel_terminal_sweep")
             continue
         child.status = "CANCELLED"
         child.cancelled_at = now
@@ -631,6 +806,8 @@ def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None)
                 payload_json={"by": "batch"},
             )
         )
+        purge_job_secrets(db, child, reason="batch_cancelled")
+    batch.status = "CANCELLED"
     batch.cancelled_at = now
     db.commit()
     db.refresh(batch)
@@ -683,6 +860,7 @@ def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
         trial.finished_at = now
         trial.lease_owner = None
         trial.lease_expires_at = None
+    purge_job_secrets(db, job, reason="job_cancelled")
     db.add(models.JobEvent(job_id=job.id, event_type="job_cancelled", payload_json=None))
     db.commit()
     db.refresh(job)

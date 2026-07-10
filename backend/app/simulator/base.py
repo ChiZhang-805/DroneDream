@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from threading import Event
 from typing import Any
 
 # --- Failure codes ---------------------------------------------------------
@@ -30,6 +31,10 @@ FAILURE_SIMULATION = "SIMULATION_FAILED"
 FAILURE_UNSTABLE = "UNSTABLE_CANDIDATE"
 FAILURE_SIM_ERROR = "SIM_ERROR"
 FAILURE_ADAPTER_UNAVAILABLE = "ADAPTER_UNAVAILABLE"
+FAILURE_CANCELLED = "CANCELLED"
+FAILURE_ARTIFACT_PERSISTENCE = "ARTIFACT_PERSISTENCE_FAILED"
+FAILURE_RESULT_PERSISTENCE = "RESULT_PERSISTENCE_FAILED"
+FAILURE_INVALID_PARAMETERS = "INVALID_CANDIDATE_PARAMETERS"
 
 
 # --- Value objects ---------------------------------------------------------
@@ -51,6 +56,8 @@ class JobConfig:
     objective_profile: str
     reference_track: list[dict[str, float]] | None = None
     vehicle_profile: dict[str, Any] = field(default_factory=dict)
+    parameter_catalog_version: str | None = None
+    selected_parameter_names: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -65,6 +72,13 @@ class TrialContext:
     seed: int
     scenario_type: str
     scenario_config: dict[str, Any] | None = None
+    attempt_count: int = 1
+    cancellation_event: Event | None = field(default=None, compare=False, repr=False)
+
+    def cancellation_requested(self) -> bool:
+        """Return whether the worker no longer owns this execution attempt."""
+
+        return self.cancellation_event is not None and self.cancellation_event.is_set()
 
 
 @dataclass
@@ -159,9 +173,23 @@ class SimulatorAdapter(ABC):
     def cleanup(self, ctx: TrialContext) -> None:  # noqa: B027 — optional hook
         """Hook for per-trial teardown. No-op default."""
 
+    def finalize_trial(self, ctx: TrialContext, result: TrialResult | None) -> None:  # noqa: B027 — optional hook
+        """Release persisted run data after the executor stores artifacts.
+
+        This hook deliberately runs *after* artifact persistence. ``cleanup``
+        remains the place to stop simulator processes and release transient
+        resources immediately after execution.
+        """
+
+        _ = ctx, result
+
 
 __all__ = [
     "FAILURE_ADAPTER_UNAVAILABLE",
+    "FAILURE_ARTIFACT_PERSISTENCE",
+    "FAILURE_RESULT_PERSISTENCE",
+    "FAILURE_INVALID_PARAMETERS",
+    "FAILURE_CANCELLED",
     "FAILURE_SIMULATION",
     "FAILURE_SIM_ERROR",
     "FAILURE_TIMEOUT",

@@ -117,9 +117,10 @@ function DashboardBody({ jobs }: { jobs: Job[] }) {
               (counts.RUNNING ?? 0) +
               (counts.QUEUED ?? 0) +
               (counts.AGGREGATING ?? 0) +
+              (counts.FINALIZING ?? 0) +
               (counts.CREATED ?? 0)
             }
-            sub="CREATED + QUEUED + RUNNING + AGGREGATING"
+            sub="CREATED + QUEUED + RUNNING + AGGREGATING + FINALIZING"
             tone="muted"
           />
           <MetricCard

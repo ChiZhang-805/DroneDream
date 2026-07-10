@@ -59,15 +59,29 @@ def _emit_artifacts(
     run_dir.mkdir(parents=True, exist_ok=True)
     trial_id = str(payload.get("trial_id", "unknown_trial"))
     scenario = payload.get("scenario_type", "nominal")
+    job_config = payload.get("job_config")
+    altitude = float(job_config.get("altitude_m", 3.0)) if isinstance(job_config, dict) else 3.0
+    telemetry_samples = [
+        {
+            "t": round(i * 0.1, 2),
+            "x": round(i * 0.05, 3),
+            "y": round(i * 0.05, 3),
+            "z": altitude,
+        }
+        for i in range(0, 20)
+    ]
 
     telem_path = run_dir / "telemetry.json"
     with telem_path.open("w", encoding="utf-8") as f:
         json.dump(
             {
+                "schema_version": "dronedream.telemetry.v1",
                 "trial_id": trial_id,
-                "scenario": scenario,
-                "metrics": metrics,
-                "parameters": payload.get("parameters", {}),
+                "samples": telemetry_samples,
+                "meta": {
+                    "scenario": scenario,
+                    "parameters": payload.get("parameters", {}),
+                },
             },
             f,
             indent=2,
@@ -78,8 +92,7 @@ def _emit_artifacts(
     # Minimal deterministic trajectory — enough to prove the file exists.
     # A real wrapper would write a real trajectory file / PNG.
     samples = [
-        {"t": round(i * 0.1, 2), "x": round(i * 0.05, 3), "y": round(i * 0.05, 3)}
-        for i in range(0, 20)
+        {"t": sample["t"], "x": sample["x"], "y": sample["y"]} for sample in telemetry_samples
     ]
     with traj_path.open("w", encoding="utf-8") as f:
         json.dump({"trial_id": trial_id, "samples": samples}, f, indent=2, sort_keys=True)
@@ -225,16 +238,18 @@ def main() -> int:
         print(f"[example_real_simulator] cannot read input: {exc}", file=sys.stderr)
         return 2
     result = _compute_metrics(payload)
+    identity = payload.get("execution_identity")
+    if isinstance(identity, dict):
+        result["schema_version"] = "dronedream.trial_result.v2"
+        result["execution_identity"] = dict(identity)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     # Emit per-trial artifact files for successful trials. Failure paths
     # (``success=False``) intentionally skip this so the adapter's error
     # reporting stays the salient signal.
     if result.get("success") and isinstance(result.get("metrics"), dict):
-        result["artifacts"] = _emit_artifacts(
-            payload, args.output.parent, result["metrics"]
-        )
+        result["artifacts"] = _emit_artifacts(payload, args.output.parent, result["metrics"])
     with args.output.open("w", encoding="utf-8") as f:
-        json.dump(result, f, indent=2, sort_keys=True)
+        json.dump(result, f, indent=2, sort_keys=True, allow_nan=False)
     return 0 if os.environ.get("EXAMPLE_SIM_EXIT_NONZERO") != "1" else 3
 
 

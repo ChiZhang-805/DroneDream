@@ -9,14 +9,17 @@ the DB and drives the runner.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pytest
 
 from app import models, schemas
-from app.orchestration import aggregation, constants
+from app.orchestration import acceptance, aggregation, constants, job_manager
 from app.orchestration.optimizer import (
     generate_candidates,
     generate_selected_parameter_candidates,
 )
+from app.parameters import validate_parameter_values
 
 # --- Candidate generation --------------------------------------------------
 
@@ -32,6 +35,30 @@ def test_generate_candidates_is_deterministic() -> None:
     b = generate_candidates(dict(constants.BASELINE_PARAMETERS))
     assert [p.parameters for p in a] == [p.parameters for p in b]
     assert [p.label for p in a] == [p.label for p in b]
+
+
+def test_duplicate_detection_compares_only_selected_tuning_dimensions() -> None:
+    job = models.Job(
+        id="job_duplicate",
+        track_type="circle",
+        altitude_m=3.0,
+        sensor_noise_level="medium",
+        objective_profile="robust",
+        parameter_space_json=[{"name": "MPC_XY_P", "enabled": True}],
+    )
+    job.candidates.append(
+        models.CandidateParameterSet(
+            id="candidate_existing",
+            job_id=job.id,
+            parameter_json={
+                **constants.BASELINE_PARAMETERS,
+                "MPC_XY_P": 0.95,
+            },
+        )
+    )
+
+    assert job_manager._is_duplicate_proposal(job, {"MPC_XY_P": 0.95}) is True
+    assert job_manager._is_duplicate_proposal(job, {"MPC_XY_P": 1.05}) is False
 
 
 def test_generate_candidates_uses_only_whitelisted_keys() -> None:
@@ -70,8 +97,9 @@ def test_generate_candidates_differ_from_baseline() -> None:
 
 
 def test_generate_candidates_rejects_out_of_range_count() -> None:
+    assert len(generate_candidates(dict(constants.BASELINE_PARAMETERS), count=1)) == 1
     with pytest.raises(ValueError):
-        generate_candidates(dict(constants.BASELINE_PARAMETERS), count=1)
+        generate_candidates(dict(constants.BASELINE_PARAMETERS), count=0)
     with pytest.raises(ValueError):
         generate_candidates(dict(constants.BASELINE_PARAMETERS), count=6)
 
@@ -127,6 +155,39 @@ def test_generate_selected_parameter_candidates_uses_declared_domain() -> None:
     assert all(item.parameters["MPC_TILTMAX_AIR"].is_integer() for item in proposals)
 
 
+def test_selected_parameter_design_skips_catalog_coupling_violations() -> None:
+    def validate(parameters: Mapping[str, float]) -> None:
+        validate_parameter_values(parameters, px4_version="v1.16")
+
+    proposals = generate_selected_parameter_candidates(
+        [
+            {
+                "name": "MPC_ACC_HOR",
+                "baseline": 3,
+                "minimum": 2,
+                "maximum": 8,
+                "step": 1,
+            },
+            {
+                "name": "MPC_ACC_HOR_MAX",
+                "baseline": 5,
+                "minimum": 3,
+                "maximum": 10,
+                "step": 1,
+            },
+        ],
+        count=20,
+        candidate_validator=validate,
+    )
+
+    assert len(proposals) == 20
+    assert all(
+        proposal.parameters["MPC_ACC_HOR"]
+        <= proposal.parameters["MPC_ACC_HOR_MAX"]
+        for proposal in proposals
+    )
+
+
 # --- Aggregation scoring ---------------------------------------------------
 
 
@@ -149,6 +210,46 @@ class _FakeMetric:
         self.crash_flag = crash
         self.timeout_flag = timeout
         self.instability_flag = instability
+
+
+def _aggregation_trial(
+    *,
+    candidate: models.CandidateParameterSet,
+    trial_id: str,
+    case_id: str,
+    seed: int,
+    status: str = "COMPLETED",
+    rmse: float = 1.0,
+    max_error: float = 1.0,
+    passed: bool = True,
+    holdout: bool = False,
+    scenario_type: str = "nominal",
+) -> models.Trial:
+    trial = models.Trial(
+        id=trial_id,
+        job_id=candidate.job_id,
+        candidate_id=candidate.id,
+        seed=seed,
+        scenario_type=scenario_type,
+        scenario_config_json={"scenario_case_id": case_id, "holdout": holdout},
+        status=status,
+    )
+    if status == "COMPLETED":
+        trial.metric = models.TrialMetric(
+            trial_id=trial.id,
+            rmse=rmse,
+            max_error=max_error,
+            overshoot_count=0,
+            completion_time=10.0,
+            crash_flag=False,
+            timeout_flag=False,
+            score=rmse,
+            final_error=0.0,
+            pass_flag=passed,
+            instability_flag=False,
+            raw_metric_json={},
+        )
+    return trial
 
 
 def test_score_candidate_is_deterministic_and_documented() -> None:
@@ -268,6 +369,290 @@ def test_multiobjective_aggregation_uses_robust_score_and_hard_constraints() -> 
     assert result["constraint_violations"]
     assert candidate.aggregated_score is not None
     assert candidate.aggregated_score > 1_000_000
+
+
+def test_scenario_case_weight_is_independent_of_seed_count() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_case_weights",
+        job_id="job_case_weights",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trials: list[models.Trial] = []
+    for index, (case_id, rmse) in enumerate(
+        (("case-a", 0.0), ("case-a", 2.0), ("case-b", 3.0)), start=1
+    ):
+        trial = models.Trial(
+            id=f"case_weight_trial_{index}",
+            job_id=candidate.job_id,
+            candidate_id=candidate.id,
+            seed=index,
+            scenario_type="nominal" if case_id == "case-a" else "wind_perturbed",
+            scenario_config_json={"scenario_case_id": case_id},
+            status="COMPLETED",
+        )
+        trial.metric = models.TrialMetric(
+            trial_id=trial.id,
+            rmse=rmse,
+            max_error=rmse,
+            overshoot_count=0,
+            completion_time=10,
+            crash_flag=False,
+            timeout_flag=False,
+            score=rmse,
+            final_error=0,
+            pass_flag=True,
+            instability_flag=False,
+        )
+        trials.append(trial)
+    result = aggregation._aggregate_candidate(
+        candidate,
+        trials,
+        objective_config=schemas.ObjectiveConfig(
+            objectives=[schemas.ObjectiveSpec(metric="rmse")],
+            robust_aggregation="mean",
+        ),
+        scenario_suite=schemas.ScenarioSuiteConfig(
+            cases=[
+                schemas.ScenarioCaseConfig(
+                    id="case-a", scenario_type="nominal", seeds=[1, 2], weight=1
+                ),
+                schemas.ScenarioCaseConfig(
+                    id="case-b", scenario_type="wind_perturbed", seeds=[3], weight=1
+                ),
+            ]
+        ),
+    )
+
+    assert result is not None
+    # case-a contributes its seed mean (1.0), case-b contributes 3.0; equal
+    # case weights therefore aggregate to 2.0 rather than 5/3.
+    assert result["objective_values"]["rmse"] == pytest.approx(2.0)
+
+
+def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_weighted_rates",
+        job_id="job_weighted_rates",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trials = [
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id=f"case_a_{seed}",
+            case_id="case-a",
+            seed=seed,
+            rmse=0.0,
+        )
+        for seed in (1, 2, 3)
+    ]
+    trials.append(
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="case_a_failed",
+            case_id="case-a",
+            seed=4,
+            status="FAILED",
+        )
+    )
+    trials.append(
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="case_b_completed_not_passing",
+            case_id="case-b",
+            seed=5,
+            rmse=4.0,
+            passed=False,
+            scenario_type="wind_perturbed",
+        )
+    )
+
+    result = aggregation._aggregate_candidate(
+        candidate,
+        trials,
+        objective_config=schemas.ObjectiveConfig(
+            objectives=[schemas.ObjectiveSpec(metric="rmse")],
+            robust_aggregation="mean",
+        ),
+        scenario_suite=schemas.ScenarioSuiteConfig(
+            cases=[
+                schemas.ScenarioCaseConfig(
+                    id="case-a", scenario_type="nominal", seeds=[1, 2, 3, 4], weight=1
+                ),
+                schemas.ScenarioCaseConfig(
+                    id="case-b", scenario_type="wind_perturbed", seeds=[5], weight=3
+                ),
+            ]
+        ),
+    )
+
+    assert result is not None
+    # case-a: completion/pass/failure = .75/.75/.25 at weight 1
+    # case-b: completion/pass/failure = 1/0/0 at weight 3
+    assert result["training_completion_rate"] == pytest.approx(0.9375)
+    assert result["training_pass_rate"] == pytest.approx(0.1875)
+    assert result["training_failure_rate"] == pytest.approx(0.0625)
+    assert result["training_completed_trial_count"] == 4
+    assert result["training_failed_trial_count"] == 1
+    # Completed samples retain only their dispatched-seed share of a case's
+    # weight: case-a contributes 3/4 * 1 and case-b contributes 1 * 3.
+    assert result["objective_values"]["rmse"] == pytest.approx(3.2)
+    assert result["training_scenario_case_rates"] == [
+        {
+            "scenario_case_id": "case-a",
+            "scenario_type": "nominal",
+            "weight": 1.0,
+            "trial_count": 4,
+            "completed_trial_count": 3,
+            "failed_trial_count": 1,
+            "passing_trial_count": 3,
+            "completion_rate": 0.75,
+            "failure_rate": 0.25,
+            "pass_rate": 0.75,
+        },
+        {
+            "scenario_case_id": "case-b",
+            "scenario_type": "wind_perturbed",
+            "weight": 3.0,
+            "trial_count": 1,
+            "completed_trial_count": 1,
+            "failed_trial_count": 0,
+            "passing_trial_count": 0,
+            "completion_rate": 1.0,
+            "failure_rate": 0.0,
+            "pass_rate": 0.0,
+        },
+    ]
+    # Failed-seed penalty uses the weighted case failure rate, not raw 1/5.
+    assert result["aggregated_score"] == pytest.approx(
+        3.2 + constants.SCORE_WEIGHTS["failed_trial"] * 0.0625
+    )
+    acceptance_result = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=None, target_max_error=None, min_pass_rate=0.2
+        ),
+    )
+    assert acceptance_result.passed is False
+    assert acceptance_result.reason == "pass_rate_too_low"
+    assert acceptance_result.pass_rate == pytest.approx(0.1875)
+    assert acceptance_result.completion_rate == pytest.approx(0.9375)
+
+
+def test_acceptance_uses_worst_trial_max_error_and_keeps_legacy_mean() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_max_error",
+        job_id="job_max_error",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trials = [
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="max_error_low",
+            case_id="nominal",
+            seed=1,
+            max_error=0.1,
+        ),
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="max_error_high",
+            case_id="nominal",
+            seed=2,
+            max_error=10.0,
+        ),
+    ]
+
+    result = aggregation._aggregate_candidate(candidate, trials)
+
+    assert result is not None
+    assert result["max_error"] == pytest.approx(5.05)
+    assert result["max_error_mean"] == pytest.approx(5.05)
+    assert result["max_error_worst"] == pytest.approx(10.0)
+    target_five = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=None, target_max_error=5.0, min_pass_rate=0.0
+        ),
+    )
+    assert target_five.passed is False
+    assert target_five.reason == "max_error_above_target"
+    assert target_five.max_error == pytest.approx(10.0)
+    # This threshold distinguishes the new worst-trial semantics from the
+    # historical 5.05 mean, which would otherwise have passed.
+    assert not acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=None, target_max_error=6.0, min_pass_rate=0.0
+        ),
+    ).passed
+
+
+def test_partial_holdout_failure_is_reported_and_never_marked_feasible() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_partial_holdout",
+        job_id="job_partial_holdout",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trials = [
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="training_complete",
+            case_id="training",
+            seed=1,
+        ),
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="holdout_complete",
+            case_id="validation",
+            seed=2,
+            rmse=0.2,
+            max_error=0.3,
+            holdout=True,
+        ),
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="holdout_failed",
+            case_id="validation",
+            seed=3,
+            status="FAILED",
+            holdout=True,
+        ),
+    ]
+    result = aggregation._aggregate_candidate(
+        candidate,
+        trials,
+        objective_config=schemas.ObjectiveConfig(
+            objectives=[schemas.ObjectiveSpec(metric="rmse")]
+        ),
+        scenario_suite=schemas.ScenarioSuiteConfig(
+            cases=[
+                schemas.ScenarioCaseConfig(id="training", seeds=[1]),
+                schemas.ScenarioCaseConfig(
+                    id="validation", seeds=[2, 3], holdout=True, weight=2
+                ),
+            ]
+        ),
+    )
+
+    assert result is not None
+    holdout = result["holdout"]
+    assert holdout["trial_count"] == 2
+    assert holdout["completed_trial_count"] == 1
+    assert holdout["failed_trial_count"] == 1
+    assert holdout["passing_trial_count"] == 1
+    assert holdout["completion_rate"] == pytest.approx(0.5)
+    assert holdout["failure_rate"] == pytest.approx(0.5)
+    assert holdout["pass_rate"] == pytest.approx(0.5)
+    assert holdout["objective_feasible"] is True
+    assert holdout["validation_status"] == "incomplete"
+    assert holdout["feasible"] is False
 
 
 # --- Best candidate selection ---------------------------------------------

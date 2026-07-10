@@ -44,6 +44,11 @@ def _load_fernet() -> object | None:
         return None
 
     normalized = raw.strip()
+    # An all-whitespace value must behave exactly like an unset value.  Without
+    # this guard it would be hashed into the publicly reproducible SHA-256 of
+    # the empty string and incorrectly reported as production-grade storage.
+    if not normalized:
+        return None
     try:
         Fernet(normalized.encode("ascii"))
         key_bytes = normalized.encode("ascii")

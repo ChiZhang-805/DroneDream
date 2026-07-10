@@ -117,7 +117,15 @@ def halton_design(
     attempts = 0
     while len(candidates) < count and attempts < max_attempts:
         vector = [_radical_inverse(index, _PRIMES[dim]) for dim in range(dimensions)]
-        append_unique(search_space.from_unit_vector(vector))
+        try:
+            candidate = search_space.from_unit_vector(vector)
+        except ValueError:
+            # Coupled catalog constraints can make only part of the
+            # rectangular unit cube feasible. Deterministically skip invalid
+            # points and continue the low-discrepancy sequence.
+            pass
+        else:
+            append_unique(candidate)
         index += 1
         attempts += 1
     return candidates

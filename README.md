@@ -29,6 +29,14 @@ DroneDream is a PX4/Gazebo-oriented web platform for automatic drone parameter t
 
 # Complete DroneDream Runpod Setup Guide
 
+> This section is a single-operator development deployment. Do not expose an
+> `AUTH_MODE=disabled` API to untrusted users. A public/multi-user deployment
+> must use OIDC (or temporary demo tokens), PostgreSQL, S3-compatible storage,
+> worker heartbeats, TLS, and per-user quotas as described in `docs/11-operations.md`.
+> The bundled real runner currently supports verified **nominal** scenarios;
+> wind/noise/combined/advanced effects fail closed until a site launcher
+> physically injects them and returns evidence.
+
 ## 0. Pod Configuration
 
 Ports:
@@ -240,7 +248,7 @@ ARTIFACT_ROOT=/workspace/DroneDream/.artifacts
 
 # --- PX4/Gazebo runner ---
 PX4_GAZEBO_DRY_RUN=false
-PX4_GAZEBO_LAUNCH_COMMAND="/workspace/PX4-Autopilot/.venv/bin/python /workspace/DroneDream/scripts/simulators/local_px4_launch_wrapper.py --run-dir {run_dir} --input {trial_input} --params {params_json} --track {track_json} --telemetry {telemetry_json} --stdout-log {stdout_log} --stderr-log {stderr_log} --vehicle {vehicle} --world {world} --headless {headless}"
+PX4_GAZEBO_LAUNCH_COMMAND="/workspace/PX4-Autopilot/.venv/bin/python /workspace/DroneDream/scripts/simulators/local_px4_launch_wrapper.py --run-dir {run_dir} --input {trial_input} --params {params_json} --px4-params {px4_params_json} --track {track_json} --telemetry {telemetry_json} --stdout-log {stdout_log} --stderr-log {stderr_log} --vehicle {vehicle} --world {world} --headless {headless}"
 PX4_GAZEBO_WORKDIR=/workspace/DroneDream
 PX4_GAZEBO_TIMEOUT_SECONDS=900
 PX4_GAZEBO_HEADLESS=false
@@ -248,11 +256,13 @@ PX4_GAZEBO_KEEP_RAW_LOGS=true
 PX4_GAZEBO_PASS_RMSE=0.75
 PX4_GAZEBO_PASS_MAX_ERROR=2.0
 PX4_GAZEBO_MIN_TRACK_COVERAGE=0.9
-PX4_GAZEBO_VEHICLE=x500
-PX4_GAZEBO_WORLD=default
+# Leave blank to honor each job's model/world selection.
+PX4_GAZEBO_VEHICLE=
+PX4_GAZEBO_WORLD=
 PX4_GAZEBO_EXTRA_ARGS=
 PX4_GAZEBO_TELEMETRY_FORMAT=json
 PX4_GAZEBO_ALLOW_CSV_TELEMETRY=false
+PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS=false
 
 # --- local PX4 wrapper ---
 PX4_AUTOPILOT_DIR=/workspace/PX4-Autopilot
@@ -280,6 +290,9 @@ PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS=30
 PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS=120
 PX4_OFFBOARD_LAND_AFTER=true
 PX4_OFFBOARD_DRY_RUN=false
+PX4_PARAMETER_TRANSPORT=environment
+PX4_PARAMETER_CONNECTION=udp://:14540
+PX4_PARAMETER_ENFORCE_SAFE_BOUNDS=true
 
 # --- noVNC / Gazebo GUI ---
 DISPLAY=:99
@@ -514,6 +527,7 @@ npm run dev -- --host 0.0.0.0 --port 5173
 ```text
 Simulator Backend: real_cli
 Optimizer Strategy: heuristic
+Scenario matrix: click "Use bundled nominal-only matrix"
 Track: circle
 Altitude: 3
 Wind: 0/0/0/0
@@ -525,8 +539,9 @@ Target RMSE: 0.75
 ```text
 Simulator Backend: real_cli
 Optimizer Strategy: gpt
-Max Iterations: 20
-Trials per Candidate: 3
+Scenario matrix: click "Use bundled nominal-only matrix"
+Max Iterations: 2
+Trials per Candidate: 1
 Target RMSE: 0.75
 Min Pass Rate: 0.8
 OpenAI Model: gpt-4.1

@@ -30,6 +30,7 @@ class S3ArtifactStorage(ArtifactStorage):
             self.prefix = f"{self.prefix}/"
         try:
             import boto3
+            from botocore.config import Config
         except ModuleNotFoundError as exc:
             raise S3StorageConfigError(
                 "boto3 is not installed; install backend[storage] dependencies"
@@ -40,6 +41,14 @@ class S3ArtifactStorage(ArtifactStorage):
             region_name=settings.s3_region,
             aws_access_key_id=settings.s3_access_key_id,
             aws_secret_access_key=settings.s3_secret_access_key,
+            config=Config(
+                connect_timeout=settings.s3_connect_timeout_seconds,
+                read_timeout=settings.s3_read_timeout_seconds,
+                retries={
+                    "max_attempts": settings.s3_max_attempts,
+                    "mode": "standard",
+                },
+            ),
         )
 
     def put_file(self, local_path: Path, key: str, content_type: str | None = None) -> str:

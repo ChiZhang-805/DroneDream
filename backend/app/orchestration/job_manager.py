@@ -31,6 +31,7 @@ from app.orchestration.optimizer import (
     generate_candidates,
     generate_selected_parameter_candidates,
 )
+from app.orchestration.parameter_constraints import validator_for_job
 
 
 @dataclass(frozen=True)
@@ -70,11 +71,14 @@ def _configured_scenario_runs(
     # Users may explicitly disable common random numbers. Keep that mode
     # deterministic while giving each generation a disjoint seed range.
     offset = generation_index * 1_000_003
+    # Keep derived seeds inside the portable signed 32-bit range accepted by
+    # the request schema and common simulator/SDK interfaces.
+    seed_modulus = 2_147_483_648
     return [
         ScenarioRun(
             case_id=run.case_id,
             scenario_type=run.scenario_type,
-            seed=run.seed + offset,
+            seed=(run.seed + offset) % seed_modulus,
             weight=run.weight,
             holdout=run.holdout,
             config=run.config,
@@ -124,6 +128,56 @@ def _baseline_parameters_for_job(job: models.Job) -> dict[str, float]:
     return params
 
 
+def _complete_candidate_parameters(
+    job: models.Job, proposed: dict[str, float]
+) -> dict[str, float]:
+    """Overlay tuned values onto the invariant job-level controller inputs.
+
+    Schedule/controller values that are not selected for tuning must remain
+    identical across baseline and every candidate; otherwise candidates would
+    fly different commands and the comparison would not be causal.
+    """
+
+    completed = _baseline_parameters_for_job(job)
+    completed.update({name: float(value) for name, value in proposed.items()})
+    return completed
+
+
+def _proposal_fingerprint(
+    job: models.Job, parameters: dict[str, Any]
+) -> tuple[tuple[str, float], ...] | None:
+    selected_names = {
+        str(item.get("name", "")).strip().upper()
+        for item in (job.parameter_space_json or [])
+        if isinstance(item, dict)
+        and item.get("enabled", True)
+        and str(item.get("name", "")).strip()
+    }
+    keys = selected_names or set(constants.BASELINE_PARAMETERS)
+    values: list[tuple[str, float]] = []
+    for key in sorted(keys):
+        value = parameters.get(key)
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            return None
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            return None
+        values.append((key, round(numeric, 12)))
+    return tuple(values)
+
+
+def _is_duplicate_proposal(
+    job: models.Job, proposed: dict[str, float]
+) -> bool:
+    fingerprint = _proposal_fingerprint(job, proposed)
+    if fingerprint is None:
+        return True
+    return any(
+        _proposal_fingerprint(job, candidate.parameter_json or {}) == fingerprint
+        for candidate in job.candidates
+    )
+
+
 def _create_baseline_candidate(db: Session, job: models.Job) -> models.CandidateParameterSet:
     """Persist the baseline CandidateParameterSet for a job."""
 
@@ -161,13 +215,12 @@ def _create_llm_candidate(
     trials_per_candidate: int,
     raw_response: dict[str, Any] | None,
 ) -> models.CandidateParameterSet:
-    parameter_json = {**proposal.parameters, "_rationale": proposal.rationale}
     candidate = models.CandidateParameterSet(
         job_id=job.id,
         generation_index=generation_index,
         source_type="llm_optimizer",
         label=proposal.label,
-        parameter_json=parameter_json,
+        parameter_json=_complete_candidate_parameters(job, proposal.parameters),
         is_baseline=False,
         trial_count=trials_per_candidate,
         proposal_reason=proposal.rationale,
@@ -361,7 +414,7 @@ def _create_optimizer_candidate(
         generation_index=proposal.generation_index,
         source_type="optimizer",
         label=proposal.label,
-        parameter_json=dict(proposal.parameters),
+        parameter_json=_complete_candidate_parameters(job, proposal.parameters),
         is_baseline=False,
         trial_count=trial_count,
         proposal_reason=proposal.strategy,
@@ -522,14 +575,21 @@ def _claim_and_initialize_job(db: Session, job: models.Job) -> bool:
             if configured_runs is not None
             else len(constants.OPTIMIZER_SCENARIOS)
         )
+        requested_count = (
+            job.max_iterations
+            if job.parameter_space_json
+            else min(job.max_iterations, constants.OPTIMIZER_CANDIDATE_COUNT)
+        )
         budgeted_count = min(
-            constants.OPTIMIZER_CANDIDATE_COUNT,
+            requested_count,
             max(0, (job.max_total_trials - total_trials) // trials_per_optimizer),
         )
         if job.parameter_space_json:
             proposals = (
                 generate_selected_parameter_candidates(
-                    job.parameter_space_json, count=budgeted_count
+                    job.parameter_space_json,
+                    count=budgeted_count,
+                    candidate_validator=validator_for_job(job),
                 )
                 if budgeted_count > 0
                 else []
@@ -539,7 +599,7 @@ def _claim_and_initialize_job(db: Session, job: models.Job) -> bool:
                 generate_candidates(
                     _baseline_parameters_for_job(job), count=budgeted_count
                 )
-                if budgeted_count >= 2
+                if budgeted_count > 0
                 else []
             )
         record_event(
@@ -549,7 +609,9 @@ def _claim_and_initialize_job(db: Session, job: models.Job) -> bool:
             {
                 "candidate_count": len(proposals),
                 "strategy": "heuristic",
-                "budget_limited": len(proposals) < constants.OPTIMIZER_CANDIDATE_COUNT,
+                "requested_candidate_count": requested_count,
+                "budget_limited": budgeted_count < requested_count,
+                "design_limited": len(proposals) < budgeted_count,
             },
         )
         for proposal in proposals:
@@ -566,6 +628,10 @@ def _claim_and_initialize_job(db: Session, job: models.Job) -> bool:
                 trials_per_candidate=trials_per_optimizer,
             )
         total_trials += len(proposals) * trials_per_optimizer
+        job.current_generation = max(
+            (proposal.generation_index for proposal in proposals), default=0
+        )
+        job.current_phase = "trial_execution"
 
     job.progress_completed_trials = 0
     job.progress_total_trials = total_trials
@@ -614,6 +680,18 @@ def dispatch_next_llm_generation(
         return LlmDispatchResult(status="no_usable_proposal")
 
     proposal = result.proposals[0]
+    if _is_duplicate_proposal(job, proposal.parameters):
+        record_event(
+            db,
+            job.id,
+            "optimizer_candidate_skipped",
+            {
+                "reason": "duplicate_parameters",
+                "strategy": "gpt",
+                "generation_index": generation_index,
+            },
+        )
+        return LlmDispatchResult(status="no_usable_proposal")
     candidate = _create_llm_candidate(
         db,
         job,
@@ -666,6 +744,18 @@ def dispatch_next_cma_es_generation(
         baseline_parameters=_baseline_parameters_for_job(job),
         generation_index=generation_index,
     )
+    if _is_duplicate_proposal(job, proposal.parameters):
+        record_event(
+            db,
+            job.id,
+            "optimizer_candidate_skipped",
+            {
+                "reason": "search_space_exhausted",
+                "strategy": "cma_es",
+                "generation_index": generation_index,
+            },
+        )
+        return AdaptiveDispatchResult(status="search_space_exhausted")
     candidate = _create_optimizer_candidate(
         db,
         job,

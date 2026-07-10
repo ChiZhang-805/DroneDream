@@ -42,10 +42,10 @@
 
 ### 3.1 Enums (locked)
 
-- **Job status**: `CREATED | QUEUED | RUNNING | AGGREGATING | COMPLETED | FAILED | CANCELLED`
+- **Job status**: `CREATED | QUEUED | RUNNING | AGGREGATING | FINALIZING | COMPLETED | FAILED | CANCELLED`
 - **Trial status**: `PENDING | RUNNING | COMPLETED | FAILED | CANCELLED`
 - **Report status**: `PENDING | READY | FAILED`
-- **Track type**: `circle | u_turn | lemniscate`
+- **Track type**: `circle | u_turn | lemniscate | custom`
 - **Sensor noise**: `low | medium | high`
 - **Objective profile**: `stable | fast | smooth | robust | custom`
 - **Scenario type** (trial-level): `nominal | noise_perturbed | wind_perturbed | combined_perturbed`
@@ -394,7 +394,7 @@ These are internal to the worker process and not exposed over HTTP.
 - **Dashboard / History**: refresh on user action (pull-to-refresh / manual
   reload); no background polling.
 - **Job Detail**: polls `GET /api/v1/jobs/{id}` every 4 s while the job is
-  in `QUEUED / RUNNING / AGGREGATING`; stops once the job reaches a terminal
+  in `QUEUED / RUNNING / AGGREGATING / FINALIZING`; stops once the job reaches a terminal
   state.
 - **Trial Detail**: polls while the trial is `PENDING / RUNNING`.
 

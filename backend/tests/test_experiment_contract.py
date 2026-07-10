@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from app.parameters import CATALOG_VERSION
+
 
 def _advanced_job_payload() -> dict[str, object]:
     return {
@@ -14,6 +16,9 @@ def _advanced_job_payload() -> dict[str, object]:
             "airframe": "x500",
             "simulator_model": "gz_x500",
             "world": "windy_test_world",
+            "headless": False,
+            "simulation_speed_factor": 2.5,
+            "instance_id": 7,
         },
         "parameter_catalog_version": "px4-v1.16",
         "parameter_space": [
@@ -85,7 +90,7 @@ def test_advanced_experiment_round_trips_and_reruns(client: TestClient) -> None:
     created_response = client.post("/api/v1/jobs", json=_advanced_job_payload())
     assert created_response.status_code == 200, created_response.text
     created = created_response.json()["data"]
-    assert created["parameter_catalog_version"] == "px4-v1.16"
+    assert created["parameter_catalog_version"] == CATALOG_VERSION
     assert [item["name"] for item in created["parameter_space"]] == [
         "MPC_XY_P",
         "MPC_TILTMAX_AIR",
@@ -93,6 +98,9 @@ def test_advanced_experiment_round_trips_and_reruns(client: TestClient) -> None:
     assert created["objective_config"]["robust_aggregation"] == "cvar"
     assert created["scenario_suite"]["cases"][1]["holdout"] is True
     assert created["vehicle_profile"]["firmware_commit"] == "a1b2c3d4"
+    assert created["vehicle_profile"]["headless"] is False
+    assert created["vehicle_profile"]["simulation_speed_factor"] == 2.5
+    assert created["vehicle_profile"]["instance_id"] == 7
 
     detail = client.get(f"/api/v1/jobs/{created['id']}").json()["data"]
     assert detail["parameter_space"] == created["parameter_space"]
@@ -114,6 +122,7 @@ def test_advanced_experiment_round_trips_and_reruns(client: TestClient) -> None:
     assert rerun["parameter_space"] == created["parameter_space"]
     assert rerun["objective_config"] == created["objective_config"]
     assert rerun["scenario_suite"] == created["scenario_suite"]
+    assert rerun["vehicle_profile"] == created["vehicle_profile"]
 
 
 def test_legacy_job_receives_safe_advanced_defaults(client: TestClient) -> None:
@@ -124,7 +133,7 @@ def test_legacy_job_receives_safe_advanced_defaults(client: TestClient) -> None:
     assert response.status_code == 200, response.text
     job = response.json()["data"]
     assert job["parameter_space"] == []
-    assert job["parameter_catalog_version"] == "builtin-v1"
+    assert job["parameter_catalog_version"] == CATALOG_VERSION
     assert job["vehicle_profile"]["airframe"] == "x500"
     assert [case["scenario_type"] for case in job["scenario_suite"]["cases"]] == [
         "nominal",

@@ -16,6 +16,7 @@ from typing import Any
 from app import models, schemas
 from app.optimization.domain import SearchSpace
 from app.orchestration.optimizer import CandidateProposal
+from app.orchestration.parameter_constraints import validator_for_job
 
 _TUNABLE_KEYS: tuple[str, ...] = (
     "kp_xy",
@@ -26,7 +27,7 @@ _TUNABLE_KEYS: tuple[str, ...] = (
     "disturbance_rejection",
 )
 _EPSILON = 1e-6
-_MAX_RESAMPLE = 10
+_MAX_RESAMPLE = 50
 
 
 def _clamp(key: str, value: float, safe_ranges: dict[str, tuple[float, float]]) -> float:
@@ -185,32 +186,42 @@ def _propose_selected_parameter_generation(
         for item in (job.parameter_space_json or [])
         if item.get("enabled", True)
     ]
-    search_space = SearchSpace.from_schema(selections)
+    search_space = SearchSpace.from_schema(
+        selections,
+        candidate_validator=validator_for_job(job),
+    )
     tunable_keys = tuple(domain.name for domain in search_space.tunable)
     known_keys = {domain.name for domain in search_space.domains}
+    baseline = search_space.baseline()
     center_candidate = _best_scored_center(candidates)
-    center_raw = (
-        (center_candidate.parameter_json or search_space.baseline())
-        if center_candidate is not None
-        else search_space.baseline()
-    )
-    center = search_space.project(
-        {
-            key: float(value)
-            for key, value in center_raw.items()
-            if key in known_keys and isinstance(value, int | float)
-        }
-    )
-    history = [
-        search_space.project(
-            {
-                key: float(value)
-                for key, value in (candidate.parameter_json or {}).items()
-                if key in known_keys and isinstance(value, int | float)
-            }
-        )
-        for candidate in candidates
-    ]
+    center = baseline
+    if center_candidate is not None:
+        try:
+            center = search_space.project(
+                {
+                    key: float(value)
+                    for key, value in (center_candidate.parameter_json or {}).items()
+                    if key in known_keys and isinstance(value, int | float)
+                }
+            )
+        except ValueError:
+            # Old database rows may predate catalog coupling validation. They
+            # remain visible in history but cannot seed a new generation.
+            center_candidate = None
+    valid_history: list[tuple[models.CandidateParameterSet, dict[str, float]]] = []
+    for candidate in candidates:
+        try:
+            projected = search_space.project(
+                {
+                    key: float(value)
+                    for key, value in (candidate.parameter_json or {}).items()
+                    if key in known_keys and isinstance(value, int | float)
+                }
+            )
+        except ValueError:
+            continue
+        valid_history.append((candidate, projected))
+    history = [parameters for _candidate, parameters in valid_history]
     seed_payload = {
         "job_id": job.id,
         "generation_index": generation_index,
@@ -222,7 +233,7 @@ def _propose_selected_parameter_generation(
                 "score": candidate.aggregated_score,
                 "parameters": parameters,
             }
-            for candidate, parameters in zip(candidates, history, strict=True)
+            for candidate, parameters in valid_history
         ],
     }
     digest = hashlib.sha256(
@@ -231,31 +242,29 @@ def _propose_selected_parameter_generation(
     rng = random.Random(int(digest[:16], 16))
     normalized_sigma = 0.15 * (0.85**generation_index)
 
-    candidate_params = search_space.baseline()
-    for attempt in range(_MAX_RESAMPLE + 1):
+    candidate_params = baseline
+    found_unique = False
+    for _attempt in range(_MAX_RESAMPLE + 1):
         unit_values = []
         for domain in search_space.tunable:
             center_unit = domain.to_unit(center[domain.name])
             sampled_unit = rng.normalvariate(center_unit, normalized_sigma)
             unit_values.append(max(0.0, min(1.0, sampled_unit)))
-        candidate_params = search_space.from_unit_vector(unit_values)
-        if not _is_dynamic_duplicate(candidate_params, history, tunable_keys):
+        try:
+            sampled_params = search_space.from_unit_vector(unit_values)
+        except ValueError:
+            continue
+        if not _is_dynamic_duplicate(sampled_params, history, tunable_keys):
+            candidate_params = sampled_params
+            found_unique = True
             break
-        if attempt == _MAX_RESAMPLE and tunable_keys:
-            fallback_units = list(search_space.to_unit_vector(center))
-            index = int(digest[-8:], 16) % len(fallback_units)
-            direction = -1.0 if int(digest[-1], 16) % 2 else 1.0
-            fallback_units[index] = max(
-                0.0,
-                min(1.0, fallback_units[index] + direction * max(0.01, normalized_sigma)),
-            )
-            candidate_params = search_space.from_unit_vector(fallback_units)
 
     center_label = center_candidate.label if center_candidate is not None else "baseline"
     reason = (
         f"Adaptive normalized-space step from center={center_label} "
         f"(generation={generation_index}, sigma={normalized_sigma:.4f}, "
-        f"dimensions={len(tunable_keys)})"
+        f"dimensions={len(tunable_keys)}, "
+        f"fallback_to_center={str(not found_unique).lower()})"
     )
     return CandidateProposal(
         generation_index=generation_index,
