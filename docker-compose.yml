@@ -1,0 +1,142 @@
+name: dronedream
+
+x-backend-environment: &backend-environment
+  APP_ENV: production
+  DATABASE_URL: postgresql+psycopg://dronedream:${POSTGRES_PASSWORD:-local-postgres-password}@postgres:5432/dronedream
+  DATABASE_AUTO_CREATE: "false"
+  REDIS_URL: redis://valkey:6379/0
+  REQUIRE_WORKER_HEARTBEAT: "true"
+  AUTH_MODE: demo_token
+  DEMO_AUTH_TOKENS: ${DEMO_AUTH_TOKENS:-admin@dronedream.local:change-me-local-only}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+  ARTIFACT_STORAGE_BACKEND: s3
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_REGION: us-east-1
+  S3_BUCKET: dronedream
+  S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-dronedream}
+  S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-local-minio-password}
+  S3_PREFIX: artifacts/
+  ARTIFACT_ROOT: /srv/artifacts
+  REAL_SIMULATOR_ARTIFACT_ROOT: /srv/artifacts
+  APP_SECRET_KEY: ${APP_SECRET_KEY:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dronedream
+      POSTGRES_USER: dronedream
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-postgres-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dronedream -d dronedream"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-dronedream}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-minio-password}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set local http://minio:9000
+        "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+        mc mb --ignore-existing local/dronedream &&
+        mc anonymous set none local/dronedream
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-dronedream}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-local-minio-password}
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+      target: api
+    environment:
+      <<: *backend-environment
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+      target: worker
+    environment:
+      <<: *backend-environment
+      WORKER_LOG_LEVEL: ${WORKER_LOG_LEVEL:-info}
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-1}
+      WORKER_LEASE_SECONDS: ${WORKER_LEASE_SECONDS:-900}
+      WORKER_LEASE_HEARTBEAT_SECONDS: ${WORKER_LEASE_HEARTBEAT_SECONDS:-30}
+      SIMULATOR_BACKEND: ${SIMULATOR_BACKEND:-mock}
+      REAL_SIMULATOR_COMMAND: ${REAL_SIMULATOR_COMMAND:-}
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: ""
+        VITE_DEMO_AUTH_TOKEN: ${VITE_DEMO_AUTH_TOKEN:-change-me-local-only}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  valkey-data:
+  minio-data:

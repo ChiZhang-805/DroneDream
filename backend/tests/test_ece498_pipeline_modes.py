@@ -26,13 +26,38 @@ def gpt_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     import app.services.jobs as jobs_service
 
     db_module.init_db()
-    yield {"db_module": db_module, "models": models_module, "schemas": __import__("app.schemas", fromlist=["*"]), "jobs_service": jobs_service, "aggregation": aggregation, "runner": runner}
+    yield {
+        "db_module": db_module,
+        "models": models_module,
+        "schemas": __import__("app.schemas", fromlist=["*"]),
+        "jobs_service": jobs_service,
+        "aggregation": aggregation,
+        "runner": runner,
+    }
     config_module.get_settings.cache_clear()
 
 
-def _create_job(ctx: dict[str, object], *, strategy: str, target_rmse: float | None, max_iterations: int) -> str:
+def _create_job(
+    ctx: dict[str, object],
+    *,
+    strategy: str,
+    target_rmse: float | None,
+    max_iterations: int,
+) -> str:
     schemas = ctx["schemas"]
-    req = schemas.JobCreateRequest(simulator_backend="mock", optimizer_strategy=strategy, max_iterations=max_iterations, trials_per_candidate=2, acceptance_criteria=schemas.AcceptanceCriteria(target_rmse=target_rmse, min_pass_rate=0.5), openai=(schemas.OpenAIConfig(api_key="sk") if strategy == "gpt" else None))
+    req = schemas.JobCreateRequest(
+        simulator_backend="mock",
+        optimizer_strategy=strategy,
+        max_iterations=max_iterations,
+        trials_per_candidate=2,
+        acceptance_criteria=schemas.AcceptanceCriteria(
+            target_rmse=target_rmse,
+            min_pass_rate=0.5,
+        ),
+        openai=(
+            schemas.OpenAIConfig(api_key="sk") if strategy == "gpt" else None
+        ),
+    )
     with ctx["db_module"].SessionLocal() as db:
         return ctx["jobs_service"].create_job(db, req).id
 

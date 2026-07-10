@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -619,31 +620,53 @@ def test_artifacts_includes_trial_scoped_artifacts(client: TestClient) -> None:
     assert "trial" in owner_types and "job" in owner_types
     assert "trajectory_plot" in kinds and "report_summary" in kinds
 
-from pathlib import Path
-
 def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) -> None:
     from app import models
     from app.db import SessionLocal
-    job = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
-    other = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
+
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    other = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     with SessionLocal() as db:
-        j = db.get(models.Job, job['id'])
+        j = db.get(models.Job, job["id"])
         assert j is not None
-        j.status = 'COMPLETED'
+        j.status = "COMPLETED"
         cand = models.CandidateParameterSet(job_id=j.id, parameter_json={})
-        db.add(cand); db.flush()
-        trial = models.Trial(job_id=j.id, candidate_id=cand.id, status='COMPLETED')
-        db.add(trial); db.flush()
-        art_file = tmp_path / 'mock_artifacts' / 'artifact.bin'
+        db.add(cand)
+        db.flush()
+        trial = models.Trial(job_id=j.id, candidate_id=cand.id, status="COMPLETED")
+        db.add(trial)
+        db.flush()
+        art_file = tmp_path / "mock_artifacts" / "artifact.bin"
         art_file.parent.mkdir(parents=True, exist_ok=True)
-        art_file.write_bytes(b'x')
-        db.add(models.Artifact(owner_type='job', owner_id=j.id, artifact_type='log', storage_path=str(art_file)))
-        db.add(models.Artifact(owner_type='trial', owner_id=trial.id, artifact_type='log', storage_path=str(art_file)))
-        db.add(models.Artifact(owner_type='job', owner_id=other['id'], artifact_type='log', storage_path='mock://keep'))
+        art_file.write_bytes(b"x")
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=j.id,
+                artifact_type="log",
+                storage_path=str(art_file),
+            )
+        )
+        db.add(
+            models.Artifact(
+                owner_type="trial",
+                owner_id=trial.id,
+                artifact_type="log",
+                storage_path=str(art_file),
+            )
+        )
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=other["id"],
+                artifact_type="log",
+                storage_path="mock://keep",
+            )
+        )
         db.commit()
     resp = client.delete(f"/api/v1/jobs/{job['id']}")
     assert resp.status_code == 200
-    assert resp.json()['data'] == {'id': job['id'], 'deleted': True}
+    assert resp.json()["data"] == {"id": job["id"], "deleted": True}
     assert client.get(f"/api/v1/jobs/{job['id']}").status_code == 404
     ids = [x['id'] for x in client.get('/api/v1/jobs').json()['data']['items']]
     assert job['id'] not in ids and other['id'] in ids
@@ -687,7 +710,14 @@ def test_delete_job_ignores_missing_artifact_file(client: TestClient, tmp_path: 
         j = db.get(models.Job, job['id'])
         assert j is not None
         j.status = 'COMPLETED'
-        db.add(models.Artifact(owner_type='job', owner_id=j.id, artifact_type='log', storage_path=str(missing_path)))
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=j.id,
+                artifact_type="log",
+                storage_path=str(missing_path),
+            )
+        )
         db.commit()
 
     resp = client.delete(f"/api/v1/jobs/{job['id']}")

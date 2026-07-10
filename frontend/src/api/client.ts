@@ -17,6 +17,8 @@ import type {
   PaginatedBatchJobs,
   JobStatus,
   PaginatedJobs,
+  ParameterCatalogApiResponse,
+  OptimizationHistory,
   Trial,
   TrialSummary,
 } from "../types/api";
@@ -137,6 +139,11 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async getParameterCatalog(px4Version: string): Promise<ParameterCatalogApiResponse> {
+    const qs = buildQuery({ px4_version: px4Version });
+    return request<ParameterCatalogApiResponse>(`/parameter-catalog${qs}`);
+  },
+
   async createJob(req: JobCreateRequest): Promise<Job> {
     return request<Job>("/jobs", {
       method: "POST",
@@ -176,6 +183,12 @@ export const apiClient = {
   async listJobTrials(jobId: string): Promise<TrialSummary[]> {
     return request<TrialSummary[]>(
       `/jobs/${encodeURIComponent(jobId)}/trials`,
+    );
+  },
+
+  async listJobCandidates(jobId: string): Promise<OptimizationHistory> {
+    return request<OptimizationHistory>(
+      `/jobs/${encodeURIComponent(jobId)}/candidates`,
     );
   },
 

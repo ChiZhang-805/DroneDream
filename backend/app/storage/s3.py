@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 from urllib.parse import urlparse
 
 from app.config import get_settings
@@ -28,7 +29,7 @@ class S3ArtifactStorage(ArtifactStorage):
         if self.prefix and not self.prefix.endswith("/"):
             self.prefix = f"{self.prefix}/"
         try:
-            import boto3  # type: ignore
+            import boto3
         except ModuleNotFoundError as exc:
             raise S3StorageConfigError(
                 "boto3 is not installed; install backend[storage] dependencies"
@@ -54,7 +55,7 @@ class S3ArtifactStorage(ArtifactStorage):
     def read_bytes(self, storage_uri: str) -> bytes:
         bucket, key = _parse_s3_uri(storage_uri)
         response = self._client.get_object(Bucket=bucket, Key=key)
-        return response["Body"].read()
+        return cast(bytes, response["Body"].read())
 
     def exists(self, storage_uri: str) -> bool:
         bucket, key = _parse_s3_uri(storage_uri)
@@ -67,6 +68,26 @@ class S3ArtifactStorage(ArtifactStorage):
     def delete(self, storage_uri: str) -> None:
         bucket, key = _parse_s3_uri(storage_uri)
         self._client.delete_object(Bucket=bucket, Key=key)
+
+    def presign_download(
+        self, storage_uri: str, *, expires_seconds: int | None = None
+    ) -> str | None:
+        bucket, key = _parse_s3_uri(storage_uri)
+        if bucket != self.bucket:
+            raise S3StorageConfigError(
+                f"Refusing to presign an object outside configured bucket {self.bucket!r}"
+            )
+        expiry = expires_seconds or get_settings().artifact_presign_expiry_seconds
+        return str(
+            self._client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": bucket, "Key": key},
+                ExpiresIn=expiry,
+            )
+        )
+
+    def check_health(self) -> None:
+        self._client.head_bucket(Bucket=self.bucket)
 
 
 def _parse_s3_uri(uri: str) -> tuple[str, str]:

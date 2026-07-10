@@ -15,19 +15,35 @@ supports:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import json
 import math
 import os
+import re
 import shlex
 import shutil
 import signal
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
+from app.parameters import (
+    ParameterValueValidationError,
+    get_parameter,
+    normalize_px4_version,
+    validate_parameter_values,
+)
+from app.simulator.px4_parameters import (
+    APPLIED_EVIDENCE_NAME,
+    BEFORE_EVIDENCE_NAME,
+    REQUESTED_EVIDENCE_NAME,
+    write_simulated_parameter_evidence,
+)
 
 FAILURE_ADAPTER_UNAVAILABLE = "ADAPTER_UNAVAILABLE"
 FAILURE_TIMEOUT = "TIMEOUT"
@@ -47,6 +63,7 @@ _TEMPLATE_TOKENS = (
     "trial_input",
     "trial_output",
     "params_json",
+    "px4_params_json",
     "track_json",
     "telemetry_json",
     "trajectory_json",
@@ -58,7 +75,10 @@ _TEMPLATE_TOKENS = (
     "seed",
     "scenario_type",
     "vehicle",
+    "airframe",
+    "simulator_model",
     "world",
+    "px4_version",
     "headless",
     "extra_args",
 )
@@ -84,6 +104,8 @@ class RunnerEnv:
     eval_near_track_threshold_m: float
     eval_consecutive_samples: int
     eval_collapse_altitude_fraction: float
+    px4_version: str
+    enforce_safe_parameter_bounds: bool
 
 
 @dataclass(frozen=True)
@@ -105,6 +127,20 @@ class RunnerError(Exception):
 
 class TimeoutRunnerError(RunnerError):
     """Raised when lower-level simulator exceeds timeout."""
+
+
+_SAFE_PROFILE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+
+
+def _profile_token(name: str, value: Any, *, default: str) -> str:
+    """Normalize a profile value before it is exposed as a launcher token."""
+
+    normalized = str(value or default).strip()
+    if not _SAFE_PROFILE_TOKEN.fullmatch(normalized):
+        raise RunnerError(
+            f"vehicle_profile.{name} must contain only letters, numbers, '.', '_' or '-'"
+        )
+    return normalized
 
 
 def _parse_bool(raw: str | None, *, default: bool) -> bool:
@@ -155,6 +191,10 @@ def _load_env() -> RunnerEnv:
         eval_collapse_altitude_fraction=_parse_float(
             os.environ.get("PX4_GAZEBO_EVAL_COLLAPSE_ALTITUDE_FRACTION"), default=0.5
         ),
+        px4_version=os.environ.get("PX4_VERSION", "main").strip() or "main",
+        enforce_safe_parameter_bounds=_parse_bool(
+            os.environ.get("PX4_ENFORCE_SAFE_PARAMETER_BOUNDS"), default=True
+        ),
     )
 
 
@@ -176,7 +216,14 @@ def _safe_excerpt(text: str, *, limit: int = 1800) -> str:
     return text[:limit] + f"\n... [truncated from {len(text)} chars]"
 
 
-def _validate_trial_input(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, float], dict[str, Any]]:
+def _validate_trial_input(
+    payload: dict[str, Any],
+    *,
+    default_px4_version: str = "main",
+    default_vehicle: str = "x500",
+    default_world: str = "default",
+    enforce_safe_parameter_bounds: bool = True,
+) -> tuple[dict[str, Any], dict[str, float], dict[str, int | float], dict[str, Any]]:
     required_ids = ("trial_id", "job_id", "candidate_id", "seed", "scenario_type")
     missing = [key for key in required_ids if key not in payload]
     if missing:
@@ -267,6 +314,64 @@ def _validate_trial_input(payload: dict[str, Any]) -> tuple[dict[str, Any], dict
         if not math.isfinite(params[key]):
             raise RunnerError(f"parameters.{key} must be finite")
 
+    profile_raw = payload.get("vehicle_profile")
+    if not isinstance(profile_raw, dict):
+        nested_profile = job_cfg_raw.get("vehicle_profile")
+        profile_raw = nested_profile if isinstance(nested_profile, dict) else {}
+    airframe = _profile_token(
+        "airframe", profile_raw.get("airframe"), default=default_vehicle
+    )
+    simulator_model = _profile_token(
+        "simulator_model",
+        profile_raw.get("simulator_model"),
+        default=default_vehicle,
+    )
+    world = _profile_token("world", profile_raw.get("world"), default=default_world)
+    vehicle_type = _profile_token(
+        "vehicle_type", profile_raw.get("vehicle_type"), default="multicopter"
+    )
+
+    raw_px4_version = str(
+        payload.get("px4_version")
+        or profile_raw.get("px4_version")
+        or job_cfg_raw.get("px4_version")
+        or default_px4_version
+    )
+    try:
+        px4_version = normalize_px4_version(raw_px4_version)
+    except ValueError as exc:
+        raise RunnerError(f"vehicle_profile.px4_version is invalid: {exc}") from exc
+    explicit_px4_params = payload.get("px4_parameters")
+    if explicit_px4_params is None:
+        explicit_px4_params = job_cfg_raw.get("px4_parameters")
+    if explicit_px4_params is None:
+        # Forward-compatible bridge for candidates that place real PX4 names in
+        # the existing parameters object while the legacy six fields still exist.
+        explicit_px4_params = {
+            str(key): value
+            for key, value in params_raw.items()
+            if str(key).startswith(("MC_", "MPC_"))
+        }
+    if not isinstance(explicit_px4_params, dict):
+        raise RunnerError("px4_parameters must be an object when provided")
+    try:
+        px4_params = validate_parameter_values(
+            explicit_px4_params,
+            px4_version=px4_version,
+            enforce_safe_bounds=enforce_safe_parameter_bounds,
+        )
+    except (ParameterValueValidationError, ValueError) as exc:
+        raise RunnerError(f"invalid px4_parameters: {exc}") from exc
+
+    normalized_job_cfg["vehicle_profile"] = {
+        "px4_version": px4_version,
+        "firmware_commit": profile_raw.get("firmware_commit"),
+        "vehicle_type": vehicle_type,
+        "airframe": airframe,
+        "simulator_model": simulator_model,
+        "world": world,
+    }
+
     scenario_config = payload.get("scenario_config") if isinstance(payload.get("scenario_config"), dict) else {}
     advanced = payload.get("advanced_scenario_config")
     if not isinstance(advanced, dict):
@@ -280,8 +385,15 @@ def _validate_trial_input(payload: dict[str, Any]) -> tuple[dict[str, Any], dict
         "scenario_type": str(payload["scenario_type"]),
         "scenario_config": scenario_config,
         "advanced_scenario_config": advanced,
+        "px4_version": px4_version,
+        "airframe": airframe,
+        "simulator_model": simulator_model,
+        # ``vehicle`` is the backwards-compatible launcher alias. PX4/Gazebo
+        # launchers historically interpreted it as the simulator model.
+        "vehicle": simulator_model,
+        "world": world,
     }
-    return normalized_job_cfg, params, meta
+    return normalized_job_cfg, params, px4_params, meta
 
 
 def _make_reference_track(
@@ -393,8 +505,11 @@ def _make_dry_run_telemetry(
         "samples": samples,
         "meta": {
             "simulator": "px4_gazebo",
-            "vehicle": env.vehicle,
-            "world": env.world,
+            "vehicle": meta["vehicle"],
+            "airframe": meta["airframe"],
+            "simulator_model": meta["simulator_model"],
+            "world": meta["world"],
+            "px4_version": meta["px4_version"],
             "mode": "dry_run",
             "seed": meta["seed"],
         },
@@ -957,8 +1072,11 @@ def _compute_metrics(
             },
             "crash_reason": crash_reason,
             "mode": "dry_run" if dry_run else "real",
-            "vehicle": env.vehicle,
-            "world": env.world,
+            "vehicle": job_cfg["vehicle_profile"]["simulator_model"],
+            "airframe": job_cfg["vehicle_profile"]["airframe"],
+            "simulator_model": job_cfg["vehicle_profile"]["simulator_model"],
+            "world": job_cfg["vehicle_profile"]["world"],
+            "px4_version": job_cfg["vehicle_profile"]["px4_version"],
             "advanced_scenario_summary": {
                 "enabled": bool(advanced),
                 "obstacle_count": obstacle_count,
@@ -991,7 +1109,7 @@ def _artifact_record(path: Path, artifact_type: str, display_name: str, mime_typ
 
 
 def _command_is_executable(command: str) -> bool:
-    argv = shlex.split(command)
+    argv = _split_command(command)
     if not argv:
         return False
     first = argv[0]
@@ -1000,15 +1118,29 @@ def _command_is_executable(command: str) -> bool:
     return shutil.which(first) is not None
 
 
+def _split_command(command: str) -> list[str]:
+    """Split a configured command without eating Windows path separators."""
+
+    argv = shlex.split(command, posix=os.name != "nt")
+    if os.name == "nt":
+        return [
+            item[1:-1]
+            if len(item) >= 2 and item[0] == item[-1] and item[0] in {'"', "'"}
+            else item
+            for item in argv
+        ]
+    return argv
+
+
 def _build_launch_argv(command_template: str, values: dict[str, str]) -> list[str]:
     has_token = any("{" + token + "}" in command_template for token in _TEMPLATE_TOKENS)
     if has_token:
         rendered = command_template
         for token, value in values.items():
             rendered = rendered.replace("{" + token + "}", value)
-        return shlex.split(rendered)
+        return _split_command(rendered)
 
-    argv = shlex.split(command_template)
+    argv = _split_command(command_template)
     argv.extend(
         [
             "--input",
@@ -1033,6 +1165,7 @@ def _run_lower_level_launcher(
     cwd: Path,
     stdout_log: Path,
     stderr_log: Path,
+    launch_env: dict[str, str] | None = None,
 ) -> int:
     with stdout_log.open("w", encoding="utf-8") as out, stderr_log.open("w", encoding="utf-8") as err:
         proc = subprocess.Popen(  # noqa: S603
@@ -1042,20 +1175,28 @@ def _run_lower_level_launcher(
             stderr=err,
             text=True,
             start_new_session=True,
+            env=launch_env,
         )
         try:
             return proc.wait(timeout=env.timeout_seconds)
         except subprocess.TimeoutExpired as exc:
-            try:
-                os.killpg(proc.pid, signal.SIGTERM)
-            except OSError:
-                pass
+            _terminate_subprocess_tree(proc, force=False)
             time.sleep(0.2)
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except OSError:
-                pass
+            _terminate_subprocess_tree(proc, force=True)
             raise TimeoutRunnerError(f"lower-level launcher timed out after {env.timeout_seconds}s") from exc
+
+
+def _terminate_subprocess_tree(proc: subprocess.Popen[str], *, force: bool) -> None:
+    """Terminate a launcher safely on both POSIX and native Windows."""
+
+    if proc.poll() is not None:
+        return
+    if os.name == "nt":
+        with contextlib.suppress(OSError):
+            proc.kill() if force else proc.terminate()
+        return
+    with contextlib.suppress(OSError):
+        os.killpg(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
 
 
 def _failure_result(reason: str, code: str, artifacts: list[dict[str, Any]], log_excerpt: str) -> dict[str, Any]:
@@ -1116,8 +1257,86 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "Gazebo Track Marker stderr",
             "text/plain",
         ),
+        _artifact_record(
+            run_dir / REQUESTED_EVIDENCE_NAME,
+            "px4_parameter_evidence_json",
+            "PX4 Parameters Requested",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / BEFORE_EVIDENCE_NAME,
+            "px4_parameter_evidence_json",
+            "PX4 Parameters Before",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / APPLIED_EVIDENCE_NAME,
+            "px4_parameter_evidence_json",
+            "PX4 Parameters Applied",
+            "application/json",
+        ),
     ]
     return [r for r in records if r]
+
+
+def _require_verified_px4_parameter_evidence(
+    run_dir: Path,
+    requested: dict[str, int | float],
+    *,
+    expected_px4_version: str,
+) -> None:
+    """Reject a trial before metrics if its requested parameters lack proof."""
+
+    if not requested:
+        return
+    evidence: dict[str, dict[str, Any]] = {}
+    for filename in (REQUESTED_EVIDENCE_NAME, BEFORE_EVIDENCE_NAME, APPLIED_EVIDENCE_NAME):
+        path = run_dir / filename
+        if not path.is_file():
+            raise RunnerError(f"PX4 parameter evidence missing: {filename}")
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise RunnerError(f"PX4 parameter evidence must be an object: {filename}")
+        try:
+            evidence_version = normalize_px4_version(str(payload.get("px4_version")))
+        except ValueError as exc:
+            raise RunnerError(f"PX4 parameter evidence has invalid version: {filename}") from exc
+        if evidence_version != expected_px4_version:
+            raise RunnerError(f"PX4 parameter evidence version mismatch: {filename}")
+        evidence[filename] = payload
+
+    requested_values = evidence[REQUESTED_EVIDENCE_NAME].get("values")
+    if not isinstance(requested_values, dict) or requested_values != requested:
+        raise RunnerError("PX4 requested-parameter evidence does not match the trial request")
+    applied_values = evidence[APPLIED_EVIDENCE_NAME].get("values")
+    verification = evidence[APPLIED_EVIDENCE_NAME].get("verification")
+    if not isinstance(applied_values, dict) or not isinstance(verification, dict):
+        raise RunnerError("PX4 applied-parameter evidence is malformed")
+    if verification.get("verified") is not True:
+        raise RunnerError("PX4 parameter readback was not verified")
+    if set(applied_values) != set(requested):
+        raise RunnerError("PX4 applied-parameter evidence has missing or unexpected names")
+    for name, expected in requested.items():
+        actual = applied_values.get(name)
+        if isinstance(actual, bool) or not isinstance(actual, (int, float)):
+            raise RunnerError(f"PX4 applied-parameter evidence has invalid value for {name}")
+        definition = get_parameter(name, px4_version=expected_px4_version)
+        if definition is None:
+            raise RunnerError(f"PX4 applied-parameter evidence contains unknown parameter: {name}")
+        tolerance = (
+            0.0
+            if definition.value_type == "int"
+            else max(float(definition.step) / 10.0, 1e-6)
+        )
+        if not math.isfinite(float(actual)) or not math.isclose(
+            float(actual),
+            float(expected),
+            rel_tol=0.0,
+            abs_tol=tolerance,
+        ):
+            raise RunnerError(
+                f"PX4 applied-parameter evidence does not match request for {name}"
+            )
 
 
 def run_once(input_path: Path, output_path: Path) -> int:
@@ -1131,6 +1350,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
     telemetry_json = run_dir / "telemetry.json"
     trajectory_json = run_dir / "trajectory.json"
     params_json = run_dir / "controller_params.json"
+    px4_params_json = run_dir / "px4_parameters.input.json"
     track_json = run_dir / "reference_track.json"
 
     def log(msg: str) -> None:
@@ -1142,7 +1362,13 @@ def run_once(input_path: Path, output_path: Path) -> int:
         if not isinstance(payload, dict):
             raise RunnerError("trial_input must be a JSON object")
 
-        job_cfg, params, meta = _validate_trial_input(payload)
+        job_cfg, params, px4_params, meta = _validate_trial_input(
+            payload,
+            default_px4_version=env.px4_version,
+            default_vehicle=env.vehicle,
+            default_world=env.world,
+            enforce_safe_parameter_bounds=env.enforce_safe_parameter_bounds,
+        )
 
         reference_track = _make_reference_track(
             job_cfg["track_type"],
@@ -1161,9 +1387,22 @@ def run_once(input_path: Path, output_path: Path) -> int:
             },
         )
         _json_dump(params_json, params)
+        _json_dump(px4_params_json, px4_params)
 
         timeout_flag = False
         if env.dry_run:
+            if px4_params:
+                write_simulated_parameter_evidence(
+                    px4_params,
+                    run_dir,
+                    px4_version=str(meta["px4_version"]),
+                    context={
+                        "trial_id": meta["trial_id"],
+                        "job_id": meta["job_id"],
+                        "candidate_id": meta["candidate_id"],
+                    },
+                    enforce_safe_bounds=env.enforce_safe_parameter_bounds,
+                )
             telemetry = _make_dry_run_telemetry(reference_track, params, job_cfg, meta, env)
             _json_dump(telemetry_json, telemetry)
             stdout_log.write_text("dry-run mode: no external launcher executed\n", encoding="utf-8")
@@ -1194,6 +1433,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 "trial_input": str(input_path),
                 "trial_output": str(output_path),
                 "params_json": str(params_json),
+                "px4_params_json": str(px4_params_json),
                 "track_json": str(track_json),
                 "telemetry_json": str(telemetry_json),
                 "trajectory_json": str(trajectory_json),
@@ -1204,24 +1444,53 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 "candidate_id": meta["candidate_id"],
                 "seed": str(meta["seed"]),
                 "scenario_type": meta["scenario_type"],
-                "vehicle": env.vehicle,
-                "world": env.world,
+                "vehicle": meta["vehicle"],
+                "airframe": meta["airframe"],
+                "simulator_model": meta["simulator_model"],
+                "world": meta["world"],
+                "px4_version": meta["px4_version"],
                 "headless": "true" if env.headless else "false",
                 "extra_args": env.extra_args,
             }
             _json_dump(
                 run_dir / "launch_config.json",
                 {
-                    "vehicle": env.vehicle,
-                    "world": env.world,
+                    "vehicle": meta["vehicle"],
+                    "airframe": meta["airframe"],
+                    "simulator_model": meta["simulator_model"],
+                    "world": meta["world"],
                     "headless": env.headless,
                     "extra_args": env.extra_args,
                     "scenario_type": meta["scenario_type"],
                     "advanced_scenario_config": meta.get("advanced_scenario_config", {}),
+                    "px4_version": meta["px4_version"],
+                    "px4_parameter_names": sorted(px4_params),
                 },
             )
             argv = _build_launch_argv(env.launch_command, values)
             cwd = Path(env.workdir) if env.workdir else run_dir
+            launch_env = os.environ.copy()
+            launch_env.update(
+                {
+                    "PX4_TRIAL_AIRFRAME": str(meta["airframe"]),
+                    "PX4_TRIAL_SIMULATOR_MODEL": str(meta["simulator_model"]),
+                    "PX4_TRIAL_WORLD": str(meta["world"]),
+                    "PX4_TRIAL_PX4_VERSION": str(meta["px4_version"]),
+                }
+            )
+            if px4_params:
+                launch_env["PX4_PARAMETER_REQUEST_PATH"] = str(px4_params_json)
+                launch_env["PX4_PARAMETER_PX4_VERSION"] = str(meta["px4_version"])
+                launch_env["PX4_PARAMETER_CONTEXT_JSON"] = json.dumps(
+                    {
+                        "trial_id": meta["trial_id"],
+                        "job_id": meta["job_id"],
+                        "candidate_id": meta["candidate_id"],
+                    }
+                )
+                launch_env["PX4_PARAMETER_ENFORCE_SAFE_BOUNDS"] = (
+                    "true" if env.enforce_safe_parameter_bounds else "false"
+                )
             log(f"launch argv: {argv}")
             log(f"launch cwd: {cwd}")
             try:
@@ -1231,6 +1500,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     cwd=cwd,
                     stdout_log=stdout_log,
                     stderr_log=stderr_log,
+                    launch_env=launch_env,
                 )
             except TimeoutRunnerError as exc:
                 timeout_flag = True
@@ -1243,6 +1513,21 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 _json_dump(output_path, result)
                 return 0
             log(f"launcher exit code: {exit_code}")
+            if exit_code != 0:
+                result = _failure_result(
+                    f"lower-level launcher exited with code {exit_code}",
+                    FAILURE_SIMULATION,
+                    _collect_artifacts(run_dir),
+                    f"lower-level launcher exited with code {exit_code}",
+                )
+                _json_dump(output_path, result)
+                return 0
+
+        _require_verified_px4_parameter_evidence(
+            run_dir,
+            px4_params,
+            expected_px4_version=str(meta["px4_version"]),
+        )
 
         telemetry = _load_telemetry(telemetry_json, allow_csv=env.allow_csv_telemetry)
         telemetry.setdefault("schema_version", "dronedream.telemetry.v1")

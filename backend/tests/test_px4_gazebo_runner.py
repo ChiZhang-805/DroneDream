@@ -15,7 +15,9 @@ from app.simulator.real_cli import RealCliSimulatorAdapter
 RUNNER = Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "px4_gazebo_runner.py"
 
 
-def _trial_input(tmp_path: Path) -> Path:
+def _trial_input(
+    tmp_path: Path, *, vehicle_profile: dict[str, str] | None = None
+) -> Path:
     tmp_path.mkdir(parents=True, exist_ok=True)
     payload = {
         "trial_id": "trial-1",
@@ -42,15 +44,21 @@ def _trial_input(tmp_path: Path) -> Path:
         },
         "output_path": str(tmp_path / "trial_result.json"),
     }
+    if vehicle_profile is not None:
+        payload["vehicle_profile"] = vehicle_profile
+        payload["job_config"]["vehicle_profile"] = vehicle_profile
     p = tmp_path / "trial_input.json"
     p.write_text(json.dumps(payload), encoding="utf-8")
     return p
 
 
 def _run_runner(
-    tmp_path: Path, *, env_overrides: dict[str, str]
+    tmp_path: Path,
+    *,
+    env_overrides: dict[str, str],
+    vehicle_profile: dict[str, str] | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
-    input_path = _trial_input(tmp_path)
+    input_path = _trial_input(tmp_path, vehicle_profile=vehicle_profile)
     output_path = tmp_path / "trial_result.json"
     env = os.environ.copy()
     env.update(env_overrides)
@@ -189,8 +197,7 @@ def test_px4_runner_dry_run_is_deterministic(tmp_path: Path):
 def test_px4_runner_timeout_maps_to_timeout(tmp_path: Path):
     sleeper = tmp_path / "sleeper.py"
     sleeper.write_text(
-        "import time\n"
-        "time.sleep(5)\n",
+        "import time\ntime.sleep(5)\n",
         encoding="utf-8",
     )
     command = f"{sys.executable} {sleeper} --input {{trial_input}} --telemetry {{telemetry_json}}"
@@ -242,6 +249,65 @@ def test_px4_runner_writes_expected_artifacts_in_dry_run(tmp_path: Path):
         assert (tmp_path / name).exists(), name
 
 
+def test_px4_runner_extracts_real_candidate_parameters_and_writes_evidence(
+    tmp_path: Path,
+):
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["parameters"]["MPC_XY_P"] = 1.1
+    payload["parameters"]["MC_ROLLRATE_P"] = 0.16
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env["PX4_GAZEBO_DRY_RUN"] = "true"
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is True
+    requested = json.loads((tmp_path / "px4_parameters.requested.json").read_text(encoding="utf-8"))
+    applied = json.loads((tmp_path / "px4_parameters.applied.json").read_text(encoding="utf-8"))
+    assert requested["values"] == {"MC_ROLLRATE_P": 0.16, "MPC_XY_P": 1.1}
+    assert applied["verification"]["verified"] is True
+    artifact_names = {Path(item["storage_path"]).name for item in result["artifacts"]}
+    assert {
+        "px4_parameters.requested.json",
+        "px4_parameters.before.json",
+        "px4_parameters.applied.json",
+    }.issubset(artifact_names)
+
+
+def test_px4_runner_rejects_real_parameter_outside_safe_bounds(tmp_path: Path):
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["parameters"]["MPC_XY_VEL_I_ACC"] = 5.0
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env["PX4_GAZEBO_DRY_RUN"] = "true"
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is False
+    assert result["failure"]["code"] == "SIMULATION_FAILED"
+    assert "OUTSIDE_SAFE_BOUNDS" in result["failure"]["reason"]
+
+
 def test_px4_runner_prefers_trial_input_reference_track_even_when_track_type_not_custom(
     tmp_path: Path,
 ):
@@ -280,7 +346,7 @@ def test_px4_runner_template_substitutes_env_tokens(tmp_path: Path):
     launcher.write_text(
         "import json, pathlib, sys\n"
         "pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1]).write_text("
-        "'{\"samples\": [{\"t\": 0.0, \"x\": 0.0, \"y\": 0.0, \"z\": 3.0}]}'"
+        '\'{"samples": [{"t": 0.0, "x": 0.0, "y": 0.0, "z": 3.0}]}\''
         ", encoding='utf-8')\n"
         f"pathlib.Path({str(args_dump)!r}).write_text(json.dumps(sys.argv), encoding='utf-8')\n",
         encoding="utf-8",
@@ -312,6 +378,151 @@ def test_px4_runner_template_substitutes_env_tokens(tmp_path: Path):
     assert argv[extra_idx + 1 : extra_idx + 5] == ["--speed", "2", "--foo", "bar"]
 
 
+def test_px4_runner_uses_per_job_vehicle_profile_instead_of_worker_defaults(
+    tmp_path: Path,
+):
+    launcher = tmp_path / "profile_launcher.py"
+    args_dump = tmp_path / "profile_argv.json"
+    launcher.write_text(
+        "import json, pathlib, sys\n"
+        "pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1]).write_text("
+        "'{\"samples\": [{\"t\": 0.0, \"x\": 0.0, \"y\": 0.0, \"z\": 3.0}]}',"
+        " encoding='utf-8')\n"
+        f"pathlib.Path({str(args_dump)!r}).write_text(json.dumps(sys.argv), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    command = (
+        f"{sys.executable} {launcher} --vehicle {{vehicle}} --airframe {{airframe}} "
+        "--model {simulator_model} --world {world} --version {px4_version} "
+        "--telemetry {telemetry_json}"
+    )
+    profile = {
+        "px4_version": "v1.16",
+        "vehicle_type": "multicopter",
+        "airframe": "quad_x",
+        "simulator_model": "gz_x500_depth",
+        "world": "warehouse",
+    }
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": command,
+            "PX4_GAZEBO_VEHICLE": "worker_default",
+            "PX4_GAZEBO_WORLD": "worker_default",
+        },
+        vehicle_profile=profile,
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    argv = json.loads(args_dump.read_text(encoding="utf-8"))
+    assert argv[argv.index("--vehicle") + 1] == "gz_x500_depth"
+    assert argv[argv.index("--airframe") + 1] == "quad_x"
+    assert argv[argv.index("--model") + 1] == "gz_x500_depth"
+    assert argv[argv.index("--world") + 1] == "warehouse"
+    assert argv[argv.index("--version") + 1] == "v1.16"
+    launch_config = json.loads((tmp_path / "launch_config.json").read_text(encoding="utf-8"))
+    assert launch_config["simulator_model"] == "gz_x500_depth"
+    assert launch_config["airframe"] == "quad_x"
+
+
+def test_px4_runner_rejects_unsafe_vehicle_profile_tokens(tmp_path: Path):
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={"PX4_GAZEBO_DRY_RUN": "true"},
+        vehicle_profile={
+            "px4_version": "v1.16",
+            "airframe": "x500; touch owned",
+            "simulator_model": "gz_x500",
+            "world": "default",
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert "vehicle_profile.airframe" in str(result["failure"]["reason"])
+
+
+def test_px4_runner_rejects_unsupported_or_malformed_px4_version(tmp_path: Path):
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={"PX4_GAZEBO_DRY_RUN": "true"},
+        vehicle_profile={
+            "px4_version": "v1.16 --unexpected",
+            "airframe": "x500",
+            "simulator_model": "gz_x500",
+            "world": "default",
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert "vehicle_profile.px4_version" in str(result["failure"]["reason"])
+
+
+def test_px4_runner_independently_rejects_false_readback_evidence(tmp_path: Path):
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["parameters"]["MPC_XY_P"] = 1.1
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+    launcher = tmp_path / "false_evidence_launcher.py"
+    launcher.write_text(
+        "import json, pathlib, sys\n"
+        "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
+        "run_dir = telemetry.parent\n"
+        "telemetry.write_text(json.dumps({'samples': [{"
+        "'t': 0.0, 'x': 0.0, 'y': 0.0, 'z': 3.0}]}), encoding='utf-8')\n"
+        "(run_dir / 'px4_parameters.requested.json').write_text(json.dumps({"
+        "'px4_version': 'main', 'values': {'MPC_XY_P': 1.1}}), encoding='utf-8')\n"
+        "(run_dir / 'px4_parameters.before.json').write_text(json.dumps({"
+        "'px4_version': 'main', 'values': {'MPC_XY_P': 0.95}}), encoding='utf-8')\n"
+        "(run_dir / 'px4_parameters.applied.json').write_text(json.dumps({"
+        "'px4_version': 'main', 'values': {'MPC_XY_P': 0.7}, "
+        "'verification': {'verified': True, 'mismatches': {}}}), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env["PX4_GAZEBO_DRY_RUN"] = "false"
+    env["PX4_GAZEBO_LAUNCH_COMMAND"] = (
+        f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+    )
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert proc.returncode == 0
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is False
+    assert "does not match request for MPC_XY_P" in result["failure"]["reason"]
+
+
+def test_px4_runner_treats_nonzero_launcher_exit_as_failure(tmp_path: Path):
+    launcher = tmp_path / "nonzero_launcher.py"
+    launcher.write_text(
+        "import json, pathlib, sys\n"
+        "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
+        "telemetry.write_text(json.dumps({'samples': [{"
+        "'t': 0.0, 'x': 0.0, 'y': 0.0, 'z': 3.0}]}), encoding='utf-8')\n"
+        "raise SystemExit(7)\n",
+        encoding="utf-8",
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert result["failure"]["code"] == "SIMULATION_FAILED"
+    assert "exited with code 7" in result["failure"]["reason"]
+
+
 def test_px4_runner_trajectory_artifact_type_is_json(tmp_path: Path):
     proc, result = _run_runner(tmp_path, env_overrides={"PX4_GAZEBO_DRY_RUN": "true"})
     assert proc.returncode == 0
@@ -331,7 +542,7 @@ def test_px4_runner_collects_track_marker_logs_when_present(tmp_path: Path):
         "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
         "run_dir = telemetry.parent\n"
         "telemetry.write_text("
-        "'{\"samples\": [{\"t\": 0.0, \"x\": 0.0, \"y\": 0.0, \"z\": 3.0}]}'"
+        '\'{"samples": [{"t": 0.0, "x": 0.0, "y": 0.0, "z": 3.0}]}\''
         ", encoding='utf-8')\n"
         "(run_dir / 'track_marker_stdout.log').write_text('marker ok\\n', encoding='utf-8')\n"
         "(run_dir / 'track_marker_stderr.log').write_text('', encoding='utf-8')\n",
@@ -574,7 +785,7 @@ def _ctx() -> TrialContext:
 def test_real_cli_integration_with_px4_runner_dry_run(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
-    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f"{sys.executable} {RUNNER}")
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{RUNNER}"')
     monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
     monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "true")
     adapter = RealCliSimulatorAdapter()

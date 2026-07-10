@@ -1,0 +1,25 @@
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /srv
+
+COPY backend /srv/backend
+COPY worker /srv/worker
+COPY scripts /srv/scripts
+
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir "/srv/backend[production,storage]" \
+    && python -m pip install --no-cache-dir /srv/worker \
+    && mkdir -p /srv/artifacts
+
+FROM runtime AS api
+WORKDIR /srv/backend
+EXPOSE 8000
+CMD ["sh", "-c", "alembic -c alembic.ini upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
+FROM runtime AS worker
+WORKDIR /srv
+CMD ["drone-dream-worker"]

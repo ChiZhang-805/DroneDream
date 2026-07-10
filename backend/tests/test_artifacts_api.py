@@ -57,7 +57,7 @@ def test_download_repro_manifest_artifact_success(client: TestClient, tmp_path: 
     root = tmp_path / "real_artifacts"
     path = root / "jobs" / job_id / "job_artifacts" / "repro_manifest.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text('{"ok":true}\n', encoding="utf-8")
+    path.write_bytes(b'{"ok":true}\n')
 
     with db.SessionLocal() as session:
         artifact = models.Artifact(

@@ -62,13 +62,25 @@ def _truncate(text: str, limit: int = 4000) -> str:
     return text[:limit] + f"\n... [truncated, original length {len(text)}]"
 
 
+def _split_command(command: str) -> list[str]:
+    tokens = shlex.split(command, posix=os.name != "nt")
+    if os.name != "nt":
+        return tokens
+    return [
+        token[1:-1]
+        if len(token) >= 2 and token[0] == token[-1] and token[0] in {'"', "'"}
+        else token
+        for token in tokens
+    ]
+
+
 def _build_command(
     command_template: str, input_path: Path, output_path: Path
 ) -> list[str]:
     if "{input}" in command_template or "{output}" in command_template:
         formatted = command_template.format(input=str(input_path), output=str(output_path))
-        return shlex.split(formatted)
-    tokens = shlex.split(command_template)
+        return _split_command(formatted)
+    tokens = _split_command(command_template)
     tokens.extend(["--input", str(input_path), "--output", str(output_path)])
     return tokens
 
@@ -91,6 +103,13 @@ def _trial_input_payload(ctx: TrialContext, output_path: Path) -> dict[str, Any]
         "south": jc.wind_south,
         "west": jc.wind_west,
     }
+    vehicle_profile = dict(jc.vehicle_profile or {})
+    px4_version = str(vehicle_profile.get("px4_version") or "main")
+    px4_parameters = {
+        str(name): value
+        for name, value in ctx.parameters.items()
+        if str(name).startswith(("MC_", "MPC_"))
+    }
     job_config = {
         "track_type": jc.track_type,
         "start_point": start_point,
@@ -99,6 +118,9 @@ def _trial_input_payload(ctx: TrialContext, output_path: Path) -> dict[str, Any]
         "wind": wind,
         "sensor_noise_level": jc.sensor_noise_level,
         "objective_profile": jc.objective_profile,
+        "vehicle_profile": vehicle_profile,
+        "px4_version": px4_version,
+        "px4_parameters": px4_parameters,
     }
     scenario_config = dict(ctx.scenario_config or {})
     advanced = scenario_config.get("advanced_scenario_config")
@@ -122,6 +144,9 @@ def _trial_input_payload(ctx: TrialContext, output_path: Path) -> dict[str, Any]
         "wind": wind,
         "sensor_noise_level": jc.sensor_noise_level,
         "objective_profile": jc.objective_profile,
+        "vehicle_profile": vehicle_profile,
+        "px4_version": px4_version,
+        "px4_parameters": px4_parameters,
         "parameters": dict(ctx.parameters),
         "output_path": str(output_path),
     }

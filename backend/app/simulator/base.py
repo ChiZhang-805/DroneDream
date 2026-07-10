@@ -50,6 +50,7 @@ class JobConfig:
     sensor_noise_level: str
     objective_profile: str
     reference_track: list[dict[str, float]] | None = None
+    vehicle_profile: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

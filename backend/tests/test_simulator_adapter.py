@@ -8,6 +8,7 @@ adapter rather than hardcoding simulator logic.
 from __future__ import annotations
 
 import importlib
+import sys
 from collections.abc import Iterator
 
 import pytest
@@ -298,13 +299,16 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
+    models_was_loaded = "app.models" in sys.modules
+
     import app.db as db_module
 
     importlib.reload(db_module)
 
-    import app.models as models_module
-
-    importlib.reload(models_module)
+    if models_was_loaded:
+        models_module = importlib.reload(sys.modules["app.models"])
+    else:
+        models_module = importlib.import_module("app.models")
 
     import app.services.jobs as jobs_service_module
 

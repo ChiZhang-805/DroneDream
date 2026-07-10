@@ -21,15 +21,16 @@ from typing import Any, Protocol
 
 from sqlalchemy.orm import Session
 
-from app import models
+from app import models, schemas
 from app import secrets as job_secrets
+from app.optimization.domain import ParameterDomain, SearchSpace
 from app.orchestration import constants
 from app.orchestration.acceptance import AcceptanceCriteria
 from app.orchestration.events import record_event
 
 logger = logging.getLogger("drone_dream.orchestration.llm")
 
-_PARAMETER_KEYS: tuple[str, ...] = tuple(constants.PARAMETER_SAFE_RANGES.keys())
+_LEGACY_PARAMETER_KEYS: tuple[str, ...] = tuple(constants.PARAMETER_SAFE_RANGES.keys())
 _DEFAULT_MODEL = "gpt-4.1"
 _MAX_PROPOSALS = 1
 _MIN_PROPOSALS = 1
@@ -76,8 +77,16 @@ class _DefaultOpenAIClient:
     newer Responses API is desired, only this class needs to change.
     """
 
-    def __init__(self, api_key: str) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        proposal_schema: dict[str, Any],
+        base_url: str | None = None,
+    ) -> None:
         self._api_key = api_key
+        self._proposal_schema = proposal_schema
+        self._base_url = base_url
 
     def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
         try:
@@ -88,23 +97,40 @@ class _DefaultOpenAIClient:
                 "optimizer_strategy=gpt (pip install openai)."
             ) from exc
 
-        client = OpenAI(api_key=self._api_key)
-        response_format = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "drone_dream_candidate_proposals",
-                "schema": _PROPOSAL_SCHEMA,
-                "strict": True,
-            },
-        }
-        chat = client.chat.completions.create(  # type: ignore[call-overload]
-            model=model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            response_format=response_format,
-        )
+        if self._base_url:
+            client = OpenAI(api_key=self._api_key, base_url=self._base_url)
+        else:
+            client = OpenAI(api_key=self._api_key)
+        messages: Any = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+        if self._base_url:
+            response_format: Any = {"type": "json_object"}
+        else:
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "drone_dream_candidate_proposals",
+                    "schema": self._proposal_schema,
+                    "strict": True,
+                },
+            }
+        try:
+            chat = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_format=response_format,
+            )
+        except Exception:
+            if not self._base_url:
+                raise
+            # Some OpenAI-compatible providers accept chat completions but not
+            # response_format. The prompt and local validator remain strict.
+            chat = client.chat.completions.create(
+                model=model,
+                messages=messages,
+            )
         content = chat.choices[0].message.content or "{}"
         try:
             return json.loads(content)  # type: ignore[no-any-return]
@@ -114,57 +140,95 @@ class _DefaultOpenAIClient:
 
 # --- JSON schema used for structured outputs ---------------------------
 
-_PROPOSAL_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": ["proposals"],
-    "properties": {
-        "proposals": {
-            "type": "array",
-            "minItems": _MIN_PROPOSALS,
-            "maxItems": _MAX_PROPOSALS,
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["label", "rationale", "parameters"],
-                "properties": {
-                    "label": {"type": "string", "minLength": 1, "maxLength": 80},
-                    "rationale": {"type": "string", "minLength": 1, "maxLength": 400},
-                    "parameters": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": list(_PARAMETER_KEYS),
-                        "properties": {key: {"type": "number"} for key in _PARAMETER_KEYS},
+def _proposal_schema(search_space: SearchSpace) -> dict[str, Any]:
+    parameter_properties: dict[str, Any] = {}
+    for domain in search_space.domains:
+        definition: dict[str, Any] = {
+            "type": "integer" if domain.value_type != "float" else "number",
+            "minimum": domain.minimum,
+            "maximum": domain.maximum,
+        }
+        if domain.choices:
+            definition["enum"] = list(domain.choices)
+        parameter_properties[domain.name] = definition
+    parameter_keys = [domain.name for domain in search_space.domains]
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["proposals"],
+        "properties": {
+            "proposals": {
+                "type": "array",
+                "minItems": _MIN_PROPOSALS,
+                "maxItems": _MAX_PROPOSALS,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["label", "rationale", "parameters"],
+                    "properties": {
+                        "label": {"type": "string", "minLength": 1, "maxLength": 80},
+                        "rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 400,
+                        },
+                        "parameters": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": parameter_keys,
+                            "properties": parameter_properties,
+                        },
                     },
                 },
-            },
-        }
-    },
-}
+            }
+        },
+    }
 
 
 # --- Helpers -----------------------------------------------------------
 
 
-def _clamp(value: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, value))
+def _search_space_for_job(job: models.Job) -> SearchSpace:
+    if job.parameter_space_json:
+        selections = [
+            schemas.ParameterSelection(**item)
+            for item in job.parameter_space_json
+            if item.get("enabled", True)
+        ]
+        if selections:
+            return SearchSpace.from_schema(selections)
+    return SearchSpace(
+        [
+            ParameterDomain(
+                name=key,
+                baseline=constants.BASELINE_PARAMETERS[key],
+                minimum=bounds[0],
+                maximum=bounds[1],
+            )
+            for key, bounds in constants.PARAMETER_SAFE_RANGES.items()
+        ]
+    )
 
 
-def _sanitize(parameters: dict[str, Any]) -> dict[str, float] | None:
-    cleaned: dict[str, float] = {}
-    for key in _PARAMETER_KEYS:
-        raw = parameters.get(key)
-        if raw is None:
-            return None
+def _sanitize(
+    parameters: dict[str, Any], search_space: SearchSpace
+) -> dict[str, float] | None:
+    parameter_keys = {domain.name for domain in search_space.domains}
+    if set(parameters) != parameter_keys:
+        return None
+    numeric_parameters: dict[str, float] = {}
+    for key, raw in parameters.items():
         try:
             numeric = float(raw)
         except (TypeError, ValueError):
             return None
         if math.isnan(numeric) or math.isinf(numeric):
             return None
-        lo, hi = constants.PARAMETER_SAFE_RANGES[key]
-        cleaned[key] = round(_clamp(numeric, lo, hi), 6)
-    return cleaned
+        numeric_parameters[key] = numeric
+    try:
+        return search_space.project(numeric_parameters)
+    except ValueError:
+        return None
 
 
 def _load_api_key(db: Session, job: models.Job) -> str | None:
@@ -189,15 +253,28 @@ def _build_prompt(
     job: models.Job,
     criteria: AcceptanceCriteria,
     candidates: list[models.CandidateParameterSet],
+    search_space: SearchSpace,
 ) -> tuple[str, str]:
     system = (
         "You are an expert drone-control tuning assistant. Your job is to "
-        "propose candidate PID + velocity/acceleration limit + disturbance "
-        "rejection parameters that improve simulator metrics under the given "
-        "scenarios. You must return only structured JSON conforming to the "
+        "propose only the user-selected PX4 control parameters that improve "
+        "simulator metrics under the configured scenario matrix and constraints. "
+        "You must return only structured JSON conforming to the "
         "provided schema — no free-form text."
     )
-    safe_ranges = {key: list(value) for key, value in constants.PARAMETER_SAFE_RANGES.items()}
+    parameter_domains = {
+        domain.name: {
+            "minimum": domain.minimum,
+            "maximum": domain.maximum,
+            "baseline": domain.baseline,
+            "step": domain.step,
+            "scale": domain.scale,
+            "value_type": domain.value_type,
+            "choices": list(domain.choices),
+            "locked": domain.locked,
+        }
+        for domain in search_space.domains
+    }
 
     prior: list[dict[str, Any]] = []
     for cand in sorted(
@@ -205,13 +282,45 @@ def _build_prompt(
         key=lambda c: (c.generation_index, c.is_baseline),
     ):
         agg = cand.aggregated_metric_json or {}
-        trial_count = cand.trial_count or 0
-        passing_trial_count = int(agg.get("passing_trial_count", 0) or 0)
-        completion_rate = (
-            (cand.completed_trial_count / trial_count) if trial_count > 0 else 0.0
+        trial_count = int(agg.get("training_trial_count", cand.trial_count or 0) or 0)
+        completed_trial_count = int(
+            agg.get(
+                "training_completed_trial_count", cand.completed_trial_count or 0
+            )
+            or 0
         )
+        passing_trial_count = int(
+            agg.get(
+                "training_passing_trial_count", agg.get("passing_trial_count", 0)
+            )
+            or 0
+        )
+        completion_rate = (
+            (completed_trial_count / trial_count) if trial_count > 0 else 0.0
+        )
+        prompt_aggregate = {key: value for key, value in agg.items() if key != "holdout"}
+        prompt_aggregate.update(
+            {
+                "trial_count": trial_count,
+                "completed_trial_count": completed_trial_count,
+                "failed_trial_count": int(
+                    agg.get("training_failed_trial_count", cand.failed_trial_count or 0)
+                    or 0
+                ),
+                "passing_trial_count": passing_trial_count,
+            }
+        )
+        for key in (
+            "training_trial_count",
+            "training_completed_trial_count",
+            "training_failed_trial_count",
+            "training_passing_trial_count",
+        ):
+            prompt_aggregate.pop(key, None)
         trial_feedback: list[dict[str, Any]] = []
         for trial in sorted(cand.trials, key=lambda t: (t.created_at, t.id)):
+            if bool((trial.scenario_config_json or {}).get("holdout")):
+                continue
             metric = trial.metric
             trial_feedback.append(
                 {
@@ -232,7 +341,7 @@ def _build_prompt(
                 "label": cand.label,
                 "generation_index": cand.generation_index,
                 "parameters": dict(cand.parameter_json or {}),
-                "aggregated_metrics": agg,
+                "aggregated_metrics": prompt_aggregate,
                 "aggregated_score": cand.aggregated_score,
                 "pass_rate": (
                     round((passing_trial_count / trial_count), 4)
@@ -241,7 +350,7 @@ def _build_prompt(
                 ),
                 "completion_rate": round(completion_rate, 4),
                 "passing_trial_count": passing_trial_count,
-                "trial_count": cand.trial_count,
+                "trial_count": trial_count,
                 "trials": trial_feedback,
             }
         )
@@ -263,15 +372,20 @@ def _build_prompt(
             "target_max_error": criteria.target_max_error,
             "min_pass_rate": criteria.min_pass_rate,
         },
-        "parameter_safe_ranges": safe_ranges,
-        "baseline_parameters": dict(constants.BASELINE_PARAMETERS),
+        "vehicle_profile": dict(job.vehicle_profile_json or {}),
+        "parameter_catalog_version": job.parameter_catalog_version,
+        "parameter_domains": parameter_domains,
+        "baseline_parameters": search_space.baseline(),
+        "objective_config": dict(job.objective_config_json or {}),
+        "scenario_suite": dict(job.scenario_suite_json or {}),
         "previous_candidates": prior,
         "current_generation": job.current_generation,
         "max_iterations": job.max_iterations,
         "instructions": (
             "Propose exactly 1 next-generation candidate parameter set. "
             "The proposal must include all required keys and "
-            "every numeric value must lie strictly inside the safe range. Do not "
+            "every numeric value must lie inside its declared domain. Keep locked "
+            "parameters at baseline and honor step/enum values. Do not "
             "include any other keys. Be explicit about the rationale."
         ),
     }
@@ -295,12 +409,18 @@ def propose_candidates(
     :class:`LlmProposerResult` has ``error`` set and ``proposals`` empty.
     """
 
-    chosen_model = (
-        model
-        or job.openai_model
-        or job_secrets_env_model()
-        or _DEFAULT_MODEL
-    )
+    provider = job.llm_provider or "openai"
+    configured_model = model or job.openai_model or job_secrets_env_model()
+    if configured_model is None and provider != "openai":
+        record_event(
+            db,
+            job.id,
+            "llm_proposal_failed",
+            {"reason": "missing_model", "provider": provider},
+        )
+        return LlmProposerResult(error="missing_model")
+    chosen_model = configured_model or _DEFAULT_MODEL
+    search_space = _search_space_for_job(job)
 
     effective_client: OpenAIClientLike | None = client
     if effective_client is None:
@@ -313,17 +433,26 @@ def propose_candidates(
                 {"reason": "missing_api_key", "model": chosen_model},
             )
             return LlmProposerResult(error="missing_api_key", model=chosen_model)
-        effective_client = _DefaultOpenAIClient(api_key)
+        effective_client = _DefaultOpenAIClient(
+            api_key,
+            proposal_schema=_proposal_schema(search_space),
+            base_url=job.llm_base_url,
+        )
 
     record_event(
         db,
         job.id,
         "llm_proposal_started",
-        {"generation": job.current_generation + 1, "model": chosen_model},
+        {
+            "generation": job.current_generation + 1,
+            "model": chosen_model,
+            "provider": provider,
+            "parameter_count": len(search_space.domains),
+        },
     )
 
     try:
-        system, user = _build_prompt(job, criteria, list(job.candidates))
+        system, user = _build_prompt(job, criteria, list(job.candidates), search_space)
         raw = effective_client.generate(model=chosen_model, system=system, user=user)
     except Exception as exc:  # OpenAI client failure, network, etc.
         logger.exception("LLM proposer call failed for job %s", job.id)
@@ -335,7 +464,7 @@ def propose_candidates(
         )
         return LlmProposerResult(error=str(exc), model=chosen_model)
 
-    proposals = _validate_response(raw)
+    proposals = _validate_response(raw, search_space)
     if not proposals:
         record_event(
             db,
@@ -358,7 +487,9 @@ def propose_candidates(
     return LlmProposerResult(proposals=proposals, raw_response=raw, model=chosen_model)
 
 
-def _validate_response(raw: dict[str, Any] | None) -> list[LlmProposal]:
+def _validate_response(
+    raw: dict[str, Any] | None, search_space: SearchSpace
+) -> list[LlmProposal]:
     if not isinstance(raw, dict):
         return []
     proposals_raw = raw.get("proposals")
@@ -376,7 +507,7 @@ def _validate_response(raw: dict[str, Any] | None) -> list[LlmProposal]:
             continue
         if not isinstance(parameters, dict):
             continue
-        cleaned = _sanitize(parameters)
+        cleaned = _sanitize(parameters, search_space)
         if cleaned is None:
             continue
         fingerprint = tuple(sorted(cleaned.items()))

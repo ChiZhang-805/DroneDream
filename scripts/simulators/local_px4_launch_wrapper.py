@@ -10,6 +10,8 @@ This script is intentionally a thin, configurable launcher layer:
 from __future__ import annotations
 
 import argparse
+import asyncio
+import contextlib
 import json
 import math
 import os
@@ -66,6 +68,20 @@ def _parse_bool(raw: str | None, *, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _make_target_for_vehicle(vehicle: str) -> str:
+    """Resolve a per-trial Gazebo target with an explicit force escape hatch."""
+
+    configured = os.environ.get("PX4_MAKE_TARGET", "").strip()
+    if configured and _parse_bool(os.environ.get("PX4_FORCE_MAKE_TARGET"), default=False):
+        return configured
+    model = vehicle.strip()
+    if model.startswith("gz_"):
+        return model
+    if model in {"x500", "x500_depth", "x500_vision"}:
+        return f"gz_{model}"
+    return configured or DEFAULT_MAKE_TARGET
+
+
 def _parse_int(raw: str | None, *, default: int) -> int:
     if raw is None or not raw.strip():
         return default
@@ -83,12 +99,30 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--params", required=True, type=Path)
+    parameter_request_path = os.environ.get("PX4_PARAMETER_REQUEST_PATH", "").strip()
+    parser.add_argument(
+        "--px4-params",
+        type=Path,
+        default=Path(parameter_request_path) if parameter_request_path else None,
+    )
     parser.add_argument("--track", required=True, type=Path)
     parser.add_argument("--telemetry", required=True, type=Path)
     parser.add_argument("--stdout-log", required=True, type=Path)
     parser.add_argument("--stderr-log", required=True, type=Path)
     parser.add_argument("--vehicle", required=True)
+    parser.add_argument(
+        "--airframe",
+        default=os.environ.get("PX4_TRIAL_AIRFRAME", "").strip(),
+    )
+    parser.add_argument(
+        "--simulator-model",
+        default=os.environ.get("PX4_TRIAL_SIMULATOR_MODEL", "").strip(),
+    )
     parser.add_argument("--world", required=True)
+    parser.add_argument(
+        "--px4-version",
+        default=os.environ.get("PX4_TRIAL_PX4_VERSION", "main").strip() or "main",
+    )
     parser.add_argument("--headless", required=True)
     parser.add_argument("--extra-args", default="")
     return parser.parse_args()
@@ -115,6 +149,124 @@ def _copy_used_inputs(run_dir: Path, params: Path, track: Path) -> tuple[Any, An
     _json_dump(run_dir / "controller_params.used.json", params_payload)
     _json_dump(run_dir / "reference_track.used.json", track_payload)
     return params_payload, track_payload
+
+
+def _load_parameter_engine() -> Any:
+    """Import the backend engine when installed or from this repository checkout."""
+
+    try:
+        from app.simulator import px4_parameters as engine
+    except ModuleNotFoundError:
+        backend_root = Path(__file__).resolve().parents[2] / "backend"
+        if not backend_root.is_dir():
+            raise RuntimeError(
+                "DroneDream backend package is required for PX4 parameter application"
+            ) from None
+        sys.path.insert(0, str(backend_root))
+        from app.simulator import px4_parameters as engine
+    return engine
+
+
+def _load_px4_parameter_request(args: argparse.Namespace) -> dict[str, object]:
+    if args.px4_params is None:
+        return {}
+    if not args.px4_params.is_file():
+        raise ValueError(f"PX4 parameter request does not exist: {args.px4_params}")
+    payload = _json_load(args.px4_params)
+    if not isinstance(payload, dict):
+        raise ValueError("PX4 parameter request must be a JSON object")
+    return {str(name): value for name, value in payload.items()}
+
+
+def _parameter_context() -> dict[str, object]:
+    raw = os.environ.get("PX4_PARAMETER_CONTEXT_JSON", "").strip()
+    if not raw:
+        return {}
+    payload = json.loads(raw)
+    if not isinstance(payload, dict):
+        raise ValueError("PX4_PARAMETER_CONTEXT_JSON must be a JSON object")
+    return {str(key): value for key, value in payload.items()}
+
+
+def _parameter_transport() -> str:
+    transport = os.environ.get("PX4_PARAMETER_TRANSPORT", "environment").strip().lower()
+    if transport not in {"environment", "mavsdk"}:
+        raise ValueError("PX4_PARAMETER_TRANSPORT must be environment or mavsdk")
+    return transport
+
+
+def _prepare_px4_launch_environment(
+    requested: dict[str, object],
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Return launch environment and the previous override values for evidence."""
+
+    launch_env = os.environ.copy()
+    previous = {
+        key: value
+        for key, value in launch_env.items()
+        if key.startswith("PX4_PARAM_")
+    }
+    if requested and _parameter_transport() == "environment":
+        engine = _load_parameter_engine()
+        launch_env.update(
+            engine.build_px4_parameter_environment(
+                requested,
+                px4_version=os.environ.get("PX4_PARAMETER_PX4_VERSION", "main"),
+                enforce_safe_bounds=_parse_bool(
+                    os.environ.get("PX4_PARAMETER_ENFORCE_SAFE_BOUNDS"), default=True
+                ),
+            )
+        )
+    return launch_env, previous
+
+
+def _apply_or_verify_px4_parameters(
+    requested: dict[str, object],
+    *,
+    run_dir: Path,
+    previous_environment: dict[str, str],
+) -> None:
+    if not requested:
+        return
+    engine = _load_parameter_engine()
+    transport = _parameter_transport()
+    connection = os.environ.get(
+        "PX4_PARAMETER_CONNECTION",
+        os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION),
+    ).strip()
+    timeout_seconds = _parse_float(
+        os.environ.get("PX4_PARAMETER_TIMEOUT_SECONDS"), default=15.0
+    )
+    px4_version = os.environ.get("PX4_PARAMETER_PX4_VERSION", "main")
+    context = _parameter_context()
+    enforce_safe = _parse_bool(
+        os.environ.get("PX4_PARAMETER_ENFORCE_SAFE_BOUNDS"), default=True
+    )
+    if transport == "environment":
+        asyncio.run(
+            engine.verify_environment_parameters_with_mavsdk(
+                requested,
+                run_dir,
+                connection=connection,
+                previous_environment=previous_environment,
+                timeout_seconds=timeout_seconds,
+                px4_version=px4_version,
+                context=context,
+                enforce_safe_bounds=enforce_safe,
+            )
+        )
+        return
+    asyncio.run(
+        engine.apply_parameters_with_mavsdk(
+            requested,
+            run_dir,
+            connection=connection,
+            timeout_seconds=timeout_seconds,
+            px4_version=px4_version,
+            context=context,
+            enforce_safe_bounds=enforce_safe,
+        )
+    )
 
 
 def _normalize_telemetry_payload(payload: Any) -> dict[str, Any]:
@@ -366,7 +518,42 @@ def _render_launch_command(template: str, values: dict[str, str]) -> str:
     return rendered
 
 
+def _split_command(command: str) -> list[str]:
+    """Split configured commands without corrupting native Windows paths."""
+
+    argv = shlex.split(command, posix=os.name != "nt")
+    if os.name == "nt":
+        return [
+            item[1:-1]
+            if len(item) >= 2 and item[0] == item[-1] and item[0] in {'"', "'"}
+            else item
+            for item in argv
+        ]
+    return argv
+
+
 def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path, *, label: str) -> None:
+    if proc.poll() is not None:
+        return
+    if os.name == "nt":
+        try:
+            subprocess.run(  # noqa: S603, S607
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            _append_log(
+                stderr_log,
+                f"[local_px4_launch_wrapper] Sent SIGTERM to {label} process group "
+                "(taskkill tree on Windows)",
+            )
+        except OSError:
+            return
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            proc.wait(timeout=2.0)
+        return
+
     try:
         os.killpg(proc.pid, signal.SIGTERM)
         _append_log(stderr_log, f"[local_px4_launch_wrapper] Sent SIGTERM to {label} process group")
@@ -395,12 +582,42 @@ def _launch_process(
 ) -> subprocess.Popen[str]:
     out_handle = stdout_log.open("a", encoding="utf-8")
     err_handle = stderr_log.open("a", encoding="utf-8")
+    start_new_session = os.name != "nt"
+    creationflags = 0
+    if os.name == "nt":
+        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
+            subprocess, "CREATE_NO_WINDOW", 0
+        )
+        shell_preference = os.environ.get("PX4_WINDOWS_COMMAND_SHELL", "powershell").lower()
+        if shell_preference == "direct":
+            shell_argv = _split_command(command)
+        elif shell_preference == "wsl":
+            wsl = shutil.which("wsl")
+            if not wsl:
+                raise RuntimeError("PX4_WINDOWS_COMMAND_SHELL=wsl but wsl.exe was not found")
+            shell_argv = [wsl, "bash", "-lc", command]
+        elif shell_preference == "bash":
+            bash = shutil.which("bash")
+            if not bash:
+                raise RuntimeError("PX4_WINDOWS_COMMAND_SHELL=bash but bash was not found")
+            shell_argv = [bash, "-lc", command]
+        else:
+            shell_argv = [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                command,
+            ]
+    else:
+        shell_argv = ["bash", "-lc", command]
     proc = subprocess.Popen(  # noqa: S603
-        ["bash", "-lc", command],
+        shell_argv,
         stdout=out_handle,
         stderr=err_handle,
         text=True,
-        start_new_session=True,
+        start_new_session=start_new_session,
+        creationflags=creationflags,
         env=launch_env,
     )
     proc._stdout_handle = out_handle  # type: ignore[attr-defined]
@@ -426,7 +643,7 @@ def _cleanup_process(proc: subprocess.Popen[str] | None, stderr_log: Path, *, la
 
 def _default_offboard_executor_command() -> str:
     script_path = Path(__file__).resolve().parent / "px4_offboard_track_executor.py"
-    return f"python3 {shlex.quote(str(script_path))}"
+    return f"{shlex.quote(sys.executable)} {shlex.quote(str(script_path))}"
 
 
 def _default_track_marker_command(args: argparse.Namespace) -> str:
@@ -455,7 +672,7 @@ def _run_track_marker(args: argparse.Namespace, stderr_log: Path) -> int:
     stderr_marker_log = args.run_dir / "track_marker_stderr.log"
     _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Track marker command: {command}")
     proc = subprocess.run(  # noqa: S603
-        ["bash", "-lc", command],
+        _split_command(command),
         text=True,
         capture_output=True,
         check=False,
@@ -486,7 +703,7 @@ def _build_offboard_executor_argv(args: argparse.Namespace) -> list[str]:
     connection = os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION).strip() or DEFAULT_OFFBOARD_CONNECTION
     offboard_log = args.run_dir / "offboard_executor.log"
 
-    argv = shlex.split(command)
+    argv = _split_command(command)
     argv.extend(
         [
             "--run-dir",
@@ -532,7 +749,9 @@ def _run_offboard_executor(args: argparse.Namespace, stderr_log: Path) -> int:
 
 def _resolve_real_launch_command(args: argparse.Namespace) -> tuple[str, str | None]:
     setup_commands = os.environ.get("PX4_SETUP_COMMANDS", "").strip()
-    make_target = os.environ.get("PX4_MAKE_TARGET", DEFAULT_MAKE_TARGET).strip() or DEFAULT_MAKE_TARGET
+    simulator_model = args.simulator_model or args.vehicle
+    airframe = args.airframe or simulator_model
+    make_target = _make_target_for_vehicle(simulator_model)
     launch_template = os.environ.get("PX4_LAUNCH_COMMAND_TEMPLATE", "").strip()
     autopilot_dir = os.environ.get("PX4_AUTOPILOT_DIR", "").strip()
 
@@ -545,7 +764,10 @@ def _resolve_real_launch_command(args: argparse.Namespace) -> tuple[str, str | N
         "stdout_log": shlex.quote(str(args.stdout_log)),
         "stderr_log": shlex.quote(str(args.stderr_log)),
         "vehicle": shlex.quote(args.vehicle),
+        "airframe": shlex.quote(airframe),
+        "simulator_model": shlex.quote(simulator_model),
         "world": shlex.quote(args.world),
+        "px4_version": shlex.quote(args.px4_version),
         "headless": "1" if _parse_bool(args.headless, default=True) else "0",
         "extra_args": args.extra_args,
         "make_target": shlex.quote(make_target),
@@ -576,6 +798,7 @@ def _write_launch_config(
     autopilot_dir: str | None,
     setup_commands: str,
     make_target: str,
+    px4_parameters: dict[str, object],
 ) -> None:
     gui_command = os.environ.get("PX4_GAZEBO_GUI_COMMAND", DEFAULT_GUI_COMMAND).strip() or DEFAULT_GUI_COMMAND
     track_marker_command = _build_track_marker_command(args)
@@ -585,11 +808,16 @@ def _write_launch_config(
     gui_stderr_log = args.run_dir / "gui_stderr.log"
     payload = {
         "vehicle": args.vehicle,
+        "airframe": args.airframe or args.vehicle,
+        "simulator_model": args.simulator_model or args.vehicle,
         "world": args.world,
+        "px4_version": args.px4_version,
         "headless": _parse_bool(args.headless, default=True),
         "make_target": make_target,
         "PX4_AUTOPILOT_DIR": autopilot_dir,
         "PX4_SETUP_COMMANDS": setup_commands,
+        "PX4_PARAMETER_TRANSPORT": _parameter_transport() if px4_parameters else None,
+        "px4_parameter_names": sorted(px4_parameters),
         "PX4_ENABLE_OFFBOARD_EXECUTOR": _parse_bool(
             os.environ.get("PX4_ENABLE_OFFBOARD_EXECUTOR"), default=DEFAULT_ENABLE_OFFBOARD_EXECUTOR
         ),
@@ -641,6 +869,7 @@ def _write_launch_config(
             "run_dir": str(args.run_dir),
             "input": str(args.input),
             "params": str(args.params),
+            "px4_params": str(args.px4_params) if args.px4_params is not None else None,
             "track": str(args.track),
             "telemetry": str(args.telemetry),
             "stdout_log": str(args.stdout_log),
@@ -710,7 +939,7 @@ def main() -> int:
     args = _parse_args()
     args.run_dir.mkdir(parents=True, exist_ok=True)
 
-    make_target = os.environ.get("PX4_MAKE_TARGET", DEFAULT_MAKE_TARGET).strip() or DEFAULT_MAKE_TARGET
+    make_target = _make_target_for_vehicle(args.simulator_model or args.vehicle)
     setup_commands = os.environ.get("PX4_SETUP_COMMANDS", "").strip()
     run_seconds = max(1, _parse_int(os.environ.get("PX4_RUN_SECONDS"), default=DEFAULT_RUN_SECONDS))
     ready_timeout_seconds = max(
@@ -761,8 +990,16 @@ def main() -> int:
 
     try:
         _copy_used_inputs(args.run_dir, args.params, args.track)
+        px4_parameters = _load_px4_parameter_request(args)
+        launch_env, previous_parameter_environment = _prepare_px4_launch_environment(
+            px4_parameters
+        )
+        launch_env["PX4_GZ_WORLD"] = args.world
     except Exception as exc:
-        _append_log(args.stderr_log, f"[local_px4_launch_wrapper] Failed reading params/track: {exc}")
+        _append_log(
+            args.stderr_log,
+            f"[local_px4_launch_wrapper] Failed preparing params/track: {exc}",
+        )
         return 2
 
     if site_dry_run:
@@ -771,7 +1008,19 @@ def main() -> int:
             autopilot_dir=os.environ.get("PX4_AUTOPILOT_DIR", "").strip() or None,
             setup_commands=setup_commands,
             make_target=make_target,
+            px4_parameters=px4_parameters,
         )
+        if px4_parameters:
+            engine = _load_parameter_engine()
+            engine.write_simulated_parameter_evidence(
+                px4_parameters,
+                args.run_dir,
+                px4_version=os.environ.get("PX4_PARAMETER_PX4_VERSION", "main"),
+                context=_parameter_context(),
+                enforce_safe_bounds=_parse_bool(
+                    os.environ.get("PX4_PARAMETER_ENFORCE_SAFE_BOUNDS"), default=True
+                ),
+            )
         _write_dry_run_telemetry(args.telemetry, vehicle=args.vehicle, world=args.world)
         _append_log(args.stdout_log, "[local_px4_launch_wrapper] site dry-run enabled; no PX4 process launched")
         _append_log(args.stderr_log, "")
@@ -786,18 +1035,43 @@ def main() -> int:
             autopilot_dir=resolved_autopilot_dir,
             setup_commands=setup_commands,
             make_target=make_target,
+            px4_parameters=px4_parameters,
         )
         _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Launch command: {command}")
         px4_proc = _launch_process(
             command,
             stdout_log=args.stdout_log,
             stderr_log=args.stderr_log,
+            launch_env=launch_env,
         )
         _append_log(
             args.stdout_log,
             f"[local_px4_launch_wrapper] Waiting {ready_timeout_seconds}s for PX4 readiness (simple fixed wait)",
         )
-        time.sleep(float(ready_timeout_seconds))
+        ready_deadline = time.time() + float(ready_timeout_seconds)
+        while time.time() < ready_deadline:
+            if px4_proc.poll() is not None:
+                break
+            time.sleep(min(0.1, max(0.0, ready_deadline - time.time())))
+
+        if px4_proc.poll() is not None and px4_proc.returncode != 0:
+            raise RuntimeError(
+                f"PX4 process exited before execution with code {px4_proc.returncode}"
+            )
+        if px4_parameters and px4_proc.poll() is not None:
+            raise RuntimeError(
+                f"PX4 process exited before parameter verification with code {px4_proc.returncode}"
+            )
+        _apply_or_verify_px4_parameters(
+            px4_parameters,
+            run_dir=args.run_dir,
+            previous_environment=previous_parameter_environment,
+        )
+        if px4_parameters:
+            _append_log(
+                args.stdout_log,
+                "[local_px4_launch_wrapper] PX4 parameter readback verified before flight",
+            )
 
         should_launch_gui = (not headless) and gui_launch_enabled and bool(display)
         if should_launch_gui:
@@ -893,7 +1167,8 @@ def main() -> int:
                 args.stdout_log,
                 "[local_px4_launch_wrapper] PX4_ENABLE_OFFBOARD_EXECUTOR=false; preserving launcher-only behavior",
             )
-            time.sleep(float(run_seconds))
+            if px4_proc.poll() is None:
+                time.sleep(float(run_seconds))
 
         _cleanup_process(gui_proc, args.stderr_log, label="GUI")
         gui_proc = None

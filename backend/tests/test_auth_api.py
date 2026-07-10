@@ -169,3 +169,53 @@ def test_demo_token_never_leaks_into_job_endpoints(client: TestClient, monkeypat
         blob = json.dumps(resp.json())
         assert "token-a" not in blob
         assert "token-b" not in blob
+
+
+def test_oidc_subjects_are_isolated_even_when_email_matches(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("AUTH_MODE", "oidc_jwt")
+    monkeypatch.setenv("OIDC_ISSUER", "https://identity.example.test/")
+    monkeypatch.setenv("OIDC_AUDIENCE", "dronedream-api")
+    monkeypatch.setenv("OIDC_JWKS_URL", "https://identity.example.test/jwks.json")
+    get_settings.cache_clear()
+
+    def fake_decode(token: str, _settings) -> dict[str, object]:
+        return {
+            "sub": "subject-a" if token == "token-a" else "subject-b",
+            "email": "shared@example.com",
+            "name": "OIDC User",
+        }
+
+    monkeypatch.setattr("app.auth._decode_oidc_token", fake_decode)
+    created = client.post(
+        "/api/v1/jobs",
+        headers={"Authorization": "Bearer token-a"},
+        json=PAYLOAD,
+    )
+    assert created.status_code == 200, created.text
+    job_id = created.json()["data"]["id"]
+    denied = client.get(
+        f"/api/v1/jobs/{job_id}", headers={"Authorization": "Bearer token-b"}
+    )
+    assert denied.status_code == 404
+
+
+def test_oidc_invalid_token_returns_bearer_challenge(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("AUTH_MODE", "oidc_jwt")
+    monkeypatch.setenv("OIDC_ISSUER", "https://identity.example.test/")
+    monkeypatch.setenv("OIDC_AUDIENCE", "dronedream-api")
+    monkeypatch.setenv("OIDC_JWKS_URL", "https://identity.example.test/jwks.json")
+    get_settings.cache_clear()
+
+    def reject_token(_token: str, _settings) -> dict[str, object]:
+        raise ValueError("bad signature")
+
+    monkeypatch.setattr("app.auth._decode_oidc_token", reject_token)
+    response = client.get(
+        "/api/v1/jobs", headers={"Authorization": "Bearer invalid"}
+    )
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"

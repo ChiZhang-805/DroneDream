@@ -186,4 +186,43 @@ describe("apiClient envelope handling", () => {
       }),
     );
   });
+
+  it("loads the versioned parameter catalog from the advanced endpoint", async () => {
+    mockFetchOnce({
+      success: true,
+      data: {
+        catalog_version: "catalog-v1",
+        source: "PX4 snapshot",
+        px4_version: "v1.16",
+        supported_px4_versions: ["v1.16"],
+        vehicle_type: "multicopter",
+        parameter_count: 0,
+        parameters: [],
+      },
+      error: null,
+    });
+    await apiClient.getParameterCatalog("v1.16");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/parameter-catalog?px4_version=v1.16",
+      expect.any(Object),
+    );
+  });
+
+  it("loads constraint-aware candidate and Pareto history for a job", async () => {
+    mockFetchOnce({
+      success: true,
+      data: {
+        items: [],
+        pareto_candidate_ids: [],
+        recommendations: {},
+        objective_directions: {},
+      },
+      error: null,
+    });
+    await apiClient.listJobCandidates("job advanced/1");
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/jobs/job%20advanced%2F1/candidates",
+      expect.any(Object),
+    );
+  });
 });

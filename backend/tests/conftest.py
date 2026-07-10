@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import sys
 from collections.abc import Iterator
 
 import pytest
@@ -27,13 +28,16 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
 
     config_module.get_settings.cache_clear()
 
+    models_was_loaded = "app.models" in sys.modules
+
     import app.db as db_module
 
     importlib.reload(db_module)
 
-    import app.models as models_module
-
-    importlib.reload(models_module)
+    if models_was_loaded:
+        importlib.reload(sys.modules["app.models"])
+    else:
+        importlib.import_module("app.models")
 
     # Reload services so they import the freshly reloaded models/db.
     import app.services.jobs as jobs_service_module

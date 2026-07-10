@@ -12,20 +12,24 @@ purely a matter of setting ``SIMULATOR_BACKEND`` (see
 retry policy, etc.) remain the job manager's responsibility; the executor
 only reports trial outcomes.
 
-Concurrency note: Phase 3 targets a **single** local worker process, so the
-claim-by-update-then-commit pattern is safe. If we ever run multiple workers
-against the same SQLite DB we would need ``SELECT ... FOR UPDATE SKIP LOCKED``
-semantics (Postgres) or app-level leasing, neither of which is worth the
-complexity in the MVP. A TODO marker is left at the claim site.
+Concurrency note: claims use conditional updates, renewable leases, and an
+``attempt_count`` fencing token. A stale worker may finish its external
+simulation after another worker reclaims the row, but it cannot persist that
+obsolete attempt's metrics or artifacts.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import threading
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, cast
 
 from sqlalchemy import case, or_, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app import models
@@ -41,6 +45,7 @@ from app.simulator import (
     get_simulator_adapter,
 )
 from app.simulator.base import FAILURE_SIM_ERROR
+from app.storage import get_artifact_storage
 
 
 def _env_simulator_backend() -> str | None:
@@ -81,6 +86,114 @@ logger = logging.getLogger("drone_dream.orchestration.trial")
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+@dataclass(frozen=True)
+class _TrialLeaseToken:
+    """Fencing token for exactly one execution attempt."""
+
+    trial_id: str
+    worker_id: str
+    attempt_count: int
+
+
+def _renew_owned_lease(
+    db: Session,
+    token: _TrialLeaseToken,
+    *,
+    lease_seconds: int,
+) -> bool:
+    """Renew a lease only while this exact attempt still owns the trial."""
+
+    result = cast(
+        CursorResult[Any],
+        db.execute(
+            update(models.Trial)
+            .where(
+                models.Trial.id == token.trial_id,
+                models.Trial.status == "RUNNING",
+                models.Trial.lease_owner == token.worker_id,
+                models.Trial.attempt_count == token.attempt_count,
+            )
+            .values(lease_expires_at=_now() + timedelta(seconds=lease_seconds))
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    return result.rowcount == 1
+
+
+class _TrialLeaseHeartbeat:
+    """Renew a trial lease from an independent DB session during simulation."""
+
+    def __init__(
+        self,
+        token: _TrialLeaseToken,
+        *,
+        lease_seconds: int,
+        interval_seconds: float,
+    ) -> None:
+        self._token = token
+        self._lease_seconds = lease_seconds
+        self._interval_seconds = interval_seconds
+        self._stop = threading.Event()
+        self.lost = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"trial-lease-{token.trial_id}",
+            daemon=True,
+        )
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=max(1.0, self._interval_seconds + 1.0))
+
+    def _run(self) -> None:
+        from app.db import SessionLocal
+
+        while not self._stop.wait(self._interval_seconds):
+            try:
+                with SessionLocal() as heartbeat_db:
+                    if not _renew_owned_lease(
+                        heartbeat_db,
+                        self._token,
+                        lease_seconds=self._lease_seconds,
+                    ):
+                        heartbeat_db.rollback()
+                        self.lost.set()
+                        return
+                    heartbeat_db.commit()
+            except Exception:
+                # A transient database outage should not kill a simulator
+                # process. The completion fence below remains authoritative.
+                logger.warning(
+                    "failed to renew lease for trial %s",
+                    self._token.trial_id,
+                    exc_info=True,
+                )
+
+
+def _acquire_completion_fence(
+    db: Session,
+    token: _TrialLeaseToken,
+    *,
+    lease_seconds: int,
+) -> bool:
+    """Fence result persistence against a newer reclaimed attempt."""
+
+    if not _renew_owned_lease(db, token, lease_seconds=lease_seconds):
+        db.rollback()
+        logger.warning(
+            "discarding stale result for trial %s attempt=%d worker=%s",
+            token.trial_id,
+            token.attempt_count,
+            token.worker_id,
+        )
+        return False
+    db.expire_all()
+    return True
 
 
 def _refresh_progress_counters(db: Session, job: models.Job) -> None:
@@ -130,6 +243,7 @@ def _job_config_from(job: models.Job) -> JobConfig:
         sensor_noise_level=job.sensor_noise_level,
         objective_profile=job.objective_profile,
         reference_track=reference_track,
+        vehicle_profile=dict(job.vehicle_profile_json or {}),
     )
 
 
@@ -155,14 +269,25 @@ def _build_trial_context(
 def _persist_artifacts(
     db: Session, trial: models.Trial, artifacts: list[ArtifactMetadata]
 ) -> None:
+    storage = get_artifact_storage()
     for meta in artifacts:
+        storage_path = meta.storage_path
+        local_path = Path(storage_path)
+        if local_path.exists() and local_path.is_file():
+            safe_name = Path(meta.display_name or local_path.name).name
+            key = f"jobs/{trial.job_id}/trials/{trial.id}/{meta.artifact_type}/{safe_name}"
+            storage_path = storage.put_file(
+                local_path,
+                key,
+                content_type=meta.mime_type,
+            )
         db.add(
             models.Artifact(
                 owner_type="trial",
                 owner_id=trial.id,
                 artifact_type=meta.artifact_type,
                 display_name=meta.display_name,
-                storage_path=meta.storage_path,
+                storage_path=storage_path,
                 mime_type=meta.mime_type,
                 file_size_bytes=meta.file_size_bytes,
             )
@@ -229,6 +354,10 @@ def claim_and_run_one_pending_trial(
             lease_owner=worker_id,
             lease_expires_at=lease_until,
             claimed_at=now,
+            finished_at=None,
+            failure_code=None,
+            failure_reason=None,
+            log_excerpt=None,
         )
         .values(attempt_count=(models.Trial.attempt_count + 1))
         .values(
@@ -268,6 +397,12 @@ def claim_and_run_one_pending_trial(
         {"trial_id": trial.id, "worker_id": worker_id},
     )
     db.commit()
+    db.refresh(trial)
+    lease_token = _TrialLeaseToken(
+        trial_id=trial.id,
+        worker_id=worker_id,
+        attempt_count=trial.attempt_count,
+    )
 
     logger.info(
         "claimed trial %s (job=%s candidate=%s scenario=%s seed=%d backend=%s)",
@@ -281,36 +416,96 @@ def claim_and_run_one_pending_trial(
 
     candidate = db.get(models.CandidateParameterSet, trial.candidate_id)
     if candidate is None:
+        if not _acquire_completion_fence(db, lease_token, lease_seconds=lease_seconds):
+            return trial_id
+        trial = db.get(models.Trial, trial_id)
+        if trial is None:  # pragma: no cover - defensive only.
+            db.rollback()
+            return trial_id
         _mark_trial_failed(
             db, trial, code="CANDIDATE_NOT_FOUND", reason="Candidate row disappeared."
         )
-        return trial.id
+        return trial_id
     job = db.get(models.Job, trial.job_id)
-    if job is None:  # pragma: no cover — defensive only
+    if job is None:
+        if not _acquire_completion_fence(db, lease_token, lease_seconds=lease_seconds):
+            return trial_id
+        trial = db.get(models.Trial, trial_id)
+        if trial is None:  # pragma: no cover - defensive only.
+            db.rollback()
+            return trial_id
         _mark_trial_failed(db, trial, code="JOB_NOT_FOUND", reason="Job row disappeared.")
-        return trial.id
+        return trial_id
 
     ctx = _build_trial_context(trial, job, candidate)
+    # Do not hold the main session's read transaction open while PX4/Gazebo
+    # runs. Lease heartbeats use independent short-lived sessions.
+    db.commit()
 
     # --- Execute --------------------------------------------------------
-    result: TrialResult
+    settings = get_settings()
+    heartbeat_interval = min(
+        settings.worker_lease_heartbeat_seconds,
+        max(0.1, lease_seconds / 3),
+    )
+    heartbeat = _TrialLeaseHeartbeat(
+        lease_token,
+        lease_seconds=lease_seconds,
+        interval_seconds=heartbeat_interval,
+    )
+    heartbeat.start()
+    result: TrialResult | None = None
+    execution_error: Exception | None = None
     try:
         sim.prepare(ctx)
         result = sim.run_trial(ctx)
     except Exception as exc:  # Infrastructure-level crash inside the adapter.
         logger.exception("simulator adapter crashed for trial %s", trial.id)
-        _mark_trial_failed(db, trial, code=FAILURE_SIM_ERROR, reason=str(exc)[:500])
-        return trial.id
+        execution_error = exc
     finally:
         try:
             sim.cleanup(ctx)
         except Exception:  # pragma: no cover — cleanup is best-effort.
             logger.exception("simulator adapter cleanup failed for trial %s", trial.id)
+        heartbeat.stop()
+
+    # The exact owner + attempt count form a fencing token. If another worker
+    # reclaimed this lease, the old simulator result is intentionally dropped.
+    if not _acquire_completion_fence(db, lease_token, lease_seconds=lease_seconds):
+        return trial_id
+    trial = db.get(models.Trial, trial_id)
+    if trial is None:  # pragma: no cover - defensive only.
+        db.rollback()
+        return trial_id
+    job = db.get(models.Job, job_id)
+    if job is None:  # pragma: no cover - defensive only.
+        _mark_trial_failed(db, trial, code="JOB_NOT_FOUND", reason="Job row disappeared.")
+        return trial_id
+
+    if execution_error is not None:
+        _mark_trial_failed(
+            db,
+            trial,
+            code=FAILURE_SIM_ERROR,
+            reason=str(execution_error)[:500],
+        )
+        return trial_id
+    if result is None:  # pragma: no cover - adapter contract guard.
+        _mark_trial_failed(
+            db,
+            trial,
+            code=FAILURE_SIM_ERROR,
+            reason="Adapter returned without a TrialResult.",
+        )
+        return trial_id
 
     if not result.success or result.metrics is None:
         failure: TrialFailure = result.failure or TrialFailure(
             code=FAILURE_SIM_ERROR, reason="Adapter returned no metrics and no failure."
         )
+        # Commit post-mortem artifacts and terminal state together. S3 keys
+        # are deterministic, so a retry after an upload/DB boundary is safe.
+        _persist_artifacts(db, trial, result.artifacts)
         _mark_trial_failed(
             db,
             trial,
@@ -318,12 +513,7 @@ def claim_and_run_one_pending_trial(
             reason=failure.reason,
             log_excerpt=result.log_excerpt,
         )
-        # Artifacts can still be useful for post-mortem even on failure.
-        _persist_artifacts(db, trial, result.artifacts)
-        trial.lease_owner = None
-        trial.lease_expires_at = None
-        db.commit()
-        return trial.id
+        return trial_id
 
     # --- Persist metrics + mark COMPLETED ------------------------------
     payload = result.metrics

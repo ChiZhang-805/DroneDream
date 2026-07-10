@@ -198,6 +198,66 @@ def test_proposer_rejects_invalid_response(llm_ctx):
         assert result.proposals == []
 
 
+def test_proposer_uses_selected_px4_domain_and_provider_metadata(llm_ctx):
+    ctx = llm_ctx
+    schemas = ctx["schemas"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                optimizer_strategy="gpt",
+                llm=schemas.LLMProviderConfig(
+                    provider="deepseek",
+                    api_key="provider-key",
+                    model="control-tuner-model",
+                    base_url="https://llm.example.test/v1",
+                ),
+                parameter_catalog_version="px4-v1.16",
+                parameter_space=[
+                    schemas.ParameterSelection(
+                        name="MPC_XY_P",
+                        baseline=0.95,
+                        minimum=0.6,
+                        maximum=1.3,
+                        step=0.1,
+                    ),
+                    schemas.ParameterSelection(
+                        name="MPC_TILTMAX_AIR",
+                        baseline=45,
+                        minimum=25,
+                        maximum=60,
+                        step=1,
+                        value_type="integer",
+                    ),
+                ],
+            ),
+        )
+        fake = FakeOpenAIClient(
+            {
+                "proposals": [
+                    {
+                        "label": "px4 candidate",
+                        "rationale": "balance tracking and tilt authority",
+                        "parameters": {"MPC_XY_P": 1.023, "MPC_TILTMAX_AIR": 52.6},
+                    }
+                ]
+            }
+        )
+        criteria = ctx["acceptance"].criteria_for_job(job)
+        result = ctx["proposer"].propose_candidates(db, job, criteria, client=fake)
+        assert result.error is None
+        assert result.model == "control-tuner-model"
+        assert result.proposals[0].parameters == {
+            "MPC_XY_P": 1.0,
+            "MPC_TILTMAX_AIR": 53.0,
+        }
+        prompt = json.loads(fake.calls[0]["user"])
+        assert set(prompt["parameter_domains"]) == {"MPC_XY_P", "MPC_TILTMAX_AIR"}
+        assert prompt["parameter_catalog_version"] == "px4-v1.16"
+        assert job.llm_provider == "deepseek"
+        assert job.llm_base_url == "https://llm.example.test/v1"
+
+
 def test_proposer_handles_client_exception(llm_ctx):
     ctx = llm_ctx
     job_id = _create_gpt_job(ctx)
@@ -264,10 +324,10 @@ def test_create_job_rejects_gpt_without_api_key(llm_ctx):
         assert exc.value.code == "INVALID_INPUT"
 
 
-def test_job_create_request_defaults_are_gpt_and_20(llm_ctx):
+def test_job_create_request_defaults_are_keyless_heuristic_and_20(llm_ctx):
     schemas = llm_ctx["schemas"]
     req = schemas.JobCreateRequest()
-    assert req.optimizer_strategy == "gpt"
+    assert req.optimizer_strategy == "heuristic"
     assert req.max_iterations == 20
 
 

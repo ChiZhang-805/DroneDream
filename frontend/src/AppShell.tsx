@@ -1,25 +1,34 @@
 import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom";
 
-const NAV_ITEMS: { to: string; label: string; end?: boolean }[] = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/jobs/new", label: "New Job" },
-  { to: "/batches/new", label: "New Batch", end: true },
-  { to: "/batches", label: "Batches", end: true },
-  { to: "/history", label: "History / Reports" },
+import { useI18n } from "./i18n/I18nProvider";
+import type { TranslationKey } from "./i18n/I18nProvider";
+
+const NAV_ITEMS: {
+  to: string;
+  labelKey?: TranslationKey;
+  label?: string;
+  end?: boolean;
+}[] = [
+  { to: "/", labelKey: "app.dashboard", end: true },
+  { to: "/jobs/new", labelKey: "app.newExperiment" },
+  { to: "/batches/new", labelKey: "app.newBatch", end: true },
+  { to: "/batches", labelKey: "app.batches", end: true },
+  { to: "/history", labelKey: "app.history" },
   { to: "/ece498", label: "ECE498" },
 ];
 
 export function AppShell() {
   const location = useLocation();
+  const { locale, setLocale, t } = useI18n();
 
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
         <Link to="/" className="app-title">
-          <span className="app-title-mark">◆</span>
+          <span className="app-title-mark" aria-hidden="true">◆</span>
           <span>DroneDream</span>
         </Link>
-        <nav className="app-nav" aria-label="Primary">
+        <nav className="app-nav" aria-label={t("app.primaryNav")}>
           {NAV_ITEMS.map((item) => {
             const isBatchesItem = item.to === "/batches";
             const isBatchesActive =
@@ -40,7 +49,7 @@ export function AppShell() {
                   return isActive ? "active" : undefined;
                 }}
               >
-                {item.label}
+                {item.labelKey ? t(item.labelKey) : item.label}
               </NavLink>
             );
           })}
@@ -51,9 +60,22 @@ export function AppShell() {
       </aside>
       <div className="app-body">
         <header className="app-header">
-          <div className="app-header-title">DroneDream —— Auto Parameter Tuning Platform</div>
+          <div className="app-header-title">DroneDream — {t("app.platform")}</div>
           <div className="app-header-meta">
             <span className="env-chip">live API</span>
+            <label className="language-switcher">
+              <span className="sr-only">{t("app.language")}</span>
+              <select
+                aria-label={t("app.language")}
+                value={locale}
+                onChange={(event) =>
+                  setLocale(event.target.value === "zh-CN" ? "zh-CN" : "en")
+                }
+              >
+                <option value="en">EN</option>
+                <option value="zh-CN">中文</option>
+              </select>
+            </label>
           </div>
         </header>
         <main className="app-main">

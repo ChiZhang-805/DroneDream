@@ -166,6 +166,42 @@ def test_trial_input_payload_includes_advanced_scenario_config() -> None:
     assert payload["advanced_scenario_config"]["wind_gusts"]["enabled"] is True
 
 
+def test_trial_input_payload_carries_vehicle_profile_and_real_px4_parameters() -> None:
+    base = _ctx(parameters={"MPC_XY_P": 1.0, "MC_ROLL_P": 4.5, "kp_xy": 1.0})
+    ctx = TrialContext(
+        trial_id=base.trial_id,
+        job_id=base.job_id,
+        candidate_id=base.candidate_id,
+        seed=base.seed,
+        scenario_type=base.scenario_type,
+        scenario_config=base.scenario_config,
+        parameters=base.parameters,
+        job_config=JobConfig(
+            track_type="circle",
+            start_point_x=0,
+            start_point_y=0,
+            altitude_m=3,
+            wind_north=0,
+            wind_east=0,
+            wind_south=0,
+            wind_west=0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            vehicle_profile={
+                "px4_version": "v1.16",
+                "airframe": "x500",
+                "simulator_model": "gz_x500",
+                "world": "windy",
+            },
+        ),
+    )
+    payload = _trial_input_payload(ctx, Path("/tmp/out.json"))
+    assert payload["px4_version"] == "v1.16"
+    assert payload["vehicle_profile"]["world"] == "windy"
+    assert payload["px4_parameters"] == {"MPC_XY_P": 1.0, "MC_ROLL_P": 4.5}
+    assert payload["job_config"]["px4_parameters"] == payload["px4_parameters"]
+
+
 def test_real_cli_maps_timeout(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "REAL_SIMULATOR_COMMAND",

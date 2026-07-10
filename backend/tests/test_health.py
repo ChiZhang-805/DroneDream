@@ -20,6 +20,38 @@ def test_health_returns_ok_envelope() -> None:
     assert body["data"]["service"] == "drone-dream-backend"
 
 
+def test_liveness_alias_returns_ok() -> None:
+    response = TestClient(app).get("/health/live")
+    assert response.status_code == 200
+    assert response.json()["data"]["status"] == "ok"
+
+
+def test_readiness_checks_database_storage_and_optional_worker() -> None:
+    response = TestClient(app).get("/health/ready")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["status"] == "ready"
+    assert data["components"]["database"]["ok"] is True
+    assert data["components"]["storage"]["ok"] is True
+    assert data["components"]["worker"]["status"] == "not_required"
+
+
+def test_readiness_fails_when_required_worker_signal_is_not_configured(monkeypatch) -> None:
+    from app import config as config_module
+
+    monkeypatch.setenv("REQUIRE_WORKER_HEARTBEAT", "true")
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    config_module.get_settings.cache_clear()
+    try:
+        response = TestClient(app).get("/health/ready")
+        assert response.status_code == 503
+        data = response.json()["data"]
+        assert data["status"] == "not_ready"
+        assert data["components"]["worker"]["status"] == "not_configured"
+    finally:
+        config_module.get_settings.cache_clear()
+
+
 def test_envelope_helpers_shape() -> None:
     success = ok({"foo": 1})
     assert success == {"success": True, "data": {"foo": 1}, "error": None}

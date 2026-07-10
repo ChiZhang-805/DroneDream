@@ -8,11 +8,16 @@ independently of the HTTP layer.
 from __future__ import annotations
 
 import importlib
+import sys
+import time
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy.orm import Session
+
+from app.simulator import MockSimulatorAdapter, TrialContext, TrialResult
 
 
 @pytest.fixture()
@@ -27,13 +32,16 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
+    models_was_loaded = "app.models" in sys.modules
+
     import app.db as db_module
 
     importlib.reload(db_module)
 
-    import app.models as models_module
-
-    importlib.reload(models_module)
+    if models_was_loaded:
+        models_module = importlib.reload(sys.modules["app.models"])
+    else:
+        models_module = importlib.import_module("app.models")
 
     import app.services.jobs as jobs_service_module
 
@@ -158,6 +166,154 @@ def test_start_queued_jobs_creates_baseline_and_trials(orchestration_ctx):
         assert "optimizer_started" in events
         assert "optimizer_candidate_created" in events
         assert "trial_dispatched" in events
+
+
+def test_explicit_scenario_suite_uses_common_random_numbers_for_every_candidate(
+    orchestration_ctx,
+):
+    ctx = orchestration_ctx
+    schemas = ctx["schemas"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                optimizer_strategy="heuristic",
+                parameter_catalog_version="test-catalog",
+                parameter_space=[
+                    schemas.ParameterSelection(
+                        name="MPC_XY_P",
+                        baseline=0.95,
+                        minimum=0.6,
+                        maximum=1.3,
+                        step=0.1,
+                    )
+                ],
+                scenario_suite=schemas.ScenarioSuiteConfig(
+                    cases=[
+                        schemas.ScenarioCaseConfig(
+                            id="nominal", scenario_type="nominal", seeds=[11, 12]
+                        ),
+                        schemas.ScenarioCaseConfig(
+                            id="wind-validation",
+                            scenario_type="wind_perturbed",
+                            seeds=[91],
+                            holdout=True,
+                            config={"wind_mps": 8},
+                        ),
+                    ],
+                    common_random_numbers=True,
+                ),
+            ),
+        )
+        job_id = job.id
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert len(job.candidates) == 4
+        assert job.progress_total_trials == 4 * 3
+        scenario_keys_by_candidate = {
+            candidate.id: {
+                (
+                    trial.scenario_config_json["scenario_case_id"],
+                    trial.seed,
+                    trial.scenario_type,
+                )
+                for trial in candidate.trials
+            }
+            for candidate in job.candidates
+        }
+        expected = {
+            ("nominal", 11, "nominal"),
+            ("nominal", 12, "nominal"),
+            ("wind-validation", 91, "wind_perturbed"),
+        }
+        assert all(keys == expected for keys in scenario_keys_by_candidate.values())
+        assert all(
+            trial.scenario_config_json["holdout"] is True
+            for trial in job.trials
+            if trial.scenario_config_json["scenario_case_id"] == "wind-validation"
+        )
+
+
+def test_holdout_results_never_influence_candidate_selection(orchestration_ctx):
+    """A validation scenario may be reported, but cannot steer optimization."""
+
+    ctx = orchestration_ctx
+    schemas = ctx["schemas"]
+    objective = schemas.ObjectiveConfig(
+        objectives=[
+            schemas.ObjectiveSpec(metric="rmse", direction="minimize", weight=1.0)
+        ],
+        constraints=[
+            schemas.ConstraintSpec(metric="pass_rate", operator="gte", threshold=0.5)
+        ],
+    )
+    suite = schemas.ScenarioSuiteConfig(
+        cases=[
+            schemas.ScenarioCaseConfig(id="training", seeds=[1]),
+            schemas.ScenarioCaseConfig(id="validation", seeds=[2], holdout=True),
+        ]
+    )
+
+    def metric(rmse: float, *, passed: bool) -> SimpleNamespace:
+        return SimpleNamespace(
+            rmse=rmse,
+            max_error=rmse * 2,
+            overshoot_count=0,
+            completion_time=10.0,
+            crash_flag=False,
+            timeout_flag=False,
+            score=rmse,
+            final_error=rmse,
+            pass_flag=passed,
+            instability_flag=False,
+            raw_metric_json={},
+        )
+
+    def aggregate(holdout_rmse: float) -> tuple[SimpleNamespace, dict]:
+        candidate = SimpleNamespace(
+            is_baseline=False,
+            trial_count=0,
+            completed_trial_count=0,
+            failed_trial_count=0,
+            aggregated_metric_json=None,
+            aggregated_score=None,
+        )
+        trials = [
+            SimpleNamespace(
+                status="COMPLETED",
+                metric=metric(2.0, passed=True),
+                scenario_config_json={"scenario_case_id": "training", "holdout": False},
+                scenario_type="nominal",
+            ),
+            SimpleNamespace(
+                status="COMPLETED",
+                metric=metric(holdout_rmse, passed=holdout_rmse < 1.0),
+                scenario_config_json={"scenario_case_id": "validation", "holdout": True},
+                scenario_type="nominal",
+            ),
+        ]
+        result = ctx["aggregation"]._aggregate_candidate(
+            candidate,
+            trials,
+            objective_config=objective,
+            scenario_suite=suite,
+        )
+        assert result is not None
+        return candidate, result
+
+    excellent_holdout, excellent_metrics = aggregate(0.01)
+    failed_holdout, failed_metrics = aggregate(100.0)
+
+    assert excellent_holdout.aggregated_score == failed_holdout.aggregated_score
+    assert excellent_metrics["objective_values"] == failed_metrics["objective_values"]
+    assert excellent_metrics["rmse"] == failed_metrics["rmse"] == 2.0
+    assert excellent_metrics["training_trial_count"] == 1
+    assert excellent_metrics["training_completed_trial_count"] == 1
+    assert excellent_metrics["holdout"]["objective_values"]["rmse"] == 0.01
+    assert failed_metrics["holdout"]["objective_values"]["rmse"] == 100.0
+    assert ctx["aggregation"]._is_eligible(excellent_holdout) is True
 
 
 def test_start_queued_jobs_skips_non_queued(orchestration_ctx):
@@ -297,6 +453,82 @@ def test_unexpired_lease_blocks_second_worker(orchestration_ctx):
     with ctx["db_module"].SessionLocal() as db:
         claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(db, "worker-b")
     assert claimed is None
+
+
+def test_long_trial_renews_lease_while_simulator_runs(
+    orchestration_ctx, monkeypatch
+):
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    monkeypatch.setenv("WORKER_LEASE_SECONDS", "1")
+    monkeypatch.setenv("WORKER_LEASE_HEARTBEAT_SECONDS", "0.05")
+
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+
+    class SlowAdapter(MockSimulatorAdapter):
+        backend_name = "slow-mock"
+
+        def __init__(self) -> None:
+            self.before = None
+            self.after = None
+
+        def prepare(self, trial_ctx: TrialContext) -> None:
+            with ctx["db_module"].SessionLocal() as heartbeat_db:
+                row = heartbeat_db.get(ctx["models"].Trial, trial_ctx.trial_id)
+                self.before = row.lease_expires_at
+
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            time.sleep(0.35)
+            with ctx["db_module"].SessionLocal() as heartbeat_db:
+                row = heartbeat_db.get(ctx["models"].Trial, trial_ctx.trial_id)
+                self.after = row.lease_expires_at
+            return super().run_trial(trial_ctx)
+
+    adapter = SlowAdapter()
+    try:
+        with ctx["db_module"].SessionLocal() as db:
+            claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db, "worker-heartbeat", adapter=adapter
+            )
+        assert claimed == trial_id
+        assert adapter.before is not None
+        assert adapter.after is not None
+        assert adapter.after > adapter.before
+    finally:
+        get_settings.cache_clear()
+
+
+def test_reclaimed_attempt_fences_stale_result_persistence(orchestration_ctx):
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+
+    class ReclaimingAdapter(MockSimulatorAdapter):
+        backend_name = "reclaiming-mock"
+
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            with ctx["db_module"].SessionLocal() as reclaim_db:
+                row = reclaim_db.get(ctx["models"].Trial, trial_ctx.trial_id)
+                row.worker_id = "worker-new"
+                row.lease_owner = "worker-new"
+                row.attempt_count += 1
+                row.lease_expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+                reclaim_db.commit()
+            return super().run_trial(trial_ctx)
+
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db, "worker-old", adapter=ReclaimingAdapter()
+        )
+    assert claimed == trial_id
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial.status == "RUNNING"
+        assert trial.lease_owner == "worker-new"
+        assert trial.attempt_count == 2
+        assert trial.metric is None
 
 
 def test_cancel_job_clears_trial_lease(orchestration_ctx):

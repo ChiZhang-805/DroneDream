@@ -22,6 +22,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from app import schemas
+from app.optimization.design import halton_design
+from app.optimization.domain import SearchSpace
 from app.orchestration import constants
 
 # Whitelisted parameter keys the optimizer is allowed to vary. The caller can
@@ -188,4 +191,39 @@ def generate_candidates(
     return proposals
 
 
-__all__ = ["CandidateProposal", "generate_candidates"]
+def generate_selected_parameter_candidates(
+    parameter_space_json: list[dict[str, Any]],
+    *,
+    count: int = 3,
+) -> list[CandidateProposal]:
+    """Generate a space-filling first generation for arbitrary PX4 parameters."""
+
+    if count < 1 or count > 32:
+        raise ValueError("selected-parameter candidate count must be in [1, 32]")
+    selections = [
+        schemas.ParameterSelection(**item)
+        for item in parameter_space_json
+        if item.get("enabled", True)
+    ]
+    search_space = SearchSpace.from_schema(selections)
+    design = halton_design(search_space, count + 1, include_baseline=True)
+    non_baseline = design[1 : count + 1]
+    return [
+        CandidateProposal(
+            generation_index=index,
+            label=f"space_filling_{index}",
+            strategy=(
+                "Deterministic Halton space-filling proposal over the user-selected "
+                f"PX4 domain ({len(search_space.tunable)} tunable dimensions)."
+            ),
+            parameters=parameters,
+        )
+        for index, parameters in enumerate(non_baseline, start=1)
+    ]
+
+
+__all__ = [
+    "CandidateProposal",
+    "generate_candidates",
+    "generate_selected_parameter_candidates",
+]

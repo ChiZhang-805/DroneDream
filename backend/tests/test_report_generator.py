@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import sys
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -28,13 +29,16 @@ def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
+    models_was_loaded = "app.models" in sys.modules
+
     import app.db as db_module
 
     importlib.reload(db_module)
 
-    import app.models as models_module
-
-    importlib.reload(models_module)
+    if models_was_loaded:
+        models_module = importlib.reload(sys.modules["app.models"])
+    else:
+        models_module = importlib.import_module("app.models")
 
     import app.services.jobs as jobs_service_module
 
@@ -699,7 +703,7 @@ def test_generate_job_pdf_report_excludes_secret_values(ctx, tmp_path):
         db.add(job)
         db.flush()
 
-        secret_value = "sk-secret-should-not-appear"
+        secret_value = "test-secret-should-not-appear"
         baseline = models.CandidateParameterSet(
             job_id=job.id,
             source_type="baseline",

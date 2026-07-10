@@ -149,6 +149,7 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 | `POST` | `/api/v1/jobs/{job_id}/rerun` | Clone config as a new `QUEUED` job. |
 | `POST` | `/api/v1/jobs/{job_id}/cancel` | Cancel a non-terminal job. |
 | `GET` | `/api/v1/jobs/{job_id}/trials` | Per-job trial summaries. |
+| `GET` | `/api/v1/jobs/{job_id}/candidates` | Candidate history, feasibility, Pareto front, and recommendations. |
 | `GET` | `/api/v1/trials/{trial_id}` | Trial detail (metrics, failure reason, artifacts). |
 | `GET` | `/api/v1/jobs/{job_id}/report` | Job report (requires job in `COMPLETED`). |
 | `GET` | `/api/v1/jobs/{job_id}/artifacts` | Artifact metadata list. |
@@ -174,39 +175,38 @@ Request body (Phase 7 baseline — all Phase 8 fields below are optional):
 }
 ```
 
-**Phase 8 optional fields** (see
-[`archive/phase8-real-sim-and-gpt-tuning.md`](archive/phase8-real-sim-and-gpt-tuning.md) for
-full details):
+**Optimization fields** (see [`09-optimizer-guide.md`](09-optimizer-guide.md) for
+the full advanced experiment contract):
 
 ```json
 {
   "simulator_backend": "mock",
-  "optimizer_strategy": "gpt",
+  "optimizer_strategy": "heuristic",
   "max_iterations": 20,
   "trials_per_candidate": 3,
   "acceptance_criteria": {
     "target_rmse": 0.5,
     "target_max_error": 1.5,
     "min_pass_rate": 0.8
-  },
-  "openai": {
-    "api_key": "sk-...",
-    "model": "gpt-4.1"
   }
 }
 ```
 
 - `simulator_backend`: `"mock"` (default) or `"real_cli"`.
-- `optimizer_strategy`: `"gpt"` (default) or `"heuristic"`.
-- `openai.api_key` is required **only** when `optimizer_strategy == "gpt"`;
+- `optimizer_strategy`: `"heuristic"` (default), `"none"`, `"cma_es"`, or `"gpt"`.
+- New clients should send provider credentials in `llm`; legacy `openai` remains accepted.
+- An API key is required **only** when `optimizer_strategy == "gpt"`;
   the server stores it encrypted (Fernet via `APP_SECRET_KEY`) and never
   returns it in any response.
+- `vehicle_profile`, `parameter_space`, `objective_config`, `scenario_suite`, and
+  `max_total_trials` define the reproducible advanced experiment. See
+  [`09-optimizer-guide.md`](09-optimizer-guide.md).
 - Acceptance criteria fields are all optional; `null` disables that check.
 
-The job response echoes these Phase 8 fields (with the key redacted):
+The job response echoes these fields (with every API key redacted):
 `simulator_backend_requested`, `optimizer_strategy`, `max_iterations`,
 `trials_per_candidate`, `acceptance_criteria`, `current_generation`,
-`optimization_outcome`, `openai_model`.
+`optimization_outcome`, provider/model metadata, and the advanced experiment config.
 
 Validation errors:
 
@@ -277,19 +277,20 @@ Creates a new job by cloning the source job's configuration. Response
 matches `POST /api/v1/jobs` exactly: the full new `Job` object plus the
 `job_id` alias. The new job's `source_job_id` references the original.
 
-For source jobs with `optimizer_strategy="gpt"`, the rerun request must
-include a fresh key:
+For source jobs with `optimizer_strategy="gpt"`, the rerun request must include a
+fresh provider configuration/key; stored credentials are never reused:
 
 ```json
 {
-  "openai": {
-    "api_key": "sk-..."
+  "llm": {
+    "provider": "openai",
+    "api_key": "<API_KEY>",
+    "model": "gpt-4.1"
   }
 }
 ```
 
-GPT reruns remain GPT-based; the previously stored encrypted job key is not
-reused.
+LLM reruns remain LLM-based; the previously stored encrypted job key is not reused.
 
 ### 7.5 `POST /api/v1/jobs/{job_id}/cancel`
 

@@ -28,10 +28,12 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app import models
+from app import models, schemas
+from app.optimization.robust import CandidateEvaluation
+from app.optimization.robust import evaluate_candidate as evaluate_objectives
 from app.orchestration import constants, report_generator
 from app.orchestration.acceptance import (
     AcceptanceCriteria,
@@ -100,6 +102,9 @@ def _score_candidate(metrics: list[models.TrialMetric], trial_count: int, failed
 def _aggregate_candidate(
     candidate: models.CandidateParameterSet,
     trials: list[models.Trial],
+    *,
+    objective_config: schemas.ObjectiveConfig | None = None,
+    scenario_suite: schemas.ScenarioSuiteConfig | None = None,
 ) -> dict[str, Any] | None:
     """Roll up this candidate's trial metrics, update counts + aggregated_score.
 
@@ -150,6 +155,167 @@ def _aggregate_candidate(
         # acceptance.evaluate_candidate and the UI in sync.
         "passing_trial_count": passing_trial_count,
     }
+    if objective_config is not None:
+        cases_by_id = {
+            case.id: case
+            for case in (scenario_suite.cases if scenario_suite is not None else [])
+            if case.enabled
+        }
+        cases_by_type: dict[str, schemas.ScenarioCaseConfig] = {}
+        for case in cases_by_id.values():
+            cases_by_type.setdefault(case.scenario_type, case)
+
+        def _evaluate_rows(
+            rows: list[models.Trial],
+        ) -> tuple[CandidateEvaluation, float] | None:
+            completed_rows = [
+                trial
+                for trial in rows
+                if trial.status == "COMPLETED" and trial.metric is not None
+            ]
+            if not completed_rows:
+                return None
+            failed_rate = sum(1 for trial in rows if trial.status == "FAILED") / max(
+                1, len(rows)
+            )
+            pass_rate = sum(
+                1 for trial in completed_rows if trial.metric and trial.metric.pass_flag
+            ) / max(1, len(rows))
+            samples: list[dict[str, float]] = []
+            sample_weights: list[float] = []
+            for trial in completed_rows:
+                metric = trial.metric
+                assert metric is not None
+                sample: dict[str, float] = {
+                    "rmse": float(metric.rmse or 0.0),
+                    "max_error": float(metric.max_error or 0.0),
+                    "overshoot_count": float(metric.overshoot_count or 0),
+                    "completion_time": float(metric.completion_time or 0.0),
+                    "crash_flag": float(metric.crash_flag),
+                    "timeout_flag": float(metric.timeout_flag),
+                    "score": float(metric.score or 0.0),
+                    "final_error": float(metric.final_error or 0.0),
+                    "pass_flag": float(metric.pass_flag),
+                    "instability_flag": float(metric.instability_flag),
+                    "failed_trial_rate": failed_rate,
+                    "pass_rate": pass_rate,
+                }
+                for key, raw_value in (metric.raw_metric_json or {}).items():
+                    if isinstance(raw_value, (bool, int, float)):
+                        sample[key] = float(raw_value)
+                samples.append(sample)
+                scenario_config = trial.scenario_config_json or {}
+                case_id = scenario_config.get("scenario_case_id")
+                case = cases_by_id.get(str(case_id)) if case_id is not None else None
+                if case is None:
+                    case = cases_by_type.get(trial.scenario_type)
+                sample_weights.append(case.weight if case is not None else 1.0)
+            return (
+                evaluate_objectives(
+                    samples,
+                    objective_config,
+                    sample_weights=sample_weights,
+                ),
+                failed_rate,
+            )
+
+        training_trials = [
+            trial
+            for trial in trials
+            if not bool((trial.scenario_config_json or {}).get("holdout"))
+        ]
+        try:
+            training_result = _evaluate_rows(training_trials)
+        except ValueError as exc:
+            agg["objective_evaluation_error"] = str(exc)
+            candidate.aggregated_metric_json = agg
+            candidate.aggregated_score = None
+            return agg
+        if training_result is None:
+            agg["objective_evaluation_error"] = "no completed training scenario metrics"
+            candidate.aggregated_metric_json = agg
+            candidate.aggregated_score = None
+            return agg
+        evaluation, failed_rate = training_result
+        training_completed = [
+            trial
+            for trial in training_trials
+            if trial.status == "COMPLETED" and trial.metric is not None
+        ]
+        training_metrics = [
+            trial.metric for trial in training_completed if trial.metric is not None
+        ]
+        training_passing = sum(1 for metric in training_metrics if metric.pass_flag)
+        training_failed = sum(1 for trial in training_trials if trial.status == "FAILED")
+        agg.update(
+            {
+                "rmse": _avg([metric.rmse or 0.0 for metric in training_metrics]),
+                "max_error": _avg(
+                    [metric.max_error or 0.0 for metric in training_metrics]
+                ),
+                "overshoot_count": int(
+                    round(
+                        sum(metric.overshoot_count or 0 for metric in training_metrics)
+                        / len(training_metrics)
+                    )
+                ),
+                "completion_time": _avg(
+                    [metric.completion_time or 0.0 for metric in training_metrics]
+                ),
+                "score": _avg([metric.score or 0.0 for metric in training_metrics]),
+                "passing_trial_count": training_passing,
+                "training_completed_trial_count": len(training_completed),
+                "training_failed_trial_count": training_failed,
+                "training_passing_trial_count": training_passing,
+            }
+        )
+        selection_score = evaluation.scalar_loss
+        selection_score += constants.SCORE_WEIGHTS["failed_trial"] * failed_rate
+        if not evaluation.feasible:
+            selection_score += 1_000_000.0 + 1_000.0 * evaluation.total_violation
+        aggregated_score = round(selection_score, 8)
+        agg.update(
+            {
+                "aggregated_score": aggregated_score,
+                "objective_values": evaluation.objectives,
+                "constraint_values": evaluation.constraint_values,
+                "constraint_violations": evaluation.violations,
+                "feasible": evaluation.feasible,
+                "total_constraint_violation": evaluation.total_violation,
+                "robust_aggregation": objective_config.robust_aggregation,
+                "scalar_loss": evaluation.scalar_loss,
+                "training_trial_count": len(training_trials),
+            }
+        )
+        holdout_trials = [
+            trial
+            for trial in trials
+            if bool((trial.scenario_config_json or {}).get("holdout"))
+        ]
+        if holdout_trials:
+            try:
+                holdout_result = _evaluate_rows(holdout_trials)
+            except ValueError as exc:
+                agg["holdout"] = {
+                    "trial_count": len(holdout_trials),
+                    "evaluation_error": str(exc),
+                }
+            else:
+                if holdout_result is None:
+                    agg["holdout"] = {
+                        "trial_count": len(holdout_trials),
+                        "evaluation_error": "no completed holdout metrics",
+                    }
+                else:
+                    holdout_evaluation, _holdout_failed_rate = holdout_result
+                    agg["holdout"] = {
+                        "trial_count": len(holdout_trials),
+                        "objective_values": holdout_evaluation.objectives,
+                        "constraint_values": holdout_evaluation.constraint_values,
+                        "constraint_violations": holdout_evaluation.violations,
+                        "feasible": holdout_evaluation.feasible,
+                        "total_constraint_violation": holdout_evaluation.total_violation,
+                    }
     candidate.aggregated_metric_json = agg
     candidate.aggregated_score = aggregated_score
     return agg
@@ -169,11 +335,19 @@ def _is_eligible(candidate: models.CandidateParameterSet) -> bool:
 
     if candidate.aggregated_score is None:
         return False
+    aggregate = candidate.aggregated_metric_json or {}
+    trial_count = int(aggregate.get("training_trial_count", candidate.trial_count) or 0)
+    completed_trial_count = int(
+        aggregate.get(
+            "training_completed_trial_count", candidate.completed_trial_count
+        )
+        or 0
+    )
     if candidate.is_baseline:
-        return candidate.completed_trial_count > 0
-    if candidate.trial_count <= 0:
+        return completed_trial_count > 0
+    if trial_count <= 0:
         return False
-    ratio = candidate.completed_trial_count / candidate.trial_count
+    ratio = completed_trial_count / trial_count
     return ratio >= constants.MIN_COMPLETED_TRIAL_RATIO
 
 
@@ -238,7 +412,7 @@ def finalize_job_if_ready(
     iteration/trial budget is exhausted.
     """
 
-    if job.status not in {"RUNNING", "AGGREGATING"}:
+    if job.status not in {"RUNNING", "AGGREGATING", "FINALIZING"}:
         return False
 
     trials = list(job.trials)
@@ -272,11 +446,31 @@ def finalize_job_if_ready(
     for t in trials:
         trials_by_candidate.setdefault(t.candidate_id, []).append(t)
 
-    baseline_agg = _aggregate_candidate(baseline, trials_by_candidate.get(baseline.id, []))
+    objective_config = (
+        schemas.ObjectiveConfig(**job.objective_config_json)
+        if job.objective_config_json is not None
+        else None
+    )
+    scenario_suite = (
+        schemas.ScenarioSuiteConfig(**job.scenario_suite_json)
+        if job.scenario_suite_json is not None
+        else None
+    )
+    baseline_agg = _aggregate_candidate(
+        baseline,
+        trials_by_candidate.get(baseline.id, []),
+        objective_config=objective_config,
+        scenario_suite=scenario_suite,
+    )
     for candidate in candidates:
         if candidate.id == baseline.id:
             continue
-        _aggregate_candidate(candidate, trials_by_candidate.get(candidate.id, []))
+        _aggregate_candidate(
+            candidate,
+            trials_by_candidate.get(candidate.id, []),
+            objective_config=objective_config,
+            scenario_suite=scenario_suite,
+        )
 
     if baseline_agg is None:
         _fail_job(
@@ -567,7 +761,13 @@ def set_llm_client_override(client: object | None) -> None:
 
 
 def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
-    """Finalize up to ``limit`` jobs that are ready to complete."""
+    """Atomically claim and finalize up to ``limit`` ready jobs.
+
+    ``FINALIZING`` is a transaction-scoped claim: it is committed only with
+    the terminal result (or with a newly dispatched iterative generation).
+    A worker crash before that point rolls the status change back, so another
+    worker can safely retry without a separate job-lease column.
+    """
 
     stmt = (
         select(models.Job)
@@ -576,6 +776,24 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
     )
     finalized: list[str] = []
     for job in list(db.scalars(stmt)):
+        trials = list(job.trials)
+        if not trials or not all(t.status in _TERMINAL_TRIAL for t in trials):
+            continue
+        claimed = db.execute(
+            update(models.Job)
+            .where(
+                models.Job.id == job.id,
+                models.Job.status.in_(["RUNNING", "AGGREGATING"]),
+            )
+            .values(status="FINALIZING", current_phase="aggregating")
+            .execution_options(synchronize_session=False)
+        )
+        if claimed.rowcount != 1:  # type: ignore[attr-defined]
+            db.rollback()
+            continue
+        db.expire(job)
+        db.refresh(job)
+        record_event(db, job.id, "aggregation_started", None)
         if finalize_job_if_ready(db, job, llm_client=_llm_client_override):
             finalized.append(job.id)
     return finalized

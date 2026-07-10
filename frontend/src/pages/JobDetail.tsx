@@ -18,6 +18,7 @@ import { Loading, ErrorState, Empty } from "../components/States";
 import { ComparisonChart } from "../components/ComparisonChart";
 import { ArtifactsPanel } from "../components/ArtifactsPanel";
 import { GazeboLivePanel } from "../components/GazeboLivePanel";
+import { OptimizationInsights } from "../components/OptimizationInsights";
 
 // Polling interval for active jobs. The frontend only polls; all state
 // transitions are driven by the backend worker process (Phase 3+). See
@@ -190,6 +191,17 @@ export function JobDetail() {
         : false,
   });
 
+  const candidatesQuery = useQuery({
+    queryKey: ["job-candidates", safeId],
+    queryFn: () => apiClient.listJobCandidates(safeId),
+    enabled: !!safeId,
+    refetchInterval:
+      jobStatus && isActiveJobStatus(jobStatus)
+        ? ACTIVE_POLL_INTERVAL_MS
+        : false,
+    retry: false,
+  });
+
   const job = jobQuery.data;
   // Phase 8: FAILED jobs (e.g. MAX_ITERATIONS_REACHED) may still have a
   // best-so-far READY report; the backend returns it if available and
@@ -356,6 +368,31 @@ export function JobDetail() {
       ) : null}
 
       <SectionCard
+        title="Optimization search insights"
+        description="Generation convergence, per-candidate evidence, and a score/pass-rate Pareto-style view derived from completed trials."
+      >
+        {trialsQuery.isLoading ? (
+          <Loading label="Loading optimization evidence…" />
+        ) : trialsQuery.isError ? (
+          <div className="insight-empty">
+            Search charts are unavailable because trial data could not be loaded.
+          </div>
+        ) : (
+          <>
+            {candidatesQuery.isError ? (
+              <p className="form-hint insight-fallback-note">
+                The advanced candidate/Pareto endpoint is unavailable; this view is derived from trial summaries.
+              </p>
+            ) : null}
+            <OptimizationInsights
+              trials={trials}
+              history={candidatesQuery.data}
+            />
+          </>
+        )}
+      </SectionCard>
+
+      <SectionCard
         title="Trials"
         description="Per-candidate evaluation runs for this job."
       >
@@ -493,6 +530,31 @@ function JobSummaryCard({ job }: { job: Job }) {
           <span className="kv-key">Objective profile</span>
           <span className="kv-value">{job.objective_profile}</span>
         </li>
+        {job.vehicle_profile ? (
+          <li>
+            <span className="kv-key">Vehicle / firmware</span>
+            <span className="kv-value">
+              {job.vehicle_profile.airframe} · {job.vehicle_profile.simulator_model} · PX4 {job.vehicle_profile.px4_version}
+              {job.vehicle_profile.firmware_commit ? ` @ ${job.vehicle_profile.firmware_commit}` : ""}
+            </span>
+          </li>
+        ) : null}
+        {job.parameter_space && job.parameter_space.length > 0 ? (
+          <li>
+            <span className="kv-key">Tunable PX4 parameters</span>
+            <span className="kv-value">
+              {job.parameter_space.filter((parameter) => parameter.enabled && !parameter.locked).length} dimensions · {job.parameter_space.map((parameter) => parameter.name).join(", ")}
+            </span>
+          </li>
+        ) : null}
+        {job.scenario_suite ? (
+          <li>
+            <span className="kv-key">Scenario suite</span>
+            <span className="kv-value">
+              {job.scenario_suite.cases.filter((scenario) => scenario.enabled && !scenario.holdout).length} search cases · {job.scenario_suite.cases.filter((scenario) => scenario.enabled && scenario.holdout).length} holdout cases · matched randomness {job.scenario_suite.common_random_numbers ? "on" : "off"}
+            </span>
+          </li>
+        ) : null}
         <li>
           <span className="kv-key">Altitude</span>
           <span className="kv-value">{job.altitude_m} m</span>
@@ -548,6 +610,9 @@ function ExecutionBackendCard({ job }: { job: Job }) {
             {job.openai_model ? (
               <span className="form-hint"> · model {job.openai_model}</span>
             ) : null}
+            {job.llm_provider ? (
+              <span className="form-hint"> · provider {job.llm_provider}</span>
+            ) : null}
           </span>
         </li>
         <li>
@@ -560,6 +625,12 @@ function ExecutionBackendCard({ job }: { job: Job }) {
           <span className="kv-key">Trials per candidate</span>
           <span className="kv-value">{job.trials_per_candidate}</span>
         </li>
+        {job.max_total_trials ? (
+          <li>
+            <span className="kv-key">Maximum total trials</span>
+            <span className="kv-value">{job.max_total_trials}</span>
+          </li>
+        ) : null}
         <li>
           <span className="kv-key">Acceptance criteria</span>
           <span className="kv-value">

@@ -28,6 +28,7 @@ from app.db import SessionLocal
 from app.orchestration.aggregation import finalize_ready_jobs
 from app.orchestration.job_manager import start_queued_jobs
 from app.orchestration.trial_executor import claim_and_run_one_pending_trial
+from app.orchestration.worker_presence import WorkerPresenceHeartbeat
 
 logger = logging.getLogger("drone_dream.orchestration.runner")
 
@@ -82,6 +83,8 @@ def run_forever(
     wid = worker_id or _default_worker_id()
     _install_signal_handlers()
     logger.info("worker %s starting (poll_interval=%.2fs)", wid, poll_interval_seconds)
+    presence = WorkerPresenceHeartbeat(wid)
+    presence.start()
 
     iterations = 0
     try:
@@ -99,5 +102,6 @@ def run_forever(
     except WorkerStopped:
         pass
     finally:
+        presence.stop()
         logger.info("worker %s stopped after %d ticks", wid, iterations)
     return 0

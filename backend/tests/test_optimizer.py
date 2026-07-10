@@ -11,8 +11,12 @@ from __future__ import annotations
 
 import pytest
 
+from app import models, schemas
 from app.orchestration import aggregation, constants
-from app.orchestration.optimizer import generate_candidates
+from app.orchestration.optimizer import (
+    generate_candidates,
+    generate_selected_parameter_candidates,
+)
 
 # --- Candidate generation --------------------------------------------------
 
@@ -84,6 +88,43 @@ def test_generate_candidates_generation_index_starts_at_one() -> None:
     assert [p.generation_index for p in proposals] == list(
         range(1, len(proposals) + 1)
     )
+
+
+def test_generate_selected_parameter_candidates_uses_declared_domain() -> None:
+    proposals = generate_selected_parameter_candidates(
+        [
+            {
+                "name": "MPC_XY_P",
+                "baseline": 0.95,
+                "minimum": 0.2,
+                "maximum": 2.0,
+                "step": 0.05,
+                "scale": "linear",
+                "value_type": "float",
+                "enabled": True,
+                "locked": False,
+            },
+            {
+                "name": "MPC_TILTMAX_AIR",
+                "baseline": 45,
+                "minimum": 20,
+                "maximum": 70,
+                "step": 1,
+                "scale": "linear",
+                "value_type": "integer",
+                "enabled": True,
+                "locked": False,
+            },
+        ],
+        count=4,
+    )
+    assert len(proposals) == 4
+    assert len({tuple(sorted(item.parameters.items())) for item in proposals}) == 4
+    assert all(
+        set(item.parameters) == {"MPC_XY_P", "MPC_TILTMAX_AIR"}
+        for item in proposals
+    )
+    assert all(item.parameters["MPC_TILTMAX_AIR"].is_integer() for item in proposals)
 
 
 # --- Aggregation scoring ---------------------------------------------------
@@ -164,6 +205,69 @@ def test_score_weights_match_expected_public_values() -> None:
         "instability": 1.0,
         "failed_trial": 1.5,
     }
+
+
+def test_multiobjective_aggregation_uses_robust_score_and_hard_constraints() -> None:
+    candidate = models.CandidateParameterSet(
+        id="cand_robust",
+        job_id="job_robust",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trials: list[models.Trial] = []
+    for index, (rmse, crashed) in enumerate(((0.5, False), (2.0, True)), start=1):
+        trial = models.Trial(
+            id=f"trial_{index}",
+            job_id="job_robust",
+            candidate_id=candidate.id,
+            seed=index,
+            scenario_type="wind_perturbed",
+            scenario_config_json={"scenario_case_id": "wind"},
+            status="COMPLETED",
+        )
+        trial.metric = models.TrialMetric(
+            trial_id=trial.id,
+            rmse=rmse,
+            max_error=rmse * 2,
+            overshoot_count=0,
+            completion_time=10,
+            crash_flag=crashed,
+            timeout_flag=False,
+            score=rmse,
+            final_error=0,
+            pass_flag=not crashed,
+            instability_flag=False,
+        )
+        trials.append(trial)
+    objective_config = schemas.ObjectiveConfig(
+        objectives=[schemas.ObjectiveSpec(metric="rmse", direction="minimize")],
+        constraints=[
+            schemas.ConstraintSpec(
+                metric="crash_flag", operator="lte", threshold=0, hard=True
+            )
+        ],
+        robust_aggregation="worst",
+    )
+    scenario_suite = schemas.ScenarioSuiteConfig(
+        cases=[
+            schemas.ScenarioCaseConfig(
+                id="wind", scenario_type="wind_perturbed", seeds=[1, 2]
+            )
+        ]
+    )
+    result = aggregation._aggregate_candidate(
+        candidate,
+        trials,
+        objective_config=objective_config,
+        scenario_suite=scenario_suite,
+    )
+    assert result is not None
+    assert result["objective_values"] == {"rmse": 2.0}
+    assert result["feasible"] is False
+    assert result["constraint_violations"]
+    assert candidate.aggregated_score is not None
+    assert candidate.aggregated_score > 1_000_000
 
 
 # --- Best candidate selection ---------------------------------------------

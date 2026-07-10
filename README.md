@@ -15,7 +15,13 @@ DroneDream is a PX4/Gazebo-oriented web platform for automatic drone parameter t
 # Core Capabilities
 
 - `real_cli` integration with PX4/Gazebo SITL.
-- Heuristic and GPT-based parameter proposal strategies.
+- User-selectable, versioned PX4 parameter domains with safe-bound validation and
+  write/readback evidence.
+- Keyless heuristic, generic CMA-ES, and provider-neutral LLM proposal strategies.
+- Multi-objective robust scoring, constraints, fair seed matrices, holdout validation,
+  Pareto recommendations, and generation history.
+- Seven-step experiment builder with track editing and Chinese/English UI support.
+- PostgreSQL/S3/OIDC-ready multi-user deployment foundation.
 - noVNC/Gazebo GUI visualization and replay.
 - Artifact download and report generation.
 
@@ -251,7 +257,9 @@ PX4_GAZEBO_ALLOW_CSV_TELEMETRY=false
 PX4_AUTOPILOT_DIR=/workspace/PX4-Autopilot
 PX4_SETUP_COMMANDS="source /workspace/PX4-Autopilot/.venv/bin/activate"
 PX4_LAUNCH_COMMAND_TEMPLATE=
-PX4_MAKE_TARGET=gz_x500
+# Leave blank to use each job's vehicle_profile.simulator_model.
+PX4_MAKE_TARGET=
+PX4_FORCE_MAKE_TARGET=false
 PX4_RUN_SECONDS=90
 PX4_READY_TIMEOUT_SECONDS=30
 PX4_SITE_DRY_RUN=false

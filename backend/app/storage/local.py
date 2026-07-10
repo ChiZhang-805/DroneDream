@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
 from app.config import get_settings
@@ -28,3 +29,15 @@ class LocalArtifactStorage(ArtifactStorage):
             raise ValueError("Artifact path is outside allowed roots.")
         if path.exists() and path.is_file():
             path.unlink()
+
+    def presign_download(
+        self, storage_uri: str, *, expires_seconds: int | None = None
+    ) -> str | None:
+        _ = storage_uri, expires_seconds
+        return None
+
+    def check_health(self) -> None:
+        root = get_settings().default_artifact_root_path
+        root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(prefix=".health-", dir=root):
+            pass

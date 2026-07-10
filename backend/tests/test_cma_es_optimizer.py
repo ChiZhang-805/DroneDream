@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import re
 
-from app import models
+import pytest
+
+from app import models, schemas
 from app.orchestration import constants
 from app.orchestration.cma_es_optimizer import propose_next_generation
 
@@ -185,3 +187,59 @@ def test_cma_es_avoids_duplicate_history_candidate():
         generation_index=2,
     )
     assert proposal.parameters != prior
+
+
+def test_cma_es_supports_user_selected_px4_parameter_space():
+    job = _make_job("job_px4_space")
+    selections = [
+        schemas.ParameterSelection(
+            name="MPC_XY_P", baseline=0.95, minimum=0.2, maximum=2.0, step=0.05
+        ),
+        schemas.ParameterSelection(
+            name="MPC_TILTMAX_AIR",
+            baseline=45,
+            minimum=20,
+            maximum=70,
+            step=1,
+            value_type="integer",
+        ),
+        schemas.ParameterSelection(
+            name="MC_AIRMODE",
+            baseline=1,
+            minimum=0,
+            maximum=2,
+            value_type="enum",
+            choices=[0, 1, 2],
+            locked=True,
+        ),
+    ]
+    job.parameter_space_json = [item.model_dump(mode="json") for item in selections]
+    baseline = {"MPC_XY_P": 0.95, "MPC_TILTMAX_AIR": 45.0, "MC_AIRMODE": 1.0}
+    history = [
+        _candidate(
+            cid="cand_px4_base",
+            generation_index=0,
+            score=1.0,
+            label="baseline",
+            params=baseline,
+            is_baseline=True,
+        )
+    ]
+    proposal = propose_next_generation(
+        job=job,
+        candidates=history,
+        safe_ranges=constants.PARAMETER_SAFE_RANGES,
+        baseline_parameters=constants.BASELINE_PARAMETERS,
+        generation_index=1,
+    )
+    assert set(proposal.parameters) == {
+        "MPC_XY_P",
+        "MPC_TILTMAX_AIR",
+        "MC_AIRMODE",
+    }
+    assert 0.2 <= proposal.parameters["MPC_XY_P"] <= 2.0
+    assert (proposal.parameters["MPC_XY_P"] - 0.2) / 0.05 == pytest.approx(
+        round((proposal.parameters["MPC_XY_P"] - 0.2) / 0.05)
+    )
+    assert proposal.parameters["MPC_TILTMAX_AIR"].is_integer()
+    assert proposal.parameters["MC_AIRMODE"] == 1.0

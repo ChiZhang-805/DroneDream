@@ -289,7 +289,8 @@ export PX4_GAZEBO_DRY_RUN=false
 export PX4_GAZEBO_LAUNCH_COMMAND='python3 /abs/path/scripts/simulators/local_px4_launch_wrapper.py --run-dir {run_dir} --input {trial_input} --params {params_json} --track {track_json} --telemetry {telemetry_json} --stdout-log {stdout_log} --stderr-log {stderr_log} --vehicle {vehicle} --world {world} --headless {headless}'
 export PX4_AUTOPILOT_DIR=/home/chi/PX4-Autopilot
 export PX4_SETUP_COMMANDS='source /opt/ros/humble/setup.bash'
-export PX4_MAKE_TARGET=gz_x500
+# Optional fixed override; leave unset to use each job's simulator model.
+unset PX4_MAKE_TARGET
 ```
 
 Wrapper env vars (with defaults):
@@ -297,7 +298,8 @@ Wrapper env vars (with defaults):
 - `PX4_AUTOPILOT_DIR` (required in real mode unless custom launch template is provided)
 - `PX4_SETUP_COMMANDS` (optional semicolon-separated shell setup commands)
 - `PX4_LAUNCH_COMMAND_TEMPLATE` (optional full shell command template)
-- `PX4_MAKE_TARGET` (default `gz_x500`)
+- `PX4_MAKE_TARGET` (optional site override; ignored unless
+  `PX4_FORCE_MAKE_TARGET=true`)
 - `PX4_RUN_SECONDS` (default `30`)
 - `PX4_READY_TIMEOUT_SECONDS` (default `30`; reserved for site probes)
 - `PX4_SITE_DRY_RUN` (default `false`)

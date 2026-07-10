@@ -68,14 +68,27 @@ def evaluate_candidate(
     diagnostics only.
     """
 
-    trial_count = max(1, candidate.trial_count or 0)
-    completed = candidate.completed_trial_count or 0
+    agg = candidate.aggregated_metric_json or {}
+    trial_count = max(
+        1,
+        int(agg.get("training_trial_count", candidate.trial_count or 0) or 0),
+    )
+    completed = int(
+        agg.get(
+            "training_completed_trial_count", candidate.completed_trial_count or 0
+        )
+        or 0
+    )
     completion_rate = completed / trial_count if trial_count > 0 else 0.0
 
-    agg = candidate.aggregated_metric_json or {}
     rmse = _safe_float(agg.get("rmse"))
     max_error = _safe_float(agg.get("max_error"))
-    passing = int(agg.get("passing_trial_count") or 0)
+    passing = int(
+        agg.get(
+            "training_passing_trial_count", agg.get("passing_trial_count", 0)
+        )
+        or 0
+    )
     pass_rate = passing / trial_count if trial_count > 0 else 0.0
 
     if candidate.aggregated_metric_json is None:

@@ -116,6 +116,12 @@ function renderWithJob(jobId: string) {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.spyOn(apiClient, "listJobCandidates").mockResolvedValue({
+    items: [],
+    pareto_candidate_ids: [],
+    recommendations: {},
+    objective_directions: {},
+  });
 });
 
 describe("JobDetail — Phase 8 best-so-far rendering", () => {

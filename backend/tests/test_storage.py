@@ -37,6 +37,7 @@ def test_s3_storage_fake_client(monkeypatch) -> None:
     class _FakeClient:
         def __init__(self) -> None:
             self.uploaded: tuple[str, str, str] | None = None
+            self.health_checked = False
 
         def upload_file(self, filename: str, bucket: str, key: str, ExtraArgs=None):
             self.uploaded = (filename, bucket, key)
@@ -50,6 +51,16 @@ def test_s3_storage_fake_client(monkeypatch) -> None:
             assert Bucket == "bucket"
             assert Key == "prefix/jobs/j1/a.txt"
             return {"ok": True}
+
+        def generate_presigned_url(self, operation: str, Params, ExpiresIn: int):
+            assert operation == "get_object"
+            assert Params == {"Bucket": "bucket", "Key": "prefix/jobs/j1/a.txt"}
+            assert ExpiresIn == 120
+            return "https://objects.example/signed"
+
+        def head_bucket(self, Bucket: str):
+            assert Bucket == "bucket"
+            self.health_checked = True
 
     fake = _FakeClient()
 
@@ -71,8 +82,20 @@ def test_s3_storage_fake_client(monkeypatch) -> None:
     assert uri == "s3://bucket/prefix/jobs/j1/a.txt"
     assert storage.exists(uri) is True
     assert storage.read_bytes(uri) == b"payload"
+    assert storage.presign_download(uri, expires_seconds=120) == (
+        "https://objects.example/signed"
+    )
+    storage.check_health()
+    assert fake.health_checked is True
 
     get_settings.cache_clear()
+
+
+def test_local_storage_presign_falls_back_to_api_streaming(tmp_path: Path) -> None:
+    from app.storage.local import LocalArtifactStorage
+
+    storage = LocalArtifactStorage()
+    assert storage.presign_download(str(tmp_path / "x")) is None
 
 
 def test_s3_storage_missing_config_error(monkeypatch) -> None:
