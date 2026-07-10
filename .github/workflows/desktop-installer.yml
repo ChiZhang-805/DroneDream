@@ -2,6 +2,13 @@ name: Desktop installer
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/desktop-installer.yml"
+      - "desktop/**"
+      - "frontend/**"
+      - "backend/app/config.py"
+      - "backend/tests/test_config.py"
   push:
     tags:
       - "desktop-v*"
