@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom";
 
+import { isDesktopRuntime } from "./desktop/bridge";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
 
@@ -14,11 +15,13 @@ const NAV_ITEMS: {
   { to: "/batches/new", labelKey: "app.newBatch", end: true },
   { to: "/batches", labelKey: "app.batches", end: true },
   { to: "/history", labelKey: "app.history" },
+  { to: "/desktop/setup", labelKey: "app.desktopSetup" },
   { to: "/ece498", label: "ECE498" },
 ];
 
 export function AppShell() {
   const location = useLocation();
+  const desktopRuntime = isDesktopRuntime();
   const { locale, setLocale, t } = useI18n();
 
   return (
@@ -62,7 +65,7 @@ export function AppShell() {
         <header className="app-header">
           <div className="app-header-title">DroneDream — {t("app.platform")}</div>
           <div className="app-header-meta">
-            <span className="env-chip">live API</span>
+            <span className="env-chip">{desktopRuntime ? "desktop" : "live API"}</span>
             <label className="language-switcher">
               <span className="sr-only">{t("app.language")}</span>
               <select

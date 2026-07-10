@@ -28,7 +28,10 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///./drone_dream.db")
     database_auto_create: bool = Field(default=True)
     cors_origins: str = Field(
-        default="http://localhost:5173,http://127.0.0.1:5173"
+        default=(
+            "http://localhost:5173,http://127.0.0.1:5173,"
+            "http://tauri.localhost,tauri://localhost"
+        )
     )
 
     # Phase 9: artifact roots for generated job/trial outputs and safe downloads.

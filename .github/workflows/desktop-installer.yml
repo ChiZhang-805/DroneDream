@@ -1,0 +1,68 @@
+name: Desktop installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-nsis:
+    name: Windows x64 NSIS
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      CARGO_BUILD_JOBS: "4"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+
+      - name: Set up stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install JavaScript dependencies
+        shell: pwsh
+        run: |
+          npm ci --prefix frontend
+          npm ci --prefix desktop
+
+      - name: Verify shared frontend
+        shell: pwsh
+        run: |
+          npm --prefix frontend run typecheck
+          npm --prefix frontend run test
+
+      - name: Build DroneDream setup executable
+        shell: pwsh
+        run: npm --prefix desktop run build
+
+      - name: Write SHA-256 checksum
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "desktop/src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer was not produced" }
+          $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName
+          "$($hash.Hash.ToLower())  $($installer.Name)" | Set-Content -Encoding ascii "desktop-installer.sha256"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DroneDream-Windows-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            desktop-installer.sha256

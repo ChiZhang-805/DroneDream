@@ -1963,3 +1963,457 @@ a {
     min-width: 100px;
   }
 }
+
+/* ---------- Desktop first-run environment check ---------- */
+
+.desktop-setup-page {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.desktop-setup-header {
+  padding: 0.25rem 0;
+}
+
+.desktop-eyebrow {
+  margin-bottom: 0.35rem;
+  color: var(--active);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+}
+
+.desktop-browser-card {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  align-items: center;
+  gap: 1.5rem;
+  min-height: 300px;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 12% 40%, rgba(168, 85, 247, 0.3), transparent 36%),
+    linear-gradient(135deg, rgba(43, 14, 74, 0.96), rgba(28, 7, 50, 0.94));
+  box-shadow: 0 24px 70px rgba(7, 1, 13, 0.42);
+}
+
+.desktop-browser-card h2 {
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+}
+
+.desktop-browser-card p {
+  max-width: 720px;
+  color: var(--text-dim);
+}
+
+.desktop-browser-hint {
+  color: var(--text-muted) !important;
+  font-size: 0.86rem;
+}
+
+.desktop-browser-illustration {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 115, 213, 0.36);
+  border-radius: 28px;
+  background: rgba(18, 5, 31, 0.58);
+  box-shadow: inset 0 0 50px rgba(168, 85, 247, 0.2);
+}
+
+.desktop-browser-illustration span:first-child {
+  color: var(--primary);
+  font-size: 4.5rem;
+  line-height: 0.8;
+}
+
+.desktop-browser-illustration span:last-child {
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+}
+
+.desktop-readiness-hero {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: rgba(28, 7, 50, 0.82);
+}
+
+.desktop-readiness-ready {
+  border-color: rgba(93, 247, 200, 0.42);
+  background: linear-gradient(90deg, rgba(93, 247, 200, 0.12), rgba(28, 7, 50, 0.8));
+}
+
+.desktop-readiness-pending {
+  border-color: rgba(255, 209, 102, 0.42);
+  background: linear-gradient(90deg, rgba(255, 209, 102, 0.09), rgba(28, 7, 50, 0.8));
+}
+
+.desktop-readiness-hero > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.desktop-readiness-hero > div span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.desktop-readiness-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: var(--warning);
+  font-weight: 800;
+}
+
+.desktop-readiness-ready .desktop-readiness-icon {
+  color: var(--success);
+}
+
+.desktop-alert-copy {
+  margin: 0 0 0.4rem;
+}
+
+.desktop-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.desktop-check-card {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(18, 5, 31, 0.55);
+}
+
+.desktop-check-card > strong {
+  display: block;
+  margin-top: 0.45rem;
+  overflow-wrap: anywhere;
+}
+
+.desktop-check-card p {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.desktop-check-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.desktop-check-ready .desktop-check-heading span:last-child {
+  color: var(--success);
+}
+
+.desktop-check-warning .desktop-check-heading span:last-child {
+  color: var(--warning);
+}
+
+.desktop-hardware-list {
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(18, 5, 31, 0.38);
+}
+
+.desktop-hardware-list h3,
+.desktop-diagnostics h3,
+.desktop-plan-blockers h3,
+.desktop-install-steps h3 {
+  margin-bottom: 0.55rem;
+  color: var(--text-dim);
+  font-size: 0.84rem;
+}
+
+.desktop-hardware-list ul,
+.desktop-diagnostic-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.desktop-hardware-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.25rem 0;
+}
+
+.desktop-hardware-list li span,
+.desktop-hardware-list p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.desktop-diagnostic-list li {
+  margin: 0.2rem 0;
+  overflow-wrap: anywhere;
+}
+
+.desktop-runtime-pill {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.7rem;
+}
+
+.desktop-runtime-pill.ready {
+  color: var(--success);
+}
+
+.desktop-runtime-pill.pending {
+  color: var(--warning);
+}
+
+.desktop-runtime-facts,
+.desktop-plan-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.desktop-storage-selector {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+  align-items: end;
+  gap: 0.7rem;
+}
+
+.desktop-storage-target {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(18, 5, 31, 0.45);
+}
+
+.desktop-storage-target span {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.desktop-storage-target code {
+  min-height: 1.35rem;
+  overflow-wrap: anywhere;
+}
+
+.desktop-runtime-facts > div,
+.desktop-plan-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(18, 5, 31, 0.45);
+}
+
+.desktop-runtime-facts dt,
+.desktop-plan-summary span {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.desktop-runtime-facts dd {
+  min-width: 0;
+  margin: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.desktop-plan-summary code {
+  overflow-wrap: anywhere;
+}
+
+.desktop-component-list {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.desktop-component-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.desktop-component-row:last-child {
+  border-bottom: 0;
+}
+
+.desktop-component-row > div:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.desktop-component-row > div:nth-child(2) span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.desktop-component-state {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-shadow: 0 0 10px currentColor;
+}
+
+.desktop-component-ready { color: var(--success); background: var(--success); }
+.desktop-component-missing,
+.desktop-component-unhealthy { color: var(--danger); background: var(--danger); }
+.desktop-component-stopped { color: var(--warning); background: var(--warning); }
+
+.desktop-component-badges,
+.desktop-step-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.desktop-status-badge,
+.desktop-requirement-badge,
+.desktop-step-meta span {
+  padding: 0.18rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.63rem;
+}
+
+.desktop-status-ready { color: var(--success); border-color: rgba(93, 247, 200, 0.35); }
+.desktop-status-missing,
+.desktop-status-unhealthy { color: var(--danger); border-color: rgba(255, 92, 156, 0.42); }
+.desktop-status-stopped { color: var(--warning); border-color: rgba(255, 209, 102, 0.4); }
+
+.desktop-diagnostics,
+.desktop-plan-blockers {
+  padding: 0.7rem 0.8rem;
+  border-left: 3px solid var(--warning);
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.desktop-install-steps ol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desktop-install-steps li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 0.7rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(18, 5, 31, 0.45);
+}
+
+.desktop-step-number {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--active);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.desktop-install-steps p {
+  margin: 0.2rem 0 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.desktop-step-meta {
+  justify-content: flex-start;
+}
+
+@media (max-width: 720px) {
+  .desktop-browser-card {
+    grid-template-columns: 1fr;
+  }
+
+  .desktop-browser-illustration {
+    width: min(180px, 70vw);
+  }
+
+  .desktop-check-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .desktop-storage-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .desktop-readiness-hero {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .desktop-readiness-hero .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .desktop-component-row {
+    grid-template-columns: 12px minmax(0, 1fr);
+  }
+
+  .desktop-component-badges {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .desktop-hardware-list li {
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+}

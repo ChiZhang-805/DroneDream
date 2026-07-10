@@ -6,6 +6,14 @@ from pydantic import ValidationError
 from app.config import Settings, get_settings
 
 
+def test_default_cors_origins_include_web_and_desktop_clients() -> None:
+    origins = Settings().cors_origin_list
+
+    assert "http://127.0.0.1:5173" in origins
+    assert "http://tauri.localhost" in origins
+    assert "tauri://localhost" in origins
+
+
 def test_default_real_simulator_artifact_root_matches_cli_default(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("REAL_SIMULATOR_ARTIFACT_ROOT", raising=False)

@@ -1,0 +1,21 @@
+[package]
+name = "drone-dream-desktop"
+version = "0.1.0"
+description = "Local-first desktop shell for DroneDream"
+authors = ["DroneDream contributors"]
+edition = "2021"
+
+[lib]
+name = "drone_dream_desktop_lib"
+# The first desktop release targets Windows only. Mobile-oriented cdylib/staticlib
+# outputs make LLVM-MinGW export every dependency symbol and can exceed PE limits.
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+wait-timeout = "0.2"

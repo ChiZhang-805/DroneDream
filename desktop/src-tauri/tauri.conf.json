@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream",
+  "version": "0.1.0",
+  "identifier": "io.dronedream.desktop",
+  "build": {
+    "beforeDevCommand": "npm run frontend:dev",
+    "beforeBuildCommand": "npm run frontend:build",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../../frontend/dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:8000 ws://127.0.0.1:*; frame-src http://127.0.0.1:* http://localhost:*; img-src 'self' asset: http://asset.localhost http://127.0.0.1:8000 data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'",
+      "devCsp": "default-src 'self' http://127.0.0.1:5173; connect-src ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:*; frame-src http://127.0.0.1:* http://localhost:*; img-src 'self' asset: http://asset.localhost http://127.0.0.1:* data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-eval'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "DroneDream",
+    "shortDescription": "Automatic PX4 and Gazebo parameter tuning",
+    "longDescription": "DroneDream provides a local-first desktop workflow for configuring, running, comparing, and exporting PX4/Gazebo parameter optimization experiments.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "SimpChinese"],
+        "displayLanguageSelector": true
+      }
+    }
+  }
+}
