@@ -12,6 +12,8 @@ ARG GAZEBO_APT_KEY_URL=https://packages.osrfoundation.org/gazebo.gpg
 ARG GAZEBO_APT_KEY_SHA256=15d0300460e0c9c0efb21fa9770c0bf228988a07d71c4fac985c2161954a25a4
 ARG VALKEY_GIT_COMMIT=5f4bae3ea10174a7c872cc099c953b0e91afa93a
 ARG PX4_BUILD_JOBS=2
+ARG DRONEDREAM_UID=2000
+ARG DRONEDREAM_GID=2000
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -21,8 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       pkg-config procps rsync unzip zip jq sqlite3 libssl-dev libsystemd-dev \
       libffi-dev libxml2-dev libxslt1-dev libyaml-dev libsqlite3-dev && \
     rm -rf /var/lib/apt/lists/* && \
-    groupadd --gid 1000 dronedream && \
-    useradd --create-home --uid 1000 --gid dronedream --shell /bin/bash dronedream && \
+    groupadd --gid "${DRONEDREAM_GID}" dronedream && \
+    useradd --create-home --uid "${DRONEDREAM_UID}" --gid dronedream --shell /bin/bash dronedream && \
     groupadd --system valkey && \
     useradd --system --gid valkey --home /var/lib/valkey --shell /usr/sbin/nologin valkey
 
