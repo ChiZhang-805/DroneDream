@@ -17,7 +17,7 @@ case "$check" in
     test -x /usr/local/bin/valkey-server
     test "$(git -C /opt/PX4-Autopilot rev-parse HEAD)" = \
       "$($venv/bin/python -c 'import json; print(json.load(open("/opt/dronedream/runtime-manifest.json"))["componentDetails"]["px4"]["commit"])')"
-    gz --versions
+    gz sim --versions
     valkey-server --version
     "$venv/bin/pip" check
     ;;
