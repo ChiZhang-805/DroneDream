@@ -18,7 +18,7 @@ ARG DRONEDREAM_GID=2000
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl git gnupg lsb-release sudo systemd systemd-sysv \
+      ca-certificates curl wget git gnupg lsb-release sudo systemd systemd-sysv \
       python3 python3-pip python3-venv build-essential cmake ninja-build \
       pkg-config procps rsync unzip zip jq sqlite3 libssl-dev libsystemd-dev \
       libffi-dev libxml2-dev libxslt1-dev libyaml-dev libsqlite3-dev && \
