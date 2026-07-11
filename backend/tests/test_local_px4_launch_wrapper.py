@@ -272,6 +272,26 @@ def test_find_latest_ulog_recurses_and_selects_newest(tmp_path: Path):
     assert latest == newer
 
 
+def test_find_latest_ulog_with_snapshot_rejects_unchanged_history(tmp_path: Path):
+    historical = tmp_path / "2026-04-23" / "08_51_47.ulg"
+    historical.parent.mkdir(parents=True)
+    historical.write_text("old", encoding="utf-8")
+    before = wrapper.snapshot_ulogs(tmp_path)
+
+    with pytest.raises(FileNotFoundError, match="No new or changed ULog"):
+        wrapper.find_latest_ulog(tmp_path, before=before)
+
+
+def test_find_latest_ulog_with_snapshot_accepts_changed_or_new_file(tmp_path: Path):
+    changed = tmp_path / "changed.ulg"
+    changed.write_text("old", encoding="utf-8")
+    before = wrapper.snapshot_ulogs(tmp_path)
+    changed.write_text("new-and-larger", encoding="utf-8")
+    os.utime(changed, (1_900_000_000, 1_900_000_000))
+
+    assert wrapper.find_latest_ulog(tmp_path, before=before) == changed
+
+
 def test_ulog_to_telemetry_json_writes_schema_with_attitude_groundtruth_fallback(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
@@ -375,7 +395,11 @@ def test_wrapper_real_mode_ulog_missing_log_fails_with_clear_message(tmp_path: P
     env["PX4_AUTOPILOT_DIR"] = str(tmp_path)
     env["PX4_LAUNCH_COMMAND_TEMPLATE"] = f"{sys.executable} {launcher}"
     env["PX4_TELEMETRY_MODE"] = "ulog"
-    env["PX4_ULOG_ROOT"] = str(tmp_path / "missing_root")
+    ulog_root = tmp_path / "ulog_root"
+    historical = ulog_root / "old" / "historical.ulg"
+    historical.parent.mkdir(parents=True)
+    historical.write_text("stale", encoding="utf-8")
+    env["PX4_ULOG_ROOT"] = str(ulog_root)
     env["PX4_ENABLE_OFFBOARD_EXECUTOR"] = "false"
 
     proc = subprocess.run(
@@ -387,7 +411,7 @@ def test_wrapper_real_mode_ulog_missing_log_fails_with_clear_message(tmp_path: P
     )
     assert proc.returncode != 0
     stderr_text = (tmp_path / "run" / "stderr.log").read_text(encoding="utf-8")
-    assert "No ULog files found for PX4_TELEMETRY_MODE=ulog under" in stderr_text
+    assert "No new or changed ULog files were produced by this PX4 run" in stderr_text
 
 
 def test_px4_runner_can_call_local_wrapper_in_site_dry_run(tmp_path: Path):

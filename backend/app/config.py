@@ -52,6 +52,17 @@ class Settings(BaseSettings):
     worker_presence_ttl_seconds: int = Field(default=45, ge=5)
     worker_presence_key: str = Field(default="dronedream:workers:last_seen")
     artifact_storage_backend: Literal["local", "s3"] = Field(default="local")
+    # Local artifact lifecycle is deliberately opt-in. Operators can enable
+    # periodic scans in dry-run mode first, inspect statistics, and only then
+    # allow deletion. A value of 0 disables the corresponding age/size limit.
+    artifact_cleanup_enabled: bool = Field(default=False)
+    artifact_cleanup_dry_run: bool = Field(default=True)
+    artifact_cleanup_interval_seconds: int = Field(default=3600, ge=60, le=86400)
+    artifact_retention_max_total_bytes: int = Field(default=0, ge=0)
+    artifact_retention_max_age_seconds: int = Field(default=0, ge=0)
+    artifact_retention_min_age_seconds: int = Field(default=86400, ge=0)
+    artifact_retention_keep_recent_terminal_jobs: int = Field(default=20, ge=0, le=10000)
+    artifact_orphan_grace_seconds: int = Field(default=86400, ge=0)
     s3_endpoint_url: str | None = Field(default=None)
     s3_region: str | None = Field(default=None)
     s3_bucket: str | None = Field(default=None)
@@ -189,6 +200,24 @@ class Settings(BaseSettings):
         for root in roots:
             if root not in dedup:
                 dedup.append(root)
+        return dedup
+
+    @property
+    def managed_artifact_roots(self) -> list[Path]:
+        """Directories exclusively managed by DroneDream cleanup.
+
+        Cleanup never treats an entire operator-configured root as disposable.
+        Only the ``jobs`` subtree used by report and trial persistence is
+        eligible, which protects unrelated files when a broad parent directory
+        was configured accidentally.
+        """
+
+        roots = [root / "jobs" for root in self.allowed_artifact_roots]
+        dedup: list[Path] = []
+        for root in roots:
+            resolved = root.resolve()
+            if resolved not in dedup:
+                dedup.append(resolved)
         return dedup
 
     @property

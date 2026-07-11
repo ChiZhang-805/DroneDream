@@ -26,6 +26,7 @@ from app.routers import jobs as jobs_router
 from app.routers import parameter_catalog as parameter_catalog_router
 from app.routers import trials as trials_router
 from app.services.jobs import purge_expired_job_secrets
+from app.storage.cleanup import cleanup_local_artifacts
 
 logger = logging.getLogger("drone_dream.backend")
 
@@ -50,6 +51,26 @@ async def _secret_housekeeping_loop(interval_seconds: int) -> None:
             logger.exception("expired-secret housekeeping failed")
 
 
+async def _artifact_housekeeping_loop(interval_seconds: int) -> None:
+    """Periodically apply the opt-in local artifact lifecycle policy."""
+
+    while True:
+        await asyncio.sleep(interval_seconds)
+
+        def cleanup_once() -> dict[str, object]:
+            with SessionLocal() as db:
+                return cleanup_local_artifacts(db).to_dict()
+
+        try:
+            stats = await asyncio.to_thread(cleanup_once)
+            if stats["planned_files"] or stats["planned_artifact_rows"] or stats["errors"]:
+                logger.info("local artifact cleanup: %s", stats)
+        except Exception:
+            # Retention is operational housekeeping and must never terminate
+            # the API. The next configured interval retries any safe orphans.
+            logger.exception("local artifact housekeeping failed")
+
+
 def create_app() -> FastAPI:
     """Build and configure the FastAPI application."""
 
@@ -61,15 +82,27 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        task = asyncio.create_task(
-            _secret_housekeeping_loop(settings.job_secret_cleanup_interval_seconds)
-        )
+        tasks = [
+            asyncio.create_task(
+                _secret_housekeeping_loop(settings.job_secret_cleanup_interval_seconds)
+            )
+        ]
+        if settings.artifact_cleanup_enabled:
+            tasks.append(
+                asyncio.create_task(
+                    _artifact_housekeeping_loop(
+                        settings.artifact_cleanup_interval_seconds
+                    )
+                )
+            )
         try:
             yield
         finally:
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                with suppress(asyncio.CancelledError):
+                    await task
 
     app = FastAPI(
         title="DroneDream API",

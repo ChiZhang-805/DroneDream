@@ -2,6 +2,7 @@ mod prerequisites;
 #[cfg(target_os = "windows")]
 mod process;
 mod runtime;
+mod runtime_cache;
 
 pub(crate) const MINIMUM_WINDOWS_BUILD: u32 = 19041;
 

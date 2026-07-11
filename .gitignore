@@ -41,3 +41,4 @@ artifacts/
 tmp/
 /desktop/src-tauri/target/
 /desktop/src-tauri/gen/
+/runtime/out/

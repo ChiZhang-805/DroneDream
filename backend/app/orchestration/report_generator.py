@@ -29,6 +29,7 @@ from app.orchestration.events import record_event
 from app.orchestration.repro_manifest import build_repro_manifest
 from app.services.pdf_report import generate_job_pdf_report
 from app.storage import get_artifact_storage
+from app.storage.registration import guard_artifact_registration
 
 logger = logging.getLogger("drone_dream.orchestration.report_generator")
 
@@ -334,6 +335,7 @@ def ensure_mock_job_artifacts(db: Session, job: models.Job) -> list[models.Artif
     same job does not create duplicate rows.
     """
 
+    guard_artifact_registration(db, owner_type="job", owner_id=job.id)
     existing = db.scalars(
         select(models.Artifact)
         .where(models.Artifact.owner_type == "job")
@@ -401,6 +403,7 @@ def ensure_real_job_artifacts(
 ) -> list[models.Artifact]:
     """Ensure real backend jobs expose concrete job-level artifact files + rows."""
 
+    guard_artifact_registration(db, owner_type="job", owner_id=job.id)
     artifact_dir = _real_artifact_root() / "jobs" / job.id / "job_artifacts"
     custom_track_count, custom_track_preview = _custom_track_summary(job)
     report_payload = {
@@ -621,6 +624,7 @@ def ensure_repro_manifest_artifact(
     job: models.Job,
     best: models.CandidateParameterSet,
 ) -> models.Artifact:
+    guard_artifact_registration(db, owner_type="job", owner_id=job.id)
     root = (
         _real_artifact_root()
         if job.simulator_backend_requested == "real_cli"
@@ -670,6 +674,7 @@ def _upsert_pdf_artifact(
 
 
 def ensure_job_pdf_artifact(db: Session, *, job: models.Job) -> models.Artifact:
+    guard_artifact_registration(db, owner_type="job", owner_id=job.id)
     root = (
         _real_artifact_root()
         if job.simulator_backend_requested == "real_cli"

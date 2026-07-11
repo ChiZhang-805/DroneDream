@@ -20,9 +20,12 @@ const RUNTIME_MANIFEST: &str = "/opt/dronedream/runtime-manifest.json";
 const RUNTIME_ROOT_MARKER: &str = ".dronedream-runtime-root.json";
 const RUNTIME_ROOT_MARKER_OWNER: &str = "DroneDreamDesktop";
 const BACKEND_PORT: u16 = 8000;
-const ESTIMATED_DOWNLOAD_BYTES: u64 = 8 * 1024 * 1024 * 1024;
-const ESTIMATED_INSTALLED_BYTES: u64 = 24 * 1024 * 1024 * 1024;
-const MINIMUM_FREE_BYTES: u64 = 40 * 1024 * 1024 * 1024;
+const GIB: u64 = 1024 * 1024 * 1024;
+const ESTIMATED_DOWNLOAD_BYTES: u64 = 8 * GIB;
+const ESTIMATED_INSTALLED_BYTES: u64 = 24 * GIB;
+const MINIMUM_POST_INSTALL_HEADROOM_BYTES: u64 = 20 * GIB;
+const MINIMUM_FREE_BYTES: u64 =
+    ESTIMATED_DOWNLOAD_BYTES + ESTIMATED_INSTALLED_BYTES + MINIMUM_POST_INSTALL_HEADROOM_BYTES;
 const MINIMUM_MEMORY_BYTES: u64 = 15 * 1024 * 1024 * 1024;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
@@ -156,6 +159,15 @@ struct DriveProbe {
     drive_type: u8,
     total_bytes: u64,
     free_bytes: u64,
+}
+
+#[cfg(target_os = "windows")]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DefaultDriveProbeReport {
+    system_drive: String,
+    #[serde(default)]
+    drives: Vec<DriveProbe>,
 }
 
 #[cfg(target_os = "windows")]
@@ -952,7 +964,8 @@ fn build_install_plan(target_root: Option<String>) -> Result<RuntimeInstallPlan,
     }
     if probe.free_bytes < MINIMUM_FREE_BYTES {
         blockers.push(format!(
-            "At least 40 GiB free is required; {} currently has {:.1} GiB.",
+            "At least {} GiB free is required (download, installed runtime, and 20 GiB reserve); {} currently has {:.1} GiB.",
+            MINIMUM_FREE_BYTES / GIB,
             probe.drive,
             probe.free_bytes as f64 / 1024_f64.powi(3)
         ));
@@ -1052,6 +1065,7 @@ fn base_plan(
     requires_administrator: bool,
     requires_restart: bool,
 ) -> RuntimeInstallPlan {
+    let download_cache = crate::runtime_cache::runtime_download_cache_root(&target_root);
     let wsl_description = if requires_administrator {
         "Enable or update WSL2. Windows may request administrator approval and a restart."
     } else {
@@ -1090,7 +1104,10 @@ fn base_plan(
             RuntimeInstallStep {
                 id: "download".to_string(),
                 title: "Download the signed DroneDream runtime".to_string(),
-                description: "The online installer will support resume and SHA-256 verification.".to_string(),
+                description: format!(
+                    "The future online installer will keep resumable data under {}. Verified temporary archives and parts are removed only after a successful import; failed imports retain resumable data.",
+                    download_cache.display()
+                ),
                 requires_administrator: false,
                 destructive: false,
                 estimated_bytes: Some(ESTIMATED_DOWNLOAD_BYTES),
@@ -1120,19 +1137,87 @@ fn default_target_root() -> Result<String, String> {
     const SCRIPT: &str = r#"
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$drive = Get-CimInstance -ClassName Win32_LogicalDisk -Filter 'DriveType = 3' |
-  Where-Object { $_.FileSystem -eq 'NTFS' } |
-  Sort-Object -Property FreeSpace -Descending |
-  Select-Object -First 1
-if ($null -eq $drive) { throw 'No fixed NTFS drive is available.' }
-[ordered]@{ drive = [string]$drive.DeviceID } | ConvertTo-Json -Compress
+$drives = @(Get-CimInstance -ClassName Win32_LogicalDisk -Filter 'DriveType = 3' | ForEach-Object {
+  [ordered]@{
+    drive = [string]$_.DeviceID
+    fileSystem = [string]$_.FileSystem
+    driveType = [byte]$_.DriveType
+    totalBytes = [UInt64]$_.Size
+    freeBytes = [UInt64]$_.FreeSpace
+  }
+})
+[ordered]@{
+  systemDrive = [string]$env:SystemDrive
+  drives = $drives
+} | ConvertTo-Json -Depth 4 -Compress
 "#;
-    let value: BTreeMap<String, String> =
+    let report: DefaultDriveProbeReport =
         run_powershell_json(SCRIPT, &[], "default runtime drive probe")?;
-    let drive = value
-        .get("drive")
-        .ok_or_else(|| "Default runtime drive probe omitted the drive.".to_string())?;
-    Ok(format!("{}\\DroneDream", drive.to_ascii_uppercase()))
+    select_default_target(&report.drives, &report.system_drive, |target| {
+        default_target_is_safe_and_writable(target)
+    })
+    .ok_or_else(|| {
+        format!(
+            "No safe writable fixed NTFS drive has at least {} GiB free. DroneDream checks non-system drives first, then the Windows system drive.",
+            MINIMUM_FREE_BYTES / GIB
+        )
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn select_default_target<F>(
+    drives: &[DriveProbe],
+    system_drive: &str,
+    mut target_is_safe_and_writable: F,
+) -> Option<String>
+where
+    F: FnMut(&str) -> bool,
+{
+    // If Windows does not identify its system volume, fail closed instead of
+    // accidentally treating that volume as a preferred data disk.
+    let normalized_system_target = normalize_windows_target(system_drive).ok()?;
+    let normalized_system_drive = &normalized_system_target[..2];
+    let mut eligible = drives
+        .iter()
+        .filter(|probe| {
+            probe.drive_type == 3
+                && probe.file_system.eq_ignore_ascii_case("NTFS")
+                && probe.total_bytes > 0
+                && probe.free_bytes >= MINIMUM_FREE_BYTES
+        })
+        .collect::<Vec<_>>();
+
+    // A qualifying non-system disk keeps the Windows/WSL system volume clean.
+    // Within each class, prefer more headroom and use the drive letter only as
+    // a deterministic tie-breaker.
+    eligible.sort_by(|left, right| {
+        let left_is_system = left
+            .drive
+            .trim()
+            .eq_ignore_ascii_case(normalized_system_drive);
+        let right_is_system = right
+            .drive
+            .trim()
+            .eq_ignore_ascii_case(normalized_system_drive);
+        left_is_system
+            .cmp(&right_is_system)
+            .then_with(|| right.free_bytes.cmp(&left.free_bytes))
+            .then_with(|| left.drive.cmp(&right.drive))
+    });
+
+    eligible.into_iter().find_map(|probe| {
+        let target = normalize_windows_target(&probe.drive).ok()?;
+        target_is_safe_and_writable(&target).then_some(target)
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn default_target_is_safe_and_writable(target: &str) -> bool {
+    let Ok(target_probe) = inspect_target_directory(target) else {
+        return false;
+    };
+    target_directory_blockers(&target_probe, target).is_empty()
+        && probe_target_directory_access(target, target_probe.exists).is_ok()
 }
 
 #[cfg(target_os = "windows")]
@@ -1477,6 +1562,107 @@ mod tests {
 
     #[cfg(target_os = "windows")]
     #[test]
+    fn default_target_prefers_a_safe_qualifying_non_system_drive() {
+        let gib = 1024 * 1024 * 1024;
+        let drives = vec![
+            DriveProbe {
+                drive: "C:".to_string(),
+                file_system: "NTFS".to_string(),
+                drive_type: 3,
+                total_bytes: 1024 * gib,
+                free_bytes: 500 * gib,
+            },
+            DriveProbe {
+                drive: "E:".to_string(),
+                file_system: "ntfs".to_string(),
+                drive_type: 3,
+                total_bytes: 256 * gib,
+                free_bytes: 80 * gib,
+            },
+            DriveProbe {
+                drive: "F:".to_string(),
+                file_system: "NTFS".to_string(),
+                drive_type: 3,
+                total_bytes: 128 * gib,
+                free_bytes: 39 * gib,
+            },
+        ];
+
+        assert_eq!(
+            select_default_target(&drives, "c:", |_| true).as_deref(),
+            Some("E:\\DroneDream")
+        );
+        assert!(select_default_target(&drives, "", |_| true).is_none());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn default_target_skips_unsafe_non_system_targets_then_falls_back_to_system() {
+        let gib = 1024 * 1024 * 1024;
+        let drives = vec![
+            DriveProbe {
+                drive: "E:".to_string(),
+                file_system: "NTFS".to_string(),
+                drive_type: 3,
+                total_bytes: 256 * gib,
+                free_bytes: 80 * gib,
+            },
+            DriveProbe {
+                drive: "C:".to_string(),
+                file_system: "NTFS".to_string(),
+                drive_type: 3,
+                total_bytes: 1024 * gib,
+                free_bytes: 500 * gib,
+            },
+        ];
+
+        let mut inspected = Vec::new();
+        let selected = select_default_target(&drives, "C:", |target| {
+            inspected.push(target.to_string());
+            target.starts_with("C:")
+        });
+        assert_eq!(selected.as_deref(), Some("C:\\DroneDream"));
+        assert_eq!(inspected, vec!["E:\\DroneDream", "C:\\DroneDream"]);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn default_target_requires_fixed_ntfs_capacity_before_access_probe() {
+        let gib = 1024 * 1024 * 1024;
+        let drives = vec![
+            DriveProbe {
+                drive: "D:".to_string(),
+                file_system: "exFAT".to_string(),
+                drive_type: 3,
+                total_bytes: 500 * gib,
+                free_bytes: 400 * gib,
+            },
+            DriveProbe {
+                drive: "E:".to_string(),
+                file_system: "NTFS".to_string(),
+                drive_type: 2,
+                total_bytes: 500 * gib,
+                free_bytes: 400 * gib,
+            },
+            DriveProbe {
+                drive: "F:".to_string(),
+                file_system: "NTFS".to_string(),
+                drive_type: 3,
+                total_bytes: 500 * gib,
+                free_bytes: 39 * gib,
+            },
+        ];
+        let mut access_probe_calls = 0;
+        assert!(select_default_target(&drives, "C:", |_| {
+            access_probe_calls += 1;
+            true
+        })
+        .is_none());
+        assert_eq!(access_probe_calls, 0);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
     fn validates_required_runtime_manifest_components() {
         let valid: RuntimeManifest = serde_json::from_str(
             r#"{
@@ -1754,6 +1940,31 @@ mod tests {
             ..TargetDirectoryProbe::default()
         };
         assert!(target_directory_blockers(&managed, "E:\\DroneDream").is_empty());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn sibling_download_cache_does_not_block_the_import_target_after_restart() {
+        let sandbox = std::env::temp_dir().join(format!(
+            "dronedream-plan-cache-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&sandbox).unwrap();
+        let target = sandbox.join("DroneDream");
+        let cache = crate::runtime_cache::initialize_runtime_download_cache(&target).unwrap();
+
+        assert_eq!(cache, sandbox.join("DroneDream.download-cache"));
+        assert!(!target.exists());
+        let probe = inspect_target_directory(&target.to_string_lossy()).unwrap();
+        assert!(!probe.exists);
+        assert!(target_directory_blockers(&probe, &target.to_string_lossy()).is_empty());
+
+        std::fs::remove_dir_all(&cache).unwrap();
+        std::fs::remove_dir(&sandbox).unwrap();
     }
 
     #[cfg(target_os = "windows")]

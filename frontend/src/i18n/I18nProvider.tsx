@@ -83,7 +83,7 @@ const translations = {
     "desktop.diagnosticsTitle": "Runtime diagnostics",
     "desktop.storageTitle": "Choose runtime storage",
     "desktop.storageDesc":
-      "Choose from the fixed local disks detected on this computer. DroneDream creates its own dedicated folder and does not reuse a personal WSL distribution.",
+      "DroneDream first recommends a writable non-system NTFS disk with at least 52 GiB free (8 GiB download, 24 GiB runtime, and 20 GiB reserve), then falls back to the Windows system disk. It creates a dedicated folder and never reuses a personal WSL distribution.",
     "desktop.storageDrive": "Runtime disk",
     "desktop.storageTarget": "Runtime folder",
     "desktop.storageNoDisk": "No eligible fixed local disk was detected.",
@@ -118,7 +118,7 @@ const translations = {
       "Windows may request administrator approval and a restart on machines without WSL2.",
     "desktop.step.download.title": "Download the signed DroneDream runtime",
     "desktop.step.download.description":
-      "The online installer will support resume and SHA-256 verification.",
+      "The future online installer will keep downloads inside its managed cache, remove verified temporary files only after a successful import, and retain resumable data after failure.",
     "desktop.step.import.title":
       "Create an isolated DroneDreamRuntime distribution",
     "desktop.step.import.description":
@@ -373,7 +373,7 @@ const translations = {
     "desktop.componentLabel.gazebo": "Gazebo 仿真器",
     "desktop.diagnosticsTitle": "运行环境诊断",
     "desktop.storageTitle": "选择运行环境存储位置",
-    "desktop.storageDesc": "仅可选择这台电脑已检测到的本地固定磁盘。DroneDream 会创建独立专用目录，不会复用用户个人的 WSL 发行版。",
+    "desktop.storageDesc": "DroneDream 会优先推荐可写、至少有 52 GiB 空间的非系统 NTFS 固定磁盘（8 GiB 下载、24 GiB 运行环境、20 GiB 安装后余量）；没有符合条件的非系统盘时才回退到 Windows 系统盘。它会创建独立专用目录，不会复用用户个人的 WSL 发行版。",
     "desktop.storageDrive": "运行环境磁盘",
     "desktop.storageTarget": "运行环境目录",
     "desktop.storageNoDisk": "未检测到可用的本地固定磁盘。",
@@ -400,7 +400,7 @@ const translations = {
     "desktop.step.enableWsl.title": "启用或更新 WSL2",
     "desktop.step.enableWsl.description": "如果电脑尚未启用 WSL2，Windows 可能要求管理员授权并重启。",
     "desktop.step.download.title": "下载已签名的 DroneDream 运行环境",
-    "desktop.step.download.description": "在线安装器将支持断点续传和 SHA-256 完整性校验。",
+    "desktop.step.download.description": "未来的在线安装器会把下载内容限制在受管缓存中；仅在导入成功后删除已验证的临时文件，导入失败时保留可续传数据。",
     "desktop.step.import.title": "创建隔离的 DroneDreamRuntime 发行版",
     "desktop.step.import.description": "不会复用或修改用户已有的 Ubuntu 发行版和个人文件。",
     "desktop.step.smokeTest.title": "检查后端、PX4、Gazebo 和参数回读",

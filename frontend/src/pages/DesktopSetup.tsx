@@ -68,14 +68,19 @@ function fixedDiskOptions(disks: DiskInfo[]): DiskInfo[] {
     if (!/^[A-Z]:$/.test(drive) || unique.has(drive)) continue;
     unique.set(drive, { ...disk, drive });
   }
-  return [...unique.values()].sort((left, right) => right.freeBytes - left.freeBytes);
+  return [...unique.values()].sort((left, right) => {
+    if (left.isSystemDrive !== right.isSystemDrive) {
+      return left.isSystemDrive ? 1 : -1;
+    }
+    return right.freeBytes - left.freeBytes || left.drive.localeCompare(right.drive);
+  });
 }
 
 function chooseRuntimeDrive(disks: DiskInfo[], currentDrive: string): string {
   const normalizedCurrent = currentDrive.trim().toUpperCase();
   return disks.some((disk) => disk.drive === normalizedCurrent)
     ? normalizedCurrent
-    : disks[0]?.drive ?? "";
+    : "";
 }
 
 function runtimeTargetRoot(drive: string): string | undefined {
@@ -174,8 +179,7 @@ export function DesktopSetup() {
       prerequisites.status === "fulfilled" &&
       runtime.status === "fulfilled" &&
       isRuntimeConfirmedMissing(runtime.value) &&
-      fixedDisks.length > 0 &&
-      Boolean(nextDrive);
+      fixedDisks.length > 0;
 
     setState((current) => ({
       ...current,
@@ -198,6 +202,13 @@ export function DesktopSetup() {
     if (!shouldRequestPlan) return;
     const plan = await getSettledInstallPlan(nextDrive);
     if (requestId.current !== currentRequest) return;
+
+    if (plan.status === "fulfilled") {
+      const plannedDrive = plan.value.targetRoot.slice(0, 2).toUpperCase();
+      const recommendedDrive = chooseRuntimeDrive(fixedDisks, plannedDrive);
+      selectedDriveRef.current = recommendedDrive;
+      setSelectedDrive(recommendedDrive);
+    }
 
     const planIssues = plan.status === "rejected"
       ? [probeIssue("plan", "get_runtime_install_plan", plan.reason)]

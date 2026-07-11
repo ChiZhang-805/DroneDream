@@ -17,6 +17,10 @@ commands under `frontend/` continue to work unchanged.
   page first; the normal web build still opens the dashboard.
 - A fixed-disk selector that derives the isolated `X:\DroneDream` runtime path
   and recalculates the install plan without accepting arbitrary directories.
+  The native default chooser prefers a safe writable non-system disk with NTFS
+  and at least 52 GiB free, then falls back to the Windows system disk. This
+  reserves 8 GiB for the download, 24 GiB for the installed runtime, and
+  20 GiB of post-install host headroom.
 - Read-only `probe_runtime_status` and `get_runtime_install_plan` commands. The
   target-drive probe rejects network/removable/non-NTFS locations and checks
   that enough free space exists before a runtime installation can be offered.
@@ -56,7 +60,9 @@ const plan = await window.__TAURI__.core.invoke(
 The global API is available only inside Tauri. Browser builds remain ordinary
 web builds, so UI code must guard access with `window.__TAURI__` before calling
 these commands. Omitting `targetRoot` asks the native probe to choose the fixed
-NTFS drive with the most free space.
+NTFS drive using the non-system-first safety policy above. The setup page omits
+`targetRoot` on its first request and adopts the native recommendation; it sends
+an explicit path only after the user changes the disk selector.
 
 ## Developer prerequisites (Windows)
 
@@ -147,8 +153,21 @@ Only DroneDream installation or repair tooling may create the reserved
 `.dronedream-runtime-root.json` ownership marker; users should never create
 that marker by hand.
 
+Future downloads use the strictly named same-drive sibling
+`X:\DroneDream.download-cache`, not a child of `X:\DroneDream`. This keeps the
+WSL import target empty across retries and application restarts. The cache has
+its own ownership marker and accepts cleanup entries only below its
+`artifacts` directory; absolute paths, parent traversal, duplicate entries,
+links, junctions, reparse points, directories, and unmarked roots are rejected
+before any deletion. A successful import removes only artifacts already marked
+as digest-verified. A failed import removes nothing, preserving verified chunks
+and partial data for resume. The small marker and cache directory may remain
+for a later repair or update.
+
 The future first-run runtime installer will download the image with resume
 support, verify its published SHA-256/signature, import it to a user-selected
 fixed NTFS drive, and run backend, worker, PX4, Gazebo, and parameter-readback
-smoke tests. Until a signed runtime artifact is published, the setup page
-remains diagnostic and does not expose a destructive install action.
+smoke tests. The cache lifecycle primitives are implemented and tested, but are
+intentionally not registered as a Tauri command until a real signed artifact
+manifest and release URL exist. Until then, the setup page remains diagnostic
+and does not expose a destructive install action.

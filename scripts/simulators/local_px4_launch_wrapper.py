@@ -339,11 +339,42 @@ def _write_dry_run_telemetry(path: Path, *, vehicle: str, world: str) -> None:
     _json_dump(path, payload)
 
 
-def find_latest_ulog(root: Path) -> Path:
+ULogIdentity = tuple[int, int, int, int]
+ULogSnapshot = dict[Path, ULogIdentity]
+
+
+def _ulog_identity(path: Path) -> ULogIdentity:
+    info = path.stat()
+    return (int(info.st_dev), int(info.st_ino), int(info.st_mtime_ns), int(info.st_size))
+
+
+def snapshot_ulogs(root: Path) -> ULogSnapshot:
+    snapshot: ULogSnapshot = {}
+    for path in root.rglob("*.ulg"):
+        try:
+            if path.is_file():
+                snapshot[path.resolve()] = _ulog_identity(path)
+        except OSError:
+            continue
+    return snapshot
+
+
+def find_latest_ulog(root: Path, *, before: ULogSnapshot | None = None) -> Path:
     candidates = [path for path in root.rglob("*.ulg") if path.is_file()]
+    if before is not None:
+        changed: list[Path] = []
+        for path in candidates:
+            try:
+                resolved = path.resolve()
+                if before.get(resolved) != _ulog_identity(path):
+                    changed.append(path)
+            except OSError:
+                continue
+        candidates = changed
     if not candidates:
-        raise FileNotFoundError(f"No ULog files found under {root}")
-    return max(candidates, key=lambda path: path.stat().st_mtime)
+        qualifier = "new or changed " if before is not None else ""
+        raise FileNotFoundError(f"No {qualifier}ULog files found under {root}")
+    return max(candidates, key=lambda path: (_ulog_identity(path)[2], str(path)))
 
 
 def _dataset_map(ulog: Any) -> dict[str, Any]:
@@ -975,7 +1006,32 @@ def _write_launch_config(
     _json_dump(launch_config_path, existing)
 
 
-def _finalize_real_telemetry(args: argparse.Namespace) -> None:
+def _automatic_ulog_root() -> Path:
+    ulog_root_raw = os.environ.get("PX4_ULOG_ROOT", "").strip()
+    if ulog_root_raw:
+        return Path(ulog_root_raw)
+    autopilot_dir = os.environ.get("PX4_AUTOPILOT_DIR", "").strip()
+    if not autopilot_dir:
+        raise ValueError("PX4_AUTOPILOT_DIR is required to locate default PX4 ULog root")
+    return Path(autopilot_dir) / "build" / "px4_sitl_default" / "rootfs" / "log"
+
+
+def _prepare_automatic_ulog() -> tuple[Path, ULogSnapshot] | None:
+    telemetry_mode = (
+        os.environ.get("PX4_TELEMETRY_MODE", DEFAULT_TELEMETRY_MODE).strip().lower()
+        or DEFAULT_TELEMETRY_MODE
+    )
+    if telemetry_mode != "ulog" or os.environ.get("PX4_ULOG_PATH", "").strip():
+        return None
+    root = _automatic_ulog_root()
+    return root, snapshot_ulogs(root)
+
+
+def _finalize_real_telemetry(
+    args: argparse.Namespace,
+    *,
+    automatic_ulog: tuple[Path, ULogSnapshot] | None,
+) -> None:
     telemetry_source = os.environ.get("PX4_TELEMETRY_SOURCE_JSON", "").strip()
     telemetry_mode = (
         os.environ.get("PX4_TELEMETRY_MODE", DEFAULT_TELEMETRY_MODE).strip().lower()
@@ -1005,21 +1061,15 @@ def _finalize_real_telemetry(args: argparse.Namespace) -> None:
                     f"PX4_ULOG_PATH does not exist or is not a file: {ulog_path_raw}"
                 )
         else:
-            ulog_root_raw = os.environ.get("PX4_ULOG_ROOT", "").strip()
-            if ulog_root_raw:
-                ulog_root = Path(ulog_root_raw)
-            else:
-                autopilot_dir = os.environ.get("PX4_AUTOPILOT_DIR", "").strip()
-                if not autopilot_dir:
-                    raise ValueError(
-                        "PX4_AUTOPILOT_DIR is required to locate default PX4 ULog root"
-                    )
-                ulog_root = Path(autopilot_dir) / "build" / "px4_sitl_default" / "rootfs" / "log"
+            if automatic_ulog is None:
+                raise RuntimeError("Automatic ULog snapshot was not captured before PX4 launch")
+            ulog_root, before = automatic_ulog
             try:
-                ulog_path = find_latest_ulog(ulog_root)
+                ulog_path = find_latest_ulog(ulog_root, before=before)
             except FileNotFoundError as exc:
                 raise FileNotFoundError(
-                    f"No ULog files found for PX4_TELEMETRY_MODE=ulog under: {ulog_root}"
+                    "No new or changed ULog files were produced by this PX4 run under: "
+                    f"{ulog_root}"
                 ) from exc
 
         ulog_to_telemetry_json(
@@ -1132,6 +1182,15 @@ def main() -> int:
         )
         _append_log(args.stderr_log, "")
         return 0
+
+    try:
+        automatic_ulog = _prepare_automatic_ulog()
+    except Exception as exc:
+        _append_log(
+            args.stderr_log,
+            f"[local_px4_launch_wrapper] Failed capturing pre-launch ULog snapshot: {exc}",
+        )
+        return 2
 
     px4_proc: subprocess.Popen[str] | None = None
     gui_proc: subprocess.Popen[str] | None = None
@@ -1308,7 +1367,7 @@ def main() -> int:
             args.stdout_log,
             "[local_px4_launch_wrapper] PX4 process terminated after execution window",
         )
-        _finalize_real_telemetry(args)
+        _finalize_real_telemetry(args, automatic_ulog=automatic_ulog)
         return 0
     except Exception as exc:
         _cleanup_process(gui_proc, args.stderr_log, label="GUI")

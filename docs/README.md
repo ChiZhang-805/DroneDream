@@ -12,6 +12,7 @@
 - [10 Development](./10-development.md)
 - [11 Operations](./11-operations.md)
 - [12 Local Phase Status](./12-phase-status.md)
+- [13 Local Artifact Capacity and Retention](./13-artifact-retention.md)
 - [PX4 Parameter Catalog](./PX4_PARAMETER_CATALOG.md)
 - [Deployment](./DEPLOYMENT.md)
 - [real_cli Artifact Schema](./REAL_CLI_ARTIFACT_SCHEMA.md)

@@ -36,7 +36,7 @@ const prerequisites: SystemPrerequisiteReport = {
     {
       drive: "E:",
       totalBytes: 2 * 1024 ** 4,
-      freeBytes: 640 * 1024 ** 3,
+      freeBytes: 80 * 1024 ** 3,
       isSystemDrive: false,
     },
   ],
@@ -268,9 +268,11 @@ describe("DesktopSetup", () => {
     expect(
       await screen.findByText("Validate Windows, virtualization, memory, and disk"),
     ).toBeInTheDocument();
+    expect(screen.getByText(/remove verified temporary files only after a successful import/i))
+      .toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith(
       "get_runtime_install_plan",
-      { targetRoot: "E:\\DroneDream" },
+      undefined,
     );
   });
 
@@ -351,6 +353,7 @@ describe("DesktopSetup", () => {
       await screen.findByRole("combobox", { name: "运行环境磁盘" }),
     ).toHaveValue("E:");
     expect(screen.getByText("运行环境目录")).toBeInTheDocument();
+    expect(screen.getByText(/导入失败时保留可续传数据/)).toBeInTheDocument();
   });
 
   it("keeps successful sections when one desktop command fails", async () => {

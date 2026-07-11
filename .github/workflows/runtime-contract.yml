@@ -1,0 +1,60 @@
+name: Runtime contract
+
+on:
+  pull_request:
+    paths:
+      - "runtime/**"
+      - ".github/workflows/runtime-contract.yml"
+      - "desktop/src-tauri/src/runtime.rs"
+      - "backend/app/routers/health.py"
+      - "backend/pyproject.toml"
+      - "worker/pyproject.toml"
+      - "scripts/simulators/**"
+  push:
+    paths:
+      - "runtime/**"
+      - ".github/workflows/runtime-contract.yml"
+      - "desktop/src-tauri/src/runtime.rs"
+      - "backend/app/routers/health.py"
+      - "backend/pyproject.toml"
+      - "worker/pyproject.toml"
+      - "scripts/simulators/**"
+
+permissions:
+  contents: read
+
+jobs:
+  static-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Validate pinned inputs and Python code
+        run: |
+          python runtime/tools/runtime_manifest.py validate-config \
+            --pins runtime/pins.env \
+            --python-lock runtime/locks/python-requirements.lock
+          python -m compileall -q runtime/tools runtime/tests runtime/scripts
+          python -m unittest discover -s runtime/tests -v
+      - name: Validate shell syntax
+        run: |
+          bash -n runtime/build-rootfs.sh
+          bash -n runtime/smoke-image.sh
+          bash -n runtime/export-rootfs.sh
+          bash -n runtime/scripts/runtime-init.sh
+          bash -n runtime/scripts/runtime-check.sh
+      - name: Prove untested manifests cannot be released
+        run: |
+          python runtime/tools/runtime_manifest.py generate \
+            --pins runtime/pins.env \
+            --python-lock runtime/locks/python-requirements.lock \
+            --source-commit "$(git rev-parse HEAD)" \
+            --output /tmp/runtime-manifest.json
+          if python runtime/tools/runtime_manifest.py validate \
+            --manifest /tmp/runtime-manifest.json --require-smoke-passed; then
+            echo "un-smoked manifest was incorrectly accepted" >&2
+            exit 1
+          fi

@@ -53,6 +53,7 @@ from app.simulator.base import (
     FAILURE_SIM_ERROR,
 )
 from app.storage import get_artifact_storage
+from app.storage.registration import guard_artifact_registration
 
 
 def _env_simulator_backend() -> str | None:
@@ -369,6 +370,7 @@ def _validate_trial_px4_parameters(ctx: TrialContext) -> TrialContext:
 
 
 def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[ArtifactMetadata]) -> None:
+    guard_artifact_registration(db, owner_type="trial", owner_id=trial.id)
     storage = get_artifact_storage()
     settings = get_settings()
     for meta in artifacts:

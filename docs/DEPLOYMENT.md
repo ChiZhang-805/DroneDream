@@ -130,6 +130,9 @@ fleet.
   versioning/lifecycle rules, and database/object-store backups.
 - Keep the bucket private. S3 storage exposes short-lived presigned download
   capability; local storage continues to use API streaming for compatibility.
+- Local-only installations can use the opt-in, DB-safe capacity policy in
+  [Local Artifact Capacity and Retention](./13-artifact-retention.md). S3/MinIO
+  deployments should keep cleanup disabled and configure bucket lifecycle rules.
 - Pin and scan all images. The Compose tags are a tested baseline, not an
   automatic upgrade policy.
 - Send structured logs and metrics off-host. Alert on `/health/ready`, queue
