@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  cancelRuntimeInstall,
   DesktopCommandContractError,
   DesktopRuntimeUnavailableError,
+  getRuntimeInstallProgress,
   getRuntimeInstallPlan,
   isDesktopRuntime,
   probeRuntimeStatus,
   probeSystemPrerequisites,
+  repairRuntime,
+  startRuntime,
+  startRuntimeInstall,
 } from "../desktop/bridge";
 
 const prerequisiteReport = {
@@ -95,6 +100,22 @@ const installPlan = {
       estimatedBytes: null,
     },
   ],
+};
+
+const installSnapshot = {
+  operationId: "install-1",
+  phase: "downloading",
+  bytesDownloaded: 1024,
+  bytesTotal: 4096,
+  currentPart: 1,
+  totalParts: 4,
+  message: "Downloading part 1 of 4",
+  error: null,
+  resumable: true,
+  requiresRestart: false,
+  targetRoot: "E:\\DroneDream",
+  installedVersion: null,
+  updatedAt: "2026-07-12T10:00:00Z",
 };
 
 describe("desktop bridge", () => {
@@ -280,5 +301,65 @@ describe("desktop bridge", () => {
     await expect(getRuntimeInstallPlan("E:\\DroneDream")).rejects.toThrow(
       /step download cannot require administrator approval/i,
     );
+  });
+
+  it("routes installer lifecycle commands with the exact Tauri request wrapper", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "start_runtime" || command === "repair_runtime") {
+        return runtimeReport;
+      }
+      return installSnapshot;
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await startRuntimeInstall({
+      targetRoot: "e:\\DroneDream\\",
+      releaseManifestUrl: "https://example.com/releases/runtime.json",
+    });
+    await getRuntimeInstallProgress();
+    await cancelRuntimeInstall();
+    await startRuntime();
+    await repairRuntime();
+
+    expect(invoke).toHaveBeenNthCalledWith(1, "start_runtime_install", {
+      request: {
+        targetRoot: "E:\\DroneDream",
+        releaseManifestUrl: "https://example.com/releases/runtime.json",
+      },
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, "get_runtime_install_progress", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(3, "cancel_runtime_install", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(4, "start_runtime", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(5, "repair_runtime", undefined);
+  });
+
+  it("fails closed for unsafe release URLs and contradictory installer snapshots", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    expect(() => startRuntimeInstall({
+      targetRoot: "E:\\DroneDream",
+      releaseManifestUrl: "http://example.com/runtime.json",
+    })).toThrow(/absolute HTTPS URL/i);
+    expect(invoke).not.toHaveBeenCalled();
+
+    invoke.mockResolvedValueOnce({
+      ...installSnapshot,
+      bytesDownloaded: 4097,
+    });
+    await expect(getRuntimeInstallProgress()).rejects.toThrow(/cannot exceed bytesTotal/i);
+
+    invoke.mockResolvedValueOnce({
+      ...installSnapshot,
+      phase: "failed",
+      error: null,
+    });
+    await expect(getRuntimeInstallProgress()).rejects.toThrow(/requires an error/i);
+
+    invoke.mockResolvedValueOnce({
+      ...installSnapshot,
+      phase: "teleporting",
+    });
+    await expect(getRuntimeInstallProgress()).rejects.toThrow(/unknown value/i);
   });
 });

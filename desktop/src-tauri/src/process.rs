@@ -1,6 +1,7 @@
 use std::io::{self, Read};
 use std::os::windows::io::AsRawHandle;
 use std::process::{Command, ExitStatus, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use wait_timeout::ChildExt;
@@ -173,6 +174,92 @@ pub(crate) fn command_output(
         ));
     }
 
+    Ok(CapturedOutput {
+        status,
+        stdout: stdout.bytes,
+        stderr: stderr.bytes,
+    })
+}
+
+/// Run a potentially long-lived Windows command while retaining the same
+/// process-tree containment guarantees as [`command_output`].  Cancellation
+/// closes the Job Object, so descendants (including a WSL import helper) are
+/// terminated as a unit rather than leaving an orphaned background process.
+pub(crate) fn command_output_cancelable(
+    mut command: Command,
+    timeout: Duration,
+    label: &str,
+    cancelled: &AtomicBool,
+) -> Result<CapturedOutput, String> {
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let job = KillOnCloseJob::new(label)?;
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("Unable to start {label}: {error}"))?;
+    if let Err(error) = job.assign(&child, label) {
+        terminate_process_tree(&mut child, None);
+        return Err(error);
+    }
+
+    let stdout = match child.stdout.take() {
+        Some(value) => value,
+        None => {
+            terminate_process_tree(&mut child, Some(job));
+            return Err(format!("Unable to capture {label} standard output."));
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(value) => value,
+        None => {
+            terminate_process_tree(&mut child, Some(job));
+            return Err(format!("Unable to capture {label} error output."));
+        }
+    };
+    let stdout_reader = std::thread::spawn(move || read_limited(stdout));
+    let stderr_reader = std::thread::spawn(move || read_limited(stderr));
+    let started = std::time::Instant::now();
+
+    let status = loop {
+        if cancelled.load(Ordering::Acquire) {
+            terminate_process_tree(&mut child, Some(job));
+            let _ = join_reader(stdout_reader, label, "standard output");
+            let _ = join_reader(stderr_reader, label, "error output");
+            return Err(format!("{label} was cancelled."));
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                drop(job);
+                break status;
+            }
+            Ok(None) if started.elapsed() < timeout => {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            Ok(None) => {
+                terminate_process_tree(&mut child, Some(job));
+                let _ = join_reader(stdout_reader, label, "standard output");
+                let _ = join_reader(stderr_reader, label, "error output");
+                return Err(format!(
+                    "{label} timed out after {} seconds.",
+                    timeout.as_secs()
+                ));
+            }
+            Err(error) => {
+                terminate_process_tree(&mut child, Some(job));
+                let _ = join_reader(stdout_reader, label, "standard output");
+                let _ = join_reader(stderr_reader, label, "error output");
+                return Err(format!("Unable to wait for {label}: {error}"));
+            }
+        }
+    };
+
+    let stdout = join_reader(stdout_reader, label, "standard output")?;
+    let stderr = join_reader(stderr_reader, label, "error output")?;
+    if stdout.truncated || stderr.truncated {
+        return Err(format!(
+            "{label} produced more than {} KiB of output and was rejected.",
+            MAX_CAPTURE_BYTES / 1024
+        ));
+    }
     Ok(CapturedOutput {
         status,
         stdout: stdout.bytes,

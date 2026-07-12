@@ -8,6 +8,9 @@ on:
       - "desktop/**"
       - "frontend/**"
       - "backend/**"
+      - "LICENSE"
+      - "runtime/THIRD_PARTY_NOTICES.md"
+      - "runtime/licenses/valkey-COPYING"
   push:
     tags:
       - "desktop-v*"
@@ -272,6 +275,20 @@ jobs:
             }
             if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
               throw "NSIS uninstaller was not found at $uninstaller"
+            }
+            $licenseRoot = Join-Path $installDirFull "licenses"
+            foreach ($licenseName in @(
+              "DroneDream-LICENSE.txt",
+              "THIRD_PARTY_NOTICES.md",
+              "Valkey-COPYING.txt"
+            )) {
+              $licensePath = Join-Path $licenseRoot $licenseName
+              if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf)) {
+                throw "Installed license material was not found at $licensePath"
+              }
+              if ((Get-Item -LiteralPath $licensePath).Length -le 0) {
+                throw "Installed license material is empty: $licensePath"
+              }
             }
 
             $originalPath = $env:PATH

@@ -5,15 +5,22 @@ import { Alert } from "../components/Alert";
 import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
 import {
+  cancelRuntimeInstall,
+  getRuntimeInstallProgress,
   getRuntimeInstallPlan,
   isDesktopRuntime,
   probeRuntimeStatus,
   probeSystemPrerequisites,
+  repairRuntime,
+  startRuntime,
+  startRuntimeInstall,
 } from "../desktop/bridge";
 import type {
   DiskInfo,
   RuntimeComponentState,
+  RuntimeInstallPhase,
   RuntimeInstallPlan,
+  RuntimeInstallSnapshot,
   RuntimeStatusReport,
   SystemPrerequisiteReport,
 } from "../desktop/bridge";
@@ -46,6 +53,12 @@ interface ProbeIssue {
   message: string;
 }
 
+interface InstallState {
+  snapshot: RuntimeInstallSnapshot | null;
+  commandError: string | null;
+  commandBusy: boolean;
+}
+
 const INITIAL_STATE: ProbeState = {
   prerequisites: null,
   runtime: null,
@@ -57,7 +70,35 @@ const INITIAL_STATE: ProbeState = {
   runtimeFresh: false,
 };
 
+const INITIAL_INSTALL_STATE: InstallState = {
+  snapshot: null,
+  commandError: null,
+  commandBusy: false,
+};
+
+const ACTIVE_INSTALL_PHASES = new Set<RuntimeInstallPhase>([
+  "queued",
+  "verifyingManifest",
+  "downloading",
+  "verifyingArchive",
+  "importing",
+  "starting",
+  "healthChecking",
+]);
+
 const GIB = 1024 ** 3;
+
+function configuredRuntimeReleaseManifestUrl(): string | null {
+  const configured = import.meta.env.VITE_RUNTIME_RELEASE_MANIFEST_URL?.trim();
+  if (!configured) return null;
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
 
 function fixedDiskOptions(disks: DiskInfo[]): DiskInfo[] {
   // The prerequisite command returns only DriveType=3 disks. Keep the UI
@@ -99,6 +140,21 @@ async function getSettledInstallPlan(drive: string) {
   }
 }
 
+async function getSettledInstallProgress() {
+  try {
+    return {
+      status: "fulfilled" as const,
+      value: await getRuntimeInstallProgress(),
+    };
+  } catch (reason) {
+    return { status: "rejected" as const, reason };
+  }
+}
+
+function isActiveInstall(snapshot: RuntimeInstallSnapshot | null): boolean {
+  return snapshot !== null && ACTIVE_INSTALL_PHASES.has(snapshot.phase);
+}
+
 function replaceIssues(
   current: ProbeIssue[],
   sources: ProbeIssueSource[],
@@ -128,8 +184,20 @@ export function DesktopSetup() {
     ...INITIAL_STATE,
     loading: desktopAvailable,
   }));
+  const [installState, setInstallState] = useState<InstallState>(
+    INITIAL_INSTALL_STATE,
+  );
+  const [runtimeCommandError, setRuntimeCommandError] = useState<string | null>(null);
+  const [runtimeCommandBusy, setRuntimeCommandBusy] = useState(false);
   const [selectedDrive, setSelectedDrive] = useState("");
-  const busy = state.loading || state.planLoading;
+  const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
+  const installActive = isActiveInstall(installState.snapshot);
+  const busy =
+    state.loading ||
+    state.planLoading ||
+    installState.commandBusy ||
+    runtimeCommandBusy ||
+    installActive;
   const showInstallPlanner =
     state.prerequisitesFresh &&
     state.runtimeFresh &&
@@ -168,7 +236,7 @@ export function DesktopSetup() {
     const fixedDisks = prerequisites.status === "fulfilled"
       ? fixedDiskOptions(prerequisites.value.disks)
       : [];
-    const nextDrive = prerequisites.status === "fulfilled"
+    let nextDrive = prerequisites.status === "fulfilled"
       ? chooseRuntimeDrive(fixedDisks, selectedDriveRef.current)
       : selectedDriveRef.current;
     if (prerequisites.status === "fulfilled") {
@@ -200,6 +268,30 @@ export function DesktopSetup() {
     }));
 
     if (!shouldRequestPlan) return;
+
+    const progress = await getSettledInstallProgress();
+    if (requestId.current !== currentRequest) return;
+
+    if (progress.status === "fulfilled") {
+      setInstallState({
+        snapshot: progress.value,
+        commandError: null,
+        commandBusy: false,
+      });
+      const progressDrive = progress.value.targetRoot?.slice(0, 2).toUpperCase();
+      if (progressDrive && fixedDisks.some((disk) => disk.drive === progressDrive)) {
+        nextDrive = progressDrive;
+        selectedDriveRef.current = progressDrive;
+        setSelectedDrive(progressDrive);
+      }
+    } else {
+      setInstallState((current) => ({
+        ...current,
+        commandError: `get_runtime_install_progress: ${errorMessage(progress.reason)}`,
+        commandBusy: false,
+      }));
+    }
+
     const plan = await getSettledInstallPlan(nextDrive);
     if (requestId.current !== currentRequest) return;
 
@@ -263,6 +355,142 @@ export function DesktopSetup() {
     state.runtime,
     state.runtimeFresh,
   ]);
+
+  const beginOrResumeInstall = useCallback(async () => {
+    const targetRoot = installState.snapshot?.targetRoot ?? state.plan?.targetRoot;
+    if (
+      !desktopAvailable ||
+      installState.commandBusy ||
+      isActiveInstall(installState.snapshot) ||
+      !state.plan?.canInstall ||
+      state.plan.blockers.length > 0 ||
+      !targetRoot ||
+      !releaseManifestUrl
+    ) return;
+
+    setInstallState((current) => ({
+      ...current,
+      commandError: null,
+      commandBusy: true,
+    }));
+    try {
+      const snapshot = await startRuntimeInstall({
+        targetRoot,
+        releaseManifestUrl,
+      });
+      setInstallState({ snapshot, commandError: null, commandBusy: false });
+    } catch (error) {
+      setInstallState((current) => ({
+        ...current,
+        commandError: `start_runtime_install: ${errorMessage(error)}`,
+        commandBusy: false,
+      }));
+    }
+  }, [
+    desktopAvailable,
+    installState.commandBusy,
+    installState.snapshot,
+    releaseManifestUrl,
+    state.plan,
+  ]);
+
+  const cancelInstall = useCallback(async () => {
+    if (
+      !desktopAvailable ||
+      installState.commandBusy ||
+      !isActiveInstall(installState.snapshot)
+    ) return;
+    setInstallState((current) => ({
+      ...current,
+      commandError: null,
+      commandBusy: true,
+    }));
+    try {
+      const snapshot = await cancelRuntimeInstall();
+      setInstallState({ snapshot, commandError: null, commandBusy: false });
+    } catch (error) {
+      setInstallState((current) => ({
+        ...current,
+        commandError: `cancel_runtime_install: ${errorMessage(error)}`,
+        commandBusy: false,
+      }));
+    }
+  }, [desktopAvailable, installState.commandBusy, installState.snapshot]);
+
+  const runRuntimeAction = useCallback(async (action: "start" | "repair") => {
+    if (!desktopAvailable || runtimeCommandBusy) return;
+    setRuntimeCommandError(null);
+    setRuntimeCommandBusy(true);
+    try {
+      const runtime = action === "start" ? await startRuntime() : await repairRuntime();
+      setState((current) => ({
+        ...current,
+        runtime,
+        runtimeFresh: true,
+        issues: replaceIssues(current.issues, ["runtime"], []),
+      }));
+    } catch (error) {
+      setRuntimeCommandError(
+        `${action === "start" ? "start_runtime" : "repair_runtime"}: ${errorMessage(error)}`,
+      );
+    } finally {
+      setRuntimeCommandBusy(false);
+    }
+  }, [desktopAvailable, runtimeCommandBusy]);
+
+  const pollingOperationId = installState.snapshot?.operationId;
+  const pollingPhase = installState.snapshot?.phase;
+  useEffect(() => {
+    if (
+      !desktopAvailable ||
+      !pollingPhase ||
+      !ACTIVE_INSTALL_PHASES.has(pollingPhase)
+    ) return;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const poll = async () => {
+      try {
+        const snapshot = await getRuntimeInstallProgress();
+        if (disposed) return;
+        setInstallState((current) => ({
+          ...current,
+          snapshot,
+          commandError: null,
+        }));
+        if (isActiveInstall(snapshot)) timer = setTimeout(poll, 750);
+      } catch (error) {
+        if (disposed) return;
+        setInstallState((current) => ({
+          ...current,
+          commandError: `get_runtime_install_progress: ${errorMessage(error)}`,
+        }));
+        timer = setTimeout(poll, 1500);
+      }
+    };
+
+    timer = setTimeout(poll, 350);
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [
+    desktopAvailable,
+    pollingOperationId,
+    pollingPhase,
+  ]);
+
+  const completedOperation = useRef<string | null>(null);
+  useEffect(() => {
+    const snapshot = installState.snapshot;
+    if (
+      snapshot?.phase !== "completed" ||
+      !snapshot.operationId ||
+      completedOperation.current === snapshot.operationId
+    ) return;
+    completedOperation.current = snapshot.operationId;
+    void refresh();
+  }, [installState.snapshot, refresh]);
 
   useEffect(() => {
     void refresh();
@@ -336,8 +564,18 @@ export function DesktopSetup() {
           {state.runtime ? (
             <RuntimeOverview report={state.runtime} stale={!state.runtimeFresh} />
           ) : null}
+          {runtimeCommandError ? (
+            <Alert tone="warning" title={t("desktop.runtimeActionFailed")}>
+              <code>{runtimeCommandError}</code>
+            </Alert>
+          ) : null}
           {state.runtimeFresh && state.runtime?.installed ? (
-            <InstalledRuntimeNotice report={state.runtime} />
+            <InstalledRuntimeNotice
+              report={state.runtime}
+              busy={runtimeCommandBusy}
+              onStart={() => void runRuntimeAction("start")}
+              onRepair={() => void runRuntimeAction("repair")}
+            />
           ) : null}
           {showInstallPlanner && state.prerequisites ? (
             <RuntimeStorageSelector
@@ -352,6 +590,17 @@ export function DesktopSetup() {
           ) : null}
           {showInstallPlanner && state.plan ? (
             <InstallPlanOverview plan={state.plan} />
+          ) : null}
+          {showInstallPlanner && (state.plan || installState.snapshot) ? (
+            <RuntimeInstallControls
+              plan={state.plan}
+              snapshot={installState.snapshot}
+              commandError={installState.commandError}
+              commandBusy={installState.commandBusy}
+              releaseManifestUrlAvailable={releaseManifestUrl !== null}
+              onStart={() => void beginOrResumeInstall()}
+              onCancel={() => void cancelInstall()}
+            />
           ) : null}
         </>
       )}
@@ -709,7 +958,17 @@ function StaleResultBadge() {
   return <span className="desktop-stale-pill">{t("desktop.lastSuccessful")}</span>;
 }
 
-function InstalledRuntimeNotice({ report }: { report: RuntimeStatusReport }) {
+function InstalledRuntimeNotice({
+  report,
+  busy,
+  onStart,
+  onRepair,
+}: {
+  report: RuntimeStatusReport;
+  busy: boolean;
+  onStart: () => void;
+  onRepair: () => void;
+}) {
   const { t } = useI18n();
   const ready = isRuntimeFullyReady(report);
   return (
@@ -719,7 +978,23 @@ function InstalledRuntimeNotice({ report }: { report: RuntimeStatusReport }) {
         ? t("desktop.runtimeAlreadyReady")
         : t("desktop.runtimeNeedsRepair")}
     >
-      {t("desktop.installedStorageHint")}
+      <p>{t("desktop.installedStorageHint")}</p>
+      {!ready ? (
+        <div className="desktop-install-actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy}
+            onClick={report.running ? onRepair : onStart}
+          >
+            {busy
+              ? t("desktop.runtimeActionRunning")
+              : report.running
+                ? t("desktop.repairRuntime")
+                : t("desktop.startRuntime")}
+          </button>
+        </div>
+      ) : null}
     </Alert>
   );
 }
@@ -792,6 +1067,211 @@ function InstallPlanOverview({ plan }: { plan: RuntimeInstallPlan }) {
       </div>
     </SectionCard>
   );
+}
+
+const INSTALL_PROGRESS_PHASES: RuntimeInstallPhase[] = [
+  "verifyingManifest",
+  "downloading",
+  "verifyingArchive",
+  "importing",
+  "starting",
+  "healthChecking",
+];
+
+function RuntimeInstallControls({
+  plan,
+  snapshot,
+  commandError,
+  commandBusy,
+  releaseManifestUrlAvailable,
+  onStart,
+  onCancel,
+}: {
+  plan: RuntimeInstallPlan | null;
+  snapshot: RuntimeInstallSnapshot | null;
+  commandError: string | null;
+  commandBusy: boolean;
+  releaseManifestUrlAvailable: boolean;
+  onStart: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  const phase = snapshot?.phase ?? "idle";
+  const active = isActiveInstall(snapshot);
+  const canInstall = Boolean(
+    plan?.canInstall &&
+    plan.blockers.length === 0 &&
+    releaseManifestUrlAvailable,
+  );
+  const canRetry =
+    phase !== "failed" ||
+    Boolean(snapshot?.resumable || snapshot?.error?.retryable);
+  const total = snapshot?.bytesTotal ?? null;
+  const downloaded = snapshot?.bytesDownloaded ?? 0;
+  const percent = total && total > 0
+    ? Math.min(100, Math.round((downloaded / total) * 100))
+    : null;
+  const currentProgressIndex = INSTALL_PROGRESS_PHASES.indexOf(phase);
+
+  let startLabel = t("desktop.installNow");
+  if (phase === "failed") startLabel = t("desktop.retryInstall");
+  if (phase === "cancelled") startLabel = t("desktop.resumeInstall");
+  if (phase === "waitingForRestart") startLabel = t("desktop.continueInstall");
+
+  return (
+    <SectionCard
+      title={t("desktop.installerTitle")}
+      description={t("desktop.installerDesc")}
+      actions={snapshot?.installedVersion ? (
+        <span className="desktop-runtime-pill ready">
+          {snapshot.installedVersion}
+        </span>
+      ) : null}
+    >
+      <div
+        className={`desktop-installer-status desktop-installer-${phase}`}
+        role="status"
+        aria-live="polite"
+        aria-busy={active || commandBusy}
+      >
+        <div className="desktop-installer-heading">
+          <div>
+            <span>{t("desktop.currentStage")}</span>
+            <strong>{t(installPhaseKey(phase))}</strong>
+          </div>
+          {percent !== null ? <strong>{percent}%</strong> : null}
+        </div>
+
+        <progress
+          className="desktop-installer-progress"
+          max={total && total > 0 ? total : 1}
+          value={total && total > 0 ? Math.min(downloaded, total) : 0}
+          aria-label={t("desktop.downloadProgress")}
+        />
+        <div className="desktop-installer-byte-row">
+          <span>
+            {total === null
+              ? `${formatBytes(downloaded)} ${t("desktop.downloaded")}`
+              : `${formatBytes(downloaded)} / ${formatBytes(total)}`}
+          </span>
+          {snapshot?.currentPart !== null && snapshot?.currentPart !== undefined &&
+          snapshot.totalParts !== null ? (
+            <span>
+              {t("desktop.downloadPart")} {snapshot.currentPart} / {snapshot.totalParts}
+            </span>
+          ) : null}
+        </div>
+
+        <ol className="desktop-installer-phases" aria-label={t("desktop.installStages")}>
+          {INSTALL_PROGRESS_PHASES.map((installPhase, index) => {
+            const complete =
+              phase === "completed" ||
+              currentProgressIndex > index;
+            const current = phase === installPhase;
+            return (
+              <li
+                key={installPhase}
+                className={complete
+                  ? "complete"
+                  : current
+                    ? "current"
+                    : "pending"}
+              >
+                <span aria-hidden="true">{complete ? "✓" : index + 1}</span>
+                {t(installPhaseKey(installPhase))}
+              </li>
+            );
+          })}
+        </ol>
+
+        {snapshot?.message ? <p className="desktop-installer-message">{snapshot.message}</p> : null}
+        {snapshot?.targetRoot ? (
+          <p className="desktop-installer-target">
+            {t("desktop.target")}: <code>{snapshot.targetRoot}</code>
+          </p>
+        ) : null}
+      </div>
+
+      {phase === "waitingForRestart" ? (
+        <Alert tone="warning" title={t("desktop.restartRequired")}>
+          {t("desktop.restartRequiredHint")}
+        </Alert>
+      ) : null}
+      {!releaseManifestUrlAvailable && phase !== "completed" ? (
+        <Alert tone="warning" title={t("desktop.runtimeReleaseUnavailable")}>
+          {t("desktop.runtimeReleaseUnavailableHint")}
+        </Alert>
+      ) : null}
+      {phase === "completed" ? (
+        <Alert tone="success" title={t("desktop.installCompleted")}>
+          {t("desktop.installCompletedHint")}
+        </Alert>
+      ) : null}
+      {snapshot?.error ? (
+        <Alert tone="warning" title={t("desktop.installFailed")}>
+          <p><code>{snapshot.error.code}</code>: {snapshot.error.message}</p>
+          <p>
+            {snapshot.error.retryable || snapshot.resumable
+              ? t("desktop.retryAvailable")
+              : t("desktop.retryUnavailable")}
+          </p>
+        </Alert>
+      ) : null}
+      {commandError ? (
+        <Alert tone="warning" title={t("desktop.installCommandFailed")}>
+          <code>{commandError}</code>
+        </Alert>
+      ) : null}
+
+      <div className="desktop-install-actions">
+        {active ? (
+          <button
+            type="button"
+            className="btn"
+            disabled={commandBusy}
+            onClick={onCancel}
+          >
+            {commandBusy ? t("desktop.cancelling") : t("desktop.cancelInstall")}
+          </button>
+        ) : phase === "completed" ? (
+          <Link to="/jobs/new" className="btn btn-primary">
+            {t("desktop.continue")}
+          </Link>
+        ) : phase !== "failed" || canRetry ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={commandBusy || !canInstall}
+            onClick={onStart}
+          >
+            {commandBusy ? t("desktop.startingInstall") : startLabel}
+          </button>
+        ) : null}
+        {snapshot?.resumable && phase !== "completed" ? (
+          <span className="desktop-resume-hint">{t("desktop.resumeHint")}</span>
+        ) : null}
+      </div>
+    </SectionCard>
+  );
+}
+
+const INSTALL_PHASE_KEYS: Record<RuntimeInstallPhase, TranslationKey> = {
+  idle: "desktop.installPhase.idle",
+  queued: "desktop.installPhase.queued",
+  verifyingManifest: "desktop.installPhase.verifyingManifest",
+  downloading: "desktop.installPhase.downloading",
+  verifyingArchive: "desktop.installPhase.verifyingArchive",
+  importing: "desktop.installPhase.importing",
+  starting: "desktop.installPhase.starting",
+  healthChecking: "desktop.installPhase.healthChecking",
+  waitingForRestart: "desktop.installPhase.waitingForRestart",
+  completed: "desktop.installPhase.completed",
+  failed: "desktop.installPhase.failed",
+  cancelled: "desktop.installPhase.cancelled",
+};
+
+function installPhaseKey(phase: RuntimeInstallPhase): TranslationKey {
+  return INSTALL_PHASE_KEYS[phase];
 }
 
 function PlanFact({

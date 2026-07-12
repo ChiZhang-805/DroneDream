@@ -1,10 +1,11 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
   RuntimeInstallPlan,
+  RuntimeInstallSnapshot,
   RuntimeStatusReport,
   SystemPrerequisiteReport,
 } from "../desktop/bridge";
@@ -207,6 +208,43 @@ const plan: RuntimeInstallPlan = {
   ],
 };
 
+const idleInstallSnapshot: RuntimeInstallSnapshot = {
+  operationId: null,
+  phase: "idle",
+  bytesDownloaded: 0,
+  bytesTotal: null,
+  currentPart: null,
+  totalParts: null,
+  message: null,
+  error: null,
+  resumable: false,
+  requiresRestart: false,
+  targetRoot: null,
+  installedVersion: null,
+  updatedAt: null,
+};
+
+function installSnapshot(
+  overrides: Partial<RuntimeInstallSnapshot> = {},
+): RuntimeInstallSnapshot {
+  return {
+    operationId: "install-1",
+    phase: "downloading",
+    bytesDownloaded: 1024 ** 3,
+    bytesTotal: 8 * 1024 ** 3,
+    currentPart: 1,
+    totalParts: 8,
+    message: "Downloading runtime part 1 of 8",
+    error: null,
+    resumable: true,
+    requiresRestart: false,
+    targetRoot: "E:\\DroneDream",
+    installedVersion: null,
+    updatedAt: "2026-07-12T10:00:00Z",
+    ...overrides,
+  };
+}
+
 function renderPage(locale: "en" | "zh-CN" = "en") {
   window.localStorage.setItem("drone-dream:locale", locale);
   return render(
@@ -217,6 +255,10 @@ function renderPage(locale: "en" | "zh-CN" = "en") {
     </I18nProvider>,
   );
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("DesktopSetup", () => {
   it("explains the capability boundary in a normal browser", () => {
@@ -257,6 +299,7 @@ describe("DesktopSetup", () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
       if (command === "get_runtime_install_plan") return plan;
       throw new Error(`Unexpected command: ${command}`);
     });
@@ -268,12 +311,111 @@ describe("DesktopSetup", () => {
     expect(
       await screen.findByText("Validate Windows, virtualization, memory, and disk"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/remove verified temporary files only after a successful import/i))
+    expect(screen.getByText(/removes verified temporary files only after a successful import/i))
       .toBeInTheDocument();
+    expect(screen.getByText("Runtime download is not published yet")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
+      .toBeDisabled();
     expect(invoke).toHaveBeenCalledWith(
       "get_runtime_install_plan",
       undefined,
     );
+  });
+
+  it("starts and cancels a published runtime installation with live byte progress", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const user = userEvent.setup();
+    let progress: RuntimeInstallSnapshot = idleInstallSnapshot;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return progress;
+      if (command === "get_runtime_install_plan") return plan;
+      if (command === "start_runtime_install") {
+        progress = installSnapshot({
+          phase: "queued",
+          bytesDownloaded: 0,
+          bytesTotal: 8 * 1024 ** 3,
+          currentPart: null,
+          totalParts: null,
+          message: "Queued",
+        });
+        return progress;
+      }
+      if (command === "cancel_runtime_install") {
+        progress = installSnapshot({
+          phase: "cancelled",
+          message: "Cancelled by user",
+        });
+        return progress;
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+    const install = await screen.findByRole("button", {
+      name: "Install DroneDreamRuntime",
+    });
+    expect(install).toBeEnabled();
+    await user.click(install);
+
+    expect(await screen.findByText("Preparing installation")).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("start_runtime_install", {
+      request: {
+        targetRoot: "E:\\DroneDream",
+        releaseManifestUrl:
+          "https://downloads.example.test/dronedream/runtime-manifest.json",
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Cancel installation" }));
+    expect(await screen.findByRole("button", { name: "Resume installation" }))
+      .toBeEnabled();
+    expect(screen.getByText("1.0 GiB / 8.0 GiB")).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("cancel_runtime_install", undefined);
+  });
+
+  it("offers a safe retry and restart continuation for resumable installs", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const user = userEvent.setup();
+    let progress = installSnapshot({
+      phase: "failed",
+      error: {
+        code: "NETWORK_INTERRUPTED",
+        message: "The connection was interrupted.",
+        retryable: true,
+      },
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return progress;
+      if (command === "get_runtime_install_plan") return plan;
+      if (command === "start_runtime_install") {
+        progress = installSnapshot({
+          phase: "waitingForRestart",
+          error: null,
+          requiresRestart: true,
+          message: "Restart Windows to enable WSL2.",
+        });
+        return progress;
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+    expect(await screen.findByText("NETWORK_INTERRUPTED")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry installation" }));
+    expect(await screen.findByText("Restart Windows to continue")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue installation" })).toBeEnabled();
   });
 
   it("re-fetches the plan for a user-selected fixed disk", async () => {
@@ -284,6 +426,7 @@ describe("DesktopSetup", () => {
     ) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
       if (command === "get_runtime_install_plan") {
         return { ...plan, targetRoot: String(args?.targetRoot ?? plan.targetRoot) };
       }
@@ -324,6 +467,7 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return report;
           if (command === "probe_runtime_status") return missingRuntime;
+          if (command === "get_runtime_install_progress") return idleInstallSnapshot;
           return plan;
         }),
       },
@@ -342,6 +486,7 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return missingRuntime;
+          if (command === "get_runtime_install_progress") return idleInstallSnapshot;
           return plan;
         }),
       },
@@ -502,6 +647,7 @@ describe("DesktopSetup", () => {
   });
 
   it("shows attention for an installed runtime with an unhealthy required component", async () => {
+    const user = userEvent.setup();
     const contradictoryRuntime: RuntimeStatusReport = {
       ...runtime,
       ready: false,
@@ -511,20 +657,42 @@ describe("DesktopSetup", () => {
           : component,
       ),
     };
-    window.__TAURI__ = {
-      core: {
-        invoke: vi.fn(async (command: string) => {
-          if (command === "probe_system_prerequisites") return prerequisites;
-          if (command === "probe_runtime_status") return contradictoryRuntime;
-          throw new Error(`Unexpected command: ${command}`);
-        }),
-      },
-    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return contradictoryRuntime;
+      if (command === "repair_runtime") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
     renderPage();
 
     expect(await screen.findByText("The installed runtime needs attention.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Create a tuning experiment" }))
       .not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Repair and restart runtime" }));
+    expect(await screen.findByText("The installed runtime is ready.")).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("repair_runtime", undefined);
+  });
+
+  it("starts an installed runtime that is currently stopped", async () => {
+    const user = userEvent.setup();
+    const stoppedRuntime: RuntimeStatusReport = {
+      ...runtime,
+      running: false,
+      ready: false,
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return stoppedRuntime;
+      if (command === "start_runtime") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Start runtime" }));
+    expect(await screen.findByText("The installed runtime is ready.")).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("start_runtime", undefined);
   });
 
   it("rejects a native plan whose canInstall flag contradicts its blockers", async () => {
@@ -538,6 +706,7 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return missingRuntime;
+          if (command === "get_runtime_install_progress") return idleInstallSnapshot;
           return contradictoryPlan;
         }),
       },
@@ -557,6 +726,7 @@ describe("DesktopSetup", () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return pendingPrerequisites;
       if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
       if (command === "get_runtime_install_plan") return plan;
       throw new Error(`Unexpected command: ${command}`);
     });
@@ -589,6 +759,7 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return missingRuntime;
+          if (command === "get_runtime_install_progress") return idleInstallSnapshot;
           return localizedPlan;
         }),
       },

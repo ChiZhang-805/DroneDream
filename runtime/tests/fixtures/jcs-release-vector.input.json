@@ -1,0 +1,7 @@
+{
+  "unicode": "Drone梦想",
+  "schemaVersion": 1,
+  "escaped": "line\nquote\"slash\\",
+  "values": [true, false, null, 55834574848],
+  "artifact": {"parts": [{"sizeBytes": 7, "index": 0}]}
+}

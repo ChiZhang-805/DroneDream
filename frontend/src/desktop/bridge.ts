@@ -93,6 +93,47 @@ export interface RuntimeInstallPlan {
   steps: RuntimeInstallStep[];
 }
 
+export type RuntimeInstallPhase =
+  | "idle"
+  | "queued"
+  | "verifyingManifest"
+  | "downloading"
+  | "verifyingArchive"
+  | "importing"
+  | "starting"
+  | "healthChecking"
+  | "waitingForRestart"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface RuntimeInstallError {
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+
+export interface RuntimeInstallSnapshot {
+  operationId: string | null;
+  phase: RuntimeInstallPhase;
+  bytesDownloaded: number;
+  bytesTotal: number | null;
+  currentPart: number | null;
+  totalParts: number | null;
+  message: string | null;
+  error: RuntimeInstallError | null;
+  resumable: boolean;
+  requiresRestart: boolean;
+  targetRoot: string | null;
+  installedVersion: string | null;
+  updatedAt: string | null;
+}
+
+export interface RuntimeInstallRequest {
+  targetRoot: string;
+  releaseManifestUrl?: string | null;
+}
+
 interface TauriCore {
   invoke(command: string, args?: Record<string, unknown>): Promise<unknown>;
 }
@@ -125,6 +166,20 @@ const COMPONENT_STATES = new Set<RuntimeComponentState>([
   "stopped",
   "unhealthy",
   "unknown",
+]);
+const INSTALL_PHASES = new Set<RuntimeInstallPhase>([
+  "idle",
+  "queued",
+  "verifyingManifest",
+  "downloading",
+  "verifyingArchive",
+  "importing",
+  "starting",
+  "healthChecking",
+  "waitingForRestart",
+  "completed",
+  "failed",
+  "cancelled",
 ]);
 
 declare global {
@@ -195,6 +250,39 @@ export async function getRuntimeInstallPlan(
     (value) => parseInstallPlan(value, expectedTargetRoot),
     expectedTargetRoot ? { targetRoot: expectedTargetRoot } : undefined,
   );
+}
+
+export function startRuntimeInstall(
+  request: RuntimeInstallRequest,
+): Promise<RuntimeInstallSnapshot> {
+  const normalizedRequest = normalizeRuntimeInstallRequest(request);
+  return invokeDesktop(
+    "start_runtime_install",
+    parseRuntimeInstallSnapshot,
+    { request: normalizedRequest },
+  );
+}
+
+export function getRuntimeInstallProgress(): Promise<RuntimeInstallSnapshot> {
+  return invokeDesktop(
+    "get_runtime_install_progress",
+    parseRuntimeInstallSnapshot,
+  );
+}
+
+export function cancelRuntimeInstall(): Promise<RuntimeInstallSnapshot> {
+  return invokeDesktop(
+    "cancel_runtime_install",
+    parseRuntimeInstallSnapshot,
+  );
+}
+
+export function startRuntime(): Promise<RuntimeStatusReport> {
+  return invokeDesktop("start_runtime", parseRuntimeStatus);
+}
+
+export function repairRuntime(): Promise<RuntimeStatusReport> {
+  return invokeDesktop("repair_runtime", parseRuntimeStatus);
 }
 
 function parsePrerequisiteReport(value: unknown): SystemPrerequisiteReport {
@@ -461,6 +549,136 @@ function parseInstallStep(value: unknown, index: number): RuntimeInstallStep {
   };
 }
 
+function normalizeRuntimeInstallRequest(
+  request: RuntimeInstallRequest,
+): Required<RuntimeInstallRequest> {
+  const targetRoot = normalizeRequestedTargetRoot(request.targetRoot);
+  const releaseManifestUrl = request.releaseManifestUrl == null
+    ? null
+    : normalizeReleaseManifestUrl(request.releaseManifestUrl);
+  return { targetRoot, releaseManifestUrl };
+}
+
+function normalizeReleaseManifestUrl(value: string): string {
+  const urlString = expectSafeNonEmptyString(value, "releaseManifestUrl");
+  let url: URL;
+  try {
+    url = new URL(urlString);
+  } catch {
+    throw new Error("releaseManifestUrl must be an absolute HTTPS URL");
+  }
+  if (url.protocol !== "https:" || url.username !== "" || url.password !== "") {
+    throw new Error("releaseManifestUrl must be an absolute HTTPS URL without credentials");
+  }
+  return url.toString();
+}
+
+function parseRuntimeInstallSnapshot(value: unknown): RuntimeInstallSnapshot {
+  const record = expectRecord(value, "snapshot");
+  const phase = expectString(record.phase, "snapshot.phase");
+  if (!INSTALL_PHASES.has(phase as RuntimeInstallPhase)) {
+    throw new Error(`snapshot.phase has the unknown value ${JSON.stringify(phase)}`);
+  }
+  const currentPart = record.currentPart == null
+    ? null
+    : expectNonNegativeInteger(record.currentPart, "snapshot.currentPart");
+  const totalParts = record.totalParts == null
+    ? null
+    : expectNonNegativeInteger(record.totalParts, "snapshot.totalParts");
+  const snapshot: RuntimeInstallSnapshot = {
+    operationId: expectNullableSafeNonEmptyString(
+      record.operationId,
+      "snapshot.operationId",
+    ),
+    phase: phase as RuntimeInstallPhase,
+    bytesDownloaded: expectNonNegativeNumber(
+      record.bytesDownloaded,
+      "snapshot.bytesDownloaded",
+    ),
+    bytesTotal: record.bytesTotal == null
+      ? null
+      : expectNonNegativeNumber(record.bytesTotal, "snapshot.bytesTotal"),
+    currentPart,
+    totalParts,
+    message: expectNullableSafeNonEmptyString(record.message, "snapshot.message"),
+    error: record.error == null ? null : parseRuntimeInstallError(record.error),
+    resumable: expectBoolean(record.resumable, "snapshot.resumable"),
+    requiresRestart: expectBoolean(
+      record.requiresRestart,
+      "snapshot.requiresRestart",
+    ),
+    targetRoot: record.targetRoot == null
+      ? null
+      : expectCanonicalRuntimeTargetRoot(record.targetRoot, "snapshot.targetRoot"),
+    installedVersion: expectNullableSafeNonEmptyString(
+      record.installedVersion,
+      "snapshot.installedVersion",
+    ),
+    updatedAt: parseNullableTimestamp(record.updatedAt, "snapshot.updatedAt"),
+  };
+  validateRuntimeInstallSnapshot(snapshot);
+  return snapshot;
+}
+
+function parseRuntimeInstallError(value: unknown): RuntimeInstallError {
+  const record = expectRecord(value, "snapshot.error");
+  return {
+    code: expectSafeNonEmptyString(record.code, "snapshot.error.code"),
+    message: expectSafeNonEmptyString(record.message, "snapshot.error.message"),
+    retryable: expectBoolean(record.retryable, "snapshot.error.retryable"),
+  };
+}
+
+function validateRuntimeInstallSnapshot(snapshot: RuntimeInstallSnapshot): void {
+  if (
+    snapshot.bytesTotal !== null &&
+    snapshot.bytesDownloaded > snapshot.bytesTotal
+  ) {
+    throw new Error("snapshot.bytesDownloaded cannot exceed bytesTotal");
+  }
+  if (snapshot.currentPart !== null && snapshot.totalParts === null) {
+    throw new Error("snapshot.currentPart requires totalParts");
+  }
+  if (
+    snapshot.currentPart !== null &&
+    snapshot.totalParts !== null &&
+    (snapshot.totalParts === 0 || snapshot.currentPart > snapshot.totalParts)
+  ) {
+    throw new Error("snapshot.currentPart cannot exceed a positive totalParts");
+  }
+  if (snapshot.phase === "idle") {
+    if (
+      snapshot.operationId !== null ||
+      snapshot.targetRoot !== null ||
+      snapshot.error !== null ||
+      snapshot.bytesDownloaded !== 0 ||
+      snapshot.bytesTotal !== null ||
+      snapshot.currentPart !== null ||
+      snapshot.totalParts !== null ||
+      snapshot.message !== null ||
+      snapshot.installedVersion !== null ||
+      snapshot.updatedAt !== null ||
+      snapshot.resumable ||
+      snapshot.requiresRestart
+    ) {
+      throw new Error("snapshot idle state must not contain operation progress");
+    }
+    return;
+  }
+  if (snapshot.operationId === null || snapshot.targetRoot === null) {
+    throw new Error("snapshot non-idle state requires operationId and targetRoot");
+  }
+  if (snapshot.phase === "failed" && snapshot.error === null) {
+    throw new Error("snapshot failed state requires an error");
+  }
+  if (snapshot.phase !== "failed" && snapshot.error !== null) {
+    throw new Error("snapshot error is only valid in the failed state");
+  }
+  if (snapshot.phase === "waitingForRestart" && !snapshot.requiresRestart) {
+    throw new Error("snapshot waitingForRestart state requires a restart");
+  }
+}
+
 function expectRecord(value: unknown, path: string): UnknownRecord {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(`${path} must be an object`);
@@ -510,6 +728,23 @@ function expectCanonicalRuntimeTargetRoot(value: unknown, path: string): string 
 function expectNullableString(value: unknown, path: string): string | null {
   if (value == null) return null;
   return expectString(value, path);
+}
+
+function expectNullableSafeNonEmptyString(
+  value: unknown,
+  path: string,
+): string | null {
+  if (value == null) return null;
+  return expectSafeNonEmptyString(value, path);
+}
+
+function parseNullableTimestamp(value: unknown, path: string): string | null {
+  if (value == null) return null;
+  const timestamp = expectSafeNonEmptyString(value, path);
+  if (!/^\d{4}-\d{2}-\d{2}T/u.test(timestamp) || Number.isNaN(Date.parse(timestamp))) {
+    throw new Error(`${path} must be an ISO 8601 timestamp`);
+  }
+  return timestamp;
 }
 
 function expectBoolean(value: unknown, path: string): boolean {

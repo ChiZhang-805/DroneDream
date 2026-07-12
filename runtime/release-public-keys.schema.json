@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/runtime-release-public-keys.v1.json",
+  "title": "DroneDreamRuntime trusted release keys",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "keys"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["keyId", "algorithm", "publicKeyBase64", "usage", "status"],
+        "properties": {
+          "keyId": {"type": "string", "pattern": "^ed25519:[0-9a-f]{64}$"},
+          "algorithm": {"const": "Ed25519"},
+          "publicKeyBase64": {"type": "string", "contentEncoding": "base64"},
+          "usage": {"const": "runtime-release"},
+          "status": {"enum": ["active", "retired"]}
+        }
+      }
+    }
+  }
+}

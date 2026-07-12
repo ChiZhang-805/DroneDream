@@ -57,6 +57,7 @@ RUN git clone --filter=blob:none https://github.com/valkey-io/valkey.git /tmp/va
     make -C /tmp/valkey -j2 BUILD_TLS=yes USE_SYSTEMD=yes && \
     install -m 0755 /tmp/valkey/src/valkey-server /usr/local/bin/valkey-server && \
     install -m 0755 /tmp/valkey/src/valkey-cli /usr/local/bin/valkey-cli && \
+    install -D -m 0644 /tmp/valkey/COPYING /usr/share/doc/valkey/COPYING && \
     rm -rf /tmp/valkey
 
 COPY . /opt/dronedream/source
@@ -67,6 +68,13 @@ RUN test -n "${DRONEDREAM_SOURCE_COMMIT}" && \
     /opt/dronedream/venv/bin/pip install --disable-pip-version-check --no-cache-dir \
       --no-deps /opt/dronedream/source/backend /opt/dronedream/source/worker && \
     /opt/dronedream/venv/bin/pip check && \
+    install -d -m 0755 /usr/share/doc/dronedream-runtime && \
+    install -m 0644 /opt/dronedream/source/LICENSE \
+      /usr/share/doc/dronedream-runtime/LICENSE && \
+    install -m 0644 /opt/dronedream/source/runtime/THIRD_PARTY_NOTICES.md \
+      /usr/share/doc/dronedream-runtime/THIRD_PARTY_NOTICES.md && \
+    cmp /opt/dronedream/source/runtime/licenses/valkey-COPYING \
+      /usr/share/doc/valkey/COPYING && \
     install -d -m 0755 /opt/dronedream/runtime && \
     /opt/dronedream/venv/bin/python /opt/dronedream/source/runtime/tools/runtime_manifest.py \
       generate --pins /opt/dronedream/source/runtime/pins.env \
@@ -105,6 +113,9 @@ RUN chmod 0755 /usr/lib/dronedream/runtime-init.sh \
     test -x /opt/dronedream/venv/bin/uvicorn && \
     test -x /opt/dronedream/venv/bin/drone-dream-worker && \
     test -x /usr/lib/dronedream/px4-log-cleanup.py && \
+    test -s /usr/share/doc/valkey/COPYING && \
+    test -s /usr/share/doc/dronedream-runtime/LICENSE && \
+    test -s /usr/share/doc/dronedream-runtime/THIRD_PARTY_NOTICES.md && \
     systemd-analyze cat-config systemd/journald.conf >/dev/null && \
     systemd-analyze verify /etc/systemd/system/dronedream-runtime-init.service \
       /etc/systemd/system/valkey.service /etc/systemd/system/dronedream-api.service \

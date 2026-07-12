@@ -1,9 +1,4 @@
-//! Safe lifecycle primitives for the future runtime-image downloader.
-//!
-//! This module deliberately is not exposed as a Tauri command yet: no signed
-//! runtime artifact or release URL exists in the repository. The installer can
-//! call these primitives once the downloader/importer is wired to a real,
-//! versioned manifest.
+//! Safe lifecycle primitives for the signed runtime-image installer.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -94,11 +89,7 @@ fn runtime_download_cache_root_path(target_root: &Path) -> PathBuf {
         .join(CACHE_DIRECTORY)
 }
 
-/// Creates (or reopens) the marked cache used by the future downloader.
-///
-/// It is intentionally not called by the preview installer. Creating cache
-/// state before a real signed artifact is configured would imply an install
-/// capability that does not exist yet.
+/// Creates (or reopens) the marker-owned cache used by the runtime downloader.
 #[allow(dead_code)]
 pub(crate) fn initialize_runtime_download_cache(
     runtime_target_root: &Path,
@@ -228,7 +219,7 @@ pub(crate) fn apply_runtime_import_outcome(
     Ok(report)
 }
 
-fn validate_managed_cache(runtime_target_root: &Path) -> Result<PathBuf, String> {
+pub(crate) fn validate_managed_cache(runtime_target_root: &Path) -> Result<PathBuf, String> {
     require_absolute_runtime_root(runtime_target_root)?;
     reject_existing_link_like(runtime_target_root)?;
     let cache_parent = runtime_target_root
@@ -379,7 +370,7 @@ fn ensure_real_directory(path: &Path, label: &str) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn is_link_like(metadata: &fs::Metadata) -> bool {
+pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
     metadata.file_type().is_symlink()
@@ -387,7 +378,7 @@ fn is_link_like(metadata: &fs::Metadata) -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn is_link_like(metadata: &fs::Metadata) -> bool {
+pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
     metadata.file_type().is_symlink()
 }
 

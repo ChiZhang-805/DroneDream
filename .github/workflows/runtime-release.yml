@@ -1,0 +1,197 @@
+name: Runtime release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Immutable prerelease tag, for example runtime-v0.1.0-beta.1"
+        required: true
+        type: string
+      publish:
+        description: "Create a GitHub prerelease after every verification gate passes"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: runtime-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  build-smoke-sign:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    # The full PX4/Gazebo build is intentionally excluded from shared hosted
+    # runners. Register a dedicated Linux amd64 runner with this custom label.
+    runs-on: [self-hosted, Linux, X64, dronedream-runtime-builder]
+    timeout-minutes: 240
+    environment: runtime-release
+    env:
+      IMAGE: dronedream/runtime:${{ github.run_id }}-${{ github.run_attempt }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Validate manual release inputs and trust anchor
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version=$(sed -n 's/^DRONEDREAM_RUNTIME_VERSION=//p' runtime/pins.env)
+          if [[ ! "$RELEASE_TAG" =~ ^runtime-v${version}-beta\.[0-9]+$ ]]; then
+            echo "release tag must match runtime-v${version}-beta.N" >&2
+            exit 2
+          fi
+          python -m pip install --disable-pip-version-check \
+            --requirement runtime/locks/release-tools-requirements.lock
+          python - <<'PY'
+          import importlib.util
+          import pathlib
+
+          path = pathlib.Path("runtime/tools/runtime_release.py")
+          spec = importlib.util.spec_from_file_location("runtime_release", path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+          keys = module.validate_keyring(module.load_json(pathlib.Path("runtime/release-public-keys.json")))
+          if not keys:
+              raise SystemExit("trusted runtime release keyring is empty")
+          PY
+
+      - name: Guard immutable release tag
+        if: ${{ inputs.publish }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release already exists and will never be overwritten: $RELEASE_TAG" >&2
+            exit 2
+          fi
+
+      - name: Confirm signing secret is configured
+        shell: bash
+        env:
+          SIGNING_KEY_CONFIGURED: ${{ secrets.DRONEDREAM_RUNTIME_ED25519_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          if [[ -z "$SIGNING_KEY_CONFIGURED" ]]; then
+            echo "runtime release signing secret is not configured" >&2
+            exit 2
+          fi
+
+      - name: Validate static runtime contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python runtime/tools/runtime_manifest.py validate-config \
+            --pins runtime/pins.env \
+            --python-lock runtime/locks/python-requirements.lock
+          python -m unittest discover -s runtime/tests -v
+          bash -n runtime/build-rootfs.sh runtime/smoke-image.sh runtime/export-rootfs.sh
+
+      - name: Build immutable linux amd64 runtime image
+        shell: bash
+        run: bash runtime/build-rootfs.sh
+
+      - name: Run the real PX4 and Gazebo smoke gate
+        shell: bash
+        run: bash runtime/smoke-image.sh "$IMAGE" runtime/out/smoke-report.json
+
+      - name: Export smoke-promoted WSL rootfs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version=$(sed -n 's/^DRONEDREAM_RUNTIME_VERSION=//p' runtime/pins.env)
+          rootfs="runtime/out/DroneDreamRuntime-${version}-amd64.tar"
+          bash runtime/export-rootfs.sh "$IMAGE" runtime/out/smoke-report.json "$rootfs"
+          test -s "$rootfs"
+          test -s "$rootfs.manifest.json"
+
+      - name: Split and describe release assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version=$(sed -n 's/^DRONEDREAM_RUNTIME_VERSION=//p' runtime/pins.env)
+          rootfs="runtime/out/DroneDreamRuntime-${version}-amd64.tar"
+          output="runtime/out/release/$RELEASE_TAG"
+          base_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
+          build_timestamp=$(docker image inspect --format '{{.Created}}' "$IMAGE")
+          test ! -e "$output"
+          python runtime/tools/runtime_release.py package \
+            --rootfs "$rootfs" \
+            --runtime-manifest "$rootfs.manifest.json" \
+            --smoke-report runtime/out/smoke-report.json \
+            --output-directory "$output" \
+            --base-url "$base_url" \
+            --build-timestamp "$build_timestamp"
+          install -m 0644 LICENSE "$output/DroneDream-LICENSE.txt"
+          install -m 0644 runtime/THIRD_PARTY_NOTICES.md \
+            "$output/THIRD_PARTY_NOTICES.md"
+          install -m 0644 runtime/licenses/valkey-COPYING \
+            "$output/Valkey-COPYING.txt"
+          test -s "$output/DroneDream-LICENSE.txt"
+          test -s "$output/THIRD_PARTY_NOTICES.md"
+          test -s "$output/Valkey-COPYING.txt"
+
+      - name: Sign canonical release manifest
+        shell: bash
+        env:
+          DRONEDREAM_RUNTIME_ED25519_PRIVATE_KEY: ${{ secrets.DRONEDREAM_RUNTIME_ED25519_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          output="runtime/out/release/$RELEASE_TAG"
+          python runtime/tools/runtime_release.py sign \
+            --manifest "$output/runtime-release.json"
+
+      - name: Independently verify signed release assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          output="runtime/out/release/$RELEASE_TAG"
+          python runtime/tools/runtime_release.py verify \
+            --manifest "$output/runtime-release.json" \
+            --signature "$output/runtime-release.json.sig" \
+            --keyring runtime/release-public-keys.json \
+            --payload-directory "$output"
+          find "$output" -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
+
+      - name: Create immutable GitHub prerelease
+        if: ${{ inputs.publish }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          output="runtime/out/release/$RELEASE_TAG"
+          # `package` enforces every part is strictly under GitHub's 2 GiB
+          # per-asset ceiling. Assets enter an invisible draft first so a
+          # network/upload failure cannot expose a partial public release.
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "DroneDreamRuntime $RELEASE_TAG" \
+            --notes "Signed beta WSL2 runtime. Real PX4/Gazebo smoke evidence is attached." \
+            --draft
+          gh release upload "$RELEASE_TAG" "$output"/* \
+            --repo "$GITHUB_REPOSITORY"
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --prerelease
+
+      - name: Record dry-run location
+        if: ${{ ! inputs.publish }}
+        shell: bash
+        run: |
+          echo "Verified assets remain on this self-hosted runner at:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$GITHUB_WORKSPACE/runtime/out/release/$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

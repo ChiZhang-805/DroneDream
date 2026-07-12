@@ -2589,6 +2589,122 @@ a {
   justify-content: flex-start;
 }
 
+.desktop-installer-status {
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(18, 5, 31, 0.55);
+}
+
+.desktop-installer-completed {
+  border-color: rgba(93, 247, 200, 0.42);
+  background: rgba(93, 247, 200, 0.07);
+}
+
+.desktop-installer-failed,
+.desktop-installer-cancelled {
+  border-color: rgba(255, 209, 102, 0.42);
+}
+
+.desktop-installer-heading,
+.desktop-installer-byte-row,
+.desktop-install-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.desktop-installer-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.desktop-installer-heading span,
+.desktop-installer-byte-row,
+.desktop-installer-message,
+.desktop-installer-target,
+.desktop-resume-hint {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.desktop-installer-progress {
+  width: 100%;
+  height: 10px;
+  margin: 0.8rem 0 0.35rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  accent-color: var(--primary);
+}
+
+.desktop-installer-progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: rgba(240, 162, 255, 0.12);
+}
+
+.desktop-installer-progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--active), var(--primary));
+}
+
+.desktop-installer-phases {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desktop-installer-phases li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.45rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 0.68rem;
+}
+
+.desktop-installer-phases li > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 21px;
+  width: 21px;
+  height: 21px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.62rem;
+  font-weight: 750;
+}
+
+.desktop-installer-phases li.current {
+  color: var(--active);
+  border-color: rgba(255, 115, 213, 0.38);
+  background: rgba(255, 115, 213, 0.06);
+}
+
+.desktop-installer-phases li.complete {
+  color: var(--success);
+  border-color: rgba(93, 247, 200, 0.28);
+}
+
+.desktop-installer-message,
+.desktop-installer-target {
+  margin: 0.7rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.desktop-install-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 720px) {
   .desktop-browser-card {
     grid-template-columns: 1fr;
@@ -2603,6 +2719,10 @@ a {
   }
 
   .desktop-storage-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .desktop-installer-phases {
     grid-template-columns: 1fr;
   }
 

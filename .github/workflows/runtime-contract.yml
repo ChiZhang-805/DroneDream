@@ -5,6 +5,7 @@ on:
     paths:
       - "runtime/**"
       - ".github/workflows/runtime-contract.yml"
+      - ".github/workflows/runtime-release.yml"
       - "desktop/src-tauri/src/runtime.rs"
       - "backend/app/routers/health.py"
       - "backend/pyproject.toml"
@@ -14,6 +15,7 @@ on:
     paths:
       - "runtime/**"
       - ".github/workflows/runtime-contract.yml"
+      - ".github/workflows/runtime-release.yml"
       - "desktop/src-tauri/src/runtime.rs"
       - "backend/app/routers/health.py"
       - "backend/pyproject.toml"
@@ -34,6 +36,11 @@ jobs:
           python-version: "3.12"
       - name: Validate pinned inputs and Python code
         run: |
+          python -m pip install --disable-pip-version-check \
+            --requirement runtime/locks/release-tools-requirements.lock \
+            "ruff==0.15.21"
+          python -m ruff check runtime/tools runtime/tests
+          python -m ruff format --check runtime/tools runtime/tests
           python runtime/tools/runtime_manifest.py validate-config \
             --pins runtime/pins.env \
             --python-lock runtime/locks/python-requirements.lock

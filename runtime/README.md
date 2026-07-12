@@ -168,3 +168,22 @@ The `Runtime contract` GitHub workflow is intentionally static: it validates
 contracts, pins, Python, shell syntax, and the rule that an untested manifest
 cannot be released. It never labels or uploads a hosted-runner artifact as a
 tested PX4/Gazebo runtime.
+
+## Signed downloadable release
+
+Exporting a rootfs is deliberately not the same as publishing it. The separate
+`runtime/tools/runtime_release.py` tool verifies the promoted manifest and real
+smoke report again, splits the uncompressed rootfs tar into 1900 MiB pieces,
+records per-part and whole-artifact SHA-256 values, creates canonical release
+metadata, signs it with Ed25519, and can verify/reassemble it atomically.
+
+The private key is accepted only from an environment variable during signing;
+it is never committed. The trusted public-key file is
+`runtime/release-public-keys.json`; it contains the first beta public trust
+anchor only. Publishing and installation fail closed for absent, malformed,
+retired, or unknown signing keys.
+
+See [the signed runtime release guide](../docs/14-runtime-release.md) for the
+exact schema, one-time key setup, GitHub Release asset layout, self-hosted
+workflow, and installer trust model. The workflow is manual and defaults to a
+non-publishing verification run.

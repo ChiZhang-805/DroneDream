@@ -171,12 +171,18 @@ struct DefaultDriveProbeReport {
 }
 
 #[cfg(target_os = "windows")]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct RuntimeRootMarker {
     schema_version: u32,
     owner: String,
     runtime_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    build_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    installed_at: Option<String>,
 }
 
 #[cfg(target_os = "windows")]
@@ -220,8 +226,62 @@ pub async fn get_runtime_install_plan(
         .map_err(|error| format!("Runtime install-plan task failed: {error}"))?
 }
 
+#[cfg(target_os = "windows")]
+pub(crate) fn validate_runtime_install_target_with_storage_credit(
+    target_root: &str,
+    storage_credit: u64,
+) -> Result<String, String> {
+    let plan =
+        build_install_plan_with_storage_credit(Some(target_root.to_string()), storage_credit)?;
+    if !plan.can_install {
+        return Err(plan.blockers.join(" "));
+    }
+    Ok(plan.target_root)
+}
+
 #[cfg(not(target_os = "windows"))]
-fn probe_runtime() -> Result<RuntimeStatusReport, String> {
+pub(crate) fn validate_runtime_install_target_with_storage_credit(
+    target_root: &str,
+    _: u64,
+) -> Result<String, String> {
+    let plan = build_install_plan(Some(target_root.to_string()))?;
+    if !plan.can_install {
+        return Err(plan.blockers.join(" "));
+    }
+    Ok(plan.target_root)
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn validate_runtime_install_target_free_bytes(
+    target_root: &str,
+    required: u64,
+    storage_credit: u64,
+) -> Result<(), String> {
+    let normalized = normalize_windows_target(target_root)?;
+    let drive = normalized[..2].to_ascii_uppercase();
+    let probe = probe_drive(&drive)?;
+    if probe.free_bytes.saturating_add(storage_credit) < required {
+        return Err(format!(
+            "{} has {:.1} GiB free, but this signed runtime requires at least {:.1} GiB.",
+            probe.drive,
+            probe.free_bytes.saturating_add(storage_credit) as f64 / 1024_f64.powi(3),
+            required as f64 / 1024_f64.powi(3)
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn validate_runtime_install_target_free_bytes(
+    _: &str,
+    _: u64,
+    _: u64,
+) -> Result<(), String> {
+    Err("The runtime installer supports Windows only.".to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn probe_runtime() -> Result<RuntimeStatusReport, String> {
     Ok(RuntimeStatusReport {
         runtime_name: RUNTIME_NAME.to_string(),
         installed: false,
@@ -242,7 +302,7 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn probe_runtime() -> Result<RuntimeStatusReport, String> {
+pub(crate) fn probe_runtime() -> Result<RuntimeStatusReport, String> {
     let mut diagnostics = Vec::new();
     // Installation is a binary field in the desktop IPC contract. If the
     // registry cannot be inspected, returning a fresh `installed: false`
@@ -274,7 +334,20 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
         });
     }
 
-    let (manifest, manifest_status) = if running && runtime_is_wsl2 {
+    let ownership = if registry_probe.installed && runtime_is_wsl2 {
+        match validate_installed_runtime_ownership() {
+            Ok(identity) => Some(identity),
+            Err(error) => {
+                diagnostics.push(format!("Host runtime ownership receipt: {error}"));
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let ownership_valid = ownership.is_some();
+
+    let (manifest, mut manifest_status) = if running && runtime_is_wsl2 {
         match read_runtime_manifest() {
             Ok(Some(value)) => (Some(value), ComponentStatus::Ready),
             Ok(None) => {
@@ -296,11 +369,22 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
         (None, ComponentStatus::Missing)
     };
 
+    let ownership_matches_manifest =
+        runtime_ownership_matches_manifest(ownership.as_ref(), manifest.as_ref());
+    let ownership_authorizes_runtime = ownership_valid && (!running || ownership_matches_manifest);
+    if running && manifest.is_some() && !ownership_matches_manifest {
+        manifest_status = ComponentStatus::Unhealthy;
+        diagnostics.push(
+            "Host ownership receipt build/version does not match the running runtime manifest."
+                .to_string(),
+        );
+    }
+
     let expected_backend_version = manifest
         .as_ref()
         .and_then(|value| value.components.get("backend"))
         .map(String::as_str);
-    let backend_healthy = if running && runtime_is_wsl2 {
+    let backend_healthy = if running && runtime_is_wsl2 && ownership_matches_manifest {
         if let Some(manifest) = manifest.as_ref() {
             // Manifest validation guarantees that the backend component exists.
             let expected_version = manifest
@@ -326,17 +410,43 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
         RuntimeComponent {
             id: "wsl-runtime".to_string(),
             label: "Dedicated WSL2 runtime".to_string(),
-            status: wsl_runtime_component_status(
+            status: ownership_gate_component_status(
+                wsl_runtime_component_status(
+                    registry_probe.installed,
+                    running,
+                    running_probe_failed,
+                    registry_probe.version,
+                ),
                 registry_probe.installed,
-                running,
-                running_probe_failed,
-                registry_probe.version,
+                ownership_authorizes_runtime,
             ),
             required: true,
             version: registry_probe
                 .version
                 .map(|version| format!("WSL {version}")),
             detail: registry_probe.base_path.clone(),
+        },
+        RuntimeComponent {
+            id: "host-ownership".to_string(),
+            label: "Host ownership receipt".to_string(),
+            status: if !registry_probe.installed {
+                ComponentStatus::Missing
+            } else if !ownership_valid
+                || (running && manifest.is_some() && !ownership_matches_manifest)
+            {
+                ComponentStatus::Unhealthy
+            } else {
+                ComponentStatus::Ready
+            },
+            required: true,
+            version: ownership.as_ref().map(|(_, version)| version.clone()),
+            detail: registry_probe.base_path.as_ref().map(|base| {
+                format!(
+                    "{}\\{}",
+                    base.trim_end_matches(['\\', '/']),
+                    RUNTIME_ROOT_MARKER
+                )
+            }),
         },
         RuntimeComponent {
             id: "runtime-manifest".to_string(),
@@ -391,16 +501,58 @@ fn probe_runtime() -> Result<RuntimeStatusReport, String> {
         runtime_name: RUNTIME_NAME.to_string(),
         installed: registry_probe.installed,
         running,
-        ready: registry_probe.installed
-            && runtime_is_wsl2
-            && running
-            && manifest.is_some()
-            && backend_healthy,
+        ready: runtime_ready_from_evidence(
+            registry_probe.installed,
+            runtime_is_wsl2,
+            running,
+            manifest.is_some(),
+            backend_healthy,
+            ownership_matches_manifest,
+        ),
         version,
         data_root: registry_probe.base_path,
         components,
         diagnostics,
     })
+}
+
+#[cfg(target_os = "windows")]
+fn runtime_ownership_matches_manifest(
+    ownership: Option<&(String, String)>,
+    manifest: Option<&RuntimeManifest>,
+) -> bool {
+    matches!((ownership, manifest), (Some((build_id, version)), Some(manifest))
+        if build_id == &manifest.runtime_id && version == &manifest.version)
+}
+
+#[cfg(target_os = "windows")]
+fn ownership_gate_component_status(
+    base: ComponentStatus,
+    installed: bool,
+    ownership_valid: bool,
+) -> ComponentStatus {
+    if installed && !ownership_valid {
+        ComponentStatus::Unhealthy
+    } else {
+        base
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn runtime_ready_from_evidence(
+    installed: bool,
+    runtime_is_wsl2: bool,
+    running: bool,
+    manifest_present: bool,
+    backend_healthy: bool,
+    ownership_matches_manifest: bool,
+) -> bool {
+    installed
+        && runtime_is_wsl2
+        && running
+        && manifest_present
+        && backend_healthy
+        && ownership_matches_manifest
 }
 
 fn wsl_runtime_component_status(
@@ -555,6 +707,219 @@ fn validate_runtime_registry_probe(
         probe.version = None;
     }
     Ok(probe)
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn runtime_is_registered() -> Result<bool, String> {
+    Ok(probe_runtime_registry()?.installed)
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn runtime_registration_matches_target(target_root: &str) -> Result<bool, String> {
+    let registration = probe_runtime_registry()?;
+    if !registration.installed {
+        return Ok(false);
+    }
+    let registered = registration
+        .base_path
+        .ok_or_else(|| "DroneDreamRuntime has no registered base path.".to_string())?;
+    let registered = registered
+        .strip_prefix(r"\\?\")
+        .unwrap_or(&registered)
+        .trim_end_matches(['\\', '/']);
+    let expected = normalize_windows_target(target_root)?;
+    Ok(registered.eq_ignore_ascii_case(&expected))
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn registered_runtime_target() -> Result<Option<String>, String> {
+    let registration = probe_runtime_registry()?;
+    if !registration.installed {
+        return Ok(None);
+    }
+    let base = registration
+        .base_path
+        .ok_or_else(|| "DroneDreamRuntime has no registered base path.".to_string())?;
+    let base = base.strip_prefix(r"\\?\").unwrap_or(&base);
+    normalize_windows_target(base).map(Some)
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn registered_runtime_target() -> Result<Option<String>, String> {
+    Err("The runtime installer supports Windows only.".to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn runtime_registration_matches_target(_: &str) -> Result<bool, String> {
+    Err("The runtime installer supports Windows only.".to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn runtime_is_registered() -> Result<bool, String> {
+    Err("The runtime installer supports Windows only.".to_string())
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn verify_runtime_release_identity(
+    expected_build_id: &str,
+    expected_version: &str,
+) -> Result<bool, String> {
+    let Some(manifest) = read_runtime_manifest()? else {
+        return Ok(false);
+    };
+    if manifest.runtime_id != expected_build_id || manifest.version != expected_version {
+        return Err(format!(
+            "Runtime identity mismatch: expected build {expected_build_id} version {expected_version}, got build {} version {}.",
+            manifest.runtime_id, manifest.version
+        ));
+    }
+    let expected_backend = manifest
+        .components
+        .get("backend")
+        .ok_or_else(|| "Runtime manifest has no backend component.".to_string())?;
+    verify_backend_ready(expected_backend, expected_build_id)?;
+    Ok(true)
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn verify_runtime_release_identity(_: &str, _: &str) -> Result<bool, String> {
+    Err("The runtime installer supports Windows only.".to_string())
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn validate_installed_runtime_ownership() -> Result<(String, String), String> {
+    use std::os::windows::fs::MetadataExt;
+    use std::path::Path;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    const MAX_MARKER_BYTES: u64 = 16 * 1024;
+    let registration = probe_runtime_registry()?;
+    if !registration.installed || registration.version != Some(2) {
+        return Err("DroneDreamRuntime is not a registered WSL2 distribution.".to_string());
+    }
+    let raw_base = registration
+        .base_path
+        .ok_or_else(|| "DroneDreamRuntime has no registered base path.".to_string())?;
+    let base = raw_base.strip_prefix(r"\\?\").unwrap_or(&raw_base);
+    let root = Path::new(base);
+    if !root.is_absolute()
+        || !root
+            .file_name()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.eq_ignore_ascii_case("DroneDream"))
+    {
+        return Err("DroneDreamRuntime is not stored in a dedicated DroneDream root.".to_string());
+    }
+    let root_metadata = std::fs::symlink_metadata(root)
+        .map_err(|error| format!("Unable to inspect DroneDreamRuntime root: {error}"))?;
+    if !root_metadata.is_dir()
+        || root_metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    {
+        return Err("DroneDreamRuntime root is not a real local directory.".to_string());
+    }
+    let marker_path = root.join(RUNTIME_ROOT_MARKER);
+    let marker_metadata = std::fs::symlink_metadata(&marker_path)
+        .map_err(|error| format!("DroneDreamRuntime ownership receipt is missing: {error}"))?;
+    if !marker_metadata.is_file()
+        || marker_metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        || marker_metadata.len() > MAX_MARKER_BYTES
+    {
+        return Err("DroneDreamRuntime ownership receipt is not a safe ordinary file.".to_string());
+    }
+    let marker: RuntimeRootMarker =
+        serde_json::from_slice(&std::fs::read(&marker_path).map_err(|error| {
+            format!("Unable to read DroneDreamRuntime ownership receipt: {error}")
+        })?)
+        .map_err(|error| format!("DroneDreamRuntime ownership receipt is invalid: {error}"))?;
+    if marker.schema_version != 1
+        || marker.owner != RUNTIME_ROOT_MARKER_OWNER
+        || marker.runtime_name != RUNTIME_NAME
+    {
+        return Err("DroneDreamRuntime ownership receipt identity is not trusted.".to_string());
+    }
+    let build_id = marker
+        .build_id
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "DroneDreamRuntime ownership receipt has no build identity.".to_string())?;
+    let version = marker
+        .version
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "DroneDreamRuntime ownership receipt has no version.".to_string())?;
+    Ok((build_id, version))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn validate_installed_runtime_ownership() -> Result<(String, String), String> {
+    Err("The runtime installer supports Windows only.".to_string())
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn write_runtime_root_receipt(
+    target_root: &str,
+    build_id: &str,
+    version: &str,
+) -> Result<(), String> {
+    use std::io::Write as _;
+    use std::os::windows::fs::MetadataExt;
+    use std::path::Path;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    let normalized = normalize_windows_target(target_root)?;
+    let root = Path::new(&normalized);
+    let metadata = std::fs::symlink_metadata(root)
+        .map_err(|error| format!("Unable to inspect imported runtime root: {error}"))?;
+    if !metadata.is_dir() || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        return Err("Imported runtime root is not a real local directory.".to_string());
+    }
+    let marker = RuntimeRootMarker {
+        schema_version: 1,
+        owner: RUNTIME_ROOT_MARKER_OWNER.to_string(),
+        runtime_name: RUNTIME_NAME.to_string(),
+        build_id: Some(build_id.to_string()),
+        version: Some(version.to_string()),
+        installed_at: Some(chrono::Utc::now().to_rfc3339()),
+    };
+    let encoded = serde_json::to_vec(&marker)
+        .map_err(|error| format!("Unable to encode runtime ownership receipt: {error}"))?;
+    let temporary = root.join(".dronedream-runtime-root.json.tmp");
+    let destination = root.join(RUNTIME_ROOT_MARKER);
+    if temporary.exists() {
+        let temp_metadata = std::fs::symlink_metadata(&temporary)
+            .map_err(|error| format!("Unable to inspect temporary runtime receipt: {error}"))?;
+        if !temp_metadata.is_file()
+            || temp_metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        {
+            return Err("Temporary runtime ownership receipt is not a safe file.".to_string());
+        }
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&temporary)
+        .map_err(|error| format!("Unable to create runtime ownership receipt: {error}"))?;
+    file.write_all(&encoded)
+        .and_then(|()| file.sync_all())
+        .map_err(|error| format!("Unable to persist runtime ownership receipt: {error}"))?;
+    drop(file);
+    if destination.exists() {
+        let destination_metadata = std::fs::symlink_metadata(&destination)
+            .map_err(|error| format!("Unable to inspect runtime ownership receipt: {error}"))?;
+        if !destination_metadata.is_file()
+            || destination_metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        {
+            return Err("Runtime ownership receipt is not a safe file.".to_string());
+        }
+        std::fs::remove_file(&destination)
+            .map_err(|error| format!("Unable to replace runtime ownership receipt: {error}"))?;
+    }
+    std::fs::rename(&temporary, &destination)
+        .map_err(|error| format!("Unable to commit runtime ownership receipt: {error}"))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn write_runtime_root_receipt(_: &str, _: &str, _: &str) -> Result<(), String> {
+    Err("The runtime installer supports Windows only.".to_string())
 }
 
 #[cfg(target_os = "windows")]
@@ -911,12 +1276,23 @@ fn build_install_plan(target_root: Option<String>) -> Result<RuntimeInstallPlan,
 
 #[cfg(target_os = "windows")]
 fn build_install_plan(target_root: Option<String>) -> Result<RuntimeInstallPlan, String> {
+    build_install_plan_with_storage_credit(target_root, 0)
+}
+
+#[cfg(target_os = "windows")]
+fn build_install_plan_with_storage_credit(
+    target_root: Option<String>,
+    mut storage_credit: u64,
+) -> Result<RuntimeInstallPlan, String> {
     let prerequisites = probe_install_prerequisites()?;
     let requested = match target_root {
         Some(value) if !value.trim().is_empty() => value,
         _ => default_target_root()?,
     };
     let normalized = normalize_windows_target(&requested)?;
+    if storage_credit == 0 {
+        storage_credit = crate::runtime_installer::planner_signed_resume_credit(&normalized);
+    }
     let drive = normalized[..2].to_ascii_uppercase();
     let probe = probe_drive(&drive)?;
     let mut blockers = Vec::new();
@@ -962,7 +1338,7 @@ fn build_install_plan(target_root: Option<String>) -> Result<RuntimeInstallPlan,
             probe.drive, probe.file_system
         ));
     }
-    if probe.free_bytes < MINIMUM_FREE_BYTES {
+    if probe.free_bytes.saturating_add(storage_credit) < MINIMUM_FREE_BYTES {
         blockers.push(format!(
             "At least {} GiB free is required (download, installed runtime, and 20 GiB reserve); {} currently has {:.1} GiB.",
             MINIMUM_FREE_BYTES / GIB,
@@ -1033,7 +1409,7 @@ $processorArchitecture = if ($env:PROCESSOR_ARCHITEW6432) {
 }
 
 #[cfg(target_os = "windows")]
-fn wsl_is_ready() -> Result<bool, String> {
+pub(crate) fn wsl_is_ready() -> Result<bool, String> {
     const SCRIPT: &str = r#"
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -1105,7 +1481,7 @@ fn base_plan(
                 id: "download".to_string(),
                 title: "Download the signed DroneDream runtime".to_string(),
                 description: format!(
-                    "The future online installer will keep resumable data under {}. Verified temporary archives and parts are removed only after a successful import; failed imports retain resumable data.",
+                    "The installer keeps resumable data under {}. Verified temporary archives are removed only after a successful import; failed or cancelled installs retain resumable data.",
                     download_cache.display()
                 ),
                 requires_administrator: false,
@@ -1153,25 +1529,42 @@ $drives = @(Get-CimInstance -ClassName Win32_LogicalDisk -Filter 'DriveType = 3'
 "#;
     let report: DefaultDriveProbeReport =
         run_powershell_json(SCRIPT, &[], "default runtime drive probe")?;
-    select_default_target(&report.drives, &report.system_drive, |target| {
-        default_target_is_safe_and_writable(target)
-    })
+    select_default_target_with_credit(
+        &report.drives,
+        &report.system_drive,
+        default_target_is_safe_and_writable,
+        crate::runtime_installer::planner_signed_resume_credit,
+    )
     .ok_or_else(|| {
         format!(
-            "No safe writable fixed NTFS drive has at least {} GiB free. DroneDream checks non-system drives first, then the Windows system drive.",
+            "No safe writable fixed NTFS drive has at least {} GiB of free or authenticated resumable capacity. DroneDream checks non-system drives first, then the Windows system drive.",
             MINIMUM_FREE_BYTES / GIB
         )
     })
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(target_os = "windows", test))]
 fn select_default_target<F>(
     drives: &[DriveProbe],
     system_drive: &str,
-    mut target_is_safe_and_writable: F,
+    target_is_safe_and_writable: F,
 ) -> Option<String>
 where
     F: FnMut(&str) -> bool,
+{
+    select_default_target_with_credit(drives, system_drive, target_is_safe_and_writable, |_| 0)
+}
+
+#[cfg(target_os = "windows")]
+fn select_default_target_with_credit<F, C>(
+    drives: &[DriveProbe],
+    system_drive: &str,
+    mut target_is_safe_and_writable: F,
+    mut storage_credit: C,
+) -> Option<String>
+where
+    F: FnMut(&str) -> bool,
+    C: FnMut(&str) -> u64,
 {
     // If Windows does not identify its system volume, fail closed instead of
     // accidentally treating that volume as a preferred data disk.
@@ -1180,10 +1573,14 @@ where
     let mut eligible = drives
         .iter()
         .filter(|probe| {
+            let resume_credit = normalize_windows_target(&probe.drive)
+                .ok()
+                .map(|target| storage_credit(&target))
+                .unwrap_or(0);
             probe.drive_type == 3
                 && probe.file_system.eq_ignore_ascii_case("NTFS")
                 && probe.total_bytes > 0
-                && probe.free_bytes >= MINIMUM_FREE_BYTES
+                && probe.free_bytes.saturating_add(resume_credit) >= MINIMUM_FREE_BYTES
         })
         .collect::<Vec<_>>();
 
@@ -1199,9 +1596,19 @@ where
             .drive
             .trim()
             .eq_ignore_ascii_case(normalized_system_drive);
+        let left_capacity = normalize_windows_target(&left.drive)
+            .ok()
+            .map(|target| storage_credit(&target))
+            .unwrap_or(0)
+            .saturating_add(left.free_bytes);
+        let right_capacity = normalize_windows_target(&right.drive)
+            .ok()
+            .map(|target| storage_credit(&target))
+            .unwrap_or(0)
+            .saturating_add(right.free_bytes);
         left_is_system
             .cmp(&right_is_system)
-            .then_with(|| right.free_bytes.cmp(&left.free_bytes))
+            .then_with(|| right_capacity.cmp(&left_capacity))
             .then_with(|| left.drive.cmp(&right.drive))
     });
 
@@ -1453,7 +1860,7 @@ fn open_directory_handle(
     Ok(DirectoryAccessHandle(handle))
 }
 
-fn normalize_windows_target(value: &str) -> Result<String, String> {
+pub(crate) fn normalize_windows_target(value: &str) -> Result<String, String> {
     let trimmed = value.trim().replace('/', "\\");
     let bytes = trimmed.as_bytes();
     if bytes.len() < 2 || !bytes[0].is_ascii_alphabetic() || bytes[1] != b':' {
@@ -1593,6 +2000,34 @@ mod tests {
             Some("E:\\DroneDream")
         );
         assert!(select_default_target(&drives, "", |_| true).is_none());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn default_target_counts_authenticated_resume_capacity() {
+        let gib = 1024 * 1024 * 1024;
+        let drives = vec![DriveProbe {
+            drive: "E:".to_string(),
+            file_system: "NTFS".to_string(),
+            drive_type: 3,
+            total_bytes: 256 * gib,
+            free_bytes: 44 * gib,
+        }];
+        assert!(select_default_target(&drives, "C:", |_| true).is_none());
+        assert_eq!(
+            select_default_target_with_credit(
+                &drives,
+                "C:",
+                |_| true,
+                |target| if target == "E:\\DroneDream" {
+                    8 * gib
+                } else {
+                    0
+                },
+            )
+            .as_deref(),
+            Some("E:\\DroneDream")
+        );
     }
 
     #[cfg(target_os = "windows")]
@@ -1753,6 +2188,48 @@ mod tests {
         .unwrap();
         assert!(absent.base_path.is_none());
         assert!(absent.version.is_none());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn runtime_readiness_is_gated_by_matching_host_ownership_identity() {
+        let manifest: RuntimeManifest = serde_json::from_str(
+            r#"{
+              "schemaVersion": 1,
+              "version": "0.1.0",
+              "runtimeId": "123e4567-e89b-12d3-a456-426614174000",
+              "components": {"backend": "0.1.0", "px4": "abc", "gazebo": "gz-harmonic"},
+              "smokeTests": {"px4Sitl": true, "gazebo": true, "parameterReadback": true}
+            }"#,
+        )
+        .unwrap();
+        let matching = (
+            "123e4567-e89b-12d3-a456-426614174000".to_string(),
+            "0.1.0".to_string(),
+        );
+        let mismatched = (
+            "223e4567-e89b-12d3-a456-426614174000".to_string(),
+            "0.1.0".to_string(),
+        );
+        assert!(runtime_ownership_matches_manifest(
+            Some(&matching),
+            Some(&manifest)
+        ));
+        assert!(!runtime_ownership_matches_manifest(
+            Some(&mismatched),
+            Some(&manifest)
+        ));
+        assert!(!runtime_ownership_matches_manifest(None, Some(&manifest)));
+        assert!(runtime_ready_from_evidence(
+            true, true, true, true, true, true
+        ));
+        assert!(!runtime_ready_from_evidence(
+            true, true, true, true, true, false
+        ));
+        assert_eq!(
+            ownership_gate_component_status(ComponentStatus::Ready, true, false),
+            ComponentStatus::Unhealthy
+        );
     }
 
     #[test]

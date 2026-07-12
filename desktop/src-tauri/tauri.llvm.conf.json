@@ -2,7 +2,10 @@
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
     "resources": {
-      "target/llvm-bundle/WebView2Loader.dll": "WebView2Loader.dll"
+      "target/llvm-bundle/WebView2Loader.dll": "WebView2Loader.dll",
+      "../../LICENSE": "licenses/DroneDream-LICENSE.txt",
+      "../../runtime/THIRD_PARTY_NOTICES.md": "licenses/THIRD_PARTY_NOTICES.md",
+      "../../runtime/licenses/valkey-COPYING": "licenses/Valkey-COPYING.txt"
     }
   }
 }

@@ -119,6 +119,44 @@ class RuntimeManifestContractTests(unittest.TestCase):
             self.assertIn(fragment, desktop)
 
 
+class ThirdPartyNoticeContractTests(unittest.TestCase):
+    def test_notice_is_included_in_the_exported_rootfs_source_tree(self) -> None:
+        notice = RUNTIME / "THIRD_PARTY_NOTICES.md"
+        self.assertTrue(notice.is_file())
+        self.assertTrue((RUNTIME / "licenses" / "valkey-COPYING").is_file())
+
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        dockerignore = (RUNTIME / "Dockerfile.dockerignore").read_text(encoding="utf-8")
+        self.assertIn("COPY . /opt/dronedream/source", dockerfile)
+        self.assertIn("!LICENSE", dockerignore)
+        self.assertIn("!runtime/**", dockerignore)
+        self.assertNotIn("runtime/THIRD_PARTY_NOTICES.md", dockerignore)
+        self.assertIn("/usr/share/doc/valkey/COPYING", dockerfile)
+        self.assertIn("/usr/share/doc/dronedream-runtime/LICENSE", dockerfile)
+        self.assertIn(
+            "/usr/share/doc/dronedream-runtime/THIRD_PARTY_NOTICES.md",
+            dockerfile,
+        )
+        self.assertIn("runtime/licenses/valkey-COPYING", dockerfile)
+
+    def test_notice_tracks_current_primary_runtime_pins(self) -> None:
+        notice = (RUNTIME / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+        pins = runtime_manifest.load_pins(RUNTIME / "pins.env")
+        for name in (
+            "DRONEDREAM_RUNTIME_VERSION",
+            "UBUNTU_VERSION",
+            "PX4_VERSION",
+            "PX4_GIT_COMMIT",
+            "GAZEBO_RELEASE",
+            "GAZEBO_METAPACKAGE_VERSION",
+            "VALKEY_VERSION",
+            "VALKEY_GIT_COMMIT",
+        ):
+            self.assertIn(pins[name], notice, name)
+        self.assertIn("/usr/share/doc/*/copyright", notice)
+        self.assertIn("/usr/share/doc/valkey/COPYING", notice)
+
+
 @unittest.skipUnless(
     px4_log_cleanup.secure_dirfd_supported(),
     "secure ULog deletion is intentionally POSIX/WSL only",
