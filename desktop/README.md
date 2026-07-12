@@ -49,9 +49,15 @@ it must not be advertised as a production release. The NSIS application install
 uses the current user. If WSL2 is not ready, first-run setup separately asks for
 Windows administrator approval to run `wsl --install --no-distribution`; this
 enables the platform without installing Ubuntu, and setup records a
-`waitingForRestart` state when Windows cannot continue until after reboot. If
-Microsoft Edge WebView2 is missing, NSIS downloads the official WebView2
-bootstrapper and therefore needs an internet connection for that prerequisite.
+`waitingForRestart` state when Windows cannot continue until after reboot. The
+NSIS package embeds Microsoft's official Evergreen WebView2 bootstrapper. It
+verifies both registration and the real runtime executable; a stale registry
+entry triggers a best-effort Microsoft repair/install attempt before DroneDream
+files are copied. The application also asks the official WebView2 Loader API to
+confirm a usable runtime before creating its first window, so a damaged shared
+runtime produces a bilingual native error instead of a blank application window.
+The bootstrapper still needs an internet connection if WebView2 must be installed
+or repaired.
 
 The NSIS package installs project and runtime notices under `licenses/`,
 including the DroneDream MIT license, the runtime third-party component index,

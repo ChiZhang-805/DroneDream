@@ -28,6 +28,7 @@ const desktopPrerequisites = {
 
 const runtimeComponents = [
   "wsl-runtime",
+  "host-ownership",
   "runtime-manifest",
   "local-backend",
   "px4",

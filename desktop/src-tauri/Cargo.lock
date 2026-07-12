@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "drone-dream-desktop"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -732,6 +732,8 @@ dependencies = [
  "tauri-build",
  "uuid",
  "wait-timeout",
+ "webview2-com-sys",
+ "windows-core 0.61.2",
  "windows-sys 0.61.2",
 ]
 

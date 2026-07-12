@@ -68,6 +68,14 @@ const runtime: RuntimeStatusReport = {
       detail: "E:\\DroneDream\\Runtime",
     },
     {
+      id: "host-ownership",
+      label: "Host ownership receipt",
+      status: "ready",
+      required: true,
+      version: "2026.07",
+      detail: "E:\\DroneDream\\.dronedream-runtime-root.json",
+    },
+    {
       id: "runtime-manifest",
       label: "Runtime manifest",
       status: "ready",
@@ -114,6 +122,14 @@ const missingRuntime: RuntimeStatusReport = {
     {
       id: "wsl-runtime",
       label: "Dedicated WSL2 runtime",
+      status: "missing",
+      required: true,
+      version: null,
+      detail: null,
+    },
+    {
+      id: "host-ownership",
+      label: "Host ownership receipt",
       status: "missing",
       required: true,
       version: null,

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const requiredComponentIds = [
   "wsl-runtime",
+  "host-ownership",
   "runtime-manifest",
   "local-backend",
   "px4",

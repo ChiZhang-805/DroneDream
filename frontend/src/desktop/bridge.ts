@@ -147,6 +147,7 @@ type UnknownRecord = Record<string, unknown>;
 const RUNTIME_NAME = "DroneDreamRuntime";
 const REQUIRED_RUNTIME_COMPONENT_IDS = [
   "wsl-runtime",
+  "host-ownership",
   "runtime-manifest",
   "local-backend",
   "px4",
@@ -413,12 +414,9 @@ function validateRuntimeSemantics(report: RuntimeStatusReport): void {
     .filter((component) => component.required)
     .map((component) => component.id);
   const requiredIdSet = new Set(requiredIds);
-  if (
-    requiredIds.length !== REQUIRED_RUNTIME_COMPONENT_IDS.length ||
-    REQUIRED_RUNTIME_COMPONENT_IDS.some((id) => !requiredIdSet.has(id))
-  ) {
+  if (REQUIRED_RUNTIME_COMPONENT_IDS.some((id) => !requiredIdSet.has(id))) {
     throw new Error(
-      `report.components must mark exactly ${REQUIRED_RUNTIME_COMPONENT_IDS.join(", ")} as required`,
+      `report.components must mark all known runtime components as required: ${REQUIRED_RUNTIME_COMPONENT_IDS.join(", ")}`,
     );
   }
 

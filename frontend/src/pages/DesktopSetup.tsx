@@ -1297,6 +1297,7 @@ function componentStateKey(state: RuntimeComponentState): TranslationKey {
 
 const COMPONENT_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   "wsl-runtime": "desktop.componentLabel.wslRuntime",
+  "host-ownership": "desktop.componentLabel.hostOwnership",
   "runtime-manifest": "desktop.componentLabel.manifest",
   "local-backend": "desktop.componentLabel.backend",
   px4: "desktop.componentLabel.px4",

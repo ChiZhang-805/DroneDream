@@ -12,6 +12,7 @@ import {
 
 const componentIds = [
   "wsl-runtime",
+  "host-ownership",
   "runtime-manifest",
   "local-backend",
   "px4",

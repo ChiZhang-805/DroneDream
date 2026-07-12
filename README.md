@@ -15,7 +15,7 @@ DroneDream is a PX4/Gazebo-oriented web platform for automatic drone parameter t
 # Windows Closed Beta
 
 Download the current Windows installer from
-[DroneDream Desktop 0.1.0](https://github.com/ChiZhang-805/DroneDream/releases/tag/desktop-v0.1.0).
+[DroneDream Desktop 0.1.1](https://github.com/ChiZhang-805/DroneDream/releases/tag/desktop-v0.1.1).
 The first-run wizard can prepare WSL2, lets the user choose a fixed NTFS disk
 such as `E:`, downloads the signed
 [DroneDreamRuntime](https://github.com/ChiZhang-805/DroneDream/releases/tag/runtime-v0.1.0-beta.1),

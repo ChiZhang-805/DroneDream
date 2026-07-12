@@ -34,6 +34,7 @@ const runtimeReport = {
   dataRoot: null,
   components: [
     "wsl-runtime",
+    "host-ownership",
     "runtime-manifest",
     "local-backend",
     "px4",
@@ -189,7 +190,26 @@ describe("desktop bridge", () => {
     await expect(probeRuntimeStatus()).rejects.toThrow(/unknown value/i);
   });
 
-  it("rejects a runtime with the wrong identity or incomplete required components", async () => {
+  it("accepts the complete uninstalled runtime contract including host ownership", async () => {
+    window.__TAURI__ = {
+      core: { invoke: vi.fn(async () => runtimeReport) },
+    };
+
+    await expect(probeRuntimeStatus()).resolves.toMatchObject({
+      installed: false,
+      running: false,
+      ready: false,
+      components: expect.arrayContaining([
+        expect.objectContaining({
+          id: "host-ownership",
+          status: "missing",
+          required: true,
+        }),
+      ]),
+    });
+  });
+
+  it("rejects a runtime with the wrong identity or missing known required components", async () => {
     const invoke = vi.fn();
     window.__TAURI__ = { core: { invoke } };
 
@@ -203,7 +223,43 @@ describe("desktop bridge", () => {
       ...runtimeReport,
       components: runtimeReport.components.slice(0, -1),
     });
-    await expect(probeRuntimeStatus()).rejects.toThrow(/must mark exactly/i);
+    await expect(probeRuntimeStatus()).rejects.toThrow(/must mark all known/i);
+
+    invoke.mockResolvedValueOnce({
+      ...runtimeReport,
+      components: runtimeReport.components.map((component) =>
+        component.id === "host-ownership"
+          ? { ...component, required: false }
+          : component,
+      ),
+    });
+    await expect(probeRuntimeStatus()).rejects.toThrow(/must mark all known/i);
+  });
+
+  it("accepts additional required runtime components for forward compatibility", async () => {
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async () => ({
+          ...runtimeReport,
+          components: [
+            ...runtimeReport.components,
+            {
+              id: "future-safety-gate",
+              label: "Future safety gate",
+              status: "missing",
+              required: true,
+              version: null,
+              detail: null,
+            },
+          ],
+        })),
+      },
+    };
+
+    await expect(probeRuntimeStatus()).resolves.toMatchObject({
+      installed: false,
+      ready: false,
+    });
   });
 
   it("rejects contradictory installed, running, ready, and data-root states", async () => {

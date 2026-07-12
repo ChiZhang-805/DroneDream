@@ -1,6 +1,6 @@
 [package]
 name = "drone-dream-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local-first desktop shell for DroneDream"
 authors = ["DroneDream contributors"]
 edition = "2021"
@@ -30,10 +30,14 @@ uuid = "1"
 wait-timeout = "0.2"
 
 [target.'cfg(windows)'.dependencies]
+webview2-com-sys = "0.38.2"
+windows-core = "0.61"
 windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Storage_FileSystem",
   "Win32_System_JobObjects",
+  "Win32_System_Com",
   "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
 ] }

@@ -4,11 +4,25 @@ mod process;
 mod runtime;
 mod runtime_cache;
 mod runtime_installer;
+mod webview2_preflight;
 
 pub(crate) const MINIMUM_WINDOWS_BUILD: u32 = 19041;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if let Err(error) = webview2_preflight::ensure_ready_before_tauri() {
+        #[cfg(target_os = "windows")]
+        {
+            webview2_preflight::show_blocking_error(&error);
+            std::process::exit(2);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            eprintln!("Desktop webview prerequisite check failed: {error}");
+            return;
+        }
+    }
+
     tauri::Builder::default()
         .manage(runtime_installer::RuntimeInstaller::default())
         .invoke_handler(tauri::generate_handler![
