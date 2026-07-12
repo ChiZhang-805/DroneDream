@@ -13,6 +13,9 @@ import { SectionCard } from "../components/SectionCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { type Column } from "../components/DataTable";
 import { Loading, ErrorState } from "../components/States";
+import { RuntimeAccessNotice } from "../components/RuntimeAccessNotice";
+import { useDesktopRuntimeAccess } from "../desktop/access";
+import { useI18n } from "../i18n/I18nProvider";
 import { formatDateTime } from "../utils/format";
 
 const COLUMNS: Column<Job>[] = [
@@ -57,6 +60,8 @@ const COLUMNS: Column<Job>[] = [
 export function History() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const runtimeAccess = useDesktopRuntimeAccess();
+  const { t } = useI18n();
   const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
   const [trackFilter, setTrackFilter] = useState<TrackType | "ALL">("ALL");
   const [objectiveFilter, setObjectiveFilter] = useState<
@@ -85,6 +90,7 @@ export function History() {
   const query = useQuery({
     queryKey: ["jobs", "history"],
     queryFn: () => apiClient.listJobs({ page: 1, page_size: 100 }),
+    enabled: runtimeAccess.canUseRuntime,
   });
 
   const allJobs = useMemo(() => query.data?.items ?? [], [query.data]);
@@ -131,12 +137,26 @@ export function History() {
           </p>
         </div>
         <div className="page-header-actions">
-          <Link to="/jobs/new" className="btn btn-primary">
-            + New Job
-          </Link>
+          {runtimeAccess.canUseRuntime ? (
+            <Link to="/jobs/new" className="btn btn-primary">
+              + New Job
+            </Link>
+          ) : runtimeAccess.status === "checking" ? (
+            <button type="button" className="btn btn-primary" disabled>
+              {t("runtimeGate.checkingShort")}
+            </button>
+          ) : (
+            <Link to="/desktop/setup" className="btn btn-primary">
+              {t("runtimeGate.openSetup")}
+            </Link>
+          )}
         </div>
       </header>
 
+      {!runtimeAccess.canUseRuntime ? (
+        <RuntimeAccessNotice page="history" />
+      ) : (
+        <>
       <SectionCard title="Filters">
         <div className="filter-bar">
           <div className="form-field">
@@ -315,6 +335,8 @@ export function History() {
           </div>
         </div>
       ) : null}
+        </>
+      )}
     </section>
   );
 }

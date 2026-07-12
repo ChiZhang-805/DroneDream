@@ -65,8 +65,8 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     expect(router.state.location.pathname).toBe("/desktop/setup");
-    await router.navigate("/dashboard");
-    expect(window.location.hash).toBe("#/dashboard");
+    await router.navigate("/jobs/new");
+    expect(window.location.hash).toBe("#/jobs/new");
     expect(invoke.mock.calls.map(([command]) => command).sort()).toEqual([
       "probe_runtime_status",
       "probe_system_prerequisites",
@@ -75,23 +75,20 @@ describe("environment-aware routing", () => {
     router.dispose();
   });
 
-  it("guards every desktop business route", async () => {
+  it("guards runtime-backed routes while keeping preview and static pages open", async () => {
     installDesktopBridge();
     window.history.replaceState(null, "", "/#/desktop/setup");
     vi.resetModules();
     const { router } = await import("../router");
     const children = router.routes[0]?.children ?? [];
     const guardedPaths = [
-      "dashboard",
       "jobs/new",
       "jobs/:jobId",
       "trials/:trialId",
-      "history",
       "batches",
       "batches/new",
       "batches/:batchId",
       "compare",
-      "ece498",
     ];
 
     for (const path of guardedPaths) {
@@ -100,6 +97,10 @@ describe("environment-aware routing", () => {
     }
     expect(children.find((route) => route.path === "desktop/setup")?.loader)
       .toBeUndefined();
+    for (const path of ["dashboard", "history", "ece498"]) {
+      expect(children.find((route) => route.path === path)?.loader, path)
+        .toBeUndefined();
+    }
 
     router.dispose();
   });
@@ -124,7 +125,8 @@ describe("environment-aware routing", () => {
 
     await router.navigate("/jobs/new");
     expect(router.state.location.pathname).toBe("/desktop/setup");
-    expect(window.location.hash).toBe("#/desktop/setup");
+    expect(router.state.location.search).toBe("?required=experiment");
+    expect(window.location.hash).toBe("#/desktop/setup?required=experiment");
     expect(invoke).toHaveBeenCalledTimes(2);
 
     router.dispose();
@@ -143,8 +145,9 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const { router } = await import("../router");
 
-    await router.navigate("/history");
+    await router.navigate("/jobs/new");
     expect(router.state.location.pathname).toBe("/desktop/setup");
+    expect(router.state.location.search).toBe("?required=experiment");
 
     router.dispose();
   });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { Alert } from "../components/Alert";
 import { Loading } from "../components/States";
@@ -31,6 +31,7 @@ import type {
   SystemPrerequisiteReport,
 } from "../desktop/bridge";
 import { formatBytes } from "../desktop/format";
+import { useDesktopRuntimeAccess } from "../desktop/access";
 import {
   isOverallDesktopReady,
   isRuntimeConfirmedMissing,
@@ -229,6 +230,8 @@ function probeIssue(
 
 export function DesktopSetup() {
   const { t } = useI18n();
+  const [searchParams] = useSearchParams();
+  const { refresh: refreshRuntimeAccess } = useDesktopRuntimeAccess();
   const desktopAvailable = isDesktopRuntime();
   const requestId = useRef(0);
   const installerIntentPromise = useRef<Promise<InstallerRuntimeIntent> | null>(null);
@@ -274,6 +277,18 @@ export function DesktopSetup() {
     state.prerequisitesFresh &&
     state.runtimeFresh &&
     isRuntimeConfirmedMissing(state.runtime);
+  const localRuntimeReady =
+    state.prerequisitesFresh &&
+    state.runtimeFresh &&
+    isOverallDesktopReady(state.prerequisites, state.runtime);
+  const requestedFeature = searchParams.get("required");
+  const requestedFeatureLabel = requestedFeature === "experiment"
+    ? t("runtimeGate.featureExperiment")
+    : requestedFeature === "job"
+      ? t("runtimeGate.featureJob")
+      : requestedFeature === "batch"
+        ? t("runtimeGate.featureBatch")
+        : null;
 
   useEffect(() => {
     componentMounted.current = true;
@@ -299,6 +314,12 @@ export function DesktopSetup() {
       probeRuntimeStatus(),
     ]);
     if (requestId.current !== currentRequest) return;
+
+    // Keep the navigation/action gate in sync after every explicit setup-page
+    // check, including transitions from ready to stopped or uncertain. The
+    // access provider performs its own fail-closed probe, so stale local
+    // reports are never promoted into global readiness.
+    void refreshRuntimeAccess();
 
     const probeIssues: ProbeIssue[] = [];
     if (prerequisites.status === "rejected") {
@@ -402,7 +423,7 @@ export function DesktopSetup() {
       issues: replaceIssues(current.issues, ["plan"], planIssues),
       planLoading: false,
     }));
-  }, [desktopAvailable]);
+  }, [desktopAvailable, refreshRuntimeAccess]);
 
   const selectRuntimeDrive = useCallback(async (drive: string) => {
     if (
@@ -1036,6 +1057,16 @@ export function DesktopSetup() {
           </button>
         ) : null}
       </header>
+
+      {requestedFeatureLabel && !localRuntimeReady ? (
+        <Alert tone="warning" title={t("runtimeGate.redirectTitle")}>
+          <p className="desktop-alert-copy">{t("runtimeGate.redirectBody")}</p>
+          <p className="desktop-alert-copy">
+            <strong>{t("runtimeGate.requestedFeature")}:</strong>{" "}
+            {requestedFeatureLabel}
+          </p>
+        </Alert>
+      ) : null}
 
       {!desktopAvailable ? (
         <BrowserExplanation />

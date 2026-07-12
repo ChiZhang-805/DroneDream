@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $templatePath = Join-Path $repoRoot "desktop\src-tauri\nsis\installer.nsi"
 $runtimeModePath = Join-Path $repoRoot "desktop\src-tauri\nsis\runtime-mode.nsh"
+$installerLanguagesPath = Join-Path $repoRoot "desktop\src-tauri\nsis\installer-languages.nsh"
 $installerHookPath = Join-Path $repoRoot "desktop\src-tauri\nsis\webview2-health.nsh"
 $packageLockPath = Join-Path $repoRoot "desktop\package-lock.json"
 $tauriConfigPath = Join-Path $repoRoot "desktop\src-tauri\tauri.conf.json"
@@ -25,8 +26,8 @@ $config = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
 if ($config.bundle.windows.nsis.template -cne "nsis/installer.nsi") {
     throw "Tauri config does not select the vendored NSIS template"
 }
-if ($config.bundle.windows.nsis.displayLanguageSelector -ne $false) {
-    throw "The one-confirmation installer must follow Windows language without a selector dialog"
+if ($config.bundle.windows.nsis.displayLanguageSelector -ne $true) {
+    throw "The installer must ask for Chinese or English once, then keep that language"
 }
 
 $template = Get-Content -LiteralPath $templatePath -Raw
@@ -102,6 +103,12 @@ foreach ($required in @(
     'Var DroneDreamQuiesceToken',
     'Var DroneDreamQuiesceOwnerPid',
     'Var DroneDreamQuiesceActive',
+    'Var DroneDreamPlanBlockerCode',
+    'Pop $DroneDreamPlanCanInstall',
+    'dronedream_plan_retry_or_fail:',
+    '$(DD_ModeHeader)',
+    '$(DD_RecommendedTarget)',
+    '$(DD_InstallButton)',
     'ole32::CoCreateGuid(g .s)',
     'kernel32::GetCurrentProcessId()i.r0',
     '--recover-runtime-quiesce',
@@ -118,7 +125,52 @@ foreach ($required in @(
     }
 }
 
+if ($runtimeMode -match '[\p{IsCJKUnifiedIdeographs}]') {
+    throw "Runtime mode contains hard-coded Chinese instead of selected-language strings"
+}
+
+$installerLanguages = Get-Content -LiteralPath $installerLanguagesPath -Raw -Encoding UTF8
+if ($installerLanguages.Contains([char]0xFFFD)) {
+    throw "Installer language table contains a Unicode replacement character"
+}
+if ($installerLanguages -notmatch '[\p{IsCJKUnifiedIdeographs}]') {
+    throw "Installer language table does not contain readable Simplified Chinese text"
+}
+$englishNames = [regex]::Matches(
+    $installerLanguages,
+    '(?m)^LangString\s+(\S+)\s+\$\{LANG_ENGLISH\}\s+"'
+) | ForEach-Object { $_.Groups[1].Value }
+$chineseNames = [regex]::Matches(
+    $installerLanguages,
+    '(?m)^LangString\s+(\S+)\s+\$\{LANG_SIMPCHINESE\}\s+"'
+) | ForEach-Object { $_.Groups[1].Value }
+if ($englishNames.Count -eq 0 -or $englishNames.Count -ne $chineseNames.Count) {
+    throw "Installer language tables are empty or incomplete"
+}
+$englishOnly = @($englishNames | Where-Object { $_ -notin $chineseNames })
+$chineseOnly = @($chineseNames | Where-Object { $_ -notin $englishNames })
+if ($englishOnly.Count -ne 0 -or $chineseOnly.Count -ne 0) {
+    throw "Every custom installer string must have both English and Simplified Chinese values"
+}
+foreach ($required in @(
+    'DD_ModeHeader',
+    'DD_ModeRequirements',
+    'DD_RecommendedTarget',
+    'DD_CustomDriveHint',
+    'DD_AppOnly',
+    'DD_InstallButton',
+    'DD_NoEligibleDrive',
+    'DD_PlannerUnavailable'
+)) {
+    if ($required -notin $englishNames) {
+        throw "Installer language contract is missing: $required"
+    }
+}
+
 $installerHook = Get-Content -LiteralPath $installerHookPath -Raw
+if ($installerHook -match '[\p{IsCJKUnifiedIdeographs}]') {
+    throw "Installer hooks contain hard-coded Chinese instead of selected-language strings"
+}
 if (([regex]::Matches($installerHook, '--installer-handoff-status')).Count -lt 2 -or
     ([regex]::Matches($installerHook, '\$0 == 76')).Count -lt 2) {
     throw "Install and uninstall must both preserve a pending runtime continuation"

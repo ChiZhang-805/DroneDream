@@ -116,6 +116,10 @@ code {
 }
 
 .app-nav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   color: var(--text-dim);
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
@@ -130,6 +134,22 @@ code {
 .app-nav a.active {
   background: var(--bg-elev-2);
   color: var(--text);
+}
+
+.app-nav a.runtime-locked {
+  border: 1px solid rgba(240, 180, 41, 0.2);
+  color: var(--text-muted);
+}
+
+.nav-runtime-badge {
+  flex: none;
+  padding: 0.08rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(240, 180, 41, 0.1);
+  color: var(--warning);
+  font-size: 0.66rem;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
 .app-sidebar-footer {
@@ -503,6 +523,10 @@ code {
 .alert-danger {
   background: rgba(239, 90, 90, 0.08);
   border-color: rgba(239, 90, 90, 0.4);
+}
+
+.runtime-access-copy {
+  margin: 0 0 0.75rem;
 }
 
 /* ---------- State blocks (loading, empty, error) ---------- */

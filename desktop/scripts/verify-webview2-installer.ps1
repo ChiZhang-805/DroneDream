@@ -20,7 +20,7 @@ foreach ($required in @(
     'IfFileExists "$LOCALAPPDATA\Microsoft\EdgeWebView\Application\$1\msedgewebview2.exe"',
     'File "/oname=$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe" "${WEBVIEW2BOOTSTRAPPERPATH}"',
     'ExecWait ''"$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe" /silent /install''',
-    'Abort "Microsoft WebView2 is still unusable'
+    'Abort "$(DD_WebViewStillUnusable)"'
 )) {
     if (-not $hook.Contains($required)) {
         throw "WebView2 health hook is missing contract fragment: $required"

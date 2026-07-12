@@ -9,6 +9,9 @@ import { SectionCard } from "../components/SectionCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { DataTable, type Column } from "../components/DataTable";
 import { Loading, Empty, ErrorState } from "../components/States";
+import { RuntimeAccessNotice } from "../components/RuntimeAccessNotice";
+import { useDesktopRuntimeAccess } from "../desktop/access";
+import { useI18n } from "../i18n/I18nProvider";
 import type { Job } from "../types/api";
 import { formatDateTime } from "../utils/format";
 
@@ -52,9 +55,12 @@ const JOB_COLUMNS: Column<Job>[] = [
 ];
 
 export function Dashboard() {
+  const runtimeAccess = useDesktopRuntimeAccess();
+  const { t } = useI18n();
   const jobsQuery = useQuery({
     queryKey: ["jobs", "dashboard"],
     queryFn: () => apiClient.listJobs({ page: 1, page_size: 10 }),
+    enabled: runtimeAccess.canUseRuntime,
   });
 
   return (
@@ -67,13 +73,25 @@ export function Dashboard() {
           </p>
         </div>
         <div className="page-header-actions">
-          <Link to="/jobs/new" className="btn btn-primary">
-            + New Job
-          </Link>
+          {runtimeAccess.canUseRuntime ? (
+            <Link to="/jobs/new" className="btn btn-primary">
+              + New Job
+            </Link>
+          ) : runtimeAccess.status === "checking" ? (
+            <button type="button" className="btn btn-primary" disabled>
+              {t("runtimeGate.checkingShort")}
+            </button>
+          ) : (
+            <Link to="/desktop/setup" className="btn btn-primary">
+              {t("runtimeGate.openSetup")}
+            </Link>
+          )}
         </div>
       </header>
 
-      {jobsQuery.isLoading ? (
+      {!runtimeAccess.canUseRuntime ? (
+        <RuntimeAccessNotice page="dashboard" />
+      ) : jobsQuery.isLoading ? (
         <Loading label="Loading jobs…" />
       ) : jobsQuery.isError ? (
         <ErrorState

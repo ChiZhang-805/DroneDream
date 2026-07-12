@@ -8,6 +8,8 @@ function LanguageProbe() {
   return (
     <div>
       <span>{t("wizard.title")}</span>
+      <span>{t("runtimeGate.previewTitle")}</span>
+      <span>{t("runtimeGate.ece498PreviewBody")}</span>
       <button type="button" onClick={() => setLocale(locale === "en" ? "zh-CN" : "en")}>
         Switch language
       </button>
@@ -32,8 +34,12 @@ describe("I18nProvider", () => {
       </I18nProvider>,
     );
     expect(screen.getByText("New Tuning Experiment")).toBeInTheDocument();
+    expect(screen.getByText("Runtime data is not available yet")).toBeInTheDocument();
+    expect(screen.getByText(/review and edit the ECE498 configuration/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Switch language/i }));
     expect(screen.getByText("新建调优实验")).toBeInTheDocument();
+    expect(screen.getByText("运行数据暂不可用")).toBeInTheDocument();
+    expect(screen.getByText(/查看并编辑 ECE498 配置/)).toBeInTheDocument();
     expect(window.localStorage.getItem("drone-dream:locale")).toBe("zh-CN");
     expect(document.documentElement.lang).toBe("zh-CN");
   });

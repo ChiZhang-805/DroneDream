@@ -1,6 +1,10 @@
 import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom";
 
 import { isDesktopRuntime } from "./desktop/bridge";
+import {
+  DesktopRuntimeAccessProvider,
+  useDesktopRuntimeAccess,
+} from "./desktop/access";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
 
@@ -10,20 +14,33 @@ const NAV_ITEMS: {
   label?: string;
   end?: boolean;
   desktopTo?: string;
+  requiresRuntime?: boolean;
 }[] = [
   { to: "/", desktopTo: "/dashboard", labelKey: "app.dashboard", end: true },
-  { to: "/jobs/new", labelKey: "app.newExperiment" },
-  { to: "/batches/new", labelKey: "app.newBatch", end: true },
-  { to: "/batches", labelKey: "app.batches", end: true },
+  { to: "/jobs/new", labelKey: "app.newExperiment", requiresRuntime: true },
+  { to: "/batches/new", labelKey: "app.newBatch", end: true, requiresRuntime: true },
+  { to: "/batches", labelKey: "app.batches", end: true, requiresRuntime: true },
   { to: "/history", labelKey: "app.history" },
   { to: "/desktop/setup", labelKey: "app.desktopSetup" },
   { to: "/ece498", label: "ECE498" },
 ];
 
 export function AppShell() {
+  return (
+    <DesktopRuntimeAccessProvider>
+      <AppShellContent />
+    </DesktopRuntimeAccessProvider>
+  );
+}
+
+function AppShellContent() {
   const location = useLocation();
   const desktopRuntime = isDesktopRuntime();
+  const runtimeAccess = useDesktopRuntimeAccess();
   const { locale, setLocale, t } = useI18n();
+  const runtimeNavDescription = runtimeAccess.status === "checking"
+    ? t("runtimeGate.navChecking")
+    : t("runtimeGate.navLocked");
 
   return (
     <div className="app-shell">
@@ -43,10 +60,18 @@ export function AppShell() {
           <span>DroneDream</span>
         </Link>
         <nav className="app-nav" aria-label={t("app.primaryNav")}>
+          <span id="runtime-nav-description" className="sr-only">
+            {runtimeNavDescription}
+          </span>
           {NAV_ITEMS.map((item) => {
             const destination = desktopRuntime && item.desktopTo
               ? item.desktopTo
               : item.to;
+            const runtimeLocked = Boolean(
+              desktopRuntime &&
+              item.requiresRuntime &&
+              runtimeAccess.status !== "ready",
+            );
             const isBatchesItem = destination === "/batches";
             const isBatchesActive =
               isBatchesItem &&
@@ -59,14 +84,26 @@ export function AppShell() {
                 key={item.to}
                 to={destination}
                 end={item.end}
+                title={runtimeLocked ? runtimeNavDescription : undefined}
+                aria-describedby={runtimeLocked ? "runtime-nav-description" : undefined}
                 className={({ isActive }) => {
+                  const classes = runtimeLocked ? ["runtime-locked"] : [];
                   if (isBatchesItem) {
-                    return isBatchesActive ? "active" : undefined;
+                    if (isBatchesActive) classes.push("active");
+                    return classes.length > 0 ? classes.join(" ") : undefined;
                   }
-                  return isActive ? "active" : undefined;
+                  if (isActive) classes.push("active");
+                  return classes.length > 0 ? classes.join(" ") : undefined;
                 }}
               >
-                {item.labelKey ? t(item.labelKey) : item.label}
+                <span>{item.labelKey ? t(item.labelKey) : item.label}</span>
+                {runtimeLocked ? (
+                  <span className="nav-runtime-badge" aria-hidden="true">
+                    {runtimeAccess.status === "checking"
+                      ? t("runtimeGate.checkingShort")
+                      : `🔒 ${t("runtimeGate.requiredShort")}`}
+                  </span>
+                ) : null}
               </NavLink>
             );
           })}

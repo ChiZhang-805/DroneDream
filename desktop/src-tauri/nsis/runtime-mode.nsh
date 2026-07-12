@@ -2,6 +2,8 @@
 ; These three variables are declared at include time because the vendored
 ; reinstall function appends them to the old uninstaller command before the
 ; custom Runtime page macro is expanded later in the template.
+!include "${__FILEDIR__}\installer-languages.nsh"
+
 Var DroneDreamQuiesceToken
 Var DroneDreamQuiesceOwnerPid
 Var DroneDreamQuiesceActive
@@ -26,13 +28,13 @@ Var DroneDreamQuiesceActive
       Call DroneDreamAcquireRuntimeQuiesce
       Pop $0
       ${If} $0 == "busy"
-        MessageBox MB_ICONEXCLAMATION|MB_OK "DroneDreamRuntime 正在运行，或另一个安装器正在维护它。请等待或取消该任务后重试。 / DroneDreamRuntime is busy or another installer owns maintenance. Wait or cancel it, then retry."
+        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_RuntimeBusy)"
         Abort
       ${ElseIf} $0 == "pending"
-        MessageBox MB_ICONEXCLAMATION|MB_OK "DroneDreamRuntime 安装正在等待续传。请先打开 DroneDream 完成或取消，再升级或重装。 / Runtime setup is waiting to continue. Open DroneDream to finish or cancel it before updating."
+        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_RuntimePendingUpdate)"
         Abort
       ${ElseIf} $0 != "ok"
-        MessageBox MB_ICONEXCLAMATION|MB_OK "无法建立安全的 Runtime 升级隔离，安装已停止。 / Unable to establish safe Runtime update isolation; setup stopped."
+        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_RuntimeIsolationFailed)"
         Abort
       ${EndIf}
     dronedream_oninit_no_quiesce:
@@ -48,6 +50,8 @@ Var DroneDreamQuiesceActive
   Var DroneDreamPlanFile
   Var DroneDreamPlanTarget
   Var DroneDreamPlanCanInstall
+  Var DroneDreamPlanBlockerCode
+  Var DroneDreamSuggestedDrive
   Var DroneDreamFullRadio
   Var DroneDreamCustomRadio
   Var DroneDreamAppOnlyRadio
@@ -231,6 +235,8 @@ Var DroneDreamQuiesceActive
 
   Function DroneDreamRunPlanner
     Exch $0
+    StrCpy $8 "0"
+    dronedream_plan_retry:
     Delete "$DroneDreamPlanFile"
     ${If} $0 == ""
       ExecWait '"$DroneDreamPlannerExe" --write-installer-plan "$DroneDreamPlanFile"' $1
@@ -238,11 +244,7 @@ Var DroneDreamQuiesceActive
       ExecWait '"$DroneDreamPlannerExe" --write-installer-plan "$DroneDreamPlanFile" "$0"' $1
     ${EndIf}
     ${If} $1 != 0
-      StrCpy $DroneDreamPlanCanInstall "0"
-      StrCpy $DroneDreamPlanTarget ""
-      Pop $0
-      Push "0"
-      Return
+      Goto dronedream_plan_retry_or_fail
     ${EndIf}
     ReadINIStr $1 "$DroneDreamPlanFile" "plan" "schemaVersion"
     ReadINIStr $2 "$DroneDreamPlanFile" "plan" "targetDrive"
@@ -252,20 +254,54 @@ Var DroneDreamQuiesceActive
     ReadINIStr $5 "$DroneDreamPlanFile" "plan" "minimumFreeBytes"
     ReadINIStr $DroneDreamPlanCanInstall "$DroneDreamPlanFile" "plan" "canInstall"
     ReadINIStr $6 "$DroneDreamPlanFile" "plan" "blockerCode"
+    StrCpy $DroneDreamPlanBlockerCode "$6"
     StrCpy $7 "$2\DroneDream"
     ${If} $1 != "1"
     ${OrIf} $3 != "8589934592"
     ${OrIf} $4 != "25769803776"
     ${OrIf} $5 != "55834574848"
-    ${OrIf} $DroneDreamPlanCanInstall != "1"
-    ${OrIf} $2 == ""
-    ${OrIf} $DroneDreamPlanTarget != $7
-    ${OrIf} $6 != "none"
-      StrCpy $DroneDreamPlanCanInstall "0"
+      Goto dronedream_plan_retry_or_fail
+    ${EndIf}
+    ${If} $DroneDreamPlanCanInstall == "1"
+      ${If} $2 == ""
+      ${OrIf} $DroneDreamPlanTarget != $7
+      ${OrIf} $6 != "none"
+        Goto dronedream_plan_retry_or_fail
+      ${EndIf}
+    ${ElseIf} $DroneDreamPlanCanInstall == "0"
+      ${If} $6 == "no-eligible-target"
+        ${If} $2 != ""
+        ${OrIf} $DroneDreamPlanTarget != ""
+          Goto dronedream_plan_retry_or_fail
+        ${EndIf}
+      ${ElseIf} $6 == "prerequisite-blocked"
+        ${If} $2 == ""
+        ${OrIf} $DroneDreamPlanTarget != $7
+          Goto dronedream_plan_retry_or_fail
+        ${EndIf}
+      ${Else}
+        Goto dronedream_plan_retry_or_fail
+      ${EndIf}
+    ${Else}
+      Goto dronedream_plan_retry_or_fail
     ${EndIf}
     Delete "$DroneDreamPlanFile"
     Pop $0
     Push $DroneDreamPlanCanInstall
+    Return
+
+    dronedream_plan_retry_or_fail:
+    Delete "$DroneDreamPlanFile"
+    ${If} $8 == "0"
+      StrCpy $8 "1"
+      Sleep 300
+      Goto dronedream_plan_retry
+    ${EndIf}
+    StrCpy $DroneDreamPlanCanInstall "0"
+    StrCpy $DroneDreamPlanTarget ""
+    StrCpy $DroneDreamPlanBlockerCode "planner-error"
+    Pop $0
+    Push "0"
   FunctionEnd
 
   Function DroneDreamRuntimeModePageCreate
@@ -289,34 +325,42 @@ Var DroneDreamQuiesceActive
     File /nonfatal "/oname=WebView2Loader.dll" "${DRONEDREAM_PLANNER_LOADER_SOURCE}"
     Push ""
     Call DroneDreamRunPlanner
-    Pop $0
-    !insertmacro MUI_HEADER_TEXT "DroneDreamRuntime" "选择安装方式 / Choose setup mode"
+    Pop $DroneDreamPlanCanInstall
+    StrCpy $DroneDreamSuggestedDrive ""
+    ${If} $DroneDreamPlanTarget != ""
+      StrCpy $DroneDreamSuggestedDrive $DroneDreamPlanTarget 2
+    ${EndIf}
+    !insertmacro MUI_HEADER_TEXT "DroneDreamRuntime" "$(DD_ModeHeader)"
     nsDialogs::Create 1018
     Pop $1
     ${If} $1 == error
       Abort
     ${EndIf}
-    ${NSD_CreateLabel} 0 0 100% 24u "PX4/Gazebo：下载约 6.1 GB（预留 8 GiB）、安装约 24 GiB，至少需要 52 GiB 可用空间。"
+    ${NSD_CreateLabel} 0 0 100% 24u "$(DD_ModeRequirements)"
     Pop $1
-    ${NSD_CreateRadioButton} 0 34u 100% 12u "安装全部（推荐） / Install all (recommended)"
+    ${NSD_CreateRadioButton} 0 30u 100% 14u "$(DD_InstallAll)"
     Pop $DroneDreamFullRadio
-    ${NSD_CreateLabel} 18u 50u 95% 16u "推荐位置 / Recommended: $DroneDreamPlanTarget"
+    ${If} $DroneDreamPlanTarget == ""
+      ${NSD_CreateLabel} 18u 47u 95% 18u "$(DD_NoRecommendedTarget)"
+    ${Else}
+      ${NSD_CreateLabel} 18u 47u 95% 18u "$(DD_RecommendedTarget)"
+    ${EndIf}
     Pop $1
-    ${NSD_CreateRadioButton} 0 74u 100% 12u "自定义 Runtime 磁盘 / Custom runtime drive"
+    ${NSD_CreateRadioButton} 0 69u 100% 14u "$(DD_CustomDrive)"
     Pop $DroneDreamCustomRadio
-    ${NSD_CreateText} 18u 92u 80u 13u "$2"
+    ${NSD_CreateText} 18u 88u 52u 14u "$DroneDreamSuggestedDrive"
     Pop $DroneDreamCustomDriveEdit
-    ${NSD_CreateLabel} 104u 94u 75% 12u "输入盘符（如 E:）；目录固定为 X:\DroneDream"
+    ${NSD_CreateLabel} 78u 87u 73% 20u "$(DD_CustomDriveHint)"
     Pop $1
-    ${NSD_CreateRadioButton} 0 120u 100% 12u "仅安装桌面程序 / Desktop application only"
+    ${NSD_CreateRadioButton} 0 114u 100% 14u "$(DD_AppOnly)"
     Pop $DroneDreamAppOnlyRadio
-    ${NSD_CreateLabel} 18u 138u 95% 28u "软件首屏显示计划和取消按钮后才继续。可能需重启 Windows；现有 Ubuntu 不会被修改。"
+    ${NSD_CreateLabel} 18u 132u 95% 26u "$(DD_ModeNote)"
     Pop $1
-    ${If} $0 == "1"
+    ${If} $DroneDreamPlanCanInstall == "1"
       ${If} $DroneDreamModePageVisited == "0"
         ${NSD_Check} $DroneDreamFullRadio
         StrCpy $DroneDreamInstallMode "install-all"
-        StrCpy $DroneDreamRuntimeDrive $2
+        StrCpy $DroneDreamRuntimeDrive $DroneDreamSuggestedDrive
       ${ElseIf} $DroneDreamInstallMode == "custom"
         ${NSD_Check} $DroneDreamCustomRadio
         ${NSD_SetText} $DroneDreamCustomDriveEdit $DroneDreamRuntimeDrive
@@ -324,20 +368,30 @@ Var DroneDreamQuiesceActive
         ${NSD_Check} $DroneDreamAppOnlyRadio
       ${Else}
         ${NSD_Check} $DroneDreamFullRadio
-        StrCpy $DroneDreamRuntimeDrive $2
+        StrCpy $DroneDreamRuntimeDrive $DroneDreamSuggestedDrive
       ${EndIf}
     ${Else}
       EnableWindow $DroneDreamFullRadio 0
-      EnableWindow $DroneDreamCustomRadio 0
-      EnableWindow $DroneDreamCustomDriveEdit 0
+      ${If} $DroneDreamPlanBlockerCode == "prerequisite-blocked"
+        EnableWindow $DroneDreamCustomRadio 0
+        EnableWindow $DroneDreamCustomDriveEdit 0
+      ${EndIf}
       ${NSD_Check} $DroneDreamAppOnlyRadio
       StrCpy $DroneDreamInstallMode "install-app-only"
       StrCpy $DroneDreamRuntimeDrive ""
-      MessageBox MB_ICONEXCLAMATION|MB_OK "没有固定 NTFS 磁盘满足至少 52 GiB 可用空间；本次只能安装桌面程序。"
+      ${If} $DroneDreamModePageVisited == "0"
+        ${If} $DroneDreamPlanBlockerCode == "prerequisite-blocked"
+          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PreflightBlocked)"
+        ${ElseIf} $DroneDreamPlanBlockerCode == "no-eligible-target"
+          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_NoEligibleDrive)"
+        ${Else}
+          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PlannerUnavailable)"
+        ${EndIf}
+      ${EndIf}
     ${EndIf}
     StrCpy $DroneDreamModePageVisited "1"
     GetDlgItem $1 $HWNDPARENT 1
-    SendMessage $1 ${WM_SETTEXT} 0 "STR:安装 / Install"
+    SendMessage $1 ${WM_SETTEXT} 0 "STR:$(DD_InstallButton)"
     nsDialogs::Show
   FunctionEnd
 
@@ -353,7 +407,7 @@ Var DroneDreamQuiesceActive
       ${NSD_GetText} $DroneDreamCustomDriveEdit $DroneDreamRuntimeDrive
       StrCpy $DroneDreamInstallMode "custom"
       ${If} $DroneDreamRuntimeDrive == ""
-        MessageBox MB_ICONEXCLAMATION|MB_OK "自定义安装必须输入一个盘符（例如 E:）。 / Custom runtime setup requires a drive such as E:."
+        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_CustomDriveRequired)"
         Abort
       ${EndIf}
     ${Else}
@@ -363,7 +417,7 @@ Var DroneDreamQuiesceActive
     Call DroneDreamRunPlanner
     Pop $0
     ${If} $0 != "1"
-      MessageBox MB_ICONEXCLAMATION|MB_OK "所选磁盘不满足固定 NTFS、安全路径和至少 52 GiB 可用空间要求。"
+      MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_SelectedDriveInvalid)"
       Abort
     ${EndIf}
     StrCpy $DroneDreamRuntimeDrive $DroneDreamPlanTarget 2
@@ -377,13 +431,13 @@ Var DroneDreamQuiesceActive
     ${StrCase} $1 $1 "U"
     ${StrCase} $2 $2 "U"
     ${If} $1 == $2
-      MessageBox MB_ICONEXCLAMATION|MB_OK "桌面程序不能安装到专用 Runtime 目录 $DroneDreamPlanTarget。请返回并选择其他桌面安装目录。 / The desktop application cannot be installed inside the dedicated runtime root. Go back and choose another application folder."
+      MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_AppAtRuntimeRoot)"
       Abort
     ${EndIf}
     StrCpy $3 "$2\"
     ${StrLoc} $0 $1 $3 ">"
     ${If} $0 == 0
-      MessageBox MB_ICONEXCLAMATION|MB_OK "桌面程序不能安装到专用 Runtime 目录 $DroneDreamPlanTarget 的子目录。请返回并选择其他桌面安装目录。 / The desktop application cannot be installed below the dedicated runtime root. Go back and choose another application folder."
+      MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_AppBelowRuntimeRoot)"
       Abort
     ${EndIf}
   FunctionEnd

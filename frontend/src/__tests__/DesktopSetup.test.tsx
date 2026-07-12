@@ -291,6 +291,7 @@ function renderPage(
   installerResult: unknown = noInstallerAutoStart,
   strict = false,
   discardResult: unknown = discardedInstallerIntent,
+  initialEntry = "/",
 ) {
   window.localStorage.setItem("drone-dream:locale", locale);
   const originalTauri = window.__TAURI__;
@@ -342,14 +343,14 @@ function renderPage(
   const page = render(strict ? (
     <StrictMode>
       <I18nProvider>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <DesktopSetup />
         </MemoryRouter>
       </I18nProvider>
     </StrictMode>
   ) : (
     <I18nProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <DesktopSetup />
       </MemoryRouter>
     </I18nProvider>
@@ -430,6 +431,32 @@ describe("DesktopSetup", () => {
       "get_runtime_install_plan",
       undefined,
     );
+  });
+
+  it("explains which guarded feature sent the user to setup", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage(
+      "en",
+      noInstallerRuntimeIntent,
+      noInstallerAutoStart,
+      false,
+      discardedInstallerIntent,
+      "/desktop/setup?required=experiment",
+    );
+
+    expect(await screen.findByText("This feature needs DroneDreamRuntime"))
+      .toBeInTheDocument();
+    expect(screen.getByText("Create a tuning experiment")).toBeInTheDocument();
+    expect(screen.getByText(/requested action was stopped safely/i))
+      .toBeInTheDocument();
   });
 
   it("starts a confirmed install-all handoff automatically exactly once", async () => {

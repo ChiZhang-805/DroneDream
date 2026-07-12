@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "drone-dream-desktop"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",

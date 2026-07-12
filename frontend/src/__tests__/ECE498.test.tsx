@@ -1,6 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  RouterProvider,
+} from "react-router-dom";
 
 import { AppShell } from "../AppShell";
 import { apiClient } from "../api/client";
@@ -95,15 +99,104 @@ function mkTrial(overrides: Partial<Trial>): Trial {
 }
 
 describe("ECE498", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders three run buttons", () => {
     render(
       <MemoryRouter>
         <ECE498 />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("button", { name: /Run Baseline \(No Tool\)/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Run Tool-Augmented \(CMA-ES\)/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Run Tool \+ Refinement \(CMA-ES Loop\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Run Baseline \(No Tool\)/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Run Tool-Augmented \(CMA-ES\)/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Run Tool \+ Refinement \(CMA-ES Loop\)/i })).toBeEnabled();
+  });
+
+  it("keeps desktop configuration visible but blocks all runs without Runtime", async () => {
+    const requiredIds = [
+      "wsl-runtime",
+      "host-ownership",
+      "runtime-manifest",
+      "local-backend",
+      "px4",
+      "gazebo",
+    ];
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") {
+            return {
+              platform: "windows",
+              supported: true,
+              windows: {
+                caption: "Windows 11 Pro",
+                version: "10.0.26100",
+                buildNumber: "26100",
+                architecture: "64-bit",
+              },
+              wsl: { executableAvailable: true, distributions: [] },
+              memory: {
+                totalBytes: 16 * 1024 ** 3,
+                availableBytes: 8 * 1024 ** 3,
+              },
+              disks: [],
+              gpus: [],
+              probeErrors: [],
+            };
+          }
+          if (command === "probe_runtime_status") {
+            return {
+              runtimeName: "DroneDreamRuntime",
+              installed: false,
+              running: false,
+              ready: false,
+              version: null,
+              dataRoot: null,
+              components: requiredIds.map((id) => ({
+                id,
+                label: id,
+                status: "missing",
+                required: true,
+                version: null,
+                detail: null,
+              })),
+              diagnostics: [],
+            };
+          }
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+    const createJob = vi.spyOn(apiClient, "createJob");
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: <AppShell />,
+        children: [{ path: "ece498", element: <ECE498 /> }],
+      },
+    ], { initialEntries: ["/ece498"] });
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("Runtime data is not available yet"))
+      .toBeInTheDocument();
+    expect(screen.getByText(/review and edit the ECE498 configuration/i))
+      .toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Desktop Setup" }))
+      .toHaveAttribute("href", "/desktop/setup");
+    const buttons = [
+      screen.getByRole("button", { name: /Run Baseline \(No Tool\)/i }),
+      screen.getByRole("button", { name: /Run Tool-Augmented \(CMA-ES\)/i }),
+      screen.getByRole("button", { name: /Run Tool \+ Refinement \(CMA-ES Loop\)/i }),
+    ];
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+    }
+    expect(createJob).not.toHaveBeenCalled();
+    router.dispose();
   });
 
 

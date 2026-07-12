@@ -2109,6 +2109,7 @@ mod tests {
     fn nsis_contract_keeps_silent_safe_and_mirrors_storage_policy() {
         let hook = include_str!("../nsis/webview2-health.nsh");
         let mode_page = include_str!("../nsis/runtime-mode.nsh");
+        let installer_languages = include_str!("../nsis/installer-languages.nsh");
         let template = include_str!("../nsis/installer.nsi");
         for required in [
             "--clear-installer-handoff",
@@ -2128,13 +2129,26 @@ mod tests {
             "8589934592",
             "25769803776",
             "55834574848",
-            "NTFS",
-            "52 GiB",
             r"\DroneDream",
+            "Pop $DroneDreamPlanCanInstall",
+            "planner-error",
         ] {
             assert!(
                 mode_page.contains(required),
                 "missing NSIS mode-page contract: {required}"
+            );
+        }
+        for required in [
+            "LANG_ENGLISH",
+            "LANG_SIMPCHINESE",
+            "DD_ModeHeader",
+            "NTFS",
+            "52 GiB",
+            "推荐的 Runtime 位置",
+        ] {
+            assert!(
+                installer_languages.contains(required),
+                "missing NSIS language contract: {required}"
             );
         }
         assert!(template.contains("tauri-v2.11.4"));

@@ -29,25 +29,25 @@
         StrCpy $1 $0
         Call DroneDreamBestEffortEndRuntimeQuiesce
         ${If} $1 == "pending"
-          Abort "DroneDreamRuntime setup is waiting to continue / Runtime 安装正在等待续传。Open DroneDream to continue or cancel it before updating or reinstalling / 请先打开 DroneDream 完成或取消安装，再升级或重装。"
+          Abort "$(DD_UpdatePending)"
         ${ElseIf} $1 == "busy"
-          Abort "DroneDreamRuntime is busy or another installer owns maintenance / Runtime 正忙，或另一个安装器正在维护它。"
+          Abort "$(DD_UpdateBusy)"
         ${Else}
-          Abort "Unable to validate the durable DroneDreamRuntime update isolation; refusing to replace the application / 无法验证 Runtime 升级隔离，已停止覆盖安装。"
+          Abort "$(DD_UpdateIsolationInvalid)"
         ${EndIf}
       ${EndIf}
     ${ElseIf} $1 == 1
       ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --runtime-operation-status' $0
       ${If} $0 == 75
-        Abort "DroneDreamRuntime is busy / DroneDreamRuntime 正在运行安装或维护。Cancel or wait for it in DroneDream, then retry / 请先在软件中取消或等待完成后重试。"
+        Abort "$(DD_LegacyRuntimeBusy)"
       ${ElseIf} $0 != 0
-        Abort "Unable to verify DroneDreamRuntime operation state; refusing to replace the application / 无法验证 Runtime 状态，已停止覆盖安装。"
+        Abort "$(DD_RuntimeStateUnknown)"
       ${EndIf}
       ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --installer-handoff-status' $0
       ${If} $0 == 76
-        Abort "DroneDreamRuntime setup is waiting to continue / Runtime 安装正在等待续传。Open DroneDream to continue or cancel it before updating or reinstalling / 请先打开 DroneDream 完成或取消安装，再升级或重装。"
+        Abort "$(DD_UpdatePending)"
       ${ElseIf} $0 != 0
-        Abort "Unable to verify the pending DroneDreamRuntime setup request; refusing to replace the application / 无法验证待处理的 Runtime 安装请求，已停止覆盖安装。"
+        Abort "$(DD_RuntimeRequestUnknown)"
       ${EndIf}
     ${EndIf}
   dronedream_no_existing_operation:
@@ -55,7 +55,7 @@
   Call DroneDreamWebView2IsUsable
   Pop $0
   ${If} $0 != "1"
-    DetailPrint "WebView2 registration is incomplete; starting the official Microsoft repair/install attempt."
+    DetailPrint "$(DD_WebViewRepair)"
     InitPluginsDir
     Delete "$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe"
     ; This macro is expanded after Tauri defines WEBVIEW2BOOTSTRAPPERPATH.
@@ -63,7 +63,7 @@
     ExecWait '"$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe" /silent /install' $1
     ${If} $1 != 0
       Call DroneDreamBestEffortEndRuntimeQuiesce
-      Abort "Microsoft WebView2 could not be installed / Microsoft WebView2 安装失败 (exit code $1). Restart Windows, ensure 2 GB is free on C:, and retry / 请重启 Windows、确保 C 盘至少有 2 GB 空间后重试。"
+      Abort "$(DD_WebViewInstallFailed)"
     ${EndIf}
 
     ; EdgeUpdate may finish registration shortly after the bootstrapper exits.
@@ -72,7 +72,7 @@
     Pop $0
     ${If} $0 != "1"
       Call DroneDreamBestEffortEndRuntimeQuiesce
-      Abort "Microsoft WebView2 is still unusable / Microsoft WebView2 仍不可用. Restart Windows and retry DroneDream; if needed run this installer as administrator / 请重启后重试，必要时以管理员身份运行安装器。"
+      Abort "$(DD_WebViewStillUnusable)"
     ${EndIf}
   ${EndIf}
 
@@ -88,7 +88,7 @@
   ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --clear-installer-handoff' $0
   ${If} $0 != 0
     Call DroneDreamBestEffortEndRuntimeQuiesce
-    Abort "Unable to clear the previous DroneDreamRuntime setup request / 无法清除旧的 Runtime 安装请求。"
+    Abort "$(DD_ClearRequestFailed)"
   ${EndIf}
 
   ${If} $DroneDreamWasInstalled == "0"
@@ -98,7 +98,7 @@
       ; The old receipt is already gone, so failure is safe and cannot be
       ; converted into an automatic install by launching the app.
       Call DroneDreamBestEffortEndRuntimeQuiesce
-      Abort "Unable to save the verified DroneDreamRuntime setup request / 无法保存已验证的 Runtime 安装请求。"
+      Abort "$(DD_SaveRequestFailed)"
     ${EndIf}
   ${EndIf}
 
@@ -109,7 +109,7 @@
   Call DroneDreamEndRuntimeQuiesce
   Pop $0
   ${If} $0 != "ok"
-    Abort "Unable to release DroneDreamRuntime update isolation; setup stopped before launching / 无法解除 Runtime 升级隔离，安装已在启动软件前停止。"
+    Abort "$(DD_ReleaseIsolationFailed)"
   ${EndIf}
 
   Pop $0
@@ -124,24 +124,24 @@
       Call un.DroneDreamPrepareRuntimeQuiesce
       Pop $0
       ${If} $0 == "pending"
-        Abort "DroneDreamRuntime setup is waiting to continue. Open DroneDream to continue or cancel it before uninstalling / Runtime 安装正在等待续传，请先打开 DroneDream 完成或取消安装。"
+        Abort "$(DD_UninstallPending)"
       ${ElseIf} $0 == "busy"
-        Abort "DroneDreamRuntime is busy or another installer owns maintenance; uninstall stopped / Runtime 正忙，或另一个安装器正在维护它，卸载已停止。"
+        Abort "$(DD_UninstallBusy)"
       ${ElseIf} $0 != "ok"
-        Abort "Unable to establish safe Runtime uninstall isolation; uninstall stopped / 无法建立安全的 Runtime 卸载隔离，卸载已停止。"
+        Abort "$(DD_UninstallIsolationFailed)"
       ${EndIf}
     ${ElseIf} $1 == 1
       ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --runtime-operation-status' $0
       ${If} $0 == 75
-        Abort "DroneDreamRuntime is busy. Cancel or wait for the operation before uninstalling the desktop app / Runtime 正在工作，请先取消或等待完成。"
+        Abort "$(DD_UninstallLegacyBusy)"
       ${ElseIf} $0 != 0
-        Abort "Unable to verify DroneDreamRuntime operation state; uninstall stopped safely / 无法验证 Runtime 状态，已安全停止卸载。"
+        Abort "$(DD_UninstallStateUnknown)"
       ${EndIf}
       ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --installer-handoff-status' $0
       ${If} $0 == 76
-        Abort "DroneDreamRuntime setup is waiting to continue. Open DroneDream to continue or cancel it before uninstalling / Runtime 安装正在等待续传，请先打开 DroneDream 完成或取消安装。"
+        Abort "$(DD_UninstallPending)"
       ${ElseIf} $0 != 0
-        Abort "Unable to verify the pending DroneDreamRuntime setup request; uninstall stopped safely / 无法验证待处理的 Runtime 请求，已安全停止卸载。"
+        Abort "$(DD_UninstallRequestUnknown)"
       ${EndIf}
     ${EndIf}
     ${If} $1 >= 1
@@ -150,7 +150,7 @@
         ${If} $1 >= 2
           Call un.DroneDreamBestEffortEndRuntimeQuiesce
         ${EndIf}
-        Abort "Unable to clear the pending Runtime request; uninstall stopped safely / 无法清除待处理请求，已安全停止卸载。"
+        Abort "$(DD_UninstallClearFailed)"
       ${EndIf}
     ${EndIf}
   dronedream_uninstall_no_binary:

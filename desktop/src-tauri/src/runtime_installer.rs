@@ -1847,6 +1847,8 @@ struct ImportPendingRecord {
     archive_sha256: String,
     archive_size: u64,
     archive_verified: bool,
+    #[serde(default)]
+    target_created_by_installer: bool,
     created_at: String,
 }
 
@@ -2121,6 +2123,7 @@ fn write_import_pending(
     manifest: &ReleaseManifest,
     manifest_sha256: &str,
     operation_id: &str,
+    target_created_by_installer: bool,
 ) -> Result<(), InstallFailure> {
     let target_root = target.to_str().ok_or_else(|| {
         fail(
@@ -2141,6 +2144,7 @@ fn write_import_pending(
         archive_sha256: manifest.artifact.sha256.clone(),
         archive_size: manifest.artifact.size_bytes,
         archive_verified: true,
+        target_created_by_installer,
         created_at: chrono::Utc::now().to_rfc3339(),
     };
     let encoded = serde_json::to_vec(&record).map_err(|error| {
@@ -2168,6 +2172,39 @@ fn write_import_pending(
                 false,
             )
         })
+}
+
+fn prepare_import_target_and_write_pending(
+    artifact_root: &Path,
+    target: &Path,
+    manifest: &ReleaseManifest,
+    manifest_sha256: &str,
+    operation_id: &str,
+) -> Result<(), InstallFailure> {
+    let target_created_by_installer = prepare_import_target(target)?;
+    match write_import_pending(
+        artifact_root,
+        target,
+        manifest,
+        manifest_sha256,
+        operation_id,
+        target_created_by_installer,
+    ) {
+        Ok(()) => Ok(()),
+        Err(pending_error) => {
+            match rollback_import_target_preparation(target, target_created_by_installer) {
+                Ok(()) => Err(pending_error),
+                Err(rollback_error) => Err(fail(
+                    "import_target_setup_rollback_failed",
+                    format!(
+                        "{} DroneDream could not roll back the import directory setup, so the target was preserved: {}",
+                        pending_error.message, rollback_error.message
+                    ),
+                    false,
+                )),
+            }
+        }
+    }
 }
 
 fn validate_import_pending(
@@ -2273,6 +2310,278 @@ fn clear_import_pending(target: &Path) -> Result<(), InstallFailure> {
         }
     }
     Ok(())
+}
+
+/// Establishes the import location immediately before `wsl --import` runs.
+///
+/// Returning `true` is a deletion capability: it is issued only when this
+/// process atomically created the previously absent, empty target directory.
+/// A directory that existed before this operation is accepted only while it
+/// remains empty and is never made eligible for automatic removal.
+fn prepare_import_target(target: &Path) -> Result<bool, InstallFailure> {
+    match fs::create_dir(target) {
+        Ok(()) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            require_safe_empty_import_target(target)?;
+            Ok(false)
+        }
+        Err(error) => Err(fail(
+            "import_target",
+            format!(
+                "Unable to create the isolated runtime import directory {}: {error}",
+                target.display()
+            ),
+            true,
+        )),
+    }
+}
+
+fn require_safe_empty_import_target(target: &Path) -> Result<(), InstallFailure> {
+    let metadata = fs::symlink_metadata(target).map_err(|error| {
+        fail(
+            "import_target",
+            format!(
+                "Unable to inspect the runtime import directory {}: {error}",
+                target.display()
+            ),
+            false,
+        )
+    })?;
+    if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
+        return Err(fail(
+            "unsafe_import_target",
+            "The runtime import target is not a real local directory.",
+            false,
+        ));
+    }
+    let mut entries = fs::read_dir(target).map_err(|error| {
+        fail(
+            "import_target",
+            format!(
+                "Unable to inspect the runtime import directory {}: {error}",
+                target.display()
+            ),
+            false,
+        )
+    })?;
+    match entries.next() {
+        None => Ok(()),
+        Some(Ok(_)) => Err(fail(
+            "unsafe_import_target",
+            "The runtime import target changed and is no longer empty; no files were modified.",
+            false,
+        )),
+        Some(Err(error)) => Err(fail(
+            "import_target",
+            format!("Unable to inspect a runtime import directory entry: {error}"),
+            false,
+        )),
+    }
+}
+
+fn rollback_import_target_preparation(
+    target: &Path,
+    target_created_by_installer: bool,
+) -> Result<(), InstallFailure> {
+    if !target_created_by_installer {
+        return Ok(());
+    }
+    let metadata = match fs::symlink_metadata(target) {
+        Ok(value) => value,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(fail(
+                "import_target_setup_rollback_failed",
+                format!(
+                    "Unable to inspect the newly created import directory {}: {error}",
+                    target.display()
+                ),
+                false,
+            ))
+        }
+    };
+    if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
+        return Err(fail(
+            "import_target_setup_rollback_failed",
+            "The newly created import target changed type and was preserved.",
+            false,
+        ));
+    }
+    let mut entries = fs::read_dir(target).map_err(|error| {
+        fail(
+            "import_target_setup_rollback_failed",
+            format!(
+                "Unable to inspect the newly created import directory {}: {error}",
+                target.display()
+            ),
+            false,
+        )
+    })?;
+    if entries.next().is_some() {
+        return Err(fail(
+            "import_target_setup_rollback_failed",
+            "The newly created import directory is no longer empty and was preserved.",
+            false,
+        ));
+    }
+    fs::remove_dir(target).map_err(|error| {
+        fail(
+            "import_target_setup_rollback_failed",
+            format!(
+                "Unable to remove the empty import directory created by this installation: {error}"
+            ),
+            false,
+        )
+    })
+}
+
+/// Reconciles a failed `wsl --import` that did not leave a registered distro.
+///
+/// The only removable payload is the ordinary root-level `ext4.vhdx` file
+/// created by WSL inside a directory atomically created by this installation.
+/// Unknown files, nested directories, reparse points, and every directory that
+/// predated the operation are preserved and reported for manual inspection.
+fn reconcile_failed_unregistered_import_target(
+    target: &Path,
+    pending: &ImportPendingRecord,
+) -> Result<(), InstallFailure> {
+    if !pending.target_created_by_installer {
+        return require_safe_empty_import_target(target).map_err(|error| {
+            fail(
+                "partial_import_target_preserved",
+                format!(
+                    "The import target existed before this installation and was preserved. {}",
+                    error.message
+                ),
+                false,
+            )
+        });
+    }
+
+    let metadata = match fs::symlink_metadata(target) {
+        Ok(value) => value,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(fail(
+                "partial_import_target_preserved",
+                format!(
+                    "Unable to inspect the failed runtime import directory {}: {error}",
+                    target.display()
+                ),
+                false,
+            ))
+        }
+    };
+    if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
+        return Err(fail(
+            "partial_import_target_preserved",
+            "The failed runtime import target is no longer the ordinary directory created by DroneDream; it was preserved.",
+            false,
+        ));
+    }
+
+    let mut entries = fs::read_dir(target).map_err(|error| {
+        fail(
+            "partial_import_target_preserved",
+            format!(
+                "Unable to inspect the failed runtime import directory {}: {error}",
+                target.display()
+            ),
+            false,
+        )
+    })?;
+    let first = match entries.next() {
+        None => None,
+        Some(Ok(entry)) => Some(entry),
+        Some(Err(error)) => {
+            return Err(fail(
+                "partial_import_target_preserved",
+                format!("Unable to inspect a failed runtime import artifact: {error}"),
+                false,
+            ))
+        }
+    };
+    if entries.next().is_some() {
+        return Err(fail(
+            "partial_import_target_preserved",
+            "The failed runtime import directory contains unexpected content and was preserved.",
+            false,
+        ));
+    }
+
+    if let Some(entry) = first {
+        let filename = entry.file_name();
+        if !filename
+            .to_str()
+            .is_some_and(|value| value.eq_ignore_ascii_case("ext4.vhdx"))
+        {
+            return Err(fail(
+                "partial_import_target_preserved",
+                "The failed runtime import directory contains an unknown file and was preserved.",
+                false,
+            ));
+        }
+        let artifact = entry.path();
+        let artifact_metadata = fs::symlink_metadata(&artifact).map_err(|error| {
+            fail(
+                "partial_import_target_preserved",
+                format!("Unable to inspect the partial WSL disk: {error}"),
+                false,
+            )
+        })?;
+        if !artifact_metadata.is_file() || crate::runtime_cache::is_link_like(&artifact_metadata) {
+            return Err(fail(
+                "partial_import_target_preserved",
+                "The partial WSL disk is not an ordinary file and was preserved.",
+                false,
+            ));
+        }
+        // A failed WSL import can leave ext4.vhdx before its eight-byte VHDX
+        // identifier is complete. Under the already-proven installer-created
+        // directory and signed pending record, a 0..7 byte ordinary file is a
+        // safe truncated import artifact. Once eight bytes exist, the VHDX
+        // identity is mandatory; an unknown file is always preserved.
+        if artifact_metadata.len() >= 8 {
+            let mut vhdx_signature = [0_u8; 8];
+            File::open(&artifact)
+                .and_then(|mut file| file.read_exact(&mut vhdx_signature))
+                .map_err(|error| {
+                    fail(
+                        "partial_import_target_preserved",
+                        format!(
+                            "The partial WSL disk could not be identified safely and was preserved: {error}"
+                        ),
+                        false,
+                    )
+                })?;
+            if &vhdx_signature != b"vhdxfile" {
+                return Err(fail(
+                    "partial_import_target_preserved",
+                    "The ext4.vhdx file does not contain a VHDX identity header and was preserved.",
+                    false,
+                ));
+            }
+        }
+        fs::remove_file(&artifact).map_err(|error| {
+            fail(
+                "partial_import_cleanup_failed",
+                format!(
+                    "Unable to remove the partial WSL disk: {error}. The disk and its target were preserved; no unknown files were deleted."
+                ),
+                false,
+            )
+        })?;
+    }
+
+    fs::remove_dir(target).map_err(|error| {
+        fail(
+            "partial_import_cleanup_failed",
+            format!(
+                "Unable to remove the empty runtime directory created by this installation: {error}"
+            ),
+            true,
+        )
+    })
 }
 
 /// Returns only bytes backed by a currently trusted cached release. Missing,
@@ -2719,7 +3028,7 @@ fn run_install_core(
             OPERATION_COUNTER.fetch_add(1, Ordering::Relaxed)
         )
     });
-    write_import_pending(
+    prepare_import_target_and_write_pending(
         &artifact_root,
         target,
         manifest,
@@ -2765,7 +3074,7 @@ fn run_install_core(
         // name appeared during our attempt may rollback unregister it.
         match executor.registration_matches_target(target) {
             Ok(true) => {
-                validate_import_pending(target, manifest, &manifest_sha256)?;
+                let pending = validate_import_pending(target, manifest, &manifest_sha256)?;
                 if let Err(rollback) = executor.unregister() {
                     return Err(fail(
                         "rollback_failed",
@@ -2776,9 +3085,32 @@ fn run_install_core(
                         false,
                     ));
                 }
+                if let Err(cleanup) = reconcile_failed_unregistered_import_target(target, &pending)
+                {
+                    return Err(fail(
+                        cleanup.code.as_str(),
+                        format!(
+                            "{} The newly imported distro was unregistered, but DroneDream preserved its target: {}",
+                            original.message, cleanup.message
+                        ),
+                        cleanup.retryable,
+                    ));
+                }
                 clear_import_pending(target)?;
             }
             Ok(false) => {
+                let pending = validate_import_pending(target, manifest, &manifest_sha256)?;
+                if let Err(cleanup) = reconcile_failed_unregistered_import_target(target, &pending)
+                {
+                    return Err(fail(
+                        cleanup.code.as_str(),
+                        format!(
+                            "{} DroneDream did not delete the failed import target: {}",
+                            original.message, cleanup.message
+                        ),
+                        cleanup.retryable,
+                    ));
+                }
                 clear_import_pending(target)?;
             }
             Err(probe_error) => {
@@ -3364,6 +3696,9 @@ mod tests {
         registration_owned_by_attempt: bool,
         unrelated_registered: bool,
         fail_import_after_registration: bool,
+        fail_import_without_registration: bool,
+        unregistered_import_payload: Option<Vec<u8>>,
+        leave_unexpected_import_file: bool,
         fail_import_with_foreign_registration: bool,
         cancel_during_import: bool,
         preparation_requires_restart: bool,
@@ -3396,9 +3731,31 @@ mod tests {
             Ok(state.registered && state.registration_owned_by_attempt)
         }
 
-        fn import(&self, _: &Path, _: &Path, cancel: &AtomicBool) -> Result<(), InstallFailure> {
+        fn import(
+            &self,
+            target: &Path,
+            _: &Path,
+            cancel: &AtomicBool,
+        ) -> Result<(), InstallFailure> {
             let mut state = self.state.lock().unwrap();
             state.imports += 1;
+            if state.fail_import_without_registration {
+                let payload = state
+                    .unregistered_import_payload
+                    .as_deref()
+                    .unwrap_or(b"vhdxfilepartial WSL disk");
+                fs::write(target.join("ext4.vhdx"), payload).unwrap();
+                if state.leave_unexpected_import_file {
+                    fs::write(target.join("user-data.txt"), b"must not be deleted").unwrap();
+                }
+                state.registered = false;
+                state.registration_owned_by_attempt = false;
+                return Err(fail(
+                    "fake_import_unregistered",
+                    "injected import failure before registration",
+                    true,
+                ));
+            }
             state.registered = true;
             state.registration_owned_by_attempt = !state.fail_import_with_foreign_registration;
             if state.cancel_during_import {
@@ -3448,6 +3805,31 @@ mod tests {
             self.state.lock().unwrap().receipts += 1;
             Ok(())
         }
+    }
+
+    fn fail_unregistered_import_with_payload(payload: Vec<u8>) -> (Sandbox, InstallFailure) {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        let body = b"runtime";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let wsl = FakeWsl::default();
+        {
+            let mut state = wsl.state.lock().unwrap();
+            state.fail_import_without_registration = true;
+            state.unregistered_import_payload = Some(payload);
+        }
+        let error = run_install_core(
+            &RuntimeInstaller::default(),
+            &target,
+            &manifest,
+            &raw,
+            &FakeTransport::valid(body),
+            &wsl,
+            &AtomicBool::new(false),
+        )
+        .unwrap_err();
+        (sandbox, error)
     }
 
     #[test]
@@ -3862,6 +4244,212 @@ mod tests {
         assert_eq!((state.imports, state.unregisters), (1, 1));
         assert!(!state.registered);
         assert!(state.unrelated_registered);
+        assert!(!sandbox.target().exists());
+    }
+
+    #[test]
+    fn pending_write_failure_rolls_back_only_a_new_empty_target() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        let body = b"runtime";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let cache = initialize_runtime_download_cache(&target).unwrap();
+        let artifact_root = cache.join("artifacts");
+        fs::create_dir(artifact_root.join(IMPORT_PENDING_FILE)).unwrap();
+
+        let error = prepare_import_target_and_write_pending(
+            &artifact_root,
+            &target,
+            &manifest,
+            &digest(&raw),
+            "install-pending-failure",
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "unsafe_cache");
+        assert!(!target.exists());
+        assert!(artifact_root.join(IMPORT_PENDING_FILE).is_dir());
+    }
+
+    #[test]
+    fn pending_write_failure_never_deletes_a_preexisting_target() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        fs::create_dir(&target).unwrap();
+        let body = b"runtime";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let cache = initialize_runtime_download_cache(&target).unwrap();
+        let artifact_root = cache.join("artifacts");
+        fs::create_dir(artifact_root.join(IMPORT_PENDING_FILE)).unwrap();
+
+        let error = prepare_import_target_and_write_pending(
+            &artifact_root,
+            &target,
+            &manifest,
+            &digest(&raw),
+            "install-preexisting-pending-failure",
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "unsafe_cache");
+        assert!(target.is_dir());
+        assert!(fs::read_dir(&target).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn setup_rollback_preserves_a_created_target_that_is_no_longer_empty() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("user-data.txt"), b"preserve").unwrap();
+
+        let error = rollback_import_target_preparation(&target, true).unwrap_err();
+
+        assert_eq!(error.code, "import_target_setup_rollback_failed");
+        assert_eq!(fs::read(target.join("user-data.txt")).unwrap(), b"preserve");
+    }
+
+    #[test]
+    fn unregistered_import_failure_cleans_attempt_created_target_for_retry() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        let body = b"runtime";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let wsl = FakeWsl::default();
+        wsl.state.lock().unwrap().fail_import_without_registration = true;
+
+        let error = run_install_core(
+            &RuntimeInstaller::default(),
+            &target,
+            &manifest,
+            &raw,
+            &FakeTransport::valid(body),
+            &wsl,
+            &AtomicBool::new(false),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "fake_import_unregistered");
+        assert!(error.retryable);
+        assert!(!target.exists());
+        let pending = crate::runtime_cache::runtime_download_cache_root(
+            target.to_str().expect("test target is UTF-8"),
+        )
+        .join("artifacts")
+        .join(IMPORT_PENDING_FILE);
+        assert!(!pending.exists());
+        let state = wsl.state.lock().unwrap();
+        assert_eq!((state.imports, state.unregisters), (1, 0));
+        assert!(!state.registered);
+    }
+
+    #[test]
+    fn unregistered_import_failure_cleans_a_zero_byte_truncated_vhdx() {
+        let (sandbox, error) = fail_unregistered_import_with_payload(Vec::new());
+
+        assert_eq!(error.code, "fake_import_unregistered");
+        assert!(error.retryable);
+        assert!(!sandbox.target().exists());
+    }
+
+    #[test]
+    fn unregistered_import_failure_cleans_one_to_seven_byte_truncated_vhdx_files() {
+        for length in 1..8 {
+            let (sandbox, error) = fail_unregistered_import_with_payload(vec![0x5a; length]);
+
+            assert_eq!(error.code, "fake_import_unregistered", "length={length}");
+            assert!(error.retryable, "length={length}");
+            assert!(!sandbox.target().exists(), "length={length}");
+        }
+    }
+
+    #[test]
+    fn unregistered_import_failure_preserves_an_eight_byte_wrong_header() {
+        let payload = b"notvhdx!".to_vec();
+        let (sandbox, error) = fail_unregistered_import_with_payload(payload.clone());
+        let target = sandbox.target();
+
+        assert_eq!(error.code, "partial_import_target_preserved");
+        assert!(!error.retryable);
+        assert_eq!(fs::read(target.join("ext4.vhdx")).unwrap(), payload);
+    }
+
+    #[test]
+    fn unregistered_import_failure_preserves_unknown_content() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        let body = b"runtime";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let wsl = FakeWsl::default();
+        {
+            let mut state = wsl.state.lock().unwrap();
+            state.fail_import_without_registration = true;
+            state.leave_unexpected_import_file = true;
+        }
+
+        let error = run_install_core(
+            &RuntimeInstaller::default(),
+            &target,
+            &manifest,
+            &raw,
+            &FakeTransport::valid(body),
+            &wsl,
+            &AtomicBool::new(false),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "partial_import_target_preserved");
+        assert!(!error.retryable);
+        assert_eq!(
+            fs::read(target.join("ext4.vhdx")).unwrap(),
+            b"vhdxfilepartial WSL disk"
+        );
+        assert_eq!(
+            fs::read(target.join("user-data.txt")).unwrap(),
+            b"must not be deleted"
+        );
+        let pending = crate::runtime_cache::runtime_download_cache_root(
+            target.to_str().expect("test target is UTF-8"),
+        )
+        .join("artifacts")
+        .join(IMPORT_PENDING_FILE);
+        assert!(pending.exists());
+    }
+
+    #[test]
+    fn unregistered_import_failure_never_deletes_preexisting_target() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        fs::create_dir(&target).unwrap();
+        let body = b"runtime";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let wsl = FakeWsl::default();
+        wsl.state.lock().unwrap().fail_import_without_registration = true;
+
+        let error = run_install_core(
+            &RuntimeInstaller::default(),
+            &target,
+            &manifest,
+            &raw,
+            &FakeTransport::valid(body),
+            &wsl,
+            &AtomicBool::new(false),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "partial_import_target_preserved");
+        assert!(!error.retryable);
+        assert!(target.is_dir());
+        assert_eq!(
+            fs::read(target.join("ext4.vhdx")).unwrap(),
+            b"vhdxfilepartial WSL disk"
+        );
+        assert_eq!(wsl.state.lock().unwrap().unregisters, 0);
     }
 
     #[test]
@@ -3932,6 +4520,7 @@ mod tests {
             &manifest,
             &digest(&raw),
             "install-1-1",
+            false,
         )
         .unwrap();
         let result = recover_pending_install(

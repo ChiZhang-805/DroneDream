@@ -22,16 +22,19 @@ import { ECE498 } from "./pages/ECE498";
 import { DesktopSetup } from "./pages/DesktopSetup";
 
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
-  const requireDesktopReadiness = desktopRuntime
-    ? async () => {
-        try {
-          const snapshot = await probeOverallDesktopReadiness();
-          return snapshot.ready ? null : redirect("/desktop/setup");
-        } catch {
-          return redirect("/desktop/setup");
+  const requireDesktopReadiness = (feature: "experiment" | "job" | "batch") =>
+    desktopRuntime
+      ? async () => {
+          try {
+            const snapshot = await probeOverallDesktopReadiness();
+            return snapshot.ready
+              ? null
+              : redirect(`/desktop/setup?required=${feature}`);
+          } catch {
+            return redirect(`/desktop/setup?required=${feature}`);
+          }
         }
-      }
-    : undefined;
+      : undefined;
   const fallbackPath = desktopRuntime ? "/desktop/setup" : "/";
 
   return [
@@ -45,17 +48,45 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             ? <Navigate to="/desktop/setup" replace />
             : <Dashboard />,
         },
-        { path: "dashboard", element: <Dashboard />, loader: requireDesktopReadiness },
-        { path: "jobs/new", element: <NewJob />, loader: requireDesktopReadiness },
-        { path: "jobs/:jobId", element: <JobDetail />, loader: requireDesktopReadiness },
-        { path: "trials/:trialId", element: <TrialDetail />, loader: requireDesktopReadiness },
-        { path: "history", element: <History />, loader: requireDesktopReadiness },
-        { path: "batches", element: <Batches />, loader: requireDesktopReadiness },
-        { path: "batches/new", element: <BatchCreate />, loader: requireDesktopReadiness },
-        { path: "batches/:batchId", element: <BatchDetail />, loader: requireDesktopReadiness },
-        { path: "compare", element: <JobCompare />, loader: requireDesktopReadiness },
+        { path: "dashboard", element: <Dashboard /> },
+        {
+          path: "jobs/new",
+          element: <NewJob />,
+          loader: requireDesktopReadiness("experiment"),
+        },
+        {
+          path: "jobs/:jobId",
+          element: <JobDetail />,
+          loader: requireDesktopReadiness("job"),
+        },
+        {
+          path: "trials/:trialId",
+          element: <TrialDetail />,
+          loader: requireDesktopReadiness("job"),
+        },
+        { path: "history", element: <History /> },
+        {
+          path: "batches",
+          element: <Batches />,
+          loader: requireDesktopReadiness("batch"),
+        },
+        {
+          path: "batches/new",
+          element: <BatchCreate />,
+          loader: requireDesktopReadiness("batch"),
+        },
+        {
+          path: "batches/:batchId",
+          element: <BatchDetail />,
+          loader: requireDesktopReadiness("batch"),
+        },
+        {
+          path: "compare",
+          element: <JobCompare />,
+          loader: requireDesktopReadiness("job"),
+        },
         { path: "desktop/setup", element: <DesktopSetup /> },
-        { path: "ece498", element: <ECE498 />, loader: requireDesktopReadiness },
+        { path: "ece498", element: <ECE498 /> },
         { path: "*", loader: () => redirect(fallbackPath) },
       ],
     },

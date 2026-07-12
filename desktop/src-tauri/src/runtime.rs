@@ -11,8 +11,9 @@ use crate::MINIMUM_WINDOWS_BUILD;
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Storage::FileSystem::{
-    CreateFileW, FILE_ADD_FILE, FILE_ADD_SUBDIRECTORY, FILE_FLAG_BACKUP_SEMANTICS,
-    FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+    CreateFileW, GetDiskFreeSpaceExW, GetDriveTypeW, GetVolumeInformationW, FILE_ADD_FILE,
+    FILE_ADD_SUBDIRECTORY, FILE_FLAG_BACKUP_SEMANTICS, FILE_SHARE_DELETE, FILE_SHARE_READ,
+    FILE_SHARE_WRITE, OPEN_EXISTING,
 };
 
 const RUNTIME_NAME: &str = "DroneDreamRuntime";
@@ -37,6 +38,7 @@ struct InstallerPlanExport {
     installed_bytes: u64,
     minimum_free_bytes: u64,
     can_install: bool,
+    blocker_code: &'static str,
 }
 
 #[derive(Debug, Serialize)]
@@ -170,12 +172,10 @@ struct DriveProbe {
 }
 
 #[cfg(target_os = "windows")]
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct DefaultDriveProbeReport {
-    system_drive: String,
-    #[serde(default)]
-    drives: Vec<DriveProbe>,
+#[derive(Debug)]
+struct FixedDriveProbeReport {
+    probes: Vec<DriveProbe>,
+    errors: Vec<String>,
 }
 
 #[cfg(target_os = "windows")]
@@ -258,40 +258,19 @@ pub(crate) fn write_installer_plan(
             "Installer plan output must be the fixed {OUTPUT_NAME} sibling of the planner."
         ));
     }
-    let export = match build_install_plan(target_root) {
-        Ok(plan) => InstallerPlanExport {
-            target_root: Some(plan.target_root),
-            download_bytes: plan.estimated_download_bytes,
-            installed_bytes: plan.estimated_installed_bytes,
-            minimum_free_bytes: MINIMUM_FREE_BYTES,
-            can_install: plan.can_install,
-        },
-        Err(_error) => InstallerPlanExport {
-            target_root: None,
-            download_bytes: ESTIMATED_DOWNLOAD_BYTES,
-            installed_bytes: ESTIMATED_INSTALLED_BYTES,
-            minimum_free_bytes: MINIMUM_FREE_BYTES,
-            can_install: false,
-        },
-    };
+    let export = installer_plan_export(build_install_plan(target_root))?;
     let target = export.target_root.as_deref().unwrap_or("");
     if !target.is_ascii() || target.contains(['\r', '\n', '=']) {
         return Err("Installer plan target is not safe for the NSIS handoff.".to_string());
     }
     let target_drive = target.get(..2).unwrap_or("");
-    let blocker_code = if export.can_install {
-        "none"
-    } else if export.target_root.is_none() {
-        "no-eligible-target"
-    } else {
-        "prerequisite-blocked"
-    };
     let encoded = format!(
-        "[plan]\r\nschemaVersion=1\r\ntargetDrive={target_drive}\r\ntargetRoot={target}\r\ndownloadBytes={}\r\ninstalledBytes={}\r\nminimumFreeBytes={}\r\ncanInstall={}\r\nblockerCode={blocker_code}\r\n",
+        "[plan]\r\nschemaVersion=1\r\ntargetDrive={target_drive}\r\ntargetRoot={target}\r\ndownloadBytes={}\r\ninstalledBytes={}\r\nminimumFreeBytes={}\r\ncanInstall={}\r\nblockerCode={}\r\n",
         export.download_bytes,
         export.installed_bytes,
         export.minimum_free_bytes,
-        u8::from(export.can_install)
+        u8::from(export.can_install),
+        export.blocker_code,
     )
     .into_bytes();
     if encoded.len() > 64 * 1024 {
@@ -305,6 +284,34 @@ pub(crate) fn write_installer_plan(
     file.write_all(&encoded)
         .and_then(|_| file.sync_all())
         .map_err(|error| format!("Unable to persist installer plan: {error}"))
+}
+
+fn installer_plan_export(
+    result: Result<RuntimeInstallPlan, String>,
+) -> Result<InstallerPlanExport, String> {
+    match result {
+        Ok(plan) => Ok(InstallerPlanExport {
+            target_root: Some(plan.target_root),
+            download_bytes: plan.estimated_download_bytes,
+            installed_bytes: plan.estimated_installed_bytes,
+            minimum_free_bytes: MINIMUM_FREE_BYTES,
+            can_install: plan.can_install,
+            blocker_code: if plan.can_install {
+                "none"
+            } else {
+                "prerequisite-blocked"
+            },
+        }),
+        Err(error) if error == no_eligible_target_message() => Ok(InstallerPlanExport {
+            target_root: None,
+            download_bytes: ESTIMATED_DOWNLOAD_BYTES,
+            installed_bytes: ESTIMATED_INSTALLED_BYTES,
+            minimum_free_bytes: MINIMUM_FREE_BYTES,
+            can_install: false,
+            blocker_code: "no-eligible-target",
+        }),
+        Err(error) => Err(format!("Unable to build the installer plan: {error}")),
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -1591,37 +1598,91 @@ fn base_plan(
 
 #[cfg(target_os = "windows")]
 fn default_target_root() -> Result<String, String> {
-    const SCRIPT: &str = r#"
-$ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$drives = @(Get-CimInstance -ClassName Win32_LogicalDisk -Filter 'DriveType = 3' | ForEach-Object {
-  [ordered]@{
-    drive = [string]$_.DeviceID
-    fileSystem = [string]$_.FileSystem
-    driveType = [byte]$_.DriveType
-    totalBytes = [UInt64]$_.Size
-    freeBytes = [UInt64]$_.FreeSpace
-  }
-})
-[ordered]@{
-  systemDrive = [string]$env:SystemDrive
-  drives = $drives
-} | ConvertTo-Json -Depth 4 -Compress
-"#;
-    let report: DefaultDriveProbeReport =
-        run_powershell_json(SCRIPT, &[], "default runtime drive probe")?;
-    select_default_target_with_credit(
-        &report.drives,
-        &report.system_drive,
+    let report = probe_fixed_local_drives()?;
+    let system_drive = std::env::var("SystemDrive")
+        .map_err(|_| "Windows did not report its system drive.".to_string())?;
+    select_default_target_from_report(
+        &report,
+        &system_drive,
         default_target_is_safe_and_writable,
         crate::runtime_installer::planner_signed_resume_credit,
+    )?
+    .ok_or_else(no_eligible_target_message)
+}
+
+fn no_eligible_target_message() -> String {
+    format!(
+        "No safe writable fixed NTFS drive has at least {} GiB of free or authenticated resumable capacity. DroneDream checks non-system drives first, then the Windows system drive.",
+        MINIMUM_FREE_BYTES / GIB
     )
-    .ok_or_else(|| {
-        format!(
-            "No safe writable fixed NTFS drive has at least {} GiB of free or authenticated resumable capacity. DroneDream checks non-system drives first, then the Windows system drive.",
-            MINIMUM_FREE_BYTES / GIB
-        )
-    })
+}
+
+#[cfg(target_os = "windows")]
+fn probe_fixed_local_drives() -> Result<FixedDriveProbeReport, String> {
+    let mut results = Vec::new();
+    for letter in b'A'..=b'Z' {
+        let drive = format!("{}:", char::from(letter));
+        let root = format!("{drive}\\")
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<_>>();
+        if unsafe { GetDriveTypeW(root.as_ptr()) } == 3 {
+            results.push((drive.clone(), probe_drive(&drive)));
+        }
+    }
+    collect_fixed_drive_probes(results)
+}
+
+#[cfg(target_os = "windows")]
+fn collect_fixed_drive_probes(
+    results: Vec<(String, Result<DriveProbe, String>)>,
+) -> Result<FixedDriveProbeReport, String> {
+    let mut probes = Vec::new();
+    let mut errors = Vec::new();
+    for (drive, result) in results {
+        match result {
+            Ok(probe) => probes.push(probe),
+            Err(error) => errors.push(format!("{drive} ({error})")),
+        }
+    }
+    if probes.is_empty() && !errors.is_empty() {
+        return Err(fixed_drive_probe_error(&errors));
+    }
+    Ok(FixedDriveProbeReport { probes, errors })
+}
+
+#[cfg(target_os = "windows")]
+fn fixed_drive_probe_error(errors: &[String]) -> String {
+    format!(
+        "Unable to inspect fixed local drive(s): {}",
+        errors.join("; ")
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn select_default_target_from_report<F, C>(
+    report: &FixedDriveProbeReport,
+    system_drive: &str,
+    target_is_safe_and_writable: F,
+    storage_credit: C,
+) -> Result<Option<String>, String>
+where
+    F: FnMut(&str) -> bool,
+    C: FnMut(&str) -> u64,
+{
+    let selected = select_default_target_with_credit(
+        &report.probes,
+        system_drive,
+        target_is_safe_and_writable,
+        storage_credit,
+    );
+    if selected.is_none() && !report.errors.is_empty() {
+        return Err(format!(
+            "No eligible target was found among the successfully inspected fixed drives, and the remaining fixed drives could not be checked: {}",
+            report.errors.join("; ")
+        ));
+    }
+    Ok(selected)
 }
 
 #[cfg(all(target_os = "windows", test))]
@@ -1710,24 +1771,72 @@ fn default_target_is_safe_and_writable(target: &str) -> bool {
 
 #[cfg(target_os = "windows")]
 fn probe_drive(drive: &str) -> Result<DriveProbe, String> {
-    const SCRIPT: &str = r#"
-$ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$drive = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID = '$env:DRONEDREAM_DRIVE'"
-if ($null -eq $drive) { throw "Drive $env:DRONEDREAM_DRIVE was not found." }
-[ordered]@{
-  drive = [string]$drive.DeviceID
-  fileSystem = [string]$drive.FileSystem
-  driveType = [byte]$drive.DriveType
-  totalBytes = [UInt64]$drive.Size
-  freeBytes = [UInt64]$drive.FreeSpace
-} | ConvertTo-Json -Compress
-"#;
-    run_powershell_json(
-        SCRIPT,
-        &[("DRONEDREAM_DRIVE", drive)],
-        "runtime target drive probe",
-    )
+    let normalized = normalize_windows_target(drive)?;
+    let canonical_drive = normalized[..2].to_string();
+    let root = format!("{canonical_drive}\\");
+    let wide_root = root
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+
+    let drive_type = unsafe { GetDriveTypeW(wide_root.as_ptr()) };
+    if drive_type == 0 || drive_type == 1 {
+        return Err(format!(
+            "Windows did not find a usable volume at {canonical_drive}."
+        ));
+    }
+
+    let mut available_bytes = 0_u64;
+    let mut total_bytes = 0_u64;
+    let mut total_free_bytes = 0_u64;
+    if unsafe {
+        GetDiskFreeSpaceExW(
+            wide_root.as_ptr(),
+            &mut available_bytes,
+            &mut total_bytes,
+            &mut total_free_bytes,
+        )
+    } == 0
+    {
+        return Err(format!(
+            "Windows could not read the available capacity of {canonical_drive}: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    let mut file_system = [0_u16; 32];
+    if unsafe {
+        GetVolumeInformationW(
+            wide_root.as_ptr(),
+            std::ptr::null_mut(),
+            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            file_system.as_mut_ptr(),
+            file_system.len() as u32,
+        )
+    } == 0
+    {
+        return Err(format!(
+            "Windows could not read the file system of {canonical_drive}: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    let file_system_len = file_system
+        .iter()
+        .position(|value| *value == 0)
+        .unwrap_or(file_system.len());
+
+    Ok(DriveProbe {
+        drive: canonical_drive,
+        file_system: String::from_utf16_lossy(&file_system[..file_system_len]),
+        drive_type: u8::try_from(drive_type).unwrap_or(u8::MAX),
+        total_bytes,
+        // Available-to-caller is the safe value for per-user installation and
+        // can be lower than total free space when disk quotas are configured.
+        free_bytes: available_bytes.min(total_free_bytes),
+    })
 }
 
 #[cfg(target_os = "windows")]
@@ -2041,6 +2150,28 @@ mod tests {
     }
 
     #[test]
+    fn installer_export_distinguishes_no_target_from_probe_failure() {
+        let no_target = installer_plan_export(Err(no_eligible_target_message())).unwrap();
+        assert_eq!(no_target.blocker_code, "no-eligible-target");
+        assert!(no_target.target_root.is_none());
+
+        let probe_error = installer_plan_export(Err(
+            "Unable to inspect fixed local drive(s): E: (capacity query failed)".to_string(),
+        ));
+        assert!(probe_error.is_err());
+
+        let ready = installer_plan_export(Ok(base_plan(
+            "E:\\DroneDream".to_string(),
+            Vec::new(),
+            false,
+            false,
+        )))
+        .unwrap();
+        assert_eq!(ready.blocker_code, "none");
+        assert!(ready.can_install);
+    }
+
+    #[test]
     fn rejects_relative_and_parent_paths() {
         assert!(normalize_windows_target("DroneDream").is_err());
         assert!(normalize_windows_target("C:\\DroneDream\\..\\other").is_err());
@@ -2081,6 +2212,122 @@ mod tests {
             Some("E:\\DroneDream")
         );
         assert!(select_default_target(&drives, "", |_| true).is_none());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn default_target_recommends_observed_e_drive_even_when_c_has_more_space() {
+        let gib = 1024 * 1024 * 1024;
+        let drives = vec![
+            DriveProbe {
+                drive: "C:".to_string(),
+                file_system: "NTFS".to_string(),
+                drive_type: 3,
+                total_bytes: 610 * gib,
+                free_bytes: 383 * gib,
+            },
+            DriveProbe {
+                drive: "E:".to_string(),
+                file_system: "NTFS".to_string(),
+                drive_type: 3,
+                // Values observed on the affected machine when the installer
+                // incorrectly claimed that no eligible drive existed.
+                total_bytes: 243_185_741_824,
+                free_bytes: 101_934_280_704,
+            },
+        ];
+
+        assert_eq!(
+            select_default_target(&drives, "C:", |_| true).as_deref(),
+            Some("E:\\DroneDream")
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn fixed_drive_probe_errors_are_not_reported_as_no_eligible_target() {
+        let error = collect_fixed_drive_probes(vec![
+            ("C:".to_string(), Err("capacity query failed".to_string())),
+            (
+                "E:".to_string(),
+                Err("file-system query failed".to_string()),
+            ),
+        ])
+        .unwrap_err();
+
+        assert!(error.contains("Unable to inspect fixed local drive"));
+        assert!(error.contains("C:"));
+        assert!(error.contains("E:"));
+        assert!(!error.contains("No safe writable"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn unrelated_locked_fixed_drive_does_not_block_a_healthy_e_recommendation() {
+        let report = collect_fixed_drive_probes(vec![
+            (
+                "E:".to_string(),
+                Ok(DriveProbe {
+                    drive: "E:".to_string(),
+                    file_system: "NTFS".to_string(),
+                    drive_type: 3,
+                    total_bytes: 243_185_741_824,
+                    free_bytes: 101_934_280_704,
+                }),
+            ),
+            ("X:".to_string(), Err("locked BitLocker volume".to_string())),
+        ])
+        .unwrap();
+
+        assert_eq!(report.probes.len(), 1);
+        assert_eq!(report.errors.len(), 1);
+        assert_eq!(
+            select_default_target_from_report(&report, "C:", |_| true, |_| 0)
+                .unwrap()
+                .as_deref(),
+            Some("E:\\DroneDream")
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn incomplete_fixed_drive_scan_is_not_misreported_when_known_drives_are_ineligible() {
+        let gib = 1024 * 1024 * 1024;
+        let report = collect_fixed_drive_probes(vec![
+            (
+                "C:".to_string(),
+                Ok(DriveProbe {
+                    drive: "C:".to_string(),
+                    file_system: "NTFS".to_string(),
+                    drive_type: 3,
+                    total_bytes: 256 * gib,
+                    free_bytes: 40 * gib,
+                }),
+            ),
+            ("X:".to_string(), Err("offline virtual disk".to_string())),
+        ])
+        .unwrap();
+
+        let error = select_default_target_from_report(&report, "C:", |_| true, |_| 0).unwrap_err();
+        assert!(error.contains("remaining fixed drives could not be checked"));
+        assert!(error.contains("X:"));
+
+        let complete_report = collect_fixed_drive_probes(vec![(
+            "C:".to_string(),
+            Ok(DriveProbe {
+                drive: "C:".to_string(),
+                file_system: "NTFS".to_string(),
+                drive_type: 3,
+                total_bytes: 256 * gib,
+                free_bytes: 40 * gib,
+            }),
+        )])
+        .unwrap();
+        assert!(
+            select_default_target_from_report(&complete_report, "C:", |_| true, |_| 0)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[cfg(target_os = "windows")]

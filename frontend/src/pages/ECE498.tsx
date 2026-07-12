@@ -5,7 +5,9 @@ import { Link } from "react-router-dom";
 
 import { apiClient } from "../api/client";
 import { Alert } from "../components/Alert";
+import { RuntimeAccessNotice } from "../components/RuntimeAccessNotice";
 import { SectionCard } from "../components/SectionCard";
+import { useDesktopRuntimeAccess } from "../desktop/access";
 import { DEFAULT_TRACK_GEOMETRY, generateReferenceTrack } from "../utils/referenceTrack";
 import type {
   CandidateSourceType,
@@ -638,6 +640,7 @@ function Ece498CandidateTurnsTable({ turns }: { turns: Ece498CandidateTurn[] }) 
 }
 
 export function ECE498() {
+  const runtimeAccess = useDesktopRuntimeAccess();
   const [form, setForm] = useState<Ece498FormState>(DEFAULT_FORM);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [results, setResults] = useState<Ece498RunResult[]>([]);
@@ -652,6 +655,9 @@ export function ECE498() {
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
   async function runMode(mode: Ece498Mode) {
+    // Route-level browsing is intentionally available without Runtime, but an
+    // ECE498 run is a mutating backend operation and must still fail closed.
+    if (!runtimeAccess.canUseRuntime) return;
     setError(null);
     const nextErrors = validateEce498Form(form);
     setErrors(nextErrors);
@@ -682,6 +688,9 @@ export function ECE498() {
   return (
     <div>
       <h1>ECE498</h1>
+      {!runtimeAccess.canUseRuntime ? (
+        <RuntimeAccessNotice page="ece498" />
+      ) : null}
       {error && (
         <Alert tone="danger" title="Error">
           {error}
@@ -737,13 +746,22 @@ export function ECE498() {
       </SectionCard>
 
       <div className="ece498-run-actions">
-        <button disabled={running} onClick={() => void runMode("baseline_no_tool")}>
+        <button
+          disabled={running || !runtimeAccess.canUseRuntime}
+          onClick={() => void runMode("baseline_no_tool")}
+        >
           Run Baseline (No Tool)
         </button>
-        <button disabled={running} onClick={() => void runMode("tool_augmented")}>
+        <button
+          disabled={running || !runtimeAccess.canUseRuntime}
+          onClick={() => void runMode("tool_augmented")}
+        >
           Run Tool-Augmented (CMA-ES)
         </button>
-        <button disabled={running} onClick={() => void runMode("tool_refinement")}>
+        <button
+          disabled={running || !runtimeAccess.canUseRuntime}
+          onClick={() => void runMode("tool_refinement")}
+        >
           Run Tool + Refinement (CMA-ES Loop)
         </button>
       </div>
