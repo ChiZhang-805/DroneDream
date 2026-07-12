@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  autoStartInstallerRuntime,
   cancelRuntimeInstall,
   DesktopCommandContractError,
   DesktopRuntimeUnavailableError,
+  discardInstallerRuntimeIntent,
+  getInstallerRuntimeIntent,
   getRuntimeInstallProgress,
   getRuntimeInstallPlan,
   isDesktopRuntime,
@@ -387,6 +390,160 @@ describe("desktop bridge", () => {
     expect(invoke).toHaveBeenNthCalledWith(3, "cancel_runtime_install", undefined);
     expect(invoke).toHaveBeenNthCalledWith(4, "start_runtime", undefined);
     expect(invoke).toHaveBeenNthCalledWith(5, "repair_runtime", undefined);
+  });
+
+  it("strictly validates and routes the atomic installer handoff", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce({
+      disposition: "started",
+      mode: "custom",
+      targetRoot: "E:\\DroneDream",
+      snapshot: installSnapshot,
+      message: "The confirmed installation started.",
+    });
+    await expect(autoStartInstallerRuntime()).resolves.toMatchObject({
+      disposition: "started",
+      mode: "custom",
+      targetRoot: "E:\\DroneDream",
+      snapshot: { operationId: "install-1" },
+    });
+    expect(invoke).toHaveBeenLastCalledWith(
+      "auto_start_installer_runtime",
+      undefined,
+    );
+
+    invoke.mockResolvedValueOnce({
+      disposition: "desktopOnly",
+      mode: "install-app-only",
+      targetRoot: null,
+      snapshot: null,
+      message: null,
+    });
+    await expect(autoStartInstallerRuntime()).resolves.toMatchObject({
+      disposition: "desktopOnly",
+      mode: "install-app-only",
+    });
+  });
+
+  it("strictly validates the read-only installer intent peek", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce({
+      status: "ready",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      message: "Install everything was confirmed.",
+    });
+    await expect(getInstallerRuntimeIntent()).resolves.toEqual({
+      status: "ready",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      message: "Install everything was confirmed.",
+    });
+    expect(invoke).toHaveBeenLastCalledWith(
+      "get_installer_runtime_intent",
+      undefined,
+    );
+
+    invoke.mockResolvedValueOnce({
+      status: "desktopOnly",
+      mode: "install-app-only",
+      targetRoot: null,
+      message: null,
+    });
+    await expect(getInstallerRuntimeIntent()).resolves.toMatchObject({
+      status: "desktopOnly",
+      mode: "install-app-only",
+    });
+  });
+
+  it("strictly validates and routes pending installer-intent discard", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce({
+      discarded: true,
+      message: "The pending installer choice was cleared.",
+    });
+    await expect(discardInstallerRuntimeIntent()).resolves.toEqual({
+      discarded: true,
+      message: "The pending installer choice was cleared.",
+    });
+    expect(invoke).toHaveBeenLastCalledWith(
+      "discard_installer_runtime_intent",
+      undefined,
+    );
+
+    invoke.mockResolvedValueOnce({ discarded: "yes", message: null });
+    await expect(discardInstallerRuntimeIntent()).rejects.toThrow(
+      /discardResult.discarded must be a boolean/i,
+    );
+  });
+
+  it("rejects contradictory read-only installer intents", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce({
+      status: "ready",
+      mode: "install-app-only",
+      targetRoot: "E:\\DroneDream",
+      message: null,
+    });
+    await expect(getInstallerRuntimeIntent()).rejects.toThrow(
+      /requires install-all or custom mode/i,
+    );
+
+    invoke.mockResolvedValueOnce({
+      status: "none",
+      mode: null,
+      targetRoot: "E:\\DroneDream",
+      message: null,
+    });
+    await expect(getInstallerRuntimeIntent()).rejects.toThrow(
+      /cannot return targetRoot/i,
+    );
+  });
+
+  it("rejects contradictory atomic installer handoff responses", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce({
+      disposition: "started",
+      mode: "install-app-only",
+      targetRoot: "E:\\DroneDream",
+      snapshot: installSnapshot,
+      message: null,
+    });
+    await expect(autoStartInstallerRuntime()).rejects.toThrow(
+      /requires install-all or custom mode/i,
+    );
+
+    invoke.mockResolvedValueOnce({
+      disposition: "resumed",
+      mode: "install-all",
+      targetRoot: "C:\\DroneDream",
+      snapshot: installSnapshot,
+      message: null,
+    });
+    await expect(autoStartInstallerRuntime()).rejects.toThrow(
+      /targetRoot must match/i,
+    );
+
+    invoke.mockResolvedValueOnce({
+      disposition: "none",
+      mode: null,
+      targetRoot: null,
+      snapshot: installSnapshot,
+      message: null,
+    });
+    await expect(autoStartInstallerRuntime()).rejects.toThrow(
+      /cannot return targetRoot or snapshot/i,
+    );
   });
 
   it("fails closed for unsafe release URLs and contradictory installer snapshots", async () => {

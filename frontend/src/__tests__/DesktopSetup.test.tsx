@@ -1,9 +1,13 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
+  InstallerRuntimeAutoStartResult,
+  InstallerRuntimeDiscardResult,
+  InstallerRuntimeIntent,
   RuntimeInstallPlan,
   RuntimeInstallSnapshot,
   RuntimeStatusReport,
@@ -240,6 +244,26 @@ const idleInstallSnapshot: RuntimeInstallSnapshot = {
   updatedAt: null,
 };
 
+const noInstallerRuntimeIntent: InstallerRuntimeIntent = {
+  status: "none",
+  mode: null,
+  targetRoot: null,
+  message: null,
+};
+
+const noInstallerAutoStart: InstallerRuntimeAutoStartResult = {
+  disposition: "none",
+  mode: null,
+  targetRoot: null,
+  snapshot: null,
+  message: null,
+};
+
+const discardedInstallerIntent: InstallerRuntimeDiscardResult = {
+  discarded: true,
+  message: "The pending installer choice was cleared.",
+};
+
 function installSnapshot(
   overrides: Partial<RuntimeInstallSnapshot> = {},
 ): RuntimeInstallSnapshot {
@@ -261,15 +285,85 @@ function installSnapshot(
   };
 }
 
-function renderPage(locale: "en" | "zh-CN" = "en") {
+function renderPage(
+  locale: "en" | "zh-CN" = "en",
+  installerIntent: InstallerRuntimeIntent = noInstallerRuntimeIntent,
+  installerResult: unknown = noInstallerAutoStart,
+  strict = false,
+  discardResult: unknown = discardedInstallerIntent,
+) {
   window.localStorage.setItem("drone-dream:locale", locale);
-  return render(
+  const originalTauri = window.__TAURI__;
+  const originalInvoke = window.__TAURI__?.core?.invoke;
+  const installerIntentInvoke = vi.fn(async (
+    command: string,
+    args?: Record<string, unknown>,
+  ) => {
+    void command;
+    void args;
+    return installerIntent;
+  });
+  const installerInvoke = vi.fn(async (
+    command: string,
+    args?: Record<string, unknown>,
+  ) => {
+    void command;
+    void args;
+    return installerResult;
+  });
+  const installerDiscardInvoke = vi.fn(async (
+    command: string,
+    args?: Record<string, unknown>,
+  ) => {
+    void command;
+    void args;
+    return discardResult;
+  });
+  let wrappedTauri = originalTauri;
+  if (originalInvoke) {
+    wrappedTauri = {
+      core: {
+        invoke: async (command, args) => {
+          if (command === "get_installer_runtime_intent") {
+            return installerIntentInvoke(command, args);
+          }
+          if (command === "auto_start_installer_runtime") {
+            return installerInvoke(command, args);
+          }
+          if (command === "discard_installer_runtime_intent") {
+            return installerDiscardInvoke(command, args);
+          }
+          return originalInvoke(command, args);
+        },
+      },
+    };
+    window.__TAURI__ = wrappedTauri;
+  }
+  const page = render(strict ? (
+    <StrictMode>
+      <I18nProvider>
+        <MemoryRouter>
+          <DesktopSetup />
+        </MemoryRouter>
+      </I18nProvider>
+    </StrictMode>
+  ) : (
     <I18nProvider>
       <MemoryRouter>
         <DesktopSetup />
       </MemoryRouter>
-    </I18nProvider>,
-  );
+    </I18nProvider>
+  ));
+  const originalUnmount = page.unmount;
+  page.unmount = () => {
+    originalUnmount();
+    if (window.__TAURI__ === wrappedTauri) window.__TAURI__ = originalTauri;
+  };
+  return Object.assign(page, {
+    installerIntentInvoke,
+    installerInvoke,
+    installerDiscardInvoke,
+  });
 }
 
 afterEach(() => {
@@ -335,6 +429,914 @@ describe("DesktopSetup", () => {
     expect(invoke).toHaveBeenCalledWith(
       "get_runtime_install_plan",
       undefined,
+    );
+  });
+
+  it("starts a confirmed install-all handoff automatically exactly once", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const automaticSnapshot = installSnapshot({
+      phase: "queued",
+      bytesDownloaded: 0,
+      currentPart: null,
+      totalParts: null,
+      message: "Queued from the Windows installer",
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        message: "Install everything was confirmed.",
+      },
+      {
+        disposition: "started",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        snapshot: automaticSnapshot,
+        message: "The confirmed installation started.",
+      },
+      true,
+    );
+
+    expect(await screen.findByText("One-click runtime installation started"))
+      .toBeInTheDocument();
+    expect(screen.getByText("Preparing installation")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel installation" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
+      .not.toBeInTheDocument();
+    expect(page.installerIntentInvoke).toHaveBeenCalledTimes(1);
+    expect(page.installerInvoke).toHaveBeenCalledTimes(1);
+    expect(page.installerInvoke).toHaveBeenCalledWith(
+      "auto_start_installer_runtime",
+      undefined,
+    );
+    expect(invoke).toHaveBeenCalledWith("get_runtime_install_plan", {
+      targetRoot: "E:\\DroneDream",
+    });
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
+    );
+  });
+
+  it("does not claim the handoff until the exact plan and controls have rendered", async () => {
+    let resolvePlan!: (value: RuntimeInstallPlan) => void;
+    const pendingPlan = new Promise<RuntimeInstallPlan>((resolve) => {
+      resolvePlan = resolve;
+    });
+    const automaticSnapshot = installSnapshot({
+      phase: "queued",
+      bytesDownloaded: 0,
+      currentPart: null,
+      totalParts: null,
+      message: "Queued",
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return pendingPlan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        message: null,
+      },
+      {
+        disposition: "started",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        snapshot: automaticSnapshot,
+        message: null,
+      },
+    );
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith(
+      "get_runtime_install_plan",
+      { targetRoot: "E:\\DroneDream" },
+    ));
+    expect(page.installerInvoke).not.toHaveBeenCalled();
+
+    resolvePlan(plan);
+    expect(await screen.findByText("First-run installation plan")).toBeInTheDocument();
+    expect(screen.getAllByText("8.0 GiB")).not.toHaveLength(0);
+    await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("Runtime download is not published yet"))
+      .not.toBeInTheDocument();
+  });
+
+  it("cancels a confirmed automatic install before a runtime operation starts", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    let resolveAutoStart!: (value: InstallerRuntimeAutoStartResult) => void;
+    const pendingAutoStart = new Promise<InstallerRuntimeAutoStartResult>((resolve) => {
+      resolveAutoStart = resolve;
+    });
+    const user = userEvent.setup();
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        message: null,
+      },
+      pendingAutoStart,
+    );
+
+    const cancel = await screen.findByRole("button", {
+      name: "Cancel automatic installation",
+    });
+    await user.click(cancel);
+
+    expect(await screen.findByText("Automatic runtime installation was cancelled"))
+      .toBeInTheDocument();
+    expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
+    );
+    expect(screen.getByRole("combobox", { name: "Runtime disk" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
+      .toBeEnabled();
+
+    resolveAutoStart(noInstallerAutoStart);
+  });
+
+  it("reveals an active operation when auto-start completes after a successful discard", async () => {
+    let resolveAutoStart!: (value: InstallerRuntimeAutoStartResult) => void;
+    const pendingAutoStart = new Promise<InstallerRuntimeAutoStartResult>((resolve) => {
+      resolveAutoStart = resolve;
+    });
+    const activeSnapshot = installSnapshot({
+      phase: "downloading",
+      bytesDownloaded: 4 * 1024 ** 3,
+      message: "Late native operation",
+    });
+    let progressCalls = 0;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") {
+        progressCalls += 1;
+        return progressCalls >= 3 ? activeSnapshot : idleInstallSnapshot;
+      }
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const user = userEvent.setup();
+    const page = renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        message: null,
+      },
+      pendingAutoStart,
+    );
+
+    await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(1));
+    await user.click(await screen.findByRole("button", {
+      name: "Cancel automatic installation",
+    }));
+    expect(await screen.findByText("Automatic runtime installation was cancelled"))
+      .toBeInTheDocument();
+
+    resolveAutoStart({
+      disposition: "started",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      snapshot: activeSnapshot,
+      message: null,
+    });
+
+    expect(await screen.findByText("The runtime operation may already have started"))
+      .toBeInTheDocument();
+    expect(screen.getByText(/became visible after the pending request was cleared/i))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel installation" })).toBeEnabled();
+    expect(screen.getByText("4.0 GiB / 8.0 GiB")).toBeInTheDocument();
+    expect(screen.queryByText("Automatic runtime installation was cancelled"))
+      .not.toBeInTheDocument();
+    expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the journal and attaches progress when pending discard is too late", async () => {
+    let resolveAutoStart!: (value: InstallerRuntimeAutoStartResult) => void;
+    const pendingAutoStart = new Promise<InstallerRuntimeAutoStartResult>((resolve) => {
+      resolveAutoStart = resolve;
+    });
+    const user = userEvent.setup();
+    const activeSnapshot = installSnapshot({
+      phase: "downloading",
+      bytesDownloaded: 2 * 1024 ** 3,
+      message: "The native operation already started",
+    });
+    let progressCalls = 0;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") {
+        progressCalls += 1;
+        return progressCalls === 1 ? idleInstallSnapshot : activeSnapshot;
+      }
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        message: null,
+      },
+      pendingAutoStart,
+      false,
+      {
+        discarded: false,
+        message: "The runtime operation has already started.",
+      },
+    );
+
+    await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(1));
+    await user.click(await screen.findByRole("button", {
+      name: "Cancel automatic installation",
+    }));
+
+    expect(await screen.findByText("The runtime operation may already have started"))
+      .toBeInTheDocument();
+    expect(screen.getByText("The runtime operation has already started."))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel installation" })).toBeEnabled();
+    expect(screen.getByText("2.0 GiB / 8.0 GiB")).toBeInTheDocument();
+    expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
+
+    resolveAutoStart({
+      disposition: "started",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      snapshot: activeSnapshot,
+      message: null,
+    });
+  });
+
+  it("consumes a blocked confirmed target, then unlocks manual disk recovery", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const user = userEvent.setup();
+    const blockedPlan: RuntimeInstallPlan = {
+      ...plan,
+      canInstall: false,
+      blockers: ["The selected disk no longer has enough free space."],
+    };
+    let resolveAutoStart!: (value: InstallerRuntimeAutoStartResult) => void;
+    const pendingAutoStart = new Promise<InstallerRuntimeAutoStartResult>((resolve) => {
+      resolveAutoStart = resolve;
+    });
+    const invoke = vi.fn(async (
+      command: string,
+      args?: Record<string, unknown>,
+    ) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") {
+        const targetRoot = args?.targetRoot;
+        return targetRoot === "C:\\DroneDream"
+          ? { ...plan, targetRoot }
+          : blockedPlan;
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "custom",
+        targetRoot: "E:\\DroneDream",
+        message: null,
+      },
+      pendingAutoStart,
+    );
+
+    expect(await screen.findByText(/visible plan has blockers/i)).toBeInTheDocument();
+    await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(1));
+    resolveAutoStart({
+      disposition: "invalid",
+      mode: null,
+      targetRoot: null,
+      snapshot: null,
+      message: "The installer-selected target is no longer safe to use.",
+    });
+    expect(await screen.findByText("The confirmed installer choice is no longer valid"))
+      .toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
+    );
+
+    const selector = screen.getByRole("combobox", { name: "Runtime disk" });
+    expect(selector).toBeEnabled();
+    await user.selectOptions(selector, "C:");
+    await waitFor(() => expect(selector).toHaveValue("C:"));
+    expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
+      .toBeEnabled();
+  });
+
+  it("keeps a ready handoff pending when its exact plan rejects, then retries safely", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const user = userEvent.setup();
+    const automaticSnapshot = installSnapshot({
+      phase: "queued",
+      bytesDownloaded: 0,
+      currentPart: null,
+      totalParts: null,
+      message: "Queued after retry",
+    });
+    let planCalls = 0;
+    const invoke = vi.fn(async (
+      command: string,
+      args?: Record<string, unknown>,
+    ) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") {
+        if (args?.targetRoot === "E:\\DroneDream") {
+          planCalls += 1;
+          if (planCalls === 1) {
+            throw new Error("The confirmed E: drive was removed.");
+          }
+          return plan;
+        }
+        return { ...plan, targetRoot: "C:\\DroneDream" };
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "custom",
+        targetRoot: "E:\\DroneDream",
+        message: null,
+      },
+      {
+        disposition: "started",
+        mode: "custom",
+        targetRoot: "E:\\DroneDream",
+        snapshot: automaticSnapshot,
+        message: null,
+      },
+    );
+
+    expect(await screen.findByText(/confirmed E: drive was removed/i)).toBeInTheDocument();
+    expect(screen.getByText("Automatic setup needs attention")).toBeInTheDocument();
+    expect(screen.getAllByText("E:\\DroneDream")).not.toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Cancel automatic installation" }))
+      .toBeEnabled();
+    expect(page.installerInvoke).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", {
+      name: "Check the installer choice again",
+    }));
+    expect(await screen.findByText("One-click runtime installation started"))
+      .toBeInTheDocument();
+    expect(page.installerIntentInvoke).toHaveBeenCalledTimes(2);
+    expect(page.installerInvoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("never auto-starts after a prerequisite probe failure and exposes atomic cancel", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") {
+        throw new Error("system probe unavailable");
+      }
+      if (command === "probe_runtime_status") return missingRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        message: null,
+      },
+      {
+        disposition: "invalid",
+        mode: null,
+        targetRoot: null,
+        snapshot: null,
+        message: "The target could not be revalidated.",
+      },
+    );
+
+    expect(await screen.findByText(/system probe unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText("Automatic setup needs attention")).toBeInTheDocument();
+    expect(screen.getByText("E:\\DroneDream")).toBeInTheDocument();
+    expect(page.installerInvoke).not.toHaveBeenCalled();
+    const cancel = screen.getByRole("button", {
+      name: "Cancel automatic installation",
+    });
+    expect(cancel).toBeEnabled();
+    await user.click(cancel);
+
+    expect(await screen.findByText("Automatic runtime installation was cancelled"))
+      .toBeInTheDocument();
+    expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
+    expect(page.installerInvoke).not.toHaveBeenCalled();
+    expect(screen.queryByText("Automatic setup needs attention"))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel automatic installation" }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel installation" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("uses a newly selected plan target instead of a cancelled snapshot target", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const user = userEvent.setup();
+    const cancelledOnE = installSnapshot({
+      phase: "cancelled",
+      message: "Cancelled on E",
+    });
+    const invoke = vi.fn(async (
+      command: string,
+      args?: Record<string, unknown>,
+    ) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return cancelledOnE;
+      if (command === "get_runtime_install_plan") {
+        return {
+          ...plan,
+          targetRoot: String(args?.targetRoot ?? plan.targetRoot),
+        };
+      }
+      if (command === "start_runtime_install") {
+        return installSnapshot({
+          phase: "queued",
+          targetRoot: "C:\\DroneDream",
+          bytesDownloaded: 0,
+          currentPart: null,
+          totalParts: null,
+          message: "Queued on C",
+        });
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    renderPage();
+
+    const selector = await screen.findByRole("combobox", { name: "Runtime disk" });
+    expect(selector).toHaveValue("E:");
+    expect(screen.getByRole("button", { name: "Resume installation" })).toBeEnabled();
+    await user.selectOptions(selector, "C:");
+    const install = await screen.findByRole("button", {
+      name: "Install DroneDreamRuntime",
+    });
+    await user.click(install);
+
+    expect(invoke).toHaveBeenCalledWith("start_runtime_install", {
+      request: {
+        targetRoot: "C:\\DroneDream",
+        releaseManifestUrl:
+          "https://downloads.example.test/dronedream/runtime-manifest.json",
+      },
+    });
+  });
+
+  it("recovers an active native operation after an auto-start contract error", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const activeSnapshot = installSnapshot({
+      phase: "downloading",
+      bytesDownloaded: 3 * 1024 ** 3,
+      message: "Native download is active",
+    });
+    let progressCalls = 0;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") {
+        progressCalls += 1;
+        return progressCalls === 1 ? idleInstallSnapshot : activeSnapshot;
+      }
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        message: null,
+      },
+      {
+        disposition: "started",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        snapshot: { ...activeSnapshot, phase: "teleporting" },
+        message: null,
+      },
+    );
+
+    expect(await screen.findByText("The installer choice could not be checked"))
+      .toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Cancel installation" }))
+      .toBeEnabled();
+    expect(screen.getByText("3.0 GiB / 8.0 GiB")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
+      .not.toBeInTheDocument();
+    expect(progressCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps manual start locked when auto-start fails with no observable operation", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        message: null,
+      },
+      {
+        disposition: "started",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        snapshot: null,
+        message: null,
+      },
+    );
+
+    expect(await screen.findByText("The installer choice could not be checked"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check the installer choice again" }))
+      .toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Runtime disk" })).toBeDisabled();
+  });
+
+  it("does not auto-install after an app-only choice and explains the option in Chinese", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage("zh-CN", {
+      status: "desktopOnly",
+      mode: "install-app-only",
+      targetRoot: null,
+      message: null,
+    }, {
+      disposition: "desktopOnly",
+      mode: "install-app-only",
+      targetRoot: null,
+      snapshot: null,
+      message: "The desktop application was installed without the runtime.",
+    });
+
+    expect(await screen.findByText("已选择仅安装桌面程序")).toBeInTheDocument();
+    expect(screen.getByText(/以后可以在此页面核对方案并手动安装/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "安装 DroneDreamRuntime" })).toBeEnabled();
+    expect(page.installerIntentInvoke).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(1));
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
+    );
+  });
+
+  it("surfaces fail-closed cleanup recovery for an app-only receipt", async () => {
+    const user = userEvent.setup();
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage("en", {
+      status: "desktopOnly",
+      mode: "install-app-only",
+      targetRoot: null,
+      message: null,
+    }, {
+      disposition: "invalid",
+      mode: null,
+      targetRoot: null,
+      snapshot: null,
+      message: "The desktop-only request cannot replay, but cleanup is pending.",
+    });
+
+    expect(await screen.findByText("The confirmed installer choice is no longer valid"))
+      .toBeInTheDocument();
+    expect(screen.getByText(/cannot replay, but cleanup is pending/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check the installer choice again" }))
+      .toBeEnabled();
+    const discard = screen.getByRole("button", {
+      name: "Cancel automatic installation",
+    });
+    expect(discard).toBeEnabled();
+    await user.click(discard);
+    expect(await screen.findByText("Automatic runtime installation was cancelled"))
+      .toBeInTheDocument();
+    expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
+    );
+  });
+
+  it("cleans a terminal receipt and verifies an already installed runtime", async () => {
+    const user = userEvent.setup();
+    let cleanupStarted = false;
+    const cleanupFailure = installSnapshot({
+      phase: "failed",
+      error: {
+        code: "installer_receipt_cleanup_failed",
+        message: "The runtime is ready, but its terminal receipt is still locked.",
+        retryable: true,
+      },
+      installedVersion: "v0.1.0-beta.1",
+      resumable: true,
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") {
+        return cleanupStarted ? runtime : missingRuntime;
+      }
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage("en", {
+      status: "ready",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      message: null,
+    }, {
+      disposition: "started",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      snapshot: cleanupFailure,
+      message: null,
+    });
+
+    const cleanup = await screen.findByRole("button", {
+      name: "Clean up and recheck the terminal request",
+    });
+    expect(cleanup).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Retry installation" }))
+      .not.toBeInTheDocument();
+    cleanupStarted = true;
+    await user.click(cleanup);
+
+    expect(await screen.findByText("The terminal installer request was cleaned up"))
+      .toBeInTheDocument();
+    expect(await screen.findByText("The installed runtime is ready."))
+      .toBeInTheDocument();
+    expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
+    );
+  });
+
+  it("returns to explicit manual retry after cleaning a failed terminal receipt", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const user = userEvent.setup();
+    const cleanupFailure = installSnapshot({
+      phase: "failed",
+      error: {
+        code: "installer_receipt_cleanup_failed",
+        message: "The failed operation is terminal, but cleanup is pending.",
+        retryable: true,
+      },
+      installedVersion: null,
+      resumable: true,
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage("en", {
+      status: "ready",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      message: null,
+    }, {
+      disposition: "started",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      snapshot: cleanupFailure,
+      message: null,
+    });
+
+    const cleanup = await screen.findByRole("button", {
+      name: "Clean up and recheck the terminal request",
+    });
+    await user.click(cleanup);
+
+    expect(await screen.findByText("The terminal installer request was cleaned up"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
+      .toBeEnabled();
+    expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
+    );
+  });
+
+  it("fails closed for an invalid handoff without silently starting on another disk", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const user = userEvent.setup();
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage("en", {
+      status: "invalid",
+      mode: null,
+      targetRoot: null,
+      message: "The selected E: drive no longer has enough free space.",
+    }, {
+      disposition: "invalid",
+      mode: null,
+      targetRoot: null,
+      snapshot: null,
+      message: "The selected E: drive no longer has enough free space.",
+    });
+
+    expect(await screen.findByText("The confirmed installer choice is no longer valid"))
+      .toBeInTheDocument();
+    expect(screen.getByText(/without choosing a different disk/i)).toBeInTheDocument();
+    expect(screen.getByText(/selected E: drive no longer has enough free space/i))
+      .toBeInTheDocument();
+    await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(1));
+    const retry = screen.getByRole("button", {
+      name: "Check the installer choice again",
+    });
+    const discard = screen.getByRole("button", {
+      name: "Cancel automatic installation",
+    });
+    expect(retry).toBeEnabled();
+    expect(discard).toBeEnabled();
+
+    await user.click(retry);
+    await waitFor(() => expect(page.installerIntentInvoke).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(2));
+    await user.click(screen.getByRole("button", {
+      name: "Cancel automatic installation",
+    }));
+    expect(await screen.findByText("Automatic runtime installation was cancelled"))
+      .toBeInTheDocument();
+    expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
+    );
+  });
+
+  it("restores an interrupted installer-owned operation without a second start call", async () => {
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://downloads.example.test/dronedream/runtime-manifest.json",
+    );
+    const resumedSnapshot = installSnapshot({
+      phase: "downloading",
+      bytesDownloaded: 2 * 1024 ** 3,
+      message: "Resumed verified parts",
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return resumedSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage(
+      "en",
+      {
+        status: "ready",
+        mode: "custom",
+        targetRoot: "E:\\DroneDream",
+        message: "Custom installation was confirmed.",
+      },
+      {
+        disposition: "resumed",
+        mode: "custom",
+        targetRoot: "E:\\DroneDream",
+        snapshot: resumedSnapshot,
+        message: "The interrupted installation resumed.",
+      },
+    );
+
+    expect(await screen.findByText("Runtime installation resumed")).toBeInTheDocument();
+    expect(screen.getByText("2.0 GiB / 8.0 GiB")).toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
     );
   });
 
@@ -431,7 +1433,62 @@ describe("DesktopSetup", () => {
     expect(await screen.findByText("NETWORK_INTERRUPTED")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry installation" }));
     expect(await screen.findByText("Restart Windows to continue")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continue installation" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Continue installation" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText(/reopen this page and start the installation again/i))
+      .toBeInTheDocument();
+  });
+
+  it("cancels an installer-owned restart continuation without using ordinary start", async () => {
+    const user = userEvent.setup();
+    const waitingForRestart = installSnapshot({
+      phase: "waitingForRestart",
+      bytesDownloaded: 0,
+      bytesTotal: null,
+      currentPart: null,
+      totalParts: null,
+      requiresRestart: true,
+      message: "Restart Windows to enable WSL2.",
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const page = renderPage("en", {
+      status: "ready",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      message: "Runtime setup is ready to continue after restart.",
+    }, {
+      disposition: "resumed",
+      mode: "install-all",
+      targetRoot: "E:\\DroneDream",
+      snapshot: waitingForRestart,
+      message: null,
+    });
+
+    expect(await screen.findByText("Restart Windows to continue")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue installation" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText(/will continue automatically/i)).toBeInTheDocument();
+    const discard = screen.getByRole("button", {
+      name: "Cancel pending post-restart setup",
+    });
+    expect(discard).toBeEnabled();
+    await user.click(discard);
+
+    expect(await screen.findByText("Pending post-restart setup was cancelled"))
+      .toBeInTheDocument();
+    expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalledWith(
+      "start_runtime_install",
+      expect.anything(),
+    );
   });
 
   it("re-fetches the plan for a user-selected fixed disk", async () => {

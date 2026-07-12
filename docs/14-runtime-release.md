@@ -7,9 +7,51 @@ is a drive-letter placeholder, not a hard-coded installation path; on the
 current development machine the desktop planner may recommend
 `E:\DroneDream`.
 
-This document covers the release assets consumed by the one-click installer.
-The manifest embedded inside the rootfs remains the source/component/smoke
-record described in `runtime/README.md`.
+This document covers the release assets consumed by the installer-driven,
+one-confirmation Windows flow. The manifest embedded inside the rootfs remains
+the source/component/smoke record described in `runtime/README.md`.
+
+## Windows installer integration
+
+The NSIS executable remains small because it ships the desktop application,
+not the PX4/Gazebo rootfs. A fresh interactive install offers **Install all
+(recommended)**, **Custom runtime drive**, and **Desktop application only**.
+The first two choices show and validate the target before the user confirms;
+the third never creates a Runtime download request. The desktop application
+defaults to `%LOCALAPPDATA%\DroneDream`, while the Runtime is isolated at the
+fixed `X:\DroneDream` path and uses `X:\DroneDream.download-cache` for resumable
+staging.
+
+The current beta artifact recorded by the release fixture is 6,116,882,432
+bytes (about **6.1 GB**, or 5.7 GiB). The Windows planner reserves 8 GiB for
+download/staging and enforces at least **52 GiB** free for the complete
+8-GiB-download, 24-GiB-installed, and 20-GiB-headroom policy. Manifest byte
+counts remain authoritative; user-facing rounded sizes are informational.
+
+After the desktop files are installed and DroneDream opens, the setup UI
+renders the confirmed plan and automatically consumes the protected installer
+handoff. It then downloads and authenticates this separate release, imports
+only `DroneDreamRuntime`, starts it, and performs readiness checks. If WSL2
+enablement needs administrator rights, Windows may show a separate UAC prompt.
+If Windows then requires a reboot, reopening DroneDream resumes the protected
+continuation automatically.
+
+Only fresh interactive installs can create that automatic Runtime request.
+Upgrades, reinstalls, passive installs, and silent installs are treated as
+desktop-application-only operations and never start a Runtime download. A
+valid pending Runtime intent or reboot continuation blocks replacement or
+uninstall until it is resumed or explicitly discarded. Invalid or stale
+handoffs also fail closed and require the desktop recovery/discard path rather
+than being overwritten. Before work starts, the setup page can discard a
+pending request; an active operation uses the Runtime installer's safe Cancel
+path. Desktop uninstall removes neither the dedicated WSL
+distribution nor its `X:\DroneDream` root/cache. It also never modifies or
+reuses an existing Ubuntu distribution.
+
+This behavior does not remove the current release boundary: the desktop NSIS
+installer is unsigned and can trigger Windows SmartScreen. Treat it as a
+closed-beta package until code signing and the full clean-machine journey are
+verified.
 
 ## Published assets
 
@@ -192,3 +234,27 @@ Use `publish: false` first. Verified assets remain on the self-hosted runner
 for inspection and no GitHub Release is created. The workflow never updates or
 overwrites an existing tag/release. A failed, missing, mismatched, or partially
 successful smoke report cannot reach the upload step.
+
+## End-to-end release boundary
+
+Static contracts, Rust/frontend tests, the pinned-NSIS-template check, and the
+runtime smoke gate cover important pieces independently. They are not evidence
+that a particular desktop installer has completed the entire customer journey.
+Before promoting a public Windows release, exercise at least these cases on
+clean supported machines with the exact published assets:
+
+1. default install-all on a machine with WSL2 ready;
+2. custom-drive install with the 6.1-GB signed payload and 52-GiB gate;
+3. desktop-only with no Runtime network request;
+4. WSL enablement through UAC, required reboot, reopen, and automatic resume;
+5. discard before start and cancel during a resumable download;
+6. upgrade, same-version reinstall, passive/silent install, and uninstall with
+   no automatic Runtime import and with the existing Runtime preserved;
+7. a machine that already has a personal Ubuntu distribution, proving it is
+   unchanged throughout the flow;
+8. unsigned SmartScreen tester instructions until Authenticode signing exists.
+
+Record installer version, runtime release tag/build ID, Windows build, selected
+drive, WSL state before/after, and final PX4/Gazebo readiness for each run. Do
+not describe the package as full public production readiness until this matrix
+passes with the release artifacts users will actually download.

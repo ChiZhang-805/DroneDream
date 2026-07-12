@@ -5,7 +5,10 @@ import { Alert } from "../components/Alert";
 import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
 import {
+  autoStartInstallerRuntime,
   cancelRuntimeInstall,
+  discardInstallerRuntimeIntent,
+  getInstallerRuntimeIntent,
   getRuntimeInstallProgress,
   getRuntimeInstallPlan,
   isDesktopRuntime,
@@ -17,6 +20,9 @@ import {
 } from "../desktop/bridge";
 import type {
   DiskInfo,
+  InstallerRuntimeAutoStartResult,
+  InstallerRuntimeDiscardResult,
+  InstallerRuntimeIntent,
   RuntimeComponentState,
   RuntimeInstallPhase,
   RuntimeInstallPlan,
@@ -59,6 +65,18 @@ interface InstallState {
   commandBusy: boolean;
 }
 
+interface InstallerHandoffState {
+  intent: InstallerRuntimeIntent | null;
+  result: InstallerRuntimeAutoStartResult | null;
+  commandError: string | null;
+  checking: boolean;
+  autoStarting: boolean;
+  previewSettled: boolean;
+  autoStartUncertain: boolean;
+  discarding: boolean;
+  discardResult: InstallerRuntimeDiscardResult | null;
+}
+
 const INITIAL_STATE: ProbeState = {
   prerequisites: null,
   runtime: null,
@@ -76,6 +94,18 @@ const INITIAL_INSTALL_STATE: InstallState = {
   commandBusy: false,
 };
 
+const INITIAL_INSTALLER_HANDOFF_STATE: InstallerHandoffState = {
+  intent: null,
+  result: null,
+  commandError: null,
+  checking: false,
+  autoStarting: false,
+  previewSettled: false,
+  autoStartUncertain: false,
+  discarding: false,
+  discardResult: null,
+};
+
 const ACTIVE_INSTALL_PHASES = new Set<RuntimeInstallPhase>([
   "queued",
   "verifyingManifest",
@@ -87,6 +117,7 @@ const ACTIVE_INSTALL_PHASES = new Set<RuntimeInstallPhase>([
 ]);
 
 const GIB = 1024 ** 3;
+const INSTALLER_AUTO_START_TIMEOUT_MS = 15_000;
 
 function configuredRuntimeReleaseManifestUrl(): string | null {
   const configured = import.meta.env.VITE_RUNTIME_RELEASE_MANIFEST_URL?.trim();
@@ -129,11 +160,16 @@ function runtimeTargetRoot(drive: string): string | undefined {
   return /^[A-Z]:$/.test(normalized) ? `${normalized}\\DroneDream` : undefined;
 }
 
-async function getSettledInstallPlan(drive: string) {
+async function getSettledInstallPlan(
+  drive: string,
+  exactTargetRoot?: string,
+) {
   try {
     return {
       status: "fulfilled" as const,
-      value: await getRuntimeInstallPlan(runtimeTargetRoot(drive)),
+      value: await getRuntimeInstallPlan(
+        exactTargetRoot ?? runtimeTargetRoot(drive),
+      ),
     };
   } catch (reason) {
     return { status: "rejected" as const, reason };
@@ -149,6 +185,22 @@ async function getSettledInstallProgress() {
   } catch (reason) {
     return { status: "rejected" as const, reason };
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 function isActiveInstall(snapshot: RuntimeInstallSnapshot | null): boolean {
@@ -179,6 +231,13 @@ export function DesktopSetup() {
   const { t } = useI18n();
   const desktopAvailable = isDesktopRuntime();
   const requestId = useRef(0);
+  const installerIntentPromise = useRef<Promise<InstallerRuntimeIntent> | null>(null);
+  const installerAutoStartPromise = useRef<
+    Promise<InstallerRuntimeAutoStartResult> | null
+  >(null);
+  const installerDiscardRequested = useRef(false);
+  const installerDiscardSucceeded = useRef(false);
+  const componentMounted = useRef(false);
   const selectedDriveRef = useRef("");
   const [state, setState] = useState<ProbeState>(() => ({
     ...INITIAL_STATE,
@@ -187,14 +246,27 @@ export function DesktopSetup() {
   const [installState, setInstallState] = useState<InstallState>(
     INITIAL_INSTALL_STATE,
   );
+  const [installerHandoffState, setInstallerHandoffState] =
+    useState<InstallerHandoffState>(() => ({
+      ...INITIAL_INSTALLER_HANDOFF_STATE,
+      checking: desktopAvailable,
+    }));
+  const [receiptCleanupRecovered, setReceiptCleanupRecovered] = useState(false);
   const [runtimeCommandError, setRuntimeCommandError] = useState<string | null>(null);
   const [runtimeCommandBusy, setRuntimeCommandBusy] = useState(false);
   const [selectedDrive, setSelectedDrive] = useState("");
+  const [installerAttempt, setInstallerAttempt] = useState(0);
   const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
   const installActive = isActiveInstall(installState.snapshot);
+  const receiptCleanupPending =
+    installState.snapshot?.phase === "failed" &&
+    installState.snapshot.error?.code === "installer_receipt_cleanup_failed";
   const busy =
     state.loading ||
     state.planLoading ||
+    installerHandoffState.checking ||
+    installerHandoffState.autoStarting ||
+    installerHandoffState.discarding ||
     installState.commandBusy ||
     runtimeCommandBusy ||
     installActive;
@@ -203,7 +275,14 @@ export function DesktopSetup() {
     state.runtimeFresh &&
     isRuntimeConfirmedMissing(state.runtime);
 
-  const refresh = useCallback(async () => {
+  useEffect(() => {
+    componentMounted.current = true;
+    return () => {
+      componentMounted.current = false;
+    };
+  }, []);
+
+  const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;
     const currentRequest = ++requestId.current;
     setState((current) => ({
@@ -239,6 +318,14 @@ export function DesktopSetup() {
     let nextDrive = prerequisites.status === "fulfilled"
       ? chooseRuntimeDrive(fixedDisks, selectedDriveRef.current)
       : selectedDriveRef.current;
+    const installerDrive = installerTargetRoot?.slice(0, 2).toUpperCase();
+    if (
+      prerequisites.status === "fulfilled" &&
+      installerDrive &&
+      fixedDisks.some((disk) => disk.drive === installerDrive)
+    ) {
+      nextDrive = installerDrive;
+    }
     if (prerequisites.status === "fulfilled") {
       selectedDriveRef.current = nextDrive;
       setSelectedDrive(nextDrive);
@@ -247,7 +334,7 @@ export function DesktopSetup() {
       prerequisites.status === "fulfilled" &&
       runtime.status === "fulfilled" &&
       isRuntimeConfirmedMissing(runtime.value) &&
-      fixedDisks.length > 0;
+      (fixedDisks.length > 0 || installerTargetRoot !== undefined);
 
     setState((current) => ({
       ...current,
@@ -292,7 +379,11 @@ export function DesktopSetup() {
       }));
     }
 
-    const plan = await getSettledInstallPlan(nextDrive);
+    const progressTargetRoot = progress.status === "fulfilled"
+      ? progress.value.targetRoot ?? undefined
+      : undefined;
+    const exactTargetRoot = installerTargetRoot ?? progressTargetRoot;
+    const plan = await getSettledInstallPlan(nextDrive, exactTargetRoot);
     if (requestId.current !== currentRequest) return;
 
     if (plan.status === "fulfilled") {
@@ -318,7 +409,8 @@ export function DesktopSetup() {
       !desktopAvailable ||
       !state.prerequisitesFresh ||
       !state.runtimeFresh ||
-      state.runtime?.installed !== false
+      state.runtime?.installed !== false ||
+      isActiveInstall(installState.snapshot)
     ) return;
     const fixedDisks = fixedDiskOptions(state.prerequisites?.disks ?? []);
     if (!fixedDisks.some((disk) => disk.drive === drive)) return;
@@ -326,6 +418,13 @@ export function DesktopSetup() {
     const currentRequest = ++requestId.current;
     selectedDriveRef.current = drive;
     setSelectedDrive(drive);
+    const selectedTargetRoot = runtimeTargetRoot(drive);
+    if (
+      installState.snapshot?.targetRoot &&
+      installState.snapshot.targetRoot !== selectedTargetRoot
+    ) {
+      setInstallState(INITIAL_INSTALL_STATE);
+    }
     setState((current) => ({
       ...current,
       plan: null,
@@ -350,6 +449,7 @@ export function DesktopSetup() {
     }));
   }, [
     desktopAvailable,
+    installState.snapshot,
     state.prerequisites,
     state.prerequisitesFresh,
     state.runtime,
@@ -357,7 +457,7 @@ export function DesktopSetup() {
   ]);
 
   const beginOrResumeInstall = useCallback(async () => {
-    const targetRoot = installState.snapshot?.targetRoot ?? state.plan?.targetRoot;
+    const targetRoot = state.plan?.targetRoot;
     if (
       !desktopAvailable ||
       installState.commandBusy ||
@@ -493,11 +593,418 @@ export function DesktopSetup() {
   }, [installState.snapshot, refresh]);
 
   useEffect(() => {
-    void refresh();
+    if (!desktopAvailable) return;
+    let disposed = false;
+    // Peeking is strictly read-only. It lets the page render the exact confirmed
+    // disk, download size, plan, and controls before the atomic start command is
+    // allowed to claim the handoff or begin network activity.
+    const intentPromise = installerIntentPromise.current ??=
+      getInstallerRuntimeIntent();
+
+    void (async () => {
+      let installerTargetRoot: string | undefined;
+      try {
+        const intent = await intentPromise;
+        if (disposed) return;
+        installerTargetRoot = intent.status === "ready"
+          ? intent.targetRoot ?? undefined
+          : undefined;
+        setInstallerHandoffState({
+          intent,
+          result: null,
+          commandError: null,
+          checking: false,
+          autoStarting: false,
+          previewSettled: false,
+          autoStartUncertain: false,
+          discarding: false,
+          discardResult: null,
+        });
+      } catch (error) {
+        if (disposed) return;
+        setInstallerHandoffState({
+          intent: null,
+          result: null,
+          commandError: `get_installer_runtime_intent: ${errorMessage(error)}`,
+          checking: false,
+          autoStarting: false,
+          previewSettled: false,
+          autoStartUncertain: false,
+          discarding: false,
+          discardResult: null,
+        });
+      }
+      if (!disposed) {
+        await refresh(installerTargetRoot);
+        if (!disposed) {
+          setInstallerHandoffState((current) => ({
+            ...current,
+            previewSettled: true,
+          }));
+        }
+      }
+    })();
+
     return () => {
+      disposed = true;
       requestId.current += 1;
     };
-  }, [refresh]);
+  }, [desktopAvailable, installerAttempt, refresh]);
+
+  const installerIntent = installerHandoffState.intent;
+  const installerIntentReady = installerIntent?.status === "ready";
+  const exactInstallerPlanReady = Boolean(
+    installerIntentReady &&
+    installerHandoffState.previewSettled &&
+    showInstallPlanner &&
+    state.plan &&
+    state.plan.targetRoot === installerIntent?.targetRoot,
+  );
+  const installerIntentShouldBeConsumed = Boolean(
+    installerIntent &&
+    installerHandoffState.previewSettled &&
+    (installerIntent.status === "desktopOnly" ||
+      installerIntent.status === "invalid" ||
+      (installerIntent.status === "ready" && exactInstallerPlanReady)),
+  );
+
+  const reconcileLateInstallerCompletion = useCallback(async (
+    reportedSnapshot: RuntimeInstallSnapshot | null,
+  ) => {
+    const progress = await getSettledInstallProgress();
+    const recoveredSnapshot = progress.status === "fulfilled" &&
+        isActiveInstall(progress.value)
+      ? progress.value
+      : isActiveInstall(reportedSnapshot)
+        ? reportedSnapshot
+        : null;
+    if (!componentMounted.current || !recoveredSnapshot) return;
+
+    setInstallState({
+      snapshot: recoveredSnapshot,
+      commandError: null,
+      commandBusy: false,
+    });
+    setInstallerHandoffState((current) => ({
+      ...current,
+      result: null,
+      commandError: null,
+      autoStarting: false,
+      autoStartUncertain: false,
+      discarding: false,
+      discardResult: {
+        discarded: false,
+        message: t("desktop.autoInstallRecoveredAfterDiscard"),
+      },
+    }));
+  }, [t]);
+
+  useEffect(() => {
+    if (
+      !desktopAvailable ||
+      !installerIntentShouldBeConsumed ||
+      installerHandoffState.result ||
+      installerHandoffState.commandError ||
+      installerHandoffState.discarding ||
+      installerHandoffState.discardResult ||
+      installerDiscardRequested.current ||
+      installerAutoStartPromise.current
+    ) return;
+
+    let disposed = false;
+    let frame = requestAnimationFrame(() => {
+      if (disposed || installerDiscardRequested.current) return;
+      setInstallerHandoffState((current) => ({
+        ...current,
+        autoStarting: true,
+      }));
+      // This is the trust boundary. Rust revalidates and atomically claims the
+      // handoff, so the target is never sent back through the ordinary start
+      // command and a stale or changed disk fails closed.
+      const autoStartPromise = installerAutoStartPromise.current ??=
+        autoStartInstallerRuntime();
+      void (async () => {
+        try {
+          const result = await withTimeout(
+            autoStartPromise,
+            INSTALLER_AUTO_START_TIMEOUT_MS,
+            "the atomic installer handoff timed out",
+          );
+          if (installerDiscardSucceeded.current) {
+            await reconcileLateInstallerCompletion(result.snapshot);
+            return;
+          }
+          if (
+            !componentMounted.current ||
+            installerAutoStartPromise.current !== autoStartPromise
+          ) return;
+          if (installerIntent?.status === "ready") {
+            if (
+              (result.disposition === "started" || result.disposition === "resumed") &&
+              result.targetRoot !== installerIntent.targetRoot
+            ) {
+              throw new Error(
+                "the atomically claimed target does not match the confirmed installer target",
+              );
+            }
+            if (
+              (result.disposition === "started" ||
+                result.disposition === "resumed" ||
+                result.disposition === "alreadyInstalled") &&
+              result.mode !== installerIntent.mode
+            ) {
+              throw new Error(
+                "the atomically claimed mode does not match the confirmed installer mode",
+              );
+            }
+            if (result.disposition === "none" || result.disposition === "desktopOnly") {
+              throw new Error(
+                result.message ??
+                  "the confirmed installer choice changed before automatic setup could claim it",
+              );
+            }
+          } else if (installerIntent?.status === "desktopOnly") {
+            if (
+              result.disposition !== "invalid" &&
+              (result.disposition !== "desktopOnly" ||
+                result.mode !== "install-app-only")
+            ) {
+              throw new Error(
+                result.message ?? "the desktop-only installer choice could not be consumed",
+              );
+            }
+          } else if (
+            installerIntent?.status === "invalid" &&
+            result.disposition !== "invalid"
+          ) {
+            throw new Error(
+              result.message ?? "the invalid installer receipt could not be cleared",
+            );
+          }
+          setInstallerHandoffState((current) => ({
+            ...current,
+            result,
+            commandError: null,
+            autoStarting: false,
+            autoStartUncertain: false,
+            discarding: false,
+            discardResult: null,
+          }));
+          if (result.snapshot) {
+            setInstallState({
+              snapshot: result.snapshot,
+              commandError: null,
+              commandBusy: false,
+            });
+          }
+          if (result.disposition === "alreadyInstalled") void refresh();
+        } catch (error) {
+          if (installerDiscardSucceeded.current) {
+            await reconcileLateInstallerCompletion(null);
+            return;
+          }
+          if (
+            !componentMounted.current ||
+            installerAutoStartPromise.current !== autoStartPromise
+          ) return;
+          const progress = await getSettledInstallProgress();
+          if (
+            !componentMounted.current ||
+            installerAutoStartPromise.current !== autoStartPromise
+          ) return;
+          const recoveredSnapshot = progress.status === "fulfilled" &&
+            progress.value.phase !== "idle"
+            ? progress.value
+            : null;
+          if (recoveredSnapshot) {
+            setInstallState({
+              snapshot: recoveredSnapshot,
+              commandError: null,
+              commandBusy: false,
+            });
+          }
+          const progressDetail = progress.status === "rejected"
+            ? `; get_runtime_install_progress: ${errorMessage(progress.reason)}`
+            : "";
+          setInstallerHandoffState((current) => ({
+            ...current,
+            result: null,
+            commandError:
+              `auto_start_installer_runtime: ${errorMessage(error)}${progressDetail}`,
+            autoStarting: false,
+            autoStartUncertain: recoveredSnapshot === null,
+            discarding: false,
+          }));
+        }
+      })();
+    });
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(frame);
+      frame = 0;
+    };
+  }, [
+    desktopAvailable,
+    installerHandoffState.commandError,
+    installerHandoffState.discarding,
+    installerHandoffState.discardResult,
+    installerHandoffState.result,
+    installerIntentShouldBeConsumed,
+    installerIntent?.mode,
+    installerIntent?.status,
+    installerIntent?.targetRoot,
+    reconcileLateInstallerCompletion,
+    refresh,
+  ]);
+
+  const automaticStartPending = Boolean(
+    installerIntentReady &&
+    !installerHandoffState.result &&
+    (!installerHandoffState.commandError || installerHandoffState.autoStartUncertain) &&
+    (!installerHandoffState.discardResult ||
+      installerHandoffState.autoStartUncertain),
+  );
+  const restartContinuationPending = Boolean(
+    installerIntentReady &&
+    installState.snapshot?.phase === "waitingForRestart",
+  );
+  const invalidInstallerHandoffRecoverable = Boolean(
+    installerHandoffState.result?.disposition === "invalid" ||
+    installerIntent?.status === "invalid",
+  );
+  const installerHandoffDiscardAvailable = Boolean(
+    automaticStartPending ||
+    restartContinuationPending ||
+    invalidInstallerHandoffRecoverable ||
+    receiptCleanupPending,
+  );
+  const installerManagedInstall = Boolean(
+    installerIntentReady &&
+    (automaticStartPending ||
+      installerHandoffState.result?.disposition === "started" ||
+      installerHandoffState.result?.disposition === "resumed" ||
+      (installState.snapshot?.phase !== undefined &&
+        installState.snapshot.phase !== "idle" &&
+        installState.snapshot.targetRoot === installerIntent?.targetRoot)),
+  );
+  const automaticStartScheduled = Boolean(
+    automaticStartPending &&
+    !installerHandoffState.commandError &&
+    !installerHandoffState.discardResult,
+  );
+  const retryInstallerHandoff = useCallback(() => {
+    if (installerHandoffState.autoStarting) return;
+    installerIntentPromise.current = null;
+    installerAutoStartPromise.current = null;
+    installerDiscardRequested.current = false;
+    installerDiscardSucceeded.current = false;
+    setReceiptCleanupRecovered(false);
+    setInstallerHandoffState({
+      ...INITIAL_INSTALLER_HANDOFF_STATE,
+      checking: true,
+    });
+    setInstallerAttempt((current) => current + 1);
+  }, [installerHandoffState.autoStarting]);
+  const discardAutomaticInstall = useCallback(async () => {
+    if (!installerHandoffDiscardAvailable || installerHandoffState.discarding) return;
+    installerDiscardRequested.current = true;
+    installerDiscardSucceeded.current = false;
+    setInstallerHandoffState((current) => ({
+      ...current,
+      discarding: true,
+      discardResult: null,
+    }));
+
+    try {
+      const discardResult = await withTimeout(
+        discardInstallerRuntimeIntent(),
+        INSTALLER_AUTO_START_TIMEOUT_MS,
+        "discarding the pending installer handoff timed out",
+      );
+      if (discardResult.discarded) {
+        installerDiscardSucceeded.current = true;
+        installerAutoStartPromise.current = null;
+        setInstallerHandoffState((current) => ({
+          ...current,
+          intent: {
+            status: "none",
+            mode: null,
+            targetRoot: null,
+            message: null,
+          },
+          result: null,
+          commandError: null,
+          autoStarting: false,
+          autoStartUncertain: false,
+          discarding: false,
+          discardResult,
+        }));
+        if (receiptCleanupPending) {
+          const runtimeWasInstalled = Boolean(
+            installState.snapshot?.installedVersion,
+          );
+          setReceiptCleanupRecovered(true);
+          setInstallState(INITIAL_INSTALL_STATE);
+          if (runtimeWasInstalled) await refresh();
+          return;
+        }
+        void reconcileLateInstallerCompletion(null);
+        return;
+      }
+
+      installerDiscardRequested.current = false;
+      const progress = await getSettledInstallProgress();
+      const recoveredSnapshot = progress.status === "fulfilled" &&
+        progress.value.phase !== "idle"
+        ? progress.value
+        : null;
+      if (recoveredSnapshot) {
+        setInstallState({
+          snapshot: recoveredSnapshot,
+          commandError: null,
+          commandBusy: false,
+        });
+      }
+      setInstallerHandoffState((current) => ({
+        ...current,
+        autoStarting: false,
+        autoStartUncertain: recoveredSnapshot === null,
+        discarding: false,
+        discardResult,
+      }));
+    } catch (error) {
+      installerDiscardRequested.current = false;
+      const progress = await getSettledInstallProgress();
+      const recoveredSnapshot = progress.status === "fulfilled" &&
+        progress.value.phase !== "idle"
+        ? progress.value
+        : null;
+      if (recoveredSnapshot) {
+        setInstallState({
+          snapshot: recoveredSnapshot,
+          commandError: null,
+          commandBusy: false,
+        });
+      }
+      setInstallerHandoffState((current) => ({
+        ...current,
+        commandError:
+          `discard_installer_runtime_intent: ${errorMessage(error)}`,
+        autoStarting: false,
+        autoStartUncertain: recoveredSnapshot === null,
+        discarding: false,
+        discardResult: null,
+      }));
+    }
+  }, [
+    installerHandoffDiscardAvailable,
+    installerHandoffState.discarding,
+    installState.snapshot,
+    receiptCleanupPending,
+    reconcileLateInstallerCompletion,
+    refresh,
+  ]);
 
   return (
     <section
@@ -514,7 +1021,11 @@ export function DesktopSetup() {
           <button
             type="button"
             className="btn"
-            onClick={() => void refresh()}
+            onClick={() => void refresh(
+              automaticStartPending
+                ? installerIntent?.targetRoot ?? undefined
+                : undefined,
+            )}
             disabled={busy}
           >
             {state.loading
@@ -536,6 +1047,16 @@ export function DesktopSetup() {
             loading={state.loading}
             prerequisitesFresh={state.prerequisitesFresh}
             runtimeFresh={state.runtimeFresh}
+          />
+
+          <InstallerHandoffNotice
+            state={installerHandoffState}
+            discardAvailable={installerHandoffDiscardAvailable}
+            discardBusy={installerHandoffState.discarding}
+            receiptCleanupRecovered={receiptCleanupRecovered}
+            waitingForRestart={installState.snapshot?.phase === "waitingForRestart"}
+            onRetry={retryInstallerHandoff}
+            onDiscard={() => void discardAutomaticInstall()}
           />
 
           {state.issues.length > 0 ? (
@@ -581,7 +1102,11 @@ export function DesktopSetup() {
             <RuntimeStorageSelector
               disks={fixedDiskOptions(state.prerequisites.disks)}
               selectedDrive={selectedDrive}
-              disabled={busy}
+              disabled={
+                busy ||
+                automaticStartPending ||
+                installState.snapshot?.phase === "waitingForRestart"
+              }
               onChange={(drive) => void selectRuntimeDrive(drive)}
             />
           ) : null}
@@ -589,17 +1114,46 @@ export function DesktopSetup() {
             <Loading label={t("desktop.planUpdating")} />
           ) : null}
           {showInstallPlanner && state.plan ? (
-            <InstallPlanOverview plan={state.plan} />
+            <InstallPlanOverview
+              plan={state.plan}
+              automaticInstallConfirmed={automaticStartScheduled}
+            />
           ) : null}
-          {showInstallPlanner && (state.plan || installState.snapshot) ? (
+          {automaticStartPending && !exactInstallerPlanReady ? (
+            <InstallerPlanFallback
+              targetRoot={installerIntent?.targetRoot ?? ""}
+              issues={state.issues}
+              checking={
+                !installerHandoffState.previewSettled ||
+                state.loading ||
+                state.planLoading
+              }
+              discardBusy={installerHandoffState.discarding}
+              onRetry={retryInstallerHandoff}
+              onDiscard={() => void discardAutomaticInstall()}
+            />
+          ) : null}
+          {(showInstallPlanner && state.plan) ||
+          (installState.snapshot && installState.snapshot.phase !== "idle") ? (
             <RuntimeInstallControls
               plan={state.plan}
               snapshot={installState.snapshot}
               commandError={installState.commandError}
               commandBusy={installState.commandBusy}
-              releaseManifestUrlAvailable={releaseManifestUrl !== null}
+              automaticStartPending={automaticStartPending}
+              automaticStartUncertain={installerHandoffState.autoStartUncertain}
+              automaticDiscardBusy={installerHandoffState.discarding}
+              receiptCleanupPending={receiptCleanupPending}
+              receiptCleanupInstalled={Boolean(
+                installState.snapshot?.installedVersion,
+              )}
+              restartContinuationPending={restartContinuationPending}
+              releaseManifestUrlAvailable={
+                releaseManifestUrl !== null || installerManagedInstall
+              }
               onStart={() => void beginOrResumeInstall()}
               onCancel={() => void cancelInstall()}
+              onDiscardAutomatic={() => void discardAutomaticInstall()}
             />
           ) : null}
         </>
@@ -622,6 +1176,240 @@ function BrowserExplanation() {
         <p className="desktop-browser-hint">{t("desktop.browserHint")}</p>
       </div>
     </div>
+  );
+}
+
+function InstallerHandoffNotice({
+  state,
+  discardAvailable,
+  discardBusy,
+  receiptCleanupRecovered,
+  waitingForRestart,
+  onRetry,
+  onDiscard,
+}: {
+  state: InstallerHandoffState;
+  discardAvailable: boolean;
+  discardBusy: boolean;
+  receiptCleanupRecovered: boolean;
+  waitingForRestart: boolean;
+  onRetry: () => void;
+  onDiscard: () => void;
+}) {
+  const { t } = useI18n();
+  if (state.checking) {
+    return (
+      <Alert tone="info" title={t("desktop.installerChoiceChecking")}>
+        {t("desktop.installerChoiceCheckingHint")}
+      </Alert>
+    );
+  }
+  if (state.discardResult?.discarded) {
+    return (
+      <Alert
+        tone="success"
+        title={t(receiptCleanupRecovered
+          ? "desktop.receiptCleanupRecovered"
+          : waitingForRestart
+            ? "desktop.restartContinuationCancelled"
+            : "desktop.autoInstallCancelled")}
+      >
+        {t(receiptCleanupRecovered
+          ? "desktop.receiptCleanupRecoveredHint"
+          : waitingForRestart
+            ? "desktop.restartContinuationCancelledHint"
+            : "desktop.autoInstallCancelledHint")}
+      </Alert>
+    );
+  }
+  if (state.discardResult && !state.discardResult.discarded) {
+    return (
+      <Alert
+        tone="warning"
+        title={t(state.autoStartUncertain
+          ? "desktop.autoInstallCancelNotConfirmed"
+          : "desktop.autoInstallAlreadyStarted")}
+      >
+        <p>
+          {state.discardResult.message ?? t(state.autoStartUncertain
+            ? "desktop.autoInstallCancelNotConfirmedHint"
+            : "desktop.autoInstallAlreadyStartedHint")}
+        </p>
+        {state.autoStartUncertain ? (
+          <button type="button" className="btn" onClick={onRetry}>
+            {t("desktop.retryInstallerCheck")}
+          </button>
+        ) : null}
+      </Alert>
+    );
+  }
+  if (state.commandError) {
+    return (
+      <Alert tone="warning" title={t("desktop.installerChoiceFailed")}>
+        <p><code>{state.commandError}</code></p>
+        <button type="button" className="btn" onClick={onRetry}>
+          {t("desktop.retryInstallerCheck")}
+        </button>
+      </Alert>
+    );
+  }
+  const result = state.result;
+  if (result?.disposition === "invalid") {
+    return (
+      <Alert tone="warning" title={t("desktop.installerChoiceInvalid")}>
+        <p>{t("desktop.installerChoiceInvalidHint")}</p>
+        {result.message ? <p>{result.message}</p> : null}
+        <div className="desktop-install-actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={state.autoStarting || discardBusy}
+            onClick={onRetry}
+          >
+            {t("desktop.retryInstallerCheck")}
+          </button>
+          {discardAvailable ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={discardBusy}
+              onClick={onDiscard}
+            >
+              {discardBusy
+                ? t("desktop.cancellingAutomaticInstall")
+                : t("desktop.cancelAutomaticInstall")}
+            </button>
+          ) : null}
+        </div>
+      </Alert>
+    );
+  }
+  if (result?.disposition === "alreadyInstalled") {
+    return (
+      <Alert tone="success" title={t("desktop.installerRuntimeAlreadyInstalled")}>
+        {t("desktop.installerRuntimeAlreadyInstalledHint")}
+      </Alert>
+    );
+  }
+  if (result?.disposition === "resumed") {
+    return (
+      <Alert tone="success" title={t("desktop.autoInstallResumed")}>
+        {t("desktop.autoInstallResumedHint")}
+      </Alert>
+    );
+  }
+  if (result?.disposition === "started") {
+    return (
+      <Alert tone="success" title={t("desktop.autoInstallStarted")}>
+        {t("desktop.autoInstallStartedHint")}
+      </Alert>
+    );
+  }
+
+  const intent = state.intent;
+  if (!intent || intent.status === "none") return null;
+  if (intent.status === "desktopOnly") {
+    return (
+      <Alert tone="info" title={t("desktop.desktopOnlySelected")}>
+        {t("desktop.desktopOnlySelectedHint")}
+      </Alert>
+    );
+  }
+  if (intent.status === "invalid") {
+    return (
+      <Alert tone="warning" title={t("desktop.installerChoiceInvalid")}>
+        <p>{t("desktop.installerChoiceInvalidHint")}</p>
+        {intent.message ? <p>{intent.message}</p> : null}
+        <div className="desktop-install-actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={state.autoStarting || discardBusy}
+            onClick={onRetry}
+          >
+            {t("desktop.retryInstallerCheck")}
+          </button>
+          {discardAvailable ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={discardBusy}
+              onClick={onDiscard}
+            >
+              {discardBusy
+                ? t("desktop.cancellingAutomaticInstall")
+                : t("desktop.cancelAutomaticInstall")}
+            </button>
+          ) : null}
+        </div>
+      </Alert>
+    );
+  }
+  return (
+    <Alert tone="info" title={t("desktop.installerChoiceReady")}>
+      {t("desktop.installerChoiceReadyHint")}
+    </Alert>
+  );
+}
+
+function InstallerPlanFallback({
+  targetRoot,
+  issues,
+  checking,
+  discardBusy,
+  onRetry,
+  onDiscard,
+}: {
+  targetRoot: string;
+  issues: ProbeIssue[];
+  checking: boolean;
+  discardBusy: boolean;
+  onRetry: () => void;
+  onDiscard: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <SectionCard
+      title={t("desktop.installerFallbackTitle")}
+      description={t("desktop.installerFallbackHint")}
+    >
+      <p className="desktop-installer-target">
+        {t("desktop.confirmedTarget")}: <code>{targetRoot}</code>
+      </p>
+      {checking ? (
+        <Loading label={t("desktop.checkingExactPlan")} />
+      ) : issues.length > 0 ? (
+        <ul className="desktop-diagnostic-list">
+          {issues.map((issue) => (
+            <li key={issue.source}>
+              <code>{issue.command}: {issue.message}</code>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>{t("desktop.exactPlanUnavailable")}</p>
+      )}
+      <div className="desktop-install-actions">
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={checking || discardBusy}
+          onClick={onRetry}
+        >
+          {t("desktop.retryInstallerCheck")}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={discardBusy}
+          onClick={onDiscard}
+        >
+          {discardBusy
+            ? t("desktop.cancellingAutomaticInstall")
+            : t("desktop.cancelAutomaticInstall")}
+        </button>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -999,7 +1787,13 @@ function InstalledRuntimeNotice({
   );
 }
 
-function InstallPlanOverview({ plan }: { plan: RuntimeInstallPlan }) {
+function InstallPlanOverview({
+  plan,
+  automaticInstallConfirmed,
+}: {
+  plan: RuntimeInstallPlan;
+  automaticInstallConfirmed: boolean;
+}) {
   const { t } = useI18n();
   const canProceed = plan.canInstall && plan.blockers.length === 0;
   const blockers = plan.blockers.length > 0
@@ -1030,7 +1824,9 @@ function InstallPlanOverview({ plan }: { plan: RuntimeInstallPlan }) {
         tone={canProceed ? "success" : "warning"}
         title={canProceed ? t("desktop.canInstall") : t("desktop.planBlocked")}
       >
-        {t("desktop.noChanges")}
+        {t(automaticInstallConfirmed
+          ? "desktop.confirmedInstallChanges"
+          : "desktop.noChanges")}
       </Alert>
 
       {blockers.length > 0 ? (
@@ -1083,26 +1879,40 @@ function RuntimeInstallControls({
   snapshot,
   commandError,
   commandBusy,
+  automaticStartPending,
+  automaticStartUncertain,
+  automaticDiscardBusy,
+  receiptCleanupPending,
+  receiptCleanupInstalled,
+  restartContinuationPending,
   releaseManifestUrlAvailable,
   onStart,
   onCancel,
+  onDiscardAutomatic,
 }: {
   plan: RuntimeInstallPlan | null;
   snapshot: RuntimeInstallSnapshot | null;
   commandError: string | null;
   commandBusy: boolean;
+  automaticStartPending: boolean;
+  automaticStartUncertain: boolean;
+  automaticDiscardBusy: boolean;
+  receiptCleanupPending: boolean;
+  receiptCleanupInstalled: boolean;
+  restartContinuationPending: boolean;
   releaseManifestUrlAvailable: boolean;
   onStart: () => void;
   onCancel: () => void;
+  onDiscardAutomatic: () => void;
 }) {
   const { t } = useI18n();
   const phase = snapshot?.phase ?? "idle";
   const active = isActiveInstall(snapshot);
-  const canInstall = Boolean(
+  const planCanInstall = Boolean(
     plan?.canInstall &&
-    plan.blockers.length === 0 &&
-    releaseManifestUrlAvailable,
+    plan.blockers.length === 0,
   );
+  const canInstall = planCanInstall && releaseManifestUrlAvailable;
   const canRetry =
     phase !== "failed" ||
     Boolean(snapshot?.resumable || snapshot?.error?.retryable);
@@ -1112,6 +1922,10 @@ function RuntimeInstallControls({
     ? Math.min(100, Math.round((downloaded / total) * 100))
     : null;
   const currentProgressIndex = INSTALL_PROGRESS_PHASES.indexOf(phase);
+  const automaticStartWillRun =
+    automaticStartPending && !automaticStartUncertain;
+  const automaticStartNeedsFailClosedValidation =
+    automaticStartWillRun && !planCanInstall;
 
   let startLabel = t("desktop.installNow");
   if (phase === "failed") startLabel = t("desktop.retryInstall");
@@ -1132,12 +1946,16 @@ function RuntimeInstallControls({
         className={`desktop-installer-status desktop-installer-${phase}`}
         role="status"
         aria-live="polite"
-        aria-busy={active || commandBusy}
+        aria-busy={active || commandBusy || automaticStartWillRun}
       >
         <div className="desktop-installer-heading">
           <div>
             <span>{t("desktop.currentStage")}</span>
-            <strong>{t(installPhaseKey(phase))}</strong>
+            <strong>
+              {automaticStartWillRun && phase === "idle"
+                ? t("desktop.installPhase.confirmed")
+                : t(installPhaseKey(phase))}
+            </strong>
           </div>
           {percent !== null ? <strong>{percent}%</strong> : null}
         </div>
@@ -1233,6 +2051,64 @@ function RuntimeInstallControls({
           >
             {commandBusy ? t("desktop.cancelling") : t("desktop.cancelInstall")}
           </button>
+        ) : receiptCleanupPending ? (
+          <>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={automaticDiscardBusy}
+              onClick={onDiscardAutomatic}
+            >
+              {automaticDiscardBusy
+                ? t("desktop.clearingTerminalInstallerRequest")
+                : t("desktop.clearTerminalInstallerRequest")}
+            </button>
+            <span className="desktop-resume-hint">
+              {t(receiptCleanupInstalled
+                ? "desktop.receiptCleanupInstalledHint"
+                : "desktop.receiptCleanupPendingHint")}
+            </span>
+          </>
+        ) : phase === "waitingForRestart" ? (
+          <>
+            {restartContinuationPending ? (
+              <button
+                type="button"
+                className="btn"
+                disabled={automaticDiscardBusy}
+                onClick={onDiscardAutomatic}
+              >
+                {automaticDiscardBusy
+                  ? t("desktop.cancellingRestartContinuation")
+                  : t("desktop.cancelRestartContinuation")}
+              </button>
+            ) : null}
+            <span className="desktop-resume-hint">
+              {t(restartContinuationPending
+                ? "desktop.restartContinuationAutomaticHint"
+                : "desktop.restartContinuationManualHint")}
+            </span>
+          </>
+        ) : automaticStartPending ? (
+          <>
+            <button
+              type="button"
+              className="btn"
+              disabled={automaticDiscardBusy}
+              onClick={onDiscardAutomatic}
+            >
+              {automaticDiscardBusy
+                ? t("desktop.cancellingAutomaticInstall")
+                : t("desktop.cancelAutomaticInstall")}
+            </button>
+            <span className="desktop-resume-hint">
+              {t(automaticStartUncertain
+                ? "desktop.autoStartUncertainHint"
+                : automaticStartNeedsFailClosedValidation
+                  ? "desktop.autoStartFailClosedHint"
+                  : "desktop.autoStartPendingHint")}
+            </span>
+          </>
         ) : phase === "completed" ? (
           <Link to="/jobs/new" className="btn btn-primary">
             {t("desktop.continue")}

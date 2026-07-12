@@ -4,11 +4,17 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - ".gitattributes"
       - ".github/workflows/desktop-installer.yml"
       - "desktop/**"
       - "frontend/**"
       - "backend/**"
+      - "docs/14-runtime-release.md"
       - "LICENSE"
+      - "runtime/release-public-keys.json"
+      - "runtime/tests/fixtures/jcs-release-vector.input.json"
+      - "runtime/tests/fixtures/runtime-release.json"
+      - "runtime/tests/fixtures/runtime-release.json.sig"
       - "runtime/THIRD_PARTY_NOTICES.md"
       - "runtime/licenses/valkey-COPYING"
   push:
@@ -33,17 +39,12 @@ jobs:
       - name: Verify release version consistency
         shell: pwsh
         run: |
-          $tauriVersion = (Get-Content -LiteralPath "desktop/src-tauri/tauri.conf.json" -Raw |
-            ConvertFrom-Json).version
-          $packageVersion = (Get-Content -LiteralPath "desktop/package.json" -Raw |
-            ConvertFrom-Json).version
-          $cargoVersionMatch = Select-String -LiteralPath "desktop/src-tauri/Cargo.toml" `
-            -Pattern '^version\s*=\s*"([^"]+)"\s*$' |
-            Select-Object -First 1
-          if (-not $cargoVersionMatch) {
-            throw "Cargo package version was not found"
+          $releaseTag = if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $env:GITHUB_REF_NAME
+          } else {
+            ""
           }
-          $cargoVersion = $cargoVersionMatch.Matches[0].Groups[1].Value
+          ./desktop/scripts/verify-desktop-version.ps1 -ReleaseTag $releaseTag
 
           $backendProjectVersionMatch = Select-String `
             -LiteralPath "backend/pyproject.toml" `
@@ -59,24 +60,10 @@ jobs:
           $backendProjectVersion = $backendProjectVersionMatch.Matches[0].Groups[1].Value
           $backendCodeVersion = $backendCodeVersionMatch.Matches[0].Groups[1].Value
 
-          if ($tauriVersion -cne $packageVersion -or $tauriVersion -cne $cargoVersion) {
-            throw "Desktop versions disagree: tauri=$tauriVersion package=$packageVersion cargo=$cargoVersion"
-          }
           if ($backendProjectVersion -cne $backendCodeVersion) {
             throw "Backend versions disagree: pyproject=$backendProjectVersion code=$backendCodeVersion"
           }
-
-          if ($env:GITHUB_REF_TYPE -eq "tag") {
-            $prefix = "desktop-v"
-            if (-not $env:GITHUB_REF_NAME.StartsWith($prefix)) {
-              throw "Unexpected desktop release tag: $env:GITHUB_REF_NAME"
-            }
-            $tagVersion = $env:GITHUB_REF_NAME.Substring($prefix.Length)
-            if ($tagVersion -cne $tauriVersion) {
-              throw "Tag version $tagVersion does not match desktop version $tauriVersion"
-            }
-          }
-          Write-Host "Versions verified: desktop=$tauriVersion backend=$backendCodeVersion"
+          Write-Host "Backend versions verified: $backendCodeVersion"
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -154,6 +141,10 @@ jobs:
           # Release-profile tests reuse most compiled artifacts in the NSIS build.
           cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify pinned NSIS template
+        shell: pwsh
+        run: ./desktop/scripts/verify-nsis-template.ps1
 
       - name: Build DroneDream setup executable
         shell: pwsh
@@ -386,3 +377,52 @@ jobs:
           path: |
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sha256
+
+  publish-prerelease:
+    name: Publish Windows closed beta
+    if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+    needs: windows-nsis
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified installer
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: DroneDream-Windows-x64
+          path: dist
+
+      - name: Validate release files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version="${GITHUB_REF_NAME#desktop-v}"
+          installer="dist/DroneDream_${version}_x64-setup.exe"
+          checksum="${installer}.sha256"
+          test -f "$installer"
+          test -f "$checksum"
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 2
+          (cd dist && sha256sum --check "$(basename "$checksum")")
+
+      - name: Publish immutable GitHub prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release already exists and will never be overwritten: $GITHUB_REF_NAME" >&2
+            exit 2
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "DroneDream Desktop ${GITHUB_REF_NAME#desktop-v}" \
+            --notes "Unsigned Windows x64 closed beta. Verify the attached SHA-256 before installation; Windows SmartScreen may warn." \
+            --draft
+          gh release upload "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY"
+          gh release edit "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --prerelease

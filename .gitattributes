@@ -1,3 +1,6 @@
 /runtime/** text eol=lf
 /scripts/**/*.sh text eol=lf
 /.github/workflows/*.yml text eol=lf
+/desktop/scripts/*.ps1 text eol=lf
+/desktop/src-tauri/nsis/*.nsi text eol=lf
+/desktop/src-tauri/nsis/*.nsh text eol=lf

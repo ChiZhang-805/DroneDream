@@ -30,7 +30,10 @@ if (([regex]::Matches($hook, 'Call DroneDreamWebView2IsUsable')).Count -lt 2) {
     throw "The WebView2 hook must probe before and after the official installer attempt."
 }
 $pvCheck = $hook.IndexOf('"pv"', [System.StringComparison]::Ordinal)
-$fileCheck = $hook.IndexOf('IfFileExists', [System.StringComparison]::Ordinal)
+$fileCheck = $hook.IndexOf(
+    'IfFileExists "$2\msedgewebview2.exe"',
+    [System.StringComparison]::Ordinal
+)
 $readyAssignment = $hook.IndexOf('StrCpy $0 "1"', [System.StringComparison]::Ordinal)
 if ($pvCheck -lt 0 -or $fileCheck -le $pvCheck -or $readyAssignment -le $fileCheck) {
     throw "A WebView2 pv value must not mark the runtime usable before a core executable is found."

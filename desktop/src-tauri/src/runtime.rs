@@ -31,6 +31,14 @@ const COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_BACKEND_RESPONSE_BYTES: usize = 256 * 1024;
 
+struct InstallerPlanExport {
+    target_root: Option<String>,
+    download_bytes: u64,
+    installed_bytes: u64,
+    minimum_free_bytes: u64,
+    can_install: bool,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeStatusReport {
@@ -224,6 +232,79 @@ pub async fn get_runtime_install_plan(
     tauri::async_runtime::spawn_blocking(move || build_install_plan(target_root))
         .await
         .map_err(|error| format!("Runtime install-plan task failed: {error}"))?
+}
+
+/// Writes the same default-drive plan used by the application to a fixed
+/// sibling file for the NSIS mode page. This is read-only: it performs system
+/// and drive probes but never enables WSL, downloads a release, or mutates a
+/// distribution.
+pub(crate) fn write_installer_plan(
+    output: &str,
+    target_root: Option<String>,
+) -> Result<(), String> {
+    use std::io::Write as _;
+
+    const OUTPUT_NAME: &str = "dronedream-installer-plan-v1.ini";
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Unable to locate installer planner executable: {error}"))?;
+    let executable_parent = executable
+        .parent()
+        .ok_or_else(|| "Installer planner executable has no parent directory.".to_string())?;
+    let requested = std::path::Path::new(output);
+    if requested.file_name().and_then(|value| value.to_str()) != Some(OUTPUT_NAME)
+        || requested.parent() != Some(executable_parent)
+    {
+        return Err(format!(
+            "Installer plan output must be the fixed {OUTPUT_NAME} sibling of the planner."
+        ));
+    }
+    let export = match build_install_plan(target_root) {
+        Ok(plan) => InstallerPlanExport {
+            target_root: Some(plan.target_root),
+            download_bytes: plan.estimated_download_bytes,
+            installed_bytes: plan.estimated_installed_bytes,
+            minimum_free_bytes: MINIMUM_FREE_BYTES,
+            can_install: plan.can_install,
+        },
+        Err(_error) => InstallerPlanExport {
+            target_root: None,
+            download_bytes: ESTIMATED_DOWNLOAD_BYTES,
+            installed_bytes: ESTIMATED_INSTALLED_BYTES,
+            minimum_free_bytes: MINIMUM_FREE_BYTES,
+            can_install: false,
+        },
+    };
+    let target = export.target_root.as_deref().unwrap_or("");
+    if !target.is_ascii() || target.contains(['\r', '\n', '=']) {
+        return Err("Installer plan target is not safe for the NSIS handoff.".to_string());
+    }
+    let target_drive = target.get(..2).unwrap_or("");
+    let blocker_code = if export.can_install {
+        "none"
+    } else if export.target_root.is_none() {
+        "no-eligible-target"
+    } else {
+        "prerequisite-blocked"
+    };
+    let encoded = format!(
+        "[plan]\r\nschemaVersion=1\r\ntargetDrive={target_drive}\r\ntargetRoot={target}\r\ndownloadBytes={}\r\ninstalledBytes={}\r\nminimumFreeBytes={}\r\ncanInstall={}\r\nblockerCode={blocker_code}\r\n",
+        export.download_bytes,
+        export.installed_bytes,
+        export.minimum_free_bytes,
+        u8::from(export.can_install)
+    )
+    .into_bytes();
+    if encoded.len() > 64 * 1024 {
+        return Err("Installer plan exceeded its 64 KiB limit.".to_string());
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(requested)
+        .map_err(|error| format!("Unable to create installer plan: {error}"))?;
+    file.write_all(&encoded)
+        .and_then(|_| file.sync_all())
+        .map_err(|error| format!("Unable to persist installer plan: {error}"))
 }
 
 #[cfg(target_os = "windows")]

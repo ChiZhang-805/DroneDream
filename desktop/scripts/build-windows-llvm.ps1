@@ -109,8 +109,12 @@ if (-not (Test-Path -LiteralPath $llvmBundleConfig -PathType Leaf)) {
     throw "The LLVM bundle configuration was not found at $llvmBundleConfig"
 }
 
+& (Join-Path $PSScriptRoot "verify-desktop-version.ps1")
+& (Join-Path $PSScriptRoot "verify-nsis-template.ps1")
+
 Write-Host "Building DroneDream Desktop with $toolchain"
-& npm.cmd run build -- `
+$desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+& npm.cmd --prefix $desktopRoot run build -- `
     --target x86_64-pc-windows-gnullvm `
     --config $llvmBundleConfig
 if ($LASTEXITCODE -ne 0) {
@@ -156,3 +160,22 @@ if ($importReport -notmatch "(?im)^\s*Name:\s*WebView2Loader\.dll\s*$") {
     throw "The LLVM executable no longer imports the staged WebView2Loader.dll; review the bundle contract."
 }
 Write-Host "Verified static LLVM runtime linkage and the bundled WebView2 loader."
+
+$generatedNsi = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\nsis\x64\installer.nsi"
+if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
+    throw "The LLVM build completed without producing $generatedNsi"
+}
+& (Join-Path $PSScriptRoot "verify-webview2-installer.ps1") -GeneratedNsi $generatedNsi
+
+$tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
+    ConvertFrom-Json
+$bundleDirectory = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\bundle\nsis"
+$installer = Join-Path $bundleDirectory "DroneDream_$($tauriConfig.version)_x64-setup.exe"
+if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+    throw "The LLVM build completed without producing the versioned installer $installer"
+}
+$hash = Get-FileHash -Algorithm SHA256 -LiteralPath $installer
+$checksumPath = "$installer.sha256"
+"$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($installer))" |
+    Set-Content -Encoding ascii -LiteralPath $checksumPath
+Write-Host "Wrote verified installer checksum to $checksumPath"

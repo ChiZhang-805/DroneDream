@@ -134,6 +134,45 @@ export interface RuntimeInstallRequest {
   releaseManifestUrl?: string | null;
 }
 
+export type InstallerRuntimeDisposition =
+  | "none"
+  | "desktopOnly"
+  | "started"
+  | "resumed"
+  | "invalid"
+  | "alreadyInstalled";
+
+export type InstallerRuntimeMode =
+  | "install-all"
+  | "custom"
+  | "install-app-only";
+
+export type InstallerRuntimeIntentStatus =
+  | "none"
+  | "ready"
+  | "desktopOnly"
+  | "invalid";
+
+export interface InstallerRuntimeIntent {
+  status: InstallerRuntimeIntentStatus;
+  mode: InstallerRuntimeMode | null;
+  targetRoot: string | null;
+  message: string | null;
+}
+
+export interface InstallerRuntimeAutoStartResult {
+  disposition: InstallerRuntimeDisposition;
+  mode: InstallerRuntimeMode | null;
+  targetRoot: string | null;
+  snapshot: RuntimeInstallSnapshot | null;
+  message: string | null;
+}
+
+export interface InstallerRuntimeDiscardResult {
+  discarded: boolean;
+  message: string | null;
+}
+
 interface TauriCore {
   invoke(command: string, args?: Record<string, unknown>): Promise<unknown>;
 }
@@ -181,6 +220,25 @@ const INSTALL_PHASES = new Set<RuntimeInstallPhase>([
   "completed",
   "failed",
   "cancelled",
+]);
+const INSTALLER_RUNTIME_DISPOSITIONS = new Set<InstallerRuntimeDisposition>([
+  "none",
+  "desktopOnly",
+  "started",
+  "resumed",
+  "invalid",
+  "alreadyInstalled",
+]);
+const INSTALLER_RUNTIME_MODES = new Set<InstallerRuntimeMode>([
+  "install-all",
+  "custom",
+  "install-app-only",
+]);
+const INSTALLER_RUNTIME_INTENT_STATUSES = new Set<InstallerRuntimeIntentStatus>([
+  "none",
+  "ready",
+  "desktopOnly",
+  "invalid",
 ]);
 
 declare global {
@@ -275,6 +333,27 @@ export function cancelRuntimeInstall(): Promise<RuntimeInstallSnapshot> {
   return invokeDesktop(
     "cancel_runtime_install",
     parseRuntimeInstallSnapshot,
+  );
+}
+
+export function autoStartInstallerRuntime(): Promise<InstallerRuntimeAutoStartResult> {
+  return invokeDesktop(
+    "auto_start_installer_runtime",
+    parseInstallerRuntimeAutoStartResult,
+  );
+}
+
+export function getInstallerRuntimeIntent(): Promise<InstallerRuntimeIntent> {
+  return invokeDesktop(
+    "get_installer_runtime_intent",
+    parseInstallerRuntimeIntent,
+  );
+}
+
+export function discardInstallerRuntimeIntent(): Promise<InstallerRuntimeDiscardResult> {
+  return invokeDesktop(
+    "discard_installer_runtime_intent",
+    parseInstallerRuntimeDiscardResult,
   );
 }
 
@@ -616,6 +695,154 @@ function parseRuntimeInstallSnapshot(value: unknown): RuntimeInstallSnapshot {
   };
   validateRuntimeInstallSnapshot(snapshot);
   return snapshot;
+}
+
+function parseInstallerRuntimeAutoStartResult(
+  value: unknown,
+): InstallerRuntimeAutoStartResult {
+  const record = expectRecord(value, "result");
+  const disposition = expectString(record.disposition, "result.disposition");
+  if (
+    !INSTALLER_RUNTIME_DISPOSITIONS.has(
+      disposition as InstallerRuntimeDisposition,
+    )
+  ) {
+    throw new Error(
+      `result.disposition has the unknown value ${JSON.stringify(disposition)}`,
+    );
+  }
+  const rawMode = record.mode == null
+    ? null
+    : expectString(record.mode, "result.mode");
+  if (rawMode !== null && !INSTALLER_RUNTIME_MODES.has(rawMode as InstallerRuntimeMode)) {
+    throw new Error(`result.mode has the unknown value ${JSON.stringify(rawMode)}`);
+  }
+  const result: InstallerRuntimeAutoStartResult = {
+    disposition: disposition as InstallerRuntimeDisposition,
+    mode: rawMode as InstallerRuntimeMode | null,
+    targetRoot: record.targetRoot == null
+      ? null
+      : expectCanonicalRuntimeTargetRoot(record.targetRoot, "result.targetRoot"),
+    snapshot: record.snapshot == null
+      ? null
+      : parseRuntimeInstallSnapshot(record.snapshot),
+    message: expectNullableSafeNonEmptyString(record.message, "result.message"),
+  };
+  validateInstallerRuntimeAutoStartResult(result);
+  return result;
+}
+
+function parseInstallerRuntimeIntent(value: unknown): InstallerRuntimeIntent {
+  const record = expectRecord(value, "intent");
+  const status = expectString(record.status, "intent.status");
+  if (!INSTALLER_RUNTIME_INTENT_STATUSES.has(status as InstallerRuntimeIntentStatus)) {
+    throw new Error(`intent.status has the unknown value ${JSON.stringify(status)}`);
+  }
+  const rawMode = record.mode == null
+    ? null
+    : expectString(record.mode, "intent.mode");
+  if (rawMode !== null && !INSTALLER_RUNTIME_MODES.has(rawMode as InstallerRuntimeMode)) {
+    throw new Error(`intent.mode has the unknown value ${JSON.stringify(rawMode)}`);
+  }
+  const intent: InstallerRuntimeIntent = {
+    status: status as InstallerRuntimeIntentStatus,
+    mode: rawMode as InstallerRuntimeMode | null,
+    targetRoot: record.targetRoot == null
+      ? null
+      : expectCanonicalRuntimeTargetRoot(record.targetRoot, "intent.targetRoot"),
+    message: expectNullableSafeNonEmptyString(record.message, "intent.message"),
+  };
+  validateInstallerRuntimeIntent(intent);
+  return intent;
+}
+
+function parseInstallerRuntimeDiscardResult(
+  value: unknown,
+): InstallerRuntimeDiscardResult {
+  const record = expectRecord(value, "discardResult");
+  return {
+    discarded: expectBoolean(record.discarded, "discardResult.discarded"),
+    message: expectNullableSafeNonEmptyString(
+      record.message,
+      "discardResult.message",
+    ),
+  };
+}
+
+function validateInstallerRuntimeIntent(intent: InstallerRuntimeIntent): void {
+  if (intent.status === "ready") {
+    if (intent.mode !== "install-all" && intent.mode !== "custom") {
+      throw new Error("intent.ready requires install-all or custom mode");
+    }
+    if (intent.targetRoot === null) {
+      throw new Error("intent.ready requires targetRoot");
+    }
+    return;
+  }
+  if (intent.targetRoot !== null) {
+    throw new Error(`intent.${intent.status} cannot return targetRoot`);
+  }
+  if (intent.status === "desktopOnly") {
+    if (intent.mode !== "install-app-only") {
+      throw new Error("intent.desktopOnly requires install-app-only mode");
+    }
+    return;
+  }
+  if (intent.mode !== null) {
+    throw new Error(`intent.${intent.status} requires a null mode`);
+  }
+}
+
+function validateInstallerRuntimeAutoStartResult(
+  result: InstallerRuntimeAutoStartResult,
+): void {
+  const started = result.disposition === "started" || result.disposition === "resumed";
+  if (started) {
+    if (result.mode !== "install-all" && result.mode !== "custom") {
+      throw new Error(
+        `result.${result.disposition} requires install-all or custom mode`,
+      );
+    }
+    if (result.targetRoot === null || result.snapshot === null) {
+      throw new Error(
+        `result.${result.disposition} requires targetRoot and snapshot`,
+      );
+    }
+    if (result.snapshot.targetRoot !== result.targetRoot) {
+      throw new Error("result.targetRoot must match result.snapshot.targetRoot");
+    }
+    if (result.snapshot.phase === "idle") {
+      throw new Error(`result.${result.disposition} cannot return an idle snapshot`);
+    }
+    return;
+  }
+
+  if (result.targetRoot !== null || result.snapshot !== null) {
+    throw new Error(
+      `result.${result.disposition} cannot return targetRoot or snapshot`,
+    );
+  }
+  if (result.disposition === "none" && result.mode !== null) {
+    throw new Error("result.none requires a null mode");
+  }
+  if (
+    result.disposition === "desktopOnly" &&
+    result.mode !== "install-app-only"
+  ) {
+    throw new Error("result.desktopOnly requires install-app-only mode");
+  }
+  if (result.disposition === "invalid" && result.mode !== null) {
+    throw new Error("result.invalid requires a null mode");
+  }
+  if (
+    result.disposition === "alreadyInstalled" &&
+    result.mode !== "install-all" &&
+    result.mode !== "custom"
+  ) {
+    throw new Error(
+      "result.alreadyInstalled requires install-all or custom mode",
+    );
+  }
 }
 
 function parseRuntimeInstallError(value: unknown): RuntimeInstallError {

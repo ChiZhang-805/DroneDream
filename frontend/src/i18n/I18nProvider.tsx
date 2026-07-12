@@ -41,7 +41,7 @@ const translations = {
     "desktop.statusUnavailable": "Runtime status unavailable",
     "desktop.overviewTitle": "Computer readiness",
     "desktop.overviewDesc":
-      "The environment check is read-only. Installation starts only after you review the plan and select Install.",
+      "The environment check is read-only. If you confirmed Install everything in the Windows installer, runtime setup starts automatically; otherwise you can start it here later.",
     "desktop.os": "Windows",
     "desktop.wsl": "WSL 2",
     "desktop.memory": "Memory",
@@ -93,7 +93,7 @@ const translations = {
     "desktop.planUpdating": "Updating the installation plan…",
     "desktop.planTitle": "First-run installation plan",
     "desktop.planDesc":
-      "Review the expected download, storage and permissions before starting the one-click installation.",
+      "Review the download, storage and permissions used by the confirmed one-click installation.",
     "desktop.target": "Target location",
     "desktop.download": "Download",
     "desktop.installedSize": "Installed size",
@@ -109,7 +109,9 @@ const translations = {
     "desktop.steps": "Planned steps",
     "desktop.destructive": "modifies system state",
     "desktop.noChanges":
-      "No changes are made until you select Install. DroneDreamRuntime is imported separately and never replaces an existing Ubuntu distribution.",
+      "Runtime changes start only from a choice you confirmed in the Windows installer or by selecting Install here later. DroneDreamRuntime is imported separately and never replaces an existing Ubuntu distribution.",
+    "desktop.confirmedInstallChanges":
+      "You already confirmed this one-click installation in the Windows installer. DroneDream will revalidate this exact target before starting automatically and will not fall back to another disk.",
     "desktop.step.preflight.title":
       "Validate Windows, virtualization, memory, and disk",
     "desktop.step.preflight.description":
@@ -141,6 +143,69 @@ const translations = {
     "desktop.runtimeActionRunning": "Working…",
     "desktop.startRuntime": "Start runtime",
     "desktop.repairRuntime": "Repair and restart runtime",
+    "desktop.installerChoiceChecking": "Applying your installer choice",
+    "desktop.installerChoiceCheckingHint":
+      "DroneDream is securely checking the option you confirmed in the Windows installer before any runtime download begins.",
+    "desktop.installerChoiceFailed": "The installer choice could not be checked",
+    "desktop.retryInstallerCheck": "Check the installer choice again",
+    "desktop.installerChoiceReady": "Your one-click installation is confirmed",
+    "desktop.installerChoiceReadyHint":
+      "DroneDream is checking the exact target you confirmed. Runtime work starts automatically only after its plan and cancellation controls are visible.",
+    "desktop.installerFallbackTitle": "Automatic setup needs attention",
+    "desktop.installerFallbackHint":
+      "The confirmed request remains pending, but no Runtime work will start until the exact plan check succeeds. You can retry the checks or cancel the request safely.",
+    "desktop.confirmedTarget": "Confirmed Runtime target",
+    "desktop.checkingExactPlan": "Checking the exact confirmed plan",
+    "desktop.exactPlanUnavailable":
+      "The exact confirmed plan is unavailable. Retry the checks or cancel this automatic request.",
+    "desktop.desktopOnlySelected": "Desktop app only was selected",
+    "desktop.desktopOnlySelectedHint":
+      "DroneDreamRuntime was intentionally skipped. You can review the plan and install it from this page later.",
+    "desktop.installerChoiceInvalid": "The confirmed installer choice is no longer valid",
+    "desktop.installerChoiceInvalidHint":
+      "Automatic setup stopped without choosing a different disk. Review the reason and the current plan before starting manually.",
+    "desktop.installerRuntimeAlreadyInstalled": "DroneDreamRuntime is already installed",
+    "desktop.installerRuntimeAlreadyInstalledHint":
+      "The one-click request was completed without creating a duplicate runtime.",
+    "desktop.autoInstallStarted": "One-click runtime installation started",
+    "desktop.autoInstallStartedHint":
+      "Your confirmed disk and installation choice were verified. Download, import and health checks now continue automatically.",
+    "desktop.autoInstallResumed": "Runtime installation resumed",
+    "desktop.autoInstallResumedHint":
+      "DroneDream safely resumed the interrupted or post-restart installation and will reuse verified downloads.",
+    "desktop.autoStartPendingHint":
+      "Automatic setup is starting. Cancellation becomes available as soon as the native operation is created.",
+    "desktop.autoStartBlockedHint":
+      "Automatic setup is waiting for the plan blockers above to be resolved.",
+    "desktop.autoStartFailClosedHint":
+      "The visible plan has blockers. DroneDream is performing the final native safety check; if they remain, no Runtime work starts and manual recovery will unlock.",
+    "desktop.autoStartUncertainHint":
+      "Automatic setup status is uncertain. Recheck above or cancel the pending handoff; manual start remains locked for safety.",
+    "desktop.cancelAutomaticInstall": "Cancel automatic installation",
+    "desktop.cancellingAutomaticInstall": "Cancelling automatic installation…",
+    "desktop.autoInstallCancelled": "Automatic runtime installation was cancelled",
+    "desktop.autoInstallCancelledHint":
+      "No runtime operation had started, so the pending installer choice was cleared safely. You can still install it manually later.",
+    "desktop.restartContinuationCancelled": "Pending post-restart setup was cancelled",
+    "desktop.restartContinuationCancelledHint":
+      "The automatic continuation was cleared without deleting verified downloads or reversing Windows features already enabled. You can start a manual installation later.",
+    "desktop.clearTerminalInstallerRequest": "Clean up and recheck the terminal request",
+    "desktop.clearingTerminalInstallerRequest": "Cleaning up the terminal request…",
+    "desktop.receiptCleanupPendingHint":
+      "The runtime operation stopped, but its non-replayable installer record still needs cleanup. Cleaning it does not restart installation; afterward you can retry normally.",
+    "desktop.receiptCleanupInstalledHint":
+      "The runtime finished successfully, but its non-replayable installer record still needs cleanup. Clean it first; DroneDream will then verify the installed runtime instead of installing it again.",
+    "desktop.receiptCleanupRecovered": "The terminal installer request was cleaned up",
+    "desktop.receiptCleanupRecoveredHint":
+      "The old request cannot replay. DroneDream rechecked the local runtime state, and any later installation must be started explicitly.",
+    "desktop.autoInstallAlreadyStarted": "The runtime operation may already have started",
+    "desktop.autoInstallAlreadyStartedHint":
+      "DroneDream kept the installation journal and checked for an operation it can attach to instead of deleting runtime data.",
+    "desktop.autoInstallCancelNotConfirmed": "Automatic setup was not cancelled",
+    "desktop.autoInstallCancelNotConfirmedHint":
+      "DroneDream could not confirm that the pending installer request was removed. Check the installer choice again before taking another action.",
+    "desktop.autoInstallRecoveredAfterDiscard":
+      "A Runtime operation became visible after the pending request was cleared. DroneDream attached its live progress so you can cancel it safely.",
     "desktop.installerTitle": "Install DroneDreamRuntime",
     "desktop.installerDesc":
       "Download, verify, import, and start an isolated PX4/Gazebo runtime. Closing the app or losing the network does not discard verified resumable parts.",
@@ -158,7 +223,13 @@ const translations = {
     "desktop.cancelling": "Cancelling…",
     "desktop.restartRequired": "Restart Windows to continue",
     "desktop.restartRequiredHint":
-      "Restart this computer, reopen DroneDream, and select Continue installation. Downloaded and verified data will be reused.",
+      "Restart this computer and reopen DroneDream. Downloaded and verified data will be reused.",
+    "desktop.cancelRestartContinuation": "Cancel pending post-restart setup",
+    "desktop.cancellingRestartContinuation": "Cancelling pending post-restart setup…",
+    "desktop.restartContinuationAutomaticHint":
+      "After Windows restarts, reopen DroneDream and the installer-confirmed setup will continue automatically.",
+    "desktop.restartContinuationManualHint":
+      "After Windows restarts, reopen this page and start the installation again. Verified downloads will be reused.",
     "desktop.installCompleted": "DroneDreamRuntime is ready",
     "desktop.installCompletedHint":
       "The dedicated runtime passed its health checks. You can now create a local tuning experiment.",
@@ -172,6 +243,7 @@ const translations = {
     "desktop.runtimeReleaseUnavailableHint":
       "This build has no fixed signed release-manifest URL. Installation is disabled instead of downloading an unverified runtime.",
     "desktop.installPhase.idle": "Ready to install",
+    "desktop.installPhase.confirmed": "Confirmed; starting automatically",
     "desktop.installPhase.queued": "Preparing installation",
     "desktop.installPhase.verifyingManifest": "Verifying release manifest",
     "desktop.installPhase.downloading": "Downloading runtime",
@@ -380,7 +452,7 @@ const translations = {
     "desktop.needsAction": "仍需完成环境设置",
     "desktop.statusUnavailable": "暂时无法读取运行环境状态",
     "desktop.overviewTitle": "电脑环境检查",
-    "desktop.overviewDesc": "环境检查本身是只读操作；只有在核对方案并点击安装后，DroneDream 才会开始修改系统。",
+    "desktop.overviewDesc": "环境检查本身是只读操作；如果已在 Windows 安装器中确认“安装全部”，运行环境会自动开始安装；否则以后也可从本页手动开始。",
     "desktop.os": "Windows",
     "desktop.wsl": "WSL 2",
     "desktop.memory": "内存",
@@ -428,7 +500,7 @@ const translations = {
     "desktop.storageNoDiskHint": "请连接或启用本地固定磁盘，然后重新检查电脑环境。",
     "desktop.planUpdating": "正在更新安装方案…",
     "desktop.planTitle": "首次安装方案",
-    "desktop.planDesc": "开始一键安装前，请核对预计下载量、占用空间和所需权限。",
+    "desktop.planDesc": "请核对已确认的一键安装将使用的下载量、占用空间和所需权限。",
     "desktop.target": "目标位置",
     "desktop.download": "下载量",
     "desktop.installedSize": "安装后占用",
@@ -442,7 +514,8 @@ const translations = {
     "desktop.blockers": "阻塞项",
     "desktop.steps": "计划步骤",
     "desktop.destructive": "会修改系统状态",
-    "desktop.noChanges": "点击“安装”前不会进行任何修改。DroneDreamRuntime 会被独立导入，绝不会替换已有的 Ubuntu 发行版。",
+    "desktop.noChanges": "只有在 Windows 安装器中确认安装，或以后在本页手动点击安装，才会开始修改运行环境。DroneDreamRuntime 会被独立导入，绝不会替换已有的 Ubuntu 发行版。",
+    "desktop.confirmedInstallChanges": "你已经在 Windows 安装器中确认本次一键安装。自动开始前，DroneDream 会再次核验这个准确目标，并且不会改用其他磁盘。",
     "desktop.step.preflight.title": "检查 Windows、虚拟化、内存和磁盘",
     "desktop.step.preflight.description": "此项检查不会修改系统。",
     "desktop.step.enableWsl.title": "启用或更新 WSL2",
@@ -464,6 +537,48 @@ const translations = {
     "desktop.runtimeActionRunning": "正在处理…",
     "desktop.startRuntime": "启动运行环境",
     "desktop.repairRuntime": "修复并重启运行环境",
+    "desktop.installerChoiceChecking": "正在应用安装器中的选择",
+    "desktop.installerChoiceCheckingHint": "开始下载运行环境前，DroneDream 正在安全核验你已在 Windows 安装器中确认的选项。",
+    "desktop.installerChoiceFailed": "无法核验安装器中的选择",
+    "desktop.retryInstallerCheck": "重新核验安装器选择",
+    "desktop.installerChoiceReady": "已确认一键安装",
+    "desktop.installerChoiceReadyHint": "DroneDream 正在核验你确认的准确目标；只有安装方案和取消控制都已显示后，运行环境任务才会自动开始。",
+    "desktop.installerFallbackTitle": "自动安装需要处理",
+    "desktop.installerFallbackHint": "已确认的请求仍保持待处理，但准确方案核验成功前不会启动任何运行环境任务。你可以重新检查，或安全取消该请求。",
+    "desktop.confirmedTarget": "已确认的运行环境目标",
+    "desktop.checkingExactPlan": "正在核验已确认目标的准确方案",
+    "desktop.exactPlanUnavailable": "暂时无法取得已确认目标的准确方案。请重新检查，或取消本次自动安装请求。",
+    "desktop.desktopOnlySelected": "已选择仅安装桌面程序",
+    "desktop.desktopOnlySelectedHint": "本次已按你的选择跳过 DroneDreamRuntime；以后可以在此页面核对方案并手动安装。",
+    "desktop.installerChoiceInvalid": "安装器中确认的选择已不再有效",
+    "desktop.installerChoiceInvalidHint": "自动安装已停止，并且不会改用其他磁盘。请查看原因和当前方案，再决定是否手动开始。",
+    "desktop.installerRuntimeAlreadyInstalled": "DroneDreamRuntime 已经安装",
+    "desktop.installerRuntimeAlreadyInstalledHint": "一键安装请求已安全完成，没有重复创建运行环境。",
+    "desktop.autoInstallStarted": "已开始一键安装运行环境",
+    "desktop.autoInstallStartedHint": "已验证你确认的磁盘和安装选项；后续下载、导入和健康检查将自动完成。",
+    "desktop.autoInstallResumed": "已继续安装运行环境",
+    "desktop.autoInstallResumedHint": "DroneDream 已安全恢复中断或重启后的安装，并会复用已验证的下载内容。",
+    "desktop.autoStartPendingHint": "正在自动启动安装；原生安装任务创建后即可取消。",
+    "desktop.autoStartBlockedHint": "自动安装正在等待上方安装方案中的阻塞项得到解决。",
+    "desktop.autoStartFailClosedHint": "当前显示的方案存在阻塞项。DroneDream 正在执行最后一次原生安全核验；如果阻塞仍然存在，将不会启动运行环境任务，并会解锁手动恢复。",
+    "desktop.autoStartUncertainHint": "自动安装状态暂不确定。请在上方重新核验，或取消待处理的交接；为安全起见，手动启动仍保持锁定。",
+    "desktop.cancelAutomaticInstall": "取消自动安装",
+    "desktop.cancellingAutomaticInstall": "正在取消自动安装…",
+    "desktop.autoInstallCancelled": "已取消自动安装运行环境",
+    "desktop.autoInstallCancelledHint": "运行环境任务尚未开始，因此待处理的安装器选择已被安全清除；以后仍可手动安装。",
+    "desktop.restartContinuationCancelled": "已取消重启后待续传安装",
+    "desktop.restartContinuationCancelledHint": "已安全清除自动续传请求，不会删除已经校验的下载，也不会回滚已启用的 Windows 功能；以后仍可手动开始安装。",
+    "desktop.clearTerminalInstallerRequest": "清理并重新核验已终结请求",
+    "desktop.clearingTerminalInstallerRequest": "正在清理已终结请求…",
+    "desktop.receiptCleanupPendingHint": "运行环境任务已经停止，但其不可重放的安装器记录仍需清理。清理不会重新启动安装；完成后可以正常重试。",
+    "desktop.receiptCleanupInstalledHint": "运行环境已经成功完成，但其不可重放的安装器记录仍需清理。请先清理；随后 DroneDream 会核验已安装的运行环境，而不会重复安装。",
+    "desktop.receiptCleanupRecovered": "已清理终结的安装器请求",
+    "desktop.receiptCleanupRecoveredHint": "旧请求已无法重放。DroneDream 已重新核验本地运行环境状态；之后的任何安装都必须由你明确开始。",
+    "desktop.autoInstallAlreadyStarted": "运行环境任务可能已经开始",
+    "desktop.autoInstallAlreadyStartedHint": "DroneDream 已保留安装日志并检查可接管的任务，不会删除运行环境数据。",
+    "desktop.autoInstallCancelNotConfirmed": "尚未确认自动安装已取消",
+    "desktop.autoInstallCancelNotConfirmedHint": "DroneDream 无法确认待处理的安装器请求已经清除。请先重新核验安装器选择，再执行其他操作。",
+    "desktop.autoInstallRecoveredAfterDiscard": "清除待处理请求后检测到一个运行环境任务。DroneDream 已接管其实时进度，你可以安全地取消该任务。",
     "desktop.installerTitle": "安装 DroneDreamRuntime",
     "desktop.installerDesc": "自动下载、校验、导入并启动隔离的 PX4/Gazebo 运行环境。关闭软件或网络中断不会丢弃已经校验的可续传分片。",
     "desktop.currentStage": "当前阶段",
@@ -479,7 +594,11 @@ const translations = {
     "desktop.cancelInstall": "取消安装",
     "desktop.cancelling": "正在取消…",
     "desktop.restartRequired": "需要重启 Windows 后继续",
-    "desktop.restartRequiredHint": "请重启电脑，重新打开 DroneDream，然后点击“重启后继续安装”。已经下载并校验的数据会被复用。",
+    "desktop.restartRequiredHint": "请重启电脑并重新打开 DroneDream。已经下载并校验的数据会被复用。",
+    "desktop.cancelRestartContinuation": "取消重启后待续传安装",
+    "desktop.cancellingRestartContinuation": "正在取消重启后待续传安装…",
+    "desktop.restartContinuationAutomaticHint": "Windows 重启后，请重新打开 DroneDream；安装器中确认的安装将自动继续。",
+    "desktop.restartContinuationManualHint": "Windows 重启后，请重新打开此页面并再次开始安装；已经校验的下载会被复用。",
     "desktop.installCompleted": "DroneDreamRuntime 已准备好",
     "desktop.installCompletedHint": "专用运行环境已通过健康检查，现在可以创建本地调优实验。",
     "desktop.installFailed": "安装已安全停止",
@@ -490,6 +609,7 @@ const translations = {
     "desktop.runtimeReleaseUnavailable": "运行环境下载尚未发布",
     "desktop.runtimeReleaseUnavailableHint": "此安装包没有内置固定的已签名发布清单地址，因此安装功能保持禁用，不会下载未经验证的运行环境。",
     "desktop.installPhase.idle": "可以开始安装",
+    "desktop.installPhase.confirmed": "已确认，正在自动启动",
     "desktop.installPhase.queued": "正在准备安装",
     "desktop.installPhase.verifyingManifest": "正在验证发布清单",
     "desktop.installPhase.downloading": "正在下载运行环境",

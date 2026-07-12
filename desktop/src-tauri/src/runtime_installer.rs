@@ -54,9 +54,9 @@ static OPERATION_COUNTER: AtomicU64 = AtomicU64::new(1);
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeInstallRequest {
-    target_root: String,
+    pub(crate) target_root: String,
     #[serde(default)]
-    release_manifest_url: Option<String>,
+    pub(crate) release_manifest_url: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -77,7 +77,7 @@ pub enum RuntimeInstallPhase {
 }
 
 impl RuntimeInstallPhase {
-    fn is_active(self) -> bool {
+    pub(crate) fn is_active(self) -> bool {
         matches!(
             self,
             Self::Queued
@@ -137,6 +137,12 @@ impl Default for RuntimeInstallSnapshot {
     }
 }
 
+impl RuntimeInstallSnapshot {
+    pub(crate) fn is_active(&self) -> bool {
+        self.phase.is_active()
+    }
+}
+
 #[derive(Clone)]
 pub struct RuntimeInstaller {
     shared: Arc<InstallerShared>,
@@ -161,7 +167,7 @@ impl Default for RuntimeInstaller {
 }
 
 impl RuntimeInstaller {
-    fn snapshot(&self) -> RuntimeInstallSnapshot {
+    pub(crate) fn snapshot(&self) -> RuntimeInstallSnapshot {
         self.shared
             .snapshot
             .lock()
@@ -186,14 +192,58 @@ impl RuntimeInstaller {
             .map_err(|_| {
                 "Another runtime installation or maintenance operation is active.".to_string()
             })?;
-        Ok(OperationGuard(self.shared.clone()))
+        Ok(OperationGuard {
+            shared: self.shared.clone(),
+        })
     }
 
-    fn begin_install(
+    fn prepare_operation(&self) -> Result<PreparedRuntimeOperation, String> {
+        crate::installer_handoff::ensure_runtime_operations_allowed()?;
+        let cross_process = CrossProcessOperationLease::acquire()?;
+        if let Err(error) = crate::installer_handoff::ensure_runtime_operations_allowed() {
+            drop(cross_process);
+            return Err(error);
+        }
+        let local = self.try_acquire_operation()?;
+        Ok(PreparedRuntimeOperation {
+            _local: local,
+            _cross_process: cross_process,
+        })
+    }
+
+    #[cfg(all(test, target_os = "windows"))]
+    fn prepare_operation_at(&self, lease_path: &Path) -> Result<PreparedRuntimeOperation, String> {
+        let cross_process = CrossProcessOperationLease::acquire_at(lease_path)?;
+        let local = self.try_acquire_operation()?;
+        Ok(PreparedRuntimeOperation {
+            _local: local,
+            _cross_process: cross_process,
+        })
+    }
+
+    pub(crate) fn prepare_installer_operation(&self) -> Result<PreparedRuntimeOperation, String> {
+        self.prepare_operation()
+    }
+
+    pub(crate) fn begin_install(
         &self,
         request: RuntimeInstallRequest,
+        installer_intent_id: Option<String>,
     ) -> Result<RuntimeInstallSnapshot, String> {
-        let guard = self.try_acquire_operation()?;
+        let operation = self.prepare_operation()?;
+        self.begin_install_prepared(request, installer_intent_id, operation, || Ok(()))
+    }
+
+    pub(crate) fn begin_install_prepared<F>(
+        &self,
+        request: RuntimeInstallRequest,
+        installer_intent_id: Option<String>,
+        operation: PreparedRuntimeOperation,
+        before_spawn: F,
+    ) -> Result<RuntimeInstallSnapshot, String>
+    where
+        F: FnOnce() -> Result<(), String>,
+    {
         let manifest_url = request
             .release_manifest_url
             .as_deref()
@@ -214,22 +264,43 @@ impl RuntimeInstaller {
             .cancel
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(cancel.clone());
-        self.update(|snapshot| {
-            *snapshot = RuntimeInstallSnapshot {
-                operation_id: Some(operation_id),
-                phase: RuntimeInstallPhase::Queued,
-                target_root: Some(request.target_root.clone()),
-                message: Some("Waiting for the signed runtime installer.".to_string()),
-                updated_at: Some(chrono::Utc::now().to_rfc3339()),
-                ..RuntimeInstallSnapshot::default()
-            };
-        });
+        let queued_snapshot = RuntimeInstallSnapshot {
+            operation_id: Some(operation_id),
+            phase: RuntimeInstallPhase::Queued,
+            target_root: Some(request.target_root.clone()),
+            message: Some("Waiting for the signed runtime installer.".to_string()),
+            updated_at: Some(chrono::Utc::now().to_rfc3339()),
+            ..RuntimeInstallSnapshot::default()
+        };
+        let previous_snapshot = {
+            let mut snapshot = self
+                .shared
+                .snapshot
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let previous = snapshot.clone();
+            *snapshot = queued_snapshot.clone();
+            previous
+        };
+        if let Err(error) = before_spawn() {
+            *self
+                .shared
+                .cancel
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+            *self
+                .shared
+                .snapshot
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = previous_snapshot;
+            return Err(error);
+        }
 
         let installer = self.clone();
-        std::thread::Builder::new()
+        let spawn_result = std::thread::Builder::new()
             .name("dronedream-runtime-install".to_string())
             .spawn(move || {
-                let _guard = guard;
+                let _operation = operation;
                 let result = run_production_install(
                     &installer,
                     request.target_root,
@@ -237,56 +308,126 @@ impl RuntimeInstaller {
                     cancel.clone(),
                 );
                 match result {
-                    Ok(success) => installer.update(|snapshot| {
-                        snapshot.phase = RuntimeInstallPhase::Completed;
-                        snapshot.installed_version = Some(success.version);
-                        snapshot.message = Some(success.cleanup_warning.unwrap_or_else(|| {
-                            "DroneDreamRuntime is installed and ready.".to_string()
-                        }));
-                        snapshot.error = None;
-                        snapshot.resumable = false;
-                    }),
-                    Err(error) if error.cancelled => installer.update(|snapshot| {
-                        snapshot.phase = RuntimeInstallPhase::Cancelled;
-                        snapshot.message = Some("Installation was cancelled safely.".to_string());
-                        snapshot.error = None;
-                        snapshot.resumable = error.retryable;
-                    }),
-                    Err(error) if error.code == "restart_required" => {
-                        installer.update(|snapshot| {
-                            snapshot.phase = RuntimeInstallPhase::WaitingForRestart;
-                            snapshot.message = Some(error.message);
-                            snapshot.error = None;
-                            snapshot.resumable = true;
-                            snapshot.requires_restart = true;
-                        })
+                    Ok(success) => {
+                        let cleanup = crate::installer_handoff::finish_installer_continuation(
+                            installer_intent_id.as_deref(),
+                            false,
+                        );
+                        match cleanup {
+                            Ok(()) => installer.update(|snapshot| {
+                                snapshot.phase = RuntimeInstallPhase::Completed;
+                                snapshot.installed_version = Some(success.version);
+                                snapshot.message =
+                                    Some(success.cleanup_warning.unwrap_or_else(|| {
+                                        "DroneDreamRuntime is installed and ready.".to_string()
+                                    }));
+                                snapshot.error = None;
+                                snapshot.resumable = false;
+                            }),
+                            Err(cleanup_error) => set_receipt_cleanup_failure(
+                                &installer,
+                                cleanup_error,
+                                "DroneDreamRuntime was installed, but its installer handoff did not clean up completely.",
+                                Some(success.version),
+                            ),
+                        }
                     }
-                    Err(error) => installer.update(|snapshot| {
-                        snapshot.phase = RuntimeInstallPhase::Failed;
-                        snapshot.message = None;
-                        snapshot.resumable = error.retryable;
-                        snapshot.error = Some(RuntimeInstallError {
-                            code: error.code,
-                            message: error.message,
-                            retryable: error.retryable,
-                        });
-                    }),
+                    Err(error) if error.cancelled => {
+                        let cleanup = crate::installer_handoff::finish_installer_continuation(
+                            installer_intent_id.as_deref(),
+                            false,
+                        );
+                        match cleanup {
+                            Ok(()) => installer.update(|snapshot| {
+                                snapshot.phase = RuntimeInstallPhase::Cancelled;
+                                snapshot.message =
+                                    Some("Installation was cancelled safely.".to_string());
+                                snapshot.error = None;
+                                snapshot.resumable = error.retryable;
+                            }),
+                            Err(cleanup_error) => set_receipt_cleanup_failure(
+                                &installer,
+                                cleanup_error,
+                                "Runtime installation was cancelled, but its installer handoff did not clean up completely.",
+                                None,
+                            ),
+                        }
+                    }
+                    Err(error) if error.code == "restart_required" => {
+                        let cleanup = crate::installer_handoff::finish_installer_continuation(
+                            installer_intent_id.as_deref(),
+                            true,
+                        );
+                        match cleanup {
+                            Ok(()) => installer.update(|snapshot| {
+                                snapshot.phase = RuntimeInstallPhase::WaitingForRestart;
+                                snapshot.message = Some(error.message);
+                                snapshot.error = None;
+                                snapshot.resumable = true;
+                                snapshot.requires_restart = true;
+                            }),
+                            Err(cleanup_error) => set_receipt_cleanup_failure(
+                                &installer,
+                                cleanup_error,
+                                "WSL preparation requires a restart, but its continuation could not be preserved safely.",
+                                None,
+                            ),
+                        }
+                    }
+                    Err(error) => {
+                        let cleanup = crate::installer_handoff::finish_installer_continuation(
+                            installer_intent_id.as_deref(),
+                            false,
+                        );
+                        match cleanup {
+                            Ok(()) => installer.update(|snapshot| {
+                                snapshot.phase = RuntimeInstallPhase::Failed;
+                                snapshot.message = None;
+                                snapshot.resumable = error.retryable;
+                                snapshot.error = Some(RuntimeInstallError {
+                                    code: error.code,
+                                    message: error.message,
+                                    retryable: error.retryable,
+                                });
+                            }),
+                            Err(cleanup_error) => set_receipt_cleanup_failure(
+                                &installer,
+                                cleanup_error,
+                                &format!(
+                                    "Runtime installation failed: {}",
+                                    error.message
+                                ),
+                                None,
+                            ),
+                        }
+                    }
                 }
                 *installer
                     .shared
                     .cancel
                     .lock()
                     .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
-            })
-            .map_err(|error| {
-                *self
-                    .shared
-                    .cancel
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
-                format!("Unable to start the runtime installer: {error}")
-            })?;
-        Ok(self.snapshot())
+            });
+        if let Err(error) = spawn_result {
+            let message = format!("Unable to start the runtime installer: {error}");
+            *self
+                .shared
+                .cancel
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+            self.update(|snapshot| {
+                snapshot.phase = RuntimeInstallPhase::Failed;
+                snapshot.message = None;
+                snapshot.resumable = true;
+                snapshot.error = Some(RuntimeInstallError {
+                    code: "installer_thread_failed".to_string(),
+                    message: message.clone(),
+                    retryable: true,
+                });
+            });
+            return Err(message);
+        }
+        Ok(queued_snapshot)
     }
 
     fn cancel_install(&self) -> RuntimeInstallSnapshot {
@@ -308,12 +449,205 @@ impl RuntimeInstaller {
     }
 }
 
-struct OperationGuard(Arc<InstallerShared>);
+fn set_receipt_cleanup_failure(
+    installer: &RuntimeInstaller,
+    cleanup_error: String,
+    outcome: &str,
+    installed_version: Option<String>,
+) {
+    installer.update(|snapshot| {
+        snapshot.phase = RuntimeInstallPhase::Failed;
+        snapshot.message = None;
+        snapshot.installed_version = installed_version;
+        snapshot.resumable = true;
+        snapshot.error = Some(RuntimeInstallError {
+            code: "installer_receipt_cleanup_failed".to_string(),
+            message: format!("{outcome} {cleanup_error}"),
+            retryable: true,
+        });
+    });
+}
+
+struct OperationGuard {
+    shared: Arc<InstallerShared>,
+}
 
 impl Drop for OperationGuard {
     fn drop(&mut self) {
-        self.0.operation_busy.store(false, Ordering::Release);
+        self.shared.operation_busy.store(false, Ordering::Release);
     }
+}
+
+pub(crate) struct PreparedRuntimeOperation {
+    _local: OperationGuard,
+    _cross_process: CrossProcessOperationLease,
+}
+
+#[cfg(target_os = "windows")]
+struct CrossProcessOperationLease(windows_sys::Win32::Foundation::HANDLE);
+
+#[cfg(target_os = "windows")]
+impl CrossProcessOperationLease {
+    fn acquire() -> Result<Self, String> {
+        Self::acquire_at(&runtime_operation_lease_path()?)
+    }
+
+    fn acquire_at(path: &Path) -> Result<Self, String> {
+        use std::os::windows::ffi::OsStrExt as _;
+        use std::os::windows::fs::MetadataExt as _;
+        use windows_sys::Win32::Foundation::{
+            CloseHandle, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE,
+        };
+        use windows_sys::Win32::Storage::FileSystem::{
+            CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT,
+            FILE_FLAG_OPEN_REPARSE_POINT, OPEN_ALWAYS,
+        };
+
+        let parent = path
+            .parent()
+            .ok_or_else(|| "Runtime operation lease directory is invalid.".to_string())?;
+        std::fs::create_dir_all(parent).map_err(|error| {
+            format!("Unable to create runtime operation lease directory: {error}")
+        })?;
+        let parent_metadata = std::fs::symlink_metadata(parent).map_err(|error| {
+            format!("Unable to inspect runtime operation lease directory: {error}")
+        })?;
+        if !parent_metadata.is_dir()
+            || parent_metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        {
+            return Err(
+                "Runtime operation lease directory is not a safe ordinary directory.".to_string(),
+            );
+        }
+
+        let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+        wide.push(0);
+        // SAFETY: `wide` is a live, NUL-terminated path. A zero share mode is
+        // the lease: Windows denies every other open until this handle closes,
+        // and closes it automatically if the owner process crashes. Unlike a
+        // mutex, the handle can move to the operation's worker thread.
+        let handle = unsafe {
+            CreateFileW(
+                wide.as_ptr(),
+                GENERIC_READ | GENERIC_WRITE,
+                0,
+                std::ptr::null(),
+                OPEN_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
+                std::ptr::null_mut(),
+            )
+        };
+        if handle == INVALID_HANDLE_VALUE {
+            let error = std::io::Error::last_os_error();
+            return match error.raw_os_error() {
+                Some(32) | Some(33) => Err(
+                    "Another DroneDream process is installing, starting, or repairing the runtime."
+                        .to_string(),
+                ),
+                _ => Err(format!(
+                    "Unable to acquire the DroneDream runtime operation lease: {error}"
+                )),
+            };
+        }
+
+        let metadata = std::fs::symlink_metadata(path).map_err(|error| {
+            // SAFETY: `handle` was returned by CreateFileW and is owned here.
+            unsafe { CloseHandle(handle) };
+            format!("Unable to verify runtime operation lease file: {error}")
+        })?;
+        if !metadata.is_file() || metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            // SAFETY: `handle` was returned by CreateFileW and is owned here.
+            unsafe { CloseHandle(handle) };
+            return Err("Runtime operation lease is not a safe ordinary file.".to_string());
+        }
+        Ok(Self(handle))
+    }
+}
+
+// SAFETY: Windows file handles are process-wide kernel references. This lease
+// has no thread-affine ownership and is released only with CloseHandle.
+#[cfg(target_os = "windows")]
+unsafe impl Send for CrossProcessOperationLease {}
+
+#[cfg(target_os = "windows")]
+impl Drop for CrossProcessOperationLease {
+    fn drop(&mut self) {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        // SAFETY: this wrapper uniquely owns the valid CreateFileW handle.
+        unsafe {
+            CloseHandle(self.0);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn runtime_operation_lease_path() -> Result<PathBuf, String> {
+    let local = std::env::var_os("LOCALAPPDATA")
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "LOCALAPPDATA is unavailable.".to_string())?;
+    Ok(PathBuf::from(local)
+        .join("io.dronedream.desktop")
+        .join("runtime-operation-v1.lock"))
+}
+
+#[cfg(not(target_os = "windows"))]
+struct CrossProcessOperationLease;
+
+#[cfg(not(target_os = "windows"))]
+impl CrossProcessOperationLease {
+    fn acquire() -> Result<Self, String> {
+        Ok(Self)
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn runtime_operation_is_busy() -> Result<bool, String> {
+    match crate::installer_handoff::ensure_runtime_operations_allowed() {
+        Ok(()) => {}
+        Err(error) if error.starts_with("DroneDream update quiesce is active") => return Ok(true),
+        Err(error) => return Err(error),
+    }
+    match CrossProcessOperationLease::acquire() {
+        Ok(lease) => {
+            drop(lease);
+            Ok(false)
+        }
+        Err(error) if error.starts_with("Another DroneDream process") => Ok(true),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn with_runtime_operation_lease<T>(
+    operation: impl FnOnce() -> Result<T, String>,
+) -> Result<T, String> {
+    let lease = CrossProcessOperationLease::acquire()?;
+    let result = operation();
+    drop(lease);
+    result
+}
+
+#[cfg(all(test, target_os = "windows"))]
+pub(crate) fn with_runtime_operation_lease_at<T>(
+    path: &Path,
+    operation: impl FnOnce() -> Result<T, String>,
+) -> Result<T, String> {
+    let lease = CrossProcessOperationLease::acquire_at(path)?;
+    let result = operation();
+    drop(lease);
+    result
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn with_runtime_operation_lease<T>(
+    operation: impl FnOnce() -> Result<T, String>,
+) -> Result<T, String> {
+    operation()
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn runtime_operation_is_busy() -> Result<bool, String> {
+    Ok(false)
 }
 
 #[tauri::command]
@@ -321,7 +655,7 @@ pub async fn start_runtime_install(
     installer: tauri::State<'_, RuntimeInstaller>,
     request: RuntimeInstallRequest,
 ) -> Result<RuntimeInstallSnapshot, String> {
-    installer.begin_install(request)
+    installer.begin_install(request, None)
 }
 
 #[tauri::command]
@@ -356,9 +690,9 @@ async fn run_runtime_maintenance(
     installer: RuntimeInstaller,
     repair: bool,
 ) -> Result<crate::runtime::RuntimeStatusReport, String> {
-    let guard = installer.try_acquire_operation()?;
+    let operation = installer.prepare_operation()?;
     tauri::async_runtime::spawn_blocking(move || {
-        let _guard = guard;
+        let _operation = operation;
         let executor = ProductionWslExecutor;
         if !executor.is_registered().map_err(|error| error.message)? {
             return Err(
@@ -3360,6 +3694,91 @@ mod tests {
         .unwrap_err();
         assert!(error.cancelled);
         assert_eq!(wsl.state.lock().unwrap().imports, 0);
+    }
+
+    #[test]
+    fn receipt_cleanup_failure_is_never_reported_as_completed_or_cancelled() {
+        let installer = RuntimeInstaller::default();
+        set_receipt_cleanup_failure(
+            &installer,
+            "The receipt is safely terminal but still locked.".to_string(),
+            "Runtime installation was cancelled.",
+            Some("1.2.3".to_string()),
+        );
+        let snapshot = installer.snapshot();
+        assert_eq!(snapshot.phase, RuntimeInstallPhase::Failed);
+        assert_eq!(snapshot.installed_version.as_deref(), Some("1.2.3"));
+        assert_eq!(
+            snapshot.error.as_ref().map(|error| error.code.as_str()),
+            Some("installer_receipt_cleanup_failed")
+        );
+        assert!(snapshot.resumable);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn file_operation_lease_serializes_and_moves_to_the_worker_thread() {
+        let sandbox = Sandbox::new();
+        let path = sandbox.0.join("runtime-operation.lock");
+        let lease = CrossProcessOperationLease::acquire_at(&path).unwrap();
+        let (ready_sender, ready_receiver) = std::sync::mpsc::channel();
+        let (release_sender, release_receiver) = std::sync::mpsc::channel();
+        let holder = std::thread::spawn(move || {
+            ready_sender.send(()).unwrap();
+            release_receiver.recv().unwrap();
+            drop(lease);
+        });
+
+        ready_receiver.recv().unwrap();
+        assert!(CrossProcessOperationLease::acquire_at(&path).is_err());
+        release_sender.send(()).unwrap();
+        holder.join().unwrap();
+        assert!(CrossProcessOperationLease::acquire_at(&path).is_ok());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn contender_cannot_reach_claim_work_before_the_owner_releases_its_lease() {
+        let sandbox = Sandbox::new();
+        let path = sandbox.0.join("runtime-operation.lock");
+        let owner = RuntimeInstaller::default();
+        let owner_operation = owner.prepare_operation_at(&path).unwrap();
+        let contender = RuntimeInstaller::default();
+        let claim_attempted = AtomicBool::new(false);
+
+        let blocked = contender.prepare_operation_at(&path).map(|operation| {
+            claim_attempted.store(true, Ordering::Release);
+            drop(operation);
+        });
+        assert!(blocked.is_err());
+        assert!(!claim_attempted.load(Ordering::Acquire));
+
+        drop(owner_operation);
+        let operation = contender.prepare_operation_at(&path).unwrap();
+        claim_attempted.store(true, Ordering::Release);
+        drop(operation);
+        assert!(claim_attempted.load(Ordering::Acquire));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn claim_commit_hook_observes_queued_state_and_rolls_back_before_spawn() {
+        let sandbox = Sandbox::new();
+        let path = sandbox.0.join("runtime-operation.lock");
+        let installer = RuntimeInstaller::default();
+        let operation = installer.prepare_operation_at(&path).unwrap();
+        let request = RuntimeInstallRequest {
+            target_root: r"E:\DroneDream".to_string(),
+            release_manifest_url: None,
+        };
+        let result = installer.begin_install_prepared(request, None, operation, || {
+            assert_eq!(installer.snapshot().phase, RuntimeInstallPhase::Queued);
+            Err("deterministic claim commit failure".to_string())
+        });
+
+        assert_eq!(result.unwrap_err(), "deterministic claim commit failure");
+        assert_eq!(installer.snapshot().phase, RuntimeInstallPhase::Idle);
+        assert!(installer.prepare_operation_at(&path).is_ok());
     }
 
     #[test]
