@@ -4,6 +4,8 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $templatePath = Join-Path $repoRoot "desktop\src-tauri\nsis\installer.nsi"
 $runtimeModePath = Join-Path $repoRoot "desktop\src-tauri\nsis\runtime-mode.nsh"
 $installerLanguagesPath = Join-Path $repoRoot "desktop\src-tauri\nsis\installer-languages.nsh"
+$englishLanguagePath = Join-Path $repoRoot "desktop\src-tauri\nsis\languages\English.nsh"
+$chineseLanguagePath = Join-Path $repoRoot "desktop\src-tauri\nsis\languages\SimpChinese.nsh"
 $installerHookPath = Join-Path $repoRoot "desktop\src-tauri\nsis\webview2-health.nsh"
 $packageLockPath = Join-Path $repoRoot "desktop\package-lock.json"
 $tauriConfigPath = Join-Path $repoRoot "desktop\src-tauri\tauri.conf.json"
@@ -28,6 +30,11 @@ if ($config.bundle.windows.nsis.template -cne "nsis/installer.nsi") {
 }
 if ($config.bundle.windows.nsis.displayLanguageSelector -ne $true) {
     throw "The installer must ask for Chinese or English once, then keep that language"
+}
+$customLanguages = $config.bundle.windows.nsis.customLanguageFiles
+if ($customLanguages.English -cne "nsis/languages/English.nsh" -or
+    $customLanguages.SimpChinese -cne "nsis/languages/SimpChinese.nsh") {
+    throw "The installer must use DroneDream-owned English and Simplified Chinese maintenance copy"
 }
 
 $template = Get-Content -LiteralPath $templatePath -Raw
@@ -75,6 +82,16 @@ if (([regex]::Matches($upstream, [regex]::Escape($uninstallQuiesceAnchor))).Coun
     throw "DroneDream inherited-uninstaller quiesce anchor is missing or duplicated"
 }
 $upstream = $upstream.Replace($uninstallQuiesceAnchor, "")
+$languageAnchor = "; DroneDream custom strings must be expanded only after every MUI language is`n" +
+    "; registered. Expanding them from the early hook include maps both locales to`n" +
+    "; English and lets the Chinese text overwrite the English text.`n" +
+    "!ifmacrodef DRONEDREAM_INSTALLER_LANGUAGE_TABLE`n" +
+    "  !insertmacro DRONEDREAM_INSTALLER_LANGUAGE_TABLE`n" +
+    "!endif`n`n"
+if (([regex]::Matches($upstream, [regex]::Escape($languageAnchor))).Count -ne 1) {
+    throw "DroneDream late language-table anchor is missing or duplicated"
+}
+$upstream = $upstream.Replace($languageAnchor, "")
 
 $bytes = [Text.UTF8Encoding]::new($false).GetBytes($upstream)
 $hashBytes = [Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
@@ -104,6 +121,16 @@ foreach ($required in @(
     'Var DroneDreamQuiesceOwnerPid',
     'Var DroneDreamQuiesceActive',
     'Var DroneDreamPlanBlockerCode',
+    'Var DroneDreamPlanDiagnosticCode',
+    '!macro DRONEDREAM_INSTALLER_LANGUAGE_TABLE',
+    'StrCpy $DroneDreamInstallerLanguage "$LANGUAGE"',
+    'StrCpy $LANGUAGE $DroneDreamInstallerLanguage',
+    'dronedream-runtime-probe.exe',
+    'ClearErrors',
+    'launch-failed',
+    'result-incomplete',
+    'Function DroneDreamAppendInstallerDiagnostic',
+    'Function DroneDreamRetryDetection',
     'Pop $DroneDreamPlanCanInstall',
     'dronedream_plan_retry_or_fail:',
     '$(DD_ModeHeader)',
@@ -165,6 +192,26 @@ foreach ($required in @(
     if ($required -notin $englishNames) {
         throw "Installer language contract is missing: $required"
     }
+}
+
+foreach ($forbidden in @(
+    'dronedream-installer-planner.exe',
+    'dronedream-setup-probe.exe'
+)) {
+    if ($runtimeMode.Contains($forbidden)) {
+        throw "The temporary planner name can trigger Windows installer detection: $forbidden"
+    }
+}
+
+$englishMaintenance = Get-Content -LiteralPath $englishLanguagePath -Raw -Encoding UTF8
+$chineseMaintenance = Get-Content -LiteralPath $chineseLanguagePath -Raw -Encoding UTF8
+if (-not $englishMaintenance.Contains('${LANG_ENGLISH}') -or
+    -not $englishMaintenance.Contains('older or unknown')) {
+    throw "The custom English maintenance language file is incomplete"
+}
+if (-not $chineseMaintenance.Contains('${LANG_SIMPCHINESE}') -or
+    -not $chineseMaintenance.Contains('$R4')) {
+    throw "The custom Simplified Chinese maintenance language file is incomplete"
 }
 
 $installerHook = Get-Content -LiteralPath $installerHookPath -Raw

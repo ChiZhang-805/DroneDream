@@ -2132,6 +2132,12 @@ mod tests {
             r"\DroneDream",
             "Pop $DroneDreamPlanCanInstall",
             "planner-error",
+            "dronedream-runtime-probe.exe",
+            "ClearErrors",
+            "launch-failed",
+            "result-incomplete",
+            "Function DroneDreamRetryDetection",
+            "installer-diagnostics.log",
         ] {
             assert!(
                 mode_page.contains(required),
@@ -2142,6 +2148,8 @@ mod tests {
             "LANG_ENGLISH",
             "LANG_SIMPCHINESE",
             "DD_ModeHeader",
+            "DD_RetryDetection",
+            "DD_PlannerFailureDetails",
             "NTFS",
             "52 GiB",
             "推荐的 Runtime 位置",
@@ -2154,6 +2162,12 @@ mod tests {
         assert!(template.contains("tauri-v2.11.4"));
         assert!(template.contains("DRONEDREAM_RUNTIME_MODE_PAGE"));
         assert!(template.contains("DRONEDREAM_ONINIT"));
+        let mui_languages = template.find("!insertmacro MUI_LANGUAGE").unwrap();
+        let custom_languages = template
+            .find("!insertmacro DRONEDREAM_INSTALLER_LANGUAGE_TABLE")
+            .unwrap();
+        assert!(custom_languages > mui_languages);
+        assert!(!mode_page.contains("dronedream-installer-planner.exe"));
         let native = include_str!("installer_handoff.rs");
         assert!(native.contains("with_runtime_operation_lease(clear_receipt)"));
         assert!(native.contains("seal_installer_receipt(mode, target_root)"));

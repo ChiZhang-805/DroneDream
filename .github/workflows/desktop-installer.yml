@@ -171,6 +171,14 @@ jobs:
           ./desktop/scripts/verify-webview2-installer.ps1 `
             -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
 
+      - name: Verify installer locales and extracted planner
+        shell: pwsh
+        run: |
+          ./desktop/scripts/verify-installer-locales.ps1 `
+            -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
+          ./desktop/scripts/verify-installer-planner.ps1 `
+            -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+
       - name: Write SHA-256 checksum
         shell: pwsh
         run: |

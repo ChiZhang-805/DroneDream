@@ -2,13 +2,29 @@
 ; These three variables are declared at include time because the vendored
 ; reinstall function appends them to the old uninstaller command before the
 ; custom Runtime page macro is expanded later in the template.
-!include "${__FILEDIR__}\installer-languages.nsh"
+; Tauri registers its MUI languages near the end of the template. Expanding
+; this macro there (rather than including the table here) is essential: before
+; MUI_LANGUAGE runs, NSIS silently maps every custom LangString to English and
+; the later Chinese declaration overwrites it.
+!define DRONEDREAM_INSTALLER_LANGUAGES_FILE "${__FILEDIR__}\installer-languages.nsh"
+!macro DRONEDREAM_INSTALLER_LANGUAGE_TABLE
+  !include "${DRONEDREAM_INSTALLER_LANGUAGES_FILE}"
+!macroend
 
 Var DroneDreamQuiesceToken
 Var DroneDreamQuiesceOwnerPid
 Var DroneDreamQuiesceActive
+Var DroneDreamInstallerLanguage
+Var DroneDreamDiagnosticLog
+Var DroneDreamDiagnosticHandle
 
 !macro DRONEDREAM_ONINIT
+  ; MUI_LANGDLL_DISPLAY has already returned at this anchor. Preserve that
+  ; exact choice for every later custom page and message.
+  StrCpy $DroneDreamInstallerLanguage "$LANGUAGE"
+  StrCpy $DroneDreamDiagnosticLog "$TEMP\DroneDream\installer-diagnostics.log"
+  CreateDirectory "$TEMP\DroneDream"
+  Delete "$DroneDreamDiagnosticLog"
   StrCpy $DroneDreamWasInstalled "0"
   StrCpy $DroneDreamInstallMode "install-app-only"
   StrCpy $DroneDreamRuntimeDrive ""
@@ -18,6 +34,8 @@ Var DroneDreamQuiesceActive
   StrCpy $DroneDreamQuiesceToken ""
   StrCpy $DroneDreamQuiesceOwnerPid ""
   StrCpy $DroneDreamQuiesceActive "0"
+  Push "installer-init language=$DroneDreamInstallerLanguage"
+  Call DroneDreamAppendInstallerDiagnostic
   ReadRegStr $0 SHCTX "${UNINSTKEY}" "UninstallString"
   ${If} $0 != ""
     StrCpy $DroneDreamWasInstalled "1"
@@ -51,7 +69,10 @@ Var DroneDreamQuiesceActive
   Var DroneDreamPlanTarget
   Var DroneDreamPlanCanInstall
   Var DroneDreamPlanBlockerCode
+  Var DroneDreamPlanDiagnosticCode
   Var DroneDreamSuggestedDrive
+  Var DroneDreamRecommendedLabel
+  Var DroneDreamRetryButton
   Var DroneDreamFullRadio
   Var DroneDreamCustomRadio
   Var DroneDreamAppOnlyRadio
@@ -61,6 +82,18 @@ Var DroneDreamQuiesceActive
   Var DroneDreamRuntimeProtocol
 
   Page custom DroneDreamRuntimeModePageCreate DroneDreamRuntimeModePageLeave
+
+  Function DroneDreamAppendInstallerDiagnostic
+    Exch $0
+    ClearErrors
+    FileOpen $DroneDreamDiagnosticHandle "$DroneDreamDiagnosticLog" a
+    ${IfNot} ${Errors}
+      FileWrite $DroneDreamDiagnosticHandle "$0$\r$\n"
+      FileClose $DroneDreamDiagnosticHandle
+    ${EndIf}
+    ClearErrors
+    Pop $0
+  FunctionEnd
 
   Function DroneDreamBestEffortEndRuntimeQuiesce
     ${If} $DroneDreamQuiesceActive != "1"
@@ -236,16 +269,28 @@ Var DroneDreamQuiesceActive
   Function DroneDreamRunPlanner
     Exch $0
     StrCpy $8 "0"
+    StrCpy $DroneDreamPlanDiagnosticCode "not-started"
     dronedream_plan_retry:
     Delete "$DroneDreamPlanFile"
+    ClearErrors
+    StrCpy $1 "-1"
     ${If} $0 == ""
       ExecWait '"$DroneDreamPlannerExe" --write-installer-plan "$DroneDreamPlanFile"' $1
     ${Else}
       ExecWait '"$DroneDreamPlannerExe" --write-installer-plan "$DroneDreamPlanFile" "$0"' $1
     ${EndIf}
-    ${If} $1 != 0
+    ${If} ${Errors}
+      StrCpy $DroneDreamPlanDiagnosticCode "launch-failed"
+      Goto dronedream_plan_retry_or_fail
+    ${ElseIf} $1 != 0
+      StrCpy $DroneDreamPlanDiagnosticCode "planner-exit-$1"
       Goto dronedream_plan_retry_or_fail
     ${EndIf}
+    IfFileExists "$DroneDreamPlanFile" dronedream_plan_file_present 0
+      StrCpy $DroneDreamPlanDiagnosticCode "result-missing"
+      Goto dronedream_plan_retry_or_fail
+    dronedream_plan_file_present:
+    ClearErrors
     ReadINIStr $1 "$DroneDreamPlanFile" "plan" "schemaVersion"
     ReadINIStr $2 "$DroneDreamPlanFile" "plan" "targetDrive"
     ReadINIStr $DroneDreamPlanTarget "$DroneDreamPlanFile" "plan" "targetRoot"
@@ -254,43 +299,55 @@ Var DroneDreamQuiesceActive
     ReadINIStr $5 "$DroneDreamPlanFile" "plan" "minimumFreeBytes"
     ReadINIStr $DroneDreamPlanCanInstall "$DroneDreamPlanFile" "plan" "canInstall"
     ReadINIStr $6 "$DroneDreamPlanFile" "plan" "blockerCode"
+    ${If} ${Errors}
+      StrCpy $DroneDreamPlanDiagnosticCode "result-incomplete"
+      Goto dronedream_plan_retry_or_fail
+    ${EndIf}
     StrCpy $DroneDreamPlanBlockerCode "$6"
     StrCpy $7 "$2\DroneDream"
     ${If} $1 != "1"
     ${OrIf} $3 != "8589934592"
     ${OrIf} $4 != "25769803776"
     ${OrIf} $5 != "55834574848"
-      Goto dronedream_plan_retry_or_fail
+      Goto dronedream_plan_result_invalid
     ${EndIf}
     ${If} $DroneDreamPlanCanInstall == "1"
       ${If} $2 == ""
       ${OrIf} $DroneDreamPlanTarget != $7
       ${OrIf} $6 != "none"
-        Goto dronedream_plan_retry_or_fail
+        Goto dronedream_plan_result_invalid
       ${EndIf}
     ${ElseIf} $DroneDreamPlanCanInstall == "0"
       ${If} $6 == "no-eligible-target"
         ${If} $2 != ""
         ${OrIf} $DroneDreamPlanTarget != ""
-          Goto dronedream_plan_retry_or_fail
+          Goto dronedream_plan_result_invalid
         ${EndIf}
       ${ElseIf} $6 == "prerequisite-blocked"
         ${If} $2 == ""
         ${OrIf} $DroneDreamPlanTarget != $7
-          Goto dronedream_plan_retry_or_fail
+          Goto dronedream_plan_result_invalid
         ${EndIf}
       ${Else}
-        Goto dronedream_plan_retry_or_fail
+        Goto dronedream_plan_result_invalid
       ${EndIf}
     ${Else}
-      Goto dronedream_plan_retry_or_fail
+      Goto dronedream_plan_result_invalid
     ${EndIf}
+    StrCpy $DroneDreamPlanDiagnosticCode "$6"
+    Push "planner-result code=$DroneDreamPlanDiagnosticCode target=$DroneDreamPlanTarget"
+    Call DroneDreamAppendInstallerDiagnostic
     Delete "$DroneDreamPlanFile"
     Pop $0
     Push $DroneDreamPlanCanInstall
     Return
 
+    dronedream_plan_result_invalid:
+    StrCpy $DroneDreamPlanDiagnosticCode "result-invalid"
+
     dronedream_plan_retry_or_fail:
+    Push "planner-failure code=$DroneDreamPlanDiagnosticCode attempt=$8 drive=$0 exit=$1"
+    Call DroneDreamAppendInstallerDiagnostic
     Delete "$DroneDreamPlanFile"
     ${If} $8 == "0"
       StrCpy $8 "1"
@@ -305,6 +362,7 @@ Var DroneDreamQuiesceActive
   FunctionEnd
 
   Function DroneDreamRuntimeModePageCreate
+    StrCpy $LANGUAGE $DroneDreamInstallerLanguage
     IfSilent 0 +2
       Abort
     ${If} $PassiveMode == 1
@@ -314,18 +372,22 @@ Var DroneDreamQuiesceActive
       Abort
     ${EndIf}
     InitPluginsDir
-    StrCpy $DroneDreamPlannerExe "$PLUGINSDIR\dronedream-installer-planner.exe"
+    ; Do not put "installer" or "setup" in this temporary executable name.
+    ; Windows installer-detection heuristics otherwise reject an as-invoker
+    ; launch with Win32 error 740 before the disk probe can run.
+    StrCpy $DroneDreamPlannerExe "$PLUGINSDIR\dronedream-runtime-probe.exe"
     StrCpy $DroneDreamPlanFile "$PLUGINSDIR\dronedream-installer-plan-v1.ini"
     Delete "$DroneDreamPlannerExe"
     Delete "$DroneDreamPlanFile"
     SetOutPath "$PLUGINSDIR"
-    File "/oname=dronedream-installer-planner.exe" "${MAINBINARYSRCPATH}"
+    File "/oname=dronedream-runtime-probe.exe" "${MAINBINARYSRCPATH}"
     ; LLVM-MinGW fallback builds dynamically import this loader. MSVC builds
     ; do not have the sibling file, so /nonfatal is intentional.
     File /nonfatal "/oname=WebView2Loader.dll" "${DRONEDREAM_PLANNER_LOADER_SOURCE}"
     Push ""
     Call DroneDreamRunPlanner
     Pop $DroneDreamPlanCanInstall
+    StrCpy $LANGUAGE $DroneDreamInstallerLanguage
     StrCpy $DroneDreamSuggestedDrive ""
     ${If} $DroneDreamPlanTarget != ""
       StrCpy $DroneDreamSuggestedDrive $DroneDreamPlanTarget 2
@@ -341,11 +403,14 @@ Var DroneDreamQuiesceActive
     ${NSD_CreateRadioButton} 0 30u 100% 14u "$(DD_InstallAll)"
     Pop $DroneDreamFullRadio
     ${If} $DroneDreamPlanTarget == ""
-      ${NSD_CreateLabel} 18u 47u 95% 18u "$(DD_NoRecommendedTarget)"
+      ${NSD_CreateLabel} 18u 47u 70% 18u "$(DD_NoRecommendedTarget)"
     ${Else}
-      ${NSD_CreateLabel} 18u 47u 95% 18u "$(DD_RecommendedTarget)"
+      ${NSD_CreateLabel} 18u 47u 70% 18u "$(DD_RecommendedTarget)"
     ${EndIf}
-    Pop $1
+    Pop $DroneDreamRecommendedLabel
+    ${NSD_CreateButton} 76% 45u 24% 17u "$(DD_RetryDetection)"
+    Pop $DroneDreamRetryButton
+    ${NSD_OnClick} $DroneDreamRetryButton DroneDreamRetryDetection
     ${NSD_CreateRadioButton} 0 69u 100% 14u "$(DD_CustomDrive)"
     Pop $DroneDreamCustomRadio
     ${NSD_CreateText} 18u 88u 52u 14u "$DroneDreamSuggestedDrive"
@@ -357,6 +422,7 @@ Var DroneDreamQuiesceActive
     ${NSD_CreateLabel} 18u 132u 95% 26u "$(DD_ModeNote)"
     Pop $1
     ${If} $DroneDreamPlanCanInstall == "1"
+      ShowWindow $DroneDreamRetryButton ${SW_HIDE}
       ${If} $DroneDreamModePageVisited == "0"
         ${NSD_Check} $DroneDreamFullRadio
         StrCpy $DroneDreamInstallMode "install-all"
@@ -385,7 +451,7 @@ Var DroneDreamQuiesceActive
         ${ElseIf} $DroneDreamPlanBlockerCode == "no-eligible-target"
           MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_NoEligibleDrive)"
         ${Else}
-          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PlannerUnavailable)"
+          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PlannerFailureDetails)"
         ${EndIf}
       ${EndIf}
     ${EndIf}
@@ -395,7 +461,44 @@ Var DroneDreamQuiesceActive
     nsDialogs::Show
   FunctionEnd
 
+  Function DroneDreamRetryDetection
+    Push ""
+    Call DroneDreamRunPlanner
+    Pop $DroneDreamPlanCanInstall
+    StrCpy $LANGUAGE $DroneDreamInstallerLanguage
+    ${If} $DroneDreamPlanCanInstall == "1"
+      StrCpy $DroneDreamSuggestedDrive $DroneDreamPlanTarget 2
+      StrCpy $DroneDreamRuntimeDrive $DroneDreamSuggestedDrive
+      StrCpy $DroneDreamInstallMode "install-all"
+      ${NSD_SetText} $DroneDreamRecommendedLabel "$(DD_RecommendedTarget)"
+      ${NSD_SetText} $DroneDreamCustomDriveEdit "$DroneDreamSuggestedDrive"
+      EnableWindow $DroneDreamFullRadio 1
+      EnableWindow $DroneDreamCustomRadio 1
+      EnableWindow $DroneDreamCustomDriveEdit 1
+      ${NSD_Check} $DroneDreamFullRadio
+      ${NSD_Uncheck} $DroneDreamCustomRadio
+      ${NSD_Uncheck} $DroneDreamAppOnlyRadio
+      ShowWindow $DroneDreamRetryButton ${SW_HIDE}
+      MessageBox MB_ICONINFORMATION|MB_OK "$(DD_DetectionSucceeded)"
+    ${Else}
+      ${If} $DroneDreamPlanBlockerCode == "prerequisite-blocked"
+        EnableWindow $DroneDreamCustomRadio 0
+        EnableWindow $DroneDreamCustomDriveEdit 0
+        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PreflightBlocked)"
+      ${ElseIf} $DroneDreamPlanBlockerCode == "no-eligible-target"
+        EnableWindow $DroneDreamCustomRadio 1
+        EnableWindow $DroneDreamCustomDriveEdit 1
+        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_NoEligibleDrive)"
+      ${Else}
+        EnableWindow $DroneDreamCustomRadio 1
+        EnableWindow $DroneDreamCustomDriveEdit 1
+        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PlannerFailureDetails)"
+      ${EndIf}
+    ${EndIf}
+  FunctionEnd
+
   Function DroneDreamRuntimeModePageLeave
+    StrCpy $LANGUAGE $DroneDreamInstallerLanguage
     ${NSD_GetState} $DroneDreamAppOnlyRadio $0
     ${If} $0 == ${BST_CHECKED}
       StrCpy $DroneDreamInstallMode "install-app-only"
@@ -416,8 +519,13 @@ Var DroneDreamQuiesceActive
     Push $DroneDreamRuntimeDrive
     Call DroneDreamRunPlanner
     Pop $0
+    StrCpy $LANGUAGE $DroneDreamInstallerLanguage
     ${If} $0 != "1"
-      MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_SelectedDriveInvalid)"
+      ${If} $DroneDreamPlanBlockerCode == "planner-error"
+        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_SelectedDriveProbeFailed)"
+      ${Else}
+        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_SelectedDriveInvalid)"
+      ${EndIf}
       Abort
     ${EndIf}
     StrCpy $DroneDreamRuntimeDrive $DroneDreamPlanTarget 2

@@ -166,6 +166,10 @@ if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
     throw "The LLVM build completed without producing $generatedNsi"
 }
 & (Join-Path $PSScriptRoot "verify-webview2-installer.ps1") -GeneratedNsi $generatedNsi
+& (Join-Path $PSScriptRoot "verify-installer-locales.ps1") -GeneratedNsi $generatedNsi
+& (Join-Path $PSScriptRoot "verify-installer-planner.ps1") `
+    -Application $application `
+    -WebViewLoader $webViewLoaderStaged
 
 $tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
     ConvertFrom-Json

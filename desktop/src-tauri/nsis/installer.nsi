@@ -488,6 +488,13 @@ FunctionEnd
   !include "{{this}}"
 {{/each}}
 
+; DroneDream custom strings must be expanded only after every MUI language is
+; registered. Expanding them from the early hook include maps both locales to
+; English and lets the Chinese text overwrite the English text.
+!ifmacrodef DRONEDREAM_INSTALLER_LANGUAGE_TABLE
+  !insertmacro DRONEDREAM_INSTALLER_LANGUAGE_TABLE
+!endif
+
 Function .onInit
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
