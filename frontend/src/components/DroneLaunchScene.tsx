@@ -348,7 +348,7 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
   const attitudeValueRef = useRef<HTMLSpanElement>(null);
   const [fallback, setFallback] = useState(false);
   const [starflightActive, setStarflightActive] = useState(false);
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
 
   useEffect(() => {
     const host = hostRef.current;
@@ -689,7 +689,9 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       data-flight-state={starflightActive ? "starflight" : "hover"}
     >
       <div className="drone-launch-aura" aria-hidden="true" />
-      <div className={`drone-launch-tagline${starflightActive ? " is-hidden" : ""}`}>
+      <div
+        className={`drone-launch-tagline drone-launch-tagline-${locale === "zh-CN" ? "zh" : "en"}${starflightActive ? " is-hidden" : ""}`}
+      >
         {t("launcher.tagline")}
       </div>
       <div className="drone-launch-hud drone-launch-hud-left" aria-hidden="true">

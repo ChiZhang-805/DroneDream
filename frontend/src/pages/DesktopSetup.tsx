@@ -2254,10 +2254,15 @@ function RuntimeLauncherHero({
             <button
               type="button"
               className="btn launcher-progress-action"
+              aria-label={t("launcher.pauseInstall")}
+              data-tooltip={t("launcher.pauseInstall")}
               disabled={commandBusy}
               onClick={onCancel}
             >
-              {t("launcher.pauseShort")}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="6.5" y="5" width="3.5" height="14" rx="1.25" />
+                <rect x="14" y="5" width="3.5" height="14" rx="1.25" />
+              </svg>
             </button>
           ) : null}
         </div>

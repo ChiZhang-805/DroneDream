@@ -504,7 +504,7 @@ describe("DesktopSetup", () => {
       .toHaveClass("sr-only");
     expect(screen.getByText("Preparing download")).toBeInTheDocument();
     expect(screen.getByText("Preparing installation")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Pause installation" })).toBeEnabled();
     expect(page.container.querySelector(".launcher-stage-strip")).not.toBeInTheDocument();
     expect(page.container.querySelector(".desktop-launcher > .section-card"))
       .not.toBeInTheDocument();
@@ -681,7 +681,7 @@ describe("DesktopSetup", () => {
       .toBeInTheDocument();
     expect(screen.getByText(/became visible after the pending request was cleared/i))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Pause installation" })).toBeEnabled();
     expect(screen.getByText("4.0 GiB / 8.0 GiB")).toBeInTheDocument();
     expect(screen.queryByText("Automatic runtime installation was cancelled"))
       .not.toBeInTheDocument();
@@ -737,7 +737,7 @@ describe("DesktopSetup", () => {
       .toBeInTheDocument();
     expect(screen.getByText("The runtime operation has already started."))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Pause installation" })).toBeEnabled();
     expect(screen.getByText("2.0 GiB / 8.0 GiB")).toBeInTheDocument();
     expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
 
@@ -931,7 +931,7 @@ describe("DesktopSetup", () => {
       .not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel automatic installation" }))
       .not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Pause" }))
+    expect(screen.queryByRole("button", { name: "Pause installation" }))
       .not.toBeInTheDocument();
   });
 
@@ -1029,7 +1029,7 @@ describe("DesktopSetup", () => {
 
     expect(await screen.findByText("The installer choice could not be checked"))
       .toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Pause" }))
+    expect(await screen.findByRole("button", { name: "Pause installation" }))
       .toBeEnabled();
     expect(screen.getByText("3.0 GiB / 8.0 GiB")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
@@ -1422,7 +1422,7 @@ describe("DesktopSetup", () => {
       },
     });
 
-    await user.click(screen.getByRole("button", { name: "Pause" }));
+    await user.click(screen.getByRole("button", { name: "Pause installation" }));
     expect(await screen.findByRole("button", { name: "Resume installation" }))
       .toBeEnabled();
     expect(screen.getByText("1.0 GiB / 8.0 GiB")).toBeInTheDocument();
