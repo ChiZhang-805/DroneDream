@@ -55,18 +55,23 @@ describe("drone starflight trajectory", () => {
   });
 
   it("flies into the starfield, completes an orbit, and returns smoothly", () => {
-    const outbound = getDroneStarflightPose(0.28);
-    const orbitQuarter = getDroneStarflightPose(0.28 + 0.46 / 4);
-    const orbitEnd = getDroneStarflightPose(0.74);
-    const returning = getDroneStarflightPose(0.88);
+    const rightRear = getDroneStarflightPose(0.22);
+    const deepCentre = getDroneStarflightPose(0.5);
+    const leftRear = getDroneStarflightPose(0.78);
+    const returningFromLeft = getDroneStarflightPose(0.9);
 
-    expect(outbound.z).toBeCloseTo(-7.4, 5);
-    expect(outbound.scale).toBeCloseTo(0.5, 5);
-    expect(orbitQuarter.x).toBeGreaterThan(1.6);
-    expect(orbitEnd.x).toBeCloseTo(0, 5);
-    expect(orbitEnd.z).toBeCloseTo(-7.4, 5);
-    expect(returning.z).toBeGreaterThan(-7.4);
-    expect(returning.scale).toBeGreaterThan(0.5);
+    expect(rightRear.x).toBeCloseTo(0.5, 5);
+    expect(rightRear.y).toBeCloseTo(0.2, 5);
+    expect(rightRear.z).toBeCloseTo(-5.5, 5);
+    expect(deepCentre.x).toBeCloseTo(-5, 5);
+    expect(deepCentre.y).toBeCloseTo(0, 5);
+    expect(deepCentre.z).toBeCloseTo(-7, 5);
+    expect(leftRear.x).toBeCloseTo(-8, 5);
+    expect(leftRear.y).toBeCloseTo(-0.6, 5);
+    expect(leftRear.z).toBeCloseTo(-4.5, 5);
+    expect(returningFromLeft.x).toBeGreaterThan(-8);
+    expect(returningFromLeft.x).toBeLessThan(0);
+    expect(returningFromLeft.z).toBeGreaterThan(-4.5);
   });
 
   it("clamps trajectory progress outside the animation range", () => {

@@ -3182,7 +3182,7 @@ a {
 .drone-launch-tagline {
   position: absolute;
   z-index: 4;
-  top: clamp(3.8rem, 8vh, 5.5rem);
+  top: clamp(3.2rem, calc(8vh - 10px), 4.9rem);
   left: 50%;
   max-width: 92vw;
   color: rgba(255, 255, 255, 0.94);
@@ -3779,7 +3779,7 @@ a {
   .drone-launch-hud-left { left: 1rem; }
   .drone-launch-hud-right { right: 1rem; }
   .drone-launch-tagline {
-    top: 4.2rem;
+    top: 3.8rem;
     max-width: 92vw;
   }
   .drone-launch-tagline-zh { font-size: clamp(2.7rem, 12vw, 4.2rem); }

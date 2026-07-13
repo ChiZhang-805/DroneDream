@@ -1,7 +1,7 @@
 {
   "name": "drone-dream-desktop",
   "private": true,
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Tauri desktop shell for the existing DroneDream web interface",
   "scripts": {
     "frontend:dev": "npm --prefix ../frontend run dev",
