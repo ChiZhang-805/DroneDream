@@ -172,25 +172,19 @@ describe("desktop runtime access UX", () => {
       </I18nProvider>,
     );
 
-    const experimentLink = screen.getByRole("link", { name: "New Experiment" });
-    await waitFor(() => expect(experimentLink).not.toHaveClass("runtime-locked"));
+    expect(await screen.findByText("Ready for local tuning")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "New Experiment" }))
+      .not.toBeInTheDocument();
 
     await router.navigate("/desktop/setup?required=batch");
     await waitFor(() => {
-      expect(experimentLink).toHaveClass("runtime-locked");
-      expect(experimentLink).toHaveAttribute(
-        "title",
-        "Checking whether DroneDreamRuntime is ready.",
-      );
+      expect(screen.getByText("Checking…")).toBeInTheDocument();
     });
     expect(runtimeProbeCount).toBe(2);
 
     resolveSecondProbe(missingRuntime);
     await waitFor(() => {
-      expect(experimentLink).toHaveAttribute(
-        "title",
-        "DroneDreamRuntime must be installed and running before this feature can be used.",
-      );
+      expect(screen.getByText("Runtime")).toBeInTheDocument();
     });
 
     router.dispose();
@@ -231,8 +225,9 @@ describe("desktop runtime access UX", () => {
 
     expect(await screen.findByText("The installed runtime is ready."))
       .toBeInTheDocument();
-    const experimentLink = screen.getByRole("link", { name: "New Experiment" });
-    await waitFor(() => expect(experimentLink).not.toHaveClass("runtime-locked"));
+    expect(screen.getAllByText("Ready for local tuning").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: "New Experiment" }))
+      .not.toBeInTheDocument();
     expect(screen.queryByText("This feature needs DroneDreamRuntime"))
       .not.toBeInTheDocument();
 
@@ -251,11 +246,7 @@ describe("desktop runtime access UX", () => {
     expect(await screen.findByText("DroneDreamRuntime · Installed · Stopped"))
       .toBeInTheDocument();
     await waitFor(() => {
-      expect(experimentLink).toHaveClass("runtime-locked");
-      expect(experimentLink).toHaveAttribute(
-        "title",
-        "DroneDreamRuntime must be installed and running before this feature can be used.",
-      );
+      expect(screen.getByText("Runtime")).toBeInTheDocument();
     });
 
     router.dispose();

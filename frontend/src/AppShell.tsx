@@ -38,9 +38,61 @@ function AppShellContent() {
   const desktopRuntime = isDesktopRuntime();
   const runtimeAccess = useDesktopRuntimeAccess();
   const { locale, setLocale, t } = useI18n();
+  const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const runtimeNavDescription = runtimeAccess.status === "checking"
     ? t("runtimeGate.navChecking")
     : t("runtimeGate.navLocked");
+
+  if (launcherMode) {
+    return (
+      <div className="app-shell app-shell-launcher">
+        <a
+          className="skip-link"
+          href="#main-content"
+          onClick={(event) => {
+            event.preventDefault();
+            document.getElementById("main-content")?.focus();
+          }}
+        >
+          {t("app.skipToContent")}
+        </a>
+        <header className="launcher-chrome">
+          <Link to="/desktop/setup" className="launcher-brand" aria-label="DroneDream">
+            <span className="launcher-brand-mark" aria-hidden="true">
+              <span />
+            </span>
+            <span>DroneDream</span>
+          </Link>
+          <div className="launcher-chrome-actions">
+            <span className="launcher-runtime-indicator">
+              <span aria-hidden="true" />
+              {runtimeAccess.status === "checking"
+                ? t("runtimeGate.checkingShort")
+                : runtimeAccess.status === "ready"
+                  ? t("desktop.ready")
+                  : t("runtimeGate.requiredShort")}
+            </span>
+            <label className="language-switcher launcher-language-switcher">
+              <span className="sr-only">{t("app.language")}</span>
+              <select
+                aria-label={t("app.language")}
+                value={locale}
+                onChange={(event) =>
+                  setLocale(event.target.value === "zh-CN" ? "zh-CN" : "en")
+                }
+              >
+                <option value="en">English</option>
+                <option value="zh-CN">中文</option>
+              </select>
+            </label>
+          </div>
+        </header>
+        <main id="main-content" className="launcher-main" tabIndex={-1}>
+          <Outlet />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">
