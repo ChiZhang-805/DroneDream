@@ -111,6 +111,7 @@ if (-not (Test-Path -LiteralPath $llvmBundleConfig -PathType Leaf)) {
 
 & (Join-Path $PSScriptRoot "verify-desktop-version.ps1")
 & (Join-Path $PSScriptRoot "verify-nsis-template.ps1")
+& (Join-Path $PSScriptRoot "verify-installer-path-guard.ps1")
 
 Write-Host "Building DroneDream Desktop with $toolchain"
 $desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path

@@ -144,7 +144,9 @@ jobs:
 
       - name: Verify pinned NSIS template
         shell: pwsh
-        run: ./desktop/scripts/verify-nsis-template.ps1
+        run: |
+          ./desktop/scripts/verify-nsis-template.ps1
+          ./desktop/scripts/verify-installer-path-guard.ps1
 
       - name: Build DroneDream setup executable
         shell: pwsh

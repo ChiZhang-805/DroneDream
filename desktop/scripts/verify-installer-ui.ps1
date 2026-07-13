@@ -3,7 +3,8 @@ param(
     [string]$Installer,
     [ValidateSet("English", "SimpChinese")]
     [string]$Language = "English",
-    [string]$ExpectedTarget = "E:\DroneDream"
+    [string]$ExpectedTarget = "E:\DroneDream",
+    [string]$ExpectedApplication = (Join-Path $env:LOCALAPPDATA "DroneDream")
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,13 +33,20 @@ public static class DroneDreamInstallerUi {
     [DllImport("user32.dll")]
     public static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 
+    [DllImport("user32.dll", EntryPoint = "SendMessageW", CharSet = CharSet.Unicode)]
+    public static extern IntPtr SendMessageText(IntPtr hwnd, uint message, IntPtr wParam, StringBuilder lParam);
+
     [DllImport("user32.dll")]
     public static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 
     public static string ReadText(IntPtr hwnd) {
-        var length = GetWindowTextLength(hwnd);
+        const uint WM_GETTEXT = 0x000D;
+        const uint WM_GETTEXTLENGTH = 0x000E;
+        var length = (int)SendMessage(hwnd, WM_GETTEXTLENGTH, IntPtr.Zero, IntPtr.Zero);
+        if (length == 0) length = GetWindowTextLength(hwnd);
         var buffer = new StringBuilder(Math.Max(length + 1, 2));
-        GetWindowText(hwnd, buffer, buffer.Capacity);
+        SendMessageText(hwnd, WM_GETTEXT, (IntPtr)buffer.Capacity, buffer);
+        if (buffer.Length == 0) GetWindowText(hwnd, buffer, buffer.Capacity);
         return buffer.ToString();
     }
 
@@ -117,6 +125,9 @@ try {
     $locationPage = Wait-InstallerWindow -Process $process -Condition {
         param($handle, $title, $body)
         $body.Contains($locationNeedle)
+    }
+    if (-not $locationPage.Body.Contains($ExpectedApplication)) {
+        throw "The application page did not preserve the expected destination $ExpectedApplication. Controls='$($locationPage.Body)'"
     }
     $next = [DroneDreamInstallerUi]::GetDlgItem($locationPage.Handle, 1)
     [void][DroneDreamInstallerUi]::PostMessage($next, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)

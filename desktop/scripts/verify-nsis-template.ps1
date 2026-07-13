@@ -131,6 +131,8 @@ foreach ($required in @(
     'result-incomplete',
     'Function DroneDreamAppendInstallerDiagnostic',
     'Function DroneDreamRetryDetection',
+    'StrCmp $0 "0" 0 dronedream_app_path_safe',
+    'path-check app=$1 runtime=$2',
     'Pop $DroneDreamPlanCanInstall',
     'dronedream_plan_retry_or_fail:',
     '$(DD_ModeHeader)',

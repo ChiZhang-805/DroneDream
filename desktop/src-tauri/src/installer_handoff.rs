@@ -2138,6 +2138,8 @@ mod tests {
             "result-incomplete",
             "Function DroneDreamRetryDetection",
             "installer-diagnostics.log",
+            "StrCmp $0 \"0\" 0 dronedream_app_path_safe",
+            "path-check app=$1 runtime=$2",
         ] {
             assert!(
                 mode_page.contains(required),

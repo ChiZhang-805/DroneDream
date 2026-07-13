@@ -538,16 +538,22 @@ Var DroneDreamDiagnosticHandle
     GetFullPathName $2 "$DroneDreamPlanTarget"
     ${StrCase} $1 $1 "U"
     ${StrCase} $2 $2 "U"
+    Push "path-check app=$1 runtime=$2"
+    Call DroneDreamAppendInstallerDiagnostic
     ${If} $1 == $2
       MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_AppAtRuntimeRoot)"
       Abort
     ${EndIf}
     StrCpy $3 "$2\"
     ${StrLoc} $0 $1 $3 ">"
-    ${If} $0 == 0
+    ; StrLoc returns an empty string when the prefix is absent. LogicLib's
+    ; numeric comparison treats both "" and "0" as zero, which previously
+    ; rejected every ordinary application path (for example C:\... when the
+    ; Runtime target is E:\DroneDream). StrCmp keeps those values distinct.
+    StrCmp $0 "0" 0 dronedream_app_path_safe
       MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_AppBelowRuntimeRoot)"
       Abort
-    ${EndIf}
+    dronedream_app_path_safe:
   FunctionEnd
 !macroend
 
