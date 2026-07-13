@@ -286,6 +286,25 @@ export function DesktopSetup() {
     state.prerequisitesFresh &&
     state.runtimeFresh &&
     isOverallDesktopReady(state.prerequisites, state.runtime);
+  const installerHandoffNeedsAttention = Boolean(
+    installerHandoffState.commandError ||
+    installerHandoffState.autoStartUncertain ||
+    installerHandoffState.result?.disposition === "invalid" ||
+    installerHandoffState.intent?.status === "invalid" ||
+    (installerHandoffState.discardResult &&
+      !installerHandoffState.discardResult.discarded),
+  );
+  const launcherNeedsAttention = Boolean(
+    state.issues.length > 0 ||
+    runtimeCommandError ||
+    installState.commandError ||
+    installState.snapshot?.error ||
+    installerHandoffNeedsAttention ||
+    (!state.loading && (
+      (state.prerequisites !== null && !state.prerequisitesFresh) ||
+      (state.runtime !== null && !state.runtimeFresh)
+    )),
+  );
   const requestedFeature = searchParams.get("required");
   const requestedFeatureLabel = requestedFeature === "experiment"
     ? t("runtimeGate.featureExperiment")
@@ -1043,6 +1062,8 @@ export function DesktopSetup() {
           ready={localRuntimeReady}
           checking={state.loading || installerHandoffState.checking}
           automaticStartPending={automaticStartPending}
+          commandBusy={installState.commandBusy}
+          onCancel={() => void cancelInstall()}
         />
 
         {requestedFeatureLabel && !localRuntimeReady ? (
@@ -1056,6 +1077,7 @@ export function DesktopSetup() {
         ) : null}
 
         <InstallerHandoffNotice
+          quietSuccess
           state={installerHandoffState}
           discardAvailable={installerHandoffDiscardAvailable}
           discardBusy={installerHandoffState.discarding}
@@ -1071,26 +1093,18 @@ export function DesktopSetup() {
               {t("launcher.openWorkspace")}
               <span aria-hidden="true">→</span>
             </Link>
-            <span>{t("launcher.readyHint")}</span>
           </div>
         ) : (
           <>
             {state.issues.length > 0 ? (
               <Alert tone="warning" title={t("desktop.probeIssue")}>
                 <p className="desktop-alert-copy">{t("desktop.partialFailure")}</p>
-                <ul className="desktop-diagnostic-list">
-                  {state.issues.map((issue) => (
-                    <li key={issue.source}>
-                      <code>{issue.command}: {issue.message}</code>
-                    </li>
-                  ))}
-                </ul>
               </Alert>
             ) : null}
 
             {runtimeCommandError ? (
               <Alert tone="warning" title={t("desktop.runtimeActionFailed")}>
-                <code>{runtimeCommandError}</code>
+                {t("launcher.openDetailsForError")}
               </Alert>
             ) : null}
             {state.runtimeFresh && state.runtime?.installed ? (
@@ -1139,70 +1153,95 @@ export function DesktopSetup() {
             ) : null}
             {(showInstallPlanner && state.plan) ||
             (installState.snapshot && installState.snapshot.phase !== "idle") ? (
-              <RuntimeInstallControls
-                launcherMode
-                plan={state.plan}
-                snapshot={installState.snapshot}
-                commandError={installState.commandError}
-                commandBusy={installState.commandBusy}
-                automaticStartPending={automaticStartPending}
-                automaticStartUncertain={installerHandoffState.autoStartUncertain}
-                automaticDiscardBusy={installerHandoffState.discarding}
-                receiptCleanupPending={receiptCleanupPending}
-                receiptCleanupInstalled={Boolean(
-                  installState.snapshot?.installedVersion,
-                )}
-                restartContinuationPending={restartContinuationPending}
-                releaseManifestUrlAvailable={
-                  releaseManifestUrl !== null || installerManagedInstall
-                }
-                onStart={() => void beginOrResumeInstall()}
-                onCancel={() => void cancelInstall()}
-                onDiscardAutomatic={() => void discardAutomaticInstall()}
-              />
+              !installActive ? (
+                <RuntimeInstallControls
+                  launcherMode
+                  plan={state.plan}
+                  snapshot={installState.snapshot}
+                  commandError={installState.commandError}
+                  commandBusy={installState.commandBusy}
+                  automaticStartPending={automaticStartPending}
+                  automaticStartUncertain={installerHandoffState.autoStartUncertain}
+                  automaticDiscardBusy={installerHandoffState.discarding}
+                  receiptCleanupPending={receiptCleanupPending}
+                  receiptCleanupInstalled={Boolean(
+                    installState.snapshot?.installedVersion,
+                  )}
+                  restartContinuationPending={restartContinuationPending}
+                  releaseManifestUrlAvailable={
+                    releaseManifestUrl !== null || installerManagedInstall
+                  }
+                  onStart={() => void beginOrResumeInstall()}
+                  onCancel={() => void cancelInstall()}
+                  onDiscardAutomatic={() => void discardAutomaticInstall()}
+                />
+              ) : null
             ) : null}
           </>
         )}
 
-        <div className="launcher-secondary-actions">
-          <button
-            type="button"
-            className="btn"
-            onClick={() => void refresh(
-              automaticStartPending
-                ? installerIntent?.targetRoot ?? undefined
-                : undefined,
-            )}
-            disabled={busy}
-          >
-            {state.loading
-              ? t("desktop.checking")
-              : state.planLoading
-                ? t("desktop.planUpdating")
-                : t("desktop.refresh")}
-          </button>
-        </div>
+        {launcherNeedsAttention ? (
+          <div className="launcher-secondary-actions">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void refresh(
+                automaticStartPending
+                  ? installerIntent?.targetRoot ?? undefined
+                  : undefined,
+              )}
+              disabled={busy}
+            >
+              {state.loading
+                ? t("desktop.checking")
+                : state.planLoading
+                  ? t("desktop.planUpdating")
+                  : t("desktop.refresh")}
+            </button>
+          </div>
+        ) : null}
 
-        <details className="launcher-details">
-          <summary>
-            <span>
-              <strong>{t("launcher.details")}</strong>
-              <small>{t("launcher.detailsHint")}</small>
-            </span>
-            <span aria-hidden="true">⌄</span>
+        <details className={`launcher-details${launcherNeedsAttention ? " attention" : ""}`}>
+          <summary aria-label={t("launcher.details")} title={t("launcher.details")}>
+            {launcherNeedsAttention ? (
+              <span>
+                <strong>{t("launcher.details")}</strong>
+              </span>
+            ) : (
+              <span className="sr-only">{t("launcher.details")}</span>
+            )}
+            <span aria-hidden="true">{launcherNeedsAttention ? "⌄" : "•••"}</span>
           </summary>
           <div className="launcher-details-content stack-md">
             <div className="launcher-details-toolbar">
               <strong>{t("launcher.details")}</strong>
-              <button
-                type="button"
-                className="btn"
-                onClick={(event) => {
-                  event.currentTarget.closest("details")?.removeAttribute("open");
-                }}
-              >
-                {t("launcher.closeDetails")}
-              </button>
+              <div>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => void refresh(
+                    automaticStartPending
+                      ? installerIntent?.targetRoot ?? undefined
+                      : undefined,
+                  )}
+                  disabled={busy}
+                >
+                  {state.loading
+                    ? t("desktop.checking")
+                    : state.planLoading
+                      ? t("desktop.planUpdating")
+                      : t("desktop.refresh")}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                  }}
+                >
+                  {t("launcher.closeDetails")}
+                </button>
+              </div>
             </div>
             <ReadinessHero
               prerequisites={state.prerequisites}
@@ -1211,6 +1250,22 @@ export function DesktopSetup() {
               prerequisitesFresh={state.prerequisitesFresh}
               runtimeFresh={state.runtimeFresh}
             />
+            {state.issues.length > 0 ? (
+              <Alert tone="warning" title={t("desktop.probeIssue")}>
+                <ul className="desktop-diagnostic-list">
+                  {state.issues.map((issue) => (
+                    <li key={issue.source}>
+                      <code>{issue.command}: {issue.message}</code>
+                    </li>
+                  ))}
+                </ul>
+              </Alert>
+            ) : null}
+            {runtimeCommandError ? (
+              <Alert tone="warning" title={t("desktop.runtimeActionFailed")}>
+                <code>{runtimeCommandError}</code>
+              </Alert>
+            ) : null}
             {state.prerequisites ? (
               <PrerequisiteOverview
                 report={state.prerequisites}
@@ -1424,6 +1479,7 @@ function BrowserExplanation() {
 }
 
 function InstallerHandoffNotice({
+  quietSuccess = false,
   state,
   discardAvailable,
   discardBusy,
@@ -1432,6 +1488,7 @@ function InstallerHandoffNotice({
   onRetry,
   onDiscard,
 }: {
+  quietSuccess?: boolean;
   state: InstallerHandoffState;
   discardAvailable: boolean;
   discardBusy: boolean;
@@ -1442,6 +1499,9 @@ function InstallerHandoffNotice({
 }) {
   const { t } = useI18n();
   if (state.checking) {
+    if (quietSuccess) {
+      return <span className="sr-only">{t("desktop.installerChoiceChecking")}</span>;
+    }
     return (
       <Alert tone="info" title={t("desktop.installerChoiceChecking")}>
         {t("desktop.installerChoiceCheckingHint")}
@@ -1449,6 +1509,17 @@ function InstallerHandoffNotice({
     );
   }
   if (state.discardResult?.discarded) {
+    if (quietSuccess) {
+      return (
+        <span className="sr-only">
+          {t(receiptCleanupRecovered
+            ? "desktop.receiptCleanupRecovered"
+            : waitingForRestart
+              ? "desktop.restartContinuationCancelled"
+              : "desktop.autoInstallCancelled")}
+        </span>
+      );
+    }
     return (
       <Alert
         tone="success"
@@ -1529,6 +1600,9 @@ function InstallerHandoffNotice({
     );
   }
   if (result?.disposition === "alreadyInstalled") {
+    if (quietSuccess) {
+      return <span className="sr-only">{t("desktop.installerRuntimeAlreadyInstalled")}</span>;
+    }
     return (
       <Alert tone="success" title={t("desktop.installerRuntimeAlreadyInstalled")}>
         {t("desktop.installerRuntimeAlreadyInstalledHint")}
@@ -1536,6 +1610,9 @@ function InstallerHandoffNotice({
     );
   }
   if (result?.disposition === "resumed") {
+    if (quietSuccess) {
+      return <span className="sr-only">{t("desktop.autoInstallResumed")}</span>;
+    }
     return (
       <Alert tone="success" title={t("desktop.autoInstallResumed")}>
         {t("desktop.autoInstallResumedHint")}
@@ -1543,6 +1620,9 @@ function InstallerHandoffNotice({
     );
   }
   if (result?.disposition === "started") {
+    if (quietSuccess) {
+      return <span className="sr-only">{t("desktop.autoInstallStarted")}</span>;
+    }
     return (
       <Alert tone="success" title={t("desktop.autoInstallStarted")}>
         {t("desktop.autoInstallStartedHint")}
@@ -2203,11 +2283,15 @@ function RuntimeLauncherHero({
   ready,
   checking,
   automaticStartPending,
+  commandBusy,
+  onCancel,
 }: {
   snapshot: RuntimeInstallSnapshot | null;
   ready: boolean;
   checking: boolean;
   automaticStartPending: boolean;
+  commandBusy: boolean;
+  onCancel: () => void;
 }) {
   const { locale, t } = useI18n();
   const phase = snapshot?.phase ?? "idle";
@@ -2220,7 +2304,6 @@ function RuntimeLauncherHero({
       ? 100
       : null;
   const estimate = useRuntimeTransferEstimate(snapshot);
-  const currentProgressIndex = INSTALL_PROGRESS_PHASES.indexOf(phase);
   const headline = ready
     ? t("launcher.title.ready")
     : phase === "downloading"
@@ -2230,11 +2313,6 @@ function RuntimeLauncherHero({
         : checking || automaticStartPending
           ? t("launcher.title.checking")
           : t("launcher.title.welcome");
-  const subtitle = ready
-    ? t("launcher.subtitle.ready")
-    : active
-      ? t("launcher.subtitle.active")
-      : t("launcher.subtitle.welcome");
 
   return (
     <div className={`launcher-hero launcher-hero-${ready ? "ready" : phase}`}>
@@ -2243,84 +2321,72 @@ function RuntimeLauncherHero({
           <DroneLaunchScene active={active || ready} progress={percent} />
         </Suspense>
         <div className="launcher-hero-copy">
-          <span className="launcher-eyebrow">
-            <span aria-hidden="true" />
-            {t("launcher.eyebrow")}
-          </span>
           <h1>{headline}</h1>
-          <p>{subtitle}</p>
         </div>
       </div>
 
       <div className="launcher-progress-panel" role="status" aria-live="polite">
         <div className="launcher-progress-heading">
-          <div>
-            <span>{t("desktop.currentStage")}</span>
-            <strong>
-              {ready
-                ? t("desktop.installPhase.completed")
-                : automaticStartPending && phase === "idle"
-                  ? t("desktop.installPhase.confirmed")
-                  : checking && phase === "idle"
-                    ? t("desktop.checking")
-                    : t(installPhaseKey(phase))}
-            </strong>
-          </div>
+          <strong className="sr-only">
+            {ready
+              ? t("desktop.installPhase.completed")
+              : automaticStartPending && phase === "idle"
+                ? t("desktop.installPhase.confirmed")
+                : checking && phase === "idle"
+                  ? t("desktop.checking")
+                  : t(installPhaseKey(phase))}
+          </strong>
           <strong>{percent === null ? "—" : `${percent}%`}</strong>
         </div>
         <div className={`launcher-progress-track${percent === null && (active || checking) ? " indeterminate" : ""}`}>
           <span style={{ width: `${percent ?? 0}%` }} />
         </div>
-        <div className="launcher-transfer-row">
-          <span>
-            {total === null
-              ? downloaded > 0
-                ? `${formatBytes(downloaded)} ${t("desktop.downloaded")}`
-                : t("launcher.waitingForSize")
-              : `${formatBytes(downloaded)} / ${formatBytes(total)}`}
-          </span>
-          <span className="launcher-transfer-metrics">
-            {phase === "downloading" ? (
-              <>
-                <span>
-                  {estimate.bytesPerSecond === null
-                    ? t("launcher.calculatingSpeed")
-                    : `${formatBytes(Math.round(estimate.bytesPerSecond))}/s`}
-                </span>
-                <span aria-hidden="true">·</span>
-                <span>
-                  {estimate.secondsRemaining === null
-                    ? t("launcher.calculatingTime")
-                    : `${t("launcher.remaining")} ${formatRemainingTime(
-                        estimate.secondsRemaining,
-                        locale,
-                      )}`}
-                </span>
-              </>
-            ) : snapshot?.currentPart !== null && snapshot?.currentPart !== undefined &&
-              snapshot.totalParts !== null ? (
-                <span>
-                  {t("desktop.downloadPart")} {snapshot.currentPart} / {snapshot.totalParts}
-                </span>
-              ) : null}
-          </span>
+        <div className="launcher-progress-footer">
+          <div className="launcher-transfer-row">
+            <span>
+              {total === null
+                ? downloaded > 0
+                  ? `${formatBytes(downloaded)} ${t("desktop.downloaded")}`
+                  : t("launcher.waitingForSize")
+                : `${formatBytes(downloaded)} / ${formatBytes(total)}`}
+            </span>
+            <span className="launcher-transfer-metrics">
+              {phase === "downloading" ? (
+                <>
+                  <span>
+                    {estimate.bytesPerSecond === null
+                      ? t("launcher.calculatingSpeed")
+                      : `${formatBytes(Math.round(estimate.bytesPerSecond))}/s`}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    {estimate.secondsRemaining === null
+                      ? t("launcher.calculatingTime")
+                      : `${t("launcher.remaining")} ${formatRemainingTime(
+                          estimate.secondsRemaining,
+                          locale,
+                        )}`}
+                  </span>
+                </>
+              ) : snapshot?.currentPart !== null && snapshot?.currentPart !== undefined &&
+                snapshot.totalParts !== null ? (
+                  <span>
+                    {t("desktop.downloadPart")} {snapshot.currentPart} / {snapshot.totalParts}
+                  </span>
+                ) : null}
+            </span>
+          </div>
+          {active ? (
+            <button
+              type="button"
+              className="btn launcher-progress-action"
+              disabled={commandBusy}
+              onClick={onCancel}
+            >
+              {commandBusy ? t("launcher.pausing") : t("launcher.pause")}
+            </button>
+          ) : null}
         </div>
-
-        <ol className="launcher-stage-strip" aria-label={t("desktop.installStages")}>
-          {INSTALL_PROGRESS_PHASES.map((installPhase, index) => {
-            const complete = ready || phase === "completed" || currentProgressIndex > index;
-            const current = phase === installPhase;
-            return (
-              <li
-                key={installPhase}
-                className={complete ? "complete" : current ? "current" : "pending"}
-              >
-                <span aria-hidden="true">{complete ? "✓" : index + 1}</span>
-                <small>{t(installPhaseKey(installPhase))}</small>
-              </li>
-            );
-          })}
-        </ol>
       </div>
     </div>
   );

@@ -2895,6 +2895,7 @@ a {
 }
 
 .desktop-launcher {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: min(1240px, calc(100% - 3rem));
@@ -3035,7 +3036,7 @@ a {
   position: absolute;
   z-index: 5;
   right: 0;
-  bottom: 2.4rem;
+  bottom: 2rem;
   left: 0;
   display: flex;
   align-items: center;
@@ -3043,25 +3044,6 @@ a {
   padding: 0 1.5rem;
   text-align: center;
   pointer-events: none;
-}
-
-.launcher-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin-bottom: 0.65rem;
-  color: #7feaff;
-  font-size: 0.68rem;
-  font-weight: 760;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.launcher-eyebrow > span {
-  width: 22px;
-  height: 1px;
-  background: currentColor;
-  box-shadow: 0 0 9px currentColor;
 }
 
 .launcher-hero-copy h1 {
@@ -3075,22 +3057,13 @@ a {
   text-shadow: 0 8px 38px rgba(0, 0, 0, 0.62);
 }
 
-.launcher-hero-copy p {
-  max-width: 760px;
-  margin: 0.9rem 0 0;
-  color: #b8accb;
-  font-size: clamp(0.86rem, 1.4vw, 1.02rem);
-  line-height: 1.65;
-  text-shadow: 0 3px 20px rgba(0, 0, 0, 0.75);
-}
-
 .launcher-progress-panel {
   position: relative;
   z-index: 7;
-  width: min(1040px, calc(100% - 3rem));
+  width: min(920px, calc(100% - 3rem));
   flex: 0 0 auto;
   margin: -1.1rem auto 0.45rem;
-  padding: 0.9rem 1.15rem 0.8rem;
+  padding: 0.78rem 1rem 0.72rem;
   border: 1px solid rgba(202, 160, 255, 0.22);
   border-radius: 18px;
   background: rgba(18, 6, 36, 0.88);
@@ -3108,23 +3081,13 @@ a {
   gap: 1rem;
 }
 
-.launcher-progress-heading > div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-
-.launcher-progress-heading span {
-  color: #9486a9;
-  font-size: 0.66rem;
-  font-weight: 680;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .launcher-progress-heading strong {
   color: #faf7ff;
   font-size: 0.93rem;
+}
+
+.launcher-progress-heading {
+  justify-content: flex-end;
 }
 
 .launcher-progress-heading > strong {
@@ -3165,9 +3128,26 @@ a {
 }
 
 .launcher-transfer-row {
+  flex: 1 1 auto;
   color: #a99dbb;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.7rem;
+}
+
+.launcher-progress-footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.launcher-progress-action {
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 0.35rem 0.78rem;
+  border-color: rgba(202, 160, 255, 0.2);
+  color: #d9d0e6;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.72rem;
 }
 
 .launcher-transfer-metrics {
@@ -3175,63 +3155,6 @@ a {
   align-items: center;
   gap: 0.55rem;
   color: #c8bdd7;
-}
-
-.launcher-stage-strip {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.42rem;
-  margin: 0.65rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.launcher-stage-strip li {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
-  padding: 0.38rem 0.44rem;
-  border: 1px solid rgba(198, 157, 255, 0.1);
-  border-radius: 9px;
-  color: #746985;
-  background: rgba(8, 2, 19, 0.28);
-}
-
-.launcher-stage-strip li > span {
-  display: grid;
-  place-items: center;
-  flex: 0 0 20px;
-  width: 20px;
-  height: 20px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  font-size: 0.58rem;
-  font-weight: 760;
-}
-
-.launcher-stage-strip small {
-  overflow: hidden;
-  font-size: 0.62rem;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-}
-
-.launcher-stage-strip li.current {
-  border-color: rgba(103, 232, 255, 0.34);
-  color: #76eaff;
-  background: rgba(75, 214, 255, 0.06);
-  box-shadow: inset 0 0 18px rgba(77, 220, 255, 0.035);
-}
-
-.launcher-stage-strip li.current > span {
-  box-shadow: 0 0 13px rgba(103, 232, 255, 0.32);
-}
-
-.launcher-stage-strip li.complete {
-  border-color: rgba(96, 237, 190, 0.22);
-  color: #67e7b6;
-  background: rgba(58, 214, 160, 0.045);
 }
 
 .launcher-ready-actions {
@@ -3266,11 +3189,6 @@ a {
   background: linear-gradient(110deg, #684bff, #c13ed7 56%, #3fb7dd);
   box-shadow: 0 16px 38px rgba(128, 60, 221, 0.3), 0 0 32px rgba(87, 225, 255, 0.08);
   font-size: 1rem;
-}
-
-.launcher-ready-actions > span {
-  color: #9285a6;
-  font-size: 0.76rem;
 }
 
 .launcher-storage-card,
@@ -3317,14 +3235,20 @@ a {
 .desktop-launcher > .section-card {
   flex: 0 0 auto;
   margin-bottom: 0.35rem;
-  padding: 0.7rem 1rem;
-  border-color: rgba(202, 160, 255, 0.18);
-  border-radius: 16px;
-  background: rgba(18, 6, 36, 0.72);
+  padding: 0.25rem 1rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .desktop-launcher > .section-card .section-card-header {
-  background: rgba(255, 255, 255, 0.015);
+  display: none;
+}
+
+.desktop-launcher > .section-card .section-card-body,
+.desktop-launcher > .section-card .desktop-install-actions {
+  justify-content: center;
+  padding: 0;
 }
 
 .desktop-launcher > .section-card .desktop-install-actions .btn-primary {
@@ -3335,21 +3259,30 @@ a {
 }
 
 .launcher-details {
+  position: absolute;
+  z-index: 15;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  width: auto;
   flex: 0 0 auto;
-  margin-top: 0.35rem;
-  overflow: hidden;
-  border: 1px solid rgba(202, 160, 255, 0.12);
-  border-radius: 14px;
-  background: rgba(10, 3, 22, 0.45);
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
 }
 
 .launcher-details > summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.65rem 1rem;
-  color: #c9bfd7;
+  gap: 0.55rem;
+  min-width: 34px;
+  min-height: 30px;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(202, 160, 255, 0.12);
+  border-radius: 999px;
+  color: #8d819f;
+  background: rgba(10, 3, 22, 0.46);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -3357,13 +3290,19 @@ a {
 
 .launcher-details > summary::-webkit-details-marker { display: none; }
 
+.launcher-details.attention > summary {
+  color: #e3d9ef;
+  border-color: rgba(255, 193, 90, 0.3);
+  background: rgba(63, 35, 14, 0.72);
+}
+
 .launcher-details > summary > span:first-child {
   display: flex;
   flex-direction: column;
   gap: 0.16rem;
 }
 
-.launcher-details > summary strong { font-size: 0.82rem; }
+.launcher-details > summary strong { font-size: 0.72rem; }
 .launcher-details > summary small { color: #776c88; font-size: 0.7rem; }
 .launcher-details > summary > span:last-child {
   color: #8ceeff;
@@ -3401,6 +3340,12 @@ a {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid rgba(202, 160, 255, 0.1);
   background: rgba(10, 3, 22, 0.96);
+}
+
+.launcher-details-toolbar > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .launcher-details-toolbar .btn {
@@ -3461,7 +3406,6 @@ a {
 
 @media (max-width: 900px) {
   .launcher-hero-visual { min-height: 230px; }
-  .launcher-stage-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .launcher-storage-card { grid-template-columns: 1fr; }
   .launcher-storage-card .desktop-storage-selector { grid-template-columns: 1fr; }
 }
@@ -3481,14 +3425,13 @@ a {
   .launcher-storage-card,
   .desktop-launcher > .section-card,
   .desktop-launcher > .alert,
-  .desktop-launcher > .loading-state,
-  .launcher-details {
+  .desktop-launcher > .loading-state {
     width: calc(100% - 1.4rem);
   }
   .launcher-progress-panel { padding: 1rem 0.9rem; }
+  .launcher-progress-footer { align-items: stretch; flex-direction: column; gap: 0.55rem; }
   .launcher-transfer-row { align-items: flex-start; flex-direction: column; gap: 0.3rem; }
-  .launcher-stage-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .launcher-stage-strip small { white-space: normal; }
+  .launcher-progress-action { align-self: center; }
   .launcher-details-content { top: 70px; right: 0.7rem; bottom: 0.7rem; left: 0.7rem; }
 }
 
@@ -3497,10 +3440,8 @@ a {
   .launcher-hero { margin-top: 0.4rem; }
   .launcher-hero-copy { bottom: 1.2rem; }
   .launcher-hero-copy h1 { font-size: clamp(1.7rem, 3.2vw, 2.8rem); }
-  .launcher-hero-copy p { margin-top: 0.5rem; font-size: 0.82rem; line-height: 1.4; }
   .drone-launch-hud { top: 1.2rem; }
   .launcher-progress-panel { padding: 0.72rem 1rem 0.65rem; }
-  .launcher-stage-strip { margin-top: 0.45rem; }
   .desktop-launcher > .section-card .section-card-header { display: none; }
   .desktop-launcher > .section-card .section-card-body { gap: 0.45rem; }
   .launcher-details > summary { padding-top: 0.5rem; padding-bottom: 0.5rem; }

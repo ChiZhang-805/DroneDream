@@ -499,9 +499,15 @@ describe("DesktopSetup", () => {
     );
 
     expect(await screen.findByText("One-click runtime installation started"))
+      .toHaveClass("sr-only");
+    expect(screen.getByRole("heading", { name: "Preparing your flight environment" }))
       .toBeInTheDocument();
     expect(screen.getByText("Preparing installation")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause setup" })).toBeEnabled();
+    expect(page.container.querySelector(".launcher-stage-strip")).not.toBeInTheDocument();
+    expect(page.container.querySelector(".desktop-launcher > .section-card"))
+      .not.toBeInTheDocument();
+    expect(screen.queryByText(/Keep DroneDream open while/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
       .not.toBeInTheDocument();
     expect(page.installerIntentInvoke).toHaveBeenCalledTimes(1);
