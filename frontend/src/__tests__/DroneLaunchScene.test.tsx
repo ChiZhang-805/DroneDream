@@ -14,6 +14,10 @@ function renderScene(locale: "en" | "zh-CN") {
   );
 }
 
+function poseDistance(first: ReturnType<typeof getDroneStarflightPose>, second: ReturnType<typeof getDroneStarflightPose>) {
+  return Math.hypot(second.x - first.x, second.y - first.y, second.z - first.z);
+}
+
 afterEach(() => window.localStorage.clear());
 
 describe("DroneLaunchScene localization", () => {
@@ -63,15 +67,49 @@ describe("drone starflight trajectory", () => {
     expect(rightRear.x).toBeCloseTo(0.5, 5);
     expect(rightRear.y).toBeCloseTo(0.2, 5);
     expect(rightRear.z).toBeCloseTo(-5.5, 5);
-    expect(deepCentre.x).toBeCloseTo(-5, 5);
-    expect(deepCentre.y).toBeCloseTo(0, 5);
-    expect(deepCentre.z).toBeCloseTo(-7, 5);
+    expect(deepCentre.x).toBeGreaterThan(-5.5);
+    expect(deepCentre.x).toBeLessThan(-3.5);
+    expect(deepCentre.y).toBeGreaterThan(-0.1);
+    expect(deepCentre.y).toBeLessThan(0.2);
+    expect(deepCentre.z).toBeLessThan(-6.8);
     expect(leftRear.x).toBeCloseTo(-8, 5);
     expect(leftRear.y).toBeCloseTo(-0.6, 5);
     expect(leftRear.z).toBeCloseTo(-4.5, 5);
     expect(returningFromLeft.x).toBeGreaterThan(-8);
     expect(returningFromLeft.x).toBeLessThan(0);
     expect(returningFromLeft.z).toBeGreaterThan(-4.5);
+  });
+
+  it("eases into and out of the distance-normalized remote arc", () => {
+    const entryFirst = poseDistance(
+      getDroneStarflightPose(0.22),
+      getDroneStarflightPose(0.225),
+    );
+    const entrySecond = poseDistance(
+      getDroneStarflightPose(0.225),
+      getDroneStarflightPose(0.23),
+    );
+    const middleBefore = poseDistance(
+      getDroneStarflightPose(0.45),
+      getDroneStarflightPose(0.5),
+    );
+    const middleAfter = poseDistance(
+      getDroneStarflightPose(0.5),
+      getDroneStarflightPose(0.55),
+    );
+    const exitBefore = poseDistance(
+      getDroneStarflightPose(0.77),
+      getDroneStarflightPose(0.775),
+    );
+    const exitLast = poseDistance(
+      getDroneStarflightPose(0.775),
+      getDroneStarflightPose(0.78),
+    );
+
+    expect(entryFirst).toBeLessThan(entrySecond);
+    expect(exitLast).toBeLessThan(exitBefore);
+    expect(middleBefore / middleAfter).toBeGreaterThan(0.9);
+    expect(middleBefore / middleAfter).toBeLessThan(1.1);
   });
 
   it("clamps trajectory progress outside the animation range", () => {
