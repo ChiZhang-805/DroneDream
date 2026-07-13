@@ -2778,9 +2778,8 @@ a {
 /* ---------- Desktop launcher / first-run experience ---------- */
 
 .app-shell-launcher {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  position: relative;
+  display: block;
   width: 100%;
   height: 100vh;
   height: 100dvh;
@@ -2794,16 +2793,19 @@ a {
 }
 
 .launcher-chrome {
-  position: relative;
+  position: absolute;
   z-index: 20;
+  top: 0;
+  right: 0;
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 70px;
   padding: 0 2rem;
-  border-bottom: 1px solid rgba(204, 151, 255, 0.12);
-  background: rgba(9, 2, 20, 0.62);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
+  border-bottom: 0;
+  background: linear-gradient(180deg, rgba(5, 1, 14, 0.84), rgba(5, 1, 14, 0));
+  box-shadow: none;
   backdrop-filter: blur(24px) saturate(140%);
 }
 
@@ -2886,9 +2888,9 @@ a {
 }
 
 .launcher-main {
-  position: relative;
+  position: absolute;
   z-index: 1;
-  width: 100%;
+  inset: 0;
   min-height: 0;
   overflow: hidden;
   outline: none;
@@ -2896,32 +2898,25 @@ a {
 
 .desktop-launcher {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  width: min(1240px, calc(100% - 3rem));
+  width: 100%;
   height: 100%;
   min-height: 0;
-  margin: 0 auto;
-  padding: 0 0 0.7rem;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
 }
 
 .launcher-hero {
-  position: relative;
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
+  position: absolute;
+  inset: 0;
   min-height: 0;
-  margin-top: 0.65rem;
+  margin: 0;
 }
 
 .launcher-hero::before {
   position: absolute;
   z-index: -1;
-  top: 2rem;
-  right: 10%;
-  bottom: 7rem;
-  left: 10%;
+  inset: 0;
   border-radius: 50%;
   background: rgba(128, 64, 255, 0.2);
   filter: blur(110px);
@@ -2930,18 +2925,16 @@ a {
 }
 
 .launcher-hero-visual {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 260px;
+  position: absolute;
+  inset: 0;
+  min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(202, 160, 255, 0.16);
-  border-radius: 30px;
+  border: 0;
+  border-radius: 0;
   background:
     linear-gradient(180deg, rgba(9, 3, 22, 0.12), rgba(7, 1, 17, 0.76)),
     radial-gradient(circle at 50% 38%, rgba(100, 74, 194, 0.16), transparent 46%);
-  box-shadow:
-    0 38px 100px rgba(0, 0, 0, 0.42),
-    inset 0 0 80px rgba(104, 70, 178, 0.08);
+  box-shadow: inset 0 0 120px rgba(15, 3, 32, 0.44);
 }
 
 .launcher-hero-visual::before {
@@ -3000,6 +2993,7 @@ a {
 }
 
 .drone-launch-hud {
+  display: none;
   position: absolute;
   z-index: 4;
   top: 3.5rem;
@@ -3058,17 +3052,18 @@ a {
 }
 
 .launcher-progress-panel {
-  position: relative;
+  position: absolute;
   z-index: 7;
-  width: min(920px, calc(100% - 3rem));
-  flex: 0 0 auto;
-  margin: -1.1rem auto 0.45rem;
-  padding: 0.78rem 1rem 0.72rem;
-  border: 1px solid rgba(202, 160, 255, 0.22);
-  border-radius: 18px;
-  background: rgba(18, 6, 36, 0.88);
-  box-shadow: 0 24px 65px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.035);
-  backdrop-filter: blur(24px) saturate(150%);
+  right: clamp(1.25rem, 4vw, 4.5rem);
+  bottom: clamp(1rem, 3vh, 2.4rem);
+  left: clamp(1.25rem, 4vw, 4.5rem);
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .launcher-progress-heading,
@@ -3099,12 +3094,12 @@ a {
 
 .launcher-progress-track {
   position: relative;
-  height: 8px;
-  margin: 0.65rem 0 0.38rem;
+  height: 7px;
+  margin: 0 0 0.58rem;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(211, 176, 255, 0.1);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+  background: rgba(229, 211, 255, 0.18);
+  box-shadow: 0 1px 12px rgba(0, 0, 0, 0.34), inset 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .launcher-progress-track > span {
@@ -3127,41 +3122,48 @@ a {
   100% { transform: translateX(330%); }
 }
 
-.launcher-transfer-row {
-  flex: 1 1 auto;
-  color: #a99dbb;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.7rem;
-}
-
 .launcher-progress-footer {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  min-height: 34px;
+  gap: 0.75rem;
+  color: #f7f2ff;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
+}
+
+.launcher-compact-status {
+  margin-right: auto;
+  font-size: clamp(0.78rem, 1.2vw, 0.95rem);
+  font-weight: 650;
+  letter-spacing: 0.025em;
+}
+
+.launcher-progress-percent {
+  min-width: 3.2rem;
+  color: #a9f3ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  text-align: right;
 }
 
 .launcher-progress-action {
-  min-height: 34px;
+  min-height: 30px;
   flex: 0 0 auto;
   padding: 0.35rem 0.78rem;
-  border-color: rgba(202, 160, 255, 0.2);
-  color: #d9d0e6;
-  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(226, 210, 255, 0.24);
+  color: #f0e9f8;
+  background: rgba(8, 2, 18, 0.46);
   font-size: 0.72rem;
 }
 
-.launcher-transfer-metrics {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  color: #c8bdd7;
-}
-
 .launcher-ready-actions {
+  position: absolute;
+  z-index: 9;
+  right: 0;
+  bottom: clamp(5.2rem, 11vh, 7.4rem);
+  left: 0;
   justify-content: center;
-  flex-direction: column;
-  flex: 0 0 auto;
-  margin: 0.35rem auto 0.55rem;
+  margin: 0;
 }
 
 .launcher-secondary-actions {
@@ -3233,9 +3235,16 @@ a {
 }
 
 .desktop-launcher > .section-card {
+  position: absolute;
+  z-index: 9;
+  right: 0;
+  bottom: clamp(5.2rem, 11vh, 7.4rem);
+  left: 0;
+  width: max-content;
+  max-width: calc(100% - 2rem);
   flex: 0 0 auto;
-  margin-bottom: 0.35rem;
-  padding: 0.25rem 1rem;
+  margin: 0 auto;
+  padding: 0;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -3249,6 +3258,14 @@ a {
 .desktop-launcher > .section-card .desktop-install-actions {
   justify-content: center;
   padding: 0;
+}
+
+.desktop-launcher > .section-card .section-card-body {
+  display: block;
+}
+
+.desktop-launcher > .section-card .desktop-resume-hint {
+  display: none;
 }
 
 .desktop-launcher > .section-card .desktop-install-actions .btn-primary {
@@ -3354,6 +3371,84 @@ a {
   font-size: 0.72rem;
 }
 
+.launcher-error-backdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(4, 1, 10, 0.68);
+  backdrop-filter: blur(12px);
+}
+
+.launcher-error-dialog {
+  width: min(520px, 100%);
+  max-height: min(620px, calc(100vh - 2.5rem));
+  overflow-y: auto;
+  padding: 1.55rem;
+  border: 1px solid rgba(255, 191, 98, 0.3);
+  border-radius: 18px;
+  color: #f8f3ff;
+  background: rgba(15, 5, 28, 0.97);
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.66);
+  text-align: center;
+}
+
+.launcher-error-symbol {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 0.85rem;
+  border: 1px solid rgba(255, 194, 105, 0.55);
+  border-radius: 50%;
+  color: #ffd28a;
+  background: rgba(255, 169, 67, 0.1);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.launcher-error-dialog h2 {
+  margin: 0;
+  font-size: 1.28rem;
+}
+
+.launcher-error-dialog > p {
+  margin: 0.65rem auto 1.15rem;
+  color: #bdb0ca;
+  line-height: 1.55;
+}
+
+.launcher-error-details {
+  max-height: 250px;
+  overflow: auto;
+  margin: 0 0 1rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(207, 171, 255, 0.12);
+  border-radius: 10px;
+  color: #d8cfe2;
+  background: rgba(4, 1, 10, 0.62);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.launcher-error-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.launcher-error-actions .btn {
+  min-height: 38px;
+  padding: 0.48rem 0.8rem;
+}
+
 .drone-launch-fallback {
   position: absolute;
   top: 43%;
@@ -3405,7 +3500,7 @@ a {
 @keyframes fallback-rotor { to { transform: rotateY(360deg); } }
 
 @media (max-width: 900px) {
-  .launcher-hero-visual { min-height: 230px; }
+  .launcher-hero-visual { min-height: 0; }
   .launcher-storage-card { grid-template-columns: 1fr; }
   .launcher-storage-card .desktop-storage-selector { grid-template-columns: 1fr; }
 }
@@ -3416,32 +3511,28 @@ a {
   .launcher-language-switcher select { min-width: 92px; }
   .desktop-launcher { width: 100%; }
   .launcher-hero { margin-top: 0; }
-  .launcher-hero-visual { min-height: 210px; border-right: 0; border-left: 0; border-radius: 0 0 24px 24px; }
+  .launcher-hero-visual { min-height: 0; border-radius: 0; }
   .drone-launch-hud { top: 1.4rem; }
   .drone-launch-hud-left { left: 1rem; }
   .drone-launch-hud-right { right: 1rem; }
   .launcher-hero-copy { bottom: 2rem; }
-  .launcher-progress-panel,
   .launcher-storage-card,
   .desktop-launcher > .section-card,
   .desktop-launcher > .alert,
   .desktop-launcher > .loading-state {
     width: calc(100% - 1.4rem);
   }
-  .launcher-progress-panel { padding: 1rem 0.9rem; }
-  .launcher-progress-footer { align-items: stretch; flex-direction: column; gap: 0.55rem; }
-  .launcher-transfer-row { align-items: flex-start; flex-direction: column; gap: 0.3rem; }
-  .launcher-progress-action { align-self: center; }
+  .launcher-progress-panel { right: 1rem; bottom: 1rem; left: 1rem; }
   .launcher-details-content { top: 70px; right: 0.7rem; bottom: 0.7rem; left: 0.7rem; }
 }
 
 @media (max-height: 780px) and (min-width: 621px) {
   .launcher-chrome { min-height: 58px; padding: 0 1.4rem; }
-  .launcher-hero { margin-top: 0.4rem; }
+  .launcher-hero { margin-top: 0; }
   .launcher-hero-copy { bottom: 1.2rem; }
   .launcher-hero-copy h1 { font-size: clamp(1.7rem, 3.2vw, 2.8rem); }
   .drone-launch-hud { top: 1.2rem; }
-  .launcher-progress-panel { padding: 0.72rem 1rem 0.65rem; }
+  .launcher-progress-panel { bottom: 0.8rem; }
   .desktop-launcher > .section-card .section-card-header { display: none; }
   .desktop-launcher > .section-card .section-card-body { gap: 0.45rem; }
   .launcher-details > summary { padding-top: 0.5rem; padding-bottom: 0.5rem; }

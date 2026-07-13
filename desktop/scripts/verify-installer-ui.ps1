@@ -126,7 +126,10 @@ try {
     }
     if ($firstPage.Body.Contains($welcomeNeedle)) {
         $welcomeNext = [DroneDreamInstallerUi]::GetDlgItem($firstPage.Handle, 1)
-        [void][DroneDreamInstallerUi]::PostMessage($welcomeNext, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+        # BM_CLICK is synchronous. Posting it can leave the automation parked on
+        # the welcome page because NSIS has not processed the queued message
+        # before the next page poll starts.
+        [void][DroneDreamInstallerUi]::SendMessage($welcomeNext, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
     }
     $locationPage = Wait-InstallerWindow -Process $process -Condition {
         param($handle, $title, $body)
@@ -136,7 +139,7 @@ try {
         throw "The application page did not preserve the expected destination $ExpectedApplication. Controls='$($locationPage.Body)'"
     }
     $next = [DroneDreamInstallerUi]::GetDlgItem($locationPage.Handle, 1)
-    [void][DroneDreamInstallerUi]::PostMessage($next, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
+    [void][DroneDreamInstallerUi]::SendMessage($next, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
 
     if ($ValidatePathGuard) {
         $diagnosticLog = Join-Path $env:TEMP "DroneDream\installer-diagnostics.log"

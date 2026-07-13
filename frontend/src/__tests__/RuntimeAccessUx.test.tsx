@@ -190,9 +190,8 @@ describe("desktop runtime access UX", () => {
     router.dispose();
   });
 
-  it("syncs a manual setup recheck from ready to stopped into the global gate", async () => {
+  it("syncs a focus recheck from ready to stopped into the global gate", async () => {
     let currentRuntime = readyRuntime;
-    let pendingRuntimeProbe: Promise<typeof stoppedRuntime> | null = null;
     window.__TAURI__ = {
       core: {
         invoke: vi.fn(async (command: string) => {
@@ -201,7 +200,7 @@ describe("desktop runtime access UX", () => {
           }
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") {
-            return pendingRuntimeProbe ?? currentRuntime;
+            return currentRuntime;
           }
           throw new Error(`Unexpected command: ${command}`);
         }),
@@ -231,17 +230,8 @@ describe("desktop runtime access UX", () => {
     expect(screen.queryByText("This feature needs DroneDreamRuntime"))
       .not.toBeInTheDocument();
 
-    let resolveRuntimeProbe: (value: typeof stoppedRuntime) => void = () => undefined;
-    pendingRuntimeProbe = new Promise<typeof stoppedRuntime>((resolve) => {
-      resolveRuntimeProbe = resolve;
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
-    expect(screen.getByText("This feature needs DroneDreamRuntime"))
-      .toBeInTheDocument();
-
     currentRuntime = stoppedRuntime;
-    pendingRuntimeProbe = null;
-    resolveRuntimeProbe(stoppedRuntime);
+    fireEvent.focus(window);
 
     expect(await screen.findByText("DroneDreamRuntime · Installed · Stopped"))
       .toBeInTheDocument();

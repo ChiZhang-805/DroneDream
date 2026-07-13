@@ -91,8 +91,13 @@
     Abort "$(DD_ClearRequestFailed)"
   ${EndIf}
 
-  ${If} $DroneDreamWasInstalled == "0"
-  ${AndIf} $DroneDreamInstallMode != "install-app-only"
+  ; Keep the user's verified Runtime choice across repair installs and updates.
+  ; The native sealing command revalidates the target before any automatic
+  ; operation can start, so a stale or edited registry value still fails closed.
+  WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeInstallMode" "$DroneDreamInstallMode"
+  WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive" "$DroneDreamRuntimeDrive"
+
+  ${If} $DroneDreamInstallMode != "install-app-only"
     ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --seal-installer-handoff "$DroneDreamInstallMode" "$DroneDreamRuntimeDrive"' $0
     ${If} $0 != 0
       ; The old receipt is already gone, so failure is safe and cannot be

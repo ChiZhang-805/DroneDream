@@ -398,9 +398,9 @@ describe("DesktopSetup", () => {
     expect(screen.queryByText("Validate Windows, virtualization, memory, and disk"))
       .not.toBeInTheDocument();
     expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Create a tuning experiment" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open tuning workspace" })).toHaveAttribute(
       "href",
-      "/jobs/new",
+      "/dashboard",
     );
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
@@ -418,7 +418,9 @@ describe("DesktopSetup", () => {
 
     renderPage();
 
-    expect(await screen.findByRole("combobox", { name: "Runtime disk" })).toHaveValue("E:");
+    expect((await screen.findAllByText("Ready to install")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
+      .not.toBeInTheDocument();
     expect(
       await screen.findByText("Validate Windows, virtualization, memory, and disk"),
     ).toBeInTheDocument();
@@ -500,10 +502,9 @@ describe("DesktopSetup", () => {
 
     expect(await screen.findByText("One-click runtime installation started"))
       .toHaveClass("sr-only");
-    expect(screen.getByRole("heading", { name: "Preparing your flight environment" }))
-      .toBeInTheDocument();
+    expect(screen.getByText("Preparing download")).toBeInTheDocument();
     expect(screen.getByText("Preparing installation")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pause setup" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
     expect(page.container.querySelector(".launcher-stage-strip")).not.toBeInTheDocument();
     expect(page.container.querySelector(".desktop-launcher > .section-card"))
       .not.toBeInTheDocument();
@@ -619,7 +620,8 @@ describe("DesktopSetup", () => {
       "start_runtime_install",
       expect.anything(),
     );
-    expect(screen.getByRole("combobox", { name: "Runtime disk" })).toBeEnabled();
+    expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
+      .not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
       .toBeEnabled();
 
@@ -679,7 +681,7 @@ describe("DesktopSetup", () => {
       .toBeInTheDocument();
     expect(screen.getByText(/became visible after the pending request was cleared/i))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pause setup" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
     expect(screen.getByText("4.0 GiB / 8.0 GiB")).toBeInTheDocument();
     expect(screen.queryByText("Automatic runtime installation was cancelled"))
       .not.toBeInTheDocument();
@@ -735,7 +737,7 @@ describe("DesktopSetup", () => {
       .toBeInTheDocument();
     expect(screen.getByText("The runtime operation has already started."))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pause setup" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
     expect(screen.getByText("2.0 GiB / 8.0 GiB")).toBeInTheDocument();
     expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
 
@@ -748,12 +750,11 @@ describe("DesktopSetup", () => {
     });
   });
 
-  it("consumes a blocked confirmed target, then unlocks manual disk recovery", async () => {
+  it("consumes a blocked confirmed target and falls back to a simple retry", async () => {
     vi.stubEnv(
       "VITE_RUNTIME_RELEASE_MANIFEST_URL",
       "https://downloads.example.test/dronedream/runtime-manifest.json",
     );
-    const user = userEvent.setup();
     const blockedPlan: RuntimeInstallPlan = {
       ...plan,
       canInstall: false,
@@ -791,7 +792,8 @@ describe("DesktopSetup", () => {
       pendingAutoStart,
     );
 
-    expect(await screen.findByText(/visible plan has blockers/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/visible plan has blockers/i)).length)
+      .toBeGreaterThan(0);
     await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(1));
     resolveAutoStart({
       disposition: "invalid",
@@ -807,12 +809,12 @@ describe("DesktopSetup", () => {
       expect.anything(),
     );
 
-    const selector = screen.getByRole("combobox", { name: "Runtime disk" });
-    expect(selector).toBeEnabled();
-    await user.selectOptions(selector, "C:");
-    await waitFor(() => expect(selector).toHaveValue("C:"));
+    expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
+      .not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
-      .toBeEnabled();
+      .toBeDisabled();
+    expect(screen.getByRole("dialog", { name: "Setup needs attention" }))
+      .toBeInTheDocument();
   });
 
   it("keeps a ready handoff pending when its exact plan rejects, then retries safely", async () => {
@@ -875,7 +877,7 @@ describe("DesktopSetup", () => {
     expect(page.installerInvoke).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", {
-      name: "Check the installer choice again",
+      name: "Try again",
     }));
     expect(await screen.findByText("One-click runtime installation started"))
       .toBeInTheDocument();
@@ -929,11 +931,11 @@ describe("DesktopSetup", () => {
       .not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel automatic installation" }))
       .not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Pause setup" }))
+    expect(screen.queryByRole("button", { name: "Pause" }))
       .not.toBeInTheDocument();
   });
 
-  it("uses a newly selected plan target instead of a cancelled snapshot target", async () => {
+  it("resumes the validated target without asking for storage again", async () => {
     vi.stubEnv(
       "VITE_RUNTIME_RELEASE_MANIFEST_URL",
       "https://downloads.example.test/dronedream/runtime-manifest.json",
@@ -959,11 +961,11 @@ describe("DesktopSetup", () => {
       if (command === "start_runtime_install") {
         return installSnapshot({
           phase: "queued",
-          targetRoot: "C:\\DroneDream",
+          targetRoot: "E:\\DroneDream",
           bytesDownloaded: 0,
           currentPart: null,
           totalParts: null,
-          message: "Queued on C",
+          message: "Queued on E",
         });
       }
       throw new Error(`Unexpected command: ${command}`);
@@ -971,18 +973,14 @@ describe("DesktopSetup", () => {
     window.__TAURI__ = { core: { invoke } };
     renderPage();
 
-    const selector = await screen.findByRole("combobox", { name: "Runtime disk" });
-    expect(selector).toHaveValue("E:");
-    expect(screen.getByRole("button", { name: "Resume installation" })).toBeEnabled();
-    await user.selectOptions(selector, "C:");
-    const install = await screen.findByRole("button", {
-      name: "Install DroneDreamRuntime",
-    });
+    expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
+      .not.toBeInTheDocument();
+    const install = await screen.findByRole("button", { name: "Resume installation" });
     await user.click(install);
 
     expect(invoke).toHaveBeenCalledWith("start_runtime_install", {
       request: {
-        targetRoot: "C:\\DroneDream",
+        targetRoot: "E:\\DroneDream",
         releaseManifestUrl:
           "https://downloads.example.test/dronedream/runtime-manifest.json",
       },
@@ -1031,7 +1029,7 @@ describe("DesktopSetup", () => {
 
     expect(await screen.findByText("The installer choice could not be checked"))
       .toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Pause setup" }))
+    expect(await screen.findByRole("button", { name: "Pause" }))
       .toBeEnabled();
     expect(screen.getByText("3.0 GiB / 8.0 GiB")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
@@ -1072,11 +1070,12 @@ describe("DesktopSetup", () => {
 
     expect(await screen.findByText("The installer choice could not be checked"))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check the installer choice again" }))
+    expect(screen.getByRole("button", { name: "Try again" }))
       .toBeEnabled();
     expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
       .not.toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Runtime disk" })).toBeDisabled();
+    expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
+      .not.toBeInTheDocument();
   });
 
   it("does not auto-install after an app-only choice and explains the option in Chinese", async () => {
@@ -1144,7 +1143,7 @@ describe("DesktopSetup", () => {
     expect(await screen.findByText("The confirmed installer choice is no longer valid"))
       .toBeInTheDocument();
     expect(screen.getByText(/cannot replay, but cleanup is pending/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check the installer choice again" }))
+    expect(screen.getByRole("button", { name: "Try again" }))
       .toBeEnabled();
     const discard = screen.getByRole("button", {
       name: "Cancel automatic installation",
@@ -1306,7 +1305,7 @@ describe("DesktopSetup", () => {
       .toBeInTheDocument();
     await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(1));
     const retry = screen.getByRole("button", {
-      name: "Check the installer choice again",
+      name: "Try again",
     });
     const discard = screen.getByRole("button", {
       name: "Cancel automatic installation",
@@ -1423,7 +1422,7 @@ describe("DesktopSetup", () => {
       },
     });
 
-    await user.click(screen.getByRole("button", { name: "Pause setup" }));
+    await user.click(screen.getByRole("button", { name: "Pause" }));
     expect(await screen.findByRole("button", { name: "Resume installation" }))
       .toBeEnabled();
     expect(screen.getByText("1.0 GiB / 8.0 GiB")).toBeInTheDocument();
@@ -1468,8 +1467,8 @@ describe("DesktopSetup", () => {
     expect(await screen.findByText("Restart Windows to continue")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Continue installation" }))
       .not.toBeInTheDocument();
-    expect(screen.getByText(/reopen this page and start the installation again/i))
-      .toBeInTheDocument();
+    expect(screen.getAllByText(/reopen this page and start the installation again/i).length)
+      .toBeGreaterThan(0);
   });
 
   it("cancels an installer-owned restart continuation without using ordinary start", async () => {
@@ -1508,7 +1507,8 @@ describe("DesktopSetup", () => {
     expect(await screen.findByText("Restart Windows to continue")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Continue installation" }))
       .not.toBeInTheDocument();
-    expect(screen.getByText(/will continue automatically/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/will continue automatically/i).length)
+      .toBeGreaterThan(0);
     const discard = screen.getByRole("button", {
       name: "Cancel pending post-restart setup",
     });
@@ -1524,8 +1524,7 @@ describe("DesktopSetup", () => {
     );
   });
 
-  it("re-fetches the plan for a user-selected fixed disk", async () => {
-    const user = userEvent.setup();
+  it("uses the recommended fixed disk without showing another storage step", async () => {
     const invoke = vi.fn(async (
       command: string,
       args?: Record<string, unknown>,
@@ -1542,17 +1541,14 @@ describe("DesktopSetup", () => {
 
     renderPage();
 
-    const selector = await screen.findByRole("combobox", { name: "Runtime disk" });
-    expect(selector).toHaveValue("E:");
-    await user.selectOptions(selector, "C:");
-
-    await waitFor(() => expect(selector).toBeEnabled());
-    expect(selector).toHaveValue("C:");
+    await screen.findByText("Ready to install");
+    expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
+      .not.toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith(
       "get_runtime_install_plan",
-      { targetRoot: "C:\\DroneDream" },
+      undefined,
     );
-    expect(screen.getAllByText("C:\\DroneDream")).toHaveLength(2);
+    expect(screen.getAllByText("E:\\DroneDream").length).toBeGreaterThan(0);
   });
 
   it("does not offer paths that are not fixed local drive roots", async () => {
@@ -1581,12 +1577,13 @@ describe("DesktopSetup", () => {
 
     renderPage();
 
-    const selector = await screen.findByRole("combobox", { name: "Runtime disk" });
-    expect(screen.getAllByRole("option")).toHaveLength(2);
-    expect(selector).not.toHaveTextContent("server");
+    await screen.findByText("Ready to install");
+    expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByText("server")).not.toBeInTheDocument();
   });
 
-  it("provides the storage selector in Chinese", async () => {
+  it("keeps the Chinese first-run launcher compact", async () => {
     window.__TAURI__ = {
       core: {
         invoke: vi.fn(async (command: string) => {
@@ -1600,11 +1597,9 @@ describe("DesktopSetup", () => {
 
     renderPage("zh-CN");
 
-    expect(
-      await screen.findByRole("combobox", { name: "运行环境磁盘" }),
-    ).toHaveValue("E:");
-    expect(screen.getByText("运行环境目录")).toBeInTheDocument();
-    expect(screen.getByText(/导入失败时保留可续传数据/)).toBeInTheDocument();
+    expect(await screen.findByText("准备运行环境")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "运行环境磁盘" }))
+      .not.toBeInTheDocument();
   });
 
   it("keeps successful sections when one desktop command fails", async () => {
@@ -1687,32 +1682,22 @@ describe("DesktopSetup", () => {
       .not.toBeInTheDocument();
   });
 
-  it("retains and marks the last successful runtime result after a transient refresh failure", async () => {
-    const user = userEvent.setup();
-    let runtimeFails = false;
+  it("does not expose manual diagnostics on a healthy launcher", async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
-      if (command === "probe_runtime_status") {
-        if (runtimeFails) throw new Error("temporary runtime failure");
-        return runtime;
-      }
+      if (command === "probe_runtime_status") return runtime;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
     renderPage();
 
     await screen.findByText("DroneDreamRuntime · Installed · Running");
-    runtimeFails = true;
-    await user.click(screen.getByRole("button", { name: "Check again" }));
-
-    expect(await screen.findByText(/temporary runtime failure/i)).toBeInTheDocument();
-    expect(screen.getByText("DroneDreamRuntime · Installed · Running")).toBeInTheDocument();
-    expect(screen.getByText("Last successful result")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Create a tuning experiment" }))
+    expect(screen.queryByRole("button", { name: "Check again" }))
       .not.toBeInTheDocument();
   });
 
   it("does not request a default install plan when no eligible disk exists", async () => {
+    const user = userEvent.setup();
     const noDiskReport = { ...prerequisites, disks: [] };
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return noDiskReport;
@@ -1722,9 +1707,11 @@ describe("DesktopSetup", () => {
     window.__TAURI__ = { core: { invoke } };
     renderPage();
 
-    expect(
-      await screen.findByText("No eligible fixed local disk was detected."),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Setup needs attention" }))
+      .toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "View error information" }));
+    expect(screen.getByText("No eligible fixed local disk was detected."))
+      .toBeInTheDocument();
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
   });
@@ -1884,7 +1871,7 @@ describe("DesktopSetup", () => {
     expect(formatBytes(0.5)).toBe("—");
   });
 
-  it("exposes a refresh action after the first check", async () => {
+  it("keeps the healthy launcher free of a details or refresh control", async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
@@ -1893,6 +1880,10 @@ describe("DesktopSetup", () => {
     window.__TAURI__ = { core: { invoke } };
     renderPage();
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Check again" })).toBeEnabled());
+    expect((await screen.findAllByText("Ready")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: "Check again" }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "System and installation details" }))
+      .not.toBeInTheDocument();
   });
 });

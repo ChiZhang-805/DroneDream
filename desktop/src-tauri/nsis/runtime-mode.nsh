@@ -47,6 +47,14 @@ Var DroneDreamValidatePathOnly
   ReadRegStr $0 SHCTX "${UNINSTKEY}" "UninstallString"
   ${If} $0 != ""
     StrCpy $DroneDreamWasInstalled "1"
+    ReadRegStr $0 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeInstallMode"
+    ${If} $0 == "install-all"
+    ${OrIf} $0 == "custom"
+    ${OrIf} $0 == "install-app-only"
+      StrCpy $DroneDreamInstallMode $0
+    ${EndIf}
+    ReadRegStr $0 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive"
+    StrCpy $DroneDreamRuntimeDrive $0
   ${EndIf}
   ReadRegDWORD $DroneDreamRuntimeProtocol SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
   ${If} $DroneDreamRuntimeProtocol >= 2
