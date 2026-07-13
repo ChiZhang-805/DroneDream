@@ -73,9 +73,20 @@ SectionEnd
     if ($LASTEXITCODE -ne 0) {
         throw "Could not compile the NSIS path-guard contract:`n$compilerOutput"
     }
-    & $executablePath
-    if ($LASTEXITCODE -ne 0) {
-        throw "NSIS path guard failed with exit code $LASTEXITCODE"
+    # NSIS produces a Windows GUI-subsystem executable. PowerShell can return
+    # before that process has fully exited, which leaves the executable locked
+    # long enough for the TEMP cleanup to fail on clean CI runners. Explicitly
+    # wait for and dispose the process so the contract result and cleanup are
+    # deterministic on both Windows PowerShell and pwsh.
+    $pathGuardProcess = Start-Process `
+        -FilePath $executablePath `
+        -PassThru `
+        -Wait `
+        -WindowStyle Hidden
+    $pathGuardExitCode = $pathGuardProcess.ExitCode
+    $pathGuardProcess.Dispose()
+    if ($pathGuardExitCode -ne 0) {
+        throw "NSIS path guard failed with exit code $pathGuardExitCode"
     }
     Write-Host "NSIS application/Runtime path guard verified"
 }
