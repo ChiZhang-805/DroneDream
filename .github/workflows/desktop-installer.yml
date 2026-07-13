@@ -144,9 +144,7 @@ jobs:
 
       - name: Verify pinned NSIS template
         shell: pwsh
-        run: |
-          ./desktop/scripts/verify-nsis-template.ps1
-          ./desktop/scripts/verify-installer-path-guard.ps1
+        run: ./desktop/scripts/verify-nsis-template.ps1
 
       - name: Build DroneDream setup executable
         shell: pwsh
@@ -176,6 +174,7 @@ jobs:
       - name: Verify installer locales and extracted planner
         shell: pwsh
         run: |
+          ./desktop/scripts/verify-installer-path-guard.ps1
           ./desktop/scripts/verify-installer-locales.ps1 `
             -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
           ./desktop/scripts/verify-installer-planner.ps1 `

@@ -111,7 +111,6 @@ if (-not (Test-Path -LiteralPath $llvmBundleConfig -PathType Leaf)) {
 
 & (Join-Path $PSScriptRoot "verify-desktop-version.ps1")
 & (Join-Path $PSScriptRoot "verify-nsis-template.ps1")
-& (Join-Path $PSScriptRoot "verify-installer-path-guard.ps1")
 
 Write-Host "Building DroneDream Desktop with $toolchain"
 $desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -167,6 +166,7 @@ if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
     throw "The LLVM build completed without producing $generatedNsi"
 }
 & (Join-Path $PSScriptRoot "verify-webview2-installer.ps1") -GeneratedNsi $generatedNsi
+& (Join-Path $PSScriptRoot "verify-installer-path-guard.ps1")
 & (Join-Path $PSScriptRoot "verify-installer-locales.ps1") -GeneratedNsi $generatedNsi
 & (Join-Path $PSScriptRoot "verify-installer-planner.ps1") `
     -Application $application `
