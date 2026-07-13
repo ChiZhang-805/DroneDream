@@ -4,7 +4,8 @@ param(
     [ValidateSet("English", "SimpChinese")]
     [string]$Language = "English",
     [string]$ExpectedTarget = "E:\DroneDream",
-    [string]$ExpectedApplication = (Join-Path $env:LOCALAPPDATA "DroneDream")
+    [string]$ExpectedApplication = (Join-Path $env:LOCALAPPDATA "DroneDream"),
+    [switch]$ValidatePathGuard
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,6 +60,7 @@ public static class DroneDreamInstallerUi {
         }, IntPtr.Zero);
         return String.Join("\n", values);
     }
+
 }
 "@
 
@@ -101,7 +103,11 @@ function Wait-InstallerWindow {
 }
 
 try {
-    $process = Start-Process -FilePath $installerPath -PassThru
+    if ($ValidatePathGuard) {
+        $process = Start-Process -FilePath $installerPath -ArgumentList "/DRONEDREAMVALIDATEPATHONLY" -PassThru
+    } else {
+        $process = Start-Process -FilePath $installerPath -PassThru
+    }
     $languageDialog = Wait-InstallerWindow -Process $process -Condition {
         param($handle, $title, $body)
         [DroneDreamInstallerUi]::GetDlgItem($handle, 1002) -ne [IntPtr]::Zero
@@ -132,6 +138,28 @@ try {
     $next = [DroneDreamInstallerUi]::GetDlgItem($locationPage.Handle, 1)
     [void][DroneDreamInstallerUi]::PostMessage($next, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
 
+    if ($ValidatePathGuard) {
+        $diagnosticLog = Join-Path $env:TEMP "DroneDream\installer-diagnostics.log"
+        $deadline = [DateTime]::UtcNow.AddSeconds(45)
+        while ([DateTime]::UtcNow -lt $deadline -and -not $process.HasExited) {
+            Start-Sleep -Milliseconds 150
+        }
+        if (-not $process.HasExited) {
+            throw "The installer path-only validation did not exit"
+        }
+        if (-not (Test-Path -LiteralPath $diagnosticLog)) {
+            throw "The installer path-only validation did not write diagnostics"
+        }
+        $diagnostics = Get-Content -LiteralPath $diagnosticLog -Raw
+        if ($process.ExitCode -ne 0 -or
+            -not $diagnostics.Contains("path-check relation=safe") -or
+            -not $diagnostics.Contains("path-validation-only success")) {
+            throw "The real installer rejected the default application destination. Exit=$($process.ExitCode) diagnostics='$diagnostics'"
+        }
+        Write-Host "Real installer page flow verified: language=$Language app=$ExpectedApplication target=$ExpectedTarget"
+        return
+    }
+
     $runtimeNeedle = if ($Language -eq "English") { "Choose what to install" } else { $zhInstallContent }
     $fullNeedle = if ($Language -eq "English") { "Install everything (recommended)" } else { $zhInstallEverything }
     $forbiddenNeedle = if ($Language -eq "English") { $zhInstallContent } else { "Choose what to install" }
@@ -149,7 +177,7 @@ try {
         throw "The Runtime page did not recommend $ExpectedTarget"
     }
 
-    Write-Host "Interactive installer UI verified: language=$Language target=$ExpectedTarget"
+    Write-Host "Interactive installer UI verified: language=$Language app=$ExpectedApplication target=$ExpectedTarget pathGuard=$ValidatePathGuard"
 }
 finally {
     if ($null -ne $process -and -not $process.HasExited) {

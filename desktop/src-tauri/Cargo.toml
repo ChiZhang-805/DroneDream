@@ -1,6 +1,6 @@
 [package]
 name = "drone-dream-desktop"
-version = "0.2.3"
+version = "0.2.4"
 description = "Local-first desktop shell for DroneDream"
 authors = ["DroneDream contributors"]
 edition = "2021"

@@ -7,6 +7,7 @@
 ; MUI_LANGUAGE runs, NSIS silently maps every custom LangString to English and
 ; the later Chinese declaration overwrites it.
 !define DRONEDREAM_INSTALLER_LANGUAGES_FILE "${__FILEDIR__}\installer-languages.nsh"
+!include "${__FILEDIR__}\path-guard.nsh"
 !macro DRONEDREAM_INSTALLER_LANGUAGE_TABLE
   !include "${DRONEDREAM_INSTALLER_LANGUAGES_FILE}"
 !macroend
@@ -17,6 +18,7 @@ Var DroneDreamQuiesceActive
 Var DroneDreamInstallerLanguage
 Var DroneDreamDiagnosticLog
 Var DroneDreamDiagnosticHandle
+Var DroneDreamValidatePathOnly
 
 !macro DRONEDREAM_ONINIT
   ; MUI_LANGDLL_DISPLAY has already returned at this anchor. Preserve that
@@ -34,6 +36,13 @@ Var DroneDreamDiagnosticHandle
   StrCpy $DroneDreamQuiesceToken ""
   StrCpy $DroneDreamQuiesceOwnerPid ""
   StrCpy $DroneDreamQuiesceActive "0"
+  StrCpy $DroneDreamValidatePathOnly "0"
+  ClearErrors
+  ${GetOptions} $CMDLINE "/DRONEDREAMVALIDATEPATHONLY" $0
+  ${IfNot} ${Errors}
+    StrCpy $DroneDreamValidatePathOnly "1"
+  ${EndIf}
+  ClearErrors
   Push "installer-init language=$DroneDreamInstallerLanguage"
   Call DroneDreamAppendInstallerDiagnostic
   ReadRegStr $0 SHCTX "${UNINSTKEY}" "UninstallString"
@@ -88,6 +97,7 @@ Var DroneDreamDiagnosticHandle
     ClearErrors
     FileOpen $DroneDreamDiagnosticHandle "$DroneDreamDiagnosticLog" a
     ${IfNot} ${Errors}
+      FileSeek $DroneDreamDiagnosticHandle 0 END
       FileWrite $DroneDreamDiagnosticHandle "$0$\r$\n"
       FileClose $DroneDreamDiagnosticHandle
     ${EndIf}
@@ -361,6 +371,18 @@ Var DroneDreamDiagnosticHandle
     Push "0"
   FunctionEnd
 
+  Function DroneDreamClassifyApplicationPath
+    Push $8
+    Push $9
+    !insertmacro DRONEDREAM_CLASSIFY_APPLICATION_PATH \
+      $INSTDIR $DroneDreamPlanTarget $4 $1 $2 $3 $0 INSTALLER
+    Pop $9
+    Pop $8
+    Push "path-check relation=$4 app=$1 runtime=$2"
+    Call DroneDreamAppendInstallerDiagnostic
+    Push $4
+  FunctionEnd
+
   Function DroneDreamRuntimeModePageCreate
     StrCpy $LANGUAGE $DroneDreamInstallerLanguage
     IfSilent 0 +2
@@ -391,6 +413,21 @@ Var DroneDreamDiagnosticHandle
     StrCpy $DroneDreamSuggestedDrive ""
     ${If} $DroneDreamPlanTarget != ""
       StrCpy $DroneDreamSuggestedDrive $DroneDreamPlanTarget 2
+    ${EndIf}
+    ${If} $DroneDreamValidatePathOnly == "1"
+      Call DroneDreamClassifyApplicationPath
+      Pop $0
+      StrCmp $0 "safe" dronedream_path_validation_success dronedream_path_validation_failure
+      dronedream_path_validation_failure:
+        Push "path-validation-only failure relation=$0"
+        Call DroneDreamAppendInstallerDiagnostic
+        SetErrorLevel 86
+        Quit
+      dronedream_path_validation_success:
+        Push "path-validation-only success"
+        Call DroneDreamAppendInstallerDiagnostic
+        SetErrorLevel 0
+        Quit
     ${EndIf}
     !insertmacro MUI_HEADER_TEXT "DroneDreamRuntime" "$(DD_ModeHeader)"
     nsDialogs::Create 1018
@@ -534,25 +571,24 @@ Var DroneDreamDiagnosticHandle
     ; root. The planner runs before application files are copied, so without
     ; this check E:\DroneDream could look empty during planning and then fail
     ; the first-run safety validation after the installer fills it with files.
-    GetFullPathName $1 "$INSTDIR"
-    GetFullPathName $2 "$DroneDreamPlanTarget"
-    ${StrCase} $1 $1 "U"
-    ${StrCase} $2 $2 "U"
-    Push "path-check app=$1 runtime=$2"
-    Call DroneDreamAppendInstallerDiagnostic
-    ${If} $1 == $2
+    Call DroneDreamClassifyApplicationPath
+    Pop $4
+    StrCmp $4 "same" dronedream_app_at_runtime_root 0
+    StrCmp $4 "child" dronedream_app_below_runtime_root 0
+    StrCmp $4 "safe" dronedream_app_path_safe dronedream_app_path_invalid
+
+    dronedream_app_path_invalid:
+      MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_AppPathCheckFailed)"
+      Abort
+
+    dronedream_app_at_runtime_root:
       MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_AppAtRuntimeRoot)"
       Abort
-    ${EndIf}
-    StrCpy $3 "$2\"
-    ${StrLoc} $0 $1 $3 ">"
-    ; StrLoc returns an empty string when the prefix is absent. LogicLib's
-    ; numeric comparison treats both "" and "0" as zero, which previously
-    ; rejected every ordinary application path (for example C:\... when the
-    ; Runtime target is E:\DroneDream). StrCmp keeps those values distinct.
-    StrCmp $0 "0" 0 dronedream_app_path_safe
+
+    dronedream_app_below_runtime_root:
       MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_AppBelowRuntimeRoot)"
       Abort
+
     dronedream_app_path_safe:
   FunctionEnd
 !macroend

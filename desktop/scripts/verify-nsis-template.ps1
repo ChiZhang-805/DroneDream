@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $templatePath = Join-Path $repoRoot "desktop\src-tauri\nsis\installer.nsi"
 $runtimeModePath = Join-Path $repoRoot "desktop\src-tauri\nsis\runtime-mode.nsh"
+$pathGuardPath = Join-Path $repoRoot "desktop\src-tauri\nsis\path-guard.nsh"
 $installerLanguagesPath = Join-Path $repoRoot "desktop\src-tauri\nsis\installer-languages.nsh"
 $englishLanguagePath = Join-Path $repoRoot "desktop\src-tauri\nsis\languages\English.nsh"
 $chineseLanguagePath = Join-Path $repoRoot "desktop\src-tauri\nsis\languages\SimpChinese.nsh"
@@ -104,8 +105,6 @@ if ($hash -cne $expected) {
 $runtimeMode = Get-Content -LiteralPath $runtimeModePath -Raw
 foreach ($required in @(
     'Var DroneDreamAutoLaunched',
-    'GetFullPathName $1 "$INSTDIR"',
-    '${StrLoc} $0 $1 $3 ">"',
     '$DroneDreamRuntimeDrive == ""',
     '!macro DRONEDREAM_ONINSTSUCCESS',
     '${IfNot} ${Silent}',
@@ -122,6 +121,7 @@ foreach ($required in @(
     'Var DroneDreamQuiesceActive',
     'Var DroneDreamPlanBlockerCode',
     'Var DroneDreamPlanDiagnosticCode',
+    'Var DroneDreamValidatePathOnly',
     '!macro DRONEDREAM_INSTALLER_LANGUAGE_TABLE',
     'StrCpy $DroneDreamInstallerLanguage "$LANGUAGE"',
     'StrCpy $LANGUAGE $DroneDreamInstallerLanguage',
@@ -131,8 +131,13 @@ foreach ($required in @(
     'result-incomplete',
     'Function DroneDreamAppendInstallerDiagnostic',
     'Function DroneDreamRetryDetection',
-    'StrCmp $0 "0" 0 dronedream_app_path_safe',
-    'path-check app=$1 runtime=$2',
+    'DRONEDREAM_CLASSIFY_APPLICATION_PATH',
+    'StrCmp $4 "same" dronedream_app_at_runtime_root 0',
+    'StrCmp $4 "child" dronedream_app_below_runtime_root 0',
+    'StrCmp $4 "safe" dronedream_app_path_safe dronedream_app_path_invalid',
+    'path-check relation=$4 app=$1 runtime=$2',
+    '/DRONEDREAMVALIDATEPATHONLY',
+    'path-validation-only success',
     'Pop $DroneDreamPlanCanInstall',
     'dronedream_plan_retry_or_fail:',
     '$(DD_ModeHeader)',
@@ -151,6 +156,20 @@ foreach ($required in @(
 )) {
     if (-not $runtimeMode.Contains($required)) {
         throw "DroneDream runtime-mode contract is missing: $required"
+    }
+}
+
+$pathGuard = Get-Content -LiteralPath $pathGuardPath -Raw
+foreach ($required in @(
+    '!macro DRONEDREAM_CLASSIFY_APPLICATION_PATH',
+    'GetFullPathNameW',
+    'StrCpy ${RESULT} "invalid"',
+    'StrCmp ${APP_NORMALIZED} ${RUNTIME_NORMALIZED}',
+    'StrCmp ${POSITION} "0"',
+    'StrCpy ${RESULT} "safe"'
+)) {
+    if (-not $pathGuard.Contains($required)) {
+        throw "The shared NSIS path guard is missing: $required"
     }
 }
 

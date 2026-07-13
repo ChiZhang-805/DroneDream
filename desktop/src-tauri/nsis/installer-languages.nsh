@@ -50,6 +50,8 @@ LangString DD_AppAtRuntimeRoot ${LANG_ENGLISH} "The desktop application cannot b
 LangString DD_AppAtRuntimeRoot ${LANG_SIMPCHINESE} "桌面程序不能安装到 $DroneDreamPlanTarget。请返回并选择其他桌面安装目录。"
 LangString DD_AppBelowRuntimeRoot ${LANG_ENGLISH} "The desktop application cannot be installed below $DroneDreamPlanTarget. Go back and choose another application folder."
 LangString DD_AppBelowRuntimeRoot ${LANG_SIMPCHINESE} "桌面程序不能安装到 $DroneDreamPlanTarget 的子目录。请返回并选择其他桌面安装目录。"
+LangString DD_AppPathCheckFailed ${LANG_ENGLISH} "The desktop application path could not be validated safely. Go back and choose the default application folder, or cancel setup."
+LangString DD_AppPathCheckFailed ${LANG_SIMPCHINESE} "无法安全验证桌面程序路径。请返回并选择默认的桌面安装目录，或取消安装。"
 
 LangString DD_UpdatePending ${LANG_ENGLISH} "Runtime setup is waiting to continue. Open DroneDream to finish or cancel it before updating or reinstalling."
 LangString DD_UpdatePending ${LANG_SIMPCHINESE} "Runtime 安装正在等待续传。请先打开 DroneDream 完成或取消安装，再升级或重装。"

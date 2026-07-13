@@ -8,6 +8,7 @@ if (-not $MakeNsis) {
     $MakeNsis = Join-Path $env:LOCALAPPDATA "tauri\NSIS\makensis.exe"
 }
 $makeNsisPath = (Resolve-Path -LiteralPath $MakeNsis).Path
+$pathGuardSource = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\nsis\path-guard.nsh")).Path
 $tempRoot = [IO.Path]::GetFullPath($env:TEMP).TrimEnd('\', '/')
 $sandbox = Join-Path $tempRoot ("DroneDream-Path-Guard-" + [guid]::NewGuid().ToString("N"))
 $sandboxFull = [IO.Path]::GetFullPath($sandbox)
@@ -28,31 +29,38 @@ RequestExecutionLevel user
 OutFile "$escapedExecutable"
 !include "LogicLib.nsh"
 !include "StrFunc.nsh"
+!include "$pathGuardSource"
 `${StrCase}
 `${StrLoc}
 
 Section
-  ; A normal application path on C: must not be treated as a child of the
-  ; dedicated Runtime root on E:. StrLoc returns an empty string here.
+  ; Unrelated application and Runtime paths must be accepted.
   StrCpy `$1 "C:\Users\Test\AppData\Local\DroneDream"
   StrCpy `$2 "E:\DroneDream"
-  `${StrCase} `$1 `$1 "U"
-  `${StrCase} `$2 `$2 "U"
-  StrCpy `$3 "`$2\"
-  `${StrLoc} `$0 `$1 `$3 ">"
-  StrCmp `$0 "0" unrelated_failed unrelated_passed
+  !insertmacro DRONEDREAM_CLASSIFY_APPLICATION_PATH `$1 `$2 `$4 `$5 `$6 `$7 `$8 UNRELATED
+  StrCmp `$4 "safe" unrelated_passed unrelated_failed
 unrelated_failed:
   SetErrorLevel 21
   Quit
 
 unrelated_passed:
-  ; A real child path must still be rejected; StrLoc returns the string "0".
-  StrCpy `$1 "E:\DroneDream\Desktop"
-  `${StrCase} `$1 `$1 "U"
-  `${StrLoc} `$0 `$1 `$3 ">"
-  StrCmp `$0 "0" child_detected child_missed
-child_missed:
+  ; The exact Runtime root must be rejected.
+  StrCpy `$1 "E:\DroneDream"
+  StrCpy `$2 "E:\DroneDream"
+  !insertmacro DRONEDREAM_CLASSIFY_APPLICATION_PATH `$1 `$2 `$4 `$5 `$6 `$7 `$8 SAME
+  StrCmp `$4 "same" same_detected same_missed
+same_missed:
   SetErrorLevel 22
+  Quit
+
+same_detected:
+  ; A real child path must also be rejected.
+  StrCpy `$1 "E:\DroneDream\Desktop"
+  StrCpy `$2 "E:\DroneDream"
+  !insertmacro DRONEDREAM_CLASSIFY_APPLICATION_PATH `$1 `$2 `$4 `$5 `$6 `$7 `$8 CHILD
+  StrCmp `$4 "child" child_detected child_missed
+child_missed:
+  SetErrorLevel 23
   Quit
 
 child_detected:

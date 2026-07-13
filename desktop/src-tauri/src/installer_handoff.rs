@@ -2138,8 +2138,13 @@ mod tests {
             "result-incomplete",
             "Function DroneDreamRetryDetection",
             "installer-diagnostics.log",
-            "StrCmp $0 \"0\" 0 dronedream_app_path_safe",
-            "path-check app=$1 runtime=$2",
+            "/DRONEDREAMVALIDATEPATHONLY",
+            "path-validation-only success",
+            "DRONEDREAM_CLASSIFY_APPLICATION_PATH",
+            "StrCmp $4 \"same\" dronedream_app_at_runtime_root 0",
+            "StrCmp $4 \"child\" dronedream_app_below_runtime_root 0",
+            "StrCmp $4 \"safe\" dronedream_app_path_safe dronedream_app_path_invalid",
+            "path-check relation=$4 app=$1 runtime=$2",
         ] {
             assert!(
                 mode_page.contains(required),
