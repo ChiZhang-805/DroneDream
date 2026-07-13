@@ -31,7 +31,6 @@ Var DroneDreamValidatePathOnly
   StrCpy $DroneDreamInstallMode "install-app-only"
   StrCpy $DroneDreamRuntimeDrive ""
   StrCpy $DroneDreamModePageVisited "0"
-  StrCpy $DroneDreamAutoLaunched "0"
   StrCpy $DroneDreamRuntimeProtocol "0"
   StrCpy $DroneDreamQuiesceToken ""
   StrCpy $DroneDreamQuiesceOwnerPid ""
@@ -87,7 +86,6 @@ Var DroneDreamValidatePathOnly
   Var DroneDreamAppOnlyRadio
   Var DroneDreamCustomDriveEdit
   Var DroneDreamModePageVisited
-  Var DroneDreamAutoLaunched
   Var DroneDreamRuntimeProtocol
 
   Page custom DroneDreamRuntimeModePageCreate DroneDreamRuntimeModePageLeave
@@ -593,28 +591,10 @@ Var DroneDreamValidatePathOnly
   FunctionEnd
 !macroend
 
-; Fresh interactive install-all/custom setups launch once immediately after a
-; successful install. Other modes retain Tauri's normal Finish-page or /R
-; behavior and never gain an implicit runtime download.
-!macro DRONEDREAM_ONINSTSUCCESS
-  ${IfNot} ${Silent}
-  ${AndIf} $PassiveMode != 1
-  ${AndIf} $UpdateMode != 1
-  ${AndIf} $DroneDreamWasInstalled == "0"
-  ${AndIf} $DroneDreamInstallMode != "install-app-only"
-    StrCpy $DroneDreamAutoLaunched "1"
-    nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" ""
-  ${EndIf}
-!macroend
-
-; The Finish-page Run checkbox is checked by default. If the one-confirmation
-; path already launched the application, its callback becomes a no-op so a
-; quick Finish click cannot create a second process.
-!macro DRONEDREAM_BEFORE_RUN_MAIN_BINARY
-  ${If} $DroneDreamAutoLaunched == "1"
-    Return
-  ${EndIf}
-!macroend
+; Interactive application launch is owned exclusively by Tauri's standard
+; Finish-page Run action. Runtime intent remains durable until the application
+; opens, so there is no reason to start a second process from .onInstSuccess.
+; The desktop binary also enforces single-instance behavior as defense in depth.
 
 ; When Tauri's reinstall page starts the old uninstaller, let that child prove
 ; that it is operating inside the parent installer's already-acquired quiesce.

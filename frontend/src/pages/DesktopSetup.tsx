@@ -1192,6 +1192,18 @@ export function DesktopSetup() {
             <span aria-hidden="true">⌄</span>
           </summary>
           <div className="launcher-details-content stack-md">
+            <div className="launcher-details-toolbar">
+              <strong>{t("launcher.details")}</strong>
+              <button
+                type="button"
+                className="btn"
+                onClick={(event) => {
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                }}
+              >
+                {t("launcher.closeDetails")}
+              </button>
+            </div>
             <ReadinessHero
               prerequisites={state.prerequisites}
               runtime={state.runtime}

@@ -2778,9 +2778,14 @@ a {
 /* ---------- Desktop launcher / first-run experience ---------- */
 
 .app-shell-launcher {
-  display: block;
-  min-height: 100vh;
-  overflow-x: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background:
     radial-gradient(circle at 50% -18%, rgba(136, 74, 255, 0.28), transparent 44%),
     radial-gradient(circle at 8% 46%, rgba(45, 215, 255, 0.09), transparent 32%),
@@ -2884,18 +2889,29 @@ a {
   position: relative;
   z-index: 1;
   width: 100%;
+  min-height: 0;
+  overflow: hidden;
   outline: none;
 }
 
 .desktop-launcher {
+  display: flex;
+  flex-direction: column;
   width: min(1240px, calc(100% - 3rem));
+  height: 100%;
+  min-height: 0;
   margin: 0 auto;
-  padding: 0 0 3rem;
+  padding: 0 0 0.7rem;
+  overflow: hidden;
 }
 
 .launcher-hero {
   position: relative;
-  margin-top: 1rem;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 0.65rem;
 }
 
 .launcher-hero::before {
@@ -2914,7 +2930,8 @@ a {
 
 .launcher-hero-visual {
   position: relative;
-  min-height: clamp(430px, 58vh, 670px);
+  flex: 1 1 auto;
+  min-height: 260px;
   overflow: hidden;
   border: 1px solid rgba(202, 160, 255, 0.16);
   border-radius: 30px;
@@ -3071,8 +3088,9 @@ a {
   position: relative;
   z-index: 7;
   width: min(1040px, calc(100% - 3rem));
-  margin: -1.1rem auto 1.3rem;
-  padding: 1.15rem 1.3rem 1rem;
+  flex: 0 0 auto;
+  margin: -1.1rem auto 0.45rem;
+  padding: 0.9rem 1.15rem 0.8rem;
   border: 1px solid rgba(202, 160, 255, 0.22);
   border-radius: 18px;
   background: rgba(18, 6, 36, 0.88);
@@ -3119,7 +3137,7 @@ a {
 .launcher-progress-track {
   position: relative;
   height: 8px;
-  margin: 0.85rem 0 0.48rem;
+  margin: 0.65rem 0 0.38rem;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(211, 176, 255, 0.1);
@@ -3163,7 +3181,7 @@ a {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.42rem;
-  margin: 0.95rem 0 0;
+  margin: 0.65rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -3173,7 +3191,7 @@ a {
   align-items: center;
   gap: 0.4rem;
   min-width: 0;
-  padding: 0.48rem;
+  padding: 0.38rem 0.44rem;
   border: 1px solid rgba(198, 157, 255, 0.1);
   border-radius: 9px;
   color: #746985;
@@ -3219,14 +3237,16 @@ a {
 .launcher-ready-actions {
   justify-content: center;
   flex-direction: column;
-  margin: 1.2rem auto 1.7rem;
+  flex: 0 0 auto;
+  margin: 0.35rem auto 0.55rem;
 }
 
 .launcher-secondary-actions {
   display: flex;
   justify-content: center;
   width: min(1040px, calc(100% - 3rem));
-  margin: 0.9rem auto 0;
+  flex: 0 0 auto;
+  margin: 0.3rem auto 0;
 }
 
 .launcher-secondary-actions .btn {
@@ -3268,8 +3288,9 @@ a {
   grid-template-columns: minmax(180px, 0.65fr) minmax(0, 1.6fr);
   align-items: end;
   gap: 1.1rem;
-  margin-bottom: 0.85rem;
-  padding: 1rem 1.15rem;
+  flex: 0 0 auto;
+  margin-bottom: 0.4rem;
+  padding: 0.7rem 1rem;
   border: 1px solid rgba(202, 160, 255, 0.16);
   border-radius: 15px;
   background: rgba(18, 6, 36, 0.7);
@@ -3294,6 +3315,9 @@ a {
 }
 
 .desktop-launcher > .section-card {
+  flex: 0 0 auto;
+  margin-bottom: 0.35rem;
+  padding: 0.7rem 1rem;
   border-color: rgba(202, 160, 255, 0.18);
   border-radius: 16px;
   background: rgba(18, 6, 36, 0.72);
@@ -3311,7 +3335,8 @@ a {
 }
 
 .launcher-details {
-  margin-top: 1.15rem;
+  flex: 0 0 auto;
+  margin-top: 0.35rem;
   overflow: hidden;
   border: 1px solid rgba(202, 160, 255, 0.12);
   border-radius: 14px;
@@ -3323,7 +3348,7 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.95rem 1.1rem;
+  padding: 0.65rem 1rem;
   color: #c9bfd7;
   cursor: pointer;
   list-style: none;
@@ -3347,11 +3372,42 @@ a {
 .launcher-details[open] > summary > span:last-child { transform: rotate(180deg); }
 
 .launcher-details-content {
+  position: fixed;
+  z-index: 50;
+  top: 82px;
+  right: max(1.5rem, calc((100vw - 1240px) / 2));
+  bottom: 1.5rem;
+  left: max(1.5rem, calc((100vw - 1240px) / 2));
+  overflow-y: auto;
   padding: 0 1rem 1rem;
   border-top: 1px solid rgba(202, 160, 255, 0.08);
+  border: 1px solid rgba(202, 160, 255, 0.22);
+  border-radius: 18px;
+  background: rgba(10, 3, 22, 0.97);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(28px) saturate(140%);
 }
 
 .launcher-details-content > :first-child { margin-top: 1rem; }
+
+.launcher-details-toolbar {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(202, 160, 255, 0.1);
+  background: rgba(10, 3, 22, 0.96);
+}
+
+.launcher-details-toolbar .btn {
+  min-height: 34px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.72rem;
+}
 
 .drone-launch-fallback {
   position: absolute;
@@ -3404,7 +3460,7 @@ a {
 @keyframes fallback-rotor { to { transform: rotateY(360deg); } }
 
 @media (max-width: 900px) {
-  .launcher-hero-visual { min-height: 570px; }
+  .launcher-hero-visual { min-height: 230px; }
   .launcher-stage-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .launcher-storage-card { grid-template-columns: 1fr; }
   .launcher-storage-card .desktop-storage-selector { grid-template-columns: 1fr; }
@@ -3416,7 +3472,7 @@ a {
   .launcher-language-switcher select { min-width: 92px; }
   .desktop-launcher { width: 100%; }
   .launcher-hero { margin-top: 0; }
-  .launcher-hero-visual { min-height: 530px; border-right: 0; border-left: 0; border-radius: 0 0 24px 24px; }
+  .launcher-hero-visual { min-height: 210px; border-right: 0; border-left: 0; border-radius: 0 0 24px 24px; }
   .drone-launch-hud { top: 1.4rem; }
   .drone-launch-hud-left { left: 1rem; }
   .drone-launch-hud-right { right: 1rem; }
@@ -3433,6 +3489,21 @@ a {
   .launcher-transfer-row { align-items: flex-start; flex-direction: column; gap: 0.3rem; }
   .launcher-stage-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .launcher-stage-strip small { white-space: normal; }
+  .launcher-details-content { top: 70px; right: 0.7rem; bottom: 0.7rem; left: 0.7rem; }
+}
+
+@media (max-height: 780px) and (min-width: 621px) {
+  .launcher-chrome { min-height: 58px; padding: 0 1.4rem; }
+  .launcher-hero { margin-top: 0.4rem; }
+  .launcher-hero-copy { bottom: 1.2rem; }
+  .launcher-hero-copy h1 { font-size: clamp(1.7rem, 3.2vw, 2.8rem); }
+  .launcher-hero-copy p { margin-top: 0.5rem; font-size: 0.82rem; line-height: 1.4; }
+  .drone-launch-hud { top: 1.2rem; }
+  .launcher-progress-panel { padding: 0.72rem 1rem 0.65rem; }
+  .launcher-stage-strip { margin-top: 0.45rem; }
+  .desktop-launcher > .section-card .section-card-header { display: none; }
+  .desktop-launcher > .section-card .section-card-body { gap: 0.45rem; }
+  .launcher-details > summary { padding-top: 0.5rem; padding-bottom: 0.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -104,17 +104,7 @@ if ($hash -cne $expected) {
 
 $runtimeMode = Get-Content -LiteralPath $runtimeModePath -Raw
 foreach ($required in @(
-    'Var DroneDreamAutoLaunched',
     '$DroneDreamRuntimeDrive == ""',
-    '!macro DRONEDREAM_ONINSTSUCCESS',
-    '${IfNot} ${Silent}',
-    '$PassiveMode != 1',
-    '$UpdateMode != 1',
-    '$DroneDreamWasInstalled == "0"',
-    '$DroneDreamInstallMode != "install-app-only"',
-    'nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" ""',
-    '!macro DRONEDREAM_BEFORE_RUN_MAIN_BINARY',
-    'Return',
     'Var DroneDreamRuntimeProtocol',
     'Var DroneDreamQuiesceToken',
     'Var DroneDreamQuiesceOwnerPid',
@@ -217,7 +207,9 @@ foreach ($required in @(
 
 foreach ($forbidden in @(
     'dronedream-installer-planner.exe',
-    'dronedream-setup-probe.exe'
+    'dronedream-setup-probe.exe',
+    '!macro DRONEDREAM_ONINSTSUCCESS',
+    '!macro DRONEDREAM_BEFORE_RUN_MAIN_BINARY'
 )) {
     if ($runtimeMode.Contains($forbidden)) {
         throw "The temporary planner name can trigger Windows installer detection: $forbidden"
