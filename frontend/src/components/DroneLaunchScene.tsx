@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 import { useI18n } from "../i18n/I18nProvider";
+import {
+  DRONE_STARFLIGHT_DURATION_SECONDS,
+  getDroneStarflightPose,
+} from "./droneStarflight";
 
 type DroneLaunchSceneProps = {
   active?: boolean;
@@ -341,12 +345,15 @@ function buildGalacticDust(texture: THREE.Texture | null) {
 
 export function DroneLaunchScene({ active = false, progress = null }: DroneLaunchSceneProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const attitudeValueRef = useRef<HTMLSpanElement>(null);
   const [fallback, setFallback] = useState(false);
+  const [starflightActive, setStarflightActive] = useState(false);
   const { t } = useI18n();
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    setStarflightActive(false);
     if (typeof navigator !== "undefined" && /jsdom/iu.test(navigator.userAgent)) {
       setFallback(true);
       return;
@@ -539,12 +546,46 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
 
     const pointer = new THREE.Vector2();
     const pointerTarget = new THREE.Vector2();
-    const onPointerMove = (event: PointerEvent) => {
+    const pointerNdc = new THREE.Vector2();
+    const raycaster = new THREE.Raycaster();
+    const clock = new THREE.Clock();
+    let starflightStartedAt: number | null = null;
+    let lastAttitudeUpdate = -1;
+
+    const updatePointerNdc = (event: PointerEvent) => {
       const rect = host.getBoundingClientRect();
+      pointerNdc.x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
+      pointerNdc.y = -((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 + 1;
+      return rect;
+    };
+
+    const isDroneHit = (event: PointerEvent) => {
+      updatePointerNdc(event);
+      raycaster.setFromCamera(pointerNdc, camera);
+      return raycaster.intersectObject(drone, true).length > 0;
+    };
+
+    const beginStarflight = () => {
+      if (starflightStartedAt !== null || reducedMotion) return;
+      starflightStartedAt = clock.getElapsedTime();
+      renderer.domElement.style.cursor = "progress";
+      setStarflightActive(true);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = updatePointerNdc(event);
       pointerTarget.x = ((event.clientX - rect.left) / Math.max(rect.width, 1) - 0.5) * 2;
       pointerTarget.y = ((event.clientY - rect.top) / Math.max(rect.height, 1) - 0.5) * 2;
+      if (starflightStartedAt === null && !reducedMotion) {
+        renderer.domElement.style.cursor = isDroneHit(event) ? "pointer" : "crosshair";
+      }
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      if (event.button !== 0 || starflightStartedAt !== null || !isDroneHit(event)) return;
+      beginStarflight();
     };
     host.addEventListener("pointermove", onPointerMove, { passive: true });
+    host.addEventListener("pointerup", onPointerUp);
 
     const resize = () => {
       const width = Math.max(host.clientWidth, 1);
@@ -558,7 +599,6 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
     resize();
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const clock = new THREE.Clock();
     let animationFrame = 0;
     let visible = true;
     const onVisibility = () => {
@@ -573,12 +613,30 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       const motion = reducedMotion ? 0.18 : 1;
       pointer.lerp(pointerTarget, 0.035);
 
-      drone.position.y = 0.34 + Math.sin(elapsed * 1.15) * 0.085 * motion;
-      drone.rotation.y = -0.2 + Math.sin(elapsed * 0.22) * 0.12 + pointer.x * 0.075;
-      drone.rotation.x = Math.sin(elapsed * 0.42) * 0.018 * motion + pointer.y * 0.025;
-      drone.rotation.z = Math.sin(elapsed * 0.55) * 0.015 * motion - pointer.x * 0.025;
+      const idleY = 0.34 + Math.sin(elapsed * 0.72) * 0.075 * motion;
+      const idleYaw = -0.2 + Math.sin(elapsed * 0.18) * 0.1 * motion + pointer.x * 0.055;
+      const idlePitch = Math.sin(elapsed * 0.31) * 0.04 * motion + pointer.y * 0.02;
+      const idleRoll = Math.sin(elapsed * 0.27 + 0.8) * 0.055 * motion - pointer.x * 0.02;
+      let flightPose = getDroneStarflightPose(0);
+
+      if (starflightStartedAt !== null) {
+        const starflightProgress = (elapsed - starflightStartedAt) / DRONE_STARFLIGHT_DURATION_SECONDS;
+        flightPose = getDroneStarflightPose(starflightProgress);
+        if (starflightProgress >= 1) {
+          starflightStartedAt = null;
+          renderer.domElement.style.cursor = "crosshair";
+          setStarflightActive(false);
+        }
+      }
+
+      drone.position.set(flightPose.x, idleY + flightPose.y, flightPose.z);
+      drone.scale.setScalar(flightPose.scale);
+      drone.rotation.y = idleYaw + flightPose.yaw;
+      drone.rotation.x = idlePitch + flightPose.pitch;
+      drone.rotation.z = idleRoll + flightPose.roll;
       rotors.forEach((rotor, index) => {
-        rotor.rotation.y += (active ? 0.72 : 0.34) * (index % 2 === 0 ? 1 : -1) * motion;
+        const rotorSpeed = active || starflightStartedAt !== null ? 0.72 : 0.34;
+        rotor.rotation.y += rotorSpeed * (index % 2 === 0 ? 1 : -1) * motion;
       });
       telemetryRing.rotation.y = elapsed * 0.055 * motion;
       particles.rotation.y = elapsed * 0.012 * motion;
@@ -594,6 +652,11 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       camera.position.x = 5.3 + pointer.x * 0.28;
       camera.position.y = 3.35 - pointer.y * 0.16;
       camera.lookAt(0, 0.02, 0);
+      if (elapsed - lastAttitudeUpdate >= 0.1 && attitudeValueRef.current) {
+        const rollDegrees = THREE.MathUtils.radToDeg(drone.rotation.z);
+        attitudeValueRef.current.textContent = `${rollDegrees >= 0 ? "+" : ""}${rollDegrees.toFixed(1)}°`;
+        lastAttitudeUpdate = elapsed;
+      }
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(render);
     }
@@ -606,6 +669,7 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       if (animationFrame) cancelAnimationFrame(animationFrame);
       document.removeEventListener("visibilitychange", onVisibility);
       host.removeEventListener("pointermove", onPointerMove);
+      host.removeEventListener("pointerup", onPointerUp);
       resizeObserver.disconnect();
       disposeScene(scene);
       starTexture?.dispose();
@@ -618,8 +682,16 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
   }, [active]);
 
   return (
-    <div className="drone-launch-scene" ref={hostRef} data-progress={progress ?? undefined}>
+    <div
+      className="drone-launch-scene"
+      ref={hostRef}
+      data-progress={progress ?? undefined}
+      data-flight-state={starflightActive ? "starflight" : "hover"}
+    >
       <div className="drone-launch-aura" aria-hidden="true" />
+      <div className={`drone-launch-tagline${starflightActive ? " is-hidden" : ""}`}>
+        {t("launcher.tagline")}
+      </div>
       <div className="drone-launch-hud drone-launch-hud-left" aria-hidden="true">
         <span>{t("launcher.telemetry.system")}</span>
         <strong>{active
@@ -628,7 +700,10 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       </div>
       <div className="drone-launch-hud drone-launch-hud-right" aria-hidden="true">
         <span>{t("launcher.telemetry.attitude")}</span>
-        <strong>{t("launcher.telemetry.hold")} · 0.0°</strong>
+        <strong>
+          {t(starflightActive ? "launcher.telemetry.cruise" : "launcher.telemetry.hold")} ·{" "}
+          <span ref={attitudeValueRef}>+0.0°</span>
+        </strong>
       </div>
       {fallback ? (
         <div className="drone-launch-fallback" aria-hidden="true">

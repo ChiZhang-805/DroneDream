@@ -34,6 +34,18 @@ export function AppShell() {
   );
 }
 
+function LanguageRegionIcon({ region }: { region: "west" | "east" }) {
+  return (
+    <span className={`launcher-language-icon launcher-language-icon-${region}`} aria-hidden="true">
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.25" />
+        <path d="M3.9 12h16.2M12 3.75c2.1 2.25 3.2 5 3.2 8.25S14.1 18 12 20.25C9.9 18 8.8 15.25 8.8 12S9.9 6 12 3.75Z" />
+        <circle className="launcher-language-region" cx={region === "west" ? "8" : "16"} cy="10" r="1.65" />
+      </svg>
+    </span>
+  );
+}
+
 function AppShellContent() {
   const location = useLocation();
   const desktopRuntime = isDesktopRuntime();
@@ -124,10 +136,7 @@ function AppShellContent() {
               aria-labelledby="launcher-settings-title"
             >
               <div className="launcher-settings-heading">
-                <div>
-                  <span className="launcher-settings-kicker">DroneDream</span>
-                  <h2 id="launcher-settings-title">{t("app.settingsTitle")}</h2>
-                </div>
+                <h2 id="launcher-settings-title">{t("app.settingsTitle")}</h2>
                 <button
                   ref={launcherSettingsCloseRef}
                   type="button"
@@ -141,8 +150,7 @@ function AppShellContent() {
                   <span aria-hidden="true">×</span>
                 </button>
               </div>
-              <fieldset className="launcher-language-options">
-                <legend>{t("app.interfaceLanguage")}</legend>
+              <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
                 <button
                   type="button"
                   className={locale === "en" ? "selected" : undefined}
@@ -154,7 +162,7 @@ function AppShellContent() {
                     launcherSettingsButtonRef.current?.focus();
                   }}
                 >
-                  <span>{locale === "zh-CN" ? "英" : "EN"}</span>
+                  <LanguageRegionIcon region="west" />
                   <strong>{t("app.languageEnglish")}</strong>
                   <i aria-hidden="true">✓</i>
                 </button>
@@ -169,7 +177,7 @@ function AppShellContent() {
                     launcherSettingsButtonRef.current?.focus();
                   }}
                 >
-                  <span>{locale === "zh-CN" ? "中" : "ZH"}</span>
+                  <LanguageRegionIcon region="east" />
                   <strong>{t("app.languageChinese")}</strong>
                   <i aria-hidden="true">✓</i>
                 </button>

@@ -2946,22 +2946,14 @@ a {
 
 .launcher-settings-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.1rem;
 }
 
-.launcher-settings-kicker {
-  color: #6ce8ff;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 .launcher-settings-heading h2 {
-  margin: 0.2rem 0 0;
+  margin: 0;
   font-size: 1.35rem;
 }
 
@@ -2995,13 +2987,6 @@ a {
   border: 0;
 }
 
-.launcher-language-options legend {
-  grid-column: 1 / -1;
-  margin-bottom: 0.15rem;
-  color: #b9a9ca;
-  font-size: 0.76rem;
-}
-
 .launcher-language-options button {
   position: relative;
   display: grid;
@@ -3018,7 +3003,7 @@ a {
   cursor: pointer;
 }
 
-.launcher-language-options button > span {
+.launcher-language-icon {
   display: grid;
   place-items: center;
   width: 34px;
@@ -3026,8 +3011,28 @@ a {
   border-radius: 10px;
   color: #8deeff;
   background: rgba(87, 224, 255, 0.09);
-  font-size: 0.72rem;
-  font-weight: 760;
+}
+
+.launcher-language-icon-east {
+  color: #f2a0ff;
+  background: rgba(223, 98, 255, 0.09);
+}
+
+.launcher-language-icon svg {
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.25;
+}
+
+.launcher-language-icon .launcher-language-region {
+  fill: currentColor;
+  stroke: rgba(8, 5, 22, 0.8);
+  stroke-width: 1;
 }
 
 .launcher-language-options button strong {
@@ -3172,6 +3177,31 @@ a {
 
 @keyframes launcher-orbit {
   to { transform: rotate(360deg); }
+}
+
+.drone-launch-tagline {
+  position: absolute;
+  z-index: 4;
+  top: clamp(5.8rem, 14vh, 8.5rem);
+  left: 50%;
+  max-width: min(76vw, 900px);
+  color: rgba(255, 255, 255, 0.94);
+  font-size: clamp(1.7rem, 3vw, 3.1rem);
+  font-weight: 650;
+  letter-spacing: 0.025em;
+  line-height: 1.1;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow: 0 2px 24px rgba(8, 2, 24, 0.82), 0 0 36px rgba(124, 205, 255, 0.12);
+  transform: translate(-50%, 0);
+  opacity: 1;
+  transition: opacity 420ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.drone-launch-tagline.is-hidden {
+  transform: translate(-50%, -10px) scale(0.985);
+  opacity: 0;
 }
 
 .drone-launch-hud {

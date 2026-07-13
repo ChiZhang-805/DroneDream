@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -95,12 +95,18 @@ describe("desktop launcher chrome", () => {
     expect(settings).toHaveAttribute("aria-expanded", "true");
     const dialog = screen.getByRole("dialog", { name: "Settings" });
     expect(dialog).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "English" })).toHaveAttribute(
+    expect(within(dialog).queryByText("DroneDream")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Interface language")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "English" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+    expect(within(dialog).getByRole("button", { name: "English" }).querySelector("svg"))
+      .toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "简体中文" }).querySelector("svg"))
+      .toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Simplified Chinese" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "简体中文" }));
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(window.localStorage.getItem("drone-dream:locale")).toBe("zh-CN");
@@ -108,11 +114,11 @@ describe("desktop launcher chrome", () => {
     expect(screen.getByRole("button", { name: "设置" })).toHaveFocus();
 
     fireEvent.click(screen.getByRole("button", { name: "设置" }));
-    expect(screen.getByRole("dialog", { name: "设置" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "英文" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "简体中文" })).toBeInTheDocument();
-    expect(screen.queryByText("English")).not.toBeInTheDocument();
-    expect(screen.queryByText("Simplified Chinese")).not.toBeInTheDocument();
+    const chineseDialog = screen.getByRole("dialog", { name: "设置" });
+    expect(within(chineseDialog).getByRole("button", { name: "English" })).toBeInTheDocument();
+    expect(within(chineseDialog).getByRole("button", { name: "简体中文" })).toBeInTheDocument();
+    expect(within(chineseDialog).queryByText("界面语言")).not.toBeInTheDocument();
+    expect(within(chineseDialog).queryByText("Simplified Chinese")).not.toBeInTheDocument();
 
     router.dispose();
   });
