@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+import { useI18n } from "../i18n/I18nProvider";
+
 type DroneLaunchSceneProps = {
   active?: boolean;
   progress?: number | null;
@@ -340,6 +342,7 @@ function buildGalacticDust(texture: THREE.Texture | null) {
 export function DroneLaunchScene({ active = false, progress = null }: DroneLaunchSceneProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [fallback, setFallback] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     const host = hostRef.current;
@@ -394,20 +397,33 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
 
     const celestialBackdrop = new THREE.Group();
     const distantStars = buildStarLayer({
-      count: 760,
-      size: 0.068,
-      opacity: 0.72,
+      count: 1_100,
+      size: 0.082,
+      opacity: 0.88,
       texture: starTexture,
     });
     const accentStars = buildStarLayer({
-      count: 150,
-      size: 0.13,
-      opacity: 0.78,
+      count: 240,
+      size: 0.16,
+      opacity: 0.94,
+      texture: starTexture,
+      accent: true,
+    });
+    const beaconStars = buildStarLayer({
+      count: 44,
+      size: 0.28,
+      opacity: 0.98,
       texture: starTexture,
       accent: true,
     });
     const galacticDust = buildGalacticDust(starTexture);
-    celestialBackdrop.add(distantStars.points, accentStars.points, galacticDust.dust);
+    beaconStars.points.position.z = -1.6;
+    celestialBackdrop.add(
+      distantStars.points,
+      accentStars.points,
+      beaconStars.points,
+      galacticDust.dust,
+    );
 
     const cyanNebulaMaterial = new THREE.SpriteMaterial({
       map: cyanNebulaTexture ?? undefined,
@@ -497,20 +513,6 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
     telemetryRing.position.y = -0.88;
     scene.add(telemetryRing);
 
-    const routePoints = Array.from({ length: 150 }, (_, index) => {
-      const angle = (index / 149) * Math.PI * 2;
-      return new THREE.Vector3(
-        Math.sin(angle) * 3.55,
-        -0.45 + Math.sin(angle * 3) * 0.14,
-        Math.cos(angle) * 2.25,
-      );
-    });
-    const route = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(routePoints),
-      new THREE.LineBasicMaterial({ color: CYAN, transparent: true, opacity: 0.32 }),
-    );
-    scene.add(route);
-
     const particleCount = 240;
     const particlePositions = new Float32Array(particleCount * 3);
     for (let index = 0; index < particleCount; index += 1) {
@@ -579,12 +581,13 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
         rotor.rotation.y += (active ? 0.72 : 0.34) * (index % 2 === 0 ? 1 : -1) * motion;
       });
       telemetryRing.rotation.y = elapsed * 0.055 * motion;
-      route.rotation.y = -elapsed * 0.035 * motion;
       particles.rotation.y = elapsed * 0.012 * motion;
       particles.position.y = Math.sin(elapsed * 0.3) * 0.08 * motion;
       celestialBackdrop.rotation.y = Math.sin(elapsed * 0.025) * 0.025 * motion;
-      distantStars.material.opacity = 0.68 + Math.sin(elapsed * 0.36) * 0.055 * motion;
-      accentStars.material.opacity = 0.72 + Math.sin(elapsed * 0.7 + 1.4) * 0.1 * motion;
+      distantStars.material.opacity = 0.82 + Math.sin(elapsed * 0.36) * 0.07 * motion;
+      accentStars.material.opacity = 0.87 + Math.sin(elapsed * 0.7 + 1.4) * 0.1 * motion;
+      beaconStars.material.opacity = 0.84 + Math.sin(elapsed * 1.05 + 0.8) * 0.14 * motion;
+      beaconStars.points.rotation.z = elapsed * 0.006 * motion;
       galacticDust.material.opacity = 0.27 + Math.sin(elapsed * 0.2) * 0.035 * motion;
       cyanNebulaMaterial.opacity = 0.31 + Math.sin(elapsed * 0.12) * 0.035 * motion;
       magentaNebulaMaterial.opacity = 0.27 + Math.sin(elapsed * 0.1 + 2.2) * 0.04 * motion;
@@ -618,12 +621,14 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
     <div className="drone-launch-scene" ref={hostRef} data-progress={progress ?? undefined}>
       <div className="drone-launch-aura" aria-hidden="true" />
       <div className="drone-launch-hud drone-launch-hud-left" aria-hidden="true">
-        <span>PX4 / SITL</span>
-        <strong>{active ? "LINK ACTIVE" : "STANDBY"}</strong>
+        <span>{t("launcher.telemetry.system")}</span>
+        <strong>{active
+          ? t("launcher.telemetry.linkActive")
+          : t("launcher.telemetry.standby")}</strong>
       </div>
       <div className="drone-launch-hud drone-launch-hud-right" aria-hidden="true">
-        <span>ATTITUDE</span>
-        <strong>HOLD · 0.0°</strong>
+        <span>{t("launcher.telemetry.attitude")}</span>
+        <strong>{t("launcher.telemetry.hold")} · 0.0°</strong>
       </div>
       {fallback ? (
         <div className="drone-launch-fallback" aria-hidden="true">

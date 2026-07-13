@@ -308,7 +308,7 @@ describe("ECE498", () => {
     expect(screen.getByRole("link", { name: "ECE498" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New Batch" })).toHaveClass("active");
     expect(screen.getByRole("link", { name: "Batches" })).not.toHaveClass("active");
-    expect(screen.getByText("DroneDream 0.3.1 Preview")).toBeInTheDocument();
+    expect(screen.getByText("DroneDream 0.3.5 Preview")).toBeInTheDocument();
     expect(screen.getByText("Web app")).toBeInTheDocument();
   });
 

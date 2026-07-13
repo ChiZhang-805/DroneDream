@@ -154,7 +154,7 @@ function AppShellContent() {
                     launcherSettingsButtonRef.current?.focus();
                   }}
                 >
-                  <span>EN</span>
+                  <span>{locale === "zh-CN" ? "英" : "EN"}</span>
                   <strong>{t("app.languageEnglish")}</strong>
                   <i aria-hidden="true">✓</i>
                 </button>
@@ -169,7 +169,7 @@ function AppShellContent() {
                     launcherSettingsButtonRef.current?.focus();
                   }}
                 >
-                  <span>中</span>
+                  <span>{locale === "zh-CN" ? "中" : "ZH"}</span>
                   <strong>{t("app.languageChinese")}</strong>
                   <i aria-hidden="true">✓</i>
                 </button>

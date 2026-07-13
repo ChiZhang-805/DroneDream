@@ -107,6 +107,13 @@ describe("desktop launcher chrome", () => {
     });
     expect(screen.getByRole("button", { name: "设置" })).toHaveFocus();
 
+    fireEvent.click(screen.getByRole("button", { name: "设置" }));
+    expect(screen.getByRole("dialog", { name: "设置" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "英文" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "简体中文" })).toBeInTheDocument();
+    expect(screen.queryByText("English")).not.toBeInTheDocument();
+    expect(screen.queryByText("Simplified Chinese")).not.toBeInTheDocument();
+
     router.dispose();
   });
 
