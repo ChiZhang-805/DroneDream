@@ -155,7 +155,11 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         }
     )
     result = subprocess.run(
-        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        [
+            sys.executable,
+            "-c",
+            "from alembic.config import main; main(argv=['upgrade', 'head'])",
+        ],
         cwd=Path(__file__).resolve().parents[1],
         env=environment,
         capture_output=True,

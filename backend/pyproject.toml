@@ -22,6 +22,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "alembic>=1.13,<2.0",
     "pytest>=8.0",
     "httpx>=0.27",
     "httpx2>=2.0,<3.0",
