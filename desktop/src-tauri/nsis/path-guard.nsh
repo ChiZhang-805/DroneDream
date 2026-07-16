@@ -9,9 +9,18 @@
   StrCpy ${RESULT} "invalid"
   System::Call 'kernel32::GetFullPathNameW(w "${APP_PATH}", i ${NSIS_MAX_STRLEN}, w .r9, p 0) i .r8'
   StrCmp $8 "0" dronedream_path_guard_done_${LABEL_SUFFIX} 0
+  ; GetFullPathNameW returns the required buffer length when the supplied
+  ; buffer is too small.  Never classify a truncated application path as
+  ; unrelated to the Runtime root.
+  ${If} $8 >= ${NSIS_MAX_STRLEN}
+    Goto dronedream_path_guard_done_${LABEL_SUFFIX}
+  ${EndIf}
   StrCpy ${APP_NORMALIZED} $9
   System::Call 'kernel32::GetFullPathNameW(w "${RUNTIME_PATH}", i ${NSIS_MAX_STRLEN}, w .r9, p 0) i .r8'
   StrCmp $8 "0" dronedream_path_guard_done_${LABEL_SUFFIX} 0
+  ${If} $8 >= ${NSIS_MAX_STRLEN}
+    Goto dronedream_path_guard_done_${LABEL_SUFFIX}
+  ${EndIf}
   StrCpy ${RUNTIME_NORMALIZED} $9
   ${StrCase} ${APP_NORMALIZED} ${APP_NORMALIZED} "U"
   ${StrCase} ${RUNTIME_NORMALIZED} ${RUNTIME_NORMALIZED} "U"

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import type { OptimizationHistory, TrialSummary } from "../types/api";
 import { formatNumber } from "../utils/format";
+import { useI18n } from "../i18n/I18nProvider";
 
 interface OptimizationInsightsProps {
   trials: TrialSummary[];
@@ -116,6 +117,7 @@ function linePath(
 }
 
 function GenerationTrend({ candidates }: { candidates: CandidateAggregate[] }) {
+  const { t } = useI18n();
   const generationRows = useMemo(() => {
     const generations = new Map<number, CandidateAggregate[]>();
     for (const candidate of candidates.filter((item) => !item.isBaseline)) {
@@ -136,7 +138,7 @@ function GenerationTrend({ candidates }: { candidates: CandidateAggregate[] }) {
   if (generationRows.length === 0) {
     return (
       <div className="insight-empty">
-        Generation trend will appear after at least one optimizer candidate has completed.
+        {t("insights.generationEmpty")}
       </div>
     );
   }
@@ -151,12 +153,12 @@ function GenerationTrend({ candidates }: { candidates: CandidateAggregate[] }) {
   return (
     <div className="insight-chart-block">
       <div className="insight-chart-legend">
-        <span><i className="legend-line legend-best" />Best score</span>
-        <span><i className="legend-line legend-mean" />Generation mean</span>
-        <span>Lower is better</span>
+        <span><i className="legend-line legend-best" />{t("insights.bestScore")}</span>
+        <span><i className="legend-line legend-mean" />{t("insights.generationMean")}</span>
+        <span>{t("comparison.lowerIsBetter")}</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Optimizer generation score trend" className="insight-svg">
-        <title>Optimizer generation score trend</title>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={t("insights.generationAria")} className="insight-svg">
+        <title>{t("insights.generationAria")}</title>
         <line x1="24" y1={height - 25} x2={width - 20} y2={height - 25} className="insight-axis" />
         <path d={linePath(meanValues, width, height, sharedMin, sharedMax)} className="generation-line generation-line-mean" />
         <path d={linePath(bestValues, width, height, sharedMin, sharedMax)} className="generation-line generation-line-best" />
@@ -167,7 +169,11 @@ function GenerationTrend({ candidates }: { candidates: CandidateAggregate[] }) {
             <g key={row.generation}>
               <circle cx={x} cy={y} r="4" className="generation-dot" />
               <text x={x} y={height - 8} textAnchor="middle" className="insight-axis-label">G{row.generation}</text>
-              <title>{`Generation ${row.generation}: best ${formatNumber(row.best)}, mean ${formatNumber(row.mean)}`}</title>
+              <title>{t("insights.generationPoint", {
+                generation: row.generation,
+                best: formatNumber(row.best),
+                mean: formatNumber(row.mean),
+              })}</title>
             </g>
           );
         })}
@@ -177,11 +183,12 @@ function GenerationTrend({ candidates }: { candidates: CandidateAggregate[] }) {
 }
 
 function ParetoPlot({ candidates }: { candidates: CandidateAggregate[] }) {
+  const { t } = useI18n();
   const plottable = candidates.filter((candidate) => candidate.passRate !== null);
   if (plottable.length < 2) {
     return (
       <div className="insight-empty">
-        Pareto view needs at least two candidates with score and pass/fail evidence.
+        {t("insights.paretoEmpty")}
       </div>
     );
   }
@@ -194,15 +201,15 @@ function ParetoPlot({ candidates }: { candidates: CandidateAggregate[] }) {
   return (
     <div className="insight-chart-block">
       <div className="insight-chart-legend">
-        <span><i className="legend-dot legend-frontier" />Non-dominated</span>
-        <span><i className="legend-dot legend-candidate" />Candidate</span>
+        <span><i className="legend-dot legend-frontier" />{t("insights.nonDominated")}</span>
+        <span><i className="legend-dot legend-candidate" />{t("jobDetail.candidate")}</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Candidate score and pass rate Pareto view" className="insight-svg">
-        <title>Candidate score and pass-rate trade-off</title>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={t("insights.paretoAria")} className="insight-svg">
+        <title>{t("insights.paretoTitle")}</title>
         <line x1="42" y1={height - 34} x2={width - 18} y2={height - 34} className="insight-axis" />
         <line x1="42" y1="18" x2="42" y2={height - 34} className="insight-axis" />
-        <text x={width / 2} y={height - 8} textAnchor="middle" className="insight-axis-label">Mean score (lower is better)</text>
-        <text x="13" y={height / 2} textAnchor="middle" transform={`rotate(-90 13 ${height / 2})`} className="insight-axis-label">Pass rate</text>
+        <text x={width / 2} y={height - 8} textAnchor="middle" className="insight-axis-label">{t("insights.meanScoreAxis")}</text>
+        <text x="13" y={height / 2} textAnchor="middle" transform={`rotate(-90 13 ${height / 2})`} className="insight-axis-label">{t("insights.passRate")}</text>
         {plottable.map((candidate) => {
           const x = 50 + ((candidate.meanScore - minScore) / scoreSpan) * (width - 80);
           const y = 26 + (1 - (candidate.passRate ?? 0)) * (height - 68);
@@ -210,7 +217,11 @@ function ParetoPlot({ candidates }: { candidates: CandidateAggregate[] }) {
             <g key={candidate.id} className={candidate.frontier ? "pareto-frontier" : "pareto-candidate"}>
               <circle cx={x} cy={y} r={candidate.isBest ? 8 : 6} />
               <text x={x + 9} y={y - 7} className="pareto-label">{candidate.label}</text>
-              <title>{`${candidate.label}: score ${formatNumber(candidate.meanScore)}, pass rate ${((candidate.passRate ?? 0) * 100).toFixed(0)}%`}</title>
+              <title>{t("insights.candidatePoint", {
+                candidate: candidate.label,
+                score: formatNumber(candidate.meanScore),
+                passRate: ((candidate.passRate ?? 0) * 100).toFixed(0),
+              })}</title>
             </g>
           );
         })}
@@ -220,6 +231,7 @@ function ParetoPlot({ candidates }: { candidates: CandidateAggregate[] }) {
 }
 
 function ObjectiveParetoPlot({ history }: { history: OptimizationHistory }) {
+  const { t } = useI18n();
   const metricNames = Object.keys(history.objective_directions);
   if (metricNames.length < 2) return null;
   const [xMetric, yMetric] = metricNames;
@@ -230,7 +242,7 @@ function ObjectiveParetoPlot({ history }: { history: OptimizationHistory }) {
       Number.isFinite(candidate.objective_values[yMetric]),
   );
   if (rows.length < 2) {
-    return <div className="insight-empty">Multi-objective Pareto values will appear after two candidates complete.</div>;
+    return <div className="insight-empty">{t("insights.objectiveParetoEmpty")}</div>;
   }
   const width = 520;
   const height = 230;
@@ -244,11 +256,11 @@ function ObjectiveParetoPlot({ history }: { history: OptimizationHistory }) {
   return (
     <div className="insight-chart-block">
       <div className="insight-chart-legend">
-        <span><i className="legend-dot legend-frontier" />Backend Pareto front</span>
-        <span><i className="legend-dot legend-candidate" />Candidate</span>
+        <span><i className="legend-dot legend-frontier" />{t("insights.backendPareto")}</span>
+        <span><i className="legend-dot legend-candidate" />{t("jobDetail.candidate")}</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Multi-objective candidate Pareto front" className="insight-svg">
-        <title>Constraint-aware Pareto front calculated by the backend</title>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={t("insights.objectiveParetoAria")} className="insight-svg">
+        <title>{t("insights.objectiveParetoTitle")}</title>
         <line x1="42" y1={height - 34} x2={width - 18} y2={height - 34} className="insight-axis" />
         <line x1="42" y1="18" x2="42" y2={height - 34} className="insight-axis" />
         <text x={width / 2} y={height - 8} textAnchor="middle" className="insight-axis-label">
@@ -266,7 +278,14 @@ function ObjectiveParetoPlot({ history }: { history: OptimizationHistory }) {
             <g key={candidate.id} className={pareto.has(candidate.id) ? "pareto-frontier" : "pareto-candidate"}>
               <circle cx={x} cy={y} r={candidate.is_best ? 8 : 6} />
               <text x={x + 9} y={y - 7} className="pareto-label">{candidate.label ?? candidate.id}</text>
-              <title>{`${candidate.label ?? candidate.id}: ${xMetric} ${formatNumber(xValue)}, ${yMetric} ${formatNumber(yValue)}${candidate.feasible === false ? ", infeasible" : ""}`}</title>
+              <title>{t("insights.objectivePoint", {
+                candidate: candidate.label ?? candidate.id,
+                xMetric,
+                xValue: formatNumber(xValue),
+                yMetric,
+                yValue: formatNumber(yValue),
+                feasibility: candidate.feasible === false ? t("insights.infeasibleSuffix") : "",
+              })}</title>
             </g>
           );
         })}
@@ -276,6 +295,7 @@ function ObjectiveParetoPlot({ history }: { history: OptimizationHistory }) {
 }
 
 export function OptimizationInsights({ trials, history }: OptimizationInsightsProps) {
+  const { t } = useI18n();
   const candidates = useMemo(
     () => (history && history.items.length > 0 ? aggregateHistory(history) : aggregateCandidates(trials)),
     [history, trials],
@@ -284,7 +304,7 @@ export function OptimizationInsights({ trials, history }: OptimizationInsightsPr
   if (candidates.length === 0) {
     return (
       <div className="insight-empty" data-testid="optimization-insights-empty">
-        No completed candidate metrics are available yet. Charts will populate as trials finish.
+        {t("insights.empty")}
       </div>
     );
   }
@@ -293,11 +313,11 @@ export function OptimizationInsights({ trials, history }: OptimizationInsightsPr
     <div className="optimization-insights">
       <div className="insight-grid">
         <div>
-          <h3>Generation trend</h3>
+          <h3>{t("insights.generationTrend")}</h3>
           <GenerationTrend candidates={candidates} />
         </div>
         <div>
-          <h3>Candidate trade-offs</h3>
+          <h3>{t("insights.tradeoffs")}</h3>
           {history && <ObjectiveParetoPlot history={history} />}
           {history && Object.keys(history.objective_directions).length >= 2 ? null : <ParetoPlot candidates={candidates} />}
         </div>
@@ -313,12 +333,12 @@ export function OptimizationInsights({ trials, history }: OptimizationInsightsPr
         <table className="candidate-comparison-table">
           <thead>
             <tr>
-              <th>Candidate</th>
-              <th>Generation</th>
-              <th>Mean score ↓</th>
-              <th>Best / aggregate ↓</th>
-              <th>Pass rate ↑</th>
-              <th>Evidence</th>
+              <th>{t("jobDetail.candidate")}</th>
+              <th>{t("insights.generation")}</th>
+              <th>{t("insights.meanScore")}</th>
+              <th>{t("insights.bestAggregate")}</th>
+              <th>{t("insights.passRateUp")}</th>
+              <th>{t("insights.evidence")}</th>
             </tr>
           </thead>
           <tbody>
@@ -326,16 +346,16 @@ export function OptimizationInsights({ trials, history }: OptimizationInsightsPr
               <tr key={candidate.id} className={candidate.isBest ? "candidate-row-best" : undefined}>
                 <td>
                   <span className="candidate-comparison-name">{candidate.label}</span>
-                  {candidate.isBaseline ? <span className="candidate-tag candidate-tag-baseline">Baseline</span> : null}
-                  {candidate.frontier ? <span className="candidate-tag candidate-tag-best">Pareto</span> : null}
+                  {candidate.isBaseline ? <span className="candidate-tag candidate-tag-baseline">{t("jobDetail.baseline")}</span> : null}
+                  {candidate.frontier ? <span className="candidate-tag candidate-tag-best">{t("insights.pareto")}</span> : null}
                 </td>
                 <td>{candidate.isBaseline ? "—" : candidate.generation}</td>
                 <td>{formatNumber(candidate.meanScore)}</td>
                 <td>{formatNumber(candidate.bestScore)}</td>
                 <td>{candidate.passRate === null ? "—" : `${(candidate.passRate * 100).toFixed(0)}%`}</td>
                 <td>
-                  {candidate.completed}/{candidate.total} trials
-                  {candidate.scenarios === null ? "" : ` · ${candidate.scenarios} scenarios`}
+                  {t("insights.trialEvidence", { completed: candidate.completed, total: candidate.total })}
+                  {candidate.scenarios === null ? "" : ` · ${t("insights.scenarios", { count: candidate.scenarios })}`}
                 </td>
               </tr>
             ))}

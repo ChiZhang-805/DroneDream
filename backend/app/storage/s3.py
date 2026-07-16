@@ -61,31 +61,45 @@ class S3ArtifactStorage(ArtifactStorage):
         )
         return f"s3://{self.bucket}/{object_key}"
 
-    def read_bytes(self, storage_uri: str) -> bytes:
+    def _configured_location(self, storage_uri: str) -> tuple[str, str]:
+        """Resolve only objects inside this backend's configured namespace."""
+
         bucket, key = _parse_s3_uri(storage_uri)
+        if bucket != self.bucket:
+            raise S3StorageConfigError("Refusing to access an object outside configured bucket")
+        if self.prefix and not key.startswith(self.prefix):
+            raise S3StorageConfigError("Refusing to access an object outside configured prefix")
+        return bucket, key
+
+    def read_bytes(self, storage_uri: str) -> bytes:
+        bucket, key = self._configured_location(storage_uri)
         response = self._client.get_object(Bucket=bucket, Key=key)
         return cast(bytes, response["Body"].read())
 
     def exists(self, storage_uri: str) -> bool:
-        bucket, key = _parse_s3_uri(storage_uri)
+        bucket, key = self._configured_location(storage_uri)
         try:
             self._client.head_object(Bucket=bucket, Key=key)
             return True
-        except Exception:
-            return False
+        except Exception as exc:
+            # An outage, authorization error, or throttling response must not
+            # be misreported as "file missing". Only S3's explicit not-found
+            # responses are safe to collapse to False.
+            response = getattr(exc, "response", None)
+            error = response.get("Error", {}) if isinstance(response, dict) else {}
+            code = str(error.get("Code", "")) if isinstance(error, dict) else ""
+            if code in {"404", "NoSuchKey", "NotFound"}:
+                return False
+            raise
 
     def delete(self, storage_uri: str) -> None:
-        bucket, key = _parse_s3_uri(storage_uri)
+        bucket, key = self._configured_location(storage_uri)
         self._client.delete_object(Bucket=bucket, Key=key)
 
     def presign_download(
         self, storage_uri: str, *, expires_seconds: int | None = None
     ) -> str | None:
-        bucket, key = _parse_s3_uri(storage_uri)
-        if bucket != self.bucket:
-            raise S3StorageConfigError(
-                f"Refusing to presign an object outside configured bucket {self.bucket!r}"
-            )
+        bucket, key = self._configured_location(storage_uri)
         expiry = expires_seconds or get_settings().artifact_presign_expiry_seconds
         return str(
             self._client.generate_presigned_url(
@@ -101,6 +115,14 @@ class S3ArtifactStorage(ArtifactStorage):
 
 def _parse_s3_uri(uri: str) -> tuple[str, str]:
     parsed = urlparse(uri)
-    if parsed.scheme != "s3" or not parsed.netloc or not parsed.path:
+    key = parsed.path.lstrip("/")
+    if (
+        parsed.scheme != "s3"
+        or not parsed.netloc
+        or not key
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
         raise S3StorageConfigError(f"Invalid s3 uri: {uri}")
-    return parsed.netloc, parsed.path.lstrip("/")
+    return parsed.netloc, key

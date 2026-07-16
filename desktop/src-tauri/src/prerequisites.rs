@@ -6,6 +6,9 @@ use crate::process::{command_output, windows_command};
 #[cfg(target_os = "windows")]
 use std::time::Duration;
 
+#[cfg(target_os = "windows")]
+const SYSTEM_PROBE_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(40);
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrerequisiteReport {
@@ -261,7 +264,15 @@ try {
         "-Command",
         SCRIPT,
     ]);
-    let output = command_output(command, Duration::from_secs(20), "read-only system probe")?;
+    // CIM/WMI can take noticeably longer immediately after login or while WSL
+    // is warming up. Keep one native attempt bounded, but allow enough time for
+    // a healthy slow machine to answer. The frontend applies a three-attempt,
+    // roughly two-minute startup grace window and only retries this timeout.
+    let output = command_output(
+        command,
+        SYSTEM_PROBE_ATTEMPT_TIMEOUT,
+        "read-only system probe",
+    )?;
 
     if !output.status.success() {
         return Err(format!(

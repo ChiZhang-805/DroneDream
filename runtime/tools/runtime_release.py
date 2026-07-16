@@ -21,9 +21,10 @@ import sys
 import tarfile
 import tempfile
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, BinaryIO, Iterable
+from typing import Any, BinaryIO
 from urllib.parse import quote, unquote, urlsplit
 
 try:
@@ -314,10 +315,7 @@ def validate_release_manifest(manifest: Any) -> dict[str, Any]:
         ),
         "release manifest",
     )
-    if (
-        type(manifest["schemaVersion"]) is not int
-        or manifest["schemaVersion"] != SCHEMA_VERSION
-    ):
+    if type(manifest["schemaVersion"]) is not int or manifest["schemaVersion"] != SCHEMA_VERSION:
         raise ReleaseError("unsupported release manifest schema")
 
     runtime = manifest["runtime"]
@@ -331,9 +329,7 @@ def validate_release_manifest(manifest: Any) -> dict[str, Any]:
     if runtime["id"] != RUNTIME_ID:
         raise ReleaseError("runtime id is invalid")
     _canonical_uuid(runtime["buildId"], "runtime buildId")
-    if not isinstance(runtime["version"], str) or not SEMVER.fullmatch(
-        runtime["version"]
-    ):
+    if not isinstance(runtime["version"], str) or not SEMVER.fullmatch(runtime["version"]):
         raise ReleaseError("runtime version is invalid")
     if (
         runtime["architecture"] != ARCHITECTURE
@@ -350,13 +346,9 @@ def validate_release_manifest(manifest: Any) -> dict[str, Any]:
         ("gitCommit", "px4Commit", "gazeboVersion", "buildTimestamp"),
         "source",
     )
-    if not isinstance(source["gitCommit"], str) or not SHA40.fullmatch(
-        source["gitCommit"]
-    ):
+    if not isinstance(source["gitCommit"], str) or not SHA40.fullmatch(source["gitCommit"]):
         raise ReleaseError("source gitCommit is invalid")
-    if not isinstance(source["px4Commit"], str) or not SHA40.fullmatch(
-        source["px4Commit"]
-    ):
+    if not isinstance(source["px4Commit"], str) or not SHA40.fullmatch(source["px4Commit"]):
         raise ReleaseError("source px4Commit is invalid")
     if (
         not isinstance(source["gazeboVersion"], str)
@@ -393,9 +385,7 @@ def validate_release_manifest(manifest: Any) -> dict[str, Any]:
         or artifact["sizeBytes"] > MAX_ARTIFACT_BYTES
     ):
         raise ReleaseError("artifact sizeBytes is invalid")
-    if not isinstance(artifact["sha256"], str) or not SHA256.fullmatch(
-        artifact["sha256"]
-    ):
+    if not isinstance(artifact["sha256"], str) or not SHA256.fullmatch(artifact["sha256"]):
         raise ReleaseError("artifact sha256 is invalid")
     parts = artifact["parts"]
     if not isinstance(parts, list) or not parts or len(parts) > MAX_PARTS:
@@ -452,9 +442,7 @@ def validate_release_manifest(manifest: Any) -> dict[str, Any]:
         or report_filename in part_names
     ):
         raise ReleaseError("smoke report filename conflicts with another release asset")
-    if not isinstance(smoke["reportSha256"], str) or not SHA256.fullmatch(
-        smoke["reportSha256"]
-    ):
+    if not isinstance(smoke["reportSha256"], str) or not SHA256.fullmatch(smoke["reportSha256"]):
         raise ReleaseError("smoke report sha256 is invalid")
     _https_url(smoke["reportUrl"], "smoke report URL", report_filename)
     _rfc3339(smoke["completedAt"], "smoke completedAt")
@@ -494,9 +482,7 @@ def validate_signature_envelope(envelope: Any) -> dict[str, Any]:
         raise ReleaseError("unsupported signature envelope schema")
     if envelope["algorithm"] != "Ed25519":
         raise ReleaseError("unsupported signature algorithm")
-    if not isinstance(envelope["keyId"], str) or not KEY_ID.fullmatch(
-        envelope["keyId"]
-    ):
+    if not isinstance(envelope["keyId"], str) or not KEY_ID.fullmatch(envelope["keyId"]):
         raise ReleaseError("signature keyId is invalid")
     if not isinstance(envelope["manifestSha256"], str) or not SHA256.fullmatch(
         envelope["manifestSha256"]
@@ -506,10 +492,7 @@ def validate_signature_envelope(envelope: Any) -> dict[str, Any]:
         signature = base64.b64decode(envelope["signature"], validate=True)
     except (binascii.Error, TypeError) as exc:
         raise ReleaseError("signature is not canonical base64") from exc
-    if (
-        len(signature) != 64
-        or base64.b64encode(signature).decode("ascii") != envelope["signature"]
-    ):
+    if len(signature) != 64 or base64.b64encode(signature).decode("ascii") != envelope["signature"]:
         raise ReleaseError("signature must encode exactly 64 bytes")
     return envelope
 
@@ -547,10 +530,7 @@ def validate_keyring(keyring: Any) -> dict[str, bytes]:
             raw = base64.b64decode(entry["publicKeyBase64"], validate=True)
         except (binascii.Error, TypeError) as exc:
             raise ReleaseError("release public key is not base64") from exc
-        if (
-            len(raw) != 32
-            or base64.b64encode(raw).decode("ascii") != entry["publicKeyBase64"]
-        ):
+        if len(raw) != 32 or base64.b64encode(raw).decode("ascii") != entry["publicKeyBase64"]:
             raise ReleaseError("release public key must encode exactly 32 bytes")
         expected_id = key_id_for_public_key(raw)
         if entry["keyId"] != expected_id:
@@ -613,9 +593,7 @@ def _load_private_key_from_environment(variable: str) -> Any:
     _require_crypto()
     encoded = os.environ.get(variable)
     if not encoded:
-        raise ReleaseError(
-            f"private signing key environment variable is empty: {variable}"
-        )
+        raise ReleaseError(f"private signing key environment variable is empty: {variable}")
     try:
         raw = base64.b64decode(encoded.strip(), validate=True)
     except binascii.Error as exc:
@@ -641,18 +619,12 @@ def _validate_promoted_runtime_manifest(manifest: Any, smoke_report: Any) -> Non
         "parameterReadback": True,
     }:
         raise ReleaseError("embedded runtime manifest is not smoke-promoted")
-    if (
-        smoke_report.get("passed") is not True
-        or smoke_report.get("mode") != "runtime-image"
-    ):
+    if smoke_report.get("passed") is not True or smoke_report.get("mode") != "runtime-image":
         raise ReleaseError("release requires a passed runtime-image smoke report")
     if smoke_report.get("runtimeId") != manifest["runtimeId"]:
         raise ReleaseError("smoke report does not match embedded runtimeId")
     embedded_report = manifest.get("smokeReport")
-    if (
-        not isinstance(embedded_report, dict)
-        or embedded_report.get("passed") is not True
-    ):
+    if not isinstance(embedded_report, dict) or embedded_report.get("passed") is not True:
         raise ReleaseError("embedded smoke report is missing or failed")
     for field in ("runtimeId", "imageId", "passed", "mode", "checks"):
         if embedded_report.get(field) != smoke_report.get(field):
@@ -660,10 +632,7 @@ def _validate_promoted_runtime_manifest(manifest: Any, smoke_report: Any) -> Non
     checks = smoke_report.get("checks")
     if not isinstance(checks, list) or not checks:
         raise ReleaseError("smoke report checks are missing")
-    if any(
-        not isinstance(check, dict) or check.get("passed") is not True
-        for check in checks
-    ):
+    if any(not isinstance(check, dict) or check.get("passed") is not True for check in checks):
         raise ReleaseError("smoke report contains a failed check")
     required = {
         "component_versions",
@@ -696,11 +665,7 @@ def extract_embedded_manifest(rootfs: Path, output: Path) -> None:
                     continue
                 if content is not None:
                     raise ReleaseError("rootfs contains duplicate embedded manifests")
-                if (
-                    not member.isfile()
-                    or member.size <= 0
-                    or member.size > MAX_JSON_BYTES
-                ):
+                if not member.isfile() or member.size <= 0 or member.size > MAX_JSON_BYTES:
                     raise ReleaseError("embedded runtime manifest member is invalid")
                 stream = archive.extractfile(member)
                 if stream is None:
@@ -711,9 +676,7 @@ def extract_embedded_manifest(rootfs: Path, output: Path) -> None:
     if content is None:
         raise ReleaseError(f"rootfs is missing {EMBEDDED_MANIFEST_MEMBER}")
     manifest = load_json_bytes(content, EMBEDDED_MANIFEST_MEMBER)
-    if not isinstance(manifest, dict) or not isinstance(
-        manifest.get("smokeReport"), dict
-    ):
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("smokeReport"), dict):
         raise ReleaseError("embedded runtime manifest has no smoke evidence")
     _validate_promoted_runtime_manifest(manifest, manifest["smokeReport"])
     _write_new(output, content)
@@ -737,11 +700,7 @@ def package_release(
         raise ReleaseError("rootfs must not be empty")
     if rootfs_stat.st_size > MAX_ARTIFACT_BYTES:
         raise ReleaseError("rootfs exceeds the 12 GiB release limit")
-    if (
-        type(part_bytes) is not int
-        or part_bytes <= 0
-        or part_bytes >= MAX_PART_BYTES_EXCLUSIVE
-    ):
+    if type(part_bytes) is not int or part_bytes <= 0 or part_bytes >= MAX_PART_BYTES_EXCLUSIVE:
         raise ReleaseError("part size must be positive and strictly below 2 GiB")
     expected_parts = (rootfs_stat.st_size + part_bytes - 1) // part_bytes
     if expected_parts > MAX_PARTS:
@@ -753,24 +712,16 @@ def package_release(
     ):
         raise ReleaseError("minimum free bytes must be at least 52 GiB")
     if output_directory.exists() or output_directory.is_symlink():
-        raise ReleaseError(
-            f"release output directory must not exist: {output_directory}"
-        )
+        raise ReleaseError(f"release output directory must not exist: {output_directory}")
 
-    embedded_manifest_bytes = read_regular_bytes(
-        runtime_manifest_path, "promoted runtime manifest"
-    )
+    embedded_manifest_bytes = read_regular_bytes(runtime_manifest_path, "promoted runtime manifest")
     smoke_report_bytes = read_regular_bytes(smoke_report_path, "smoke report")
-    embedded_manifest = load_json_bytes(
-        embedded_manifest_bytes, str(runtime_manifest_path)
-    )
+    embedded_manifest = load_json_bytes(embedded_manifest_bytes, str(runtime_manifest_path))
     smoke_report = load_json_bytes(smoke_report_bytes, str(smoke_report_path))
     _validate_promoted_runtime_manifest(embedded_manifest, smoke_report)
     base = _base_url(base_url)
     build_time = _normalize_rfc3339(build_timestamp, "build timestamp")
-    completed_at = _normalize_rfc3339(
-        smoke_report.get("completedAt"), "smoke completedAt"
-    )
+    completed_at = _normalize_rfc3339(smoke_report.get("completedAt"), "smoke completedAt")
 
     source = embedded_manifest.get("source")
     component_details = embedded_manifest.get("componentDetails")
@@ -799,9 +750,7 @@ def package_release(
     report_filename = _safe_filename(smoke_report_path.name, "smoke report filename")
     parent = output_directory.parent.resolve()
     parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(
-        tempfile.mkdtemp(prefix=f".{output_directory.name}.staging-", dir=parent)
-    )
+    staging = Path(tempfile.mkdtemp(prefix=f".{output_directory.name}.staging-", dir=parent))
     try:
         whole_digest = hashlib.sha256()
         whole_size = 0
@@ -904,13 +853,12 @@ def package_release(
     return output_directory / MANIFEST_FILENAME
 
 
-def sign_manifest(
-    manifest_path: Path, private_key_env: str, public_output: Path | None
-) -> Path:
-    _regular_file(manifest_path, "release manifest")
-    payload = load_json(manifest_path)
+def sign_manifest(manifest_path: Path, private_key_env: str, public_output: Path | None) -> Path:
+    raw_manifest = read_regular_bytes(manifest_path, "release manifest")
+    if len(raw_manifest) > MAX_JSON_BYTES:
+        raise ReleaseError(f"release manifest exceeds {MAX_JSON_BYTES} bytes")
+    payload = load_json_bytes(raw_manifest, str(manifest_path))
     validate_release_manifest(payload)
-    raw_manifest = manifest_path.read_bytes()
     if raw_manifest != canonical_bytes(payload):
         raise ReleaseError("release manifest is not canonical JSON")
     private_key = _load_private_key_from_environment(private_key_env)
@@ -940,33 +888,34 @@ def verify_signature(
     _require_crypto()
     expected_signature_path = Path(str(manifest_path) + SIGNATURE_SUFFIX)
     if signature_path.resolve() != expected_signature_path.resolve():
-        raise ReleaseError(
-            "signature path must be the manifest path with .sig appended"
-        )
-    _regular_file(manifest_path, "release manifest")
-    _regular_file(signature_path, "release signature")
-    _regular_file(keyring_path, "release keyring")
-    manifest = load_json(manifest_path)
+        raise ReleaseError("signature path must be the manifest path with .sig appended")
+    raw_manifest = read_regular_bytes(manifest_path, "release manifest")
+    if len(raw_manifest) > MAX_JSON_BYTES:
+        raise ReleaseError(f"release manifest exceeds {MAX_JSON_BYTES} bytes")
+    manifest = load_json_bytes(raw_manifest, str(manifest_path))
     validate_release_manifest(manifest)
-    raw_manifest = manifest_path.read_bytes()
     if raw_manifest != canonical_bytes(manifest):
         raise ReleaseError("release manifest is not canonical JSON")
-    envelope = load_json(signature_path)
+    raw_envelope = read_regular_bytes(signature_path, "release signature")
+    if len(raw_envelope) > MAX_JSON_BYTES:
+        raise ReleaseError(f"release signature exceeds {MAX_JSON_BYTES} bytes")
+    envelope = load_json_bytes(raw_envelope, str(signature_path))
     validate_signature_envelope(envelope)
-    if signature_path.read_bytes() != canonical_bytes(envelope):
+    if raw_envelope != canonical_bytes(envelope):
         raise ReleaseError("release signature envelope is not canonical JSON")
     digest = hashlib.sha256(raw_manifest).hexdigest()
     if envelope["manifestSha256"] != digest:
         raise ReleaseError("signature envelope manifest hash does not match")
-    keys = validate_keyring(load_json(keyring_path))
+    raw_keyring = read_regular_bytes(keyring_path, "release keyring")
+    if len(raw_keyring) > MAX_JSON_BYTES:
+        raise ReleaseError(f"release keyring exceeds {MAX_JSON_BYTES} bytes")
+    keys = validate_keyring(load_json_bytes(raw_keyring, str(keyring_path)))
     raw_public_key = keys.get(envelope["keyId"])
     if raw_public_key is None:
         raise ReleaseError("signature keyId is not in the trusted keyring")
     signature = base64.b64decode(envelope["signature"], validate=True)
     try:
-        Ed25519PublicKey.from_public_bytes(raw_public_key).verify(
-            signature, raw_manifest
-        )
+        Ed25519PublicKey.from_public_bytes(raw_public_key).verify(signature, raw_manifest)
     except InvalidSignature as exc:
         raise ReleaseError("release manifest Ed25519 signature is invalid") from exc
     return manifest
@@ -980,10 +929,13 @@ def _verify_payload(
     if not payload_directory.is_dir() or payload_directory.is_symlink():
         raise ReleaseError("payload directory must be a non-symlink directory")
     report = payload_directory / manifest["smoke"]["reportFilename"]
-    report_hash, _ = file_sha256(report)
+    report_bytes = read_regular_bytes(report, "smoke report")
+    if len(report_bytes) > MAX_JSON_BYTES:
+        raise ReleaseError(f"smoke report exceeds {MAX_JSON_BYTES} bytes")
+    report_hash = hashlib.sha256(report_bytes).hexdigest()
     if report_hash != manifest["smoke"]["reportSha256"]:
         raise ReleaseError("smoke report hash does not match release manifest")
-    report_payload = load_json(report)
+    report_payload = load_json_bytes(report_bytes, str(report))
     if report_payload.get("passed") is not True:
         raise ReleaseError("downloaded smoke report is not successful")
     if report_payload.get("runtimeId") != manifest["runtime"]["buildId"]:
@@ -1009,10 +961,7 @@ def _verify_payload(
         if part_size != part["sizeBytes"] or part_digest.hexdigest() != part["sha256"]:
             raise ReleaseError(f"artifact part hash does not match: {part['filename']}")
     artifact = manifest["artifact"]
-    if (
-        whole_size != artifact["sizeBytes"]
-        or whole_digest.hexdigest() != artifact["sha256"]
-    ):
+    if whole_size != artifact["sizeBytes"] or whole_digest.hexdigest() != artifact["sha256"]:
         raise ReleaseError("reassembled artifact hash or size does not match")
 
 
@@ -1071,18 +1020,14 @@ def _build_parser() -> argparse.ArgumentParser:
     extract.add_argument("--rootfs", type=Path, required=True)
     extract.add_argument("--output", type=Path, required=True)
 
-    package = subparsers.add_parser(
-        "package", help="split and describe a smoked rootfs"
-    )
+    package = subparsers.add_parser("package", help="split and describe a smoked rootfs")
     package.add_argument("--rootfs", type=Path, required=True)
     package.add_argument("--runtime-manifest", type=Path, required=True)
     package.add_argument("--smoke-report", type=Path, required=True)
     package.add_argument("--output-directory", type=Path, required=True)
     package.add_argument("--base-url", required=True)
     package.add_argument("--build-timestamp", required=True)
-    package.add_argument(
-        "--part-bytes", type=_positive_integer, default=DEFAULT_PART_BYTES
-    )
+    package.add_argument("--part-bytes", type=_positive_integer, default=DEFAULT_PART_BYTES)
     package.add_argument(
         "--minimum-free-bytes",
         type=_positive_integer,
@@ -1094,9 +1039,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sign.add_argument("--private-key-env", default=PRIVATE_KEY_ENV_DEFAULT)
     sign.add_argument("--public-key-output", type=Path)
 
-    verify = subparsers.add_parser(
-        "verify", help="verify signature and downloaded payload"
-    )
+    verify = subparsers.add_parser("verify", help="verify signature and downloaded payload")
     verify.add_argument("--manifest", type=Path, required=True)
     verify.add_argument("--signature", type=Path, required=True)
     verify.add_argument("--keyring", type=Path, required=True)
@@ -1136,17 +1079,11 @@ def main() -> int:
             )
             print(f"created unsigned release payload at {manifest.parent}")
         elif args.command == "sign":
-            signature = sign_manifest(
-                args.manifest, args.private_key_env, args.public_key_output
-            )
+            signature = sign_manifest(args.manifest, args.private_key_env, args.public_key_output)
             print(f"created detached signature {signature}")
         elif args.command == "verify":
-            verify_release(
-                args.manifest, args.signature, args.keyring, args.payload_directory
-            )
-            print(
-                "release signature, smoke evidence, parts, and whole artifact verified"
-            )
+            verify_release(args.manifest, args.signature, args.keyring, args.payload_directory)
+            print("release signature, smoke evidence, parts, and whole artifact verified")
         else:
             reassemble_release(
                 args.manifest,

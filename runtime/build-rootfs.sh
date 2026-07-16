@@ -23,12 +23,20 @@ docker buildx build --load --platform linux/amd64 --provenance=false \
   --build-arg "UBUNTU_BASE_IMAGE=$UBUNTU_BASE_IMAGE" \
   --build-arg "DRONEDREAM_SOURCE_COMMIT=$source_commit" \
   --build-arg "PX4_VERSION=$PX4_VERSION" \
+  --build-arg "PX4_GIT_URL=$PX4_GIT_URL" \
   --build-arg "PX4_GIT_COMMIT=$PX4_GIT_COMMIT" \
   --build-arg "GAZEBO_METAPACKAGE=$GAZEBO_METAPACKAGE" \
   --build-arg "GAZEBO_METAPACKAGE_VERSION=$GAZEBO_METAPACKAGE_VERSION" \
   --build-arg "GAZEBO_APT_KEY_URL=$GAZEBO_APT_KEY_URL" \
   --build-arg "GAZEBO_APT_KEY_SHA256=$GAZEBO_APT_KEY_SHA256" \
+  --build-arg "VALKEY_VERSION=$VALKEY_VERSION" \
+  --build-arg "VALKEY_GIT_URL=$VALKEY_GIT_URL" \
   --build-arg "VALKEY_GIT_COMMIT=$VALKEY_GIT_COMMIT" \
+  --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
+  --build-arg "BACKEND_VERSION=$BACKEND_VERSION" \
+  --build-arg "WORKER_VERSION=$WORKER_VERSION" \
+  --build-arg "MAVSDK_VERSION=$MAVSDK_VERSION" \
+  --build-arg "PYULOG_VERSION=$PYULOG_VERSION" \
   "$root"
 
 echo "built $image from $source_commit"

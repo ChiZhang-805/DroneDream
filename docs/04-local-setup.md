@@ -136,7 +136,7 @@ Frontend：
 
 ```bash
 cd ~/DroneDream/frontend
-npm install
+npm ci
 ```
 
 ---
@@ -251,10 +251,11 @@ updates = {
     'PX4_OFFBOARD_DRY_RUN': 'false',
     'DISPLAY': display_value,
     'PX4_GAZEBO_LAUNCH_GUI_CLIENT': 'true',
-    'PX4_GAZEBO_GUI_COMMAND': '"gz sim -g"',
+    'PX4_GAZEBO_GUI_COMMAND': '',
     'PX4_GAZEBO_GUI_START_DELAY_SECONDS': '5',
     'PX4_GAZEBO_GUI_WAIT_TIMEOUT_SECONDS': '15',
     'PX4_GAZEBO_REQUIRE_GUI_CLIENT': 'false',
+    'PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS': 'false',
     'LIBGL_ALWAYS_SOFTWARE': '1',
     'QT_X11_NO_MITSHM': '1',
     'PX4_GAZEBO_DRAW_TRACK_MARKER': 'true',

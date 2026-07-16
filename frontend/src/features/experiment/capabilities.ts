@@ -9,19 +9,26 @@ export interface RuntimeCapabilityErrors {
   optimizer_strategy?: string;
 }
 
+interface RuntimeCapabilityMessages {
+  realSimulatorNotReady: string;
+  gptNotReady: string;
+}
+
 /** Convert discovered backend prerequisites into form-level blocking errors. */
 export function runtimeCapabilityErrors(
   simulatorBackend: SimulatorBackend,
   optimizerStrategy: OptimizerStrategy,
   capabilities: BackendCapabilitiesResponse | null,
+  messages?: RuntimeCapabilityMessages,
 ): RuntimeCapabilityErrors {
   if (!capabilities) return {};
   const errors: RuntimeCapabilityErrors = {};
   if (simulatorBackend === "real_cli" && capabilities.simulators.authoritative) {
     const capability = capabilities.simulators.items.real_cli;
     if (!capability || !capability.ready) {
-      errors.simulator_backend =
-        capability?.reason ?? "The real simulator runtime is not ready";
+      errors.simulator_backend = messages?.realSimulatorNotReady
+        ?? capability?.reason
+        ?? "The real simulator runtime is not ready";
     }
   }
   if (optimizerStrategy === "gpt") {
@@ -30,9 +37,9 @@ export function runtimeCapabilityErrors(
     // creation cannot encrypt the supplied credential. A positive result is
     // advisory until a separately deployed worker publishes its own health.
     if (!capability || !capability.ready) {
-      errors.optimizer_strategy =
-        capability?.reason ??
-        "The backend secret store is not configured for GPT optimization";
+      errors.optimizer_strategy = messages?.gptNotReady
+        ?? capability?.reason
+        ?? "The backend secret store is not configured for GPT optimization";
     }
   }
   return errors;

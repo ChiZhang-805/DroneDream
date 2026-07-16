@@ -28,7 +28,11 @@ def _extract_bearer_token(authorization: str | None) -> str | None:
     if len(parts) != 2 or parts[0].lower() != "bearer":
         return None
     token = parts[1].strip()
-    return token or None
+    # Bound work performed by JWT parsing/key selection and avoid retaining an
+    # arbitrarily large attacker-controlled header in exception chains.
+    if not token or len(token) > 16_384:
+        return None
+    return token
 
 
 def _get_or_create_user(db: Session, *, email: str, display_name: str | None = None) -> models.User:

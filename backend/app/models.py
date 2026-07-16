@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     Float,
@@ -207,6 +208,9 @@ class CandidateParameterSet(Base):
     aggregated_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     aggregated_metric_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     proposal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    optimizer_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
     parent_candidate_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     llm_response_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     trial_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -330,7 +334,10 @@ class Artifact(Base):
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
     mime_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Artifact logs and telemetry can legitimately exceed PostgreSQL's
+    # 32-bit INTEGER ceiling. SQLite already stores 64-bit integers, while
+    # BigInteger keeps the production schema portable and lossless.
+    file_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
@@ -374,6 +381,7 @@ class JobSecret(Base):
 
 __all__ = [
     "Artifact",
+    "BatchJob",
     "CandidateParameterSet",
     "Job",
     "JobEvent",

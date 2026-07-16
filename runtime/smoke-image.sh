@@ -42,10 +42,16 @@ fi
 sandbox_properties=(
   "User=dronedream"
   "Group=dronedream"
+  "UMask=0027"
   "NoNewPrivileges=true"
   "PrivateTmp=true"
   "ProtectSystem=strict"
   "ProtectHome=read-only"
+  "ProtectKernelTunables=true"
+  "ProtectKernelModules=true"
+  "ProtectControlGroups=true"
+  "LockPersonality=true"
+  "RestrictSUIDSGID=true"
   "ReadWritePaths=/var/lib/dronedream /opt/PX4-Autopilot/build /home/dronedream /tmp"
 )
 

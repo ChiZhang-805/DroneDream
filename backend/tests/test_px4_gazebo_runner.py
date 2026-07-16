@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import math
 import os
@@ -9,11 +10,55 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from app.simulator.base import FAILURE_ADAPTER_UNAVAILABLE, FAILURE_TIMEOUT, JobConfig, TrialContext
 from app.simulator.real_cli import RealCliSimulatorAdapter
 
 RUNNER = Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "px4_gazebo_runner.py"
+RUNNER_SPEC = importlib.util.spec_from_file_location("dronedream_px4_gazebo_runner", RUNNER)
+assert RUNNER_SPEC is not None and RUNNER_SPEC.loader is not None
+runner_module = importlib.util.module_from_spec(RUNNER_SPEC)
+sys.modules[RUNNER_SPEC.name] = runner_module
+RUNNER_SPEC.loader.exec_module(runner_module)
+
+
+def test_track_projection_rejects_empty_candidate_set():
+    geometry = runner_module.TrackGeometry(segments=(), total_length=0.0, closed=False)
+
+    with pytest.raises(runner_module.RunnerError, match="at least one candidate segment"):
+        runner_module._best_track_projection({}, geometry, [], [1])
+
+
+def test_runner_uses_one_canonical_safe_bounds_switch(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("PX4_ENFORCE_SAFE_PARAMETER_BOUNDS", "false")
+    monkeypatch.setenv("PX4_PARAMETER_ENFORCE_SAFE_BOUNDS", "true")
+    assert runner_module._load_env().enforce_safe_parameter_bounds is True
+
+    monkeypatch.setenv("PX4_PARAMETER_ENFORCE_SAFE_BOUNDS", "false")
+    assert runner_module._load_env().enforce_safe_parameter_bounds is False
+
+
+def test_runner_rejects_non_regular_contract_files(tmp_path: Path) -> None:
+    telemetry_directory = tmp_path / "telemetry.json"
+    telemetry_directory.mkdir()
+    evidence_directory = tmp_path / "scenario-effects.evidence.json"
+    evidence_directory.mkdir()
+
+    with pytest.raises(runner_module.RunnerError, match="regular, non-symlink"):
+        runner_module._load_telemetry(telemetry_directory, allow_csv=False)
+    with pytest.raises(
+        runner_module.ScenarioEffectContractError,
+        match="regular, non-symlink",
+    ):
+        runner_module._require_effect_evidence_file(evidence_directory)
+
+
+def test_runner_rejects_oversized_trial_input_before_json_decode(tmp_path: Path) -> None:
+    input_path = tmp_path / "trial_input.json"
+    with input_path.open("wb") as stream:
+        stream.truncate(runner_module._MAX_TRIAL_INPUT_BYTES + 1)
+
+    with pytest.raises(runner_module.RunnerError, match="byte contract limit"):
+        runner_module._load_trial_payload(input_path)
 
 
 def _trial_input(
@@ -62,6 +107,37 @@ def _trial_input(
     p = tmp_path / "trial_input.json"
     p.write_text(json.dumps(payload), encoding="utf-8")
     return p
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected"),
+    [
+        ("altitude_m", 0.5, "between 1 and 20 meters"),
+        ("altitude_m", 20.1, "between 1 and 20 meters"),
+        ("wind", {"north": 10.1}, "between -10 and 10 m/s"),
+        ("wind", {"west": -10.1}, "between -10 and 10 m/s"),
+    ],
+)
+def test_runner_independently_enforces_job_environment_bounds(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    expected: str,
+) -> None:
+    payload = json.loads(_trial_input(tmp_path).read_text(encoding="utf-8"))
+    payload["job_config"][field] = value
+
+    with pytest.raises(runner_module.RunnerError, match=expected):
+        runner_module._validate_trial_input(payload)
+
+
+def test_runner_rejects_control_characters_in_execution_identity(tmp_path: Path) -> None:
+    payload = json.loads(_trial_input(tmp_path).read_text(encoding="utf-8"))
+    payload["trial_id"] = "trial-1\nforged-log-entry"
+    payload["execution_identity"]["trial_id"] = payload["trial_id"]
+
+    with pytest.raises(runner_module.RunnerError, match="contains controls"):
+        runner_module._validate_trial_input(payload)
 
 
 def _run_runner(
@@ -735,7 +811,16 @@ def test_px4_runner_fails_fast_for_unapplied_advanced_scenario_effects(
     payload = json.loads(input_path.read_text(encoding="utf-8"))
     payload["advanced_scenario_config"] = {
         "wind_gusts": {"enabled": True, "magnitude_mps": 2.0},
-        "obstacles": [{"type": "cylinder", "x": 1.0, "y": 2.0, "z": 1.0}],
+        "obstacles": [
+            {
+                "type": "cylinder",
+                "x": 1.0,
+                "y": 2.0,
+                "z": 1.0,
+                "radius": 0.5,
+                "height": 2.0,
+            }
+        ],
         "sensor_degradation": {"dropout_rate": 0.1},
         "battery": {"initial_percent": 80.0},
     }
@@ -765,6 +850,54 @@ def test_px4_runner_fails_fast_for_unapplied_advanced_scenario_effects(
         "sensor_degradation.dropout_rate",
         "wind_gusts",
     ]
+
+
+@pytest.mark.parametrize(
+    ("advanced", "expected_error"),
+    [
+        (
+            {"wind_gusts": {"magnitude_mps": 31.0}},
+            "wind_gusts.magnitude_mps must be in [0, 30]",
+        ),
+        (
+            {"sensor_degradation": {"dropout_rate": 1.1}},
+            "sensor_degradation.dropout_rate must be in [0, 1]",
+        ),
+        (
+            {"battery": {"mass_payload_kg": 21.0}},
+            "battery.mass_payload_kg must be in [0, 20]",
+        ),
+        (
+            {"obstacles": [{"type": "box", "x": 0.0, "y": 0.0, "z": 1.0}]},
+            "obstacles[0].size_x must be finite and greater than zero",
+        ),
+    ],
+)
+def test_px4_runner_rejects_out_of_contract_advanced_scenarios(
+    tmp_path: Path,
+    advanced: dict[str, object],
+    expected_error: str,
+) -> None:
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["advanced_scenario_config"] = advanced
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env["PX4_GAZEBO_DRY_RUN"] = "true"
+
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is False
+    assert expected_error in str(result["failure"]["reason"])
 
 
 def test_unverified_advanced_effect_passthrough_can_run_but_never_pass(
@@ -810,7 +943,7 @@ def test_real_runner_fails_closed_for_unapplied_scenario_suite_effect(
     payload["scenario_config"] = {"wind_mps": 4.0}
     input_path.write_text(json.dumps(payload), encoding="utf-8")
     sentinel = tmp_path / "launcher-ran"
-    launcher = tmp_path / "must_not_run.py"
+    launcher = tmp_path / "launcher_without_effect_evidence.py"
     launcher.write_text(
         f"import pathlib\npathlib.Path({str(sentinel)!r}).write_text('ran')\n",
         encoding="utf-8",
@@ -835,14 +968,117 @@ def test_real_runner_fails_closed_for_unapplied_scenario_suite_effect(
     result = json.loads(output_path.read_text(encoding="utf-8"))
     assert proc.returncode == 0
     assert result["failure"]["code"] == "UNSUPPORTED_SCENARIO_EFFECT"
-    assert not sentinel.exists()
+    # Real launches now receive the normalized request and must return evidence.
+    # A launcher that ignores the contract is rejected after it runs rather than
+    # causing every advanced scenario to be rejected before capability discovery.
+    assert sentinel.exists()
+    assert "evidence" in str(result["failure"]["reason"])
     contract = json.loads((tmp_path / "launch_config.json").read_text(encoding="utf-8"))[
         "scenario_effect_contract"
     ]
     assert contract["unsupported_effects"] == [
         "scenario_config.wind_mps",
-        "scenario_type.wind_perturbed",
     ]
+    assert contract["verification_status"] == "invalid_launcher_evidence"
+
+
+def test_real_runner_accepts_only_verified_obstacle_application(
+    tmp_path: Path,
+) -> None:
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["advanced_scenario_config"] = {
+        "obstacles": [
+            {
+                "type": "box",
+                "x": 1.0,
+                "y": 2.0,
+                "z": 0.5,
+                "size_x": 1.0,
+                "size_y": 2.0,
+                "size_z": 1.0,
+            }
+        ]
+    }
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+    launcher = tmp_path / "verified_obstacle_launcher.py"
+    telemetry_json = json.dumps(_track_following_telemetry())
+    launcher.write_text(
+        "\n".join(
+            [
+                "import json, os, pathlib, sys",
+                (
+                    "request = json.loads(pathlib.Path(os.environ["
+                    "'PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH']).read_text())"
+                ),
+                "effect = request['effects'][0]",
+                "evidence = {",
+                "  'schema_version': 'dronedream.scenario_effect_evidence.v1',",
+                "  'request_sha256': request['request_sha256'],",
+                "  'execution_identity': request['execution_identity'],",
+                "  'launcher': 'test_verified_launcher',",
+                "  'world': os.environ['PX4_TRIAL_WORLD'],",
+                "  'effects': [{",
+                "    'effect_id': 'obstacles',",
+                "    'mechanism': 'gazebo_entity_factory',",
+                "    'status': 'applied',",
+                "    'capability': {'status': 'available', 'reason': 'test'},",
+                "    'evidence': {'created_entities': [{",
+                "      'source_index': 0,",
+                "      'entity_name': 'dronedream_obstacle_000',",
+                "      'service': '/world/default/create',",
+                "      'response_data': True,",
+                "      'sdf_sha256': 'a' * 64,",
+                "    }]},",
+                "  }],",
+                "}",
+                (
+                    "pathlib.Path(os.environ['PX4_TRIAL_SCENARIO_EFFECT_EVIDENCE_PATH'])"
+                    ".write_text(json.dumps(evidence), encoding='utf-8')"
+                ),
+                "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])",
+                f"telemetry.write_text({telemetry_json!r}, encoding='utf-8')",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": f'"{sys.executable}" "{launcher}"',
+        }
+    )
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(RUNNER),
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert proc.returncode == 0, proc.stderr
+    assert result["success"] is True
+    contract = json.loads((tmp_path / "launch_config.json").read_text(encoding="utf-8"))[
+        "scenario_effect_contract"
+    ]
+    assert contract["verification_status"] == "verified_applied"
+    assert contract["applied_effects"] == ["obstacles"]
+    assert contract["unsupported_effects"] == []
+    artifact_types = {artifact["artifact_type"] for artifact in result["artifacts"]}
+    assert "scenario_effect_request_json" in artifact_types
+    assert "scenario_effect_evidence_json" in artifact_types
 
 
 def test_px4_runner_rejects_unsafe_vehicle_profile_tokens(tmp_path: Path):
@@ -875,6 +1111,89 @@ def test_px4_runner_rejects_unsupported_or_malformed_px4_version(tmp_path: Path)
     assert proc.returncode == 0
     assert result["success"] is False
     assert "vehicle_profile.px4_version" in str(result["failure"]["reason"])
+
+
+@pytest.mark.parametrize(
+    ("field_path", "expected_error"),
+    [
+        (("job_config",), "trial_input.job_config"),
+        (("job_config", "wind"), "wind must be an object"),
+        (("parameters",), "trial_input.parameters"),
+        (("vehicle_profile",), "trial_input.vehicle_profile"),
+        (("job_config", "vehicle_profile"), "trial_input.job_config.vehicle_profile"),
+        (("scenario_config",), "trial_input.scenario_config"),
+        (("advanced_scenario_config",), "trial_input.advanced_scenario_config"),
+        (
+            ("scenario_config", "advanced_scenario_config"),
+            "trial_input.scenario_config.advanced_scenario_config",
+        ),
+    ],
+)
+def test_px4_runner_rejects_malformed_optional_object_fields(
+    tmp_path: Path,
+    field_path: tuple[str, ...],
+    expected_error: str,
+):
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    cursor = payload
+    for part in field_path[:-1]:
+        cursor = cursor[part]
+    cursor[field_path[-1]] = ["not", "an", "object"]
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env["PX4_GAZEBO_DRY_RUN"] = "true"
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is False
+    assert expected_error in str(result["failure"]["reason"])
+
+
+@pytest.mark.parametrize(
+    ("parameter_name", "value", "expected_error"),
+    [
+        ("kp_xy", -0.1, "controller gains must be non-negative"),
+        ("vel_limit", 0.0, "must be greater than zero"),
+        ("accel_limit", -1.0, "must be greater than zero"),
+        ("disturbance_rejection", 1.1, "must be between 0 and 1"),
+    ],
+)
+def test_px4_runner_rejects_unsafe_legacy_controller_parameters(
+    tmp_path: Path,
+    parameter_name: str,
+    value: float,
+    expected_error: str,
+):
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["parameters"][parameter_name] = value
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env["PX4_GAZEBO_DRY_RUN"] = "true"
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is False
+    assert expected_error in str(result["failure"]["reason"])
 
 
 def test_px4_runner_independently_rejects_false_readback_evidence(tmp_path: Path):

@@ -9,11 +9,36 @@ from fastapi import APIRouter
 
 from app import __version__
 from app.config import get_settings
+from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
 from app.parameters import CATALOG_VERSION, SUPPORTED_PX4_VERSIONS
 from app.response import ok
 from app.secrets import is_configured as secret_store_is_configured
+from app.simulator.scenario_effects import bundled_launcher_capabilities
 
 router = APIRouter(prefix="/capabilities", tags=["capabilities"])
+
+
+_EXPERIMENTAL_OPTIMIZERS: tuple[str, ...] = EXPERIMENTAL_OPTIMIZER_STRATEGIES
+
+
+def _experimental_optimizer_capabilities() -> dict[str, dict[str, object]]:
+    """Expose the accuracy-first experiment set without implying maturity.
+
+    These strategies are selectable and executable, but remain experimental
+    until the shared PX4/Gazebo benchmark suite establishes stable defaults.
+    Keeping that distinction in the discovery contract lets clients present a
+    clear preview label instead of treating them as mature legacy engines.
+    """
+
+    return {
+        strategy: {
+            "ready": True,
+            "status": "experimental",
+            "experimental": True,
+            "selection_profile": "accuracy_first",
+        }
+        for strategy in _EXPERIMENTAL_OPTIMIZERS
+    }
 
 
 def _global_simulator_override() -> str | None:
@@ -44,7 +69,10 @@ def _real_cli_configuration() -> tuple[bool, str, str | None]:
 
 def _simulator_capabilities() -> dict[str, object]:
     override = _global_simulator_override()
-    override_supported = override in {None, "mock", "real_cli", "real_stub"}
+    # real_stub is an internal regression-test adapter, not an operator-facing
+    # runtime. Treat it exactly like any other invalid override so a deployed
+    # API cannot advertise a guaranteed-to-fail worker configuration.
+    override_supported = override in {None, "mock", "real_cli"}
     real_configured, real_status, real_reason = _real_cli_configuration()
 
     def selectable(backend: str) -> bool:
@@ -117,7 +145,8 @@ def _simulator_capabilities() -> dict[str, object]:
                 # operators must serialize real simulations per host.
                 "max_concurrency_per_host_without_instance_allocator": 1,
                 "instance_allocation": "operator_managed",
-                "bundled_runner_advanced_effects": [],
+                "bundled_runner_advanced_effects": ["obstacles"],
+                "scenario_effect_contract": bundled_launcher_capabilities(),
                 "unverified_effect_passthrough_opt_in": True,
             },
         },
@@ -141,6 +170,9 @@ def read_capabilities() -> dict[str, object]:
             "simulators": _simulator_capabilities(),
             "optimizers": {
                 "configuration_scope": "api_process",
+                "selection_profile": "accuracy_first",
+                "recommended_strategy": "optimizer_portfolio",
+                "experimental_strategy_ids": list(_EXPERIMENTAL_OPTIMIZERS),
                 # The API can prove that it can encrypt a submitted key, but a
                 # separately deployed worker may have a missing or different
                 # APP_SECRET_KEY. Worker capability heartbeats are required
@@ -165,6 +197,7 @@ def read_capabilities() -> dict[str, object]:
                             settings.llm_allowed_base_urls.strip()
                         ),
                     },
+                    **_experimental_optimizer_capabilities(),
                 }
             },
             "parameter_catalog": {

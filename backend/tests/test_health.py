@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import sys
 
-from fastapi.testclient import TestClient
-
-from app.main import app
+from app.main import app, create_app
 from app.response import err, ok
+from fastapi.testclient import TestClient
+from pydantic import BaseModel, Field
 
 
 def test_health_returns_ok_envelope() -> None:
@@ -83,6 +83,8 @@ def test_packaged_runtime_is_ready_with_live_worker_and_executables(monkeypatch)
         assert data["components"]["worker"]["status"] == "available"
         assert data["components"]["px4"]["status"] == "available"
         assert data["components"]["gazebo"]["status"] == "available"
+        assert "path" not in data["components"]["px4"]
+        assert sys.executable not in response.text
     finally:
         config_module.get_settings.cache_clear()
 
@@ -123,3 +125,42 @@ def test_unknown_route_returns_error_envelope() -> None:
     assert body["success"] is False
     assert body["data"] is None
     assert body["error"]["code"] == "NOT_FOUND"
+
+
+def test_unhandled_exception_uses_sanitized_error_envelope(caplog) -> None:
+    local_app = create_app()
+    caplog.set_level("ERROR", logger="drone_dream.backend")
+
+    def explode() -> None:
+        raise RuntimeError("private database detail")
+
+    local_app.add_api_route("/explode", explode)
+    response = TestClient(local_app, raise_server_exceptions=False).get("/explode")
+    assert response.status_code == 500
+    assert response.json() == {
+        "success": False,
+        "data": None,
+        "error": {
+            "code": "INTERNAL_ERROR",
+            "message": "An unexpected internal error occurred.",
+            "details": None,
+        },
+    }
+    assert "private database detail" not in response.text
+    assert "private database detail" not in caplog.text
+    assert "exception_type=RuntimeError" in caplog.text
+
+
+def test_validation_error_never_echoes_rejected_secret_input() -> None:
+    class SecretRequest(BaseModel):
+        api_key: str = Field(max_length=4)
+
+    local_app = create_app()
+
+    def receive_secret(_request: SecretRequest) -> dict[str, bool]:
+        return {"ok": True}
+
+    local_app.add_api_route("/secret", receive_secret, methods=["POST"])
+    response = TestClient(local_app).post("/secret", json={"api_key": "do-not-echo"})
+    assert response.status_code == 422
+    assert "do-not-echo" not in response.text

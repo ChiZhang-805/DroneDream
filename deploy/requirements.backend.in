@@ -1,0 +1,21 @@
+# Production-only dependencies for the API and worker image.
+#
+# Keep these constraints aligned with backend/pyproject.toml and
+# worker/pyproject.toml. Regenerate requirements.backend.lock for CPython 3.12
+# on x86_64 Linux; do not reuse the PX4 Runtime lock, whose dependency surface
+# is intentionally different.
+setuptools>=68
+wheel
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0
+pydantic>=2.6,<3.0
+pydantic-settings>=2.2,<3.0
+sqlalchemy>=2.0,<3.0
+cryptography>=42.0
+PyJWT>=2.10,<3.0
+openai>=1.30,<3.0
+numpy>=2.0,<2.4
+boto3>=1.34
+alembic>=1.13,<2.0
+psycopg[binary]>=3.1,<4.0
+redis>=5.0,<7.0

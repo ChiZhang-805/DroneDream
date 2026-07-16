@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
 import { apiClient, ApiClientError, artifactDownloadUrl } from "../api/client";
+import {
+  ensureOverallDesktopReadiness,
+  resetDesktopReadinessSession,
+} from "../desktop/readiness";
 
 function mockFetchOnce(body: unknown, status = 200) {
   const response = new Response(JSON.stringify(body), {
@@ -43,6 +47,8 @@ const runtimeComponents = [
 }));
 
 afterEach(() => {
+  resetDesktopReadinessSession();
+  delete window.__TAURI__;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -72,6 +78,44 @@ describe("apiClient envelope handling", () => {
 
     expect(job.id).toBe("job_abc123");
     expect(job.status).toBe("QUEUED");
+  });
+
+  it("preserves provider-neutral LLM credentials when rerunning a job", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { id: "job_rerun_1", status: "QUEUED" },
+          error: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await apiClient.rerunJob("job/source", {
+      llm: {
+        provider: "deepseek",
+        api_key: "secret-token",
+        model: "deepseek-chat",
+        base_url: "https://api.deepseek.com/v1",
+      },
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/jobs/job%2Fsource/rerun",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          llm: {
+            provider: "deepseek",
+            api_key: "secret-token",
+            model: "deepseek-chat",
+            base_url: "https://api.deepseek.com/v1",
+          },
+        }),
+      }),
+    );
   });
 
   it("loads runtime capability preflight metadata", async () => {
@@ -241,10 +285,14 @@ describe("apiClient envelope handling", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
     const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const anchorClickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
     const mod = await import("../api/client");
     await mod.apiClient.downloadArtifact("art_1", "file.txt");
     expect(createObjectURLSpy).toHaveBeenCalled();
     expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock");
+    expect(anchorClickSpy).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledWith(
       "http://127.0.0.1:8000/api/v1/artifacts/art_1/download",
       expect.objectContaining({
@@ -269,16 +317,59 @@ describe("apiClient envelope handling", () => {
     );
   });
 
-  it("rechecks desktop readiness before every mutation and blocks a stale unhealthy runtime", async () => {
+  it("loads every bounded trial page without returning duplicates", async () => {
+    const firstPage = Array.from({ length: 500 }, (_, index) => ({
+      id: `trial_${index}`,
+    }));
+    const secondPage = [{ id: "trial_500" }];
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ success: true, data: firstPage, error: null }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ success: true, data: secondPage, error: null }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const trials = await apiClient.listJobTrials("job with spaces");
+
+    expect(trials).toHaveLength(501);
+    expect(new Set(trials.map((trial) => trial.id)).size).toBe(501);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      "http://127.0.0.1:8000/api/v1/jobs/job%20with%20spaces/trials?page=1&page_size=500",
+      expect.any(Object),
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:8000/api/v1/jobs/job%20with%20spaces/trials?page=2&page_size=500",
+      expect.any(Object),
+    );
+  });
+
+  it("uses only a lightweight Runtime probe before a real run and blocks stale health", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    const unhealthyRuntime = {
+    const readyRuntime = {
       runtimeName: "DroneDreamRuntime",
       installed: true,
       running: true,
-      ready: false,
+      ready: true,
       version: "2026.07",
       dataRoot: "E:\\DroneDream",
+      components: runtimeComponents,
+      diagnostics: [] as string[],
+    };
+    const unhealthyRuntime = {
+      ...readyRuntime,
+      ready: false,
       components: runtimeComponents.map((component) =>
         component.id === "local-backend"
           ? { ...component, status: "unhealthy" }
@@ -286,23 +377,28 @@ describe("apiClient envelope handling", () => {
       ),
       diagnostics: ["Backend stopped after the page was opened."],
     };
+    let runtime = readyRuntime;
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return desktopPrerequisites;
-      if (command === "probe_runtime_status") return unhealthyRuntime;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "start_runtime") return readyRuntime;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
+    await ensureOverallDesktopReadiness({ autoStart: true });
+    invoke.mockClear();
+    runtime = unhealthyRuntime;
 
-    await expect(apiClient.updateJob("job_1", { display_name: "unsafe write" }))
+    await expect(apiClient.createJob({} as never))
       .rejects.toMatchObject({
         code: "DESKTOP_RUNTIME_NOT_READY",
         httpStatus: 0,
-      });
+    });
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke.mock.calls.map(([command]) => command)).toEqual(["probe_runtime_status"]);
   });
 
-  it("allows a desktop mutation after the fresh readiness probe passes", async () => {
+  it("does not recheck the environment for metadata-only mutations", async () => {
     const readyRuntime = {
       runtimeName: "DroneDreamRuntime",
       installed: true,
@@ -316,6 +412,7 @@ describe("apiClient envelope handling", () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return desktopPrerequisites;
       if (command === "probe_runtime_status") return readyRuntime;
+      if (command === "start_runtime") return readyRuntime;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
@@ -328,7 +425,7 @@ describe("apiClient envelope handling", () => {
     await apiClient.updateJob("job_1", { display_name: "safe write" });
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("loads the versioned parameter catalog from the advanced endpoint", async () => {

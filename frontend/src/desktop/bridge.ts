@@ -111,6 +111,7 @@ export interface RuntimeInstallError {
   code: string;
   message: string;
   retryable: boolean;
+  diagnosticsPath: string | null;
 }
 
 export interface RuntimeInstallSnapshot {
@@ -849,9 +850,73 @@ function parseRuntimeInstallError(value: unknown): RuntimeInstallError {
   const record = expectRecord(value, "snapshot.error");
   return {
     code: expectSafeNonEmptyString(record.code, "snapshot.error.code"),
-    message: expectSafeNonEmptyString(record.message, "snapshot.error.message"),
+    message: normalizeRuntimeInstallErrorMessage(
+      record.message,
+      "snapshot.error.message",
+    ),
     retryable: expectBoolean(record.retryable, "snapshot.error.retryable"),
+    diagnosticsPath: record.diagnosticsPath == null
+      ? null
+      : expectAbsoluteWindowsPath(
+        record.diagnosticsPath,
+        "snapshot.error.diagnosticsPath",
+      ),
   };
+}
+
+const MAX_RUNTIME_INSTALL_ERROR_MESSAGE_LENGTH = 4096;
+
+/**
+ * Runtime failures can contain stderr supplied by curl, WSL, or systemd. Keep
+ * the rest of the native snapshot contract strict, but make this human-facing
+ * field safe to render without discarding the error code or diagnostic path.
+ * String#slice deliberately measures the bound in JavaScript UTF-16 code
+ * units; the surrogate check avoids ending the rendered message with half of
+ * a non-BMP character.
+ */
+function normalizeRuntimeInstallErrorMessage(value: unknown, path: string): string {
+  const raw = expectString(value, path);
+  if (raw.length === 0) throw new Error(`${path} must not be empty`);
+
+  let readable = "";
+  let separatorPending = false;
+  let truncated = false;
+  for (const character of raw) {
+    if (runtimeErrorCharacterIsSeparator(character)) {
+      separatorPending = readable.length > 0;
+      continue;
+    }
+    const token = `${separatorPending ? " " : ""}${character}`;
+    if (readable.length + token.length > MAX_RUNTIME_INSTALL_ERROR_MESSAGE_LENGTH) {
+      truncated = true;
+      break;
+    }
+    readable += token;
+    separatorPending = false;
+  }
+  if (readable.length === 0) {
+    return "Runtime installer returned an unreadable error message.";
+  }
+  if (!truncated) return readable;
+
+  const suffix = "…";
+  let prefix = readable.slice(0, MAX_RUNTIME_INSTALL_ERROR_MESSAGE_LENGTH - suffix.length);
+  const finalCodeUnit = prefix.charCodeAt(prefix.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) {
+    prefix = prefix.slice(0, -1);
+  }
+  return `${prefix.trimEnd()}${suffix}`;
+}
+
+function runtimeErrorCharacterIsSeparator(character: string): boolean {
+  const codePoint = character.codePointAt(0) ?? 0;
+  return codePoint <= 0x1f ||
+    (codePoint >= 0x7f && codePoint <= 0x9f) ||
+    (codePoint >= 0xd800 && codePoint <= 0xdfff) ||
+    codePoint === 0x2028 ||
+    codePoint === 0x2029 ||
+    /\p{Cf}/u.test(character) ||
+    /\s/u.test(character);
 }
 
 function validateRuntimeInstallSnapshot(snapshot: RuntimeInstallSnapshot): void {
@@ -902,6 +967,24 @@ function validateRuntimeInstallSnapshot(snapshot: RuntimeInstallSnapshot): void 
   if (snapshot.phase === "waitingForRestart" && !snapshot.requiresRestart) {
     throw new Error("snapshot waitingForRestart state requires a restart");
   }
+  if (snapshot.phase === "waitingForRestart" && !snapshot.resumable) {
+    throw new Error("snapshot waitingForRestart state must be resumable");
+  }
+  if (
+    snapshot.phase === "failed" &&
+    snapshot.error &&
+    snapshot.resumable !== snapshot.error.retryable
+  ) {
+    throw new Error("snapshot failed resumable state must match error.retryable");
+  }
+  if (snapshot.phase === "completed") {
+    if (snapshot.installedVersion === null) {
+      throw new Error("snapshot completed state requires installedVersion");
+    }
+    if (snapshot.resumable || snapshot.requiresRestart) {
+      throw new Error("snapshot completed state cannot be resumable or require restart");
+    }
+  }
 }
 
 function expectRecord(value: unknown, path: string): UnknownRecord {
@@ -948,6 +1031,35 @@ function expectCanonicalRuntimeTargetRoot(value: unknown, path: string): string 
     throw new Error(`${path} must be a canonical path such as E:\\DroneDream`);
   }
   return targetRoot;
+}
+
+function expectAbsoluteWindowsPath(value: unknown, path: string): string {
+  const windowsPath = expectSafeNonEmptyString(value, path);
+  const containsUnsafeUnicode = [...windowsPath].some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return (codePoint >= 0x7f && codePoint <= 0x9f) ||
+      (codePoint >= 0xd800 && codePoint <= 0xdfff) ||
+      codePoint === 0x2028 ||
+      codePoint === 0x2029 ||
+      /\p{Cf}/u.test(character);
+  });
+  if (containsUnsafeUnicode || !/^[A-Za-z]:\\[^<>:"\x2f|?*]+$/u.test(windowsPath)) {
+    throw new Error(`${path} must be an absolute local Windows path`);
+  }
+  const segments = windowsPath.slice(3).split("\\");
+  if (
+    segments.some((segment) =>
+      segment === "" ||
+      segment === "." ||
+      segment === ".." ||
+      segment.endsWith(" ") ||
+      segment.endsWith(".") ||
+      /^(?:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³]|CONIN\$|CONOUT\$)(?:\..*)?$/iu.test(segment)
+    )
+  ) {
+    throw new Error(`${path} contains an unsafe Windows path segment`);
+  }
+  return `${windowsPath[0].toUpperCase()}${windowsPath.slice(1)}`;
 }
 
 function expectNullableString(value: unknown, path: string): string | null {

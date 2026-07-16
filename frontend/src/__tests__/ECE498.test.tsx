@@ -1,349 +1,129 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
-import {
-  createMemoryRouter,
-  MemoryRouter,
-  RouterProvider,
-} from "react-router-dom";
+import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
-import { AppShell } from "../AppShell";
-import { apiClient } from "../api/client";
-import {
-  ECE498,
-  buildEce498JobRequest,
-  summarizeCandidateTurns,
-  type Ece498FormState,
-} from "../pages/ECE498";
-import type { Trial } from "../types/api";
+import { I18nProvider } from "../i18n/I18nProvider";
+import { ECE498 } from "../pages/ECE498";
 
-const form: Ece498FormState = {
-  display_name: "",
-  track_type: "circle",
-  reference_track_json: "",
-  start_x: "0",
-  start_y: "0",
-  altitude_m: "3",
-  baseline_kp_xy: "1",
-  baseline_kd_xy: "0.2",
-  baseline_ki_xy: "0.05",
-  baseline_vel_limit: "5",
-  baseline_accel_limit: "4",
-  baseline_disturbance_rejection: "0.5",
-  circle_radius_m: "5",
-  u_turn_straight_length_m: "10",
-  u_turn_turn_radius_m: "3",
-  lemniscate_scale_m: "4",
-  wind_north: "0",
-  wind_east: "0",
-  wind_south: "0",
-  wind_west: "0",
-  sensor_noise_level: "medium",
-  objective_profile: "robust",
-  advanced_enabled: false,
-  gust_enabled: false,
-  gust_magnitude_mps: "0",
-  gust_direction_deg: "0",
-  gust_period_s: "10",
-  gps_noise_m: "0",
-  baro_noise_m: "0",
-  imu_noise_scale: "1",
-  dropout_rate: "0",
-  battery_initial_percent: "100",
-  battery_voltage_sag: false,
-  mass_payload_kg: "",
-  obstacles_json: "[]",
-  target_rmse: "0.5",
-  target_max_error: "",
-  min_pass_rate: "0.8",
-  simulator_backend: "mock",
-};
-
-function mkTrial(overrides: Partial<Trial>): Trial {
-  return {
-    id: "t1",
-    job_id: "j1",
-    candidate_id: "c1",
-    seed: 1,
-    scenario_type: "nominal",
-    status: "COMPLETED",
-    score: 1,
-    pass_flag: true,
-    candidate_label: "cand",
-    candidate_source_type: "baseline",
-    candidate_is_baseline: true,
-    candidate_is_best: false,
-    candidate_generation_index: 0,
-    attempt_count: 1,
-    worker_id: null,
-    simulator_backend: "mock",
-    failure_code: null,
-    failure_reason: null,
-    log_excerpt: null,
-    metrics: {
-      rmse: 0.3,
-      max_error: 0.4,
-      overshoot_count: 0,
-      completion_time: 1,
-      crash_flag: false,
-      timeout_flag: false,
-      score: 1,
-      final_error: 0.1,
-      pass_flag: true,
-      instability_flag: false,
-    },
-    queued_at: null,
-    started_at: null,
-    finished_at: null,
-    ...overrides,
-  };
+function renderCourse(locale: "en" | "zh-CN" = "en") {
+  window.localStorage.setItem("drone-dream:locale", locale);
+  return render(
+    <I18nProvider>
+      <ECE498 />
+    </I18nProvider>,
+  );
 }
 
-describe("ECE498", () => {
+describe("ECE498 course tribute", () => {
   afterEach(() => {
-    vi.restoreAllMocks();
+    window.localStorage.removeItem("drone-dream:locale");
   });
 
-  it("renders three run buttons", () => {
-    render(
-      <MemoryRouter>
-        <ECE498 />
-      </MemoryRouter>,
+  it("renders the English course story, gratitude, and seven-stage timeline", () => {
+    renderCourse("en");
+
+    expect(
+      screen.getByRole("heading", { name: /ECE 498 BH.*LLM Reasoning for Engineering/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Professor Bin Hu" })).toBeInTheDocument();
+    expect(screen.getByText(/harness engineering/i)).toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(7);
+    expect(screen.queryByText("特别致谢")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Run Baseline/i })).not.toBeInTheDocument();
+  });
+
+  it("renders a fully separate Chinese copy set", () => {
+    renderCourse("zh-CN");
+
+    expect(
+      screen.getByRole("heading", { name: /ECE 498 BH.*大语言模型在工程推理中的应用/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "胡斌教授" })).toBeInTheDocument();
+    expect(screen.getByText(/一段学生亲历的课堂记忆/)).toBeInTheDocument();
+    expect(screen.getByText(/harness engineering/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText("From plausible answers to verified engineering systems"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("WITH DEEP GRATITUDE")).not.toBeInTheDocument();
+  });
+
+  it("switches the evidence panel on hover, focus, and click", () => {
+    renderCourse("en");
+    const panel = screen.getByRole("tabpanel");
+    const productTab = screen.getByRole("tab", { name: /DRONEDREAM/i });
+
+    expect(productTab).toHaveAttribute("aria-selected", "true");
+    expect(
+      within(panel).getByRole("heading", { name: "Make the verified loop usable" }),
+    ).toBeInTheDocument();
+
+    const hw2Tab = screen.getByRole("tab", { name: /HW2/i });
+    fireEvent.mouseEnter(hw2Tab);
+    expect(hw2Tab).toHaveAttribute("aria-selected", "true");
+    expect(
+      within(panel).getByRole("heading", { name: "Put the answer inside an engineering loop" }),
+    ).toBeInTheDocument();
+
+    const hw1Tab = screen.getByRole("tab", { name: /HW1/i });
+    fireEvent.focus(hw1Tab);
+    expect(hw1Tab).toHaveAttribute("aria-selected", "true");
+
+    const hw5Tab = screen.getByRole("tab", { name: /HW5/i });
+    fireEvent.click(hw5Tab);
+    expect(hw5Tab).toHaveAttribute("aria-selected", "true");
+    expect(within(panel).getByText(/Memory is a soft prior, never proof/i)).toBeInTheDocument();
+  });
+
+  it("supports arrow, Home, and End navigation across the milestone tabs", () => {
+    renderCourse("en");
+    const tabs = screen.getAllByRole("tab");
+    const productTab = tabs[6];
+
+    productTab.focus();
+    fireEvent.keyDown(productTab, { key: "ArrowRight" });
+    expect(tabs[0]).toHaveFocus();
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(tabs[0], { key: "End" });
+    expect(tabs[6]).toHaveFocus();
+    fireEvent.keyDown(tabs[6], { key: "Home" });
+    expect(tabs[0]).toHaveFocus();
+  });
+
+  it("opens the extended professor tribute without crowding the one-screen overview", async () => {
+    renderCourse("en");
+
+    fireEvent.click(screen.getByRole("button", { name: "Read the classroom story" }));
+    const dialog = screen.getByRole("dialog", {
+      name: "Why Professor Hu's course stayed with me",
+    });
+    expect(within(dialog).getByText(/two readings about what was then still an unfamiliar idea/i))
+      .toBeInTheDocument();
+    expect(within(dialog).getByText(/PX4 and Gazebo execute/i)).toBeInTheDocument();
+    await waitFor(() => expect(
+      screen.getByRole("button", { name: "Close classroom story" }),
+    ).toHaveFocus());
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "Close classroom story" })).toHaveFocus();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close classroom story" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("links only to the course and professor sources and labels the page as unofficial", () => {
+    renderCourse("en");
+
+    expect(screen.getByRole("link", { name: /Course website/i })).toHaveAttribute(
+      "href",
+      "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
     );
-    expect(screen.getByRole("button", { name: /Run Baseline \(No Tool\)/i })).toBeEnabled();
-    expect(screen.getByRole("button", { name: /Run Tool-Augmented \(CMA-ES\)/i })).toBeEnabled();
-    expect(screen.getByRole("button", { name: /Run Tool \+ Refinement \(CMA-ES Loop\)/i })).toBeEnabled();
-  });
-
-  it("keeps desktop configuration visible but blocks all runs without Runtime", async () => {
-    const requiredIds = [
-      "wsl-runtime",
-      "host-ownership",
-      "runtime-manifest",
-      "local-backend",
-      "px4",
-      "gazebo",
-    ];
-    window.__TAURI__ = {
-      core: {
-        invoke: vi.fn(async (command: string) => {
-          if (command === "probe_system_prerequisites") {
-            return {
-              platform: "windows",
-              supported: true,
-              windows: {
-                caption: "Windows 11 Pro",
-                version: "10.0.26100",
-                buildNumber: "26100",
-                architecture: "64-bit",
-              },
-              wsl: { executableAvailable: true, distributions: [] },
-              memory: {
-                totalBytes: 16 * 1024 ** 3,
-                availableBytes: 8 * 1024 ** 3,
-              },
-              disks: [],
-              gpus: [],
-              probeErrors: [],
-            };
-          }
-          if (command === "probe_runtime_status") {
-            return {
-              runtimeName: "DroneDreamRuntime",
-              installed: false,
-              running: false,
-              ready: false,
-              version: null,
-              dataRoot: null,
-              components: requiredIds.map((id) => ({
-                id,
-                label: id,
-                status: "missing",
-                required: true,
-                version: null,
-                detail: null,
-              })),
-              diagnostics: [],
-            };
-          }
-          throw new Error(`Unexpected command: ${command}`);
-        }),
-      },
-    };
-    const createJob = vi.spyOn(apiClient, "createJob");
-    const router = createMemoryRouter([
-      {
-        path: "/",
-        element: <AppShell />,
-        children: [{ path: "ece498", element: <ECE498 /> }],
-      },
-    ], { initialEntries: ["/ece498"] });
-
-    render(<RouterProvider router={router} />);
-
-    expect(await screen.findByText("Runtime data is not available yet"))
-      .toBeInTheDocument();
-    expect(screen.getByText(/review and edit the ECE498 configuration/i))
-      .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open Desktop Setup" }))
-      .toHaveAttribute("href", "/desktop/setup");
-    const buttons = [
-      screen.getByRole("button", { name: /Run Baseline \(No Tool\)/i }),
-      screen.getByRole("button", { name: /Run Tool-Augmented \(CMA-ES\)/i }),
-      screen.getByRole("button", { name: /Run Tool \+ Refinement \(CMA-ES Loop\)/i }),
-    ];
-    for (const button of buttons) {
-      expect(button).toBeDisabled();
-      fireEvent.click(button);
+    expect(screen.getByRole("link", { name: /Professor Hu's homepage/i })).toHaveAttribute(
+      "href",
+      "https://binhu7.github.io/",
+    );
+    for (const link of screen.getAllByRole("link")) {
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noreferrer");
     }
-    expect(createJob).not.toHaveBeenCalled();
-    router.dispose();
-  });
-
-
-  it("renders extended config fields", () => {
-    render(<MemoryRouter><ECE498 /></MemoryRouter>);
-    expect(screen.getByLabelText("Wind North")).toBeInTheDocument();
-    expect(screen.getByLabelText("Wind East")).toBeInTheDocument();
-    expect(screen.getByLabelText("Wind South")).toBeInTheDocument();
-    expect(screen.getByLabelText("Wind West")).toBeInTheDocument();
-    expect(screen.getByLabelText("Sensor Noise Level")).toBeInTheDocument();
-    expect(screen.getByLabelText("Objective Profile")).toBeInTheDocument();
-    expect(screen.getByLabelText("Target Max Error")).toBeInTheDocument();
-    expect(screen.getByLabelText("Min Pass Rate")).toBeInTheDocument();
-    expect(screen.getByLabelText("Simulator Backend")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show Advanced scenario" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show Advanced scenario" }));
-    expect(screen.getByLabelText("Enable advanced scenario")).toBeInTheDocument();
-    expect(screen.getByLabelText("Enable gust")).toBeInTheDocument();
-    expect(screen.getByLabelText("Dropout rate")).toBeInTheDocument();
-    expect(screen.getByLabelText("Obstacles JSON")).toBeInTheDocument();
-    expect(screen.getByText("Example obstacles JSON")).toBeInTheDocument();
-  });
-
-  it("shows validation errors for invalid inputs", () => {
-    render(<MemoryRouter><ECE498 /></MemoryRouter>);
-    fireEvent.change(screen.getByLabelText("accel_limit"), { target: { value: "100" } });
-    fireEvent.change(screen.getByLabelText("Circle Radius (m)"), { target: { value: "abc" } });
-    fireEvent.change(screen.getByLabelText("Min Pass Rate"), { target: { value: "1.5" } });
-    fireEvent.click(screen.getByRole("button", { name: /Run Baseline/i }));
-    expect(screen.getByText(/accel_limit must be between 2 and 8/i)).toBeInTheDocument();
-    expect(screen.getByText(/Circle radius must be between/i)).toBeInTheDocument();
-    expect(screen.getByText(/Min pass rate must be between 0 and 1/i)).toBeInTheDocument();
-  });
-
-  it("shows empty results state before runs", () => {
-    render(
-      <MemoryRouter>
-        <ECE498 />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText(/Run one of the three modes to see results\./i)).toBeInTheDocument();
-    expect(screen.queryByText("Candidate / Refinement Turns")).not.toBeInTheDocument();
-    expect(screen.queryByText("Run Results")).not.toBeInTheDocument();
-  });
-
-  it("maps baseline mode to optimizer none", () => {
-    expect(buildEce498JobRequest(form, "baseline_no_tool").optimizer_strategy).toBe("none");
-  });
-
-  it("maps tool_augmented to cma_es with max_iterations=1", () => {
-    const req = buildEce498JobRequest(form, "tool_augmented");
-    expect(req.optimizer_strategy).toBe("cma_es");
-    expect(req.max_iterations).toBe(1);
-  });
-
-  it("maps tool_refinement to cma_es with max_iterations=3", () => {
-    const req = buildEce498JobRequest(form, "tool_refinement");
-    expect(req.optimizer_strategy).toBe("cma_es");
-    expect(req.max_iterations).toBe(3);
-  });
-  it("does not include advanced_scenario_config when advanced is disabled", () => {
-    expect(buildEce498JobRequest(form, "baseline_no_tool").advanced_scenario_config).toBeNull();
-  });
-  it("builds advanced_scenario_config when advanced is enabled", () => {
-    const req = buildEce498JobRequest({
-      ...form, advanced_enabled: true, gust_enabled: true, dropout_rate: "0.2", baro_noise_m: "0.3", imu_noise_scale: "2", obstacles_json: "[]",
-    }, "baseline_no_tool");
-    expect(req.advanced_scenario_config?.sensor_degradation?.dropout_rate).toBe(0.2);
-    expect(req.advanced_scenario_config?.sensor_degradation?.baro_noise_m).toBe(0.3);
-    expect(req.advanced_scenario_config?.sensor_degradation?.imu_noise_scale).toBe(2);
-  });
-  it("blocks run when advanced enabled and obstacles JSON invalid", () => {
-    const createSpy = vi.spyOn(apiClient, "createJob");
-    render(<MemoryRouter><ECE498 /></MemoryRouter>);
-    fireEvent.click(screen.getByRole("button", { name: "Show Advanced scenario" }));
-    fireEvent.change(screen.getByLabelText("Enable advanced scenario"), { target: { value: "yes" } });
-    fireEvent.change(screen.getByLabelText("Obstacles JSON"), { target: { value: "{\"a\":1}" } });
-    fireEvent.click(screen.getByRole("button", { name: /Run Baseline/i }));
-    expect(screen.getByText(/Obstacles JSON must be a JSON array/i)).toBeInTheDocument();
-    expect(createSpy).not.toHaveBeenCalled();
-  });
-
-  it("builds generated track with more than 2 points for non-custom track", () => {
-    const req = buildEce498JobRequest(form, "baseline_no_tool");
-    expect((req.reference_track ?? []).length).toBeGreaterThan(2);
-  });
-
-  it("aggregates candidate turn metrics", () => {
-    const trials: Trial[] = [
-      mkTrial({ id: "t1", candidate_id: "c1", metrics: { ...mkTrial({}).metrics!, rmse: 0.3, score: 1 } }),
-      mkTrial({ id: "t2", candidate_id: "c1", metrics: { ...mkTrial({}).metrics!, rmse: 0.5, score: 2 } }),
-      mkTrial({ id: "t3", candidate_id: "c1", status: "FAILED", metrics: null, pass_flag: null }),
-    ];
-    const turns = summarizeCandidateTurns("baseline_no_tool", trials, form);
-    expect(turns).toHaveLength(1);
-    expect(turns[0].completedTrialCount).toBe(2);
-    expect(turns[0].failedTrialCount).toBe(1);
-    expect(turns[0].passingTrialCount).toBe(2);
-    expect(turns[0].passRate).toBe(1);
-    expect(turns[0].meanRmse).toBeCloseTo(0.4);
-  });
-
-  it("shows nav link label", () => {
-    render(
-      <MemoryRouter initialEntries={["/batches/new"]}>
-        <AppShell />
-      </MemoryRouter>,
-    );
-    expect(screen.getByRole("link", { name: "ECE498" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "New Batch" })).toHaveClass("active");
-    expect(screen.getByRole("link", { name: "Batches" })).not.toHaveClass("active");
-    expect(screen.getByText("DroneDream 0.3.9 Preview")).toBeInTheDocument();
-    expect(screen.getByText("Web app")).toBeInTheDocument();
-  });
-
-  it("lets keyboard users skip repeated navigation without changing routes", () => {
-    render(
-      <MemoryRouter initialEntries={["/history"]}>
-        <AppShell />
-      </MemoryRouter>,
-    );
-    const skipLink = screen.getByRole("link", { name: "Skip to main content" });
-    const main = screen.getByRole("main");
-
-    fireEvent.click(skipLink);
-
-    expect(main).toHaveFocus();
-    expect(skipLink).toHaveAttribute("href", "#main-content");
-  });
-
-  it("keeps the desktop dashboard reachable without returning to setup", () => {
-    window.__TAURI__ = { core: { invoke: vi.fn() } };
-    render(
-      <MemoryRouter initialEntries={["/dashboard"]}>
-        <AppShell />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByRole("link", { name: "Dashboard" }))
-      .toHaveAttribute("href", "/dashboard");
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveClass("active");
-    expect(screen.getByText("Desktop app")).toBeInTheDocument();
-  });
-  it("sets batches nav active for /batches and /batches/:id", () => {
-    const { rerender } = render(<MemoryRouter initialEntries={["/batches"]}><AppShell /></MemoryRouter>);
-    expect(screen.getByRole("link", { name: "Batches" })).toHaveClass("active");
-    rerender(<MemoryRouter initialEntries={["/batches/bat_123"]}><AppShell /></MemoryRouter>);
-    expect(screen.getByRole("link", { name: "Batches" })).toHaveClass("active");
+    expect(screen.getByText(/not an official UIUC or course webpage/i)).toBeInTheDocument();
   });
 });

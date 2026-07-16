@@ -52,6 +52,7 @@ _PROMPT_AGGREGATE_KEYS = (
     "feasible",
     "total_violation",
 )
+_INVALID_PROMPT_VALUE = object()
 
 
 def _is_unsupported_response_format_error(exc: Exception) -> bool:
@@ -72,6 +73,49 @@ def _is_unsupported_response_format_error(exc: Exception) -> bool:
 
 def _reject_nonfinite_json_constant(value: str) -> Any:
     raise ValueError(f"non-finite JSON constant {value!r}")
+
+
+def _finite_number(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    numeric = float(value)
+    return numeric if math.isfinite(numeric) else None
+
+
+def _safe_nonnegative_int(value: Any, *, default: int = 0) -> int:
+    numeric = _finite_number(value)
+    if numeric is None or numeric < 0 or not numeric.is_integer():
+        return default
+    return int(numeric)
+
+
+def _safe_prompt_value(value: Any, *, depth: int = 0) -> Any:
+    """Copy bounded JSON data while dropping non-finite or exotic values."""
+
+    if depth > 12:
+        return _INVALID_PROMPT_VALUE
+    if value is None or isinstance(value, str | bool):
+        return value
+    numeric = _finite_number(value)
+    if numeric is not None:
+        return value
+    if isinstance(value, list):
+        copied = []
+        for item in value[:1_000]:
+            safe_item = _safe_prompt_value(item, depth=depth + 1)
+            if safe_item is not _INVALID_PROMPT_VALUE:
+                copied.append(safe_item)
+        return copied
+    if isinstance(value, dict):
+        copied_dict: dict[str, Any] = {}
+        for key, item in list(value.items())[:1_000]:
+            if not isinstance(key, str):
+                continue
+            safe_item = _safe_prompt_value(item, depth=depth + 1)
+            if safe_item is not _INVALID_PROMPT_VALUE:
+                copied_dict[key] = safe_item
+        return copied_dict
+    return _INVALID_PROMPT_VALUE
 
 
 # --- Public data classes -------------------------------------------------
@@ -276,11 +320,8 @@ def _sanitize(
         return None
     numeric_parameters: dict[str, float] = {}
     for key, raw in parameters.items():
-        try:
-            numeric = float(raw)
-        except (TypeError, ValueError):
-            return None
-        if math.isnan(numeric) or math.isinf(numeric):
+        numeric = _finite_number(raw)
+        if numeric is None:
             return None
         numeric_parameters[key] = numeric
     try:
@@ -386,7 +427,11 @@ def _build_prompt(
         if candidate.is_baseline:
             selected_history[candidate.id] = candidate
     for candidate in sorted(
-        (item for item in candidates if item.aggregated_score is not None),
+        (
+            item
+            for item in candidates
+            if _finite_number(item.aggregated_score) is not None
+        ),
         key=lambda item: (
             item.aggregated_score if item.aggregated_score is not None else float("inf"),
             item.generation_index,
@@ -409,32 +454,48 @@ def _build_prompt(
         key=lambda c: (c.generation_index, not c.is_baseline, c.id),
     ):
         agg = cand.aggregated_metric_json or {}
-        trial_count = int(agg.get("training_trial_count", cand.trial_count or 0) or 0)
-        completed_trial_count = int(
-            agg.get(
-                "training_completed_trial_count", cand.completed_trial_count or 0
-            )
-            or 0
+        trial_count = _safe_nonnegative_int(
+            agg.get("training_trial_count", cand.trial_count or 0)
         )
-        passing_trial_count = int(
+        completed_trial_count = min(
+            trial_count,
+            _safe_nonnegative_int(
+                agg.get(
+                    "training_completed_trial_count",
+                    cand.completed_trial_count or 0,
+                )
+            ),
+        )
+        passing_trial_count = min(
+            completed_trial_count,
+            _safe_nonnegative_int(
             agg.get(
                 "training_passing_trial_count", agg.get("passing_trial_count", 0)
             )
-            or 0
+            ),
         )
         completion_rate = (
             (completed_trial_count / trial_count) if trial_count > 0 else 0.0
         )
-        prompt_aggregate = {
-            key: agg[key] for key in _PROMPT_AGGREGATE_KEYS if key in agg
-        }
+        prompt_aggregate: dict[str, Any] = {}
+        for key in _PROMPT_AGGREGATE_KEYS:
+            if key not in agg:
+                continue
+            safe_value = _safe_prompt_value(agg[key])
+            if safe_value is not _INVALID_PROMPT_VALUE:
+                prompt_aggregate[key] = safe_value
         prompt_aggregate.update(
             {
                 "trial_count": trial_count,
                 "completed_trial_count": completed_trial_count,
-                "failed_trial_count": int(
-                    agg.get("training_failed_trial_count", cand.failed_trial_count or 0)
-                    or 0
+                "failed_trial_count": min(
+                    trial_count,
+                    _safe_nonnegative_int(
+                        agg.get(
+                            "training_failed_trial_count",
+                            cand.failed_trial_count or 0,
+                        )
+                    ),
                 ),
                 "passing_trial_count": passing_trial_count,
             }
@@ -466,11 +527,16 @@ def _build_prompt(
             )
             bucket["trial_count"] += 1
             if metric is not None:
+                rmse = _finite_number(metric.rmse)
+                max_error = _finite_number(metric.max_error)
+                completion_time = _finite_number(metric.completion_time)
+                if rmse is None or max_error is None or completion_time is None:
+                    continue
                 bucket["completed_count"] += 1
                 bucket["passing_count"] += int(metric.pass_flag)
-                bucket["rmse_sum"] += float(metric.rmse or 0.0)
-                bucket["max_error_sum"] += float(metric.max_error or 0.0)
-                bucket["completion_time_sum"] += float(metric.completion_time or 0.0)
+                bucket["rmse_sum"] += rmse
+                bucket["max_error_sum"] += max_error
+                bucket["completion_time_sum"] += completion_time
             elif trial.failure_code:
                 codes = bucket["failure_codes"]
                 codes[trial.failure_code] = int(codes.get(trial.failure_code, 0)) + 1
@@ -503,10 +569,10 @@ def _build_prompt(
                 "parameters": {
                     key: value
                     for key, value in (cand.parameter_json or {}).items()
-                    if key in domain_names and isinstance(value, int | float)
+                    if key in domain_names and _finite_number(value) is not None
                 },
                 "aggregated_metrics": prompt_aggregate,
-                "aggregated_score": cand.aggregated_score,
+                "aggregated_score": _finite_number(cand.aggregated_score),
                 "pass_rate": (
                     round((passing_trial_count / trial_count), 4)
                     if trial_count > 0
@@ -537,12 +603,12 @@ def _build_prompt(
             "target_max_error": criteria.target_max_error,
             "min_pass_rate": criteria.min_pass_rate,
         },
-        "vehicle_profile": dict(job.vehicle_profile_json or {}),
+        "vehicle_profile": _safe_prompt_value(dict(job.vehicle_profile_json or {})),
         "parameter_catalog_version": job.parameter_catalog_version,
         "parameter_domains": parameter_domains,
         "baseline_parameters": search_space.baseline(),
-        "objective_config": dict(job.objective_config_json or {}),
-        "scenario_suite": dict(job.scenario_suite_json or {}),
+        "objective_config": _safe_prompt_value(dict(job.objective_config_json or {})),
+        "scenario_suite": _safe_prompt_value(dict(job.scenario_suite_json or {})),
         "previous_candidates": prior,
         "current_generation": job.current_generation,
         "max_iterations": job.max_iterations,
@@ -558,7 +624,12 @@ def _build_prompt(
     scenario_suite_compacted = False
 
     def serialize() -> str:
-        return json.dumps(user_payload, sort_keys=True, separators=(",", ":"))
+        return json.dumps(
+            user_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
 
     encoded = serialize()
     while len(encoded.encode("utf-8")) > settings.llm_max_prompt_bytes:
@@ -749,11 +820,14 @@ def _validate_response(
     ):
         return []
     proposals_raw = raw.get("proposals")
-    if not isinstance(proposals_raw, list) or not proposals_raw:
+    if (
+        not isinstance(proposals_raw, list)
+        or not _MIN_PROPOSALS <= len(proposals_raw) <= _MAX_PROPOSALS
+    ):
         return []
     out: list[LlmProposal] = []
     seen: set[tuple[tuple[str, float], ...]] = set()
-    for item in proposals_raw[:_MAX_PROPOSALS]:
+    for item in proposals_raw:
         if not isinstance(item, dict):
             continue
         if set(item) != {"label", "rationale", "parameters"}:

@@ -30,8 +30,8 @@ class ParameterValueValidationError(ValueError):
 
 
 def _coerce_number(value: Any, *, value_type: str) -> Number:
-    if isinstance(value, bool):
-        raise ValueError("boolean is not a parameter number")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("parameter value must be a JSON number")
     number: Number
     if value_type == "int":
         if isinstance(value, float) and not value.is_integer():
@@ -136,7 +136,16 @@ def validate_parameter_values(
             vehicle_type=normalized_vehicle,
             airframe=airframe,
         )
-        assert definition is not None
+        if definition is None:
+            issues.append(
+                ValidationIssue(
+                    code="UNKNOWN_PARAMETER",
+                    message=f"{name} is not available in the selected PX4 catalog",
+                    parameter=name,
+                    field="value",
+                )
+            )
+            continue
         for dependency in definition.dependencies:
             other = normalized.get(dependency.parameter)
             if other is None or dependency.kind == "recommended_with":
@@ -455,7 +464,16 @@ def validate_search_selections(
             vehicle_type=normalized_vehicle,
             airframe=airframe,
         )
-        assert definition is not None
+        if definition is None:
+            errors.append(
+                ValidationIssue(
+                    "UNKNOWN_PARAMETER",
+                    f"{selection.name} is not available in the selected PX4 catalog",
+                    selection.name,
+                    field="name",
+                )
+            )
+            continue
         for dependency in definition.dependencies:
             if dependency.kind == "recommended_with" and dependency.parameter not in selected_names:
                 warnings.append(

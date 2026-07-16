@@ -78,14 +78,13 @@ def secure_dirfd_supported() -> bool:
 
 def _open_directory_chain(path: Path) -> int:
     if not secure_dirfd_supported():
-        raise CleanupError(
-            "secure POSIX dirfd operations are unavailable; refusing cleanup"
-        )
+        raise CleanupError("secure POSIX dirfd operations are unavailable; refusing cleanup")
     absolute = path.absolute()
     if not absolute.is_absolute():
         raise CleanupError("managed ULog root must be absolute")
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
     descriptor = os.open("/", flags)
+    completed = False
     try:
         for component in absolute.parts[1:]:
             if component in {"", ".", ".."}:
@@ -93,10 +92,14 @@ def _open_directory_chain(path: Path) -> int:
             child = os.open(component, flags, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = child
+        completed = True
         return descriptor
-    except BaseException:
-        os.close(descriptor)
-        raise
+    finally:
+        # Close every descriptor on errors *and* process-level interrupts. The
+        # successfully returned directory descriptor becomes the caller's
+        # responsibility.
+        if not completed:
+            os.close(descriptor)
 
 
 def _scan_logs(root: Path) -> tuple[list[LogFile], list[str]]:
@@ -113,43 +116,55 @@ def _scan_logs(root: Path) -> tuple[list[LogFile], list[str]]:
     errors: list[str] = []
     for directory, directory_names, file_names in os.walk(root, followlinks=False):
         directory_path = Path(directory)
-        safe_directories: list[str] = []
-        for name in sorted(directory_names):
-            candidate = directory_path / name
-            try:
-                candidate_stat = candidate.lstat()
-                if stat.S_ISDIR(candidate_stat.st_mode) and not stat.S_ISLNK(
-                    candidate_stat.st_mode
-                ):
-                    safe_directories.append(name)
-            except OSError as exc:
-                errors.append(f"could not inspect directory {candidate}: {exc}")
-        directory_names[:] = safe_directories
+        directory_names[:] = _safe_subdirectories(directory_path, directory_names, errors)
 
         for name in sorted(file_names):
             if not name.lower().endswith(".ulg"):
                 continue
             candidate = directory_path / name
-            try:
-                candidate_stat = candidate.lstat()
-                if not stat.S_ISREG(candidate_stat.st_mode):
-                    continue
-                if not candidate.resolve(strict=True).is_relative_to(root_resolved):
-                    errors.append(f"ULog escaped managed root: {candidate}")
-                    continue
-                logs.append(
-                    LogFile(
-                        path=candidate,
-                        relative_path=candidate.relative_to(root),
-                        device=candidate_stat.st_dev,
-                        inode=candidate_stat.st_ino,
-                        size=candidate_stat.st_size,
-                        modified_ns=candidate_stat.st_mtime_ns,
-                    )
-                )
-            except OSError as exc:
-                errors.append(f"could not inspect ULog {candidate}: {exc}")
+            inspected = _inspect_log(root, root_resolved, candidate, errors)
+            if inspected is not None:
+                logs.append(inspected)
     return logs, errors
+
+
+def _safe_subdirectories(directory: Path, names: list[str], errors: list[str]) -> list[str]:
+    safe: list[str] = []
+    for name in sorted(names):
+        candidate = directory / name
+        try:
+            candidate_stat = candidate.lstat()
+            if stat.S_ISDIR(candidate_stat.st_mode) and not stat.S_ISLNK(candidate_stat.st_mode):
+                safe.append(name)
+        except OSError as exc:
+            errors.append(f"could not inspect directory {candidate}: {exc}")
+    return safe
+
+
+def _inspect_log(
+    root: Path,
+    root_resolved: Path,
+    candidate: Path,
+    errors: list[str],
+) -> LogFile | None:
+    try:
+        candidate_stat = candidate.lstat()
+        if not stat.S_ISREG(candidate_stat.st_mode):
+            return None
+        if not candidate.resolve(strict=True).is_relative_to(root_resolved):
+            errors.append(f"ULog escaped managed root: {candidate}")
+            return None
+        return LogFile(
+            path=candidate,
+            relative_path=candidate.relative_to(root),
+            device=candidate_stat.st_dev,
+            inode=candidate_stat.st_ino,
+            size=candidate_stat.st_size,
+            modified_ns=candidate_stat.st_mtime_ns,
+        )
+    except OSError as exc:
+        errors.append(f"could not inspect ULog {candidate}: {exc}")
+        return None
 
 
 def _open_file_identities(proc_root: Path = Path("/proc")) -> set[tuple[int, int]]:
@@ -216,6 +231,108 @@ def _unlink_verified(
         os.close(parent_fd)
 
 
+def _eligible_logs(
+    logs: list[LogFile],
+    *,
+    current_ns: int,
+    open_files: set[tuple[int, int]],
+    keep_recent: int,
+    min_age_seconds: int,
+    result: CleanupResult,
+) -> list[LogFile]:
+    newest = sorted(logs, key=lambda item: (item.modified_ns, str(item.path)), reverse=True)
+    recent = {item.identity for item in newest[:keep_recent]}
+    result.protected_recent = len(recent)
+
+    eligible: list[LogFile] = []
+    minimum_age_ns = min_age_seconds * 1_000_000_000
+    for item in sorted(logs, key=lambda value: (value.modified_ns, str(value.path))):
+        if item.identity in recent:
+            continue
+        if item.identity in open_files:
+            result.protected_open += 1
+            continue
+        if max(0, current_ns - item.modified_ns) < minimum_age_ns:
+            result.protected_young += 1
+            continue
+        eligible.append(item)
+    return eligible
+
+
+def _select_logs(
+    eligible: list[LogFile],
+    *,
+    current_ns: int,
+    max_age_seconds: int,
+    max_total_bytes: int,
+    bytes_before: int,
+    result: CleanupResult,
+) -> dict[tuple[int, int], LogFile]:
+    selected: dict[tuple[int, int], LogFile] = {}
+    projected = bytes_before
+    maximum_age_ns = max_age_seconds * 1_000_000_000
+    if max_age_seconds > 0:
+        for item in eligible:
+            if current_ns - item.modified_ns < maximum_age_ns:
+                continue
+            selected[item.identity] = item
+            projected -= item.size
+            result.selected_by_age += 1
+
+    if max_total_bytes <= 0 or projected <= max_total_bytes:
+        return selected
+    for item in eligible:
+        if projected <= max_total_bytes:
+            break
+        if item.identity in selected:
+            continue
+        selected[item.identity] = item
+        projected -= item.size
+        result.selected_by_capacity += 1
+    return selected
+
+
+def _verify_opened_root(root: Path, root_fd: int) -> None:
+    opened_root = os.fstat(root_fd)
+    named_root = root.lstat()
+    unchanged = (
+        stat.S_ISDIR(named_root.st_mode)
+        and not stat.S_ISLNK(named_root.st_mode)
+        and opened_root.st_dev == named_root.st_dev
+        and opened_root.st_ino == named_root.st_ino
+    )
+    if not unchanged:
+        raise CleanupError("managed ULog root changed during cleanup")
+
+
+def _delete_selected_logs(
+    selected: dict[tuple[int, int], LogFile],
+    *,
+    root_fd: int,
+    current_ns: int,
+    min_age_seconds: int,
+    open_files: set[tuple[int, int]],
+    result: CleanupResult,
+) -> None:
+    for item in selected.values():
+        if item.identity in open_files:
+            result.skipped_changed_or_open += 1
+            continue
+        deleted, error = _unlink_verified(
+            root_fd,
+            item,
+            current_ns=current_ns,
+            min_age_seconds=min_age_seconds,
+        )
+        if deleted:
+            result.deleted_files += 1
+            result.deleted_bytes += item.size
+            continue
+        result.skipped_changed_or_open += 1
+        if error is not None:
+            result.errors.append(f"could not delete ULog {item.path}: {error}")
+
+
 def cleanup_logs(
     root: Path = MANAGED_ROOT,
     *,
@@ -230,9 +347,7 @@ def cleanup_logs(
     if min(max_total_bytes, max_age_seconds, min_age_seconds, keep_recent) < 0:
         raise CleanupError("cleanup limits cannot be negative")
     if not secure_dirfd_supported():
-        raise CleanupError(
-            "secure POSIX dirfd operations are unavailable; refusing cleanup"
-        )
+        raise CleanupError("secure POSIX dirfd operations are unavailable; refusing cleanup")
     result = CleanupResult(
         root=str(root),
         max_total_bytes=max_total_bytes,
@@ -249,79 +364,40 @@ def cleanup_logs(
     result.scanned_files = len(logs)
     result.bytes_before = sum(item.size for item in logs)
     current_ns = now_ns if now_ns is not None else time.time_ns()
-    open_files = (
-        open_identities if open_identities is not None else _open_file_identities()
+    open_files = open_identities if open_identities is not None else _open_file_identities()
+    eligible = _eligible_logs(
+        logs,
+        current_ns=current_ns,
+        open_files=open_files,
+        keep_recent=keep_recent,
+        min_age_seconds=min_age_seconds,
+        result=result,
     )
-    newest = sorted(
-        logs, key=lambda item: (item.modified_ns, str(item.path)), reverse=True
+    selected = _select_logs(
+        eligible,
+        current_ns=current_ns,
+        max_age_seconds=max_age_seconds,
+        max_total_bytes=max_total_bytes,
+        bytes_before=result.bytes_before,
+        result=result,
     )
-    recent = {item.identity for item in newest[:keep_recent]}
-    result.protected_recent = len(recent)
-
-    eligible: list[LogFile] = []
-    for item in sorted(logs, key=lambda value: (value.modified_ns, str(value.path))):
-        age_ns = max(0, current_ns - item.modified_ns)
-        if item.identity in recent:
-            continue
-        if item.identity in open_files:
-            result.protected_open += 1
-            continue
-        if age_ns < min_age_seconds * 1_000_000_000:
-            result.protected_young += 1
-            continue
-        eligible.append(item)
-
-    selected: dict[tuple[int, int], tuple[LogFile, str]] = {}
-    projected = result.bytes_before
-    if max_age_seconds > 0:
-        for item in eligible:
-            if current_ns - item.modified_ns >= max_age_seconds * 1_000_000_000:
-                selected[item.identity] = (item, "age")
-                projected -= item.size
-                result.selected_by_age += 1
-    if max_total_bytes > 0 and projected > max_total_bytes:
-        for item in eligible:
-            if projected <= max_total_bytes:
-                break
-            if item.identity in selected:
-                continue
-            selected[item.identity] = (item, "capacity")
-            projected -= item.size
-            result.selected_by_capacity += 1
 
     root_fd = _open_directory_chain(root)
     try:
-        opened_root = os.fstat(root_fd)
-        named_root = root.lstat()
-        if (
-            not stat.S_ISDIR(named_root.st_mode)
-            or stat.S_ISLNK(named_root.st_mode)
-            or opened_root.st_dev != named_root.st_dev
-            or opened_root.st_ino != named_root.st_ino
-        ):
-            raise CleanupError("managed ULog root changed during cleanup")
+        _verify_opened_root(root, root_fd)
         final_open_files = (
             open_identities if open_identities is not None else _open_file_identities()
         )
         if _before_delete is not None:
             _before_delete()
-        for item, _reason in selected.values():
-            if item.identity in final_open_files:
-                result.skipped_changed_or_open += 1
-                continue
-            deleted, error = _unlink_verified(
-                root_fd,
-                item,
-                current_ns=current_ns,
-                min_age_seconds=min_age_seconds,
-            )
-            if deleted:
-                result.deleted_files += 1
-                result.deleted_bytes += item.size
-            else:
-                result.skipped_changed_or_open += 1
-                if error is not None:
-                    result.errors.append(f"could not delete ULog {item.path}: {error}")
+        _delete_selected_logs(
+            selected,
+            root_fd=root_fd,
+            current_ns=current_ns,
+            min_age_seconds=min_age_seconds,
+            open_files=final_open_files,
+            result=result,
+        )
     finally:
         os.close(root_fd)
 

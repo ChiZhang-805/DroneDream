@@ -36,6 +36,11 @@ struct KillOnCloseJob {
     handle: HANDLE,
 }
 
+// Windows kernel handles may be transferred between threads. Access to the
+// handle is still serialized by the owner of `KillOnCloseJob`, and this type
+// closes it exactly once in `Drop`.
+unsafe impl Send for KillOnCloseJob {}
+
 impl KillOnCloseJob {
     fn new(label: &str) -> Result<Self, String> {
         // SAFETY: null security attributes and name request an unnamed job with
@@ -103,6 +108,55 @@ pub(crate) fn windows_command(program: &str) -> Command {
     let mut command = Command::new(program);
     command.creation_flags(CREATE_NO_WINDOW);
     command
+}
+
+/// A long-lived child process contained in a kill-on-close Windows Job Object.
+/// Dropping this value terminates the complete process tree, which makes it
+/// suitable for helpers that must live exactly as long as the desktop app.
+pub(crate) struct ContainedChild {
+    child: std::process::Child,
+    job: Option<KillOnCloseJob>,
+    label: String,
+}
+
+impl ContainedChild {
+    pub(crate) fn is_running(&mut self) -> Result<bool, String> {
+        self.child
+            .try_wait()
+            .map(|status| status.is_none())
+            .map_err(|error| format!("Unable to inspect {}: {error}", self.label))
+    }
+}
+
+impl Drop for ContainedChild {
+    fn drop(&mut self) {
+        terminate_process_tree(&mut self.child, self.job.take());
+    }
+}
+
+/// Spawn a background helper without inheriting console or pipe handles. The
+/// returned guard is the sole lifetime owner of the whole child process tree.
+pub(crate) fn spawn_contained_background(
+    mut command: Command,
+    label: &str,
+) -> Result<ContainedChild, String> {
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let job = KillOnCloseJob::new(label)?;
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("Unable to start {label}: {error}"))?;
+    if let Err(error) = job.assign(&child, label) {
+        terminate_process_tree(&mut child, None);
+        return Err(error);
+    }
+    Ok(ContainedChild {
+        child,
+        job: Some(job),
+        label: label.to_string(),
+    })
 }
 
 /// Run a short-lived Windows probe without blocking a pipe or leaving its child
@@ -360,14 +414,18 @@ mod tests {
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            r#"Start-Sleep -Milliseconds 250; $info = [Diagnostics.ProcessStartInfo]::new(); $info.FileName = 'ping.exe'; $info.Arguments = '-n 4 127.0.0.1'; $info.UseShellExecute = $false; [Diagnostics.Process]::Start($info) | Out-Null"#,
+            r#"Start-Sleep -Milliseconds 250; $info = [Diagnostics.ProcessStartInfo]::new(); $info.FileName = 'ping.exe'; $info.Arguments = '-n 30 127.0.0.1'; $info.UseShellExecute = $false; [Diagnostics.Process]::Start($info) | Out-Null"#,
         ]);
         let started = std::time::Instant::now();
-        let output = command_output(command, Duration::from_secs(5), "descendant pipe test")
+        // A busy CI host may take several seconds merely to start PowerShell.
+        // The descendant deliberately lives much longer than both this
+        // deadline and the assertion below, so a leaked pipe still fails while
+        // scheduler contention cannot be mistaken for a containment defect.
+        let output = command_output(command, Duration::from_secs(15), "descendant pipe test")
             .expect("the direct parent should exit successfully");
         assert!(output.status.success());
         assert!(
-            started.elapsed() < Duration::from_millis(2500),
+            started.elapsed() < Duration::from_secs(10),
             "the inherited pipe remained open for {:?}",
             started.elapsed()
         );

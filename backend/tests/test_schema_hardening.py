@@ -5,9 +5,13 @@ from __future__ import annotations
 import math
 
 import pytest
+from app.schemas import (
+    JobCreateRequest,
+    JobsCompareRequest,
+    OpenAIConfig,
+    ParameterSelection,
+)
 from pydantic import ValidationError
-
-from app.schemas import JobCreateRequest, OpenAIConfig
 
 
 @pytest.mark.parametrize(
@@ -156,3 +160,22 @@ def test_unlocked_discrete_dimension_requires_two_choices() -> None:
                 }
             ]
         )
+
+
+def test_discrete_parameter_rejects_fractional_step() -> None:
+    with pytest.raises(ValidationError, match="values must be integers"):
+        ParameterSelection(
+            name="TEST_INT",
+            baseline=1.0,
+            minimum=0.0,
+            maximum=2.0,
+            step=0.5,
+            value_type="integer",
+        )
+
+
+def test_job_compare_rejects_duplicate_job_ids() -> None:
+    with pytest.raises(ValidationError, match="job_ids must be unique"):
+        JobsCompareRequest(job_ids=["job_same", "job_same"])
+    with pytest.raises(ValidationError):
+        JobsCompareRequest(job_ids=["job_ok", "x" * 65])

@@ -1,5 +1,4 @@
-import { Link } from "react-router-dom";
-
+import { openAppSettings } from "../appSettings";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useI18n } from "../i18n/I18nProvider";
 import { Alert } from "./Alert";
@@ -12,27 +11,38 @@ export function RuntimeAccessNotice({
   const runtimeAccess = useDesktopRuntimeAccess();
   const { t } = useI18n();
   const checking = runtimeAccess.status === "checking";
+  const starting = runtimeAccess.status === "starting";
+  const startFailed = runtimeAccess.status === "startFailed";
+  const busy = checking || starting;
 
   return (
     <Alert
-      tone={checking ? "info" : "warning"}
+      tone={busy ? "info" : "warning"}
       title={checking
         ? t("runtimeGate.checkingTitle")
-        : t("runtimeGate.previewTitle")}
+        : starting
+          ? t("runtimeGate.startingTitle")
+          : startFailed
+            ? t("runtimeGate.startFailedTitle")
+            : t("runtimeGate.previewTitle")}
     >
       <p className="runtime-access-copy">
         {checking
           ? t("runtimeGate.checkingBody")
-          : page === "dashboard"
-            ? t("runtimeGate.dashboardPreviewBody")
-            : page === "history"
-              ? t("runtimeGate.historyPreviewBody")
-              : t("runtimeGate.ece498PreviewBody")}
+          : starting
+            ? t("runtimeGate.startingBody")
+            : startFailed
+              ? t("runtimeGate.startFailedBody")
+              : page === "dashboard"
+                ? t("runtimeGate.dashboardPreviewBody")
+                : page === "history"
+                  ? t("runtimeGate.historyPreviewBody")
+                  : t("runtimeGate.ece498PreviewBody")}
       </p>
-      {!checking ? (
-        <Link className="btn btn-primary" to="/desktop/setup">
+      {!busy ? (
+        <button className="btn btn-primary" type="button" onClick={openAppSettings}>
           {t("runtimeGate.openSetup")}
-        </Link>
+        </button>
       ) : null}
     </Alert>
   );

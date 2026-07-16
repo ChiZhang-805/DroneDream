@@ -32,6 +32,20 @@ const TRUSTED_KEYRING: &str = include_str!("../../../runtime/release-public-keys
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 const MAX_SIGNATURE_BYTES: u64 = 64 * 1024;
 const MAX_SMOKE_REPORT_BYTES: u64 = 4 * 1024 * 1024;
+const MAX_DIAGNOSTIC_BYTES: usize = 512 * 1024;
+// Keep the WSL-side collector safely below process.rs's 1 MiB per-stream cap so
+// an unexpectedly large journal is truncated by the collector instead of
+// causing command_output to reject the whole diagnostic result.
+const MAX_DIAGNOSTIC_CAPTURE_BYTES: usize = 768 * 1024;
+const _: () = assert!(MAX_DIAGNOSTIC_CAPTURE_BYTES < 1024 * 1024);
+const MAX_DIAGNOSTIC_REPORTS: usize = 10;
+const MAX_DIAGNOSTIC_TOTAL_BYTES: u64 =
+    (MAX_DIAGNOSTIC_BYTES as u64) * (MAX_DIAGNOSTIC_REPORTS as u64);
+const MAX_DIAGNOSTIC_ERROR_CHARS: usize = 512;
+const MAX_IPC_ERROR_CODE_UTF16: usize = 128;
+const MAX_IPC_ERROR_MESSAGE_UTF16: usize = 2048;
+const MAX_IPC_DIAGNOSTICS_PATH_UTF16: usize = 1024;
+const DIAGNOSTIC_TIMEOUT: Duration = Duration::from_secs(25);
 const GIB: u64 = 1024 * 1024 * 1024;
 const MINIMUM_FREE_BYTES: u64 = 52 * GIB;
 const MAX_PART_BYTES: u64 = 2 * GIB;
@@ -48,6 +62,78 @@ const CACHED_MANIFEST_TEMP_FILE: &str = "signed-release-manifest.json.tmp";
 const CACHED_SIGNATURE_TEMP_FILE: &str = "signed-release-manifest.json.sig.tmp";
 const IMPORT_PENDING_FILE: &str = "import-pending.json";
 const IMPORT_PENDING_TEMP_FILE: &str = "import-pending.json.tmp";
+
+#[cfg(target_os = "windows")]
+const DIAGNOSTIC_SCRIPT: &str = r#"
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+SYSTEMD_COLORS=0
+SYSTEMD_PAGER=cat
+export SYSTEMD_COLORS SYSTEMD_PAGER
+printf '%s\n' '===== systemctl --failed ====='
+if [ -x /usr/bin/systemctl ]; then
+  /usr/bin/systemctl --failed --no-pager --plain 2>&1 || true
+else
+  printf '%s\n' 'systemctl unavailable'
+fi
+for unit in dronedream-runtime-init.service valkey.service dronedream-api.service dronedream-worker.service; do
+  printf '\n===== systemctl status %s =====\n' "$unit"
+  if [ -x /usr/bin/systemctl ]; then
+    /usr/bin/systemctl status "$unit" --no-pager --full 2>&1 || true
+  else
+    printf '%s\n' 'systemctl unavailable'
+  fi
+  printf '\n===== journalctl %s =====\n' "$unit"
+  if [ -x /usr/bin/journalctl ]; then
+    /usr/bin/journalctl -u "$unit" --no-pager --output=short-iso -n 200 2>&1 || true
+  else
+    printf '%s\n' 'journalctl unavailable'
+  fi
+done
+printf '\n===== listening sockets =====\n'
+if command -v ss >/dev/null 2>&1; then
+  ss -lntup 2>&1 || true
+else
+  printf '%s\n' 'ss unavailable; using /proc/net/tcp and /proc/net/tcp6'
+  socket_table_found=0
+  for table in /proc/net/tcp /proc/net/tcp6; do
+    if [ -r "$table" ]; then
+      printf '%s\n' "--- $table ---"
+      /usr/bin/cat "$table" 2>&1 || true
+      socket_table_found=1
+    fi
+  done
+  if [ "$socket_table_found" -eq 0 ]; then
+    printf '%s\n' 'socket tables unavailable'
+  fi
+fi
+printf '\n===== network addresses =====\n'
+if command -v ip >/dev/null 2>&1; then
+  ip -brief address 2>&1 || true
+elif command -v hostname >/dev/null 2>&1; then
+  printf '%s\n' 'ip unavailable; using hostname -I'
+  hostname -I 2>&1 || true
+else
+  printf '%s\n' 'ip and hostname unavailable'
+fi
+printf '\n===== network routes =====\n'
+if command -v ip >/dev/null 2>&1; then
+  ip route 2>&1 || true
+elif [ -r /proc/net/route ]; then
+  printf '%s\n' 'ip unavailable; using /proc/net/route'
+  /usr/bin/cat /proc/net/route 2>&1 || true
+else
+  printf '%s\n' 'ip and /proc/net/route unavailable'
+fi
+printf '\n===== WSL identity =====\n'
+/usr/bin/uname -a 2>&1 || true
+printf '\n===== runtime-internal readiness =====\n'
+if [ -x /usr/bin/curl ]; then
+  /usr/bin/curl --silent --show-error --include --http1.1 --noproxy 127.0.0.1,localhost --connect-timeout 1 --max-time 3 -- http://127.0.0.1:8000/health/ready 2>&1 || true
+else
+  printf '%s\n' 'curl unavailable'
+fi
+"#;
 
 static OPERATION_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -97,6 +183,54 @@ pub struct RuntimeInstallError {
     code: String,
     message: String,
     retryable: bool,
+    diagnostics_path: Option<String>,
+}
+
+impl RuntimeInstallError {
+    fn sanitize_for_ipc(&mut self) {
+        self.code = sanitize_single_line_utf16(&self.code, MAX_IPC_ERROR_CODE_UTF16);
+        if self.code.is_empty() {
+            self.code = "runtime_error".to_string();
+        }
+        self.message = sanitize_single_line_utf16(&self.message, MAX_IPC_ERROR_MESSAGE_UTF16);
+        if self.message.is_empty() {
+            self.message = "Runtime installation failed.".to_string();
+        }
+        self.diagnostics_path = self
+            .diagnostics_path
+            .take()
+            .map(|path| sanitize_single_line_utf16(&path, MAX_IPC_DIAGNOSTICS_PATH_UTF16))
+            .filter(|path| !path.is_empty());
+    }
+}
+
+fn sanitize_single_line_utf16(value: &str, maximum_units: usize) -> String {
+    let mut sanitized = String::new();
+    let mut units = 0_usize;
+    let mut pending_space = false;
+    for character in value.chars() {
+        if character.is_control() || character.is_whitespace() {
+            pending_space |= !sanitized.is_empty();
+            continue;
+        }
+        let separator_units = if pending_space { 1 } else { 0 };
+        let character_units = character.len_utf16();
+        if units
+            .saturating_add(separator_units)
+            .saturating_add(character_units)
+            > maximum_units
+        {
+            break;
+        }
+        if pending_space {
+            sanitized.push(' ');
+            units += 1;
+            pending_space = false;
+        }
+        sanitized.push(character);
+        units += character_units;
+    }
+    sanitized
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -141,6 +275,12 @@ impl RuntimeInstallSnapshot {
     pub(crate) fn is_active(&self) -> bool {
         self.phase.is_active()
     }
+
+    fn sanitize_error_for_ipc(&mut self) {
+        if let Some(error) = self.error.as_mut() {
+            error.sanitize_for_ipc();
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -168,11 +308,14 @@ impl Default for RuntimeInstaller {
 
 impl RuntimeInstaller {
     pub(crate) fn snapshot(&self) -> RuntimeInstallSnapshot {
-        self.shared
+        let mut snapshot = self
+            .shared
             .snapshot
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clone()
+            .clone();
+        snapshot.sanitize_error_for_ipc();
+        snapshot
     }
 
     fn update(&self, update: impl FnOnce(&mut RuntimeInstallSnapshot)) {
@@ -182,6 +325,7 @@ impl RuntimeInstaller {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         update(&mut snapshot);
+        snapshot.sanitize_error_for_ipc();
         snapshot.updated_at = Some(chrono::Utc::now().to_rfc3339());
     }
 
@@ -329,6 +473,7 @@ impl RuntimeInstaller {
                                 cleanup_error,
                                 "DroneDreamRuntime was installed, but its installer handoff did not clean up completely.",
                                 Some(success.version),
+                                None,
                             ),
                         }
                     }
@@ -350,6 +495,7 @@ impl RuntimeInstaller {
                                 cleanup_error,
                                 "Runtime installation was cancelled, but its installer handoff did not clean up completely.",
                                 None,
+                                error.diagnostics_path,
                             ),
                         }
                     }
@@ -371,6 +517,7 @@ impl RuntimeInstaller {
                                 cleanup_error,
                                 "WSL preparation requires a restart, but its continuation could not be preserved safely.",
                                 None,
+                                error.diagnostics_path,
                             ),
                         }
                     }
@@ -388,6 +535,7 @@ impl RuntimeInstaller {
                                     code: error.code,
                                     message: error.message,
                                     retryable: error.retryable,
+                                    diagnostics_path: error.diagnostics_path,
                                 });
                             }),
                             Err(cleanup_error) => set_receipt_cleanup_failure(
@@ -398,6 +546,7 @@ impl RuntimeInstaller {
                                     error.message
                                 ),
                                 None,
+                                error.diagnostics_path,
                             ),
                         }
                     }
@@ -423,6 +572,7 @@ impl RuntimeInstaller {
                     code: "installer_thread_failed".to_string(),
                     message: message.clone(),
                     retryable: true,
+                    diagnostics_path: None,
                 });
             });
             return Err(message);
@@ -454,6 +604,7 @@ fn set_receipt_cleanup_failure(
     cleanup_error: String,
     outcome: &str,
     installed_version: Option<String>,
+    diagnostics_path: Option<String>,
 ) {
     installer.update(|snapshot| {
         snapshot.phase = RuntimeInstallPhase::Failed;
@@ -464,6 +615,7 @@ fn set_receipt_cleanup_failure(
             code: "installer_receipt_cleanup_failed".to_string(),
             message: format!("{outcome} {cleanup_error}"),
             retryable: true,
+            diagnostics_path,
         });
     });
 }
@@ -675,66 +827,84 @@ pub fn cancel_runtime_install(
 #[tauri::command]
 pub async fn start_runtime(
     installer: tauri::State<'_, RuntimeInstaller>,
+    keepalive: tauri::State<'_, crate::runtime_keepalive::RuntimeKeepalive>,
 ) -> Result<crate::runtime::RuntimeStatusReport, String> {
-    run_runtime_maintenance(installer.inner().clone(), false).await
+    run_runtime_maintenance(installer.inner().clone(), keepalive.inner().clone(), false).await
 }
 
 #[tauri::command]
 pub async fn repair_runtime(
     installer: tauri::State<'_, RuntimeInstaller>,
+    keepalive: tauri::State<'_, crate::runtime_keepalive::RuntimeKeepalive>,
 ) -> Result<crate::runtime::RuntimeStatusReport, String> {
-    run_runtime_maintenance(installer.inner().clone(), true).await
+    run_runtime_maintenance(installer.inner().clone(), keepalive.inner().clone(), true).await
 }
 
 async fn run_runtime_maintenance(
     installer: RuntimeInstaller,
+    keepalive: crate::runtime_keepalive::RuntimeKeepalive,
     repair: bool,
 ) -> Result<crate::runtime::RuntimeStatusReport, String> {
     let operation = installer.prepare_operation()?;
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = operation;
         let executor = ProductionWslExecutor;
-        if !executor.is_registered().map_err(|error| error.message)? {
-            return Err(
-                "DroneDreamRuntime is not installed; no other WSL distribution was changed."
-                    .to_string(),
-            );
-        }
-        let (build_id, version) = match crate::runtime::validate_installed_runtime_ownership() {
-            Ok(identity) => identity,
-            Err(_) => {
-                let target = crate::runtime::registered_runtime_target()?.ok_or_else(|| {
-                    "DroneDreamRuntime registration disappeared during recovery.".to_string()
-                })?;
-                let cancel = AtomicBool::new(false);
-                let recovered = recover_pending_install(
-                    &installer,
-                    Path::new(&target),
-                    &executor,
-                    &cancel,
-                    TRUSTED_KEYRING,
-                )
-                .map_err(|error| error.message)?;
-                installer.update(|snapshot| {
-                    snapshot.phase = RuntimeInstallPhase::Completed;
-                    snapshot.installed_version = Some(recovered.version);
-                    snapshot.message = Some(recovered.cleanup_warning.unwrap_or_else(|| {
-                        "Interrupted DroneDreamRuntime installation recovered successfully."
-                            .to_string()
-                    }));
-                });
-                return crate::runtime::probe_runtime();
+        let result = (|| {
+            if !executor.is_registered().map_err(|error| error.message)? {
+                return Err(
+                    "DroneDreamRuntime is not installed; no other WSL distribution was changed."
+                        .to_string(),
+                );
             }
-        };
-        if repair {
-            executor.terminate().map_err(|error| error.message)?;
+            let (build_id, version) = match crate::runtime::validate_installed_runtime_ownership() {
+                Ok(identity) => identity,
+                Err(_) => {
+                    let target = crate::runtime::registered_runtime_target()?.ok_or_else(|| {
+                        "DroneDreamRuntime registration disappeared during recovery.".to_string()
+                    })?;
+                    let cancel = AtomicBool::new(false);
+                    let recovered = recover_pending_install(
+                        &installer,
+                        Path::new(&target),
+                        &executor,
+                        &cancel,
+                        TRUSTED_KEYRING,
+                    )
+                    .map_err(|error| error.message)?;
+                    installer.update(|snapshot| {
+                        snapshot.phase = RuntimeInstallPhase::Completed;
+                        snapshot.installed_version = Some(recovered.version);
+                        snapshot.message = Some(recovered.cleanup_warning.unwrap_or_else(|| {
+                            "Interrupted DroneDreamRuntime installation recovered successfully."
+                                .to_string()
+                        }));
+                    });
+                    crate::runtime::validate_installed_runtime_ownership()?
+                }
+            };
+            if repair {
+                keepalive.release()?;
+                executor.terminate().map_err(|error| error.message)?;
+            }
+            keepalive.ensure_running()?;
+            let cancel = AtomicBool::new(false);
+            executor.start(&cancel).map_err(|error| error.message)?;
+            executor
+                .wait_healthy(&build_id, &version, &cancel)
+                .map_err(|error| error.message)?;
+            let report = crate::runtime::probe_runtime()?;
+            if !report.is_ready() {
+                return Err(
+                    "DroneDreamRuntime started but did not report all required components as ready."
+                        .to_string(),
+                );
+            }
+            Ok(report)
+        })();
+        if result.is_err() {
+            let _ = keepalive.release();
         }
-        let cancel = AtomicBool::new(false);
-        executor.start(&cancel).map_err(|error| error.message)?;
-        executor
-            .wait_healthy(&build_id, &version, &cancel)
-            .map_err(|error| error.message)?;
-        crate::runtime::probe_runtime()
+        result
     })
     .await
     .map_err(|error| format!("Runtime maintenance task failed: {error}"))?
@@ -746,6 +916,7 @@ struct InstallFailure {
     message: String,
     retryable: bool,
     cancelled: bool,
+    diagnostics_path: Option<String>,
 }
 
 impl InstallFailure {
@@ -755,6 +926,7 @@ impl InstallFailure {
             message: message.into(),
             retryable,
             cancelled: false,
+            diagnostics_path: None,
         }
     }
 
@@ -764,12 +936,54 @@ impl InstallFailure {
             message: "Installation was cancelled.".to_string(),
             retryable: true,
             cancelled: true,
+            diagnostics_path: None,
         }
+    }
+
+    fn with_diagnostics_path(mut self, path: PathBuf) -> Self {
+        self.diagnostics_path = Some(path.to_string_lossy().into_owned());
+        self
+    }
+
+    fn inherit_diagnostics(mut self, original: &Self) -> Self {
+        self.diagnostics_path.clone_from(&original.diagnostics_path);
+        self
     }
 }
 
 fn fail(code: &str, message: impl Into<String>, retryable: bool) -> InstallFailure {
     InstallFailure::new(code, message, retryable)
+}
+
+fn is_runtime_health_failure(error: &InstallFailure) -> bool {
+    matches!(
+        error.code.as_str(),
+        "runtime_service_unhealthy" | "runtime_host_connectivity" | "runtime_health_unknown"
+    )
+}
+
+fn attach_runtime_failure_diagnostics(
+    executor: &dyn WslExecutor,
+    runtime_target: &Path,
+    mut original: InstallFailure,
+) -> InstallFailure {
+    if !is_runtime_health_failure(&original) {
+        return original;
+    }
+    match executor.collect_diagnostics(runtime_target, &original.code, &original.message) {
+        Ok(path) => original.with_diagnostics_path(path),
+        Err(error) => {
+            let bounded = error
+                .chars()
+                .filter(|character| !character.is_control())
+                .take(MAX_DIAGNOSTIC_ERROR_CHARS)
+                .collect::<String>();
+            original.message.push_str(&format!(
+                " Diagnostic collection was unavailable: {bounded}"
+            ));
+            original
+        }
+    }
 }
 
 fn check_cancel(cancel: &AtomicBool) -> Result<(), InstallFailure> {
@@ -1524,6 +1738,7 @@ trait WslExecutor: Send + Sync {
         archive: &Path,
         _cancel: &AtomicBool,
     ) -> Result<(), InstallFailure>;
+    fn bootstrap_imported_runtime(&self) -> Result<(), InstallFailure>;
     fn start(&self, cancel: &AtomicBool) -> Result<(), InstallFailure>;
     fn terminate(&self) -> Result<(), InstallFailure>;
     fn unregister(&self) -> Result<(), InstallFailure>;
@@ -1533,6 +1748,12 @@ trait WslExecutor: Send + Sync {
         version: &str,
         cancel: &AtomicBool,
     ) -> Result<(), InstallFailure>;
+    fn collect_diagnostics(
+        &self,
+        runtime_target: &Path,
+        failure_code: &str,
+        failure_message: &str,
+    ) -> Result<PathBuf, String>;
     fn write_receipt(
         &self,
         target: &Path,
@@ -1551,10 +1772,10 @@ enum WslPreparation {
 
 #[cfg(target_os = "windows")]
 impl ProductionWslExecutor {
-    fn run_exact(
+    fn run_exact<S: AsRef<std::ffi::OsStr>>(
         &self,
         action: &str,
-        args: &[&str],
+        args: &[S],
         cancel: Option<&AtomicBool>,
         timeout: Duration,
     ) -> Result<(), InstallFailure> {
@@ -1688,10 +1909,26 @@ impl WslExecutor for ProductionWslExecutor {
         )
     }
 
+    fn bootstrap_imported_runtime(&self) -> Result<(), InstallFailure> {
+        let args = imported_runtime_bootstrap_args();
+        self.run_exact(
+            "DroneDreamRuntime first-boot bootstrap",
+            &args,
+            None,
+            COMMAND_TIMEOUT,
+        )?;
+        // This sequence is deliberately non-cancellable. Once the idempotent
+        // mask is written, terminate the first boot before observing a queued
+        // cancellation so the distro cannot be left in a half-bootstrapped
+        // state with systemd-firstboot still blocking sysinit.
+        self.terminate()
+    }
+
     fn start(&self, cancel: &AtomicBool) -> Result<(), InstallFailure> {
+        let args = crate::runtime::runtime_wsl_exec_args("/bin/true", &[]);
         self.run_exact(
             "DroneDreamRuntime start",
-            &["--distribution", RUNTIME_NAME, "--exec", "/bin/true"],
+            &args,
             Some(cancel),
             COMMAND_TIMEOUT,
         )
@@ -1722,21 +1959,44 @@ impl WslExecutor for ProductionWslExecutor {
         cancel: &AtomicBool,
     ) -> Result<(), InstallFailure> {
         let started = Instant::now();
-        let mut last_error = String::new();
+        let mut last_health = crate::runtime::RuntimeReleaseHealth::NotReady(
+            "runtime health check has not completed".to_string(),
+        );
         while started.elapsed() < HEALTH_TIMEOUT {
             check_cancel(cancel)?;
-            match crate::runtime::verify_runtime_release_identity(build_id, version) {
-                Ok(true) => return Ok(()),
-                Ok(false) => last_error = "runtime is not ready".to_string(),
-                Err(error) => last_error = error,
+            last_health = crate::runtime::probe_runtime_release_health(build_id, version);
+            if matches!(last_health, crate::runtime::RuntimeReleaseHealth::Ready) {
+                return Ok(());
             }
             std::thread::sleep(Duration::from_secs(2));
         }
+        let (code, detail) = match last_health {
+            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(error) => {
+                ("runtime_service_unhealthy", error)
+            }
+            crate::runtime::RuntimeReleaseHealth::HostConnectivity(error) => {
+                ("runtime_host_connectivity", error)
+            }
+            crate::runtime::RuntimeReleaseHealth::Unknown(error)
+            | crate::runtime::RuntimeReleaseHealth::NotReady(error) => {
+                ("runtime_health_unknown", error)
+            }
+            crate::runtime::RuntimeReleaseHealth::Ready => unreachable!("ready returned above"),
+        };
         Err(fail(
-            "runtime_unhealthy",
-            format!("DroneDreamRuntime did not become healthy: {last_error}"),
+            code,
+            format!("DroneDreamRuntime did not become healthy: {detail}"),
             true,
         ))
+    }
+
+    fn collect_diagnostics(
+        &self,
+        runtime_target: &Path,
+        failure_code: &str,
+        failure_message: &str,
+    ) -> Result<PathBuf, String> {
+        collect_production_runtime_diagnostics(runtime_target, failure_code, failure_message)
     }
 
     fn write_receipt(
@@ -1755,6 +2015,382 @@ impl WslExecutor for ProductionWslExecutor {
         crate::runtime::write_runtime_root_receipt(target, build_id, version)
             .map_err(|error| fail("runtime_receipt", error, false))
     }
+}
+
+#[cfg(target_os = "windows")]
+fn imported_runtime_bootstrap_args() -> Vec<String> {
+    crate::runtime::runtime_wsl_exec_args(
+        "/bin/ln",
+        &[
+            "-sfn",
+            "/dev/null",
+            "/etc/systemd/system/systemd-firstboot.service",
+        ],
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn collect_production_runtime_diagnostics(
+    runtime_target: &Path,
+    failure_code: &str,
+    failure_message: &str,
+) -> Result<PathBuf, String> {
+    let cache_root = crate::runtime_cache::validate_managed_cache(runtime_target)?;
+    let diagnostics_root = prepare_diagnostics_directory(&cache_root)?;
+    let mut command = windows_command("wsl.exe");
+    let bounded_script = bounded_diagnostic_script(DIAGNOSTIC_SCRIPT);
+    command.args(diagnostic_wsl_command_args(bounded_script.as_str()));
+    let collected_at = chrono::Utc::now();
+    let mut report =
+        diagnostic_report_header(&collected_at.to_rfc3339(), failure_code, failure_message);
+    append_windows_command_report(
+        &mut report,
+        "wsl.exe --version",
+        "wsl.exe",
+        &["--version"],
+        Duration::from_secs(8),
+    );
+    append_windows_command_report(
+        &mut report,
+        "wsl.exe --status",
+        "wsl.exe",
+        &["--status"],
+        Duration::from_secs(8),
+    );
+    append_windows_command_report(
+        &mut report,
+        "wsl.exe --list --verbose",
+        "wsl.exe",
+        &["--list", "--verbose"],
+        Duration::from_secs(8),
+    );
+    const HOST_PORT_PROBE: &str = r#"
+$ErrorActionPreference='SilentlyContinue'
+$listeners=@(Get-NetTCPConnection -State Listen -LocalPort 8000)
+Write-Output ('listenerCount=' + $listeners.Count)
+foreach($listener in $listeners){ Write-Output ('listener=' + $listener.LocalAddress + ':' + $listener.LocalPort + ' pid=' + $listener.OwningProcess) }
+$client=[Net.Sockets.TcpClient]::new()
+try {
+  $pending=$client.BeginConnect('127.0.0.1',8000,$null,$null)
+  $connected=$pending.AsyncWaitHandle.WaitOne(2000) -and $client.Connected
+  Write-Output ('connect127001=' + $connected)
+} catch { Write-Output 'connect127001=False' } finally { $client.Dispose() }
+"#;
+    append_windows_command_report(
+        &mut report,
+        "Windows localhost port 8000",
+        "powershell.exe",
+        &[
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            HOST_PORT_PROBE,
+        ],
+        Duration::from_secs(8),
+    );
+    match command_output(command, DIAGNOSTIC_TIMEOUT, "DroneDreamRuntime diagnostics") {
+        Ok(output) => {
+            report.push_str(&format!("collectorExitStatus={}\n\n", output.status));
+            report.push_str("===== standard output =====\n");
+            report.push_str(&decode_diagnostic_output(&output.stdout));
+            if !output.stderr.is_empty() {
+                report.push_str("\n===== collector standard error =====\n");
+                report.push_str(&decode_diagnostic_output(&output.stderr));
+            }
+        }
+        Err(error) => {
+            report.push_str("collectorExitStatus=unavailable\n\n");
+            report.push_str("===== collector failure =====\n");
+            report.push_str(&error);
+            report.push('\n');
+        }
+    }
+    let report = sanitize_and_bound_diagnostics(&report);
+    persist_diagnostic_report(&diagnostics_root, collected_at, &report)
+}
+
+#[cfg(target_os = "windows")]
+fn diagnostic_report_header(
+    collected_at: &str,
+    failure_code: &str,
+    failure_message: &str,
+) -> String {
+    format!(
+        "DroneDreamRuntime failure diagnostics\ncollectedAt={}\ncollectorLimitBytes={}\nfailureCode={}\nfailureMessage={}\n\n",
+        collected_at,
+        MAX_DIAGNOSTIC_BYTES,
+        failure_code,
+        failure_message
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn bounded_diagnostic_script(inner: &str) -> String {
+    format!("{{\n{inner}\n}} 2>&1 | /usr/bin/head -c {MAX_DIAGNOSTIC_CAPTURE_BYTES}\n")
+}
+
+#[cfg(target_os = "windows")]
+fn diagnostic_wsl_command_args(script: &str) -> Vec<String> {
+    crate::runtime::runtime_wsl_exec_args("/usr/bin/timeout", &["20s", "/bin/sh", "-c", script])
+}
+
+#[cfg(target_os = "windows")]
+fn append_windows_command_report(
+    report: &mut String,
+    title: &str,
+    program: &str,
+    args: &[&str],
+    timeout: Duration,
+) {
+    report.push_str(&format!("===== {title} =====\n"));
+    let mut command = windows_command(program);
+    command.args(args);
+    match command_output(command, timeout, title) {
+        Ok(output) => {
+            report.push_str(&format!("exitStatus={}\n", output.status));
+            report.push_str(&decode_diagnostic_output(&output.stdout));
+            if !output.stderr.is_empty() {
+                report.push_str("\n[standard error]\n");
+                report.push_str(&decode_diagnostic_output(&output.stderr));
+            }
+        }
+        Err(error) => report.push_str(&format!("probeUnavailable={error}\n")),
+    }
+    report.push('\n');
+}
+
+fn decode_diagnostic_output(bytes: &[u8]) -> String {
+    let looks_utf16_le = bytes.len() >= 4
+        && bytes.len().is_multiple_of(2)
+        && bytes
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .filter(|byte| **byte == 0)
+            .count()
+            >= bytes.len() / 8;
+    if looks_utf16_le {
+        let units = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
+        String::from_utf16_lossy(&units.collect::<Vec<_>>())
+    } else {
+        String::from_utf8_lossy(bytes).into_owned()
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn prepare_diagnostics_directory(cache_root: &Path) -> Result<PathBuf, String> {
+    let canonical_cache = fs::canonicalize(cache_root)
+        .map_err(|error| format!("Unable to resolve the managed runtime cache: {error}"))?;
+    let diagnostics_root = cache_root.join("diagnostics");
+    match fs::symlink_metadata(&diagnostics_root) {
+        Ok(metadata) => {
+            if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
+                return Err(
+                    "Runtime diagnostics path is not a real managed-cache directory.".to_string(),
+                );
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            fs::create_dir(&diagnostics_root).map_err(|error| {
+                format!("Unable to create the runtime diagnostics directory: {error}")
+            })?;
+        }
+        Err(error) => {
+            return Err(format!(
+                "Unable to inspect the runtime diagnostics directory: {error}"
+            ))
+        }
+    }
+    let metadata = fs::symlink_metadata(&diagnostics_root)
+        .map_err(|error| format!("Unable to verify the runtime diagnostics directory: {error}"))?;
+    if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
+        return Err("Runtime diagnostics directory failed its safety check.".to_string());
+    }
+    let canonical_diagnostics = fs::canonicalize(&diagnostics_root)
+        .map_err(|error| format!("Unable to resolve the runtime diagnostics directory: {error}"))?;
+    if canonical_diagnostics.parent() != Some(canonical_cache.as_path()) {
+        return Err(
+            "Runtime diagnostics directory resolved outside the managed runtime cache.".to_string(),
+        );
+    }
+    Ok(diagnostics_root)
+}
+
+#[cfg(target_os = "windows")]
+fn persist_diagnostic_report(
+    diagnostics_root: &Path,
+    collected_at: chrono::DateTime<chrono::Utc>,
+    report: &[u8],
+) -> Result<PathBuf, String> {
+    if report.len() > MAX_DIAGNOSTIC_BYTES {
+        return Err("Runtime diagnostic report exceeded its fixed size limit.".to_string());
+    }
+    reserve_diagnostic_capacity(diagnostics_root, report.len() as u64)?;
+    for _ in 0..8 {
+        let attempt = OPERATION_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let filename = format!(
+            "runtime-health-{}-{}-{attempt}.log",
+            collected_at.format("%Y%m%dT%H%M%S%3fZ"),
+            std::process::id()
+        );
+        let path = diagnostics_root.join(filename);
+        let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(format!(
+                    "Unable to create the runtime diagnostic report: {error}"
+                ))
+            }
+        };
+        if let Err(error) = file.write_all(report).and_then(|()| file.sync_all()) {
+            drop(file);
+            let _ = fs::remove_file(&path);
+            return Err(format!(
+                "Unable to persist the runtime diagnostic report: {error}"
+            ));
+        }
+        drop(file);
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("Unable to verify the runtime diagnostic report: {error}"))?;
+        if !metadata.is_file()
+            || crate::runtime_cache::is_link_like(&metadata)
+            || metadata.len() > MAX_DIAGNOSTIC_BYTES as u64
+        {
+            let _ = fs::remove_file(&path);
+            return Err("Runtime diagnostic report failed its safety check.".to_string());
+        }
+        let canonical_root = fs::canonicalize(diagnostics_root).map_err(|error| {
+            format!("Unable to resolve the runtime diagnostic report parent: {error}")
+        })?;
+        let canonical_path = fs::canonicalize(&path)
+            .map_err(|error| format!("Unable to resolve the runtime diagnostic report: {error}"))?;
+        if canonical_path.parent() != Some(canonical_root.as_path()) {
+            let _ = fs::remove_file(&path);
+            return Err(
+                "Runtime diagnostic report resolved outside its managed directory.".to_string(),
+            );
+        }
+        return Ok(path);
+    }
+    Err("Unable to allocate a unique runtime diagnostic report name.".to_string())
+}
+
+fn reserve_diagnostic_capacity(diagnostics_root: &Path, incoming_bytes: u64) -> Result<(), String> {
+    if incoming_bytes > MAX_DIAGNOSTIC_BYTES as u64 {
+        return Err("Incoming diagnostic exceeds the per-report size limit.".to_string());
+    }
+    let canonical_root = fs::canonicalize(diagnostics_root)
+        .map_err(|error| format!("Unable to resolve diagnostics for rotation: {error}"))?;
+    let entries = fs::read_dir(diagnostics_root)
+        .map_err(|error| format!("Unable to inspect diagnostics for rotation: {error}"))?;
+    let mut reports = Vec::new();
+    for entry in entries {
+        let entry =
+            entry.map_err(|error| format!("Unable to inspect a diagnostic entry: {error}"))?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.starts_with("runtime-health-") || !name.ends_with(".log") {
+            continue;
+        }
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("Unable to validate diagnostic {name}: {error}"))?;
+        if !metadata.is_file() || crate::runtime_cache::is_link_like(&metadata) {
+            return Err(format!(
+                "Diagnostic rotation stopped because {name} is not a safe ordinary file."
+            ));
+        }
+        let canonical_path = fs::canonicalize(&path)
+            .map_err(|error| format!("Unable to resolve diagnostic {name}: {error}"))?;
+        if canonical_path.parent() != Some(canonical_root.as_path()) {
+            return Err(format!(
+                "Diagnostic rotation stopped because {name} resolves outside its directory."
+            ));
+        }
+        reports.push((name, path, metadata.len()));
+    }
+    reports.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut count = reports.len();
+    let mut total_bytes = reports.iter().map(|entry| entry.2).sum::<u64>();
+    for (_, path, length) in reports {
+        if count.saturating_add(1) <= MAX_DIAGNOSTIC_REPORTS
+            && total_bytes.saturating_add(incoming_bytes) <= MAX_DIAGNOSTIC_TOTAL_BYTES
+        {
+            break;
+        }
+        fs::remove_file(&path).map_err(|error| {
+            format!(
+                "Unable to remove old diagnostic {}: {error}",
+                path.display()
+            )
+        })?;
+        count = count.saturating_sub(1);
+        total_bytes = total_bytes.saturating_sub(length);
+    }
+    if count.saturating_add(1) > MAX_DIAGNOSTIC_REPORTS
+        || total_bytes.saturating_add(incoming_bytes) > MAX_DIAGNOSTIC_TOTAL_BYTES
+    {
+        return Err("Runtime diagnostic capacity could not be reserved safely.".to_string());
+    }
+    Ok(())
+}
+
+fn sanitize_and_bound_diagnostics(raw: &str) -> Vec<u8> {
+    const TRUNCATED: &str = "\n[diagnostic output truncated at 512 KiB]\n";
+    let mut sanitized = String::with_capacity(raw.len().min(MAX_DIAGNOSTIC_BYTES));
+    for line in raw.lines() {
+        let normalized = line
+            .chars()
+            .map(|character| {
+                if character == '\t' || !character.is_control() {
+                    character
+                } else {
+                    '?'
+                }
+            })
+            .collect::<String>();
+        if diagnostic_line_is_sensitive(&normalized) {
+            sanitized.push_str("[REDACTED sensitive diagnostic line]");
+        } else {
+            sanitized.push_str(&normalized);
+        }
+        sanitized.push('\n');
+    }
+    if sanitized.len() <= MAX_DIAGNOSTIC_BYTES {
+        return sanitized.into_bytes();
+    }
+    let limit = MAX_DIAGNOSTIC_BYTES.saturating_sub(TRUNCATED.len());
+    let mut boundary = limit.min(sanitized.len());
+    while boundary > 0 && !sanitized.is_char_boundary(boundary) {
+        boundary -= 1;
+    }
+    sanitized.truncate(boundary);
+    sanitized.push_str(TRUNCATED);
+    sanitized.into_bytes()
+}
+
+fn diagnostic_line_is_sensitive(line: &str) -> bool {
+    let lowercase = line.to_ascii_lowercase();
+    [
+        "authorization",
+        "password",
+        "passwd",
+        "secret",
+        "token",
+        "api_key",
+        "apikey",
+        "access_key",
+    ]
+    .iter()
+    .any(|needle| lowercase.contains(needle))
+        || lowercase.find("://").is_some_and(|scheme| {
+            lowercase[scheme + 3..]
+                .split_once('@')
+                .is_some_and(|(credentials, _)| credentials.contains(':'))
+        })
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -1781,6 +2417,13 @@ impl WslExecutor for ProductionWslExecutor {
         ))
     }
     fn import(&self, _: &Path, _: &Path, _: &AtomicBool) -> Result<(), InstallFailure> {
+        Err(fail(
+            "unsupported_platform",
+            "The runtime installer supports Windows only.",
+            false,
+        ))
+    }
+    fn bootstrap_imported_runtime(&self) -> Result<(), InstallFailure> {
         Err(fail(
             "unsupported_platform",
             "The runtime installer supports Windows only.",
@@ -1814,6 +2457,10 @@ impl WslExecutor for ProductionWslExecutor {
             "The runtime installer supports Windows only.",
             false,
         ))
+    }
+
+    fn collect_diagnostics(&self, _: &Path, _: &str, _: &str) -> Result<PathBuf, String> {
+        Err("Runtime diagnostics are supported on Windows only.".to_string())
     }
     fn write_receipt(&self, _: &Path, _: &str, _: &str) -> Result<(), InstallFailure> {
         Err(fail(
@@ -1998,6 +2645,9 @@ fn recover_pending_install(
     });
 
     let recovery = (|| {
+        check_cancel(cancel)?;
+        executor.bootstrap_imported_runtime()?;
+        check_cancel(cancel)?;
         executor.start(cancel)?;
         installer.update(|snapshot| {
             snapshot.phase = RuntimeInstallPhase::HealthChecking;
@@ -2015,9 +2665,10 @@ fn recover_pending_install(
             &manifest.runtime.version,
         )
     })();
-    if let Err(original) = recovery {
+    if let Err(mut original) = recovery {
         if executor.registration_matches_target(target)? {
             validate_import_pending(target, &manifest, &manifest_sha256)?;
+            original = attach_runtime_failure_diagnostics(executor, target, original);
             executor.unregister().map_err(|rollback| {
                 fail(
                     "rollback_failed",
@@ -2027,8 +2678,10 @@ fn recover_pending_install(
                     ),
                     false,
                 )
+                .inherit_diagnostics(&original)
             })?;
-            clear_import_pending(target)?;
+            clear_import_pending(target)
+                .map_err(|cleanup| cleanup.inherit_diagnostics(&original))?;
         }
         return Err(original);
     }
@@ -3050,8 +3703,10 @@ fn run_install_core(
         check_cancel(cancel)?;
         installer.update(|snapshot| {
             snapshot.phase = RuntimeInstallPhase::Starting;
-            snapshot.message = Some("Starting DroneDreamRuntime services...".to_string());
+            snapshot.message = Some("Preparing DroneDreamRuntime services...".to_string());
         });
+        executor.bootstrap_imported_runtime()?;
+        check_cancel(cancel)?;
         executor.start(cancel)?;
         installer.update(|snapshot| {
             snapshot.phase = RuntimeInstallPhase::HealthChecking;
@@ -3069,12 +3724,13 @@ fn run_install_core(
         )
     })();
 
-    if let Err(original) = install_result {
+    if let Err(mut original) = install_result {
         // The pre-import check proved the name was absent. Only if this exact
         // name appeared during our attempt may rollback unregister it.
         match executor.registration_matches_target(target) {
             Ok(true) => {
                 let pending = validate_import_pending(target, manifest, &manifest_sha256)?;
+                original = attach_runtime_failure_diagnostics(executor, target, original);
                 if let Err(rollback) = executor.unregister() {
                     return Err(fail(
                         "rollback_failed",
@@ -3083,7 +3739,8 @@ fn run_install_core(
                             original.message, rollback.message
                         ),
                         false,
-                    ));
+                    )
+                    .inherit_diagnostics(&original));
                 }
                 if let Err(cleanup) = reconcile_failed_unregistered_import_target(target, &pending)
                 {
@@ -3094,9 +3751,11 @@ fn run_install_core(
                             original.message, cleanup.message
                         ),
                         cleanup.retryable,
-                    ));
+                    )
+                    .inherit_diagnostics(&original));
                 }
-                clear_import_pending(target)?;
+                clear_import_pending(target)
+                    .map_err(|cleanup| cleanup.inherit_diagnostics(&original))?;
             }
             Ok(false) => {
                 let pending = validate_import_pending(target, manifest, &manifest_sha256)?;
@@ -3109,7 +3768,8 @@ fn run_install_core(
                             original.message, cleanup.message
                         ),
                         cleanup.retryable,
-                    ));
+                    )
+                    .inherit_diagnostics(&original));
                 }
                 clear_import_pending(target)?;
             }
@@ -3118,7 +3778,8 @@ fn run_install_core(
                     "rollback_state_unknown",
                     format!("{} The installer could not prove whether its partial DroneDreamRuntime registration exists: {}", original.message, probe_error.message),
                     false,
-                ));
+                )
+                .inherit_diagnostics(&original));
             }
         }
         return Err(original);
@@ -3149,13 +3810,18 @@ fn cleanup_successful_install(
     manifest: &ReleaseManifest,
     archive_path: &Path,
 ) -> Option<String> {
-    let mut cleanup_artifacts = vec![DownloadArtifact::verified(
-        PathBuf::from("artifacts").join(
-            archive_path
-                .file_name()
-                .expect("staged archive always has a filename"),
-        ),
-    )];
+    let mut cleanup_artifacts = Vec::new();
+    let mut warning = if let Some(filename) = archive_path.file_name() {
+        cleanup_artifacts.push(DownloadArtifact::verified(
+            PathBuf::from("artifacts").join(filename),
+        ));
+        None
+    } else {
+        Some(
+            "Runtime is ready, but the temporary archive path was malformed and could not be cleaned"
+                .to_string(),
+        )
+    };
     cleanup_artifacts.extend(
         manifest.artifact.parts.iter().map(|part| {
             DownloadArtifact::verified(PathBuf::from("artifacts").join(&part.filename))
@@ -3170,12 +3836,16 @@ fn cleanup_successful_install(
         ]
         .map(|filename| DownloadArtifact::verified(PathBuf::from("artifacts").join(filename))),
     );
-    let mut warning =
+    if let Err(error) =
         apply_runtime_import_outcome(target, ImportOutcome::Succeeded, &cleanup_artifacts)
-            .err()
-            .map(|error| {
-                format!("Runtime is ready, but temporary cache cleanup needs attention: {error}")
-            });
+    {
+        let cleanup_warning =
+            format!("Runtime is ready, but temporary cache cleanup needs attention: {error}");
+        warning = Some(match warning {
+            Some(previous) => format!("{previous}; {cleanup_warning}"),
+            None => cleanup_warning,
+        });
+    }
     let cache_root =
         crate::runtime_cache::runtime_download_cache_root(target.to_str().unwrap_or_default());
     let state_path = cache_root.join("artifacts").join(RESUME_STATE_FILE);
@@ -3703,9 +4373,15 @@ mod tests {
         cancel_during_import: bool,
         preparation_requires_restart: bool,
         imports: usize,
+        bootstraps: usize,
         starts: usize,
         unregisters: usize,
         receipts: usize,
+        diagnostics: usize,
+        fail_diagnostics: bool,
+        health_failure_code: Option<String>,
+        events: Vec<String>,
+        lifecycle_events: Vec<String>,
     }
 
     #[derive(Default)]
@@ -3739,6 +4415,7 @@ mod tests {
         ) -> Result<(), InstallFailure> {
             let mut state = self.state.lock().unwrap();
             state.imports += 1;
+            state.lifecycle_events.push("import".to_string());
             if state.fail_import_without_registration {
                 let payload = state
                     .unregistered_import_payload
@@ -3775,8 +4452,20 @@ mod tests {
             }
         }
 
+        fn bootstrap_imported_runtime(&self) -> Result<(), InstallFailure> {
+            let mut state = self.state.lock().unwrap();
+            state.bootstraps += 1;
+            state.lifecycle_events.push("bootstrap-mask".to_string());
+            state
+                .lifecycle_events
+                .push("bootstrap-terminate".to_string());
+            Ok(())
+        }
+
         fn start(&self, _: &AtomicBool) -> Result<(), InstallFailure> {
-            self.state.lock().unwrap().starts += 1;
+            let mut state = self.state.lock().unwrap();
+            state.starts += 1;
+            state.lifecycle_events.push("start".to_string());
             Ok(())
         }
 
@@ -3787,6 +4476,7 @@ mod tests {
         fn unregister(&self) -> Result<(), InstallFailure> {
             let mut state = self.state.lock().unwrap();
             state.unregisters += 1;
+            state.events.push("unregister".to_string());
             state.registered = false;
             state.registration_owned_by_attempt = false;
             Ok(())
@@ -3798,11 +4488,44 @@ mod tests {
             _: &str,
             cancel: &AtomicBool,
         ) -> Result<(), InstallFailure> {
-            check_cancel(cancel)
+            check_cancel(cancel)?;
+            let mut state = self.state.lock().unwrap();
+            state.lifecycle_events.push("health".to_string());
+            if let Some(code) = state.health_failure_code.as_deref() {
+                Err(fail(code, "injected runtime health failure", true))
+            } else {
+                Ok(())
+            }
+        }
+
+        fn collect_diagnostics(
+            &self,
+            runtime_target: &Path,
+            _: &str,
+            _: &str,
+        ) -> Result<PathBuf, String> {
+            let mut state = self.state.lock().unwrap();
+            state.diagnostics += 1;
+            state.events.push("diagnostics".to_string());
+            if state.fail_diagnostics {
+                return Err("injected diagnostic failure".to_string());
+            }
+            drop(state);
+            let root = runtime_target
+                .parent()
+                .expect("test runtime target has a parent")
+                .join("DroneDream.download-cache")
+                .join("diagnostics");
+            fs::create_dir_all(&root).map_err(|error| error.to_string())?;
+            let path = root.join("fake-runtime-health.log");
+            fs::write(&path, b"fake diagnostics\n").map_err(|error| error.to_string())?;
+            Ok(path)
         }
 
         fn write_receipt(&self, _: &Path, _: &str, _: &str) -> Result<(), InstallFailure> {
-            self.state.lock().unwrap().receipts += 1;
+            let mut state = self.state.lock().unwrap();
+            state.receipts += 1;
+            state.lifecycle_events.push("receipt".to_string());
             Ok(())
         }
     }
@@ -3929,7 +4652,26 @@ mod tests {
         assert_eq!(result.version, "1.2.3");
         assert_eq!(*transport.starts.lock().unwrap(), vec![4]);
         let state = wsl.state.lock().unwrap();
-        assert_eq!((state.imports, state.starts, state.receipts), (1, 1, 1));
+        assert_eq!(
+            (
+                state.imports,
+                state.bootstraps,
+                state.starts,
+                state.receipts
+            ),
+            (1, 1, 1, 1)
+        );
+        assert_eq!(
+            state.lifecycle_events,
+            [
+                "import",
+                "bootstrap-mask",
+                "bootstrap-terminate",
+                "start",
+                "health",
+                "receipt",
+            ]
+        );
         assert_eq!(state.unregisters, 0);
         assert!(state.registered);
         assert!(!state.unrelated_registered);
@@ -4086,6 +4828,7 @@ mod tests {
             "The receipt is safely terminal but still locked.".to_string(),
             "Runtime installation was cancelled.",
             Some("1.2.3".to_string()),
+            None,
         );
         let snapshot = installer.snapshot();
         assert_eq!(snapshot.phase, RuntimeInstallPhase::Failed);
@@ -4094,6 +4837,32 @@ mod tests {
             snapshot.error.as_ref().map(|error| error.code.as_str()),
             Some("installer_receipt_cleanup_failed")
         );
+        assert!(snapshot.resumable);
+    }
+
+    #[test]
+    fn handoff_cleanup_failure_preserves_exported_health_diagnostics_in_snapshot() {
+        let installer = RuntimeInstaller::default();
+        let diagnostics_path =
+            r"E:\DroneDream.download-cache\diagnostics\runtime-health-test.log".to_string();
+
+        set_receipt_cleanup_failure(
+            &installer,
+            "The terminal handoff receipt remained locked.".to_string(),
+            "Runtime installation failed: DroneDreamRuntime service was unhealthy.",
+            None,
+            Some(diagnostics_path.clone()),
+        );
+
+        let snapshot = installer.snapshot();
+        let error = snapshot.error.expect("final cleanup error");
+        assert_eq!(snapshot.phase, RuntimeInstallPhase::Failed);
+        assert_eq!(error.code, "installer_receipt_cleanup_failed");
+        assert_eq!(
+            error.diagnostics_path.as_deref(),
+            Some(diagnostics_path.as_str())
+        );
+        assert!(error.message.contains("service was unhealthy"));
         assert!(snapshot.resumable);
     }
 
@@ -4242,6 +5011,8 @@ mod tests {
         assert_eq!(error.code, "fake_import");
         let state = wsl.state.lock().unwrap();
         assert_eq!((state.imports, state.unregisters), (1, 1));
+        assert_eq!(state.bootstraps, 0);
+        assert_eq!(state.lifecycle_events, ["import"]);
         assert!(!state.registered);
         assert!(state.unrelated_registered);
         assert!(!sandbox.target().exists());
@@ -4477,6 +5248,298 @@ mod tests {
     }
 
     #[test]
+    fn health_failure_collects_diagnostics_before_safe_unregister() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        let body = b"runtime";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let wsl = FakeWsl::default();
+        wsl.state.lock().unwrap().health_failure_code =
+            Some("runtime_service_unhealthy".to_string());
+
+        let error = run_install_core(
+            &RuntimeInstaller::default(),
+            &target,
+            &manifest,
+            &raw,
+            &FakeTransport::valid(body),
+            &wsl,
+            &AtomicBool::new(false),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "runtime_service_unhealthy");
+        let diagnostics = PathBuf::from(error.diagnostics_path.expect("diagnostic path"));
+        assert!(diagnostics.is_file());
+        let state = wsl.state.lock().unwrap();
+        assert_eq!(state.diagnostics, 1);
+        assert_eq!(state.events, ["diagnostics", "unregister"]);
+        assert_eq!(state.unregisters, 1);
+    }
+
+    #[test]
+    fn diagnostic_collection_failure_preserves_health_classification_and_rollback() {
+        let sandbox = Sandbox::new();
+        let body = b"runtime";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let wsl = FakeWsl::default();
+        {
+            let mut state = wsl.state.lock().unwrap();
+            state.health_failure_code = Some("runtime_host_connectivity".to_string());
+            state.fail_diagnostics = true;
+        }
+
+        let error = run_install_core(
+            &RuntimeInstaller::default(),
+            &sandbox.target(),
+            &manifest,
+            &raw,
+            &FakeTransport::valid(body),
+            &wsl,
+            &AtomicBool::new(false),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "runtime_host_connectivity");
+        assert!(error.diagnostics_path.is_none());
+        assert!(error
+            .message
+            .contains("Diagnostic collection was unavailable"));
+        let state = wsl.state.lock().unwrap();
+        assert_eq!(state.events, ["diagnostics", "unregister"]);
+        assert_eq!(state.unregisters, 1);
+    }
+
+    #[test]
+    fn runtime_install_error_serializes_the_stable_diagnostics_contract() {
+        let value = serde_json::to_value(RuntimeInstallError {
+            code: "runtime_service_unhealthy".to_string(),
+            message: "service did not become ready".to_string(),
+            retryable: true,
+            diagnostics_path: Some(
+                r"E:\DroneDream.download-cache\diagnostics\runtime-health-test.log".to_string(),
+            ),
+        })
+        .unwrap();
+        assert_eq!(value["code"], "runtime_service_unhealthy");
+        assert_eq!(
+            value["diagnosticsPath"],
+            r"E:\DroneDream.download-cache\diagnostics\runtime-health-test.log"
+        );
+    }
+
+    #[test]
+    fn snapshot_boundary_single_lines_controls_and_utf16_bounds_runtime_errors() {
+        let installer = RuntimeInstaller::default();
+        let raw_message = format!(
+            "curl: (7) failed\r\ncurl: (28) timed out\0\t{}",
+            "🚁".repeat(MAX_IPC_ERROR_MESSAGE_UTF16)
+        );
+        installer.update(|snapshot| {
+            snapshot.error = Some(RuntimeInstallError {
+                code: "runtime\nservice\0unhealthy".to_string(),
+                message: raw_message,
+                retryable: true,
+                diagnostics_path: Some("E:\\DroneDream\nlogs\0health.log".to_string()),
+            });
+        });
+
+        let error = installer.snapshot().error.expect("sanitized error");
+        assert_eq!(error.code, "runtime service unhealthy");
+        assert!(error
+            .message
+            .starts_with("curl: (7) failed curl: (28) timed out "));
+        assert!(error.message.encode_utf16().count() <= MAX_IPC_ERROR_MESSAGE_UTF16);
+        assert!(!error.message.chars().any(char::is_control));
+        assert!(!['\r', '\n', '\t', '\0']
+            .iter()
+            .any(|character| error.message.contains(*character)));
+        assert_eq!(
+            error.diagnostics_path.as_deref(),
+            Some("E:\\DroneDream logs health.log")
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn diagnostic_header_keeps_multiline_curl_detail_before_ipc_sanitization() {
+        let detail =
+            "runtime-internal readiness request failed: curl: (7) refused\r\ncurl: (28) timed out";
+        let header =
+            diagnostic_report_header("2026-07-14T00:00:00Z", "runtime_service_unhealthy", detail);
+        assert!(header.contains(detail));
+
+        let persisted = String::from_utf8(sanitize_and_bound_diagnostics(&header)).unwrap();
+        assert!(persisted.contains(
+            "failureMessage=runtime-internal readiness request failed: curl: (7) refused\ncurl: (28) timed out"
+        ));
+    }
+
+    #[test]
+    fn diagnostic_sanitizer_redacts_secrets_controls_and_caps_output() {
+        let raw = format!(
+            "safe line\nAuthorization: Bearer abc\nurl=https://user:pass@example.test/path\ncontrol=\u{0}\n{}",
+            "x".repeat(MAX_DIAGNOSTIC_BYTES * 2)
+        );
+        let sanitized = sanitize_and_bound_diagnostics(&raw);
+        let text = String::from_utf8(sanitized.clone()).unwrap();
+        assert!(sanitized.len() <= MAX_DIAGNOSTIC_BYTES);
+        assert!(!text.contains("Bearer abc"));
+        assert!(!text.contains("user:pass"));
+        assert!(!text.contains('\0'));
+        assert!(text.contains("[REDACTED sensitive diagnostic line]"));
+        assert!(text.contains("diagnostic output truncated"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn diagnostic_wsl_argv_preserves_script_boundaries_and_tool_fallbacks() {
+        let script = bounded_diagnostic_script(DIAGNOSTIC_SCRIPT);
+        let argv = diagnostic_wsl_command_args(&script);
+        assert_eq!(
+            argv.iter().take(9).map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "--distribution",
+                RUNTIME_NAME,
+                "--user",
+                "root",
+                "--exec",
+                "/usr/bin/timeout",
+                "20s",
+                "/bin/sh",
+                "-c",
+            ]
+        );
+        assert_eq!(argv.len(), 10);
+        assert_eq!(argv[9], script);
+        assert!(argv[9].contains("$unit"));
+        assert!(!argv[..9].iter().any(|argument| argument.contains("$unit")));
+        assert!(argv[9].contains("/usr/bin/head -c 786432"));
+        assert!(DIAGNOSTIC_SCRIPT.contains("/usr/bin/systemctl status \"$unit\""));
+        assert!(DIAGNOSTIC_SCRIPT.contains("/usr/bin/journalctl -u \"$unit\""));
+        assert!(DIAGNOSTIC_SCRIPT.contains("/usr/bin/curl --silent"));
+        assert!(DIAGNOSTIC_SCRIPT.contains("--noproxy 127.0.0.1,localhost"));
+        assert!(!DIAGNOSTIC_SCRIPT.contains("--noproxy="));
+        assert!(!DIAGNOSTIC_SCRIPT.split_whitespace().any(|word| word == "*"));
+        assert!(DIAGNOSTIC_SCRIPT.contains("/proc/net/tcp"));
+        assert!(DIAGNOSTIC_SCRIPT.contains("/proc/net/tcp6"));
+        assert!(DIAGNOSTIC_SCRIPT.contains("hostname -I"));
+        assert!(DIAGNOSTIC_SCRIPT.contains("/proc/net/route"));
+        assert!(DIAGNOSTIC_SCRIPT.contains("ss unavailable"));
+        assert!(DIAGNOSTIC_SCRIPT.contains("ip unavailable"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn imported_runtime_bootstrap_argv_is_exact_and_shell_free() {
+        let argv = imported_runtime_bootstrap_args();
+        assert_eq!(
+            argv.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "--distribution",
+                RUNTIME_NAME,
+                "--user",
+                "root",
+                "--exec",
+                "/bin/ln",
+                "-sfn",
+                "/dev/null",
+                "/etc/systemd/system/systemd-firstboot.service",
+            ]
+        );
+        assert!(!argv.iter().any(|argument| argument == "/bin/sh"));
+        assert!(!argv.iter().any(|argument| argument == "-c"));
+    }
+
+    #[test]
+    fn diagnostic_rotation_keeps_only_the_ten_newest_safe_reports() {
+        let sandbox = Sandbox::new();
+        let diagnostics = sandbox.0.join("diagnostics");
+        fs::create_dir(&diagnostics).unwrap();
+        for index in 0..12 {
+            fs::write(
+                diagnostics.join(format!("runtime-health-{index:02}.log")),
+                [index as u8],
+            )
+            .unwrap();
+        }
+        fs::write(diagnostics.join("keep-me.txt"), b"unrelated").unwrap();
+
+        reserve_diagnostic_capacity(&diagnostics, 1).unwrap();
+        fs::write(diagnostics.join("runtime-health-12.log"), [12_u8]).unwrap();
+
+        let remaining = fs::read_dir(&diagnostics)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("runtime-health-")
+            })
+            .count();
+        assert_eq!(remaining, MAX_DIAGNOSTIC_REPORTS);
+        assert!(!diagnostics.join("runtime-health-00.log").exists());
+        assert!(!diagnostics.join("runtime-health-01.log").exists());
+        assert!(diagnostics.join("runtime-health-11.log").exists());
+        assert!(diagnostics.join("keep-me.txt").exists());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn diagnostic_capacity_enforces_total_bytes_before_creating_a_report() {
+        let sandbox = Sandbox::new();
+        let diagnostics = sandbox.0.join("diagnostics");
+        fs::create_dir(&diagnostics).unwrap();
+        for index in 0..MAX_DIAGNOSTIC_REPORTS {
+            fs::write(
+                diagnostics.join(format!("runtime-health-{index:02}.log")),
+                vec![b'x'; MAX_DIAGNOSTIC_BYTES],
+            )
+            .unwrap();
+        }
+
+        persist_diagnostic_report(&diagnostics, chrono::Utc::now(), b"new report").unwrap();
+
+        let reports = fs::read_dir(&diagnostics)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                name.starts_with("runtime-health-")
+                    .then(|| fs::metadata(entry.path()).unwrap().len())
+            })
+            .collect::<Vec<_>>();
+        assert!(reports.len() <= MAX_DIAGNOSTIC_REPORTS);
+        assert!(reports.iter().sum::<u64>() <= MAX_DIAGNOSTIC_TOTAL_BYTES);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn unsafe_matching_diagnostic_entry_prevents_a_new_report_without_deletion() {
+        let sandbox = Sandbox::new();
+        let diagnostics = sandbox.0.join("diagnostics");
+        fs::create_dir(&diagnostics).unwrap();
+        let safe = diagnostics.join("runtime-health-00.log");
+        fs::write(&safe, b"keep").unwrap();
+        fs::create_dir(diagnostics.join("runtime-health-unsafe.log")).unwrap();
+
+        let error =
+            persist_diagnostic_report(&diagnostics, chrono::Utc::now(), b"new report").unwrap_err();
+
+        assert!(error.contains("not a safe ordinary file"));
+        assert_eq!(fs::read(&safe).unwrap(), b"keep");
+        let ordinary_reports = fs::read_dir(&diagnostics)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_type().unwrap().is_file())
+            .count();
+        assert_eq!(ordinary_reports, 1);
+    }
+
+    #[test]
     fn crash_after_import_is_adopted_only_from_signed_cache_and_exact_target() {
         let sandbox = Sandbox::new();
         let target = sandbox.target();
@@ -4534,9 +5597,20 @@ mod tests {
         assert_eq!(result.version, "1.2.3");
         let state = wsl.state.lock().unwrap();
         assert_eq!(state.imports, 0);
+        assert_eq!(state.bootstraps, 1);
         assert_eq!(state.receipts, 1);
         assert_eq!(state.unregisters, 0);
         assert!(state.registered);
+        assert_eq!(
+            state.lifecycle_events,
+            [
+                "bootstrap-mask",
+                "bootstrap-terminate",
+                "start",
+                "health",
+                "receipt",
+            ]
+        );
         assert!(!artifact_root.join("rootfs.tar.staging").exists());
     }
 

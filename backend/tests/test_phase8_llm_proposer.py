@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
-
 from app.parameters import CATALOG_VERSION
 
 
@@ -122,18 +121,6 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
                         "vel_limit": 5.0,
                         "accel_limit": 4.0,
                         "disturbance_rejection": 0.5,
-                    },
-                },
-                {
-                    "label": "conservative",
-                    "rationale": "Smaller gains",
-                    "parameters": {
-                        "kp_xy": 0.9,
-                        "kd_xy": 0.25,
-                        "ki_xy": 0.05,
-                        "vel_limit": 4.0,
-                        "accel_limit": 3.0,
-                        "disturbance_rejection": 0.6,
                     },
                 },
             ]
@@ -345,6 +332,64 @@ def test_proposer_rejects_nan_or_extra_keys(llm_ctx):
         result = ctx["proposer"].propose_candidates(db, job, criteria, client=fake)
         db.commit()
         assert result.error == "invalid_response"
+
+
+def test_proposer_rejects_boolean_parameters(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+    proposal = {
+        "label": "invalid boolean",
+        "rationale": "booleans are not controller gains",
+        "parameters": {
+            "kp_xy": True,
+            "kd_xy": 0.2,
+            "ki_xy": 0.05,
+            "vel_limit": 5.0,
+            "accel_limit": 4.0,
+            "disturbance_rejection": 0.5,
+        },
+    }
+    fake = FakeOpenAIClient({"proposals": [proposal]})
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        result = ctx["proposer"].propose_candidates(
+            db,
+            job,
+            ctx["acceptance"].criteria_for_job(job),
+            client=fake,
+        )
+
+    assert result.error == "invalid_response"
+    assert result.proposals == []
+
+
+def test_proposer_rejects_surplus_proposals(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+    proposal = {
+        "label": "valid but duplicated",
+        "rationale": "the response violates maxItems",
+        "parameters": {
+            "kp_xy": 1.0,
+            "kd_xy": 0.2,
+            "ki_xy": 0.05,
+            "vel_limit": 5.0,
+            "accel_limit": 4.0,
+            "disturbance_rejection": 0.5,
+        },
+    }
+    fake = FakeOpenAIClient({"proposals": [proposal, proposal]})
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        result = ctx["proposer"].propose_candidates(
+            db,
+            job,
+            ctx["acceptance"].criteria_for_job(job),
+            client=fake,
+        )
+
+    assert result.error == "invalid_response"
+    assert result.proposals == []
 
 
 @pytest.mark.parametrize(

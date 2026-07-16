@@ -18,7 +18,7 @@ Download the newest `desktop-v*` Windows closed beta and its matching
 `.sha256` file from [GitHub Releases](https://github.com/ChiZhang-805/DroneDream/releases).
 A fresh interactive installer defaults to **Install all**, shows the Runtime
 download/storage plan, and then prepares WSL2, uses a suitable fixed NTFS disk
-such as `E:`, and downloads the signed
+such as `E:`, and downloads the manifest-signed
 [DroneDreamRuntime](https://github.com/ChiZhang-805/DroneDream/releases/tag/runtime-v0.1.0-beta.1),
 importing it as an isolated `DroneDreamRuntime` distribution without a second
 in-app install click. It does not move, convert, terminate, or unregister an
@@ -37,10 +37,14 @@ before installing.
 - `real_cli` integration with PX4/Gazebo SITL.
 - User-selectable, versioned PX4 parameter domains with safe-bound validation and
   write/readback evidence.
-- Keyless heuristic, generic CMA-ES, and provider-neutral LLM proposal strategies.
+- Seven accuracy-first experimental engines: constrained MOBO,
+  multi-fidelity MOBO, TuRBO, SAASBO, surrogate-assisted CMA-ES,
+  BIPOP-CMA-ES, and an adaptive optimizer portfolio. Keyless heuristic,
+  generic CMA-ES, and provider-neutral LLM paths remain available for
+  compatibility and comparison.
 - Multi-objective robust scoring, constraints, fair seed matrices, holdout validation,
   Pareto recommendations, and generation history.
-- Seven-step experiment builder with track editing and Chinese/English UI support.
+- Five-step experiment builder with 3D waypoint editing and fully separated Chinese/English UI.
 - PostgreSQL/S3/OIDC-ready multi-user deployment foundation.
 - noVNC/Gazebo GUI visualization and replay.
 - Artifact download and report generation.
@@ -53,9 +57,10 @@ before installing.
 > `AUTH_MODE=disabled` API to untrusted users. A public/multi-user deployment
 > must use OIDC (or temporary demo tokens), PostgreSQL, S3-compatible storage,
 > worker heartbeats, TLS, and per-user quotas as described in `docs/11-operations.md`.
-> The bundled real runner currently supports verified **nominal** scenarios;
-> wind/noise/combined/advanced effects fail closed until a site launcher
-> physically injects them and returns evidence.
+> The bundled runner can prove nominal execution and static box/cylinder
+> obstacle injection through Gazebo EntityFactory. Wind/gust, sensor/GPS,
+> battery, payload, actuator-delay, and other requested physical effects fail
+> closed until a launcher applies them and returns validated evidence.
 
 ## 0. Pod Configuration
 
@@ -430,9 +435,11 @@ python3 -m json.tool "$TMP/trial_result.json"
 Expected:
 
 ```json
-"success": true,
-"metrics": {
-  "rmse": ...
+{
+  "success": true,
+  "metrics": {
+    "rmse": 0.42
+  }
 }
 ```
 
@@ -567,21 +574,15 @@ Min Pass Rate: 0.8
 OpenAI Model: gpt-4.1
 ```
 
-## 13. ECE498 Final Project
+## 13. ECE 498 BH course tribute
 
-The pipeline includes:
-
-- baseline with no tool
-- tool-augmented pipeline
-- self-refinement with tools
-
-Run these on the ECE498 page:
-
-```text
-Run Baseline (No Tool)
-Run Tool-Augmented (CMA-ES)
-Run Tool + Refinement (CMA-ES Loop)
-```
+The in-app **ECE 498 BH** page is a one-screen, bilingual, interactive course
+introduction and student tribute to Professor Bin Hu. Its learning path connects
+reasoning baselines, tool use, structured workflows, verification, feedback,
+the final project, and DroneDream's PX4/Gazebo harness. It is informational,
+not an experiment runner or an official UIUC course website. See the
+[course-page guide](docs/Manuals/dronedream_ece498_user_manual.md) for the
+content and accessibility contract.
 
 ---
 

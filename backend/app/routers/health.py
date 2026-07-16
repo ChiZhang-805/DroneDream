@@ -44,24 +44,23 @@ def _runtime_executable_health(
         return {
             "ok": False,
             "status": "invalid",
-            "detail": f"{component} executable path must be absolute: {executable}",
+            "detail": f"{component} executable path must be absolute",
         }
     if not executable.is_file():
         return {
             "ok": False,
             "status": "missing",
-            "detail": f"{component} executable was not found at {executable}",
+            "detail": f"{component} executable was not found",
         }
     if not os.access(executable, os.X_OK):
         return {
             "ok": False,
             "status": "not_executable",
-            "detail": f"{component} path is not executable: {executable}",
+            "detail": f"{component} path is not executable",
         }
     return {
         "ok": True,
         "status": "available",
-        "path": str(executable),
     }
 
 

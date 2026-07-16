@@ -45,7 +45,19 @@ ScenarioType = Literal[
 ]
 ReportStatus = Literal["PENDING", "READY", "FAILED"]
 SimulatorBackend = Literal["mock", "real_cli"]
-OptimizerStrategy = Literal["none", "heuristic", "gpt", "cma_es"]
+OptimizerStrategy = Literal[
+    "none",
+    "heuristic",
+    "gpt",
+    "cma_es",
+    "constrained_mobo",
+    "multi_fidelity_mobo",
+    "turbo",
+    "saasbo",
+    "surrogate_cma_es",
+    "bipop_cma_es",
+    "optimizer_portfolio",
+]
 ParameterScale = Literal["linear", "log"]
 ParameterValueType = Literal["float", "integer", "boolean", "enum"]
 ObjectiveDirection = Literal["minimize", "maximize"]
@@ -261,6 +273,8 @@ class ParameterSelection(_Strict):
             raise ValueError("log-scaled parameter minimum must be > 0")
         if self.value_type in {"integer", "boolean", "enum"}:
             discrete_values = [self.baseline, self.minimum, self.maximum]
+            if self.step is not None:
+                discrete_values.append(self.step)
             if self.choices:
                 discrete_values.extend(self.choices)
             if any(not value.is_integer() for value in discrete_values):
@@ -524,6 +538,23 @@ class JobCreateRequest(_Strict):
         if len(set(parameter_names)) != len(parameter_names):
             raise ValueError("parameter_space names must be unique")
         enabled = [item for item in self.parameter_space if item.enabled and not item.locked]
+        experimental_optimizers = {
+            "constrained_mobo",
+            "multi_fidelity_mobo",
+            "turbo",
+            "saasbo",
+            "surrogate_cma_es",
+            "bipop_cma_es",
+            "optimizer_portfolio",
+        }
+        if (
+            self.simulator_backend == "real_cli"
+            and self.optimizer_strategy in experimental_optimizers
+            and not self.parameter_space
+        ):
+            raise ValueError(
+                "experimental real_cli optimization requires an explicit PX4 parameter_space"
+            )
         if (
             self.optimizer_strategy != "none"
             and self.parameter_space
@@ -641,6 +672,8 @@ class BatchJob(BaseModel):
 
 class PaginatedBatchJobs(BaseModel):
     items: list[BatchJob]
+    page: int
+    page_size: int
     total: int
 
 
@@ -667,6 +700,7 @@ class Candidate(BaseModel):
     label: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
     proposal_reason: str | None = None
+    optimizer_metadata: dict[str, Any] | None = None
     parent_candidate_id: str | None = None
     aggregated_score: float | None = None
     aggregated_metrics: dict[str, Any] | None = None
@@ -706,6 +740,7 @@ class TrialSummary(BaseModel):
     # needing a second API call.
     candidate_label: str | None = None
     candidate_source_type: CandidateSourceType | None = None
+    candidate_optimizer_strategy: OptimizerStrategy | None = None
     candidate_is_baseline: bool = False
     candidate_is_best: bool = False
     candidate_generation_index: int = 0
@@ -818,7 +853,16 @@ class JobUpdateRequest(_Strict):
         return self
 
 class JobsCompareRequest(_Strict):
-    job_ids: list[str] = Field(min_length=2, max_length=10)
+    job_ids: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(
+        min_length=2,
+        max_length=10,
+    )
+
+    @model_validator(mode="after")
+    def _validate_unique_jobs(self) -> JobsCompareRequest:
+        if len(set(self.job_ids)) != len(self.job_ids):
+            raise ValueError("job_ids must be unique")
+        return self
 
 
 class JobCompareItem(BaseModel):

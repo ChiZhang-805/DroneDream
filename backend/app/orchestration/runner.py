@@ -18,6 +18,7 @@ blocked waiting for a worker transaction.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import signal
 import socket
@@ -58,6 +59,10 @@ def tick(worker_id: str) -> dict[str, object]:
     without sleeping. Returns a small summary dict.
     """
 
+    if not isinstance(worker_id, str) or not worker_id.strip():
+        raise ValueError("worker_id must be a non-empty string")
+    worker_id = worker_id.strip()
+
     with SessionLocal() as db:
         expired_secrets = purge_expired_job_secrets(db)
 
@@ -89,7 +94,27 @@ def run_forever(
     Returns the intended process exit code.
     """
 
-    wid = worker_id or _default_worker_id()
+    if (
+        isinstance(poll_interval_seconds, bool)
+        or not isinstance(poll_interval_seconds, int | float)
+        or not math.isfinite(float(poll_interval_seconds))
+        or poll_interval_seconds < 0
+    ):
+        raise ValueError("poll_interval_seconds must be finite and >= 0")
+    if max_iterations is not None and (
+        isinstance(max_iterations, bool)
+        or not isinstance(max_iterations, int)
+        or max_iterations < 0
+    ):
+        raise ValueError("max_iterations must be a non-negative integer")
+    if max_iterations == 0:
+        return 0
+
+    if worker_id is not None and (
+        not isinstance(worker_id, str) or not worker_id.strip()
+    ):
+        raise ValueError("worker_id must be a non-empty string when provided")
+    wid = worker_id.strip() if worker_id is not None else _default_worker_id()
     _install_signal_handlers()
     logger.info("worker %s starting (poll_interval=%.2fs)", wid, poll_interval_seconds)
     presence = WorkerPresenceHeartbeat(wid)
@@ -109,7 +134,7 @@ def run_forever(
             if not did_work:
                 time.sleep(poll_interval_seconds)
     except WorkerStopped:
-        pass
+        logger.info("worker %s received a stop request", wid)
     finally:
         presence.stop()
         logger.info("worker %s stopped after %d ticks", wid, iterations)

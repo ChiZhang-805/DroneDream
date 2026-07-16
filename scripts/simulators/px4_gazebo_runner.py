@@ -25,6 +25,7 @@ import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -33,17 +34,39 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from app.parameters import (
+# The runner is intentionally executable as a standalone REAL_SIMULATOR_COMMAND.
+# When Python is given a script path, it places the script's directory (rather
+# than the repository root) on sys.path, so the sibling backend package would
+# otherwise be invisible unless callers manually set PYTHONPATH.  Resolve the
+# checkout/runtime layout here to keep local, CI, and bundled WSL launches
+# identical.
+_BACKEND_ROOT = Path(__file__).resolve().parents[2] / "backend"
+if _BACKEND_ROOT.is_dir() and str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
+
+from app.parameters import (  # noqa: E402 - path bootstrap must precede backend imports
     ParameterValueValidationError,
     get_parameter,
     normalize_px4_version,
     validate_parameter_values,
 )
-from app.simulator.px4_parameters import (
+from app.simulator.px4_parameters import (  # noqa: E402 - see path bootstrap above
     APPLIED_EVIDENCE_NAME,
     BEFORE_EVIDENCE_NAME,
     REQUESTED_EVIDENCE_NAME,
     write_simulated_parameter_evidence,
+)
+from app.simulator.scenario_effects import (  # noqa: E402 - see path bootstrap above
+    EVIDENCE_ARTIFACT_NAME,
+    MAX_EFFECT_CONTRACT_BYTES,
+    REQUEST_ARTIFACT_NAME,
+    ScenarioEffectContractError,
+    build_scenario_effect_request,
+    load_scenario_effect_evidence,
+    validate_scenario_effect_request,
+)
+from app.simulator.scenario_effects import (  # noqa: E402 - see path bootstrap above
+    write_json_atomic as write_effect_json_atomic,
 )
 
 FAILURE_ADAPTER_UNAVAILABLE = "ADAPTER_UNAVAILABLE"
@@ -53,7 +76,10 @@ FAILURE_UNSUPPORTED_SCENARIO_EFFECT = "UNSUPPORTED_SCENARIO_EFFECT"
 _MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER = 10.0
 _MAX_TELEMETRY_BYTES = 16 * 1024 * 1024
 _MAX_TELEMETRY_SAMPLES = 50_000
+_MAX_TRIAL_INPUT_BYTES = 8 * 1024 * 1024
+_MAX_OFFBOARD_TIMING_BYTES = 1024 * 1024
 _MAX_REFERENCE_TRACK_POINTS = 10_000
+_MAX_ID_LENGTH = 256
 _PROJECTION_BACKTRACK_SEGMENTS = 16
 _PROJECTION_FORWARD_SEGMENTS = 64
 _PROJECTION_GLOBAL_RESCAN_INTERVAL = 256
@@ -95,6 +121,8 @@ _TEMPLATE_TOKENS = (
     "headless",
     "extra_args",
     "scenario_config_json",
+    "scenario_effect_request_json",
+    "scenario_effect_evidence_json",
     "instance_id",
     "simulation_speed_factor",
     "px4_executable",
@@ -277,7 +305,7 @@ def _firmware_identity(requested_commit: str | None) -> dict[str, Any]:
         else:
             try:
                 completed = subprocess.run(  # noqa: S603, S607 - fixed git argv, no shell.
-                    ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+                    ["git", "-C", str(checkout), "rev-parse", "HEAD"],  # noqa: S607
                     capture_output=True,
                     check=False,
                     text=True,
@@ -355,96 +383,41 @@ def _scenario_effect_contract(
     scenario_type: str,
     scenario_config: object,
     job_config: dict[str, Any],
+    effect_request: dict[str, Any] | None = None,
     dry_run: bool,
     allow_unverified_passthrough: bool,
 ) -> dict[str, Any]:
-    if advanced_config is None:
-        advanced: dict[str, Any] = {}
-    elif isinstance(advanced_config, dict):
-        advanced = advanced_config
-    else:
-        raise RunnerError("advanced_scenario_config must be an object")
+    """Build the pre-launch view of the scenario-effect evidence contract.
 
-    surrogate_supported: list[str] = []
-    if scenario_type != "nominal":
-        surrogate_supported.append(f"scenario_type.{scenario_type}")
-    if scenario_config is not None and not isinstance(scenario_config, dict):
-        raise RunnerError("scenario_config must be an object")
-    normalized_scenario_config = scenario_config if isinstance(scenario_config, dict) else {}
-    if "wind_mps" in normalized_scenario_config:
-        wind_mps = normalized_scenario_config["wind_mps"]
-        if isinstance(wind_mps, bool) or not isinstance(wind_mps, (int, float)):
-            raise RunnerError("scenario_config.wind_mps must be numeric")
-        if not math.isfinite(float(wind_mps)) or float(wind_mps) < 0:
-            raise RunnerError("scenario_config.wind_mps must be finite and non-negative")
-        if float(wind_mps) > 0:
-            surrogate_supported.append("scenario_config.wind_mps")
-    wind = job_config.get("wind") if isinstance(job_config.get("wind"), dict) else {}
-    if any(abs(float(wind.get(direction, 0.0))) > 1e-12 for direction in wind):
-        surrogate_supported.append("job_config.wind")
-    if job_config.get("sensor_noise_level", "medium") != "medium":
-        surrogate_supported.append("job_config.sensor_noise_level")
+    Real launches are no longer rejected merely because fields are present.
+    Instead, the normalized request is handed to the launcher, which must
+    return per-effect applied/unsupported evidence. Dry-run retains explicit
+    surrogate semantics and never claims a physical effect.
+    """
 
-    advanced_requested: list[str] = []
-    wind_gusts_raw = advanced.get("wind_gusts", {})
-    if not isinstance(wind_gusts_raw, dict):
-        raise RunnerError("advanced_scenario_config.wind_gusts must be an object")
-    wind_enabled = wind_gusts_raw.get("enabled", False)
-    if not isinstance(wind_enabled, bool):
-        raise RunnerError("advanced_scenario_config.wind_gusts.enabled must be boolean")
-    if wind_enabled:
-        advanced_requested.append("wind_gusts")
-
-    obstacles = advanced.get("obstacles", [])
-    if not isinstance(obstacles, list):
-        raise RunnerError("advanced_scenario_config.obstacles must be an array")
-    if obstacles:
-        advanced_requested.append("obstacles")
-
-    sensor_raw = advanced.get("sensor_degradation", {})
-    if not isinstance(sensor_raw, dict):
-        raise RunnerError("advanced_scenario_config.sensor_degradation must be an object")
-    sensor_values = {
-        "gps_noise_m": _advanced_number(sensor_raw, "gps_noise_m", default=0.0),
-        "baro_noise_m": _advanced_number(sensor_raw, "baro_noise_m", default=0.0),
-        "imu_noise_scale": _advanced_number(sensor_raw, "imu_noise_scale", default=1.0),
-        "dropout_rate": _advanced_number(sensor_raw, "dropout_rate", default=0.0),
-    }
-    for name, value in sensor_values.items():
-        default = 1.0 if name == "imu_noise_scale" else 0.0
-        if not math.isclose(value, default, rel_tol=0.0, abs_tol=1e-12):
-            advanced_requested.append(f"sensor_degradation.{name}")
-
-    battery_raw = advanced.get("battery", {})
-    if not isinstance(battery_raw, dict):
-        raise RunnerError("advanced_scenario_config.battery must be an object")
-    initial_percent = _advanced_number(battery_raw, "initial_percent", default=100.0)
-    voltage_sag = battery_raw.get("voltage_sag", False)
-    if not isinstance(voltage_sag, bool):
-        raise RunnerError("advanced_scenario_config.battery.voltage_sag must be boolean")
-    mass_payload_raw = battery_raw.get("mass_payload_kg")
-    mass_payload = (
-        0.0
-        if mass_payload_raw is None
-        else _advanced_number(battery_raw, "mass_payload_kg", default=0.0)
+    if effect_request is None:
+        effect_request = build_scenario_effect_request(
+            execution_identity={},
+            scenario_type=scenario_type,
+            scenario_config=scenario_config if isinstance(scenario_config, dict) else {},
+            job_config=job_config,
+            advanced_config=advanced_config if isinstance(advanced_config, dict) else {},
+        )
+    validate_scenario_effect_request(effect_request)
+    requested_details = list(effect_request["effects"])
+    requested = sorted(str(item["effect_id"]) for item in requested_details)
+    advanced_sources = ("advanced_scenario_config.",)
+    dry_run_applied = sorted(
+        str(item["effect_id"])
+        for item in requested_details
+        if not str(item.get("source", "")).startswith(advanced_sources)
     )
-    if not math.isclose(initial_percent, 100.0, rel_tol=0.0, abs_tol=1e-12):
-        advanced_requested.append("battery.initial_percent")
-    if voltage_sag:
-        advanced_requested.append("battery.voltage_sag")
-    if mass_payload > 0.0:
-        advanced_requested.append("battery.mass_payload_kg")
-
-    requested = sorted(set(surrogate_supported + advanced_requested))
-    applied = sorted(set(surrogate_supported)) if dry_run else []
-    unsupported = sorted(set(advanced_requested if dry_run else requested))
-    return {
-        "requested_effects": requested,
-        "applied_effects": applied,
-        "unsupported_effects": unsupported,
-        "unverified_passthrough_enabled": allow_unverified_passthrough,
-        "application_mode": "dry_run_surrogate" if dry_run else "real_physics",
-        "verification_status": (
+    dry_run_unsupported = sorted(set(requested) - set(dry_run_applied))
+    if dry_run:
+        applied = dry_run_applied
+        unsupported = dry_run_unsupported
+        pending: list[str] = []
+        verification_status = (
             "not_requested"
             if not requested
             else (
@@ -452,7 +425,33 @@ def _scenario_effect_contract(
                 if unsupported and allow_unverified_passthrough
                 else ("unsupported" if unsupported else "dry_run_surrogate_applied")
             )
-        ),
+        )
+    else:
+        applied = []
+        unsupported = []
+        pending = list(requested)
+        verification_status = "not_requested" if not requested else "awaiting_launcher_evidence"
+    return {
+        "request_schema_version": effect_request["schema_version"],
+        "request_sha256": effect_request["request_sha256"],
+        "requested_effects": requested,
+        "requested_effect_details": requested_details,
+        "applied_effects": applied,
+        "unsupported_effects": unsupported,
+        "failed_effects": [],
+        "pending_effects": pending,
+        "capabilities": [
+            {
+                "effect_id": item["effect_id"],
+                "mechanism": item["mechanism"],
+                "status": item["capability"]["status"],
+                "reason": item["capability"]["reason"],
+            }
+            for item in requested_details
+        ],
+        "unverified_passthrough_enabled": allow_unverified_passthrough,
+        "application_mode": "dry_run_surrogate" if dry_run else "real_physics",
+        "verification_status": verification_status,
     }
 
 
@@ -461,9 +460,11 @@ def _enforce_scenario_effect_contract(contract: dict[str, Any]) -> None:
     if not unsupported or contract.get("unverified_passthrough_enabled") is True:
         return
     rendered = ", ".join(str(item) for item in unsupported)
+    evidence_error = str(contract.get("evidence_error") or "").strip()
+    evidence_detail = f" Launcher evidence error: {evidence_error}." if evidence_error else ""
     raise UnsupportedScenarioEffectRunnerError(
         "bundled PX4/Gazebo runner cannot verify requested advanced scenario effects: "
-        f"{rendered}. Configure a launcher that applies them, or explicitly set "
+        f"{rendered}.{evidence_detail} Configure a launcher that applies them, or explicitly set "
         "PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS=true for metadata-only "
         "passthrough (pass_flag will remain false)."
     )
@@ -540,14 +541,15 @@ def _load_env() -> RunnerEnv:
             os.environ.get("PX4_GAZEBO_EVAL_NEAR_TRACK_THRESHOLD_M"), default=1.5
         ),
         eval_consecutive_samples=max(
-            1, _parse_int(os.environ.get("PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES"), default=5)
+            1,
+            _parse_int(os.environ.get("PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES"), default=5),
         ),
         eval_collapse_altitude_fraction=_parse_float(
             os.environ.get("PX4_GAZEBO_EVAL_COLLAPSE_ALTITUDE_FRACTION"), default=0.5
         ),
         px4_version=os.environ.get("PX4_VERSION", "main").strip() or "main",
         enforce_safe_parameter_bounds=_parse_bool(
-            os.environ.get("PX4_ENFORCE_SAFE_PARAMETER_BOUNDS"), default=True
+            os.environ.get("PX4_PARAMETER_ENFORCE_SAFE_BOUNDS"), default=True
         ),
         allow_unverified_advanced_effects=_parse_bool(
             os.environ.get("PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS"),
@@ -627,6 +629,62 @@ def _safe_excerpt(text: str, *, limit: int = 1800) -> str:
     return text[:limit] + f"\n... [truncated from {len(text)} chars]"
 
 
+def _regular_file_size(
+    path: Path,
+    *,
+    label: str,
+    required: bool,
+) -> int | None:
+    """Return a regular file's size without following a launcher-created link."""
+
+    try:
+        file_stat = path.lstat()
+    except FileNotFoundError:
+        if required:
+            raise RunnerError(f"{label} is missing") from None
+        return None
+    except OSError as exc:
+        raise RunnerError(f"could not inspect {label}: {exc}") from exc
+    if not stat.S_ISREG(file_stat.st_mode):
+        raise RunnerError(f"{label} must be a regular, non-symlink file")
+    return file_stat.st_size
+
+
+def _load_trial_payload(path: Path) -> dict[str, Any]:
+    size = _regular_file_size(path, label="trial_input", required=True)
+    if size is None or size > _MAX_TRIAL_INPUT_BYTES:
+        raise RunnerError(f"trial_input exceeds the {_MAX_TRIAL_INPUT_BYTES}-byte contract limit")
+    try:
+        with path.open("rb") as stream:
+            encoded = stream.read(_MAX_TRIAL_INPUT_BYTES + 1)
+        if len(encoded) > _MAX_TRIAL_INPUT_BYTES:
+            raise RunnerError(
+                f"trial_input exceeds the {_MAX_TRIAL_INPUT_BYTES}-byte contract limit"
+            )
+        payload = json.loads(
+            encoded.decode("utf-8"),
+            parse_constant=_reject_nonfinite_json,
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise RunnerError(f"trial_input JSON is malformed: {exc}") from None
+    if not isinstance(payload, dict):
+        raise RunnerError("trial_input must be a JSON object")
+    return payload
+
+
+def _require_effect_evidence_file(path: Path) -> None:
+    try:
+        size = _regular_file_size(
+            path,
+            label="scenario effect evidence",
+            required=True,
+        )
+    except RunnerError as exc:
+        raise ScenarioEffectContractError(str(exc)) from exc
+    if size is None or size > MAX_EFFECT_CONTRACT_BYTES:
+        raise ScenarioEffectContractError("scenario effect evidence file is missing or too large")
+
+
 def _validate_trial_input(
     payload: dict[str, Any],
     *,
@@ -649,6 +707,12 @@ def _validate_trial_input(
     for key in ("trial_id", "job_id", "candidate_id", "scenario_type"):
         if not isinstance(payload[key], str) or not payload[key].strip():
             raise RunnerError(f"trial_input.{key} must be a non-empty string")
+        if len(payload[key]) > _MAX_ID_LENGTH or any(
+            ord(character) < 32 or ord(character) == 127 for character in payload[key]
+        ):
+            raise RunnerError(
+                f"trial_input.{key} exceeds {_MAX_ID_LENGTH} characters or contains controls"
+            )
     scenario_type = str(payload["scenario_type"]).strip()
     supported_scenarios = {
         "nominal",
@@ -670,24 +734,29 @@ def _validate_trial_input(
     seed_raw = payload["seed"]
     if isinstance(seed_raw, bool) or not isinstance(seed_raw, int):
         raise RunnerError("trial_input.seed must be an integer")
+    if not -(2**63) <= seed_raw < 2**63:
+        raise RunnerError("trial_input.seed must fit in a signed 64-bit integer")
     attempt_raw = payload.get("attempt_count", 1)
     if isinstance(attempt_raw, bool) or not isinstance(attempt_raw, int) or attempt_raw < 1:
         raise RunnerError("trial_input.attempt_count must be a positive integer")
     identity_raw = payload.get("execution_identity")
+    expected_identity = {
+        "trial_id": payload["trial_id"],
+        "job_id": payload["job_id"],
+        "candidate_id": payload["candidate_id"],
+        "seed": seed_raw,
+        "attempt_count": attempt_raw,
+    }
     if identity_raw is not None:
         if not isinstance(identity_raw, dict):
             raise RunnerError("trial_input.execution_identity must be an object")
-        expected_identity = {
-            "trial_id": payload["trial_id"],
-            "job_id": payload["job_id"],
-            "candidate_id": payload["candidate_id"],
-            "seed": seed_raw,
-            "attempt_count": attempt_raw,
-        }
         if identity_raw != expected_identity:
             raise RunnerError("trial_input.execution_identity does not match top-level fields")
 
-    job_cfg_raw = payload.get("job_config") if isinstance(payload.get("job_config"), dict) else {}
+    job_cfg_value = payload.get("job_config")
+    if job_cfg_value is not None and not isinstance(job_cfg_value, dict):
+        raise RunnerError("trial_input.job_config must be an object when provided")
+    job_cfg_raw = job_cfg_value or {}
 
     def _cfg_value(key: str) -> Any:
         if key in job_cfg_raw:
@@ -715,10 +784,12 @@ def _validate_trial_input(
         raise RunnerError("start_point.x/y and altitude_m must be numeric") from None
     if not all(math.isfinite(value) for value in (start_x, start_y, altitude)):
         raise RunnerError("start_point.x/y and altitude_m must be finite")
-    if altitude <= 0:
-        raise RunnerError("altitude_m must be greater than zero")
+    if not 1.0 <= altitude <= 20.0:
+        raise RunnerError("altitude_m must be between 1 and 20 meters")
 
-    if not isinstance(wind, dict):
+    if wind is not None and not isinstance(wind, dict):
+        raise RunnerError("wind must be an object when provided")
+    if wind is None:
         wind = {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0}
     try:
         normalized_wind = {
@@ -729,6 +800,8 @@ def _validate_trial_input(
         raise RunnerError("wind components must be numeric") from None
     if not all(math.isfinite(value) for value in normalized_wind.values()):
         raise RunnerError("wind components must be finite")
+    if any(not -10.0 <= value <= 10.0 for value in normalized_wind.values()):
+        raise RunnerError("wind components must be between -10 and 10 m/s")
     normalized_noise = str(sensor_noise_level or "medium").strip().lower()
     if normalized_noise not in {"low", "medium", "high"}:
         raise RunnerError("sensor_noise_level must be one of: low, medium, high")
@@ -775,7 +848,10 @@ def _validate_trial_input(
     if track_type == "custom" and len(normalized_job_cfg["reference_track"]) < 2:
         raise RunnerError("custom track_type requires reference_track with at least 2 points")
 
-    params_raw = payload.get("parameters") if isinstance(payload.get("parameters"), dict) else {}
+    params_value = payload.get("parameters")
+    if params_value is not None and not isinstance(params_value, dict):
+        raise RunnerError("trial_input.parameters must be an object when provided")
+    params_raw = params_value or {}
     params: dict[str, float] = {}
     defaults = {
         "kp_xy": 1.0,
@@ -793,11 +869,23 @@ def _validate_trial_input(
             raise RunnerError(f"parameters.{key} must be numeric") from None
         if not math.isfinite(params[key]):
             raise RunnerError(f"parameters.{key} must be finite")
+    if min(params["kp_xy"], params["kd_xy"], params["ki_xy"]) < 0:
+        raise RunnerError("controller gains must be non-negative")
+    if params["vel_limit"] <= 0 or params["accel_limit"] <= 0:
+        raise RunnerError(
+            "parameters.vel_limit and parameters.accel_limit must be greater than zero"
+        )
+    if not 0.0 <= params["disturbance_rejection"] <= 1.0:
+        raise RunnerError("parameters.disturbance_rejection must be between 0 and 1")
 
     profile_raw = payload.get("vehicle_profile")
-    if not isinstance(profile_raw, dict):
+    if profile_raw is not None and not isinstance(profile_raw, dict):
+        raise RunnerError("trial_input.vehicle_profile must be an object when provided")
+    if profile_raw is None:
         nested_profile = job_cfg_raw.get("vehicle_profile")
-        profile_raw = nested_profile if isinstance(nested_profile, dict) else {}
+        if nested_profile is not None and not isinstance(nested_profile, dict):
+            raise RunnerError("trial_input.job_config.vehicle_profile must be an object")
+        profile_raw = nested_profile or {}
     airframe = _profile_token("airframe", profile_raw.get("airframe"), default=default_vehicle)
     simulator_model = _profile_token(
         "simulator_model",
@@ -884,13 +972,39 @@ def _validate_trial_input(
     }
     normalized_job_cfg["parameter_catalog_version"] = parameter_catalog_version
 
-    scenario_config = (
-        payload.get("scenario_config") if isinstance(payload.get("scenario_config"), dict) else {}
-    )
+    scenario_config_raw = payload.get("scenario_config")
+    if scenario_config_raw is not None and not isinstance(scenario_config_raw, dict):
+        raise RunnerError("trial_input.scenario_config must be an object when provided")
+    scenario_config = scenario_config_raw or {}
     advanced = payload.get("advanced_scenario_config")
-    if not isinstance(advanced, dict):
+    if advanced is not None and not isinstance(advanced, dict):
+        raise RunnerError("trial_input.advanced_scenario_config must be an object when provided")
+    if advanced is None:
         nested_advanced = scenario_config.get("advanced_scenario_config")
-        advanced = nested_advanced if isinstance(nested_advanced, dict) else {}
+        if nested_advanced is not None and not isinstance(nested_advanced, dict):
+            raise RunnerError(
+                "trial_input.scenario_config.advanced_scenario_config must be an object"
+            )
+        advanced = nested_advanced or {}
+    try:
+        expected_effect_request = build_scenario_effect_request(
+            execution_identity=expected_identity,
+            scenario_type=scenario_type,
+            scenario_config=scenario_config,
+            job_config=normalized_job_cfg,
+            advanced_config=advanced,
+        )
+        supplied_effect_request = payload.get("scenario_effect_request")
+        if supplied_effect_request is not None:
+            validate_scenario_effect_request(supplied_effect_request)
+            if supplied_effect_request != expected_effect_request:
+                raise ScenarioEffectContractError(
+                    "scenario_effect_request does not match normalized trial inputs"
+                )
+        else:
+            supplied_effect_request = expected_effect_request
+    except ScenarioEffectContractError as exc:
+        raise RunnerError(f"invalid scenario effect request: {exc}") from exc
     meta = {
         "trial_id": str(payload["trial_id"]),
         "job_id": str(payload["job_id"]),
@@ -900,6 +1014,7 @@ def _validate_trial_input(
         "scenario_type": scenario_type,
         "scenario_config": scenario_config,
         "advanced_scenario_config": advanced,
+        "scenario_effect_request": supplied_effect_request,
         "px4_version": px4_version,
         "firmware_commit": firmware_commit,
         "parameter_catalog_version": parameter_catalog_version,
@@ -1026,7 +1141,7 @@ def _make_dry_run_telemetry(
 
     wx, wy = _wind_vec(job_cfg["wind"])
     wobble_mag = min(1.8, 0.15 + base_err + (abs(wx) + abs(wy)) * 0.02)
-    rng = random.Random(int(meta["seed"]))
+    rng = random.Random(int(meta["seed"]))  # noqa: S311 - deterministic simulation.
     x_phase = rng.uniform(-math.pi, math.pi)
     y_phase = rng.uniform(-math.pi, math.pi)
     noise_std = 0.01 + 0.04 * noise_penalty + 0.01 * scenario_penalty
@@ -1124,8 +1239,8 @@ def _normalize_samples(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _load_telemetry(path: Path, *, allow_csv: bool) -> dict[str, Any]:
-    if path.exists():
-        size = path.stat().st_size
+    size = _regular_file_size(path, label="telemetry JSON", required=False)
+    if size is not None:
         if size > _MAX_TELEMETRY_BYTES:
             raise RunnerError(
                 f"telemetry JSON exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
@@ -1153,8 +1268,11 @@ def _load_telemetry(path: Path, *, allow_csv: bool) -> dict[str, Any]:
         return payload
 
     csv_path = path.with_suffix(".csv")
-    if allow_csv and csv_path.exists():
-        if csv_path.stat().st_size > _MAX_TELEMETRY_BYTES:
+    csv_size = (
+        _regular_file_size(csv_path, label="telemetry CSV", required=False) if allow_csv else None
+    )
+    if csv_size is not None:
+        if csv_size > _MAX_TELEMETRY_BYTES:
             raise RunnerError(
                 f"telemetry CSV exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
             )
@@ -1283,7 +1401,8 @@ def _best_track_projection(
         )
         if best is None or projection.error < best.error:
             best = projection
-    assert best is not None
+    if best is None:
+        raise RunnerError("track projection requires at least one candidate segment")
     return best
 
 
@@ -1738,16 +1857,25 @@ def _compute_metrics(
     consecutive_samples = env.eval_consecutive_samples
     total_sample_count = len(samples)
 
-    offboard_timing_path = Path(
-        str(telemetry.get("meta", {}).get("offboard_timing_path", ""))
-    ).expanduser()
+    offboard_timing_raw = str(telemetry.get("meta", {}).get("offboard_timing_path", "")).strip()
+    offboard_timing_path = Path(offboard_timing_raw).expanduser()
     offboard_timing: dict[str, Any] | None = None
-    if offboard_timing_path and offboard_timing_path.exists():
+    if offboard_timing_raw:
         try:
-            loaded = json.loads(offboard_timing_path.read_text(encoding="utf-8"))
+            timing_size = _regular_file_size(
+                offboard_timing_path,
+                label="offboard timing evidence",
+                required=False,
+            )
+            if timing_size is None or timing_size > _MAX_OFFBOARD_TIMING_BYTES:
+                raise RunnerError("offboard timing evidence is missing or too large")
+            loaded = json.loads(
+                offboard_timing_path.read_text(encoding="utf-8"),
+                parse_constant=_reject_nonfinite_json,
+            )
             if isinstance(loaded, dict):
                 offboard_timing = loaded
-        except Exception:
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError, RunnerError):
             offboard_timing = None
 
     eval_window: EvaluationWindow | None = None
@@ -1920,6 +2048,8 @@ def _compute_metrics(
     )
     effect_contract = dict(scenario_effect_contract or {})
     unsupported_effects = list(effect_contract.get("unsupported_effects") or [])
+    failed_effects = list(effect_contract.get("failed_effects") or [])
+    pending_effects = list(effect_contract.get("pending_effects") or [])
     pass_flag = (
         (not crash_flag)
         and (not timeout_flag)
@@ -1929,6 +2059,8 @@ def _compute_metrics(
         and evaluation_track_coverage >= env.min_track_coverage
         and progress_contract_ok
         and not unsupported_effects
+        and not failed_effects
+        and not pending_effects
     )
 
     penalty = 0.0
@@ -2049,6 +2181,9 @@ def _compute_metrics(
                 "requested_effects": list(effect_contract.get("requested_effects") or []),
                 "applied_effects": list(effect_contract.get("applied_effects") or []),
                 "unsupported_effects": unsupported_effects,
+                "failed_effects": failed_effects,
+                "pending_effects": pending_effects,
+                "capabilities": list(effect_contract.get("capabilities") or []),
                 "verification_status": effect_contract.get("verification_status", "not_requested"),
                 "unverified_passthrough_enabled": bool(
                     effect_contract.get("unverified_passthrough_enabled", False)
@@ -2230,7 +2365,10 @@ def _failure_result(
 def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
     records = [
         _artifact_record(
-            run_dir / "telemetry.json", "telemetry_json", "Telemetry", "application/json"
+            run_dir / "telemetry.json",
+            "telemetry_json",
+            "Telemetry",
+            "application/json",
         ),
         _artifact_record(
             run_dir / "reference_track.json",
@@ -2242,6 +2380,18 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             run_dir / "scenario_config.json",
             "scenario_config_json",
             "Scenario Configuration",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / REQUEST_ARTIFACT_NAME,
+            "scenario_effect_request_json",
+            "Scenario Effect Request",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / EVIDENCE_ARTIFACT_NAME,
+            "scenario_effect_evidence_json",
+            "Scenario Effect Evidence",
             "application/json",
         ),
         _artifact_record(
@@ -2269,7 +2419,10 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "application/json",
         ),
         _artifact_record(
-            run_dir / "trajectory.json", "trajectory_json", "Trajectory Samples", "application/json"
+            run_dir / "trajectory.json",
+            "trajectory_json",
+            "Trajectory Samples",
+            "application/json",
         ),
         _artifact_record(run_dir / "runner.log", "worker_log", "Runner Log", "text/plain"),
         _artifact_record(
@@ -2362,7 +2515,11 @@ def _require_verified_px4_parameter_evidence(
     if not requested:
         return
     evidence: dict[str, dict[str, Any]] = {}
-    for filename in (REQUESTED_EVIDENCE_NAME, BEFORE_EVIDENCE_NAME, APPLIED_EVIDENCE_NAME):
+    for filename in (
+        REQUESTED_EVIDENCE_NAME,
+        BEFORE_EVIDENCE_NAME,
+        APPLIED_EVIDENCE_NAME,
+    ):
         path = run_dir / filename
         if not path.is_file():
             raise RunnerError(f"PX4 parameter evidence missing: {filename}")
@@ -2423,6 +2580,8 @@ def run_once(input_path: Path, output_path: Path) -> int:
     px4_params_json = run_dir / "px4_parameters.input.json"
     track_json = run_dir / "reference_track.json"
     scenario_config_json = run_dir / "scenario_config.json"
+    scenario_effect_request_json = run_dir / REQUEST_ARTIFACT_NAME
+    scenario_effect_evidence_json = run_dir / EVIDENCE_ARTIFACT_NAME
     meta: dict[str, Any] | None = None
 
     def log(msg: str) -> None:
@@ -2454,12 +2613,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             )
             write_result(result)
             return 0
-        payload = json.loads(
-            input_path.read_text(encoding="utf-8"),
-            parse_constant=_reject_nonfinite_json,
-        )
-        if not isinstance(payload, dict):
-            raise RunnerError("trial_input must be a JSON object")
+        payload = _load_trial_payload(input_path)
 
         job_cfg, params, px4_params, meta = _validate_trial_input(
             payload,
@@ -2474,11 +2628,13 @@ def run_once(input_path: Path, output_path: Path) -> int:
             float(meta["simulation_speed_factor"]),
         )
         firmware_identity = _firmware_identity(meta.get("firmware_commit"))
+        scenario_effect_request = meta["scenario_effect_request"]
         scenario_effect_contract = _scenario_effect_contract(
             meta.get("advanced_scenario_config"),
             scenario_type=str(meta["scenario_type"]),
             scenario_config=meta.get("scenario_config"),
             job_config=job_cfg,
+            effect_request=scenario_effect_request,
             dry_run=env.dry_run,
             allow_unverified_passthrough=env.allow_unverified_advanced_effects,
         )
@@ -2500,9 +2656,19 @@ def run_once(input_path: Path, output_path: Path) -> int:
             "px4_version": meta["px4_version"],
             "firmware_identity": firmware_identity,
             "scenario_effect_contract": scenario_effect_contract,
+            "scenario_effect_request": {
+                "path": str(scenario_effect_request_json),
+                "schema_version": scenario_effect_request["schema_version"],
+                "request_sha256": scenario_effect_request["request_sha256"],
+            },
+            "scenario_effect_evidence": {
+                "path": str(scenario_effect_evidence_json),
+                "required": bool(scenario_effect_request["effects"]),
+            },
             "parameter_catalog_version": meta["parameter_catalog_version"],
             "px4_parameter_names": sorted(px4_params),
         }
+        write_effect_json_atomic(scenario_effect_request_json, scenario_effect_request)
         _json_dump(run_dir / "launch_config.json", runner_launch_config)
         _json_dump(
             run_dir / "simulator_runtime_manifest.json",
@@ -2518,6 +2684,15 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 "px4_version": meta["px4_version"],
                 "firmware_identity": firmware_identity,
                 "scenario_effect_contract": scenario_effect_contract,
+                "scenario_effect_request": {
+                    "path": str(scenario_effect_request_json),
+                    "schema_version": scenario_effect_request["schema_version"],
+                    "request_sha256": scenario_effect_request["request_sha256"],
+                },
+                "scenario_effect_evidence": {
+                    "path": str(scenario_effect_evidence_json),
+                    "required": bool(scenario_effect_request["effects"]),
+                },
                 "simulator": {
                     "airframe": meta["airframe"],
                     "simulator_model": meta["simulator_model"],
@@ -2638,6 +2813,8 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 "params_json": str(params_json),
                 "px4_params_json": str(px4_params_json),
                 "scenario_config_json": str(scenario_config_json),
+                "scenario_effect_request_json": str(scenario_effect_request_json),
+                "scenario_effect_evidence_json": str(scenario_effect_evidence_json),
                 "track_json": str(track_json),
                 "telemetry_json": str(telemetry_json),
                 "trajectory_json": str(trajectory_json),
@@ -2681,6 +2858,8 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     "PX4_TRIAL_ATTEMPT": str(meta["attempt_count"]),
                     "PX4_TRIAL_SCENARIO_TYPE": str(meta["scenario_type"]),
                     "PX4_TRIAL_SCENARIO_CONFIG_PATH": str(scenario_config_json),
+                    "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH": str(scenario_effect_request_json),
+                    "PX4_TRIAL_SCENARIO_EFFECT_EVIDENCE_PATH": str(scenario_effect_evidence_json),
                     "PX4_TRIAL_WIND_JSON": json.dumps(job_cfg["wind"], sort_keys=True),
                     "PX4_TRIAL_SENSOR_NOISE_LEVEL": str(job_cfg["sensor_noise_level"]),
                     "PX4_TRIAL_HEADLESS": "true" if meta["headless"] else "false",
@@ -2741,6 +2920,62 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 return 0
             _merge_json_object(run_dir / "launch_config.json", runner_launch_config)
             log(f"launcher exit code: {exit_code}")
+            if scenario_effect_request["effects"]:
+                try:
+                    _require_effect_evidence_file(scenario_effect_evidence_json)
+                    verified_effects = load_scenario_effect_evidence(
+                        scenario_effect_evidence_json,
+                        scenario_effect_request,
+                    )
+                except ScenarioEffectContractError as exc:
+                    requested_effect_ids = list(scenario_effect_contract["requested_effects"])
+                    verified_effects = {
+                        "applied_effects": [],
+                        "unsupported_effects": requested_effect_ids,
+                        "failed_effects": [],
+                        "pending_effects": [],
+                        "verification_status": (
+                            "unverified_passthrough"
+                            if env.allow_unverified_advanced_effects
+                            else "invalid_launcher_evidence"
+                        ),
+                        "evidence_error": str(exc),
+                        "capabilities": [
+                            {
+                                "effect_id": effect_id,
+                                "status": "unsupported",
+                                "reason": (
+                                    "launcher evidence was missing or invalid while "
+                                    "unverified passthrough was enabled: " + str(exc)
+                                ),
+                            }
+                            for effect_id in requested_effect_ids
+                        ],
+                    }
+                scenario_effect_contract.update(verified_effects)
+                scenario_effect_contract["pending_effects"] = []
+                evidence_manifest = {
+                    "path": str(scenario_effect_evidence_json),
+                    "required": True,
+                    "verification_status": scenario_effect_contract["verification_status"],
+                    "schema_version": verified_effects.get("evidence_schema_version"),
+                }
+                runner_launch_config["scenario_effect_contract"] = scenario_effect_contract
+                runner_launch_config["scenario_effect_evidence"] = evidence_manifest
+                _merge_json_object(run_dir / "launch_config.json", runner_launch_config)
+                _merge_json_object(
+                    run_dir / "simulator_runtime_manifest.json",
+                    {
+                        "scenario_effect_contract": scenario_effect_contract,
+                        "scenario_effect_evidence": evidence_manifest,
+                    },
+                )
+                if scenario_effect_contract.get("failed_effects"):
+                    raise RunnerError(
+                        "launcher failed to apply scenario effects: "
+                        + ", ".join(scenario_effect_contract["failed_effects"])
+                    )
+                _enforce_scenario_effect_contract(scenario_effect_contract)
             if exit_code != 0:
                 result = _failure_result(
                     f"lower-level launcher exited with code {exit_code}",

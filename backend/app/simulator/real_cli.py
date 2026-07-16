@@ -22,6 +22,7 @@ Environment variables:
 
 from __future__ import annotations
 
+import ctypes
 import json
 import logging
 import math
@@ -57,6 +58,7 @@ from app.simulator.base import (
     TrialMetricsPayload,
     TrialResult,
 )
+from app.simulator.scenario_effects import build_scenario_effect_request
 
 logger = logging.getLogger("drone_dream.simulator.real_cli")
 
@@ -64,9 +66,11 @@ _DEFAULT_TIMEOUT = 300
 _DEFAULT_ARTIFACT_ROOT = "./artifacts"
 _MAX_RESULT_BYTES = 10 * 1024 * 1024
 _MAX_KNOWN_JSON_ARTIFACT_BYTES = 16 * 1024 * 1024
+_MAX_RESULT_ARTIFACTS = 256
 _MAX_RAW_METRIC_DEPTH = 20
 _MAX_RAW_METRIC_NODES = 10_000
 _MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER = 10.0
+_MAX_EFFECTIVE_TIMEOUT_SECONDS = 86_400.0
 _PROCESS_POLL_SECONDS = 0.2
 _TERMINATE_GRACE_SECONDS = 2.0
 
@@ -184,6 +188,125 @@ class _ProcessOutcome:
     stderr: str
 
 
+class _JobObjectBasicLimitInformation(ctypes.Structure):
+    """ctypes mirror of ``JOBOBJECT_BASIC_LIMIT_INFORMATION``."""
+
+    _fields_ = [
+        ("PerProcessUserTimeLimit", ctypes.c_int64),
+        ("PerJobUserTimeLimit", ctypes.c_int64),
+        ("LimitFlags", ctypes.c_uint32),
+        ("MinimumWorkingSetSize", ctypes.c_size_t),
+        ("MaximumWorkingSetSize", ctypes.c_size_t),
+        ("ActiveProcessLimit", ctypes.c_uint32),
+        ("Affinity", ctypes.c_size_t),
+        ("PriorityClass", ctypes.c_uint32),
+        ("SchedulingClass", ctypes.c_uint32),
+    ]
+
+
+class _IoCounters(ctypes.Structure):
+    """ctypes mirror of the Windows ``IO_COUNTERS`` structure."""
+
+    _fields_ = [
+        ("ReadOperationCount", ctypes.c_uint64),
+        ("WriteOperationCount", ctypes.c_uint64),
+        ("OtherOperationCount", ctypes.c_uint64),
+        ("ReadTransferCount", ctypes.c_uint64),
+        ("WriteTransferCount", ctypes.c_uint64),
+        ("OtherTransferCount", ctypes.c_uint64),
+    ]
+
+
+class _JobObjectExtendedLimitInformation(ctypes.Structure):
+    """ctypes mirror of ``JOBOBJECT_EXTENDED_LIMIT_INFORMATION``."""
+
+    _fields_ = [
+        ("BasicLimitInformation", _JobObjectBasicLimitInformation),
+        ("IoInfo", _IoCounters),
+        ("ProcessMemoryLimit", ctypes.c_size_t),
+        ("JobMemoryLimit", ctypes.c_size_t),
+        ("PeakProcessMemoryUsed", ctypes.c_size_t),
+        ("PeakJobMemoryUsed", ctypes.c_size_t),
+    ]
+
+
+class _WindowsKillOnCloseJob:
+    """Own a Windows job that cannot leave simulator descendants behind.
+
+    ``taskkill /T`` discovers a process tree from a point-in-time snapshot.  A
+    child created while that snapshot is being terminated can therefore escape
+    under scheduler load.  A Job Object tracks membership in the kernel: once
+    the simulator is assigned, every descendant joins the job automatically,
+    and closing the last handle terminates all remaining members.
+
+    Job creation/assignment is best-effort because an embedding process may run
+    inside a restrictive legacy job.  The existing ``taskkill`` path remains
+    the fallback in that case.
+    """
+
+    _EXTENDED_LIMIT_INFORMATION_CLASS = 9
+    _LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
+
+    def __init__(self, kernel32: Any, handle: int) -> None:
+        self._kernel32 = kernel32
+        self._handle = handle
+
+    @classmethod
+    def create(cls) -> _WindowsKillOnCloseJob | None:
+        if os.name != "nt":
+            return None
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
+        kernel32.CreateJobObjectW.restype = ctypes.c_void_p
+        kernel32.SetInformationJobObject.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+        ]
+        kernel32.SetInformationJobObject.restype = ctypes.c_int
+        kernel32.AssignProcessToJobObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        kernel32.AssignProcessToJobObject.restype = ctypes.c_int
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        kernel32.CloseHandle.restype = ctypes.c_int
+
+        raw_handle = kernel32.CreateJobObjectW(None, None)
+        if not raw_handle:
+            logger.warning("could not create simulator Windows Job Object")
+            return None
+        handle = int(raw_handle)
+        limits = _JobObjectExtendedLimitInformation()
+        limits.BasicLimitInformation.LimitFlags = cls._LIMIT_KILL_ON_JOB_CLOSE
+        configured = kernel32.SetInformationJobObject(
+            ctypes.c_void_p(handle),
+            cls._EXTENDED_LIMIT_INFORMATION_CLASS,
+            ctypes.byref(limits),
+            ctypes.sizeof(limits),
+        )
+        if not configured:
+            kernel32.CloseHandle(ctypes.c_void_p(handle))
+            logger.warning("could not configure simulator Windows Job Object")
+            return None
+        return cls(kernel32, handle)
+
+    def assign(self, proc: subprocess.Popen[bytes]) -> bool:
+        process_handle = getattr(proc, "_handle", None)
+        if process_handle is None:
+            return False
+        assigned = self._kernel32.AssignProcessToJobObject(
+            ctypes.c_void_p(self._handle),
+            ctypes.c_void_p(int(process_handle)),
+        )
+        if not assigned:
+            logger.warning("could not assign simulator to Windows Job Object")
+        return bool(assigned)
+
+    def close(self) -> None:
+        if self._handle:
+            self._kernel32.CloseHandle(ctypes.c_void_p(self._handle))
+            self._handle = 0
+
+
 def _truncate(text: str, limit: int = 4000) -> str:
     if len(text) <= limit:
         return text
@@ -230,6 +353,8 @@ def _effective_timeout_seconds(baseline_seconds: float, simulation_speed_factor:
 
     if not math.isfinite(baseline_seconds) or baseline_seconds <= 0:
         raise ValueError("timeout must be a finite number greater than zero")
+    if baseline_seconds > _MAX_EFFECTIVE_TIMEOUT_SECONDS:
+        raise ValueError("timeout cannot exceed 86400 seconds")
     if isinstance(simulation_speed_factor, bool) or not isinstance(
         simulation_speed_factor, (int, float)
     ):
@@ -241,7 +366,10 @@ def _effective_timeout_seconds(baseline_seconds: float, simulation_speed_factor:
         max(1.0, 1.0 / speed_factor),
         _MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER,
     )
-    return baseline_seconds * multiplier
+    return min(
+        baseline_seconds * multiplier,
+        _MAX_EFFECTIVE_TIMEOUT_SECONDS,
+    )
 
 
 def _is_sensitive_environment_name(name: str) -> bool:
@@ -342,9 +470,14 @@ def _terminate_process_tree(proc: subprocess.Popen[bytes]) -> None:
     if proc.poll() is not None:
         return
     if os.name == "nt":
+        taskkill_executable = shutil.which("taskkill")
+        if taskkill_executable is None:
+            with suppress(OSError):
+                proc.terminate()
+            return
         with suppress(OSError, subprocess.SubprocessError):
-            subprocess.run(  # noqa: S603, S607 - fixed system utility/arguments.
-                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+            subprocess.run(  # noqa: S603 - resolved system utility; fixed arguments.
+                [taskkill_executable, "/PID", str(proc.pid), "/T", "/F"],
                 capture_output=True,
                 check=False,
                 timeout=10,
@@ -378,31 +511,52 @@ def _execute_command(
     stderr_path: Path,
 ) -> _ProcessOutcome:
     creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
-    with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
-        proc = subprocess.Popen(  # noqa: S603 - trusted operator command, no shell.
-            argv,
-            cwd=cwd,
-            env=env,
-            stdin=subprocess.DEVNULL,
-            stdout=stdout_file,
-            stderr=stderr_file,
-            start_new_session=os.name != "nt",
-            creationflags=creationflags,
-        )
-        deadline = time.monotonic() + timeout_seconds
-        while True:
-            if cancellation_event is not None and cancellation_event.is_set():
-                _terminate_process_tree(proc)
-                raise _SimulatorCancelled
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                _terminate_process_tree(proc)
-                raise subprocess.TimeoutExpired(argv, timeout_seconds)
-            try:
-                returncode = proc.wait(timeout=min(_PROCESS_POLL_SECONDS, remaining))
-                break
-            except subprocess.TimeoutExpired:
-                continue
+    windows_job = _WindowsKillOnCloseJob.create()
+    try:
+        with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
+            proc = subprocess.Popen(  # noqa: S603 - trusted operator command, no shell.
+                argv,
+                cwd=cwd,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                start_new_session=os.name != "nt",
+                creationflags=creationflags,
+            )
+            if windows_job is not None and not windows_job.assign(proc):
+                windows_job.close()
+                windows_job = None
+            deadline = time.monotonic() + timeout_seconds
+            while True:
+                if cancellation_event is not None and cancellation_event.is_set():
+                    # Close the kernel-tracked job before invoking taskkill.
+                    # Besides eliminating the process-tree snapshot race, this
+                    # ensures a slow taskkill invocation cannot give a child
+                    # time to perform work after cancellation was observed.
+                    if windows_job is not None:
+                        windows_job.close()
+                        windows_job = None
+                    _terminate_process_tree(proc)
+                    raise _SimulatorCancelled
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    if windows_job is not None:
+                        windows_job.close()
+                        windows_job = None
+                    _terminate_process_tree(proc)
+                    raise subprocess.TimeoutExpired(argv, timeout_seconds)
+                try:
+                    returncode = proc.wait(timeout=min(_PROCESS_POLL_SECONDS, remaining))
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+    finally:
+        # Closing a configured Job Object is also important after a nominal
+        # parent exit: a buggy CLI must not detach a long-lived descendant from
+        # the worker simply by returning before its own children.
+        if windows_job is not None:
+            windows_job.close()
     return _ProcessOutcome(
         returncode=returncode,
         stdout=_read_log_tail(stdout_path),
@@ -457,6 +611,20 @@ def _trial_input_payload(ctx: TrialContext, output_path: Path) -> dict[str, Any]
     advanced = scenario_config.get("advanced_scenario_config")
     if not isinstance(advanced, dict):
         advanced = {}
+    execution_identity = {
+        "trial_id": ctx.trial_id,
+        "job_id": ctx.job_id,
+        "candidate_id": ctx.candidate_id,
+        "seed": ctx.seed,
+        "attempt_count": ctx.attempt_count,
+    }
+    scenario_effect_request = build_scenario_effect_request(
+        execution_identity=execution_identity,
+        scenario_type=ctx.scenario_type,
+        scenario_config=scenario_config,
+        job_config=job_config,
+        advanced_config=advanced,
+    )
     return {
         "schema_version": "dronedream.trial_input.v2",
         "trial_id": ctx.trial_id,
@@ -464,16 +632,13 @@ def _trial_input_payload(ctx: TrialContext, output_path: Path) -> dict[str, Any]
         "candidate_id": ctx.candidate_id,
         "seed": ctx.seed,
         "attempt_count": ctx.attempt_count,
-        "execution_identity": {
-            "trial_id": ctx.trial_id,
-            "job_id": ctx.job_id,
-            "candidate_id": ctx.candidate_id,
-            "seed": ctx.seed,
-            "attempt_count": ctx.attempt_count,
-        },
+        "execution_identity": execution_identity,
         "scenario_type": ctx.scenario_type,
         "scenario_config": scenario_config,
         "advanced_scenario_config": advanced,
+        # Canonical physical-effect mapping consumed by PX4/Gazebo launchers.
+        # The outer runner independently recomputes and verifies this contract.
+        "scenario_effect_request": scenario_effect_request,
         # Canonical grouped object.
         "job_config": job_config,
         # Top-level convenience aliases (identical values).
@@ -596,9 +761,13 @@ def _parse_metrics(raw: dict[str, Any]) -> TrialMetricsPayload:
 
 
 def _parse_artifacts(raw: dict[str, Any]) -> list[ArtifactMetadata]:
-    artifacts_raw = raw.get("artifacts") or []
+    artifacts_raw = raw.get("artifacts", [])
+    if artifacts_raw is None:
+        artifacts_raw = []
     if not isinstance(artifacts_raw, list):
         raise ValueError("'artifacts' must be an array")
+    if len(artifacts_raw) > _MAX_RESULT_ARTIFACTS:
+        raise ValueError(f"'artifacts' cannot contain more than {_MAX_RESULT_ARTIFACTS} items")
     artifacts: list[ArtifactMetadata] = []
     for item in artifacts_raw:
         if not isinstance(item, dict):
@@ -609,20 +778,37 @@ def _parse_artifacts(raw: dict[str, Any]) -> list[ArtifactMetadata]:
         if (
             not isinstance(artifact_type, str)
             or not artifact_type.strip()
-            or len(artifact_type) > 128
+            or len(artifact_type) > 32
             or any(not (char.isalnum() or char in {"-", "_", "."}) for char in artifact_type)
             or not isinstance(storage_path, str)
             or not storage_path.strip()
+            or len(storage_path) > 512
+            or any(ord(char) < 32 for char in storage_path)
         ):
             raise ValueError("artifact requires 'artifact_type' and 'storage_path'")
+        artifact_type = artifact_type.strip()
+        storage_path = storage_path.strip()
+        if display_name is not None and not isinstance(display_name, str):
+            raise ValueError("artifact display_name must be a string")
         mime_type = item.get("mime_type")
-        if not isinstance(mime_type, str):
+        if mime_type is None:
             mime_type = infer_mime_type(artifact_type)
+        elif isinstance(mime_type, str):
+            mime_type = mime_type.strip()
+            if not mime_type or len(mime_type) > 128 or any(ord(char) < 32 for char in mime_type):
+                raise ValueError("artifact mime_type is invalid")
+        else:
+            raise ValueError("artifact mime_type must be a string")
         file_size = item.get("file_size_bytes")
         if file_size is not None and (
-            isinstance(file_size, bool) or not isinstance(file_size, int) or file_size < 0
+            isinstance(file_size, bool)
+            or not isinstance(file_size, int)
+            or file_size < 0
+            or file_size > 9_223_372_036_854_775_807
         ):
-            raise ValueError("artifact file_size_bytes must be a non-negative integer")
+            raise ValueError("artifact file_size_bytes must be a signed 64-bit integer")
+        if isinstance(display_name, str) and any(ord(char) < 32 for char in display_name):
+            raise ValueError("artifact display_name cannot contain control characters")
         artifacts.append(
             ArtifactMetadata(
                 artifact_type=artifact_type,
@@ -730,12 +916,16 @@ def _reject_nonfinite_json_constant(value: str) -> None:
 
 
 def _load_result_payload(output_path: Path) -> object:
-    size = output_path.stat().st_size
-    if size > _MAX_RESULT_BYTES:
+    # Read a bounded byte count instead of trusting an earlier stat(): the
+    # simulator process could replace or extend the output between the two
+    # operations and otherwise force an unbounded worker allocation.
+    with output_path.open("rb") as stream:
+        encoded = stream.read(_MAX_RESULT_BYTES + 1)
+    if len(encoded) > _MAX_RESULT_BYTES:
         raise ValueError(f"trial_result.json exceeds {_MAX_RESULT_BYTES} byte contract limit")
     try:
         return json.loads(
-            output_path.read_text(encoding="utf-8"),
+            encoded.decode("utf-8"),
             parse_constant=_reject_nonfinite_json_constant,
         )
     except RecursionError as exc:
@@ -810,14 +1000,15 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
             run_dir = _run_directory(artifact_root, ctx)
             run_dir.mkdir(parents=True, exist_ok=True)
         except (OSError, ValueError) as exc:
+            logger.warning("simulator artifact directory setup failed", exc_info=exc)
             return TrialResult(
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
                     code=FAILURE_ADAPTER_UNAVAILABLE,
-                    reason=f"Invalid or inaccessible simulator artifact directory: {exc}",
+                    reason="Invalid or inaccessible simulator artifact directory.",
                 ),
-                log_excerpt=f"[real_cli] artifact directory error: {exc}",
+                log_excerpt="[real_cli] artifact directory setup failed",
             )
 
         input_path = run_dir / "trial_input.json"
@@ -831,14 +1022,15 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
             output_path.unlink(missing_ok=True)
             _write_json_atomic(input_path, payload)
         except (OSError, TypeError, ValueError) as exc:
+            logger.warning("simulator input preparation failed", exc_info=exc)
             return TrialResult(
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
                     code=FAILURE_ADAPTER_UNAVAILABLE,
-                    reason=f"Could not prepare simulator input: {exc}",
+                    reason="Could not prepare simulator input.",
                 ),
-                log_excerpt=f"[real_cli] input preparation failed: {exc}",
+                log_excerpt="[real_cli] input preparation failed",
             )
 
         try:
@@ -852,14 +1044,15 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 simulation_speed_factor,
             )
         except ValueError as exc:
+            logger.warning("invalid simulator timeout configuration", exc_info=exc)
             return TrialResult(
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
                     code=FAILURE_ADAPTER_UNAVAILABLE,
-                    reason=f"Invalid REAL_SIMULATOR_TIMEOUT_SECONDS: {exc}",
+                    reason="Invalid REAL_SIMULATOR_TIMEOUT_SECONDS configuration.",
                 ),
-                log_excerpt=f"[real_cli] invalid timeout: {exc}",
+                log_excerpt="[real_cli] invalid timeout configuration",
             )
         raw_workdir = os.environ.get("REAL_SIMULATOR_WORKDIR", "").strip()
         workdir: str | None = None
@@ -871,7 +1064,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                     backend=self.backend_name,
                     failure=TrialFailure(
                         code=FAILURE_ADAPTER_UNAVAILABLE,
-                        reason=f"REAL_SIMULATOR_WORKDIR is not a directory: {workdir_path}",
+                        reason="REAL_SIMULATOR_WORKDIR is not a valid directory.",
                     ),
                     log_excerpt="[real_cli] invalid simulator working directory",
                 )
@@ -880,11 +1073,15 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
         try:
             argv = _build_command(command_template, input_path, output_path)
         except ValueError as exc:
+            logger.warning("invalid simulator command configuration", exc_info=exc)
             return TrialResult(
                 success=False,
                 backend=self.backend_name,
-                failure=TrialFailure(code=FAILURE_ADAPTER_UNAVAILABLE, reason=str(exc)),
-                log_excerpt=f"[real_cli] invalid REAL_SIMULATOR_COMMAND: {exc}",
+                failure=TrialFailure(
+                    code=FAILURE_ADAPTER_UNAVAILABLE,
+                    reason="REAL_SIMULATOR_COMMAND is invalid.",
+                ),
+                log_excerpt="[real_cli] invalid REAL_SIMULATOR_COMMAND",
             )
 
         logger.info(
@@ -962,14 +1159,15 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 log_excerpt=log,
             )
         except OSError as exc:
+            logger.warning("simulator process could not be started", exc_info=exc)
             return TrialResult(
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
                     code=FAILURE_ADAPTER_UNAVAILABLE,
-                    reason=f"Simulator process could not be started: {exc}",
+                    reason="Simulator process could not be started.",
                 ),
-                log_excerpt=f"[real_cli] process start failed: {exc}",
+                log_excerpt="[real_cli] process start failed",
             )
 
         combined_log = _truncate(
@@ -1051,15 +1249,22 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
             code_value = failure_raw.get("code")
             code: str = (
                 code_value.strip()[:64]
-                if isinstance(code_value, str) and code_value.strip()
+                if isinstance(code_value, str)
+                and code_value.strip()
+                and not any(ord(char) < 32 for char in code_value)
                 else FAILURE_SIMULATION
             )
             reason_value = failure_raw.get("reason")
             reason: str = (
-                _truncate(reason_value.strip(), 1000)
+                _truncate(
+                    reason_value.replace("\x00", " ").replace("\r", " ").strip(),
+                    1000,
+                )
                 if isinstance(reason_value, str) and reason_value.strip()
                 else "Simulator reported failure without a reason."
             )
+            if not reason:
+                reason = "Simulator reported failure without a reason."
             try:
                 failure_artifacts = _sanitize_artifacts_for_trial(
                     _parse_artifacts(raw),

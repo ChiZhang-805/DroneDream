@@ -11,6 +11,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 SCHEMA_VERSION = 1
 REQUIRED_SMOKE_CHECKS = {
@@ -30,11 +31,15 @@ REQUIRED_PINS = {
     "UBUNTU_BASE_IMAGE",
     "UBUNTU_INDEX_DIGEST",
     "PX4_VERSION",
+    "PX4_GIT_URL",
     "PX4_GIT_COMMIT",
     "GAZEBO_RELEASE",
+    "GAZEBO_METAPACKAGE",
     "GAZEBO_METAPACKAGE_VERSION",
+    "GAZEBO_APT_KEY_URL",
     "GAZEBO_APT_KEY_SHA256",
     "VALKEY_VERSION",
+    "VALKEY_GIT_URL",
     "VALKEY_GIT_COMMIT",
     "PYTHON_VERSION",
     "BACKEND_VERSION",
@@ -45,13 +50,37 @@ REQUIRED_PINS = {
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
-EXACT_REQUIREMENT = re.compile(
-    r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([A-Za-z0-9][A-Za-z0-9.!+_-]*)$"
-)
+EXACT_REQUIREMENT = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([A-Za-z0-9][A-Za-z0-9.!+_-]*)$")
 
 
 class ManifestError(ValueError):
     pass
+
+
+def _require_exact_keys(value: dict[str, Any], expected: set[str], label: str) -> None:
+    actual = set(value)
+    if actual == expected:
+        return
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    details: list[str] = []
+    if missing:
+        details.append("missing " + ", ".join(missing))
+    if extra:
+        details.append("unsupported " + ", ".join(extra))
+    raise ManifestError(f"{label} fields are invalid ({'; '.join(details)})")
+
+
+def _validate_timestamp(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ManifestError(f"{label} must be an ISO-8601 UTC timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ManifestError(f"{label} must be an ISO-8601 UTC timestamp") from exc
+    if parsed.utcoffset() is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        raise ManifestError(f"{label} must use UTC")
+    return value
 
 
 def load_pins(path: Path) -> dict[str, str]:
@@ -78,11 +107,14 @@ def load_pins(path: Path) -> dict[str, str]:
     base_digest = pins["UBUNTU_BASE_IMAGE"].rsplit("sha256:", 1)[-1]
     index_digest = pins["UBUNTU_INDEX_DIGEST"].removeprefix("sha256:")
     if not SHA256.fullmatch(base_digest) or not SHA256.fullmatch(index_digest):
-        raise ManifestError(
-            "Ubuntu image digests must be full lowercase SHA-256 values"
-        )
+        raise ManifestError("Ubuntu image digests must be full lowercase SHA-256 values")
     if not SHA256.fullmatch(pins["GAZEBO_APT_KEY_SHA256"]):
         raise ManifestError("GAZEBO_APT_KEY_SHA256 must be a full lowercase SHA-256")
+    for key in ("PX4_GIT_URL", "GAZEBO_APT_KEY_URL", "VALKEY_GIT_URL"):
+        if not pins[key].startswith("https://") or any(
+            character.isspace() for character in pins[key]
+        ):
+            raise ManifestError(f"{key} must be an absolute whitespace-free HTTPS URL")
     for key in ("PX4_GIT_COMMIT", "VALKEY_GIT_COMMIT"):
         if not SHA40.fullmatch(pins[key]):
             raise ManifestError(f"{key} must be a full lowercase Git SHA")
@@ -92,27 +124,32 @@ def load_pins(path: Path) -> dict[str, str]:
     return pins
 
 
-def validate_python_lock(path: Path) -> None:
-    packages: set[str] = set()
+def validate_python_lock(path: Path) -> dict[str, str]:
+    packages: dict[str, str] = {}
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
         match = EXACT_REQUIREMENT.fullmatch(stripped)
         if match is None:
-            raise ManifestError(
-                f"{path}:{number}: requirement must use one exact == pin"
-            )
+            raise ManifestError(f"{path}:{number}: requirement must use one exact == pin")
         name, version = match.groups()
         normalized = name.lower().replace("_", "-")
         if not name or not version or normalized in packages:
             raise ManifestError(f"{path}:{number}: invalid or duplicate requirement")
-        packages.add(normalized)
-    for required in ("fastapi", "drone-dream-backend", "mavsdk"):
-        if required == "drone-dream-backend":
-            continue  # Installed from the pinned DroneDream source commit with --no-deps.
+        packages[normalized] = version
+    for required in ("fastapi", "mavsdk", "pyulog"):
         if required not in packages:
             raise ManifestError(f"python lock is missing {required}")
+    return packages
+
+
+def validate_pin_lock_versions(pins: dict[str, str], packages: dict[str, str]) -> None:
+    for pin, package in (("MAVSDK_VERSION", "mavsdk"), ("PYULOG_VERSION", "pyulog")):
+        if packages.get(package) != pins[pin]:
+            raise ManifestError(
+                f"{pin}={pins[pin]} does not match {package}=={packages.get(package)}"
+            )
 
 
 def sha256(path: Path) -> str:
@@ -123,11 +160,10 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def generate(
-    pins_path: Path, lock_path: Path, source_commit: str, output: Path
-) -> dict:
+def generate(pins_path: Path, lock_path: Path, source_commit: str, output: Path) -> dict:
     pins = load_pins(pins_path)
-    validate_python_lock(lock_path)
+    packages = validate_python_lock(lock_path)
+    validate_pin_lock_versions(pins, packages)
     if not SHA40.fullmatch(source_commit):
         raise ManifestError("DroneDream source commit must be a full lowercase Git SHA")
     identity = "|".join(
@@ -142,9 +178,7 @@ def generate(
     )
     manifest = {
         "schemaVersion": SCHEMA_VERSION,
-        "runtimeId": str(
-            uuid.uuid5(uuid.NAMESPACE_URL, "https://dronedream/runtime/" + identity)
-        ),
+        "runtimeId": str(uuid.uuid5(uuid.NAMESPACE_URL, "https://dronedream/runtime/" + identity)),
         "version": pins["DRONEDREAM_RUNTIME_VERSION"],
         "target": {
             "os": "ubuntu",
@@ -191,23 +225,63 @@ def generate(
         "artifact": None,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest
 
 
-def validate_manifest(manifest: dict, *, require_smoke_passed: bool = False) -> None:
+def validate_manifest(manifest: Any, *, require_smoke_passed: bool = False) -> None:
+    if not isinstance(manifest, dict):
+        raise ManifestError("runtime manifest must be an object")
+    _require_exact_keys(
+        manifest,
+        {
+            "schemaVersion",
+            "runtimeId",
+            "version",
+            "target",
+            "source",
+            "components",
+            "componentDetails",
+            "locks",
+            "smokeTests",
+            "smokeReport",
+            "artifact",
+        },
+        "runtime manifest",
+    )
     if manifest.get("schemaVersion") != SCHEMA_VERSION:
         raise ManifestError("unsupported runtime manifest schema")
-    runtime_id = str(manifest.get("runtimeId"))
-    parsed_runtime_id = uuid.UUID(runtime_id)
+    runtime_id = manifest.get("runtimeId")
+    if not isinstance(runtime_id, str):
+        raise ManifestError("manifest runtimeId must be a canonical lowercase UUID")
+    try:
+        parsed_runtime_id = uuid.UUID(runtime_id)
+    except ValueError as exc:
+        raise ManifestError("manifest runtimeId must be a canonical lowercase UUID") from exc
     if str(parsed_runtime_id) != runtime_id:
         raise ManifestError("manifest runtimeId must be a canonical lowercase UUID")
     version = manifest.get("version")
     if not isinstance(version, str) or not SEMVER.fullmatch(version):
         raise ManifestError("manifest version is invalid")
-    source_commit = manifest.get("source", {}).get("droneDreamCommit")
+    target = manifest.get("target")
+    if not isinstance(target, dict):
+        raise ManifestError("manifest target must be an object")
+    _require_exact_keys(target, {"os", "version", "codename", "arch", "format"}, "target")
+    if (
+        target.get("os") != "ubuntu"
+        or not isinstance(target.get("version"), str)
+        or not target["version"]
+        or not isinstance(target.get("codename"), str)
+        or not target["codename"]
+        or target.get("arch") != "amd64"
+        or target.get("format") != "wsl2-rootfs-tar"
+    ):
+        raise ManifestError("manifest target is invalid")
+    source = manifest.get("source")
+    if not isinstance(source, dict):
+        raise ManifestError("manifest source must be an object")
+    _require_exact_keys(source, {"droneDreamCommit"}, "source")
+    source_commit = source.get("droneDreamCommit")
     if not isinstance(source_commit, str) or not SHA40.fullmatch(source_commit):
         raise ManifestError("manifest source commit is invalid")
     components = manifest.get("components")
@@ -219,16 +293,49 @@ def validate_manifest(manifest: dict, *, require_smoke_passed: bool = False) -> 
             or not isinstance(value, str)
             or not value.strip()
             or len(value) > 128
-            or any(
-                ord(character) < 32 or 127 <= ord(character) <= 159
-                for character in value
-            )
+            or any(ord(character) < 32 or 127 <= ord(character) <= 159 for character in value)
         ):
             raise ManifestError("manifest components must be safe string values")
     for component in ("backend", "px4", "gazebo"):
         value = components.get(component)
         if not isinstance(value, str):
             raise ManifestError(f"manifest component {component} is invalid")
+    component_details = manifest.get("componentDetails")
+    if not isinstance(component_details, dict):
+        raise ManifestError("manifest componentDetails must be an object")
+    for component in (
+        "ubuntu",
+        "px4",
+        "gazebo",
+        "backend",
+        "worker",
+        "valkey",
+        "python",
+    ):
+        if not isinstance(component_details.get(component), dict):
+            raise ManifestError(f"manifest componentDetails.{component} must be an object")
+    for component in ("mavsdk", "pyulog"):
+        if not isinstance(component_details.get(component), dict):
+            raise ManifestError(f"manifest componentDetails.{component} must be an object")
+    px4_commit = component_details["px4"].get("commit")
+    valkey_commit = component_details["valkey"].get("commit")
+    backend_commit = component_details["backend"].get("commit")
+    worker_commit = component_details["worker"].get("commit")
+    if not isinstance(px4_commit, str) or not SHA40.fullmatch(px4_commit):
+        raise ManifestError("manifest PX4 commit is invalid")
+    if not isinstance(valkey_commit, str) or not SHA40.fullmatch(valkey_commit):
+        raise ManifestError("manifest Valkey commit is invalid")
+    if backend_commit != source_commit or worker_commit != source_commit:
+        raise ManifestError("manifest backend/worker commits must match the source commit")
+    locks = manifest.get("locks")
+    if not isinstance(locks, dict):
+        raise ManifestError("manifest locks must be an object")
+    _require_exact_keys(locks, {"pinsSha256", "pythonRequirementsSha256"}, "locks")
+    if any(not isinstance(value, str) or not SHA256.fullmatch(value) for value in locks.values()):
+        raise ManifestError("manifest lock hashes are invalid")
+    artifact = manifest.get("artifact")
+    if artifact is not None and not isinstance(artifact, dict):
+        raise ManifestError("manifest artifact must be an object or null")
     smoke = manifest.get("smokeTests")
     smoke_keys = ("px4Sitl", "gazebo", "parameterReadback")
     if not isinstance(smoke, dict) or any(
@@ -245,23 +352,36 @@ def validate_manifest(manifest: dict, *, require_smoke_passed: bool = False) -> 
         if not isinstance(report, dict) or report.get("passed") is not True:
             raise ManifestError("passed smoke flags require a successful smokeReport")
         checks = report.get("checks")
-        if not isinstance(checks, list):
+        if not isinstance(checks, list) or not checks:
             raise ManifestError("manifest smoke report checks must be an array")
-        if any(
-            not isinstance(item, dict) or item.get("passed") is not True
-            for item in checks
-        ):
-            raise ManifestError("manifest smoke report contains an unsuccessful check")
-        passed_names = {
-            item.get("name")
-            for item in checks
-            if isinstance(item, dict) and item.get("passed") is True
-        }
+        names: list[str] = []
+        for item in checks:
+            if not isinstance(item, dict) or item.get("passed") is not True:
+                raise ManifestError("manifest smoke report contains an unsuccessful check")
+            name = item.get("name")
+            duration = item.get("durationSeconds")
+            if not isinstance(name, str) or not name or len(name) > 128:
+                raise ManifestError("manifest smoke report contains an invalid check name")
+            if type(duration) is not int or duration < 0:
+                raise ManifestError("manifest smoke report contains an invalid check duration")
+            names.append(name)
+        if len(names) != len(set(names)):
+            raise ManifestError("manifest smoke report contains duplicate check names")
+        passed_names = set(names)
         missing = REQUIRED_SMOKE_CHECKS - passed_names
-        if missing or not report.get("completedAt"):
-            raise ManifestError(
-                "passed smoke status is missing successful required checks"
-            )
+        if missing:
+            raise ManifestError("passed smoke status is missing successful required checks")
+        if report.get("mode") != "runtime-image" or report.get("runtimeId") != runtime_id:
+            raise ManifestError("manifest smoke report identity is invalid")
+        image_id = report.get("imageId")
+        if (
+            not isinstance(image_id, str)
+            or not image_id
+            or len(image_id) > 256
+            or any(ord(character) < 32 for character in image_id)
+        ):
+            raise ManifestError("manifest smoke report imageId is invalid")
+        _validate_timestamp(report.get("completedAt"), "manifest smoke completedAt")
     elif report is not None:
         raise ManifestError("unpromoted manifest cannot contain a smokeReport")
     if require_smoke_passed and not passed:
@@ -281,20 +401,32 @@ def promote_smoke(manifest_path: Path, report_path: Path, output: Path) -> None:
     checks = report.get("checks")
     if not isinstance(checks, list) or report.get("passed") is not True:
         raise ManifestError("smoke report did not pass")
-    if any(
-        not isinstance(item, dict) or item.get("passed") is not True for item in checks
-    ):
-        raise ManifestError("smoke report contains an unsuccessful check")
-    passed_names = {
-        item.get("name")
-        for item in checks
-        if isinstance(item, dict) and item.get("passed") is True
-    }
+    names: list[str] = []
+    for item in checks:
+        if not isinstance(item, dict) or item.get("passed") is not True:
+            raise ManifestError("smoke report contains an unsuccessful check")
+        name = item.get("name")
+        duration = item.get("durationSeconds")
+        if not isinstance(name, str) or not name or len(name) > 128:
+            raise ManifestError("smoke report contains an invalid check name")
+        if type(duration) is not int or duration < 0:
+            raise ManifestError("smoke report contains an invalid check duration")
+        names.append(name)
+    if len(names) != len(set(names)):
+        raise ManifestError("smoke report contains duplicate check names")
+    passed_names = set(names)
     missing = REQUIRED_SMOKE_CHECKS - passed_names
     if missing:
-        raise ManifestError(
-            f"smoke report is missing passed checks: {', '.join(sorted(missing))}"
-        )
+        raise ManifestError(f"smoke report is missing passed checks: {', '.join(sorted(missing))}")
+    image_id = report.get("imageId")
+    if (
+        not isinstance(image_id, str)
+        or not image_id
+        or len(image_id) > 256
+        or any(ord(character) < 32 for character in image_id)
+    ):
+        raise ManifestError("smoke report imageId is invalid")
+    completed_at = _validate_timestamp(report.get("completedAt"), "smoke completedAt")
     manifest["smokeTests"] = {
         "px4Sitl": True,
         "gazebo": True,
@@ -303,14 +435,11 @@ def promote_smoke(manifest_path: Path, report_path: Path, output: Path) -> None:
     manifest["smokeReport"] = {
         **report,
         "passed": True,
-        "completedAt": report.get("completedAt")
-        or datetime.now(timezone.utc).isoformat(),
+        "completedAt": completed_at,
         "checks": checks,
     }
     validate_manifest(manifest, require_smoke_passed=True)
-    output.write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -334,8 +463,9 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command == "validate-config":
-            load_pins(args.pins)
-            validate_python_lock(args.python_lock)
+            pins = load_pins(args.pins)
+            packages = validate_python_lock(args.python_lock)
+            validate_pin_lock_versions(pins, packages)
         elif args.command == "generate":
             generate(args.pins, args.python_lock, args.source_commit, args.output)
         elif args.command == "validate":

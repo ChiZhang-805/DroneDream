@@ -17,6 +17,37 @@ const LEGACY_KEYS: Record<string, PX4ParameterDefinition["legacy_key"]> = {
 
 const ALL_MULTICOPTERS = ["multicopter", "x500"];
 
+const BUILTIN_PARAMETER_ZH: Record<string, { label: string; description: string }> = {
+  MPC_XY_P: { label: "水平位置 P", description: "根据水平位置误差生成修正水平速度。" },
+  MPC_XY_VEL_P_ACC: { label: "水平速度 P", description: "根据水平速度误差生成修正加速度。" },
+  MPC_XY_VEL_I_ACC: { label: "水平速度 I", description: "补偿持续存在的水平扰动。" },
+  MPC_XY_VEL_D_ACC: { label: "水平速度 D", description: "利用水平速度误差变化率增加阻尼。" },
+  MPC_Z_P: { label: "垂直位置 P", description: "根据高度误差生成修正升降速度。" },
+  MPC_Z_VEL_P_ACC: { label: "垂直速度 P", description: "根据升降速度误差生成修正垂直加速度。" },
+  MPC_Z_VEL_I_ACC: { label: "垂直速度 I", description: "补偿持续存在的垂直误差。" },
+  MPC_Z_VEL_D_ACC: { label: "垂直速度 D", description: "利用垂直速度误差变化率增加阻尼。" },
+  MC_ROLL_P: { label: "横滚姿态 P", description: "根据横滚姿态误差生成期望横滚角速度。" },
+  MC_PITCH_P: { label: "俯仰姿态 P", description: "根据俯仰姿态误差生成期望俯仰角速度。" },
+  MC_YAW_P: { label: "偏航姿态 P", description: "根据偏航姿态误差生成期望偏航角速度。" },
+  MC_ROLLRATE_P: { label: "横滚角速度 P", description: "根据横滚角速度误差生成比例力矩指令。" },
+  MC_ROLLRATE_I: { label: "横滚角速度 I", description: "补偿持续存在的横滚角速度误差。" },
+  MC_ROLLRATE_D: { label: "横滚角速度 D", description: "抑制快速横滚振荡。" },
+  MC_PITCHRATE_P: { label: "俯仰角速度 P", description: "根据俯仰角速度误差生成比例力矩指令。" },
+  MC_PITCHRATE_I: { label: "俯仰角速度 I", description: "补偿持续存在的俯仰角速度误差。" },
+  MC_PITCHRATE_D: { label: "俯仰角速度 D", description: "抑制快速俯仰振荡。" },
+  MC_YAWRATE_P: { label: "偏航角速度 P", description: "根据偏航角速度误差生成比例力矩指令。" },
+  MC_YAWRATE_I: { label: "偏航角速度 I", description: "补偿持续存在的偏航角速度误差。" },
+  MPC_XY_VEL_MAX: { label: "最大水平速度", description: "限制水平受控飞行模式的绝对速度。" },
+  MPC_Z_VEL_MAX_UP: { label: "最大上升速度", description: "限制飞行器的最大爬升速度。" },
+  MPC_Z_VEL_MAX_DN: { label: "最大下降速度", description: "限制飞行器的最大下降速度。" },
+  MPC_ACC_HOR: { label: "水平加速度", description: "设置自主飞行模式中的指令水平加速度。" },
+  MPC_ACC_HOR_MAX: { label: "最大水平加速度", description: "设置适用场景下的水平加速度上限。" },
+  MPC_JERK_AUTO: { label: "自主飞行加加速度上限", description: "限制自主飞行模式中的加速度变化率。" },
+  MPC_TILTMAX_AIR: { label: "空中最大倾角", description: "限制速度和加速度控制飞行中的最大倾角。" },
+  MC_AIRMODE: { label: "多旋翼空中模式", description: "设置低油门和高油门附近的混控权限策略。" },
+  IMU_GYRO_CUTOFF: { label: "陀螺仪低通截止频率", description: "设置发送给控制器的陀螺仪二阶低通截止频率。" },
+};
+
 interface BuiltinParameterOptions {
   unit?: string;
   risk?: ParameterRisk;
@@ -40,11 +71,14 @@ function builtinParameter(
   step: number,
   options: BuiltinParameterOptions = {},
 ): PX4ParameterDefinition {
+  const chinese = BUILTIN_PARAMETER_ZH[name];
   return {
     name,
     label,
     group,
     description,
+    localized_label: { en: label, "zh-CN": chinese?.label ?? name },
+    localized_description: { en: description, "zh-CN": chinese?.description ?? "" },
     unit: options.unit || null,
     value_type: options.valueType ?? "float",
     default_value: defaultValue,
@@ -233,12 +267,20 @@ export function normalizeApiCatalog(
             .map((dependency) => dependency?.parameter)
             .filter((name): name is string => typeof name === "string" && name !== item.name)
         : [];
-      const label = item.label && typeof item.label.en === "string"
-        ? item.label
-        : { en: item.name, "zh-CN": item.name };
-      const description = item.description && typeof item.description.en === "string"
-        ? item.description
-        : { en: "", "zh-CN": "" };
+      const label = {
+        en: typeof item.label?.en === "string" && item.label.en.trim() !== ""
+          ? item.label.en.trim()
+          : item.name,
+        "zh-CN": typeof item.label?.["zh-CN"] === "string" && item.label["zh-CN"].trim() !== ""
+          ? item.label["zh-CN"].trim()
+          : item.name,
+      };
+      const description = {
+        en: typeof item.description?.en === "string" ? item.description.en.trim() : "",
+        "zh-CN": typeof item.description?.["zh-CN"] === "string"
+          ? item.description["zh-CN"].trim()
+          : "",
+      };
       const stringArray = (value: unknown): string[] => Array.isArray(value)
         ? [...new Set(value
             .filter((entry): entry is string => typeof entry === "string")
@@ -260,7 +302,7 @@ export function normalizeApiCatalog(
                   en: choice.label.en.trim(),
                   "zh-CN": typeof choice.label["zh-CN"] === "string" && choice.label["zh-CN"].trim() !== ""
                     ? choice.label["zh-CN"].trim()
-                    : choice.label.en.trim(),
+                    : String(choice.value),
                 }
               : null;
             return choiceLabel ? [{ value: choice.value, label: choiceLabel }] : [];
@@ -271,7 +313,7 @@ export function normalizeApiCatalog(
             en: item.risk_note.en,
             "zh-CN": typeof item.risk_note["zh-CN"] === "string"
               ? item.risk_note["zh-CN"]
-              : item.risk_note.en,
+              : "",
           }
         : null;
       return [{

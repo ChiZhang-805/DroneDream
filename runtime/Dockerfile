@@ -5,12 +5,20 @@ FROM ${UBUNTU_BASE_IMAGE}
 ARG DEBIAN_FRONTEND=noninteractive
 ARG DRONEDREAM_SOURCE_COMMIT
 ARG PX4_VERSION=v1.16.0
+ARG PX4_GIT_URL=https://github.com/PX4/PX4-Autopilot.git
 ARG PX4_GIT_COMMIT=6ea3539157ca358c70a515878b77077af7d4611d
 ARG GAZEBO_METAPACKAGE=gz-harmonic
 ARG GAZEBO_METAPACKAGE_VERSION=1.0.0-1~noble
 ARG GAZEBO_APT_KEY_URL=https://packages.osrfoundation.org/gazebo.gpg
 ARG GAZEBO_APT_KEY_SHA256=15d0300460e0c9c0efb21fa9770c0bf228988a07d71c4fac985c2161954a25a4
+ARG VALKEY_VERSION=8.1.4
+ARG VALKEY_GIT_URL=https://github.com/valkey-io/valkey.git
 ARG VALKEY_GIT_COMMIT=5f4bae3ea10174a7c872cc099c953b0e91afa93a
+ARG PYTHON_VERSION=3.12
+ARG BACKEND_VERSION=0.1.0
+ARG WORKER_VERSION=0.1.0
+ARG MAVSDK_VERSION=3.15.3
+ARG PYULOG_VERSION=1.2.3
 ARG PX4_BUILD_JOBS=2
 ARG DRONEDREAM_UID=2000
 ARG DRONEDREAM_GID=2000
@@ -20,7 +28,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl wget git gnupg lsb-release sudo systemd systemd-sysv \
       python3 python3-pip python3-venv build-essential cmake ninja-build \
-      pkg-config procps rsync unzip zip jq sqlite3 libssl-dev libsystemd-dev \
+      pkg-config procps iproute2 rsync unzip zip jq sqlite3 libssl-dev libsystemd-dev \
       libffi-dev libxml2-dev libxslt1-dev libyaml-dev libsqlite3-dev && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd --gid "${DRONEDREAM_GID}" dronedream && \
@@ -40,7 +48,7 @@ RUN curl --fail --location --silent --show-error "${GAZEBO_APT_KEY_URL}" \
     rm -rf /var/lib/apt/lists/* /tmp/gazebo.gpg
 
 RUN git clone --branch "${PX4_VERSION}" --depth 1 --recursive \
-      https://github.com/PX4/PX4-Autopilot.git /opt/PX4-Autopilot && \
+      "${PX4_GIT_URL}" /opt/PX4-Autopilot && \
     test "$(git -C /opt/PX4-Autopilot rev-parse HEAD)" = "${PX4_GIT_COMMIT}" && \
     cd /opt/PX4-Autopilot && \
     bash Tools/setup/ubuntu.sh --no-nuttx && \
@@ -51,10 +59,11 @@ RUN cd /opt/PX4-Autopilot && \
     make px4_sitl_default -j"${PX4_BUILD_JOBS}"
 USER root
 
-RUN git clone --filter=blob:none https://github.com/valkey-io/valkey.git /tmp/valkey && \
+RUN git clone --filter=blob:none "${VALKEY_GIT_URL}" /tmp/valkey && \
     git -C /tmp/valkey checkout --detach "${VALKEY_GIT_COMMIT}" && \
     test "$(git -C /tmp/valkey rev-parse HEAD)" = "${VALKEY_GIT_COMMIT}" && \
     make -C /tmp/valkey -j2 BUILD_TLS=yes USE_SYSTEMD=yes && \
+    /tmp/valkey/src/valkey-server --version | grep -F "v=${VALKEY_VERSION} " && \
     install -m 0755 /tmp/valkey/src/valkey-server /usr/local/bin/valkey-server && \
     install -m 0755 /tmp/valkey/src/valkey-cli /usr/local/bin/valkey-cli && \
     install -D -m 0644 /tmp/valkey/COPYING /usr/share/doc/valkey/COPYING && \
@@ -68,6 +77,12 @@ RUN test -n "${DRONEDREAM_SOURCE_COMMIT}" && \
     /opt/dronedream/venv/bin/pip install --disable-pip-version-check --no-cache-dir \
       --no-deps /opt/dronedream/source/backend /opt/dronedream/source/worker && \
     /opt/dronedream/venv/bin/pip check && \
+    test "$(/opt/dronedream/venv/bin/python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')" = "${PYTHON_VERSION}" && \
+    test "$(/opt/dronedream/venv/bin/python -c 'import importlib.metadata as m; print(m.version("drone-dream-backend"))')" = "${BACKEND_VERSION}" && \
+    test "$(/opt/dronedream/venv/bin/python -c 'import importlib.metadata as m; print(m.version("drone-dream-worker"))')" = "${WORKER_VERSION}" && \
+    test "$(/opt/dronedream/venv/bin/python -c 'import importlib.metadata as m; print(m.version("mavsdk"))')" = "${MAVSDK_VERSION}" && \
+    test "$(/opt/dronedream/venv/bin/python -c 'import importlib.metadata as m; print(m.version("pyulog"))')" = "${PYULOG_VERSION}" && \
+    test "$(dpkg-query -W -f='${Version}' "${GAZEBO_METAPACKAGE}")" = "${GAZEBO_METAPACKAGE_VERSION}" && \
     install -d -m 0755 /usr/share/doc/dronedream-runtime && \
     install -m 0644 /opt/dronedream/source/LICENSE \
       /usr/share/doc/dronedream-runtime/LICENSE && \
@@ -113,6 +128,13 @@ RUN chmod 0755 /usr/lib/dronedream/runtime-init.sh \
     test -x /opt/dronedream/venv/bin/uvicorn && \
     test -x /opt/dronedream/venv/bin/drone-dream-worker && \
     test -x /usr/lib/dronedream/px4-log-cleanup.py && \
+    test -x /usr/bin/curl && \
+    test -x /usr/bin/timeout && \
+    test -x /usr/bin/head && \
+    test -x /usr/bin/systemctl && \
+    test -x /usr/bin/journalctl && \
+    test -x /usr/bin/ss && \
+    test -x /usr/bin/ip && \
     test -s /usr/share/doc/valkey/COPYING && \
     test -s /usr/share/doc/dronedream-runtime/LICENSE && \
     test -s /usr/share/doc/dronedream-runtime/THIRD_PARTY_NOTICES.md && \
@@ -127,7 +149,10 @@ RUN chmod 0755 /usr/lib/dronedream/runtime-init.sh \
       dronedream-px4-log-cleanup.timer && \
     printf '[network]\ngenerateResolvConf=true\n' >/etc/wsl.conf.tmp && \
     cat /etc/wsl.conf >>/etc/wsl.conf.tmp && mv /etc/wsl.conf.tmp /etc/wsl.conf && \
-    printf 'uninitialized\n' >/etc/machine-id && \
+    rm -f /var/lib/dbus/machine-id && \
+    : >/etc/machine-id && \
+    ln -s /etc/machine-id /var/lib/dbus/machine-id && \
+    ln -sfn /dev/null /etc/systemd/system/systemd-firstboot.service && \
     rm -rf /root/.cache /home/dronedream/.cache /tmp/* /var/lib/apt/lists/*
 
 STOPSIGNAL SIGRTMIN+3

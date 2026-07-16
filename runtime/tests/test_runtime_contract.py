@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -48,9 +49,7 @@ class RuntimeManifestContractTests(unittest.TestCase):
             set(manifest["components"]) & {"backend", "px4", "gazebo"},
             {"backend", "px4", "gazebo"},
         )
-        self.assertTrue(
-            all(isinstance(value, str) for value in manifest["components"].values())
-        )
+        self.assertTrue(all(isinstance(value, str) for value in manifest["components"].values()))
         self.assertEqual(
             manifest["smokeTests"],
             {"px4Sitl": False, "gazebo": False, "parameterReadback": False},
@@ -58,6 +57,23 @@ class RuntimeManifestContractTests(unittest.TestCase):
         runtime_manifest.validate_manifest(manifest)
         with self.assertRaises(runtime_manifest.ManifestError):
             runtime_manifest.validate_manifest(manifest, require_smoke_passed=True)
+
+    def test_python_component_pins_match_the_exact_lock(self) -> None:
+        pins = runtime_manifest.load_pins(RUNTIME / "pins.env")
+        packages = runtime_manifest.validate_python_lock(
+            RUNTIME / "locks" / "python-requirements.lock"
+        )
+        runtime_manifest.validate_pin_lock_versions(pins, packages)
+        packages["mavsdk"] = "0.0.0"
+        with self.assertRaisesRegex(runtime_manifest.ManifestError, "MAVSDK_VERSION"):
+            runtime_manifest.validate_pin_lock_versions(pins, packages)
+
+    def test_source_package_versions_match_runtime_pins(self) -> None:
+        pins = runtime_manifest.load_pins(RUNTIME / "pins.env")
+        backend = tomllib.loads((ROOT / "backend" / "pyproject.toml").read_text(encoding="utf-8"))
+        worker = tomllib.loads((ROOT / "worker" / "pyproject.toml").read_text(encoding="utf-8"))
+        self.assertEqual(backend["project"]["version"], pins["BACKEND_VERSION"])
+        self.assertEqual(worker["project"]["version"], pins["WORKER_VERSION"])
 
     def test_promotion_is_atomic_and_requires_every_real_check(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -70,7 +86,7 @@ class RuntimeManifestContractTests(unittest.TestCase):
                 "passed": True,
                 "completedAt": "2026-07-11T00:00:00+00:00",
                 "checks": [
-                    {"name": name, "passed": True}
+                    {"name": name, "passed": True, "durationSeconds": 1}
                     for name in sorted(runtime_manifest.REQUIRED_SMOKE_CHECKS)
                 ],
             }
@@ -88,19 +104,70 @@ class RuntimeManifestContractTests(unittest.TestCase):
             report["checks"].pop()
             report_path.write_text(json.dumps(report), encoding="utf-8")
             with self.assertRaises(runtime_manifest.ManifestError):
-                runtime_manifest.promote_smoke(
-                    manifest_path, report_path, promoted_path
-                )
+                runtime_manifest.promote_smoke(manifest_path, report_path, promoted_path)
+
+    def test_manifest_validation_fails_cleanly_for_malformed_shapes(self) -> None:
+        for malformed in (None, [], "manifest", 1):
+            with (
+                self.subTest(malformed=malformed),
+                self.assertRaisesRegex(
+                    runtime_manifest.ManifestError, "runtime manifest must be an object"
+                ),
+            ):
+                runtime_manifest.validate_manifest(malformed)
+
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["unsupported"] = True
+            with self.assertRaisesRegex(runtime_manifest.ManifestError, "unsupported"):
+                runtime_manifest.validate_manifest(manifest)
+
+    def test_promotion_rejects_incomplete_or_duplicated_smoke_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            manifest, manifest_path = self._generate(temp)
+            checks = [
+                {"name": name, "passed": True, "durationSeconds": 1}
+                for name in sorted(runtime_manifest.REQUIRED_SMOKE_CHECKS)
+            ]
+            report = {
+                "mode": "runtime-image",
+                "runtimeId": manifest["runtimeId"],
+                "imageId": "sha256:test-only",
+                "passed": True,
+                "completedAt": "2026-07-11T00:00:00+00:00",
+                "checks": checks,
+            }
+            report_path = temp / "report.json"
+            output_path = temp / "promoted.json"
+
+            for mutation in (
+                "missing_timestamp",
+                "duplicate_check",
+                "negative_duration",
+            ):
+                candidate = json.loads(json.dumps(report))
+                if mutation == "missing_timestamp":
+                    candidate.pop("completedAt")
+                elif mutation == "duplicate_check":
+                    candidate["checks"].append(dict(candidate["checks"][0]))
+                else:
+                    candidate["checks"][0]["durationSeconds"] = -1
+                report_path.write_text(json.dumps(candidate), encoding="utf-8")
+                with (
+                    self.subTest(mutation=mutation),
+                    self.assertRaises(runtime_manifest.ManifestError),
+                ):
+                    runtime_manifest.promote_smoke(manifest_path, report_path, output_path)
 
     def test_template_keeps_desktop_fields(self) -> None:
         template = json.loads((RUNTIME / "runtime-manifest.template.json").read_text())
         schema = json.loads((RUNTIME / "manifest.schema.json").read_text())
         self.assertEqual(schema["properties"]["schemaVersion"]["const"], 1)
+        self.assertEqual(set(schema["required"]), set(template))
         self.assertEqual(template["schemaVersion"], 1)
         self.assertEqual(set(template["components"]), {"backend", "px4", "gazebo"})
-        self.assertEqual(
-            set(template["smokeTests"]), {"px4Sitl", "gazebo", "parameterReadback"}
-        )
+        self.assertEqual(set(template["smokeTests"]), {"px4Sitl", "gazebo", "parameterReadback"})
 
     def test_contract_tracks_desktop_reader(self) -> None:
         desktop = (ROOT / "desktop" / "src-tauri" / "src" / "runtime.rs").read_text(
@@ -155,6 +222,30 @@ class ThirdPartyNoticeContractTests(unittest.TestCase):
             self.assertIn(pins[name], notice, name)
         self.assertIn("/usr/share/doc/*/copyright", notice)
         self.assertIn("/usr/share/doc/valkey/COPYING", notice)
+
+
+class RuntimeReleaseImmutabilityContractTests(unittest.TestCase):
+    def test_release_workflow_guards_existing_remote_tag(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "runtime-release.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn(
+            'git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG"',
+            workflow,
+        )
+        self.assertIn('if [[ "$tag_status" -ne 2 ]]', workflow)
+
+    def test_rootfs_export_refuses_every_existing_release_artifact(self) -> None:
+        script = (RUNTIME / "export-rootfs.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            'for artifact in "$output" "$partial" "$output.sha256" "$output.manifest.json"',
+            script,
+        )
+        self.assertIn('if [[ -e "$artifact" || -L "$artifact" ]]', script)
+        # The only deletion is cleanup of the just-created partial when it
+        # breaches the hard size cap; pre-existing partials are never removed.
+        self.assertEqual(script.count('rm -f "$partial"'), 1)
 
 
 @unittest.skipUnless(
@@ -312,6 +403,53 @@ class SystemdContractTests(unittest.TestCase):
         api = (RUNTIME / "systemd" / "dronedream-api.service").read_text()
         self.assertIn("--port 8000", api)
 
+    def test_runtime_services_use_a_consistent_systemd_sandbox(self) -> None:
+        common = {
+            "UMask=0027",
+            "NoNewPrivileges=true",
+            "PrivateTmp=true",
+            "ProtectSystem=strict",
+            "ProtectKernelTunables=true",
+            "ProtectKernelModules=true",
+            "ProtectControlGroups=true",
+            "LockPersonality=true",
+            "RestrictSUIDSGID=true",
+        }
+        for filename in self.EXPECTED_EXECUTABLES:
+            text = (RUNTIME / "systemd" / filename).read_text(encoding="utf-8")
+            for directive in common:
+                self.assertIn(directive, text, filename)
+        init = (RUNTIME / "systemd" / "dronedream-runtime-init.service").read_text(encoding="utf-8")
+        self.assertIn(
+            "ReadWritePaths=/etc/dronedream /var/lib/dronedream /var/lib/valkey",
+            init,
+        )
+
+    def test_runtime_diagnostic_tools_are_packaged_and_verified(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        self.assertRegex(dockerfile, r"\biproute2\b")
+        for executable in (
+            "/usr/bin/curl",
+            "/usr/bin/timeout",
+            "/usr/bin/head",
+            "/usr/bin/systemctl",
+            "/usr/bin/journalctl",
+            "/usr/bin/ss",
+            "/usr/bin/ip",
+        ):
+            self.assertIn(f"test -x {executable}", dockerfile, executable)
+
+    def test_generic_wsl_image_cannot_block_on_interactive_firstboot(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        self.assertNotIn("printf 'uninitialized\\n' >/etc/machine-id", dockerfile)
+        self.assertIn(": >/etc/machine-id", dockerfile)
+        self.assertIn("rm -f /var/lib/dbus/machine-id", dockerfile)
+        self.assertIn("ln -s /etc/machine-id /var/lib/dbus/machine-id", dockerfile)
+        self.assertIn(
+            "ln -sfn /dev/null /etc/systemd/system/systemd-firstboot.service",
+            dockerfile,
+        )
+
     def test_context_excludes_large_desktop_build_outputs(self) -> None:
         ignore = (RUNTIME / "Dockerfile.dockerignore").read_text(encoding="utf-8")
         self.assertIn("**/target/**", ignore)
@@ -327,18 +465,47 @@ class SystemdContractTests(unittest.TestCase):
         self.assertLess(unprivileged, build)
         self.assertNotIn("NOPASSWD", dockerfile)
 
+    def test_build_checks_and_forwards_every_reported_component_version(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        build_script = (RUNTIME / "build-rootfs.sh").read_text(encoding="utf-8")
+        for name in (
+            "PX4_GIT_URL",
+            "PX4_GIT_COMMIT",
+            "GAZEBO_METAPACKAGE_VERSION",
+            "VALKEY_VERSION",
+            "VALKEY_GIT_URL",
+            "VALKEY_GIT_COMMIT",
+            "PYTHON_VERSION",
+            "BACKEND_VERSION",
+            "WORKER_VERSION",
+            "MAVSDK_VERSION",
+            "PYULOG_VERSION",
+        ):
+            self.assertIn(f'--build-arg "{name}=${name}"', build_script, name)
+            self.assertIn(f"ARG {name}=", dockerfile, name)
+        self.assertIn('grep -F "v=${VALKEY_VERSION} "', dockerfile)
+        self.assertIn('m.version("drone-dream-backend")', dockerfile)
+        self.assertIn('m.version("drone-dream-worker")', dockerfile)
+        self.assertIn('m.version("mavsdk")', dockerfile)
+        self.assertIn('m.version("pyulog")', dockerfile)
+        self.assertIn('= "${GAZEBO_METAPACKAGE_VERSION}"', dockerfile)
+
     def test_smoke_uses_the_worker_sandbox_without_root_shortcuts(self) -> None:
-        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(
-            encoding="utf-8"
-        )
+        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(encoding="utf-8")
         smoke = (RUNTIME / "smoke-image.sh").read_text(encoding="utf-8")
         keys = {
             "User",
             "Group",
+            "UMask",
             "NoNewPrivileges",
             "PrivateTmp",
             "ProtectSystem",
             "ProtectHome",
+            "ProtectKernelTunables",
+            "ProtectKernelModules",
+            "ProtectControlGroups",
+            "LockPersonality",
+            "RestrictSUIDSGID",
             "ReadWritePaths",
         }
         worker_properties = {
@@ -352,16 +519,12 @@ class SystemdContractTests(unittest.TestCase):
         self.assertIsNotNone(block)
         smoke_properties = dict(
             item.split("=", 1)
-            for item in re.findall(
-                r'^\s+"([A-Za-z]+=[^"]+)"$', block["body"], re.MULTILINE
-            )
+            for item in re.findall(r'^\s+"([A-Za-z]+=[^"]+)"$', block["body"], re.MULTILINE)
         )
         self.assertEqual(smoke_properties, worker_properties)
         self.assertIn("/usr/bin/systemd-run", smoke)
         self.assertIn("--working-directory=/opt/dronedream/source", smoke)
-        self.assertNotIn(
-            'docker exec "$container" /usr/lib/dronedream/runtime-check.sh', smoke
-        )
+        self.assertNotIn('docker exec "$container" /usr/lib/dronedream/runtime-check.sh', smoke)
         self.assertIn("/var/lib/dronedream/runtime-smoke", smoke)
         self.assertNotIn("/tmp/dronedream-runtime-smoke", smoke)
 
@@ -393,9 +556,9 @@ class SystemdContractTests(unittest.TestCase):
         )
         self.assertIn("OnUnitActiveSec=1h", timer)
         self.assertIn("Persistent=true", timer)
-        service = (
-            RUNTIME / "systemd" / "dronedream-px4-log-cleanup.service"
-        ).read_text(encoding="utf-8")
+        service = (RUNTIME / "systemd" / "dronedream-px4-log-cleanup.service").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("User=dronedream", service)
         self.assertIn("ProtectSystem=strict", service)
         self.assertIn(
@@ -404,9 +567,7 @@ class SystemdContractTests(unittest.TestCase):
         )
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn("dronedream-px4-log-cleanup.timer", dockerfile)
-        source = (RUNTIME / "scripts" / "px4-log-cleanup.py").read_text(
-            encoding="utf-8"
-        )
+        source = (RUNTIME / "scripts" / "px4-log-cleanup.py").read_text(encoding="utf-8")
         self.assertIn("os.O_DIRECTORY", source)
         self.assertIn("os.O_NOFOLLOW", source)
         self.assertIn("os.stat(leaf, dir_fd=parent_fd, follow_symlinks=False)", source)
@@ -416,9 +577,11 @@ class SystemdContractTests(unittest.TestCase):
     def test_unsupported_ulog_dirfd_platform_fails_closed(self) -> None:
         if px4_log_cleanup.secure_dirfd_supported():
             self.skipTest("secure POSIX dirfd support is available")
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(px4_log_cleanup.CleanupError):
-                px4_log_cleanup.cleanup_logs(Path(directory))
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            self.assertRaises(px4_log_cleanup.CleanupError),
+        ):
+            px4_log_cleanup.cleanup_logs(Path(directory))
 
 
 if __name__ == "__main__":

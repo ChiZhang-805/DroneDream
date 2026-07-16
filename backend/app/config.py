@@ -11,6 +11,20 @@ from uuid import UUID
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_PLACEHOLDER_MARKERS = (
+    "change-me",
+    "changeme",
+    "example-token",
+    "replace-me",
+    "replace-with",
+    "your-token",
+)
+
+
+def _is_obvious_placeholder(value: str) -> bool:
+    normalized = value.strip().lower().replace("_", "-")
+    return any(marker in normalized for marker in _PLACEHOLDER_MARKERS)
+
 
 class Settings(BaseSettings):
     """Backend settings. Values come from env vars or a local .env file."""
@@ -33,8 +47,7 @@ class Settings(BaseSettings):
     database_auto_create: bool = Field(default=True)
     cors_origins: str = Field(
         default=(
-            "http://localhost:5173,http://127.0.0.1:5173,"
-            "http://tauri.localhost,tauri://localhost"
+            "http://localhost:5173,http://127.0.0.1:5173,http://tauri.localhost,tauri://localhost"
         )
     )
 
@@ -42,7 +55,7 @@ class Settings(BaseSettings):
     # Keep this default aligned with app.simulator.real_cli._DEFAULT_ARTIFACT_ROOT
     # so generated real-simulator artifacts are always downloadable by default.
     real_simulator_artifact_root: str = Field(default="./artifacts")
-    artifact_root: str = Field(default="/tmp/drone_dream_artifacts")
+    artifact_root: str = Field(default="./artifacts")
     worker_lease_seconds: int = Field(default=900, ge=1)
     worker_lease_heartbeat_seconds: float = Field(default=30.0, gt=0)
     worker_stale_running_reclaim_enabled: bool = Field(default=True)
@@ -85,9 +98,7 @@ class Settings(BaseSettings):
     job_secret_cleanup_interval_seconds: int = Field(default=60, ge=10, le=3600)
     finalization_lease_seconds: int = Field(default=900, ge=60, le=7200)
     sqlite_busy_timeout_seconds: int = Field(default=30, ge=1, le=300)
-    auth_mode: Literal["disabled", "demo_token", "oidc_jwt"] = Field(
-        default="disabled"
-    )
+    auth_mode: Literal["disabled", "demo_token", "oidc_jwt"] = Field(default="disabled")
     demo_auth_tokens: str = Field(default="")
     oidc_issuer: str | None = Field(default=None)
     oidc_audience: str | None = Field(default=None)
@@ -108,9 +119,7 @@ class Settings(BaseSettings):
         try:
             parsed = UUID(raw)
         except ValueError as error:
-            raise ValueError(
-                "DRONEDREAM_RUNTIME_ID must be a canonical UUID"
-            ) from error
+            raise ValueError("DRONEDREAM_RUNTIME_ID must be a canonical UUID") from error
         canonical = str(parsed)
         if canonical != raw.lower():
             raise ValueError("DRONEDREAM_RUNTIME_ID must be a canonical UUID")
@@ -121,6 +130,30 @@ class Settings(BaseSettings):
         """Reject the development-only anonymous identity in production."""
 
         is_production = self.app_env.strip().lower() in {"prod", "production"}
+        if self.worker_lease_heartbeat_seconds >= self.worker_lease_seconds:
+            raise ValueError(
+                "WORKER_LEASE_HEARTBEAT_SECONDS must be less than WORKER_LEASE_SECONDS"
+            )
+        if self.worker_presence_interval_seconds >= self.worker_presence_ttl_seconds:
+            raise ValueError(
+                "WORKER_PRESENCE_INTERVAL_SECONDS must be less than WORKER_PRESENCE_TTL_SECONDS"
+            )
+        for setting_name, raw_root in (
+            ("ARTIFACT_ROOT", self.artifact_root),
+            ("REAL_SIMULATOR_ARTIFACT_ROOT", self.real_simulator_artifact_root),
+        ):
+            if not raw_root.strip():
+                raise ValueError(f"{setting_name} cannot be blank")
+            resolved_root = Path(raw_root).resolve()
+            if resolved_root == Path(resolved_root.anchor):
+                raise ValueError(f"{setting_name} cannot be a filesystem root")
+        if (
+            len(self.s3_prefix) > 512
+            or any(ord(char) < 32 for char in self.s3_prefix)
+            or self.s3_prefix.startswith("/")
+            or "//" in self.s3_prefix
+        ):
+            raise ValueError("S3_PREFIX must be a relative object prefix of at most 512 chars")
         minimum_finalization_lease = (
             self.llm_request_timeout_seconds * (self.llm_max_retries + 1) + 60
         )
@@ -135,6 +168,59 @@ class Settings(BaseSettings):
                 "CORS_ORIGINS must list exact trusted origins; wildcard origins "
                 "are incompatible with credentialed CORS"
             )
+        for origin in self.cors_origin_list:
+            parsed_origin = urlsplit(origin)
+            try:
+                _ = parsed_origin.port
+            except ValueError as exc:
+                raise ValueError(f"CORS_ORIGINS contains an invalid port: {origin!r}") from exc
+            if (
+                parsed_origin.scheme not in {"http", "https", "tauri"}
+                or not parsed_origin.hostname
+                or parsed_origin.username
+                or parsed_origin.password
+                or parsed_origin.query
+                or parsed_origin.fragment
+                or parsed_origin.path not in {"", "/"}
+                or parsed_origin.netloc.endswith(":")
+            ):
+                raise ValueError(
+                    f"CORS_ORIGINS contains an invalid origin (scheme/host/port only): {origin!r}"
+                )
+            if (
+                is_production
+                and parsed_origin.scheme == "http"
+                and parsed_origin.hostname not in {"localhost", "127.0.0.1", "::1"}
+                and not parsed_origin.hostname.endswith(".localhost")
+            ):
+                raise ValueError("Production web CORS origins must use HTTPS (localhost is exempt)")
+        if self.auth_mode == "demo_token" and self.demo_auth_tokens.strip():
+            raw_pairs = [pair.strip() for pair in self.demo_auth_tokens.split(",") if pair.strip()]
+            parsed_tokens: list[str] = []
+            for pair in raw_pairs:
+                if ":" not in pair:
+                    raise ValueError("DEMO_AUTH_TOKENS entries must use the email:token format")
+                email, token = (part.strip() for part in pair.split(":", 1))
+                if (
+                    not email
+                    or len(email) > 255
+                    or not token
+                    or len(token) > 4096
+                    or any(ord(char) < 32 for char in email + token)
+                ):
+                    raise ValueError("DEMO_AUTH_TOKENS contains an invalid email:token entry")
+                if is_production and (
+                    len(token.encode("utf-8")) < 32
+                    or len(set(token)) < 8
+                    or _is_obvious_placeholder(token)
+                ):
+                    raise ValueError(
+                        "Production DEMO_AUTH_TOKENS must use non-placeholder tokens "
+                        "of at least 32 UTF-8 bytes with adequate character diversity"
+                    )
+                parsed_tokens.append(token)
+            if len(set(parsed_tokens)) != len(parsed_tokens):
+                raise ValueError("DEMO_AUTH_TOKENS cannot assign the same token more than once")
         if self.auth_mode == "oidc_jwt":
             missing = [
                 name
@@ -146,12 +232,22 @@ class Settings(BaseSettings):
                 if not value or not value.strip()
             ]
             if missing:
-                raise ValueError(
-                    "AUTH_MODE=oidc_jwt requires " + ", ".join(missing)
-                )
-            assert self.oidc_jwks_url is not None
-            parsed_jwks = urlsplit(self.oidc_jwks_url)
-            if parsed_jwks.scheme not in {"http", "https"} or not parsed_jwks.hostname:
+                raise ValueError("AUTH_MODE=oidc_jwt requires " + ", ".join(missing))
+            jwks_url = self.oidc_jwks_url
+            if jwks_url is None:  # Defensive guard for future validator changes.
+                raise ValueError("AUTH_MODE=oidc_jwt requires OIDC_JWKS_URL")
+            parsed_jwks = urlsplit(jwks_url)
+            try:
+                _ = parsed_jwks.port
+            except ValueError as exc:
+                raise ValueError("OIDC_JWKS_URL contains an invalid port") from exc
+            if (
+                parsed_jwks.scheme not in {"http", "https"}
+                or not parsed_jwks.hostname
+                or parsed_jwks.username
+                or parsed_jwks.password
+                or parsed_jwks.fragment
+            ):
                 raise ValueError("OIDC_JWKS_URL must be an absolute HTTP(S) URL")
             if is_production and parsed_jwks.scheme != "https":
                 raise ValueError("OIDC_JWKS_URL must use HTTPS in production")
@@ -236,11 +332,7 @@ class Settings(BaseSettings):
 
     @property
     def oidc_audience_list(self) -> list[str]:
-        return [
-            item.strip()
-            for item in (self.oidc_audience or "").split(",")
-            if item.strip()
-        ]
+        return [item.strip() for item in (self.oidc_audience or "").split(",") if item.strip()]
 
     @property
     def oidc_algorithm_list(self) -> list[str]:

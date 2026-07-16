@@ -13,10 +13,16 @@ ExecStartPre=/opt/dronedream/venv/bin/alembic -c /opt/dronedream/source/backend/
 ExecStart=/opt/dronedream/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=3
+UMask=0027
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
 ReadWritePaths=/var/lib/dronedream /tmp
 
 [Install]

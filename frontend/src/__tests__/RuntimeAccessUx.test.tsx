@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +8,7 @@ import { AppShell } from "../AppShell";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { Dashboard } from "../pages/Dashboard";
 import { DesktopSetup } from "../pages/DesktopSetup";
+import { resetDesktopReadinessSession } from "../desktop/readiness";
 import { History } from "../pages/History";
 
 const missingRuntime = {
@@ -58,6 +59,16 @@ const stoppedRuntime = {
   })),
 };
 
+const autoStartableRuntime = {
+  ...readyRuntime,
+  running: false,
+  ready: false,
+  components: readyRuntime.components.map((component) => ({
+    ...component,
+    status: component.id === "host-ownership" ? "ready" : "stopped",
+  })),
+};
+
 const prerequisites = {
   platform: "windows",
   supported: true,
@@ -75,20 +86,20 @@ const prerequisites = {
 };
 
 describe("desktop runtime access UX", () => {
-  afterEach(() => {
+afterEach(() => {
+  resetDesktopReadinessSession();
+    delete window.__TAURI__;
+    window.localStorage.clear();
     vi.restoreAllMocks();
   });
 
   it("keeps read-only pages visible, marks runtime routes, and avoids backend calls", async () => {
-    window.__TAURI__ = {
-      core: {
-        invoke: vi.fn(async (command: string) => {
-          if (command === "probe_system_prerequisites") return prerequisites;
-          if (command === "probe_runtime_status") return missingRuntime;
-          throw new Error(`Unexpected command: ${command}`);
-        }),
-      },
-    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
     const listJobs = vi.spyOn(apiClient, "listJobs");
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -114,21 +125,26 @@ describe("desktop runtime access UX", () => {
 
     expect(await screen.findByText("Runtime data is not available yet"))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Dashboard" }))
+    expect(screen.getByRole("link", { name: "Overview" }))
       .not.toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "History / Reports" }))
+    expect(screen.getByRole("link", { name: "Run History" }))
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "ECE498" }))
       .not.toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "New Experiment" }))
+    expect(screen.getByRole("link", { name: "Experiment" }))
       .toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "New Batch" }))
-      .toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "Batches" }))
-      .toHaveClass("runtime-locked");
+    expect(screen.queryByRole("link", { name: "New Batch" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Primary navigation" })
+      .querySelectorAll("a")).toHaveLength(4);
     expect(listJobs).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
+      .toHaveLength(1);
 
-    await router.navigate("/history");
+    await act(async () => {
+      await router.navigate("/history");
+    });
     await waitFor(() => {
       expect(screen.getByText("Runtime data is not available yet")).toBeInTheDocument();
     });
@@ -138,31 +154,123 @@ describe("desktop runtime access UX", () => {
     queryClient.clear();
   });
 
-  it("invalidates a previous ready state when only the setup query changes", async () => {
-    let runtimeProbeCount = 0;
-    let resolveSecondProbe: (value: typeof missingRuntime) => void = () => undefined;
-    const secondProbe = new Promise<typeof missingRuntime>((resolve) => {
-      resolveSecondProbe = resolve;
+  it("starts an owned stopped runtime once across route changes and unlocks the platform", async () => {
+    let resolveStart: (value: typeof readyRuntime) => void = () => undefined;
+    const pendingStart = new Promise<typeof readyRuntime>((resolve) => {
+      resolveStart = resolve;
     });
-    window.__TAURI__ = {
-      core: {
-        invoke: vi.fn(async (command: string) => {
-          if (command === "probe_system_prerequisites") return prerequisites;
-          if (command === "probe_runtime_status") {
-            runtimeProbeCount += 1;
-            return runtimeProbeCount === 1 ? readyRuntime : secondProbe;
-          }
-          throw new Error(`Unexpected command: ${command}`);
-        }),
-      },
-    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return autoStartableRuntime;
+      if (command === "start_runtime") return pendingStart;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const listJobs = vi.spyOn(apiClient, "listJobs").mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 10,
+    } as never);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     const router = createMemoryRouter([
       {
         path: "/",
         element: <AppShell />,
         children: [
-          { path: "desktop/setup", element: <div>Setup placeholder</div> },
+          { path: "dashboard", element: <Dashboard /> },
+          { path: "history", element: <History /> },
         ],
+      },
+    ], { initialEntries: ["/dashboard"] });
+
+    render(
+      <I18nProvider>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText("Starting the local runtime")).toBeInTheDocument();
+    await act(async () => {
+      await router.navigate("/history");
+    });
+    expect(await screen.findByText("Starting the local runtime")).toBeInTheDocument();
+    expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+      .toHaveLength(1);
+
+    resolveStart(readyRuntime);
+    await waitFor(() => expect(listJobs).toHaveBeenCalled());
+    expect(screen.queryByText("Starting the local runtime")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Experiment" }))
+      .not.toHaveClass("runtime-locked");
+
+    router.dispose();
+    queryClient.clear();
+  });
+
+  it("shows one actionable failure when automatic start fails", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return autoStartableRuntime;
+      if (command === "start_runtime") throw new Error("health check failed");
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: <AppShell />,
+        children: [
+          { path: "dashboard", element: <Dashboard /> },
+          { path: "history", element: <History /> },
+        ],
+      },
+    ], { initialEntries: ["/dashboard"] });
+
+    render(
+      <I18nProvider>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText("The local runtime could not start"))
+      .toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Open settings" }).length)
+      .toBeGreaterThan(0);
+    expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+      .toHaveLength(1);
+    await act(async () => {
+      await router.navigate("/history");
+    });
+    expect(await screen.findByText("The local runtime could not start"))
+      .toBeInTheDocument();
+    expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+      .toHaveLength(1);
+    router.dispose();
+    queryClient.clear();
+  });
+
+  it("does not auto-start from the explicit setup route", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return autoStartableRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: <AppShell />,
+        children: [{ path: "desktop/setup", element: <div>Setup placeholder</div> }],
       },
     ], { initialEntries: ["/desktop/setup"] });
 
@@ -172,20 +280,67 @@ describe("desktop runtime access UX", () => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Ready for local tuning")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "New Experiment" }))
-      .not.toBeInTheDocument();
-
-    await router.navigate("/desktop/setup?required=batch");
+    expect(await screen.findByText("Setup placeholder")).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText("Checking…")).toBeInTheDocument();
+      expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
+        .toHaveLength(1);
     });
-    expect(runtimeProbeCount).toBe(2);
+    expect(invoke.mock.calls.some(([command]) => command === "start_runtime")).toBe(false);
 
-    resolveSecondProbe(missingRuntime);
-    await waitFor(() => {
-      expect(screen.getByText("Runtime")).toBeInTheDocument();
+    router.dispose();
+  });
+
+  it("reuses the startup result across navigation and rechecks only on demand", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return readyRuntime;
+      if (command === "start_runtime") return readyRuntime;
+      throw new Error(`Unexpected command: ${command}`);
     });
+    window.__TAURI__ = { core: { invoke } };
+    const router = createMemoryRouter([
+      {
+        path: "/",
+        element: <AppShell />,
+        children: [
+          { path: "dashboard", element: <div>Dashboard placeholder</div> },
+          { path: "history", element: <div>History placeholder</div> },
+        ],
+      },
+    ], { initialEntries: ["/dashboard"] });
+
+    render(
+      <I18nProvider>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    );
+
+    await waitFor(() => {
+      expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
+        .toHaveLength(1);
+    });
+    await act(async () => {
+      await router.navigate("/history?view=recent");
+    });
+    expect(screen.getByText("History placeholder")).toBeInTheDocument();
+    expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
+      .toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+    await waitFor(() => {
+      expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
+        .toHaveLength(2);
+    });
+    expect(invoke.mock.calls.filter(([command]) => command === "probe_system_prerequisites"))
+      .toHaveLength(2);
+    expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+      .toHaveLength(1);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Check environment" }))
+        .not.toBeDisabled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
 
     router.dispose();
   });
@@ -225,7 +380,7 @@ describe("desktop runtime access UX", () => {
     expect(await screen.findByText("The installed runtime is ready."))
       .toBeInTheDocument();
     expect(screen.getAllByText("Ready for local tuning").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("link", { name: "New Experiment" }))
+    expect(screen.queryByRole("link", { name: "Experiment" }))
       .not.toBeInTheDocument();
     expect(screen.queryByText("This feature needs DroneDreamRuntime"))
       .not.toBeInTheDocument();

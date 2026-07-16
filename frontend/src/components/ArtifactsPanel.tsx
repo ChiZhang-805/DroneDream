@@ -1,6 +1,7 @@
 import { Empty, Loading } from "./States";
 import { SectionCard } from "./SectionCard";
 import { ArtifactCard } from "./ArtifactCard";
+import { useI18n } from "../i18n/I18nProvider";
 import type { Artifact } from "../types/api";
 
 interface ArtifactSection {
@@ -36,21 +37,25 @@ function ArtifactSectionGrid({ heading, artifacts, emptyNote }: ArtifactSection)
 }
 
 export function ArtifactsPanel({
-  title = "Artifacts",
+  title,
   description,
   sections,
   isLoading,
-  emptyTitle = "No artifacts yet",
-  emptyDescription = "Artifacts will appear after this job finishes.",
+  emptyTitle,
+  emptyDescription,
 }: ArtifactsPanelProps) {
+  const { t } = useI18n();
   const total = sections.reduce((acc, s) => acc + s.artifacts.length, 0);
 
   return (
-    <SectionCard title={title} description={description}>
+    <SectionCard title={title ?? t("artifacts.title")} description={description}>
       {isLoading ? (
-        <Loading label="Loading artifacts…" />
+        <Loading label={t("artifacts.loading")} />
       ) : total === 0 ? (
-        <Empty title={emptyTitle} description={emptyDescription} />
+        <Empty
+          title={emptyTitle ?? t("artifacts.emptyTitle")}
+          description={emptyDescription ?? t("artifacts.emptyDescription")}
+        />
       ) : (
         <div className="stack-md">
           {sections.map((section) => (

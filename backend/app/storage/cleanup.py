@@ -111,9 +111,7 @@ def _managed_files(roots: list[Path]) -> tuple[list[_ManagedFile], list[str]]:
         for directory, directory_names, file_names in os.walk(root, followlinks=False):
             directory_path = Path(directory)
             directory_names[:] = sorted(
-                name
-                for name in directory_names
-                if not (directory_path / name).is_symlink()
+                name for name in directory_names if not (directory_path / name).is_symlink()
             )
             for name in sorted(file_names):
                 candidate = directory_path / name
@@ -131,9 +129,7 @@ def _managed_files(roots: list[Path]) -> tuple[list[_ManagedFile], list[str]]:
                         _ManagedFile(
                             path=resolved,
                             size_bytes=int(file_stat.st_size),
-                            modified_at=datetime.fromtimestamp(
-                                file_stat.st_mtime, tz=timezone.utc
-                            ),
+                            modified_at=datetime.fromtimestamp(file_stat.st_mtime, tz=timezone.utc),
                             device=int(file_stat.st_dev),
                             inode=int(file_stat.st_ino),
                         )
@@ -310,9 +306,7 @@ def cleanup_local_artifacts(
 
     jobs = list(db.scalars(select(models.Job)))
     jobs_by_id = {job.id: job for job in jobs}
-    terminal_job_ids = {
-        job.id for job in jobs if job.status in schemas.JOB_TERMINAL_STATUSES
-    }
+    terminal_job_ids = {job.id for job in jobs if job.status in schemas.JOB_TERMINAL_STATUSES}
     active_job_ids = set(jobs_by_id) - terminal_job_ids
     recent_terminal_job_ids = {
         job.id
@@ -324,9 +318,7 @@ def cleanup_local_artifacts(
     }
     trial_to_job: dict[str, str] = {
         trial_id: job_id
-        for trial_id, job_id in db.execute(
-            select(models.Trial.id, models.Trial.job_id)
-        ).all()
+        for trial_id, job_id in db.execute(select(models.Trial.id, models.Trial.job_id)).all()
     }
     artifact_rows = list(db.scalars(select(models.Artifact)))
 
@@ -364,15 +356,9 @@ def cleanup_local_artifacts(
 
     selected_paths: dict[Path, str] = {}
     selected_reference_rows: dict[Path, list[models.Artifact]] = {}
-    orphan_cutoff = current_time - timedelta(
-        seconds=config.artifact_orphan_grace_seconds
-    )
-    minimum_age_cutoff = current_time - timedelta(
-        seconds=config.artifact_retention_min_age_seconds
-    )
-    maximum_age_cutoff = current_time - timedelta(
-        seconds=config.artifact_retention_max_age_seconds
-    )
+    orphan_cutoff = current_time - timedelta(seconds=config.artifact_orphan_grace_seconds)
+    minimum_age_cutoff = current_time - timedelta(seconds=config.artifact_retention_min_age_seconds)
+    maximum_age_cutoff = current_time - timedelta(seconds=config.artifact_retention_max_age_seconds)
 
     for path in sorted(orphan_paths, key=str):
         item = files_by_path[path]
@@ -444,20 +430,14 @@ def cleanup_local_artifacts(
 
     selected_existing_paths = set(selected_paths)
     selected_row_objects = {
-        artifact.id: artifact
-        for rows in selected_reference_rows.values()
-        for artifact in rows
+        artifact.id: artifact for rows in selected_reference_rows.values() for artifact in rows
     }
     result.planned_files = len(selected_existing_paths)
-    result.planned_bytes = sum(
-        files_by_path[path].size_bytes for path in selected_existing_paths
-    )
+    result.planned_bytes = sum(files_by_path[path].size_bytes for path in selected_existing_paths)
     result.planned_artifact_rows = len(selected_row_objects)
     for reason in selected_paths.values():
         result.planned_by_reason[reason] = result.planned_by_reason.get(reason, 0) + 1
-    missing_path_count = sum(
-        1 for path in selected_reference_rows if path not in files_by_path
-    )
+    missing_path_count = sum(1 for path in selected_reference_rows if path not in files_by_path)
     if missing_path_count:
         result.planned_by_reason["missing_file_metadata"] = missing_path_count
     result.projected_bytes_after = max(0, result.bytes_before - result.planned_bytes)
@@ -488,13 +468,17 @@ def cleanup_local_artifacts(
     audit_file_count_by_job: dict[str, int] = {}
     for artifact in selected_row_objects.values():
         job_id = _job_id_for_owner(artifact, trial_to_job)
-        assert job_id is not None and job_id in terminal_job_ids
+        if job_id is None or job_id not in terminal_job_ids:
+            raise RuntimeError("artifact cleanup plan contains an unowned or non-terminal artifact")
         audit_rows_by_job.setdefault(job_id, []).append(artifact)
     for path, rows in selected_reference_rows.items():
         reason = selected_paths.get(path, "missing_file_metadata")
         for artifact in rows:
             job_id = _job_id_for_owner(artifact, trial_to_job)
-            assert job_id is not None
+            if job_id is None or job_id not in terminal_job_ids:
+                raise RuntimeError(
+                    "artifact cleanup audit references an unowned or non-terminal artifact"
+                )
             audit_reasons_by_job.setdefault(job_id, set()).add(reason)
     for path, reason in selected_paths.items():
         job_id = _job_id_for_file(path, roots)
@@ -517,9 +501,7 @@ def cleanup_local_artifacts(
         else:
             locked_jobs = list(
                 db.scalars(
-                    select(models.Job)
-                    .where(models.Job.id.in_(audit_job_ids))
-                    .with_for_update()
+                    select(models.Job).where(models.Job.id.in_(audit_job_ids)).with_for_update()
                 )
             )
         locked_by_id = {job.id: job for job in locked_jobs}
@@ -573,9 +555,7 @@ def cleanup_local_artifacts(
             job_id = _job_id_for_file(path, roots)
             if job_id is not None:
                 owner_job = db.scalar(
-                    select(models.Job)
-                    .where(models.Job.id == job_id)
-                    .with_for_update()
+                    select(models.Job).where(models.Job.id == job_id).with_for_update()
                 )
                 if owner_job is not None and owner_job.status not in schemas.JOB_TERMINAL_STATUSES:
                     result.protected_active_job_files += 1
@@ -605,9 +585,7 @@ def cleanup_local_artifacts(
             result.errors.append(f"failed to delete {path}: {exc}")
 
     result.bytes_after = max(0, result.bytes_before - result.deleted_bytes)
-    result.capacity_excess_bytes = (
-        max(0, result.bytes_after - max_total) if max_total > 0 else 0
-    )
+    result.capacity_excess_bytes = max(0, result.bytes_after - max_total) if max_total > 0 else 0
     result.status = "completed_with_errors" if result.errors else "completed"
     return result
 

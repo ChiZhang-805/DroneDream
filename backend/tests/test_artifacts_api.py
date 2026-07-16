@@ -3,9 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi.testclient import TestClient
-
 from app import db, models
+from fastapi.testclient import TestClient
 
 
 def _seed_job() -> str:
@@ -96,6 +95,29 @@ def test_download_mock_artifact_rejected(client: TestClient) -> None:
 
     resp = client.get(f"/api/v1/artifacts/{art_id}/download")
     assert resp.status_code == 404
+
+
+def test_download_unknown_owner_type_fails_closed(client: TestClient, tmp_path: Path) -> None:
+    root = tmp_path / "real_artifacts"
+    path = root / "jobs" / "forged" / "secret.txt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("secret", encoding="utf-8")
+    with db.SessionLocal() as session:
+        artifact = models.Artifact(
+            owner_type="unknown",
+            owner_id="forged",
+            artifact_type="worker_log",
+            display_name="secret.txt",
+            storage_path=str(path),
+            mime_type="text/plain",
+        )
+        session.add(artifact)
+        session.commit()
+        artifact_id = artifact.id
+
+    response = client.get(f"/api/v1/artifacts/{artifact_id}/download")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "ARTIFACT_NOT_FOUND"
 
 
 def test_download_missing_file_returns_404(client: TestClient, tmp_path: Path) -> None:

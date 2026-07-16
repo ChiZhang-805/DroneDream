@@ -1,6 +1,7 @@
 # DroneDream Desktop
 
-This directory is a Tauri 2 shell around the existing React/Vite application
+This directory builds the `0.3.18` Windows development-preview installer and a
+Tauri 2 shell around the existing React/Vite application
 in `../frontend`. It does not copy or fork the business UI, and the normal web
 commands under `frontend/` continue to work unchanged.
 
@@ -30,7 +31,7 @@ commands under `frontend/` continue to work unchanged.
 - Read-only `probe_runtime_status` and `get_runtime_install_plan` commands. The
   target-drive probe rejects network/removable/non-NTFS locations and checks
   that enough free space exists before a runtime installation can be offered.
-- A signed runtime installation workflow exposed through
+- A manifest-verified runtime installation workflow exposed through
   `start_runtime_install`, `get_runtime_install_progress`, and
   `cancel_runtime_install`. It downloads the fixed beta channel selected at
   build time in `frontend/.env.production`, verifies the detached Ed25519
@@ -110,8 +111,19 @@ program deliberately preserves the `DroneDreamRuntime` WSL distribution, its
 selected `X:\DroneDream` data, and its download cache. Removing the Runtime is a
 separate destructive action and is never implied by desktop uninstall.
 
+When Runtime startup reaches the health-check stage but cannot become ready,
+DroneDream captures bounded systemd, journal, WSL-network, and Windows-localhost
+evidence before rolling back a distribution created by that failed attempt.
+The validated report path is shown in the error dialog and lives under
+`X:\DroneDream.download-cache\diagnostics`; it therefore survives rollback and
+ordinary desktop uninstall together with the resumable download cache. Reports
+are capped at 512 KiB each, ten files, and 5 MiB total, with credential-like
+lines redacted. See `../docs/14-runtime-release.md` for the complete ownership
+and retention contract.
+
 The desktop installer and installer-driven runtime workflow consume the
-separately built, smoke-tested, signed runtime manifest and split rootfs assets
+separately built, smoke-tested, Ed25519-signed runtime manifest and split
+rootfs assets whose hashes are covered by that manifest
 from the desktop binary's compiled beta channel. The manual frontend flow pins
 the same release in `frontend/.env.production`. If those assets are unavailable
 or fail verification, installation stops without importing a distribution.
@@ -120,7 +132,9 @@ backend, worker, PX4, and Gazebo. Neither install mode ever reuses, moves,
 converts, terminates, or unregisters a user's existing Ubuntu distribution or
 bundles personal files.
 
-The preview installer is still unsigned. Windows may show a SmartScreen
+The Runtime's detached Ed25519 manifest signature authenticates the Runtime
+payload; it is separate from Windows Authenticode. The preview NSIS installer
+is still not Authenticode-signed. Windows may show a SmartScreen
 warning, so it must not be advertised as a production release. The
 NSIS package embeds Microsoft's official Evergreen WebView2 bootstrapper. It
 verifies both registration and the real runtime executable; a stale registry
@@ -134,7 +148,7 @@ or repaired.
 The NSIS package installs project and runtime notices under `licenses/`,
 including the DroneDream MIT license, the runtime third-party component index,
 and the exact Valkey `COPYING` text. Runtime GitHub Releases publish the same
-materials beside the signed rootfs parts.
+materials beside the manifest-authenticated rootfs parts.
 
 The probes use read-only CIM, current-user registry, fixed WSL commands, and a
 bounded localhost HTTP readiness check. Native commands can be called from the

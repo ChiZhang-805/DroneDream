@@ -106,10 +106,9 @@ def test_cancelling_gpt_job_purges_encrypted_api_key(
     cancelled = client.post(f"/api/v1/jobs/{job_id}/cancel")
     assert cancelled.status_code == 200, cancelled.text
 
-    from sqlalchemy import select
-
     from app import models
     from app.db import SessionLocal
+    from sqlalchemy import select
 
     with SessionLocal() as db:
         secret = db.scalars(
@@ -144,10 +143,9 @@ def test_gpt_job_secret_has_bounded_lifetime(client: TestClient, monkeypatch) ->
     )
     assert created.status_code == 200, created.text
 
-    from sqlalchemy import select
-
     from app import models
     from app.db import SessionLocal
+    from sqlalchemy import select
 
     with SessionLocal() as db:
         secret = db.scalars(
@@ -197,11 +195,10 @@ def test_housekeeping_wipes_expired_secret_without_worker(
 
     from datetime import timedelta
 
-    from sqlalchemy import select
-
     from app import models
     from app.db import SessionLocal
     from app.services.jobs import purge_expired_job_secrets
+    from sqlalchemy import select
 
     with SessionLocal() as db:
         secret = db.scalars(
@@ -432,6 +429,51 @@ def test_list_trials_for_job_is_empty(client: TestClient) -> None:
     assert resp.json() == {"success": True, "data": [], "error": None}
 
 
+def test_list_trials_keeps_array_contract_and_exposes_page_metadata(
+    client: TestClient,
+) -> None:
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        candidate = models.CandidateParameterSet(
+            job_id=job["id"],
+            parameter_json={},
+            label="pagination candidate",
+        )
+        db.add(candidate)
+        db.flush()
+        db.add_all(
+            [
+                models.Trial(
+                    job_id=job["id"],
+                    candidate_id=candidate.id,
+                    seed=seed,
+                    status="PENDING",
+                )
+                for seed in range(3)
+            ]
+        )
+        db.commit()
+
+    first = client.get(f"/api/v1/jobs/{job['id']}/trials?page=1&page_size=2")
+    assert first.status_code == 200, first.text
+    assert isinstance(first.json()["data"], list)
+    assert len(first.json()["data"]) == 2
+    assert first.headers["X-Total-Count"] == "3"
+    assert first.headers["X-Page"] == "1"
+    assert first.headers["X-Page-Size"] == "2"
+
+    second = client.get(f"/api/v1/jobs/{job['id']}/trials?page=2&page_size=2")
+    assert second.status_code == 200, second.text
+    assert len(second.json()["data"]) == 1
+    assert {
+        item["id"] for item in first.json()["data"]
+    }.isdisjoint({item["id"] for item in second.json()["data"]})
+
+
 def test_trial_not_found(client: TestClient) -> None:
     resp = client.get("/api/v1/trials/tri_missing")
     assert resp.status_code == 404
@@ -582,6 +624,45 @@ def test_rerun_gpt_stays_gpt_with_new_openai_key(
     assert resp.status_code == 200
     rerun = resp.json()["data"]
     assert rerun["optimizer_strategy"] == "gpt"
+
+
+def test_rerun_gpt_accepts_provider_neutral_llm_configuration(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "dev-unit-test-key")
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
+    payload = {
+        **VALID_JOB_PAYLOAD,
+        "optimizer_strategy": "gpt",
+        "llm": {
+            "provider": "deepseek",
+            "api_key": "source-provider-key",
+            "model": "deepseek-chat",
+            "base_url": "https://api.deepseek.com/v1",
+        },
+    }
+    original_resp = client.post("/api/v1/jobs", json=payload)
+    assert original_resp.status_code == 200, original_resp.text
+    original = original_resp.json()["data"]
+
+    resp = client.post(
+        f"/api/v1/jobs/{original['id']}/rerun",
+        json={
+            "llm": {
+                "provider": "deepseek",
+                "api_key": "fresh-provider-key",
+                "model": "deepseek-reasoner",
+                "base_url": "https://api.deepseek.com/v1",
+            },
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    rerun = resp.json()["data"]
+    assert rerun["optimizer_strategy"] == "gpt"
+    assert rerun["llm_provider"] == "deepseek"
+    assert rerun["llm_base_url"] == "https://api.deepseek.com/v1"
+    assert rerun["openai_model"] == "deepseek-reasoner"
 
 
 # --- Cancel ----------------------------------------------------------------
@@ -776,6 +857,14 @@ def test_artifacts_includes_trial_scoped_artifacts(client: TestClient) -> None:
 
     with db_module.SessionLocal() as db:
         # Seed a trial row bound to this job.
+        db.add(
+            models.CandidateParameterSet(
+                id="cand_seed",
+                job_id=job_id,
+                parameter_json={},
+            )
+        )
+        db.flush()
         trial = models.Trial(
             job_id=job_id,
             candidate_id="cand_seed",
@@ -922,6 +1011,34 @@ def test_delete_job_ignores_missing_artifact_file(client: TestClient, tmp_path: 
 
     resp = client.delete(f"/api/v1/jobs/{job['id']}")
     assert resp.status_code == 200, resp.text
+
+
+def test_delete_job_never_deletes_artifact_outside_allowed_roots(
+    client: TestClient, tmp_path: Path
+) -> None:
+    from app import models
+    from app.db import SessionLocal
+
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    outside_path = tmp_path / "outside-artifact.bin"
+    outside_path.write_bytes(b"must remain")
+    with SessionLocal() as db:
+        stored_job = db.get(models.Job, job["id"])
+        assert stored_job is not None
+        stored_job.status = "COMPLETED"
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=stored_job.id,
+                artifact_type="log",
+                storage_path=str(outside_path),
+            )
+        )
+        db.commit()
+
+    response = client.delete(f"/api/v1/jobs/{job['id']}")
+    assert response.status_code == 200, response.text
+    assert outside_path.read_bytes() == b"must remain"
     with SessionLocal() as db:
         assert db.get(models.Job, job['id']) is None
         assert db.query(models.Artifact).filter(models.Artifact.owner_id == job['id']).count() == 0

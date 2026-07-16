@@ -47,6 +47,7 @@ function installDesktopBridge(runtime: unknown = readyRuntime) {
   const invoke = vi.fn(async (command: string) => {
     if (command === "probe_system_prerequisites") return readyPrerequisites;
     if (command === "probe_runtime_status") return runtime;
+    if (command === "start_runtime") return runtime;
     throw new Error(`Unexpected command: ${command}`);
   });
   window.__TAURI__ = { core: { invoke } };
@@ -70,7 +71,27 @@ describe("environment-aware routing", () => {
     expect(invoke.mock.calls.map(([command]) => command).sort()).toEqual([
       "probe_runtime_status",
       "probe_system_prerequisites",
+      "start_runtime",
     ]);
+    await router.navigate("/history");
+    await router.navigate("/jobs/new");
+    expect(invoke).toHaveBeenCalledTimes(3);
+
+    router.dispose();
+  });
+
+  it("routes a true desktop cold start through the 3D launcher", async () => {
+    installDesktopBridge();
+    window.history.replaceState(null, "", "/#/");
+    vi.resetModules();
+    const { router } = await import("../router");
+    const indexRoute = router.routes[0]?.children?.find((route) => route.index);
+    const indexElement = (indexRoute as unknown as {
+      element?: { props?: { to?: string; replace?: boolean } };
+    } | undefined)?.element;
+
+    expect(indexElement?.props?.to).toBe("/desktop/setup");
+    expect(indexElement?.props?.replace).toBe(true);
 
     router.dispose();
   });
@@ -85,9 +106,6 @@ describe("environment-aware routing", () => {
       "jobs/new",
       "jobs/:jobId",
       "trials/:trialId",
-      "batches",
-      "batches/new",
-      "batches/:batchId",
       "compare",
     ];
 
@@ -97,6 +115,8 @@ describe("environment-aware routing", () => {
     }
     expect(children.find((route) => route.path === "desktop/setup")?.loader)
       .toBeUndefined();
+    expect(children.find((route) => route.path === "batches/*")?.loader)
+      .toEqual(expect.any(Function));
     for (const path of ["dashboard", "history", "ece498"]) {
       expect(children.find((route) => route.path === path)?.loader, path)
         .toBeUndefined();
@@ -124,10 +144,39 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/desktop/setup");
-    expect(router.state.location.search).toBe("?required=experiment");
-    expect(window.location.hash).toBe("#/desktop/setup?required=experiment");
+    expect(router.state.location.pathname).toBe("/dashboard");
+    expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
+    expect(window.location.hash).toBe("#/dashboard?settings=runtime&required=experiment");
     expect(invoke).toHaveBeenCalledTimes(2);
+
+    router.dispose();
+  });
+
+  it("automatically starts a confirmed stopped runtime before a guarded deep link", async () => {
+    const stoppedRuntime = {
+      ...readyRuntime,
+      running: false,
+      ready: false,
+      components: readyRuntime.components.map((component) => ({
+        ...component,
+        status: component.id === "host-ownership" ? "ready" : "stopped",
+      })),
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return readyPrerequisites;
+      if (command === "probe_runtime_status") return stoppedRuntime;
+      if (command === "start_runtime") return readyRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    window.history.replaceState(null, "", "/#/desktop/setup");
+    vi.resetModules();
+    const { router } = await import("../router");
+
+    await router.navigate("/jobs/new");
+    expect(router.state.location.pathname).toBe("/jobs/new");
+    expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+      .toHaveLength(1);
 
     router.dispose();
   });
@@ -146,8 +195,8 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/desktop/setup");
-    expect(router.state.location.search).toBe("?required=experiment");
+    expect(router.state.location.pathname).toBe("/dashboard");
+    expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
 
     router.dispose();
   });
@@ -172,7 +221,7 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const desktop = await import("../router");
     await desktop.router.navigate("/removed-route");
-    expect(desktop.router.state.location.pathname).toBe("/desktop/setup");
+    expect(desktop.router.state.location.pathname).toBe("/dashboard");
     desktop.router.dispose();
 
     delete window.__TAURI__;
@@ -183,5 +232,17 @@ describe("environment-aware routing", () => {
     expect(browser.router.state.location.pathname).toBe("/");
     expect(window.location.hash).toBe("");
     browser.router.dispose();
+  });
+
+  it("redirects retired batch pages to the overview", async () => {
+    installDesktopBridge();
+    window.history.replaceState(null, "", "/#/dashboard");
+    vi.resetModules();
+    const { router } = await import("../router");
+
+    await router.navigate("/batches/new");
+    expect(router.state.location.pathname).toBe("/dashboard");
+
+    router.dispose();
   });
 });

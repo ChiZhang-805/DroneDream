@@ -1,6 +1,5 @@
-// Type definitions aligned with docs/04_API_SPEC.md and docs/05_DATA_MODEL.md.
-// These shapes are the source of truth for Phase 1 mock data and are intended
-// to match the real /api/v1 contract introduced in later phases.
+// Type definitions for the live /api/v1 contract. Backend schemas and the
+// generated runtime evidence must remain compatible with these wire shapes.
 
 export type JobStatus =
   | "CREATED"
@@ -165,9 +164,9 @@ export interface JobEventInfo {
   created_at: string;
 }
 
-// Phase 6: mock artifact metadata returned by
-// `GET /api/v1/jobs/{job_id}/artifacts`. No underlying files exist in the
-// MVP — `storage_path` uses a `mock://` URI scheme.
+// Artifact metadata returned by `GET /api/v1/jobs/{job_id}/artifacts`.
+// Runtime-backed artifacts can be downloaded through the artifact endpoint;
+// deterministic mock simulations may still expose metadata-only `mock://` rows.
 export interface Artifact {
   id: string;
   owner_type: string;
@@ -214,6 +213,7 @@ export interface JobUpdateRequest {
 
 export interface JobRerunRequest {
   openai?: OpenAIConfig | null;
+  llm?: LLMProviderConfig | null;
 }
 export interface DeleteJobResponse {
   id: string;
@@ -288,12 +288,39 @@ export type CandidateSourceType = "baseline" | "optimizer" | "llm_optimizer";
 export type SimulatorBackend = "mock" | "real_cli";
 export const SIMULATOR_BACKENDS: readonly SimulatorBackend[] = ["mock", "real_cli"];
 
-export type OptimizerStrategy = "none" | "heuristic" | "gpt" | "cma_es";
-export const OPTIMIZER_STRATEGIES: readonly OptimizerStrategy[] = [
+export type OptimizerStrategy =
+  | "none"
+  | "heuristic"
+  | "gpt"
+  | "cma_es"
+  | "constrained_mobo"
+  | "multi_fidelity_mobo"
+  | "turbo"
+  | "saasbo"
+  | "surrogate_cma_es"
+  | "bipop_cma_es"
+  | "optimizer_portfolio";
+
+export const EXPERIMENTAL_OPTIMIZER_STRATEGIES = [
+  "constrained_mobo",
+  "multi_fidelity_mobo",
+  "turbo",
+  "saasbo",
+  "surrogate_cma_es",
+  "bipop_cma_es",
+  "optimizer_portfolio",
+] as const satisfies readonly OptimizerStrategy[];
+
+export const LEGACY_OPTIMIZER_STRATEGIES = [
   "none",
   "heuristic",
   "gpt",
   "cma_es",
+] as const satisfies readonly OptimizerStrategy[];
+
+export const OPTIMIZER_STRATEGIES: readonly OptimizerStrategy[] = [
+  ...EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+  ...LEGACY_OPTIMIZER_STRATEGIES,
 ];
 
 export type OptimizationOutcome =
@@ -525,7 +552,20 @@ export interface BackendCapabilityItem {
   catalog_parameter_effects?: string;
   supported_scenarios?: string[];
   bundled_runner_advanced_effects?: string[];
+  scenario_effect_contract?: {
+    schema_version: string;
+    physically_applied: string[];
+    obstacles?: {
+      status: string;
+      mechanism: string;
+      requires: string[];
+      evidence: string;
+    };
+    requires_runtime_extension: string[];
+  };
   unverified_effect_passthrough_opt_in?: boolean;
+  experimental?: boolean;
+  selection_profile?: string;
 }
 
 export interface BackendCapabilitiesResponse {
@@ -540,6 +580,9 @@ export interface BackendCapabilitiesResponse {
   optimizers: {
     configuration_scope?: "api_process" | string;
     authoritative: boolean;
+    selection_profile?: string;
+    recommended_strategy?: OptimizerStrategy;
+    experimental_strategy_ids?: OptimizerStrategy[];
     items: Record<string, BackendCapabilityItem>;
   };
   parameter_catalog: {
@@ -607,6 +650,7 @@ export interface TrialSummary {
   // baseline from optimizer rows and highlight the best candidate.
   candidate_label: string | null;
   candidate_source_type: CandidateSourceType | null;
+  candidate_optimizer_strategy?: OptimizerStrategy | null;
   candidate_is_baseline: boolean;
   candidate_is_best: boolean;
   candidate_generation_index: number;
@@ -686,6 +730,7 @@ export interface Candidate {
   label: string | null;
   parameters: Record<string, unknown>;
   proposal_reason: string | null;
+  optimizer_metadata?: Record<string, unknown> | null;
   parent_candidate_id: string | null;
   aggregated_score: number | null;
   aggregated_metrics: Record<string, unknown> | null;
@@ -747,6 +792,8 @@ export interface BatchJob {
 
 export interface PaginatedBatchJobs {
   items: BatchJob[];
+  page: number;
+  page_size: number;
   total: number;
 }
 
@@ -792,11 +839,3 @@ export interface ApiError {
 export type ApiEnvelope<T> =
   | { success: true; data: T; error: null }
   | { success: false; data: null; error: ApiError };
-
-export const JOB_ACTIVE_STATUSES: readonly JobStatus[] = [
-  "CREATED",
-  "QUEUED",
-  "RUNNING",
-  "AGGREGATING",
-  "FINALIZING",
-];

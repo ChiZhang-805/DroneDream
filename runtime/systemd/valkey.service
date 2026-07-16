@@ -11,10 +11,16 @@ ExecStart=/usr/local/bin/valkey-server /etc/valkey/valkey.conf
 ExecStop=/bin/kill -s TERM $MAINPID
 Restart=on-failure
 RestartSec=2
+UMask=0027
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
 ReadWritePaths=/var/lib/valkey
 LimitNOFILE=65535
 

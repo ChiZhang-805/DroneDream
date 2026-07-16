@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
-
 from app.parameters import ParameterValueValidationError
 from app.simulator import px4_parameters as px4_parameter_module
 from app.simulator.px4_parameters import (
@@ -16,6 +17,7 @@ from app.simulator.px4_parameters import (
     ParameterReadbackError,
     apply_and_verify_parameters,
     build_px4_parameter_environment,
+    connect_mavsdk_parameter_client,
     verify_environment_parameters,
     verify_environment_parameters_with_mavsdk,
     write_simulated_parameter_evidence,
@@ -39,6 +41,24 @@ class FakeParameterClient:
     async def set_parameter(self, name: str, value: int | float, value_type: str) -> None:
         self.values[name] = value
         self.set_calls.append((name, value, value_type))
+
+
+def test_mavsdk_client_close_is_idempotent_after_stop_failure() -> None:
+    class _Owner:
+        stop_calls = 0
+
+        def _stop_mavsdk_server(self) -> None:
+            self.stop_calls += 1
+            raise RuntimeError("stop failed")
+
+    owner = _Owner()
+    client = px4_parameter_module.MavsdkParameterClient(object(), owner=owner)
+
+    with pytest.raises(RuntimeError, match="stop failed"):
+        client.close()
+    client.close()
+
+    assert owner.stop_calls == 1
 
 
 def _read(path: Path) -> dict:
@@ -128,6 +148,140 @@ def test_readback_mismatch_is_fatal_but_preserves_evidence(tmp_path: Path) -> No
     assert applied["status"] == "mismatch"
     assert applied["verification"]["verified"] is False
     assert "MPC_XY_P" in applied["verification"]["mismatches"]
+    # The fake transport corrupts every post-write readback, so the original
+    # value is restored in storage but cannot honestly be marked as verified.
+    assert applied["verification"]["rollback_succeeded"] is False
+    assert "MPC_XY_P" in applied["verification"]["rollback_errors"]
+    assert client.values["MPC_XY_P"] == 0.95
+
+
+def test_partial_live_parameter_write_rolls_back_previous_values(tmp_path: Path) -> None:
+    class FailingClient(FakeParameterClient):
+        async def set_parameter(self, name: str, value: int | float, value_type: str) -> None:
+            if name == "MPC_XY_VEL_P_ACC" and value == 2.0:
+                raise RuntimeError("transport dropped")
+            await super().set_parameter(name, value, value_type)
+
+    client = FailingClient({"MPC_XY_P": 0.95, "MPC_XY_VEL_P_ACC": 1.8})
+    with pytest.raises(ParameterApplicationError, match="transport dropped"):
+        asyncio.run(
+            apply_and_verify_parameters(
+                {"MPC_XY_P": 1.1, "MPC_XY_VEL_P_ACC": 2.0},
+                client,
+                tmp_path,
+            )
+        )
+    assert client.values == {"MPC_XY_P": 0.95, "MPC_XY_VEL_P_ACC": 1.8}
+    verification = _read(tmp_path / APPLIED_EVIDENCE_NAME)["verification"]
+    assert verification["rollback_attempted"] is True
+    assert verification["rollback_succeeded"] is True
+
+
+def test_mavsdk_connection_timeout_stops_embedded_server(monkeypatch) -> None:
+    class _Core:
+        async def connection_state(self):
+            while True:
+                yield type("State", (), {"is_connected": False})()
+                await asyncio.sleep(1)
+
+    class _System:
+        latest: _System | None = None
+
+        def __init__(self) -> None:
+            self.core = _Core()
+            self.param = object()
+            self.stopped = False
+            _System.latest = self
+
+        async def connect(self, *, system_address: str) -> None:
+            assert system_address == "udp://:14540"
+
+        def _stop_mavsdk_server(self) -> None:
+            self.stopped = True
+
+    mavsdk = ModuleType("mavsdk")
+    mavsdk.System = _System  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "mavsdk", mavsdk)
+
+    with pytest.raises(ParameterApplicationError, match="timed out"):
+        asyncio.run(
+            connect_mavsdk_parameter_client(
+                "udp://:14540",
+                timeout_seconds=0.01,
+            )
+        )
+    assert _System.latest is not None
+    assert _System.latest.stopped is True
+
+
+def test_mavsdk_connection_cancellation_stops_embedded_server_and_propagates(
+    monkeypatch,
+) -> None:
+    class _Core:
+        async def connection_state(self):
+            raise asyncio.CancelledError
+            yield  # pragma: no cover - makes this an async generator.
+
+    class _System:
+        latest: _System | None = None
+
+        def __init__(self) -> None:
+            self.core = _Core()
+            self.param = object()
+            self.stopped = False
+            _System.latest = self
+
+        async def connect(self, *, system_address: str) -> None:
+            assert system_address == "udp://:14540"
+
+        def _stop_mavsdk_server(self) -> None:
+            self.stopped = True
+
+    mavsdk = ModuleType("mavsdk")
+    mavsdk.System = _System  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "mavsdk", mavsdk)
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(
+            connect_mavsdk_parameter_client(
+                "udp://:14540",
+                timeout_seconds=1.0,
+            )
+        )
+    assert _System.latest is not None
+    assert _System.latest.stopped is True
+
+
+def test_mavsdk_connect_failure_stops_embedded_server_and_propagates(monkeypatch) -> None:
+    class _System:
+        latest: _System | None = None
+
+        def __init__(self) -> None:
+            self.core = object()
+            self.param = object()
+            self.stopped = False
+            _System.latest = self
+
+        async def connect(self, *, system_address: str) -> None:
+            assert system_address == "udp://:14540"
+            raise RuntimeError("embedded transport failed")
+
+        def _stop_mavsdk_server(self) -> None:
+            self.stopped = True
+
+    mavsdk = ModuleType("mavsdk")
+    mavsdk.System = _System  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "mavsdk", mavsdk)
+
+    with pytest.raises(RuntimeError, match="embedded transport failed"):
+        asyncio.run(
+            connect_mavsdk_parameter_client(
+                "udp://:14540",
+                timeout_seconds=1.0,
+            )
+        )
+    assert _System.latest is not None
+    assert _System.latest.stopped is True
 
 
 def test_environment_transport_readback_does_not_set_again(tmp_path: Path) -> None:

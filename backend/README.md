@@ -1,7 +1,7 @@
 # DroneDream Backend
 
-FastAPI app for the DroneDream MVP. Ships the full `/api/v1` surface
-(jobs, trials, report, artifacts) backed by SQLAlchemy persistence, plus
+FastAPI app for DroneDream. Ships the `/api/v1` experiment, trial, report,
+artifact, catalog, capability, and compatibility surfaces backed by SQLAlchemy, plus
 the standard response envelope helpers and the orchestration package the
 worker uses to dispatch and finalize jobs.
 
@@ -10,28 +10,29 @@ worker uses to dispatch and finalize jobs.
 - `app/main.py` — FastAPI application factory, CORS, exception handlers,
   router registration.
 - `app/routers/` — HTTP surface:
-  - `health` — `GET /health` (liveness, outside `/api/v1`).
-  - `jobs` — `POST/GET /api/v1/jobs`, `GET /api/v1/jobs/{job_id}`,
-    `POST /api/v1/jobs/{job_id}/rerun`, `POST /api/v1/jobs/{job_id}/cancel`,
-    `GET /api/v1/jobs/{job_id}/trials`,
-    `GET /api/v1/jobs/{job_id}/report`,
-    `GET /api/v1/jobs/{job_id}/artifacts`.
+  - `health` — public `GET /health`, `/health/live`, and `/health/ready`
+    outside `/api/v1`.
+  - `jobs` — create/list/detail/update/delete, rerun/cancel, bounded trials and
+    candidates, report/artifacts, and JSON/CSV experiment comparison.
   - `trials` — `GET /api/v1/trials/{trial_id}`.
+  - `artifacts` — authorized managed-local download or owned S3 redirect.
+  - `batches` — compatibility-only create/list/detail/jobs/cancel API. The
+    desktop batch pages are retired and redirect to the overview.
   - `parameter_catalog` — versioned PX4 multicopter parameter metadata,
     compatibility filters, guided presets, and server-side search-space validation.
   - `capabilities` — advisory worker/simulator/optimizer readiness used by the
     experiment wizard before dispatch (job creation remains authoritative).
 - `app/schemas.py` — Pydantic v2 request/response models + enum literals.
-- `app/models.py` — SQLAlchemy ORM models: `User`, `Job`,
-  `CandidateParameterSet`, `Trial`, `TrialMetric`, `JobReport`,
-  `Artifact`, `JobEvent`.
+- `app/models.py` — SQLAlchemy ORM models including `User`, `BatchJob`, `Job`,
+  `JobSecret`, `CandidateParameterSet`, `Trial`, `TrialMetric`, `JobReport`,
+  `Artifact`, and `JobEvent`.
 - `app/services/` — request-safe business logic (create / list / rerun /
   cancel / serialize). Never runs a trial.
 - `app/orchestration/` — worker-side job manager, trial executor,
   aggregator, optimizer, report generator. Shared with the worker
   process via an editable install.
 - `app/simulator/` — `SimulatorAdapter` base, `MockSimulatorAdapter`
-  (default MVP path), the subprocess-isolated `RealCliSimulatorAdapter`, and
+  (synthetic test/demo path), the subprocess-isolated `RealCliSimulatorAdapter`, and
   PX4 parameter application/readback evidence helpers.
 - `app/response.py` — `ok(data)` / `err(code, message, details)` helpers
   that emit the standard response envelope.
@@ -148,3 +149,10 @@ dispatched seed retained in its case denominator. Acceptance uses
 holdout validation status. `FINALIZING` is a committed bounded lease so slow
 LLM/report work does not hold a database transaction, remains cancellable, and
 can be reclaimed after a worker crash.
+
+The bundled real runner proves nominal execution and static box/cylinder
+obstacle injection (Gazebo EntityFactory success plus generated-SDF evidence).
+Wind/gust, sensor/GPS, battery, payload, actuator-delay, and other requested
+physical effects fail closed until a site launcher applies them and returns
+validated evidence. `real_stub` is an internal test adapter and is rejected
+outside `APP_ENV=test`.

@@ -6,6 +6,8 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from pathlib import Path
+from traceback import extract_tb
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -121,6 +123,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Total-Count", "X-Page", "X-Page-Size"],
     )
 
     # Health endpoint lives outside /api/v1 by design.
@@ -169,12 +172,45 @@ def _register_exception_handlers(target: FastAPI) -> None:
     async def validation_exception_handler(
         _request: Request, exc: RequestValidationError
     ) -> JSONResponse:
+        # Pydantic includes the rejected raw value by default. Requests can
+        # contain API keys, so never echo ``input``/``ctx`` into a response or
+        # an upstream access log merely because another field was invalid.
+        safe_errors = [
+            {key: value for key, value in item.items() if key not in {"input", "ctx"}}
+            for item in exc.errors()
+        ]
         return JSONResponse(
             status_code=422,
             content=err(
                 code="INVALID_INPUT",
                 message="Invalid request payload",
-                details=jsonable_encoder(exc.errors()),
+                details=jsonable_encoder(safe_errors),
+            ),
+        )
+
+    @target.exception_handler(Exception)
+    async def unhandled_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        # Preserve the response envelope while keeping internal exception
+        # details out of the public API. Operator logs retain a compact stack
+        # location, but not the exception message: database drivers and custom
+        # exceptions sometimes embed rejected values or credentials there.
+        stack_locations = " > ".join(
+            f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"
+            for frame in extract_tb(exc.__traceback__)[-8:]
+        )
+        logger.error(
+            "unhandled API exception path=%s exception_type=%s stack=%s",
+            request.url.path,
+            type(exc).__name__,
+            stack_locations,
+        )
+        return JSONResponse(
+            status_code=500,
+            content=err(
+                code="INTERNAL_ERROR",
+                message="An unexpected internal error occurred.",
             ),
         )
 

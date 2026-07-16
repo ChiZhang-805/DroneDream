@@ -7,6 +7,7 @@ iterative GPT tuning loop to decide whether to stop or keep proposing.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from app import models
@@ -48,11 +49,12 @@ class AcceptanceResult:
 
 def _safe_float(value: object) -> float | None:
     try:
-        if value is None:
+        if value is None or isinstance(value, bool):
             return None
-        return float(value)  # type: ignore[arg-type]
+        parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _safe_rate(value: object) -> float | None:
@@ -60,6 +62,26 @@ def _safe_rate(value: object) -> float | None:
     if parsed is None:
         return None
     return min(1.0, max(0.0, parsed))
+
+
+def _safe_nonnegative_int(value: object) -> int:
+    parsed = _safe_float(value)
+    if parsed is None or parsed < 0 or not parsed.is_integer():
+        return 0
+    return int(parsed)
+
+
+def _criteria_are_valid(criteria: AcceptanceCriteria) -> bool:
+    minimum_rate = _safe_float(criteria.min_pass_rate)
+    if minimum_rate is None or not 0.0 <= minimum_rate <= 1.0:
+        return False
+    for threshold in (criteria.target_rmse, criteria.target_max_error):
+        if threshold is None:
+            continue
+        parsed = _safe_float(threshold)
+        if parsed is None or parsed < 0:
+            return False
+    return True
 
 
 def evaluate_candidate(
@@ -74,14 +96,17 @@ def evaluate_candidate(
     """
 
     agg = candidate.aggregated_metric_json or {}
-    trial_count = max(
-        0, int(agg.get("training_trial_count", candidate.trial_count or 0) or 0)
+    trial_count = _safe_nonnegative_int(
+        agg.get("training_trial_count", candidate.trial_count or 0)
     )
-    completed = int(
-        agg.get(
-            "training_completed_trial_count", candidate.completed_trial_count or 0
-        )
-        or 0
+    completed = min(
+        trial_count,
+        _safe_nonnegative_int(
+            agg.get(
+                "training_completed_trial_count",
+                candidate.completed_trial_count or 0,
+            )
+        ),
     )
     stored_completion_rate = _safe_rate(agg.get("training_completion_rate"))
     if (
@@ -100,11 +125,14 @@ def evaluate_candidate(
     # aggregates retain it for compatibility while acceptance uses the worst
     # observed trial excursion.
     max_error = _safe_float(agg.get("max_error_worst", agg.get("max_error")))
-    passing = int(
-        agg.get(
-            "training_passing_trial_count", agg.get("passing_trial_count", 0)
-        )
-        or 0
+    passing = min(
+        trial_count,
+        _safe_nonnegative_int(
+            agg.get(
+                "training_passing_trial_count",
+                agg.get("passing_trial_count", 0),
+            )
+        ),
     )
     stored_pass_rate = _safe_rate(agg.get("training_pass_rate"))
     if (
@@ -118,9 +146,22 @@ def evaluate_candidate(
         else passing / trial_count if trial_count > 0 else 0.0
     )
 
-    if candidate.aggregated_metric_json is None:
+    if not _criteria_are_valid(criteria):
+        return AcceptanceResult(
+            False, "invalid_criteria", pass_rate, completion_rate, rmse, max_error
+        )
+    if candidate.aggregated_metric_json is None or trial_count == 0:
         return AcceptanceResult(
             False, "no_metrics", pass_rate, completion_rate, rmse, max_error
+        )
+    if completed == 0:
+        return AcceptanceResult(
+            False,
+            "no_completed_trials",
+            pass_rate,
+            completion_rate,
+            rmse,
+            max_error,
         )
     if pass_rate < criteria.min_pass_rate:
         return AcceptanceResult(

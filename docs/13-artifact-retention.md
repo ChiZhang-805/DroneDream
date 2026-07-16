@@ -92,15 +92,15 @@ python -m app.storage.cleanup --apply
 Ordinary development should retain the default disabled policy. Developers can
 still run the manual dry-run while disabled.
 
-A future desktop runtime should calculate its cap from the selected disk. The
-current desktop prerequisite therefore requires at least 52 GiB free before
-installation: roughly 8 GiB for the download, 24 GiB for the installed runtime,
-and 20 GiB of immediate post-install reserve. For the current 80.5 GiB target
-disk, a conservative first profile is 12 GiB (`12884901888` bytes), a
-30-day maximum age, a one-day capacity floor and orphan grace, and 10 protected
-recent terminal jobs. These are explicit installer recommendations, not silent
-desktop defaults; the installer should recalculate and show the result whenever
-the selected disk changes.
+The packaged desktop runtime requires at least 52 GiB free before installation:
+roughly 8 GiB for download/staging, 24 GiB for the installed runtime, and
+20 GiB of immediate host headroom. Its reviewed default profile enables cleanup
+with a 12 GiB (`12884901888` bytes) managed-artifact cap, 30-day maximum age,
+one-day capacity floor and orphan grace, and 10 protected recent terminal jobs.
+These values live in `runtime/config/runtime.env.default`; changing them requires
+a new Runtime build and smoke test. A future installer may derive a larger cap
+from the selected disk, but it must show that policy rather than silently
+changing retention.
 
 The packaged runtime separately caps persistent systemd journals at 512 MiB
 and raw PX4 ULogs at 4 GiB/14 days. Those limits are documented with the WSL

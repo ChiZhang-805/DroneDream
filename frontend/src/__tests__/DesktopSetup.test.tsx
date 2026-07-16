@@ -406,6 +406,66 @@ describe("DesktopSetup", () => {
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
   });
 
+  it("keeps checking through a transient system-probe timeout instead of showing an error", async () => {
+    let prerequisiteAttempts = 0;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") {
+        prerequisiteAttempts += 1;
+        if (prerequisiteAttempts === 1) {
+          throw new Error("read-only system probe timed out after 40 seconds.");
+        }
+        return prerequisites;
+      }
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+
+    await waitFor(() => expect(prerequisiteAttempts).toBe(1));
+    expect(screen.queryByRole("dialog", { name: "Setup needs attention" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText("Checking system")).toBeInTheDocument();
+
+    expect(await screen.findByRole("link", { name: "Open tuning workspace" }, {
+      timeout: 3_000,
+    })).toBeInTheDocument();
+    expect(prerequisiteAttempts).toBe(2);
+    expect(screen.queryByRole("dialog", { name: "Setup needs attention" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("does not unlock the workspace until a completed install passes fresh health checks", async () => {
+    const completedSnapshot = installSnapshot({
+      phase: "completed",
+      bytesDownloaded: 8 * 1024 ** 3,
+      currentPart: 8,
+      totalParts: 8,
+      message: "Installation completed",
+      resumable: false,
+      installedVersion: "2026.07",
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return completedSnapshot;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+
+    expect(await screen.findByText("Checking services")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Setup needs attention" }))
+        .toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+      .not.toBeInTheDocument();
+  });
+
   it("shows the install plan only when the runtime is confirmed missing", async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
@@ -504,6 +564,8 @@ describe("DesktopSetup", () => {
       .toHaveClass("sr-only");
     expect(screen.getByText("Preparing download")).toBeInTheDocument();
     expect(screen.getByText("Preparing installation")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Runtime download progress" }))
+      .toHaveAttribute("aria-valuenow", "0");
     expect(screen.getByRole("button", { name: "Pause installation" })).toBeEnabled();
     expect(page.container.querySelector(".launcher-stage-strip")).not.toBeInTheDocument();
     expect(page.container.querySelector(".desktop-launcher > .section-card"))
@@ -1168,6 +1230,7 @@ describe("DesktopSetup", () => {
         code: "installer_receipt_cleanup_failed",
         message: "The runtime is ready, but its terminal receipt is still locked.",
         retryable: true,
+        diagnosticsPath: null,
       },
       installedVersion: "v0.1.0-beta.1",
       resumable: true,
@@ -1228,6 +1291,7 @@ describe("DesktopSetup", () => {
         code: "installer_receipt_cleanup_failed",
         message: "The failed operation is terminal, but cleanup is pending.",
         retryable: true,
+        diagnosticsPath: null,
       },
       installedVersion: null,
       resumable: true,
@@ -1379,6 +1443,10 @@ describe("DesktopSetup", () => {
     );
     const user = userEvent.setup();
     let progress: RuntimeInstallSnapshot = idleInstallSnapshot;
+    let resolveStart!: (snapshot: RuntimeInstallSnapshot) => void;
+    const pendingStart = new Promise<RuntimeInstallSnapshot>((resolve) => {
+      resolveStart = resolve;
+    });
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return missingRuntime;
@@ -1393,7 +1461,7 @@ describe("DesktopSetup", () => {
           totalParts: null,
           message: "Queued",
         });
-        return progress;
+        return pendingStart;
       }
       if (command === "cancel_runtime_install") {
         progress = installSnapshot({
@@ -1413,6 +1481,10 @@ describe("DesktopSetup", () => {
     expect(install).toBeEnabled();
     await user.click(install);
 
+    expect(screen.getByText("Preparing download")).toBeInTheDocument();
+    expect(screen.queryByText("Pausing setup")).not.toBeInTheDocument();
+    resolveStart(progress);
+
     expect(await screen.findByText("Preparing installation")).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("start_runtime_install", {
       request: {
@@ -1429,6 +1501,117 @@ describe("DesktopSetup", () => {
     expect(invoke).toHaveBeenCalledWith("cancel_runtime_install", undefined);
   });
 
+  it.each([
+    [
+      "runtime_service_unhealthy",
+      "Runtime services did not start",
+      "The runtime started, but its internal API did not become healthy.",
+    ],
+    [
+      "runtime_host_connectivity",
+      "Windows could not reach the runtime",
+      "The service may be running in WSL, but Windows could not reach its local health endpoint.",
+    ],
+    [
+      "runtime_health_unknown",
+      "Runtime health could not be confirmed",
+      "DroneDream could not determine whether the problem is inside WSL or on the Windows-to-WSL connection.",
+    ],
+  ])("explains the %s runtime health failure without exposing raw details first", async (
+    code,
+    title,
+    hint,
+  ) => {
+    const progress = installSnapshot({
+      phase: "failed",
+      error: {
+        code,
+        message: "Low-level runtime health failure.",
+        retryable: true,
+        diagnosticsPath: null,
+      },
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return progress;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+
+    const dialog = await screen.findByRole("dialog", { name: title });
+    expect(dialog).toHaveTextContent(hint);
+    expect(dialog).not.toHaveTextContent("Low-level runtime health failure.");
+    expect(screen.getByRole("button", { name: "View error information" }))
+      .toBeEnabled();
+  });
+
+  it("shows and copies the exported diagnostic path", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
+    const diagnosticsPath =
+      "C:\\Users\\student\\AppData\\Local\\DroneDream\\diagnostics\\runtime-install.log";
+    const progress = installSnapshot({
+      phase: "failed",
+      error: {
+        code: "runtime_service_unhealthy",
+        message: "The runtime API did not become healthy.",
+        retryable: true,
+        diagnosticsPath,
+      },
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return progress;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+
+    expect(await screen.findByText(diagnosticsPath)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Copy log path" }));
+    expect(writeText).toHaveBeenCalledWith(diagnosticsPath);
+    expect(screen.getByText("Log path copied.")).toBeInTheDocument();
+  });
+
+  it("keeps the runtime health dialog fully localized in Chinese", async () => {
+    const progress = installSnapshot({
+      phase: "failed",
+      error: {
+        code: "runtime_host_connectivity",
+        message: "connection timed out",
+        retryable: true,
+        diagnosticsPath: "C:\\DroneDream\\diagnostics\\runtime-install.log",
+      },
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "get_runtime_install_progress") return progress;
+      if (command === "get_runtime_install_plan") return plan;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage("zh-CN");
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Windows 无法连接运行环境",
+    });
+    expect(dialog).toHaveTextContent(
+      "WSL 内的服务可能已经启动，但 Windows 无法连接其本地健康检查地址。",
+    );
+    expect(dialog).toHaveTextContent("诊断日志");
+    expect(screen.getByRole("button", { name: "复制日志路径" })).toBeEnabled();
+    expect(dialog).not.toHaveTextContent("View error information");
+  });
+
   it("offers a safe retry and restart continuation for resumable installs", async () => {
     vi.stubEnv(
       "VITE_RUNTIME_RELEASE_MANIFEST_URL",
@@ -1441,6 +1624,7 @@ describe("DesktopSetup", () => {
         code: "NETWORK_INTERRUPTED",
         message: "The connection was interrupted.",
         retryable: true,
+        diagnosticsPath: null,
       },
     });
     const invoke = vi.fn(async (command: string) => {
@@ -1707,13 +1891,18 @@ describe("DesktopSetup", () => {
     window.__TAURI__ = { core: { invoke } };
     renderPage();
 
-    expect(await screen.findByRole("dialog", { name: "Setup needs attention" }))
-      .toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "View error information" }));
+    const dialog = await screen.findByRole("dialog", { name: "Setup needs attention" });
+    expect(dialog).toBeInTheDocument();
+    const detailsButton = screen.getByRole("button", { name: "View error information" });
+    await waitFor(() => expect(detailsButton).toHaveFocus());
+    await user.click(detailsButton);
     expect(screen.getByText("No eligible fixed local disk was detected."))
       .toBeInTheDocument();
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Setup needs attention" }))
+      .not.toBeInTheDocument();
   });
 
   it("does not offer first installation when the runtime probe is uncertain", async () => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { TrajectoryReplay } from "../components/TrajectoryReplay";
 import { apiClient } from "../api/client";
@@ -74,5 +74,57 @@ describe("TrajectoryReplay", () => {
       />,
     );
     expect(screen.getByText("Replay unavailable")).toBeInTheDocument();
+  });
+
+  it("keeps the actual trajectory usable when an optional reference fails", async () => {
+    const reference = {
+      ...buildArtifacts().trajectory!,
+      id: "art-reference",
+      artifact_type: "reference_track_json",
+      display_name: "reference.json",
+    };
+    vi.spyOn(apiClient, "fetchArtifactJson")
+      .mockResolvedValueOnce({
+        samples: [
+          { t: 0, x: 0, y: 0, z: 0 },
+          { t: 1, x: 1, y: 1, z: 1 },
+        ],
+      })
+      .mockRejectedValueOnce(new Error("reference unavailable"));
+
+    render(
+      <TrajectoryReplay
+        artifacts={buildArtifacts({ reference })}
+        meta={{}}
+      />,
+    );
+
+    expect(await screen.findByTestId("trajectory-replay")).toBeInTheDocument();
+    expect(screen.getByText("Reference track unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("Replay failed")).not.toBeInTheDocument();
+  });
+
+  it("applies playback speed once rather than multiplying both step and timer", async () => {
+    vi.spyOn(apiClient, "fetchArtifactJson").mockResolvedValue({
+      samples: Array.from({ length: 8 }, (_, index) => ({
+        t: index,
+        x: index,
+        y: index,
+        z: index,
+      })),
+    });
+
+    render(<TrajectoryReplay artifacts={buildArtifacts()} meta={{}} />);
+    await screen.findByTestId("trajectory-replay");
+
+    fireEvent.change(screen.getByLabelText("Replay speed"), {
+      target: { value: "4" },
+    });
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    act(() => vi.advanceTimersByTime(56));
+
+    expect(screen.getByLabelText("Replay position")).toHaveValue("1");
+    vi.useRealTimers();
   });
 });

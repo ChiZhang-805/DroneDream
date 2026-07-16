@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
+from collections.abc import Callable
 
+import pytest
 from app.optimization.design import halton_design
-from app.optimization.domain import SearchSpace
+from app.optimization.domain import ParameterDomain, SearchSpace
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import aggregate_metric, evaluate_candidate
 from app.optimization.scenarios import holdout_matrix, scenario_matrix, training_matrix
@@ -16,6 +16,7 @@ from app.schemas import (
     ScenarioCaseConfig,
     ScenarioSuiteConfig,
 )
+from pydantic import ValidationError
 
 
 def _parameter_space() -> list[ParameterSelection]:
@@ -176,6 +177,17 @@ def test_pareto_front_is_constraint_aware_and_recommendations_are_stable() -> No
     assert recommendations["balanced"].id in {"stable", "fast"}
 
 
+def test_pareto_diagnostics_never_recommend_an_infeasible_parameter_set() -> None:
+    directions = {"rmse": "minimize"}
+    unsafe = [
+        ParetoPoint("less-unsafe", {"rmse": 0.4}, directions, False, 0.1),
+        ParetoPoint("more-unsafe", {"rmse": 0.2}, directions, False, 0.8),
+    ]
+
+    assert [point.id for point in nondominated_front(unsafe)] == ["less-unsafe"]
+    assert representative_points(unsafe) == {}
+
+
 def test_scenario_suite_requires_unique_ids_and_seeds() -> None:
     with pytest.raises(ValidationError, match="seeds must be unique"):
         ScenarioCaseConfig(id="wind", scenario_type="wind_perturbed", seeds=[1, 1])
@@ -186,6 +198,34 @@ def test_scenario_suite_requires_unique_ids_and_seeds() -> None:
                 ScenarioCaseConfig(id="same", seeds=[2]),
             ]
         )
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: ParameterDomain("", 0.5, 0.0, 1.0),
+        lambda: ParameterDomain("x", 0.5, 1.0, 0.0),
+        lambda: ParameterDomain("x", 2.0, 0.0, 1.0),
+        lambda: ParameterDomain("x", 0.5, 0.0, 1.0, step=0.0),
+        lambda: ParameterDomain("x", 0.5, 0.0, 1.0, scale="log"),
+        lambda: ParameterDomain("x", 0.5, 0.0, 1.0, choices=(0.25, 1.5)),
+    ],
+)
+def test_parameter_domain_rejects_invalid_runtime_contracts(
+    factory: Callable[[], ParameterDomain],
+) -> None:
+    with pytest.raises(ValueError):
+        factory()
+
+
+def test_parameter_domain_rejects_nonfinite_and_boolean_proposals() -> None:
+    domain = ParameterDomain("x", 0.5, 0.0, 1.0)
+    with pytest.raises(ValueError):
+        domain.from_unit(float("nan"))
+    with pytest.raises(ValueError):
+        domain.from_unit(True)
+    with pytest.raises(ValueError):
+        domain.project(False)
 
 
 def test_scenario_matrix_is_fixed_across_candidates_and_splits_holdout() -> None:

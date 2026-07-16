@@ -21,6 +21,7 @@ obsolete attempt's metrics or artifacts.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import shutil
 import threading
@@ -94,6 +95,28 @@ logger = logging.getLogger("drone_dream.orchestration.trial")
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _validated_worker_id(worker_id: object) -> str:
+    if not isinstance(worker_id, str):
+        raise ValueError("worker_id must be a string")
+    normalized = worker_id.strip()
+    if (
+        not normalized
+        or len(normalized) > 128
+        or any(ord(character) < 32 for character in normalized)
+    ):
+        raise ValueError("worker_id must be 1-128 visible characters")
+    return normalized
+
+
+def _finite_job_number(value: object, *, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{field_name} must be numeric")
+    numeric = float(value)
+    if not math.isfinite(numeric):
+        raise ValueError(f"{field_name} must be finite")
+    return numeric
 
 
 @dataclass(frozen=True)
@@ -223,48 +246,67 @@ def _refresh_progress_counters(db: Session, job: models.Job) -> None:
 def _job_config_from(job: models.Job) -> JobConfig:
     reference_track: list[dict[str, float]] | None = None
     if job.reference_track_json:
+        if not isinstance(job.reference_track_json, list):
+            raise ValueError("reference_track_json must be an array")
         normalized: list[dict[str, float]] = []
-        for point in job.reference_track_json:
+        for index, point in enumerate(job.reference_track_json):
             if not isinstance(point, dict):
-                continue
+                raise ValueError(f"reference track point {index} must be an object")
             x = point.get("x")
             y = point.get("y")
             z_raw = point.get("z")
             if x is None or y is None:
-                continue
-            try:
-                normalized.append(
-                    {
-                        "x": float(x),
-                        "y": float(y),
-                        "z": float(job.altitude_m if z_raw is None else z_raw),
-                    }
-                )
-            except (TypeError, ValueError):
-                continue
-        reference_track = normalized or None
-    selected_parameter_names = tuple(
-        str(item.get("name", "")).strip().upper()
-        for item in (job.parameter_space_json or [])
-        if isinstance(item, dict)
-        and item.get("enabled", True) is True
-        and str(item.get("name", "")).strip()
-    )
+                raise ValueError(f"reference track point {index} requires x and y")
+            normalized.append(
+                {
+                    "x": _finite_job_number(x, field_name=f"track[{index}].x"),
+                    "y": _finite_job_number(y, field_name=f"track[{index}].y"),
+                    "z": _finite_job_number(
+                        job.altitude_m if z_raw is None else z_raw,
+                        field_name=f"track[{index}].z",
+                    ),
+                }
+            )
+        reference_track = normalized
+
+    parameter_space = job.parameter_space_json or []
+    if not isinstance(parameter_space, list) or any(
+        not isinstance(item, dict) for item in parameter_space
+    ):
+        raise ValueError("parameter_space_json must be an array of objects")
+    selected_parameter_names: list[str] = []
+    for item in parameter_space:
+        enabled = item.get("enabled", True)
+        if not isinstance(enabled, bool):
+            raise ValueError("parameter enabled flags must be boolean")
+        if not enabled:
+            continue
+        name = item.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("enabled parameters require a non-empty name")
+        normalized_name = name.strip().upper()
+        if normalized_name in selected_parameter_names:
+            raise ValueError(f"duplicate selected parameter {normalized_name}")
+        selected_parameter_names.append(normalized_name)
+
+    vehicle_profile = job.vehicle_profile_json or {}
+    if not isinstance(vehicle_profile, dict):
+        raise ValueError("vehicle_profile_json must be an object")
     return JobConfig(
         track_type=job.track_type,
-        start_point_x=job.start_point_x,
-        start_point_y=job.start_point_y,
-        altitude_m=job.altitude_m,
-        wind_north=job.wind_north,
-        wind_east=job.wind_east,
-        wind_south=job.wind_south,
-        wind_west=job.wind_west,
+        start_point_x=_finite_job_number(job.start_point_x, field_name="start_point_x"),
+        start_point_y=_finite_job_number(job.start_point_y, field_name="start_point_y"),
+        altitude_m=_finite_job_number(job.altitude_m, field_name="altitude_m"),
+        wind_north=_finite_job_number(job.wind_north, field_name="wind_north"),
+        wind_east=_finite_job_number(job.wind_east, field_name="wind_east"),
+        wind_south=_finite_job_number(job.wind_south, field_name="wind_south"),
+        wind_west=_finite_job_number(job.wind_west, field_name="wind_west"),
         sensor_noise_level=job.sensor_noise_level,
         objective_profile=job.objective_profile,
         reference_track=reference_track,
-        vehicle_profile=dict(job.vehicle_profile_json or {}),
+        vehicle_profile=dict(vehicle_profile),
         parameter_catalog_version=job.parameter_catalog_version,
-        selected_parameter_names=selected_parameter_names,
+        selected_parameter_names=tuple(selected_parameter_names),
     )
 
 
@@ -275,15 +317,23 @@ def _build_trial_context(
     *,
     cancellation_event: threading.Event | None = None,
 ) -> TrialContext:
+    parameters = candidate.parameter_json or {}
+    if not isinstance(parameters, dict):
+        raise ValueError("candidate parameter_json must be an object")
+    scenario_config = trial.scenario_config_json
+    if scenario_config is not None and not isinstance(scenario_config, dict):
+        raise ValueError("trial scenario_config_json must be an object")
+    if isinstance(trial.seed, bool) or not isinstance(trial.seed, int):
+        raise ValueError("trial seed must be an integer")
     return TrialContext(
         trial_id=trial.id,
         job_id=trial.job_id,
         job_config=_job_config_from(job),
         candidate_id=trial.candidate_id,
-        parameters=dict(candidate.parameter_json or {}),
+        parameters=dict(parameters),
         seed=trial.seed,
         scenario_type=trial.scenario_type,
-        scenario_config=(dict(trial.scenario_config_json) if trial.scenario_config_json else None),
+        scenario_config=(dict(scenario_config) if scenario_config is not None else None),
         attempt_count=trial.attempt_count,
         cancellation_event=cancellation_event,
     )
@@ -376,6 +426,7 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
     for meta in artifacts:
         storage_path = meta.storage_path
         local_path = Path(storage_path)
+        persisted_size = meta.file_size_bytes
         if local_path.exists() and local_path.is_file():
             safe_name = Path(meta.display_name or local_path.name).name
             if safe_name in {"", ".", ".."}:
@@ -419,6 +470,7 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
                 key,
                 content_type=meta.mime_type,
             )
+            persisted_size = local_path.stat().st_size
         db.add(
             models.Artifact(
                 owner_type="trial",
@@ -427,7 +479,7 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
                 display_name=meta.display_name,
                 storage_path=storage_path,
                 mime_type=meta.mime_type,
-                file_size_bytes=meta.file_size_bytes,
+                file_size_bytes=persisted_size,
             )
         )
 
@@ -503,6 +555,7 @@ def claim_and_run_one_pending_trial(
     ``SIMULATOR_BACKEND`` environment variable.
     """
 
+    worker_id = _validated_worker_id(worker_id)
     now = _now()
     lease_seconds = get_settings().worker_lease_seconds
     lease_until = now + timedelta(seconds=lease_seconds)
@@ -626,19 +679,39 @@ def claim_and_run_one_pending_trial(
         return trial_id
 
     cancellation_event = threading.Event()
-    ctx = _build_trial_context(
-        trial,
-        job,
-        candidate,
-        cancellation_event=cancellation_event,
-    )
+    try:
+        ctx = _build_trial_context(
+            trial,
+            job,
+            candidate,
+            cancellation_event=cancellation_event,
+        )
+    except (TypeError, ValueError) as exc:
+        logger.warning(
+            "rejected invalid trial configuration trial=%s: %s",
+            trial_id,
+            exc,
+        )
+        if not _acquire_completion_fence(db, lease_token, lease_seconds=lease_seconds):
+            return trial_id
+        trial = db.get(models.Trial, trial_id)
+        if trial is None:  # pragma: no cover - defensive only.
+            db.rollback()
+            return trial_id
+        _mark_trial_failed(
+            db,
+            trial,
+            code=FAILURE_INVALID_PARAMETERS,
+            reason=str(exc)[:1000],
+        )
+        return trial_id
     # Do not hold the main session's read transaction open while PX4/Gazebo
     # runs. Lease heartbeats use independent short-lived sessions.
     db.commit()
 
     try:
         ctx = _validate_trial_px4_parameters(ctx)
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
         logger.warning(
             "rejected invalid PX4 candidate before simulation trial=%s: %s",
             trial_id,
@@ -684,10 +757,17 @@ def claim_and_run_one_pending_trial(
         execution_error = exc
     finally:
         try:
-            sim.cleanup(ctx)
-        except Exception:  # pragma: no cover — cleanup is best-effort.
-            logger.exception("simulator adapter cleanup failed for trial %s", trial.id)
-        heartbeat.stop()
+            try:
+                sim.cleanup(ctx)
+            except Exception:  # pragma: no cover - cleanup is best-effort.
+                logger.exception("simulator adapter cleanup failed for trial %s", trial.id)
+        finally:
+            # Never strand the lease heartbeat when adapter cleanup is
+            # interrupted by process-control exceptions such as SystemExit or
+            # KeyboardInterrupt. Those BaseException subclasses must still
+            # propagate to the worker boundary; only resource release is
+            # unconditional here.
+            heartbeat.stop()
 
     # The exact owner + attempt count form a fencing token. If another worker
     # reclaimed this lease, the old simulator result is intentionally dropped.

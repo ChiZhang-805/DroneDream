@@ -11,11 +11,19 @@ import type { ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 
 import { isDesktopRuntime } from "./bridge";
-import { probeOverallDesktopReadiness } from "./readiness";
+import {
+  clearRuntimeAutoStartFailure,
+  ensureOverallDesktopReadiness,
+  getDesktopReadinessSession,
+  subscribeDesktopReadiness,
+} from "./readiness";
+import type { DesktopReadinessSnapshot } from "./readiness";
 
 export type DesktopRuntimeAccessStatus =
   | "browser"
   | "checking"
+  | "starting"
+  | "startFailed"
   | "ready"
   | "blocked";
 
@@ -23,6 +31,9 @@ export interface DesktopRuntimeAccess {
   desktopRuntime: boolean;
   status: DesktopRuntimeAccessStatus;
   canUseRuntime: boolean;
+  snapshot: DesktopReadinessSnapshot | null;
+  lastFullCheckAt: number | null;
+  isChecking: boolean;
   refresh: () => Promise<void>;
 }
 
@@ -30,6 +41,9 @@ const BROWSER_ACCESS: DesktopRuntimeAccess = {
   desktopRuntime: false,
   status: "browser",
   canUseRuntime: true,
+  snapshot: null,
+  lastFullCheckAt: null,
+  isChecking: false,
   refresh: async () => undefined,
 };
 
@@ -38,10 +52,36 @@ const DesktopRuntimeAccessContext = createContext<DesktopRuntimeAccess>(BROWSER_
 export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const desktopRuntime = isDesktopRuntime();
+  const initialPath = useRef(location.pathname);
   const requestId = useRef(0);
+  const initialSession = getDesktopReadinessSession();
   const [status, setStatus] = useState<DesktopRuntimeAccessStatus>(
-    desktopRuntime ? "checking" : "browser",
+    desktopRuntime
+      ? initialSession?.snapshot.ready
+        ? "ready"
+        : initialSession?.snapshot.autoStartFailed
+          ? "startFailed"
+          : initialSession
+            ? "blocked"
+            : "checking"
+      : "browser",
   );
+  const [snapshot, setSnapshot] = useState<DesktopReadinessSnapshot | null>(
+    desktopRuntime ? initialSession?.snapshot ?? null : null,
+  );
+  const snapshotRef = useRef<DesktopReadinessSnapshot | null>(
+    desktopRuntime ? initialSession?.snapshot ?? null : null,
+  );
+  const [lastFullCheckAt, setLastFullCheckAt] = useState<number | null>(
+    desktopRuntime ? initialSession?.lastFullCheckAt ?? null : null,
+  );
+  const [isChecking, setIsChecking] = useState(desktopRuntime && !initialSession);
+
+  const applySnapshot = useCallback((next: DesktopReadinessSnapshot) => {
+    snapshotRef.current = next;
+    setSnapshot(next);
+    setStatus(next.ready ? "ready" : next.autoStartFailed ? "startFailed" : "blocked");
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!desktopRuntime) {
@@ -50,33 +90,85 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     }
 
     const currentRequest = ++requestId.current;
-    // A fresh probe invalidates the previous result immediately. Keeping an
-    // old "ready" value visible here would briefly re-enable mutating actions
-    // while the current Runtime state is still unknown.
-    setStatus("checking");
+    setIsChecking(true);
+    if (!snapshotRef.current) setStatus("checking");
+    clearRuntimeAutoStartFailure();
+    let automaticStartAttempted = false;
     try {
-      const snapshot = await probeOverallDesktopReadiness();
-      if (requestId.current === currentRequest) {
-        setStatus(snapshot.ready ? "ready" : "blocked");
-      }
+      const snapshot = await ensureOverallDesktopReadiness({
+        autoStart: true,
+        force: true,
+        shouldAutoStart: () => requestId.current === currentRequest,
+        onStarting: () => {
+          automaticStartAttempted = true;
+        },
+      });
+      if (requestId.current !== currentRequest) return;
+      applySnapshot(snapshot);
     } catch {
-      if (requestId.current === currentRequest) setStatus("blocked");
+      if (requestId.current === currentRequest) {
+        setStatus(automaticStartAttempted ? "startFailed" : "blocked");
+      }
+    } finally {
+      if (requestId.current === currentRequest) setIsChecking(false);
     }
-  }, [desktopRuntime]);
+  }, [applySnapshot, desktopRuntime]);
 
   useEffect(() => {
-    void refresh();
+    if (!desktopRuntime) return;
+    return subscribeDesktopReadiness((session) => {
+      snapshotRef.current = session.snapshot;
+      setSnapshot(session.snapshot);
+      setLastFullCheckAt(session.lastFullCheckAt);
+      applySnapshot(session.snapshot);
+    });
+  }, [applySnapshot, desktopRuntime]);
+
+  useEffect(() => {
+    if (!desktopRuntime) {
+      setStatus("browser");
+      setIsChecking(false);
+      return;
+    }
+
+    const currentRequest = ++requestId.current;
+    const hadSession = Boolean(getDesktopReadinessSession());
+    if (!hadSession) {
+      setStatus("checking");
+      setIsChecking(true);
+    }
+    let automaticStartAttempted = false;
+    void ensureOverallDesktopReadiness({
+      autoStart: initialPath.current !== "/desktop/setup",
+      shouldAutoStart: () => requestId.current === currentRequest,
+      onStarting: () => {
+        automaticStartAttempted = true;
+        if (requestId.current === currentRequest && !hadSession) setStatus("starting");
+      },
+    }).then((next) => {
+      if (requestId.current === currentRequest) applySnapshot(next);
+    }).catch(() => {
+      if (requestId.current === currentRequest) {
+        setStatus(automaticStartAttempted ? "startFailed" : "blocked");
+      }
+    }).finally(() => {
+      if (requestId.current === currentRequest) setIsChecking(false);
+    });
+
     return () => {
       requestId.current += 1;
     };
-  }, [location.pathname, location.search, refresh]);
+  }, [applySnapshot, desktopRuntime]);
 
   const value = useMemo<DesktopRuntimeAccess>(() => ({
     desktopRuntime,
     status,
     canUseRuntime: !desktopRuntime || status === "ready",
+    snapshot,
+    lastFullCheckAt,
+    isChecking,
     refresh,
-  }), [desktopRuntime, refresh, status]);
+  }), [desktopRuntime, isChecking, lastFullCheckAt, refresh, snapshot, status]);
 
   return (
     <DesktopRuntimeAccessContext.Provider value={value}>

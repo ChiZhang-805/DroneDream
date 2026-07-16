@@ -251,4 +251,47 @@ foreach ($required in @(
     }
 }
 
+# Desktop removal and Runtime removal are intentionally separate products.
+# Keep this boundary executable: an ordinary NSIS uninstall may delete only the
+# application files, while the optional app-data checkbox may delete only the
+# bundle-owned roaming/local state. The dedicated WSL distribution, its host
+# root, resumable cache, and failure diagnostics must never become implicit
+# NSIS deletion targets.
+$uninstallStart = $template.IndexOf("Section Uninstall", [StringComparison]::Ordinal)
+$uninstallEnd = $template.IndexOf("SectionEnd", $uninstallStart, [StringComparison]::Ordinal)
+if ($uninstallStart -lt 0 -or $uninstallEnd -le $uninstallStart) {
+    throw "The NSIS uninstall section could not be isolated"
+}
+$uninstallSection = $template.Substring($uninstallStart, $uninstallEnd - $uninstallStart)
+$deleteDataGate = $uninstallSection.IndexOf(
+    '${If} $DeleteAppDataCheckboxState = 1',
+    [StringComparison]::Ordinal
+)
+$roamingDelete = $uninstallSection.IndexOf(
+    'RmDir /r "$APPDATA\${BUNDLEID}"',
+    [StringComparison]::Ordinal
+)
+$localDelete = $uninstallSection.IndexOf(
+    'RmDir /r "$LOCALAPPDATA\${BUNDLEID}"',
+    [StringComparison]::Ordinal
+)
+if ($deleteDataGate -lt 0 -or
+    $roamingDelete -le $deleteDataGate -or
+    $localDelete -le $deleteDataGate) {
+    throw "Application data must be deleted only behind the explicit uninstall checkbox"
+}
+
+$packagingSources = @($template, $runtimeMode, $installerHook)
+foreach ($pattern in @(
+    '(?im)^\s*(?:Delete|RmDir(?:\s+/r)?)\s+.*DroneDream\.download-cache',
+    '(?im)^\s*(?:Exec|ExecWait|ExecShell|nsExec::Exec(?:ToStack)?)\s+.*(?:wsl(?:\.exe)?).*--unregister',
+    '(?im)^\s*(?:Delete|RmDir(?:\s+/r)?)\s+.*\\DroneDream\\diagnostics'
+)) {
+    foreach ($source in $packagingSources) {
+        if ($source -match $pattern) {
+            throw "NSIS must not destructively own Runtime, cache, or diagnostic data: $pattern"
+        }
+    }
+}
+
 Write-Host "Pinned Tauri 2.11.4 NSIS template and DroneDream anchors verified."

@@ -23,6 +23,7 @@ import json
 import math
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,12 @@ _SCENARIO_PENALTY = {
 }
 
 _NOISE_PENALTY = {"low": 0.00, "medium": 0.05, "high": 0.12}
+_MAX_INPUT_BYTES = 16 * 1024 * 1024
+_MAX_INJECTED_SLEEP_SECONDS = 3600.0
+
+
+class ExampleSimulatorError(ValueError):
+    """Invalid invocation or trial payload supplied to the example simulator."""
 
 
 def _parse_args() -> argparse.Namespace:
@@ -42,6 +49,24 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     return parser.parse_args()
+
+
+def _require_object(value: object, *, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ExampleSimulatorError(f"{label} must be a JSON object")
+    return value
+
+
+def _finite_float(value: object, *, label: str) -> float:
+    if isinstance(value, bool):
+        raise ExampleSimulatorError(f"{label} must be a finite number")
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError):
+        raise ExampleSimulatorError(f"{label} must be a finite number") from None
+    if not math.isfinite(normalized):
+        raise ExampleSimulatorError(f"{label} must be a finite number")
+    return normalized
 
 
 def _emit_artifacts(
@@ -60,7 +85,11 @@ def _emit_artifacts(
     trial_id = str(payload.get("trial_id", "unknown_trial"))
     scenario = payload.get("scenario_type", "nominal")
     job_config = payload.get("job_config")
-    altitude = float(job_config.get("altitude_m", 3.0)) if isinstance(job_config, dict) else 3.0
+    altitude = (
+        _finite_float(job_config.get("altitude_m", 3.0), label="job_config.altitude_m")
+        if isinstance(job_config, dict)
+        else 3.0
+    )
     telemetry_samples = [
         {
             "t": round(i * 0.1, 2),
@@ -131,27 +160,33 @@ def _emit_artifacts(
 
 
 def _compute_metrics(payload: dict[str, Any]) -> dict[str, Any]:
-    params = payload.get("parameters", {}) or {}
+    params = _require_object(payload.get("parameters", {}), label="parameters")
     # The canonical grouped object is ``job_config``; top-level aliases
     # (``track_type``, ``altitude_m``, ``wind``, ``start_point``,
     # ``sensor_noise_level``, ``objective_profile``) mirror the same values
     # for wrapper authors who prefer the flat shape. This reference
     # implementation prefers ``job_config`` and falls back to top-level.
-    job = payload.get("job_config") or {
-        k: payload[k]
-        for k in (
-            "track_type",
-            "altitude_m",
-            "reference_track",
-            "wind",
-            "start_point",
-            "sensor_noise_level",
-            "objective_profile",
-        )
-        if k in payload
-    }
+    raw_job = payload.get("job_config")
+    if raw_job is None:
+        job = {
+            k: payload[k]
+            for k in (
+                "track_type",
+                "altitude_m",
+                "reference_track",
+                "wind",
+                "start_point",
+                "sensor_noise_level",
+                "objective_profile",
+            )
+            if k in payload
+        }
+    else:
+        job = _require_object(raw_job, label="job_config")
     scenario = payload.get("scenario_type", "nominal")
-    scenario_config = payload.get("scenario_config") or {}
+    if not isinstance(scenario, str):
+        raise ExampleSimulatorError("scenario_type must be a string")
+    scenario_config = _require_object(payload.get("scenario_config", {}), label="scenario_config")
 
     # Controlled failure injection for tests.
     inject = scenario_config.get("inject_failure") if isinstance(scenario_config, dict) else None
@@ -160,7 +195,16 @@ def _compute_metrics(payload: dict[str, Any]) -> dict[str, Any]:
     if isinstance(inject, str):
         inject = inject.strip().lower()
         if inject == "sleep":
-            time.sleep(float(scenario_config.get("sleep_seconds", 30)))
+            sleep_seconds = _finite_float(
+                scenario_config.get("sleep_seconds", 30),
+                label="scenario_config.sleep_seconds",
+            )
+            if not 0.0 <= sleep_seconds <= _MAX_INJECTED_SLEEP_SECONDS:
+                raise ExampleSimulatorError(
+                    "scenario_config.sleep_seconds must be between "
+                    f"0 and {_MAX_INJECTED_SLEEP_SECONDS:g}"
+                )
+            time.sleep(sleep_seconds)
         if inject in {"timeout", "simulation_failed", "unstable"}:
             return {
                 "success": False,
@@ -180,10 +224,19 @@ def _compute_metrics(payload: dict[str, Any]) -> dict[str, Any]:
         if inject == "malformed":
             return {"success": True, "garbage": True}
 
-    kp = float(params.get("kp_xy", 1.0))
-    kd = float(params.get("kd_xy", 0.2))
-    ki = float(params.get("ki_xy", 0.05))
-    disturbance = max(0.0, min(1.0, float(params.get("disturbance_rejection", 0.5))))
+    kp = _finite_float(params.get("kp_xy", 1.0), label="parameters.kp_xy")
+    kd = _finite_float(params.get("kd_xy", 0.2), label="parameters.kd_xy")
+    ki = _finite_float(params.get("ki_xy", 0.05), label="parameters.ki_xy")
+    disturbance = max(
+        0.0,
+        min(
+            1.0,
+            _finite_float(
+                params.get("disturbance_rejection", 0.5),
+                label="parameters.disturbance_rejection",
+            ),
+        ),
+    )
     noise_level = str(job.get("sensor_noise_level", "medium"))
 
     base = (
@@ -229,27 +282,75 @@ def _compute_metrics(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _read_input(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise ExampleSimulatorError(f"input file does not exist: {path}")
+    try:
+        if path.stat().st_size > _MAX_INPUT_BYTES:
+            raise ExampleSimulatorError(f"input file exceeds {_MAX_INPUT_BYTES} bytes")
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except ExampleSimulatorError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ExampleSimulatorError(f"cannot read input: {exc}") from exc
+    return _require_object(payload, label="trial input")
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".partial",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            json.dump(payload, handle, indent=2, sort_keys=True, allow_nan=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
 def main() -> int:
     args = _parse_args()
     try:
-        with args.input.open("r", encoding="utf-8") as f:
-            payload = json.load(f)
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"[example_real_simulator] cannot read input: {exc}", file=sys.stderr)
+        if args.input.resolve(strict=False) == args.output.resolve(strict=False):
+            raise ExampleSimulatorError("input and output paths must be different")
+        payload = _read_input(args.input)
+        result = _compute_metrics(payload)
+    except ExampleSimulatorError as exc:
+        print(f"[example_real_simulator] invalid input: {exc}", file=sys.stderr)
         return 2
-    result = _compute_metrics(payload)
     identity = payload.get("execution_identity")
     if isinstance(identity, dict):
         result["schema_version"] = "dronedream.trial_result.v2"
         result["execution_identity"] = dict(identity)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
     # Emit per-trial artifact files for successful trials. Failure paths
     # (``success=False``) intentionally skip this so the adapter's error
     # reporting stays the salient signal.
     if result.get("success") and isinstance(result.get("metrics"), dict):
-        result["artifacts"] = _emit_artifacts(payload, args.output.parent, result["metrics"])
-    with args.output.open("w", encoding="utf-8") as f:
-        json.dump(result, f, indent=2, sort_keys=True, allow_nan=False)
+        try:
+            result["artifacts"] = _emit_artifacts(payload, args.output.parent, result["metrics"])
+        except (OSError, ExampleSimulatorError) as exc:
+            print(
+                f"[example_real_simulator] cannot write artifacts: {exc}",
+                file=sys.stderr,
+            )
+            return 2
+    try:
+        _atomic_write_json(args.output, result)
+    except (OSError, TypeError, ValueError) as exc:
+        print(f"[example_real_simulator] cannot write output: {exc}", file=sys.stderr)
+        return 2
     return 0 if os.environ.get("EXAMPLE_SIM_EXIT_NONZERO") != "1" else 3
 
 

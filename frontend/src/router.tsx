@@ -8,34 +8,31 @@ import type { RouteObject } from "react-router-dom";
 
 import { AppShell } from "./AppShell";
 import { isDesktopRuntime } from "./desktop/bridge";
-import { probeOverallDesktopReadiness } from "./desktop/readiness";
+import { ensureOverallDesktopReadiness } from "./desktop/readiness";
 import { Dashboard } from "./pages/Dashboard";
 import { NewJob } from "./pages/NewJob";
 import { JobDetail } from "./pages/JobDetail";
 import { TrialDetail } from "./pages/TrialDetail";
 import { History } from "./pages/History";
 import { JobCompare } from "./pages/JobCompare";
-import { BatchCreate } from "./pages/BatchCreate";
-import { BatchDetail } from "./pages/BatchDetail";
-import { Batches } from "./pages/Batches";
 import { ECE498 } from "./pages/ECE498";
 import { DesktopSetup } from "./pages/DesktopSetup";
 
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
-  const requireDesktopReadiness = (feature: "experiment" | "job" | "batch") =>
+  const requireDesktopReadiness = (feature: "experiment" | "job") =>
     desktopRuntime
       ? async () => {
           try {
-            const snapshot = await probeOverallDesktopReadiness();
+            const snapshot = await ensureOverallDesktopReadiness({ autoStart: true });
             return snapshot.ready
               ? null
-              : redirect(`/desktop/setup?required=${feature}`);
+              : redirect(`/dashboard?settings=runtime&required=${feature}`);
           } catch {
-            return redirect(`/desktop/setup?required=${feature}`);
+            return redirect(`/dashboard?settings=runtime&required=${feature}`);
           }
         }
       : undefined;
-  const fallbackPath = desktopRuntime ? "/desktop/setup" : "/";
+  const fallbackPath = desktopRuntime ? "/dashboard" : "/";
 
   return [
     {
@@ -65,21 +62,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
           loader: requireDesktopReadiness("job"),
         },
         { path: "history", element: <History /> },
-        {
-          path: "batches",
-          element: <Batches />,
-          loader: requireDesktopReadiness("batch"),
-        },
-        {
-          path: "batches/new",
-          element: <BatchCreate />,
-          loader: requireDesktopReadiness("batch"),
-        },
-        {
-          path: "batches/:batchId",
-          element: <BatchDetail />,
-          loader: requireDesktopReadiness("batch"),
-        },
+        { path: "batches/*", loader: () => redirect("/dashboard") },
         {
           path: "compare",
           element: <JobCompare />,

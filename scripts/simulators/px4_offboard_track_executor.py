@@ -27,6 +27,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+MAX_REFERENCE_TRACK_POINTS = 10_000
+MAX_SETPOINT_RATE_HZ = 100.0
+MAX_SETPOINTS = 1_000_000
+
 
 @dataclass(frozen=True)
 class TrackPoint:
@@ -93,34 +97,44 @@ class MavsdkOffboardClient:
         self._system = self._system_cls()
         await self._system.connect(system_address=connection_url)
 
+    def _require_system(self) -> Any:
+        if self._system is None:
+            raise RuntimeError("PX4 offboard client is not connected")
+        return self._system
+
     async def wait_until_ready(self, timeout_seconds: float) -> None:
-        assert self._system is not None
-        start = time.monotonic()
-        async for state in self._system.core.connection_state():
-            if getattr(state, "is_connected", False):
-                break
-            if time.monotonic() - start > timeout_seconds:
-                raise TimeoutError(f"PX4 connection timeout after {timeout_seconds}s")
-        async for health in self._system.telemetry.health():
-            if bool(getattr(health, "is_global_position_ok", True)) and bool(getattr(health, "is_home_position_ok", True)):
-                return
-            if time.monotonic() - start > timeout_seconds:
-                raise TimeoutError(f"PX4 health timeout after {timeout_seconds}s")
+        system = self._require_system()
+        try:
+            async with asyncio.timeout(timeout_seconds):
+                connected = False
+                async for state in system.core.connection_state():
+                    if getattr(state, "is_connected", False):
+                        connected = True
+                        break
+                if not connected:
+                    raise RuntimeError("PX4 connection state stream ended before connecting")
+
+                async for health in system.telemetry.health():
+                    if bool(getattr(health, "is_global_position_ok", True)) and bool(
+                        getattr(health, "is_home_position_ok", True)
+                    ):
+                        return
+                raise RuntimeError("PX4 health stream ended before the vehicle became ready")
+        except TimeoutError:
+            raise TimeoutError(f"PX4 readiness timeout after {timeout_seconds}s") from None
 
     async def arm(self) -> None:
-        assert self._system is not None
-        await self._system.action.arm()
+        await self._require_system().action.arm()
 
     async def set_position_ned(self, setpoint: Setpoint) -> None:
-        assert self._system is not None
-        await self._system.offboard.set_position_ned(
+        await self._require_system().offboard.set_position_ned(
             self._position_cls(setpoint.north_m, setpoint.east_m, setpoint.down_m, setpoint.yaw_deg)
         )
 
     async def start_offboard(self) -> None:
-        assert self._system is not None
+        system = self._require_system()
         try:
-            await self._system.offboard.start()
+            await system.offboard.start()
         except self._offboard_error_cls as exc:
             raise RuntimeError(f"offboard start failed: {exc}") from exc
 
@@ -129,12 +143,11 @@ class MavsdkOffboardClient:
             return
         try:
             await self._system.offboard.stop()
-        except Exception:
-            return
+        except self._offboard_error_cls as exc:
+            raise RuntimeError(f"offboard stop failed: {exc}") from exc
 
     async def land(self) -> None:
-        assert self._system is not None
-        await self._system.action.land()
+        await self._require_system().action.land()
 
 
 class FakeOffboardClient:
@@ -171,7 +184,12 @@ class FakeOffboardClient:
 def _parse_bool(raw: str | None, *, default: bool) -> bool:
     if raw is None:
         return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"invalid boolean value: {raw!r}")
 
 
 def _parse_float(raw: str | None, *, default: float) -> float:
@@ -187,7 +205,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--params", required=True, type=Path)
     parser.add_argument("--vehicle", required=True)
     parser.add_argument("--world", required=True)
-    parser.add_argument("--connection", default=os.environ.get("PX4_OFFBOARD_CONNECTION", "udp://:14540"))
+    parser.add_argument(
+        "--connection",
+        default=os.environ.get("PX4_OFFBOARD_CONNECTION", "udp://:14540"),
+    )
     parser.add_argument(
         "--setpoint-rate-hz",
         type=float,
@@ -218,32 +239,74 @@ def _write_offboard_timing(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _reject_nonfinite_json(value: str) -> None:
+    raise ValueError(f"non-standard JSON numeric constant is forbidden: {value}")
+
+
+def _finite_float(value: Any, label: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be a finite number")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"{label} must be a finite number") from None
+    if not math.isfinite(parsed):
+        raise ValueError(f"{label} must be a finite number")
+    return parsed
+
+
 def load_reference_track(path: Path) -> list[TrackPoint]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = json.loads(
+        path.read_text(encoding="utf-8"),
+        parse_constant=_reject_nonfinite_json,
+    )
     if not isinstance(payload, dict) or not isinstance(payload.get("points"), list):
         raise ValueError("reference_track.json must be an object with points[]")
+    if len(payload["points"]) > MAX_REFERENCE_TRACK_POINTS:
+        raise ValueError(
+            f"reference_track.json exceeds the {MAX_REFERENCE_TRACK_POINTS}-point limit"
+        )
     points: list[TrackPoint] = []
     for idx, raw in enumerate(payload["points"]):
         if not isinstance(raw, dict):
             raise ValueError(f"reference point {idx} must be an object")
-        points.append(TrackPoint(float(raw["x"]), float(raw["y"]), float(raw["z"])))
+        points.append(
+            TrackPoint(
+                _finite_float(raw.get("x"), f"reference point {idx}.x"),
+                _finite_float(raw.get("y"), f"reference point {idx}.y"),
+                _finite_float(raw.get("z"), f"reference point {idx}.z"),
+            )
+        )
     if not points:
         raise ValueError("reference_track.json points[] cannot be empty")
     return points
 
 
 def load_controller_params(path: Path) -> ControllerParams:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = json.loads(
+        path.read_text(encoding="utf-8"),
+        parse_constant=_reject_nonfinite_json,
+    )
     if not isinstance(payload, dict):
         raise ValueError("controller_params.json must be an object")
-    return ControllerParams(
-        kp_xy=float(payload.get("kp_xy", 1.0)),
-        kd_xy=float(payload.get("kd_xy", 0.2)),
-        ki_xy=float(payload.get("ki_xy", 0.05)),
-        vel_limit=max(0.1, float(payload.get("vel_limit", 5.0))),
-        accel_limit=max(0.1, float(payload.get("accel_limit", 4.0))),
-        disturbance_rejection=float(payload.get("disturbance_rejection", 0.5)),
+    params = ControllerParams(
+        kp_xy=_finite_float(payload.get("kp_xy", 1.0), "kp_xy"),
+        kd_xy=_finite_float(payload.get("kd_xy", 0.2), "kd_xy"),
+        ki_xy=_finite_float(payload.get("ki_xy", 0.05), "ki_xy"),
+        vel_limit=_finite_float(payload.get("vel_limit", 5.0), "vel_limit"),
+        accel_limit=_finite_float(payload.get("accel_limit", 4.0), "accel_limit"),
+        disturbance_rejection=_finite_float(
+            payload.get("disturbance_rejection", 0.5),
+            "disturbance_rejection",
+        ),
     )
+    if min(params.kp_xy, params.kd_xy, params.ki_xy) < 0:
+        raise ValueError("controller gains must be non-negative")
+    if params.vel_limit <= 0 or params.accel_limit <= 0:
+        raise ValueError("vel_limit and accel_limit must be greater than zero")
+    if not 0.0 <= params.disturbance_rejection <= 1.0:
+        raise ValueError("disturbance_rejection must be between 0 and 1")
+    return params
 
 
 def compute_yaw_from_segment(prev_point: TrackPoint, next_point: TrackPoint) -> float:
@@ -272,13 +335,17 @@ def _interpolate_points(start: TrackPoint, end: TrackPoint, parts: int) -> list[
     return result
 
 
-def build_setpoint_schedule(points: list[TrackPoint], params: ControllerParams, rate_hz: float) -> list[Setpoint]:
+def build_setpoint_schedule(
+    points: list[TrackPoint], params: ControllerParams, rate_hz: float
+) -> list[Setpoint]:
     return build_setpoint_schedule_plan(points, params, rate_hz).schedule
 
 
-def build_setpoint_schedule_plan(points: list[TrackPoint], params: ControllerParams, rate_hz: float) -> SetpointSchedulePlan:
-    if rate_hz <= 0:
-        raise ValueError("rate_hz must be > 0")
+def build_setpoint_schedule_plan(
+    points: list[TrackPoint], params: ControllerParams, rate_hz: float
+) -> SetpointSchedulePlan:
+    if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
+        raise ValueError(f"rate_hz must be finite and in (0, {MAX_SETPOINT_RATE_HZ:g}]")
     if not points:
         raise ValueError("points cannot be empty")
 
@@ -288,6 +355,8 @@ def build_setpoint_schedule_plan(points: list[TrackPoint], params: ControllerPar
     schedule: list[Setpoint] = []
 
     takeoff_hold_samples = max(3, int(rate_hz * 2.0))
+    if takeoff_hold_samples > MAX_SETPOINTS:
+        raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
     for _ in range(takeoff_hold_samples):
         schedule.append(enu_point_to_ned_setpoint(takeoff, yaw_deg=0.0))
 
@@ -303,12 +372,17 @@ def build_setpoint_schedule_plan(points: list[TrackPoint], params: ControllerPar
         step_limit = max(0.05, speed_target * dt)
         effective_step = min(max_step, step_limit)
         parts = max(1, int(math.ceil(seg_dist / effective_step)))
+        if parts > MAX_SETPOINTS - len(schedule):
+            raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
         yaw_deg = compute_yaw_from_segment(prev, point) if seg_dist > 1e-9 else 0.0
         for interp in _interpolate_points(prev, point, parts):
             schedule.append(enu_point_to_ned_setpoint(interp, yaw_deg=yaw_deg))
         prev = point
         if idx == len(points) - 1:
-            for _ in range(max(2, int(rate_hz * 0.5))):
+            final_hold_samples = max(2, int(rate_hz * 0.5))
+            if final_hold_samples > MAX_SETPOINTS - len(schedule):
+                raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
+            for _ in range(final_hold_samples):
                 schedule.append(enu_point_to_ned_setpoint(point, yaw_deg=yaw_deg))
 
     track_start_index = takeoff_hold_samples
@@ -334,27 +408,44 @@ async def run_executor(
     track_end_index: int | None = None,
     timing_path: Path | None = None,
 ) -> None:
+    if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
+        raise ValueError(f"rate_hz must be finite and in (0, {MAX_SETPOINT_RATE_HZ:g}]")
+    for label, value in (
+        ("takeoff_timeout_seconds", takeoff_timeout_seconds),
+        ("track_timeout_seconds", track_timeout_seconds),
+    ):
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError(f"{label} must be finite and greater than zero")
+    if not schedule:
+        raise ValueError("setpoint schedule is empty")
     exec_start = time.monotonic()
     timing: dict[str, Any] = {
         "time_base": "executor_relative_seconds",
         "setpoint_count": len(schedule),
         "rate_hz": rate_hz,
     }
-    track_end = len(schedule) - 1 if track_end_index is None else min(max(0, track_end_index), len(schedule) - 1)
+    track_end = (
+        len(schedule) - 1
+        if track_end_index is None
+        else min(max(0, track_end_index), len(schedule) - 1)
+    )
     track_start = min(max(0, track_start_index), track_end) if schedule else 0
-    await client.connect(connection)
-    _log(log_path, f"connected via {connection}")
-    await client.wait_until_ready(takeoff_timeout_seconds)
-    await client.arm()
-    _log(log_path, "armed")
-
-    if not schedule:
-        raise ValueError("setpoint schedule is empty")
-
+    armed = False
+    offboard_started = False
+    offboard_stopped = False
+    land_command_sent = False
     try:
+        await client.connect(connection)
+        _log(log_path, f"connected via {connection}")
+        await client.wait_until_ready(takeoff_timeout_seconds)
+        await client.arm()
+        armed = True
+        _log(log_path, "armed")
+
         timing["takeoff_start_t"] = time.monotonic() - exec_start
         await client.set_position_ned(schedule[0])
         await client.start_offboard()
+        offboard_started = True
         timing["offboard_start_t"] = time.monotonic() - exec_start
         _log(log_path, "offboard started")
 
@@ -372,12 +463,27 @@ async def run_executor(
             await asyncio.sleep(dt)
 
         await client.stop_offboard()
+        offboard_stopped = True
         _log(log_path, "offboard stopped")
         if land_after:
             timing["land_start_t"] = time.monotonic() - exec_start
             await client.land()
+            land_command_sent = True
             _log(log_path, "land command sent")
     finally:
+        if offboard_started and not offboard_stopped:
+            try:
+                await client.stop_offboard()
+                _log(log_path, "offboard stopped during failure cleanup")
+            except Exception as exc:
+                _log(log_path, f"offboard failure cleanup could not stop offboard: {exc}")
+        if armed and land_after and not land_command_sent:
+            try:
+                timing.setdefault("land_start_t", time.monotonic() - exec_start)
+                await client.land()
+                _log(log_path, "land command sent during failure cleanup")
+            except Exception as exc:
+                _log(log_path, f"offboard failure cleanup could not land: {exc}")
         if timing_path is not None:
             _write_offboard_timing(timing_path, timing)
 
@@ -391,14 +497,21 @@ def main(argv: list[str] | None = None) -> int:
         points = load_reference_track(args.track)
         params = load_controller_params(args.params)
         plan = build_setpoint_schedule_plan(points, params, args.setpoint_rate_hz)
-        _log(args.log, f"vehicle={args.vehicle} world={args.world} points={len(points)} setpoints={len(plan.schedule)}")
+        _log(
+            args.log,
+            f"vehicle={args.vehicle} world={args.world} points={len(points)} "
+            f"setpoints={len(plan.schedule)}",
+        )
         _log(
             args.log,
             "controller_params are applied by the offboard executor, not PX4 internal parameters",
         )
 
         if dry_run:
-            _log(args.log, "PX4_OFFBOARD_DRY_RUN=true; executor exiting without MAVSDK command streaming")
+            _log(
+                args.log,
+                "PX4_OFFBOARD_DRY_RUN=true; executor exiting without MAVSDK command streaming",
+            )
             dry_timing = {
                 "time_base": "executor_relative_seconds",
                 "setpoint_count": len(plan.schedule),

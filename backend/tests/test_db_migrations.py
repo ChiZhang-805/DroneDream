@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import importlib
+import os
+import subprocess
+import sys
+from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import BigInteger, text
 
 
 def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeypatch):
@@ -24,6 +28,18 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 """
                 CREATE TABLE jobs (
                     id VARCHAR(64) PRIMARY KEY,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE candidate_parameter_sets (
+                    id VARCHAR(64) PRIMARY KEY,
+                    job_id VARCHAR(64) NOT NULL,
                     created_at DATETIME NOT NULL,
                     updated_at DATETIME NOT NULL
                 )
@@ -97,8 +113,55 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
             row[1]
             for row in conn.execute(text("PRAGMA table_info('job_secrets')")).fetchall()
         }
+        candidate_columns = {
+            row[1]
+            for row in conn.execute(
+                text("PRAGMA table_info('candidate_parameter_sets')")
+            ).fetchall()
+        }
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
     assert "cancelled_at" in batch_columns
     assert "expires_at" in secret_columns
+    assert "optimizer_metadata_json" in candidate_columns
+
+
+def test_sqlite_engine_enables_foreign_key_enforcement(tmp_path) -> None:
+    from app.db import _build_engine
+
+    local_engine = _build_engine(f"sqlite:///{tmp_path / 'foreign-keys.db'}")
+    try:
+        with local_engine.connect() as connection:
+            assert connection.scalar(text("PRAGMA foreign_keys")) == 1
+    finally:
+        local_engine.dispose()
+
+
+def test_artifact_size_uses_big_integer_in_production_schema() -> None:
+    from app import models
+
+    assert isinstance(models.Artifact.__table__.c.file_size_bytes.type, BigInteger)
+
+
+def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
+    database_path = (tmp_path / "encoded%25password.db").as_posix()
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "APP_ENV": "test",
+            "DATABASE_URL": f"sqlite:///{database_path}",
+            "DATABASE_AUTO_CREATE": "false",
+        }
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (tmp_path / "encoded%25password.db").is_file()

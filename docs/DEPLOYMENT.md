@@ -1,6 +1,6 @@
 # DroneDream deployment guide
 
-This repository ships a production-shaped local stack with five independent
+This repository ships a production-shaped local stack with six independent
 roles:
 
 - `frontend`: static React application behind Nginx;
@@ -15,6 +15,31 @@ not install PX4 or Gazebo. Build a site-specific worker image on top of the
 `worker` target when real simulation is enabled, pinning the required PX4,
 Gazebo, MAVSDK, graphics, and vehicle assets.
 
+Compose forwards the operator-facing `REAL_SIMULATOR_*`, `PX4_*`, Gazebo GUI,
+marker, telemetry, evaluation, and timeout settings from `.env` to that worker.
+Leave `SIMULATOR_BACKEND` blank for normal use so each experiment retains its
+own selected backend. Per-trial `PX4_TRIAL_*` paths/evidence and the internal
+`PX4_PARAMETER_*` request context are deliberately **not** accepted from
+Compose; the runner creates them for each isolated trial.
+
+The API/worker image installs third-party Python packages from
+`deploy/requirements.backend.lock` with mandatory hashes, then installs the two
+local projects without dependency resolution or build isolation. After changing
+either production dependency list, regenerate the lock for the actual Linux
+target and review the complete diff:
+
+```powershell
+uv pip compile deploy/requirements.backend.in `
+  --output-file deploy/requirements.backend.lock `
+  --python-version 3.12 `
+  --python-platform x86_64-manylinux_2_36 `
+  --only-binary :all: `
+  --generate-hashes
+```
+
+The quality gate builds both targets, verifies their imports, and proves that
+they run as the fixed unprivileged UID 10001 before a change can ship.
+
 ## Local container stack
 
 Requirements: Docker Engine with Compose v2 and at least 8 GB of available
@@ -22,11 +47,14 @@ memory for the application stack. Real Gazebo simulation needs substantially
 more CPU and memory.
 
 1. Copy `.env.example` to `.env`.
-2. Replace `POSTGRES_PASSWORD`, `MINIO_ROOT_PASSWORD`,
+2. Replace `POSTGRES_PASSWORD`, `MINIO_ROOT_PASSWORD`, `APP_SECRET_KEY`,
    `DEMO_AUTH_TOKENS`, and `VITE_DEMO_AUTH_TOKEN`. The demo token presented by
-   the frontend must match one token in `DEMO_AUTH_TOKENS`.
-3. If GPT optimization is enabled, set a Fernet `APP_SECRET_KEY` shared by API
-   and worker.
+   the frontend must match one token in `DEMO_AUTH_TOKENS`. Compose deliberately
+   refuses to start when any of these required values is missing; there are no
+   deployable fallback passwords or tokens.
+3. Generate `APP_SECRET_KEY` as a Fernet key and share it only with API and
+   worker. Even when GPT optimization is initially disabled, setting it before
+   first deployment avoids introducing an unplanned secret migration later.
 4. Start the stack:
 
    ```powershell
@@ -36,6 +64,10 @@ more CPU and memory.
 
 5. Open `http://localhost:8080`. Inspect readiness at
    `http://localhost:8080/health/ready`.
+
+The MinIO administration console is bound to `127.0.0.1:9001` only. Keep it
+loopback-only; use an authenticated tunnel instead of exposing it publicly when
+administering a remote host.
 
 The API container runs `alembic upgrade head` before Uvicorn. Its Compose
 healthcheck uses `/health/live`, allowing the worker to start without a
@@ -133,8 +165,8 @@ fleet.
 - Local-only installations can use the opt-in, DB-safe capacity policy in
   [Local Artifact Capacity and Retention](./13-artifact-retention.md). S3/MinIO
   deployments should keep cleanup disabled and configure bucket lifecycle rules.
-- Pin and scan all images. The Compose tags are a tested baseline, not an
-  automatic upgrade policy.
+- Keep the image tag-and-digest pairs pinned and scan them before each release.
+  Dependency upgrades are explicit review events, never an automatic policy.
 - Send structured logs and metrics off-host. Alert on `/health/ready`, queue
   age, missing worker heartbeat, expired/reclaimed leases, failed Trials,
   PostgreSQL saturation, and MinIO capacity.

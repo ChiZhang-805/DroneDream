@@ -5,6 +5,7 @@ mod process;
 mod runtime;
 mod runtime_cache;
 mod runtime_installer;
+mod runtime_keepalive;
 mod webview2_preflight;
 
 use tauri::Manager;
@@ -44,6 +45,7 @@ pub fn run() {
             }
         }))
         .manage(runtime_installer::RuntimeInstaller::default())
+        .manage(runtime_keepalive::RuntimeKeepalive::default())
         .invoke_handler(tauri::generate_handler![
             prerequisites::probe_system_prerequisites,
             installer_handoff::get_installer_runtime_intent,

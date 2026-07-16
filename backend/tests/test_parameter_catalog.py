@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.parameters import (
     CATALOG_VERSION,
     ParameterValueValidationError,
@@ -283,9 +282,7 @@ def test_catalog_exposes_ordered_integral_workflow_presets(client) -> None:
     assert presets[0]["locked_parameters"] == ["MC_ROLLRATE_K", "MC_PITCHRATE_K"]
     available = {item["name"] for item in catalog["parameters"]}
     assert all(set(item["parameter_names"]) <= available for item in presets)
-    assert all(
-        set(item["metrics"]) <= set(payload["supported_trial_metrics"]) for item in presets
-    )
+    assert all(set(item["metrics"]) <= set(payload["supported_trial_metrics"]) for item in presets)
     assert all(item["evidence_signals"] for item in presets)
     assert {item["id"] for item in payload["preconditions"]} >= {
         "rate_loop_validated",
@@ -341,9 +338,7 @@ def test_catalog_version_is_explicit_and_px4_specific_aliases_cannot_drift(clien
         "/api/v1/parameter-catalog/validate",
         json={
             "catalog_version": "latest-whatever-is-installed",
-            "selections": [
-                {"name": "MPC_XY_P", "search_min": 0.7, "search_max": 1.2}
-            ],
+            "selections": [{"name": "MPC_XY_P", "search_min": 0.7, "search_max": 1.2}],
         },
     )
     assert unknown.status_code == 400
@@ -353,9 +348,7 @@ def test_catalog_version_is_explicit_and_px4_specific_aliases_cannot_drift(clien
         json={
             "catalog_version": "px4-v1.16",
             "px4_version": "v1.17",
-            "selections": [
-                {"name": "MPC_XY_P", "search_min": 0.7, "search_max": 1.2}
-            ],
+            "selections": [{"name": "MPC_XY_P", "search_min": 0.7, "search_max": 1.2}],
         },
     )
     assert mismatch.status_code == 400
@@ -440,9 +433,7 @@ def test_cross_parameter_constraints_are_executable_not_only_metadata(client) ->
         },
     ).json()["data"]
     assert impossible["valid"] is False
-    assert "DEPENDENCY_RANGE_VIOLATION" in {
-        issue["code"] for issue in impossible["errors"]
-    }
+    assert "DEPENDENCY_RANGE_VIOLATION" in {issue["code"] for issue in impossible["errors"]}
 
     overlap = client.post(
         "/api/v1/parameter-catalog/validate",
@@ -471,9 +462,27 @@ def test_cross_parameter_constraints_are_executable_not_only_metadata(client) ->
         },
     ).json()["data"]
     assert overlap["valid"] is True
-    assert "DEPENDENCY_RANGE_MAY_VIOLATE" not in {
-        issue["code"] for issue in overlap["warnings"]
-    }
+    assert "DEPENDENCY_RANGE_MAY_VIOLATE" not in {issue["code"] for issue in overlap["warnings"]}
+
+    incomplete_range = client.post(
+        "/api/v1/parameter-catalog/validate",
+        json={
+            "selections": [
+                {
+                    "name": "MPC_THR_MIN",
+                    "search_max": 0.3,
+                    "initial_value": 0.2,
+                },
+                {
+                    "name": "MPC_THR_HOVER",
+                    "initial_value": 0.5,
+                    "locked": True,
+                },
+            ]
+        },
+    )
+    assert incomplete_range.status_code == 422
+    assert incomplete_range.json()["error"]["code"] == "INVALID_INPUT"
 
     missing_for_preview = client.post(
         "/api/v1/parameter-catalog/validate",
@@ -519,9 +528,7 @@ def test_cross_parameter_constraints_are_executable_not_only_metadata(client) ->
         },
     ).json()["data"]
     assert locked_companion["valid"] is True
-    assert locked_companion["ignored"] == [
-        {"name": "MPC_ACC_HOR_MAX", "reason": "locked"}
-    ]
+    assert locked_companion["ignored"] == [{"name": "MPC_ACC_HOR_MAX", "reason": "locked"}]
     assert "CONSTRAINT_PARAMETER_NOT_SELECTED" not in {
         issue["code"] for issue in locked_companion["warnings"]
     }
@@ -550,6 +557,8 @@ def test_normalized_duplicates_integer_steps_and_empty_active_space_are_rejected
     with pytest.raises(ParameterValueValidationError) as exc_info:
         validate_parameter_values({"MPC_XY_P": 0.9, " mpc_xy_p ": 1.0})
     assert {issue.code for issue in exc_info.value.issues} == {"DUPLICATE_PARAMETER"}
+    with pytest.raises(ParameterValueValidationError, match="JSON number"):
+        validate_parameter_values({"MPC_XY_P": "0.9"})
 
     bad_step = client.post(
         "/api/v1/parameter-catalog/validate",
@@ -593,8 +602,7 @@ def test_discrete_catalog_choices_are_labelled_and_persisted_for_jobs(client) ->
     assert parameter["type"] == "int"
     assert [choice["value"] for choice in parameter["choices"]] == [0, 1, 2]
     assert all(
-        choice["label"]["en"] and choice["label"]["zh-CN"]
-        for choice in parameter["choices"]
+        choice["label"]["en"] and choice["label"]["zh-CN"] for choice in parameter["choices"]
     )
 
     response = client.post(
@@ -616,3 +624,38 @@ def test_discrete_catalog_choices_are_labelled_and_persisted_for_jobs(client) ->
     assert response.json()["data"]["parameter_catalog_version"] == CATALOG_VERSION
     assert selection["value_type"] == "integer"
     assert selection["choices"] == [0.0, 1.0, 2.0]
+
+
+def test_parameter_catalog_http_inputs_are_bounded(client) -> None:
+    query = client.get("/api/v1/parameter-catalog", params={"px4_version": "x" * 65})
+    assert query.status_code == 422
+
+    oversized_choices = client.post(
+        "/api/v1/parameter-catalog/validate",
+        json={
+            "selections": [
+                {
+                    "name": "MC_AIRMODE",
+                    "search_min": 0,
+                    "search_max": 2,
+                    "choices": list(range(129)),
+                }
+            ]
+        },
+    )
+    assert oversized_choices.status_code == 422
+
+    invalid_scale = client.post(
+        "/api/v1/parameter-catalog/validate",
+        json={
+            "selections": [
+                {
+                    "name": "MPC_XY_P",
+                    "search_min": 0.7,
+                    "search_max": 1.2,
+                    "scale": "unsupported",
+                }
+            ]
+        },
+    )
+    assert invalid_scale.status_code == 422

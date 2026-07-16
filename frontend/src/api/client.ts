@@ -1,9 +1,8 @@
-// Real HTTP client for the DroneDream /api/v1 backend. Pages and components
-// use this module instead of the Phase 1 mock client. The call surface matches
-// the mock client deliberately so swapping was a one-line import change.
+// HTTP client for the DroneDream /api/v1 backend. It owns envelope parsing,
+// desktop-runtime liveness checks, and the typed call surface used by pages.
 
 import { isDesktopRuntime } from "../desktop/bridge";
-import { probeOverallDesktopReadiness } from "../desktop/readiness";
+import { ensureDesktopRuntimeLiveness } from "../desktop/readiness";
 import type {
   ApiEnvelope,
   Artifact,
@@ -52,7 +51,6 @@ const API_BASE_URL: string =
   "http://127.0.0.1:8000";
 const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
-const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function authHeaders(): Record<string, string> {
   if (!DEMO_AUTH_TOKEN) {
@@ -85,22 +83,22 @@ async function triggerBrowserDownload(
 async function request<T>(
   path: string,
   init?: RequestInit,
+  requireRuntimeLiveness = false,
 ): Promise<T> {
-  const method = (init?.method ?? "GET").toUpperCase();
-  if (isDesktopRuntime() && MUTATING_METHODS.has(method)) {
+  if (isDesktopRuntime() && requireRuntimeLiveness) {
     try {
-      const readiness = await probeOverallDesktopReadiness();
+      const readiness = await ensureDesktopRuntimeLiveness({ autoStart: true });
       if (!readiness.ready) {
         throw new ApiClientError(
           "DESKTOP_RUNTIME_NOT_READY",
-          "The local DroneDream runtime is no longer ready. Return to Desktop Setup and run the checks again.",
+          "The local DroneDream runtime is no longer ready. Open Settings and run the environment check again.",
         );
       }
     } catch (error) {
       if (error instanceof ApiClientError) throw error;
       throw new ApiClientError(
         "DESKTOP_RUNTIME_NOT_READY",
-        "Unable to verify the local DroneDream runtime. Return to Desktop Setup and run the checks again.",
+        "Unable to verify the local DroneDream runtime. Open Settings and run the environment check again.",
         error instanceof Error ? error.message : null,
       );
     }
@@ -179,7 +177,7 @@ export const apiClient = {
     return request<Job>("/jobs", {
       method: "POST",
       body: JSON.stringify(req),
-    });
+    }, true);
   },
 
   async listJobs(params?: {
@@ -212,9 +210,36 @@ export const apiClient = {
   },
 
   async listJobTrials(jobId: string): Promise<TrialSummary[]> {
-    return request<TrialSummary[]>(
-      `/jobs/${encodeURIComponent(jobId)}/trials`,
-    );
+    // Keep the historical "all trials" client contract while the API reads
+    // bounded pages. A job is capped at 10,000 trials by JobCreateRequest, so
+    // this is at most twenty deterministic requests instead of one unbounded
+    // database load.
+    const pageSize = 500;
+    const maxPages = 20;
+    const items: TrialSummary[] = [];
+    const seen = new Set<string>();
+    for (let page = 1; page <= maxPages; page += 1) {
+      const qs = buildQuery({ page, page_size: pageSize });
+      const pageItems = await request<TrialSummary[]>(
+        `/jobs/${encodeURIComponent(jobId)}/trials${qs}`,
+      );
+      let added = 0;
+      for (const item of pageItems) {
+        if (!seen.has(item.id)) {
+          seen.add(item.id);
+          items.push(item);
+          added += 1;
+        }
+      }
+      if (pageItems.length < pageSize) return items;
+      if (added === 0) {
+        throw new ApiClientError(
+          "INVALID_PAGINATION",
+          "The trial endpoint returned a repeated page.",
+        );
+      }
+    }
+    return items;
   },
 
   async listJobCandidates(jobId: string): Promise<OptimizationHistory> {
@@ -327,7 +352,7 @@ export const apiClient = {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/rerun`, {
       method: "POST",
       body: JSON.stringify(req ?? {}),
-    });
+    }, true);
   },
 
   async compareJobs(jobIds: string[]): Promise<JobCompareResponse> {
@@ -376,11 +401,18 @@ export const apiClient = {
     return request<BatchJob>("/batches", {
       method: "POST",
       body: JSON.stringify(req),
-    });
+    }, true);
   },
 
-  async listBatches(): Promise<PaginatedBatchJobs> {
-    return request<PaginatedBatchJobs>("/batches");
+  async listBatches(params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<PaginatedBatchJobs> {
+    const qs = buildQuery({
+      page: params?.page,
+      page_size: params?.page_size,
+    });
+    return request<PaginatedBatchJobs>(`/batches${qs}`);
   },
 
   async getBatch(batchId: string): Promise<BatchJob> {

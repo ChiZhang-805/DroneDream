@@ -1,8 +1,8 @@
-// Minimal baseline vs optimized chart. Uses plain CSS bars so we do not take
-// on a chart-library dependency for Phase 1. Each row shows both bars side by
-// side on a shared scale (0 → max(|baseline|, |optimized|)).
+// Lightweight baseline-vs-optimized chart. Plain CSS bars keep this compact;
+// each row shares a scale from zero to max(|baseline|, |optimized|).
 
 import type { ComparisonPoint } from "../types/api";
+import { useI18n } from "../i18n/I18nProvider";
 
 interface Props {
   data: ComparisonPoint[];
@@ -31,11 +31,12 @@ function winner(point: ComparisonPoint): "baseline" | "optimized" | "tie" {
 }
 
 export function ComparisonChart({ data }: Props) {
+  const { t } = useI18n();
   return (
-    <div className="comparison-chart" role="table" aria-label="Baseline vs optimized comparison">
+    <div className="comparison-chart" role="table" aria-label={t("comparison.ariaLabel")}>
       <div className="comparison-legend" role="presentation">
-        <span className="legend-swatch legend-baseline" aria-hidden /> Baseline
-        <span className="legend-swatch legend-optimized" aria-hidden /> Optimized
+        <span className="legend-swatch legend-baseline" aria-hidden /> {t("comparison.baseline")}
+        <span className="legend-swatch legend-optimized" aria-hidden /> {t("comparison.optimized")}
       </div>
       {data.map((point) => {
         const scale = Math.max(
@@ -51,7 +52,9 @@ export function ComparisonChart({ data }: Props) {
             <div className="comparison-label" role="rowheader">
               {point.label}
               <span className="comparison-hint">
-                {effectiveLowerIsBetter(point) ? "lower is better" : "higher is better"}
+                {effectiveLowerIsBetter(point)
+                  ? t("comparison.lowerIsBetter")
+                  : t("comparison.higherIsBetter")}
               </span>
             </div>
             <div className="comparison-bars" role="cell">

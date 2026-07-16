@@ -305,17 +305,23 @@ when samples remain geometrically close to the path.
 - propagated to `raw_metric_json.advanced_scenario_summary`,
 - checked before the PX4/Gazebo process starts.
 
-Current PX4/Gazebo integration status in this repo:
+Current PX4/Gazebo integration status in this repository:
 
-- wind gusts / sensor degradation / battery / obstacles have no verified
-  physics implementation in the bundled launcher;
-- no full world/physics mutation is enforced by default scripts;
-- requesting any non-default effect fails fast with
-  `UNSUPPORTED_SCENARIO_EFFECT` by default;
-- an operator may explicitly set
-  `PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS=true` for metadata-only
-  passthrough, but `applied_effects` remains empty, `unsupported_effects` lists
-  every request, and `pass_flag` is forced to `false`.
+- static box/cylinder obstacles are converted to bounded SDF and injected via
+  Gazebo EntityFactory;
+- obstacle application is accepted only when Gazebo returns `data: true`, and
+  evidence records the entity name, service, source index, and generated SDF
+  SHA-256;
+- wind/gust, sensor/GPS degradation, battery, payload, actuator-delay, and
+  other advanced physical effects do not yet have bundled injection/readback
+  adapters; and
+- requesting an unsupported effect fails fast with
+  `UNSUPPORTED_SCENARIO_EFFECT` by default.
+
+An operator may explicitly set
+`PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS=true` for metadata-only
+diagnostics, but unsupported effects remain listed and `pass_flag` is forced to
+`false`. The override cannot create accepted physical evidence.
 
 A site-specific custom simulator can implement these effects, but it must emit
 its own truthful applied-effect evidence rather than relying on the bundled
@@ -323,8 +329,8 @@ runner's passthrough mode.
 
 The same fail-closed rule applies in real mode to non-`nominal`
 `scenario_type`, `scenario_config.wind_mps`, non-zero job wind, and non-default
-sensor-noise profiles: the bundled local wrapper does not inject them into
-Gazebo. Dry-run records these supported fixture perturbations as
+sensor-noise profiles unless every requested effect is applied and evidenced.
+Dry-run records supported fixture perturbations as
 `application_mode=dry_run_surrogate`; it never labels them as real physics.
 
 ---
@@ -412,6 +418,8 @@ Wrapper env vars (with defaults):
 - `PX4_OFFBOARD_SETPOINT_RATE_HZ` (default `10`)
 - `PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS` (default `30`)
 - `PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS` (default `120`)
+- `PX4_OFFBOARD_PROCESS_TIMEOUT_SECONDS` (default `330`; hard wall-clock budget
+  around the complete offboard executor process, clamped to `30..7200`)
 - `PX4_OFFBOARD_LAND_AFTER` (default `true`)
 - `PX4_OFFBOARD_DRY_RUN` (default `false`)
 - `PX4_PARAMETER_TRANSPORT` (`environment` or `mavsdk`; default
@@ -419,6 +427,10 @@ Wrapper env vars (with defaults):
 - `PX4_PARAMETER_CONNECTION` (default `udp://:14540`)
 - `PX4_PARAMETER_TIMEOUT_SECONDS` (default `15`)
 - `PX4_PARAMETER_ENFORCE_SAFE_BOUNDS` (default `true`)
+- `PX4_GAZEBO_ENTITY_FACTORY_TIMEOUT_MS` (default `5000`; per-obstacle Gazebo
+  entity-creation service timeout, with a minimum of `100`)
+- `PX4_GAZEBO_TRACK_MARKER_PROCESS_TIMEOUT_SECONDS` (default `60`; marker
+  process budget, clamped to `1..300`)
 
 Dry-run mode (`PX4_SITE_DRY_RUN=true`) produces deterministic fixture telemetry and
 writes `launch_config.json`, `controller_params.used.json`, and

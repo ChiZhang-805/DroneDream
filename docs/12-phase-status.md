@@ -24,21 +24,26 @@ new entries can be added without changing the experiment contract.
 
 ## Phase 2 - Experiment builder: complete locally
 
-- Seven-step basic/advanced/expert wizard.
+- Five-step basic/advanced/expert wizard with gated navigation and automatic draft persistence.
 - Vehicle/PX4 profile, multi-objective definition, parameter selection, explicitly
-  selectable search/holdout scenario matrix, 2D track editor, optimizer/provider
+  selectable search/holdout scenario matrix, XY/XZ/YZ/3D waypoint editor, optimizer/provider
   choice, validation, review, and drafts.
 - Chinese/English application shell and responsive experiment UI.
 
 ## Phase 3 - Optimization and orchestration: complete locally
 
-- Keyless deterministic design, generic CMA-ES, and provider-neutral LLM proposals.
+- Keyless deterministic design, generic CMA-ES, provider-neutral LLM proposals,
+  and seven experimental accuracy-first engines: constrained MOBO,
+  multi-fidelity MOBO, TuRBO, SAASBO, surrogate-assisted CMA-ES,
+  BIPOP-CMA-ES, and an adaptive optimizer portfolio.
 - Linear/log/stepped/integer/boolean/enum projection.
 - Fixed scenario matrices, common random numbers, two-level case/seed weighted
   rates, worst-max-error acceptance, hard/soft constraints, budget enforcement,
   renewable trial leases, cancellable finalization leases, and fencing.
-- Holdout scenarios are excluded from ranking, eligibility, early stopping, candidate
-  history feedback, and LLM prompts.
+- Holdout scenarios are excluded from optimizer training, acquisition feedback,
+  early stopping, candidate-history feedback, and LLM prompts. When a suite
+  includes holdout cases, a candidate must nevertheless complete them and pass
+  holdout validation before it is eligible for the final recommendation.
 
 ## Phase 4 - Results and visualization: complete locally
 
@@ -66,10 +71,12 @@ Requires a Linux PX4/Gazebo host:
 
 - Build the exact PX4 version/commit and selected Gazebo models/worlds.
 - Run a real write/readback/takeoff/track/land smoke test.
-- Validate advanced environment injection (gusts, obstacles, sensor degradation,
-  payload/battery) for each site-specific world plugin.
-- Until that evidence exists, the bundled real runner intentionally fails closed
-  for non-nominal/advanced effects and runs at most one real trial per host.
+- Validate wind/gust, sensor/GPS degradation, payload/battery, and actuator
+  effects for each site-specific world/plugin. Static box/cylinder obstacle
+  injection is implemented in the bundled runner source and still requires a
+  released Runtime plus real-host smoke evidence for customer acceptance.
+- Unsupported requested effects fail closed. The bundled single-host real
+  runner also runs at most one real trial at a time.
 - Load-test the intended worker count and tune CPU/RAM/queue limits before public use.
 
 Server provisioning and public DNS/TLS are deliberately deferred until the real-SITL

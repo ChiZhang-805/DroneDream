@@ -16,8 +16,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy.orm import Session
-
 from app.simulator import (
     ArtifactMetadata,
     MockSimulatorAdapter,
@@ -26,6 +24,7 @@ from app.simulator import (
     TrialFailure,
     TrialResult,
 )
+from sqlalchemy.orm import Session
 
 _EXAMPLE_SIM = (
     Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "example_real_simulator.py"
@@ -178,6 +177,43 @@ def test_start_queued_jobs_creates_baseline_and_trials(orchestration_ctx):
         assert "trial_dispatched" in events
 
 
+def test_invalid_queued_job_is_quarantined_without_blocking_following_job(
+    orchestration_ctx,
+):
+    ctx = orchestration_ctx
+    invalid_job_id = _create_queued_job(ctx)
+    valid_job_id = _create_queued_job(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        invalid_job = db.get(ctx["models"].Job, invalid_job_id)
+        assert invalid_job is not None
+        invalid_job.baseline_parameter_json = {"kp_xy": True}
+        db.commit()
+
+    with ctx["db_module"].SessionLocal() as db:
+        started = ctx["job_manager"].start_queued_jobs(db)
+
+    assert started == [valid_job_id]
+    with ctx["db_module"].SessionLocal() as db:
+        invalid_job = db.get(ctx["models"].Job, invalid_job_id)
+        valid_job = db.get(ctx["models"].Job, valid_job_id)
+        assert invalid_job is not None and valid_job is not None
+        assert invalid_job.status == "FAILED"
+        assert invalid_job.latest_error_code == "JOB_INITIALIZATION_FAILED"
+        assert valid_job.status == "RUNNING"
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, 101])
+def test_start_queued_jobs_rejects_invalid_limits(orchestration_ctx, limit: object):
+    with (
+        orchestration_ctx["db_module"].SessionLocal() as db,
+        pytest.raises(ValueError, match="limit"),
+    ):
+        orchestration_ctx["job_manager"].start_queued_jobs(
+            db,
+            limit=limit,  # type: ignore[arg-type]
+        )
+
+
 def test_budget_limited_legacy_heuristic_still_dispatches_one_candidate(
     orchestration_ctx,
 ):
@@ -264,10 +300,7 @@ def test_explicit_scenario_suite_uses_common_random_numbers_for_every_candidate(
             "disturbance_rejection",
         }
         assert all(
-            {
-                key: candidate.parameter_json[key]
-                for key in invariant_keys
-            }
+            {key: candidate.parameter_json[key] for key in invariant_keys}
             == {key: baseline.parameter_json[key] for key in invariant_keys}
             for candidate in job.candidates
         )
@@ -624,6 +657,45 @@ def test_long_trial_renews_lease_while_simulator_runs(orchestration_ctx, monkeyp
         get_settings.cache_clear()
 
 
+def test_process_control_exception_from_cleanup_stops_lease_heartbeat(
+    orchestration_ctx, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    heartbeat_state = SimpleNamespace(started=False, stopped=False)
+
+    class FakeHeartbeat:
+        def __init__(self, *_args, **_kwargs) -> None:
+            self.lost = SimpleNamespace(is_set=lambda: False)
+
+        def start(self) -> None:
+            heartbeat_state.started = True
+
+        def stop(self) -> None:
+            heartbeat_state.stopped = True
+
+    class InterruptingCleanupAdapter(MockSimulatorAdapter):
+        def cleanup(self, _trial_ctx: TrialContext) -> None:
+            raise SystemExit(23)
+
+    monkeypatch.setattr(ctx["trial_executor"], "_TrialLeaseHeartbeat", FakeHeartbeat)
+
+    with ctx["db_module"].SessionLocal() as db, pytest.raises(SystemExit, match="23"):
+        ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-interrupted-cleanup",
+            adapter=InterruptingCleanupAdapter(),
+        )
+
+    assert heartbeat_state.started is True
+    assert heartbeat_state.stopped is True
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "RUNNING"
+        assert trial.failure_code is None
+
+
 def test_reclaimed_attempt_fences_stale_result_persistence(orchestration_ctx):
     ctx = orchestration_ctx
     trial_id = _seed_single_pending_trial(ctx)
@@ -901,9 +973,7 @@ def test_cancel_job_clears_trial_lease(orchestration_ctx):
 # --- Aggregation / full loop -----------------------------------------------
 
 
-def test_finalization_failure_isolated_to_one_ready_job(
-    orchestration_ctx, monkeypatch
-) -> None:
+def test_finalization_failure_isolated_to_one_ready_job(orchestration_ctx, monkeypatch) -> None:
     ctx = orchestration_ctx
     failing_job_id = _create_queued_job(ctx)
     healthy_job_id = _create_queued_job(ctx)
@@ -922,9 +992,7 @@ def test_finalization_failure_isolated_to_one_ready_job(
         if trial_id is None:
             break
 
-    original_generate = (
-        ctx["aggregation"].report_generator.generate_and_persist_report
-    )
+    original_generate = ctx["aggregation"].report_generator.generate_and_persist_report
 
     def fail_one_report(db, *, job, **kwargs):
         if job.id == failing_job_id:
@@ -1080,9 +1148,7 @@ def test_api_report_endpoint_returns_ready_after_worker_runs(
         assert rep_data["best_candidate_id"] == body["best_candidate_id"]
         assert len(rep_data["comparison"]) == 5
         assert isinstance(rep_data["optimized_metrics"]["max_error_worst"], float)
-        assert any(
-            point["metric"] == "max_error_worst" for point in rep_data["comparison"]
-        )
+        assert any(point["metric"] == "max_error_worst" for point in rep_data["comparison"])
         assert set(rep_data["best_parameters"].keys()) >= {"kp_xy", "kd_xy"}
 
 

@@ -184,3 +184,29 @@ $checksumPath = "$installer.sha256"
 "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($installer))" |
     Set-Content -Encoding ascii -LiteralPath $checksumPath
 Write-Host "Wrote verified installer checksum to $checksumPath"
+
+# A developer bundle directory otherwise accumulates every historical setup
+# executable, which makes manual testing error-prone. Prune only versioned
+# DroneDream installer artifacts, only after the current installer and checksum
+# have both been verified, and only inside this build target's exact NSIS
+# output directory.
+$bundleDirectoryFull = [IO.Path]::GetFullPath($bundleDirectory).TrimEnd('\', '/')
+$expectedBundleRoot = [IO.Path]::GetFullPath(
+    (Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\bundle\nsis")
+).TrimEnd('\', '/')
+if (-not $bundleDirectoryFull.Equals($expectedBundleRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing to prune installer artifacts outside the LLVM NSIS bundle directory."
+}
+$currentArtifacts = @(
+    [IO.Path]::GetFullPath($installer),
+    [IO.Path]::GetFullPath($checksumPath)
+)
+Get-ChildItem -LiteralPath $bundleDirectoryFull -File |
+    Where-Object {
+        $_.Name -match '^DroneDream_.+_x64-setup\.exe(?:\.sha256)?$' -and
+        $_.FullName -notin $currentArtifacts
+    } |
+    ForEach-Object {
+        Remove-Item -LiteralPath $_.FullName -Force
+        Write-Host "Removed stale local installer artifact $($_.Name)"
+    }

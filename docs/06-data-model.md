@@ -1,320 +1,151 @@
-# 06-data-model.md
+# DroneDream data model
 
-## 1. 文档信息
-- **Document Title**: DroneDream Data Model Specification
-- **Version**: v1.0
-- **Audience**: Devin、后端工程师、数据库设计者、联调人员
-- **Purpose**: 定义 DroneDream MVP 的核心实体、字段结构、状态机、实体关系、索引建议和持久化边界。
+This document summarizes the persistence model used by the API and worker. It
+is intentionally conceptual rather than a duplicate of every SQLAlchemy
+column. The authoritative definitions are `backend/app/models.py` and the
+reviewed Alembic migrations under `backend/alembic/versions/`.
 
----
+## Design rules
 
-## 2. Data Modeling Principles
-- 数据模型围绕产品主流程组织：Job → Candidate → Trial → Metric → Report
-- Job / Candidate / Trial 必须分层
-- 历史记录必须保留
-- 高频查询字段应结构化，不要全部塞进 JSON
-- 可扩展字段可以使用 JSON
+- Keep Job, Candidate, Trial, Metric, Report, Artifact, and Event records
+  separate so experiments remain auditable.
+- Store frequently filtered state in typed columns; use JSON only for
+  versioned or extensible experiment payloads.
+- Preserve history instead of overwriting prior candidates or trials.
+- Fence asynchronous work with explicit state, leases, timestamps, and
+  attempt-specific evidence.
+- Scope every user-owned query through the authenticated User relationship.
 
----
+## Entity overview
 
-## 3. Core Entity Overview
-MVP 的核心实体如下：
-1. `User`
-2. `Job`
-3. `CandidateParameterSet`
-4. `Trial`
-5. `TrialMetric`
-6. `JobReport`
-7. `Artifact`
-8. `JobEvent`（推荐）
+1. `User` — local/demo/OIDC identity.
+2. `BatchJob` — API compatibility container; batch pages are retired.
+3. `Job` — one optimization experiment and its complete configuration/state.
+4. `JobSecret` — encrypted, expiring per-job provider credential.
+5. `CandidateParameterSet` — one baseline/manual/optimizer proposal.
+6. `Trial` — one candidate, scenario, and seed execution attempt.
+7. `TrialMetric` — one validated metric record per Trial.
+8. `JobReport` — finalized comparison and recommendation.
+9. `Artifact` — metadata for one Job- or Trial-owned object.
+10. `JobEvent` — append-only operational/audit event.
 
----
+## User and compatibility batch
 
-## 4. Entity: User
-### Suggested Fields
-- `id`
-- `email`（optional）
-- `display_name`（optional）
-- `created_at`
-- `updated_at`
+`User` stores `id`, optional email/display name, `identity_provider`,
+`external_subject`, and timestamps. The provider/subject pair is unique when
+present.
 
-### Notes
-即使 MVP 为单用户模式，也建议保留 `user_id` 关联。
+`BatchJob` stores owner, name/description, status, timestamps, and its Jobs.
+The batch HTTP contract remains for existing clients, but the desktop product
+does not expose a batch creation workflow.
 
----
+## Job
 
-## 5. Entity: Job
-### Suggested Fields
-- `id`
-- `user_id`
-- `track_type`
-- `start_point_x`
-- `start_point_y`
-- `altitude_m`
-- `wind_north`
-- `wind_east`
-- `wind_south`
-- `wind_west`
-- `sensor_noise_level`
-- `objective_profile`
-- `status`
-- `current_phase`
-- `progress_completed_trials`
-- `progress_total_trials`
-- `latest_error_code`
-- `latest_error_message`
-- `best_candidate_id`
-- `baseline_candidate_id`
-- `source_job_id`
-- `created_at`
-- `updated_at`
-- `queued_at`
-- `started_at`
-- `completed_at`
-- `cancelled_at`
-- `failed_at`
+The legacy flat configuration remains queryable: track type, start coordinates,
+altitude, four directional wind values, sensor-noise level, and objective
+profile. The versioned experiment definition is stored separately:
 
-### Status Enum
-- `CREATED`
-- `QUEUED`
-- `RUNNING`
-- `AGGREGATING`
-- `FINALIZING`
-- `COMPLETED`
-- `FAILED`
-- `CANCELLED`
+- `reference_track_json`, `baseline_parameter_json`, and
+  `advanced_scenario_config_json`;
+- `vehicle_profile_json`, `parameter_catalog_version`,
+  `parameter_space_json`, `objective_config_json`, and `scenario_suite_json`;
+- simulator backend, optimizer strategy, iteration/trial budgets, acceptance
+  thresholds, current generation, and optimization outcome; and
+- provider/model metadata without the plaintext API key.
 
----
+Relational pointers include owner, optional compatibility batch, baseline/best
+candidate IDs, and `source_job_id` for reruns. State columns retain progress,
+latest failure, current phase, and lifecycle timestamps.
 
-## 6. Entity: CandidateParameterSet
-### Suggested Fields
-- `id`
-- `job_id`
-- `generation_index`
-- `source_type`
-- `label`
-- `parameter_json`
-- `aggregated_score`
-- `aggregated_metric_json`
-- `trial_count`
-- `completed_trial_count`
-- `failed_trial_count`
-- `rank_in_job`
-- `is_best`
-- `is_baseline`
-- `created_at`
-- `updated_at`
+Job states are:
 
-### source_type Enum
-- `baseline`
-- `optimizer`
-- `manual`
-- `rerun_copy`
+```text
+CREATED | QUEUED | RUNNING | AGGREGATING | FINALIZING |
+COMPLETED | FAILED | CANCELLED
+```
 
----
+`FINALIZING` is a committed, cancellable, time-bounded lease used while reports
+or LLM summaries are produced outside a long database transaction.
 
-## 7. Entity: Trial
-### Suggested Fields
-- `id`
-- `job_id`
-- `candidate_id`
-- `seed`
-- `scenario_type`
-- `scenario_config_json`
-- `worker_id`
-- `status`
-- `attempt_count`
-- `failure_reason`
-- `failure_code`
-- `queued_at`
-- `started_at`
-- `finished_at`
-- `simulator_backend`
-- `log_excerpt`
+## JobSecret
 
-### scenario_type Enum
-- `nominal`
-- `noise_perturbed`
-- `wind_perturbed`
-- `combined_perturbed`
+`JobSecret` stores only the encrypted API key, provider, creation/expiry time,
+and deletion time. The encryption key comes from `APP_SECRET_KEY`. Secrets are
+never returned by the API, copied by rerun, or written into frontend drafts.
 
-### status Enum
-- `PENDING`
-- `RUNNING`
-- `COMPLETED`
-- `FAILED`
-- `CANCELLED`
+## CandidateParameterSet
 
----
+Each Candidate belongs to one Job and stores generation/source/label,
+`parameter_json`, aggregate metrics and score, counts/rank, and baseline/best
+flags. Proposal provenance is preserved in `proposal_reason`,
+`optimizer_metadata_json`, `parent_candidate_id`, and optional
+`llm_response_json`. Experimental optimizer metadata records the actual child
+algorithm and proposal backend rather than only the user-facing strategy name.
 
-## 8. Entity: TrialMetric
-### Suggested Fields
-- `id`
-- `trial_id`
-- `rmse`
-- `max_error`
-- `overshoot_count`
-- `completion_time`
-- `crash_flag`
-- `timeout_flag`
-- `score`
-- `final_error`
-- `pass_flag`
-- `instability_flag`
-- `raw_metric_json`
-- `created_at`
-- `updated_at`
+Common source types are `baseline`, `optimizer`, `manual`, and `rerun_copy`.
 
----
+## Trial and TrialMetric
 
-## 9. Entity: JobReport
-### Suggested Fields
-- `id`
-- `job_id`
-- `best_candidate_id`
-- `summary_text`
-- `baseline_metric_json`
-- `optimized_metric_json`
-- `comparison_metric_json`
-- `best_parameter_json`
-- `report_status`
-- `created_at`
-- `updated_at`
+A Trial belongs to both a Job and Candidate. It stores seed, scenario type and
+configuration, worker/backend identity, status, attempt/failure data, queue and
+execution timestamps, and a renewable `lease_owner`/`lease_expires_at` fence.
 
-### report_status Enum
-- `PENDING`
-- `READY`
-- `FAILED`
+Trial states are:
 
----
+```text
+PENDING | RUNNING | COMPLETED | FAILED | CANCELLED
+```
 
-## 10. Entity: Artifact
-### Suggested Fields
-- `id`
-- `owner_type`
-- `owner_id`
-- `artifact_type`
-- `display_name`
-- `storage_path`
-- `mime_type`
-- `file_size_bytes`
-- `created_at`
+Supported scenario values are:
 
-### owner_type Enum
-- `job`
-- `trial`
-- `job_report`
+```text
+nominal | noise_perturbed | wind_perturbed | combined_perturbed |
+turbulence | gps_dropout | payload_changed | battery_degraded |
+actuator_delay | custom
+```
 
-### artifact_type Enum
-- `trajectory_plot`
-- `comparison_plot`
-- `worker_log`
-- `telemetry_json`
-- `report_export`
+One optional `TrialMetric` record stores RMSE, maximum/final error,
+overshoots, completion time, score, crash/timeout/pass/instability flags, and
+bounded `raw_metric_json`. A successful simulator process is not enough: the
+worker validates identity, metric types/ranges, artifacts, parameter evidence,
+and requested physical-effect evidence before committing success.
 
----
+## JobReport
 
-## 11. Entity: JobEvent (Recommended)
-### Suggested Fields
-- `id`
-- `job_id`
-- `event_type`
-- `event_message`
-- `payload_json`
-- `created_at`
+One Report per Job stores status, best candidate, summary text, baseline and
+optimized aggregates, comparison data, and best parameters. Report states are
+`PENDING`, `READY`, and `FAILED`.
 
-### event_type Examples
-- `job_created`
-- `job_queued`
-- `job_started`
-- `baseline_started`
-- `candidate_generated`
-- `trial_dispatched`
-- `trial_completed`
-- `aggregation_started`
-- `report_generated`
-- `job_failed`
-- `job_cancelled`
+## Artifact
 
----
+Artifacts use the polymorphic pair `(owner_type, owner_id)`, where
+`owner_type` is only `job` or `trial`. Metadata includes artifact type,
+display name, managed storage path, MIME type, 64-bit file size, and creation
+time. Authorization rechecks the owning Job before returning local bytes or an
+S3 redirect.
 
-## 12. State Machines
+## JobEvent
 
-### Job State Machine
-Allowed States:
-- `CREATED`
-- `QUEUED`
-- `RUNNING`
-- `AGGREGATING`
-- `FINALIZING`
-- `COMPLETED`
-- `FAILED`
-- `CANCELLED`
+`JobEvent` is implemented, not optional. It stores `job_id`, `event_type`,
+optional structured `payload_json`, and creation time. Events cover lifecycle,
+candidate/trial work, retention, finalization, cancellation, and failure. There
+is no separate free-form `event_message` column.
 
-### Trial State Machine
-Allowed States:
-- `PENDING`
-- `RUNNING`
-- `COMPLETED`
-- `FAILED`
-- `CANCELLED`
+## Relationships
 
-### Report State Machine
-Allowed States:
-- `PENDING`
-- `READY`
-- `FAILED`
+- User -> Jobs and compatibility BatchJobs: one-to-many.
+- BatchJob -> Jobs: one-to-many.
+- Job -> Candidates, Trials, Events, and Secrets: one-to-many.
+- Job -> Report: one-to-one.
+- Candidate -> Trials: one-to-many.
+- Trial -> TrialMetric: one-to-one.
+- Artifact -> Job or Trial: validated polymorphic ownership.
 
----
+## Index and migration expectations
 
-## 13. Relationships
-- User → Job：one-to-many
-- Job → CandidateParameterSet：one-to-many
-- CandidateParameterSet → Trial：one-to-many
-- Trial → TrialMetric：one-to-one（推荐）
-- Job → JobReport：one-to-one（MVP）
-- Artifact 通过 `(owner_type, owner_id)` 泛化关联
-- Job → JobEvent：one-to-many
-
----
-
-## 14. Normalization vs JSON Strategy
-### 必须结构化的字段
-- job status
-- track_type
-- altitude_m
-- sensor_noise_level
-- objective_profile
-- trial status
-- seed
-- scenario_type
-- core metrics（如 rmse、score）
-
-### 可以使用 JSON 的字段
-- `parameter_json`
-- `aggregated_metric_json`
-- `scenario_config_json`
-- `raw_metric_json`
-- `payload_json`
-- `best_parameter_json`
-
----
-
-## 15. Indexing Strategy
-### Required Indexes
-- Job: `(user_id, created_at desc)`, `status`, `created_at`, `source_job_id`
-- Candidate: `(job_id, generation_index)`, `(job_id, is_best)`, `(job_id, is_baseline)`
-- Trial: `job_id`, `candidate_id`, `status`, `(candidate_id, seed, scenario_type)`
-- TrialMetric: `trial_id`
-- JobReport: unique `job_id`
-- Artifact: `(owner_type, owner_id)`
-- JobEvent: `(job_id, created_at)`
-
----
-
-## 16. Constraints for Devin
-- 不要把 Job、Candidate、Trial 合并成一张表
-- 不要通过覆盖记录丢失实验历史
-- 不要把高频查询字段全部藏在 JSON 里
-- 状态、时间戳、错误字段必须能反映异步执行过程
-- 数据模型不能假设只有某一种 simulator backend
+High-value indexes cover user/time and status Job queries, source/batch IDs,
+candidate generation/best/baseline lookups, Trial job/candidate/status/lease
+queries, unique Trial metrics and reports, artifact ownership, and JobEvent
+time order. Production startup must run Alembic and keep
+`AUTO_CREATE_SCHEMA=false`; application startup must not silently mutate a
+production schema.

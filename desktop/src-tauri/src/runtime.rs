@@ -32,6 +32,34 @@ const COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_BACKEND_RESPONSE_BYTES: usize = 256 * 1024;
 
+pub(crate) fn runtime_wsl_exec_args(program: &str, args: &[&str]) -> Vec<String> {
+    let mut argv = vec![
+        "--distribution".to_string(),
+        RUNTIME_NAME.to_string(),
+        "--user".to_string(),
+        "root".to_string(),
+        "--exec".to_string(),
+        program.to_string(),
+    ];
+    argv.extend(args.iter().map(|argument| (*argument).to_string()));
+    argv
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum RuntimeReleaseHealth {
+    Ready,
+    NotReady(String),
+    ServiceUnhealthy(String),
+    HostConnectivity(String),
+    Unknown(String),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum InternalBackendHealthError {
+    Service(String),
+    Unknown(String),
+}
+
 struct InstallerPlanExport {
     target_root: Option<String>,
     download_bytes: u64,
@@ -52,6 +80,12 @@ pub struct RuntimeStatusReport {
     data_root: Option<String>,
     components: Vec<RuntimeComponent>,
     diagnostics: Vec<String>,
+}
+
+impl RuntimeStatusReport {
+    pub(crate) fn is_ready(&self) -> bool {
+        self.ready
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -474,15 +508,22 @@ pub(crate) fn probe_runtime() -> Result<RuntimeStatusReport, String> {
         .map(String::as_str);
     let backend_healthy = if running && runtime_is_wsl2 && ownership_matches_manifest {
         if let Some(manifest) = manifest.as_ref() {
-            // Manifest validation guarantees that the backend component exists.
-            let expected_version = manifest
-                .components
-                .get("backend")
-                .expect("validated manifest");
-            match verify_backend_ready(expected_version, &manifest.runtime_id) {
-                Ok(()) => true,
-                Err(error) => {
-                    diagnostics.push(format!("Local backend readiness: {error}"));
+            match manifest.components.get("backend") {
+                Some(expected_version) => {
+                    match verify_backend_ready(expected_version, &manifest.runtime_id) {
+                        Ok(()) => true,
+                        Err(error) => {
+                            diagnostics.push(format!("Local backend readiness: {error}"));
+                            false
+                        }
+                    }
+                }
+                None => {
+                    // Keep this boundary fail-closed even if a future manifest
+                    // validation regression lets an incomplete manifest through.
+                    diagnostics.push(
+                        "Runtime manifest is missing the required backend component.".to_string(),
+                    );
                     false
                 }
             }
@@ -691,7 +732,7 @@ fn runtime_tool_component_status(
 }
 
 #[cfg(target_os = "windows")]
-fn probe_runtime_running() -> Result<bool, String> {
+pub(crate) fn probe_runtime_running() -> Result<bool, String> {
     const SCRIPT: &str = r#"
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -848,30 +889,41 @@ pub(crate) fn runtime_is_registered() -> Result<bool, String> {
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn verify_runtime_release_identity(
+pub(crate) fn probe_runtime_release_health(
     expected_build_id: &str,
     expected_version: &str,
-) -> Result<bool, String> {
-    let Some(manifest) = read_runtime_manifest()? else {
-        return Ok(false);
+) -> RuntimeReleaseHealth {
+    let manifest = match read_runtime_manifest() {
+        Ok(Some(manifest)) => manifest,
+        Ok(None) => {
+            return RuntimeReleaseHealth::NotReady(
+                "runtime manifest is not available yet".to_string(),
+            )
+        }
+        Err(error) => return RuntimeReleaseHealth::Unknown(error),
     };
     if manifest.runtime_id != expected_build_id || manifest.version != expected_version {
-        return Err(format!(
+        return RuntimeReleaseHealth::Unknown(format!(
             "Runtime identity mismatch: expected build {expected_build_id} version {expected_version}, got build {} version {}.",
             manifest.runtime_id, manifest.version
         ));
     }
-    let expected_backend = manifest
-        .components
-        .get("backend")
-        .ok_or_else(|| "Runtime manifest has no backend component.".to_string())?;
-    verify_backend_ready(expected_backend, expected_build_id)?;
-    Ok(true)
+    let Some(expected_backend) = manifest.components.get("backend") else {
+        return RuntimeReleaseHealth::Unknown(
+            "Runtime manifest has no backend component.".to_string(),
+        );
+    };
+    let internal = verify_backend_ready_inside_wsl(expected_backend, expected_build_id);
+    classify_runtime_release_health(
+        internal,
+        || verify_backend_ready(expected_backend, expected_build_id),
+        || verify_backend_ready_inside_wsl(expected_backend, expected_build_id),
+    )
 }
 
 #[cfg(not(target_os = "windows"))]
-pub(crate) fn verify_runtime_release_identity(_: &str, _: &str) -> Result<bool, String> {
-    Err("The runtime installer supports Windows only.".to_string())
+pub(crate) fn probe_runtime_release_health(_: &str, _: &str) -> RuntimeReleaseHealth {
+    RuntimeReleaseHealth::Unknown("The runtime installer supports Windows only.".to_string())
 }
 
 #[cfg(target_os = "windows")]
@@ -1012,27 +1064,45 @@ pub(crate) fn write_runtime_root_receipt(_: &str, _: &str, _: &str) -> Result<()
 
 #[cfg(target_os = "windows")]
 fn read_runtime_manifest() -> Result<Option<RuntimeManifest>, String> {
-    let mut command = windows_command("wsl.exe");
-    command.args([
-        "-d",
-        RUNTIME_NAME,
-        "-u",
-        "root",
-        "--",
-        "/bin/sh",
-        "-c",
-        "if [ ! -f /opt/dronedream/runtime-manifest.json ]; then exit 44; fi; exec cat /opt/dronedream/runtime-manifest.json",
-    ]);
-    let output = command_output(command, COMMAND_TIMEOUT, "runtime manifest probe")?;
-    if output.status.code() == Some(44) {
+    let mut existence_probe = windows_command("wsl.exe");
+    existence_probe.args(runtime_wsl_exec_args(
+        "/usr/bin/test",
+        &["-f", RUNTIME_MANIFEST],
+    ));
+    let existence = command_output(
+        existence_probe,
+        COMMAND_TIMEOUT,
+        "runtime manifest existence probe",
+    )?;
+    if existence.status.code() == Some(1) {
         return Ok(None);
     }
+    if !existence.status.success() {
+        let detail = String::from_utf8_lossy(&existence.stderr)
+            .trim()
+            .to_string();
+        return Err(if detail.is_empty() {
+            format!(
+                "Runtime manifest existence probe exited with status {}.",
+                existence.status
+            )
+        } else {
+            format!("Runtime manifest existence probe failed: {detail}")
+        });
+    }
+
+    let mut command = windows_command("wsl.exe");
+    command.args(runtime_wsl_exec_args("/usr/bin/cat", &[RUNTIME_MANIFEST]));
+    let output = command_output(command, COMMAND_TIMEOUT, "runtime manifest read")?;
     if !output.status.success() {
         let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
         return Err(if detail.is_empty() {
-            "Runtime manifest probe failed without an error message.".to_string()
+            format!(
+                "Runtime manifest read exited with status {}.",
+                output.status
+            )
         } else {
-            format!("Runtime manifest probe failed: {detail}")
+            format!("Runtime manifest read failed: {detail}")
         });
     }
     let raw = String::from_utf8(output.stdout)
@@ -1102,6 +1172,96 @@ fn verify_backend_ready(expected_version: &str, expected_runtime_id: &str) -> Re
         expected_runtime_id,
         HEALTH_TIMEOUT,
     )
+}
+
+#[cfg(target_os = "windows")]
+fn verify_backend_ready_inside_wsl(
+    expected_version: &str,
+    expected_runtime_id: &str,
+) -> Result<(), InternalBackendHealthError> {
+    let mut command = windows_command("wsl.exe");
+    let endpoint = format!("http://127.0.0.1:{BACKEND_PORT}/health/ready");
+    command.args(runtime_internal_readiness_args(endpoint.as_str()));
+    let output = command_output(
+        command,
+        Duration::from_secs(6),
+        "runtime-internal readiness probe",
+    )
+    .map_err(InternalBackendHealthError::Unknown)?;
+    if output.stdout.len() > MAX_BACKEND_RESPONSE_BYTES {
+        return Err(InternalBackendHealthError::Service(
+            "runtime-internal backend returned an oversized readiness response".to_string(),
+        ));
+    }
+    if !output.status.success() {
+        return Err(InternalBackendHealthError::Service(
+            format_internal_readiness_failure(&output.status.to_string(), &output.stderr),
+        ));
+    }
+    validate_backend_ready_response(&output.stdout, expected_version, expected_runtime_id).map_err(
+        |error| {
+            InternalBackendHealthError::Service(format!(
+                "runtime-internal backend readiness: {error}"
+            ))
+        },
+    )
+}
+
+fn format_internal_readiness_failure(status: &str, stderr: &[u8]) -> String {
+    let detail = String::from_utf8_lossy(stderr).trim().to_string();
+    if detail.is_empty() {
+        format!("runtime-internal readiness request exited with status {status}")
+    } else {
+        format!("runtime-internal readiness request failed: {detail}")
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn runtime_internal_readiness_args(endpoint: &str) -> Vec<String> {
+    runtime_wsl_exec_args(
+        "/usr/bin/curl",
+        &[
+            "--silent",
+            "--show-error",
+            "--include",
+            "--http1.1",
+            "--noproxy",
+            "127.0.0.1,localhost",
+            "--connect-timeout",
+            "1",
+            "--max-time",
+            "3",
+            "--",
+            endpoint,
+        ],
+    )
+}
+
+fn classify_runtime_release_health(
+    internal: Result<(), InternalBackendHealthError>,
+    host_probe: impl FnOnce() -> Result<(), String>,
+    confirm_internal: impl FnOnce() -> Result<(), InternalBackendHealthError>,
+) -> RuntimeReleaseHealth {
+    match internal {
+        Err(InternalBackendHealthError::Service(error)) => {
+            RuntimeReleaseHealth::ServiceUnhealthy(error)
+        }
+        Err(InternalBackendHealthError::Unknown(error)) => RuntimeReleaseHealth::Unknown(error),
+        Ok(()) => match host_probe() {
+            Ok(()) => RuntimeReleaseHealth::Ready,
+            Err(host_error) => match confirm_internal() {
+                Ok(()) => RuntimeReleaseHealth::HostConnectivity(format!(
+                    "runtime-internal API is healthy, but Windows cannot reach it: {host_error}"
+                )),
+                Err(InternalBackendHealthError::Service(error)) => {
+                    RuntimeReleaseHealth::ServiceUnhealthy(error)
+                }
+                Err(InternalBackendHealthError::Unknown(error)) => {
+                    RuntimeReleaseHealth::Unknown(error)
+                }
+            },
+        },
+    }
 }
 
 fn verify_backend_ready_at(
@@ -1941,8 +2101,19 @@ fn target_directory_blockers(probe: &TargetDirectoryProbe, target_root: &str) ->
             "{target_root} is a symbolic link, junction, or other reparse point; choose a real local directory."
         )];
     }
-    if probe.is_empty || probe.ownership_valid {
+    // `wsl.exe --import` requires an empty install directory.  A trusted
+    // ownership marker proves that the directory once belonged to
+    // DroneDream, but it does not make an orphaned ext4.vhdx (or any other
+    // leftover content) safe to overwrite.  Registered runtimes are handled
+    // by the repair path; an unregistered, non-empty managed root must stay
+    // blocked until an explicit cleanup/recovery flow is used.
+    if probe.is_empty {
         return Vec::new();
+    }
+    if probe.ownership_valid {
+        return vec![format!(
+            "{target_root} is a non-empty DroneDream-managed runtime directory and cannot be reused for a fresh WSL import. Use Runtime repair/recovery or explicitly remove the old Runtime data first."
+        )];
     }
     if let Some(error) = &probe.ownership_error {
         return vec![format!(
@@ -2111,6 +2282,174 @@ mod tests {
     use super::*;
 
     const TEST_RUNTIME_ID: &str = "123e4567-e89b-12d3-a456-426614174000";
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn runtime_wsl_commands_use_exec_without_a_shell_or_wildcard_proxy_argument() {
+        let manifest_probe = runtime_wsl_exec_args("/usr/bin/test", &["-f", RUNTIME_MANIFEST]);
+        assert_eq!(
+            manifest_probe
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec![
+                "--distribution",
+                RUNTIME_NAME,
+                "--user",
+                "root",
+                "--exec",
+                "/usr/bin/test",
+                "-f",
+                RUNTIME_MANIFEST,
+            ]
+        );
+
+        let manifest_read =
+            runtime_wsl_exec_args("/usr/bin/cat", &["/opt/dronedream/runtime-manifest.json"]);
+        assert_eq!(
+            manifest_read.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "--distribution",
+                RUNTIME_NAME,
+                "--user",
+                "root",
+                "--exec",
+                "/usr/bin/cat",
+                "/opt/dronedream/runtime-manifest.json",
+            ]
+        );
+        assert!(!manifest_probe
+            .iter()
+            .chain(&manifest_read)
+            .any(|argument| argument == "/bin/sh"));
+
+        let readiness = runtime_internal_readiness_args("http://127.0.0.1:8000/health/ready");
+        assert_eq!(
+            readiness
+                .iter()
+                .take(6)
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec![
+                "--distribution",
+                RUNTIME_NAME,
+                "--user",
+                "root",
+                "--exec",
+                "/usr/bin/curl",
+            ]
+        );
+        let noproxy = readiness
+            .iter()
+            .position(|argument| argument == "--noproxy")
+            .expect("curl noproxy option");
+        assert_eq!(
+            readiness.get(noproxy + 1).map(String::as_str),
+            Some("127.0.0.1,localhost")
+        );
+        assert!(!readiness.iter().any(|argument| argument == "*"));
+        assert!(!readiness
+            .iter()
+            .any(|argument| argument.starts_with("--noproxy=")));
+        assert!(!readiness.iter().any(|argument| argument == "/bin/sh"));
+        assert_eq!(
+            readiness
+                .iter()
+                .rev()
+                .take(2)
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec!["http://127.0.0.1:8000/health/ready", "--"]
+        );
+    }
+
+    #[test]
+    fn multiline_curl_stderr_is_kept_for_diagnostics_before_ipc_sanitization() {
+        let stderr = b"curl: (7) Failed to connect\r\ncurl: (28) Operation timed out\n";
+        assert_eq!(
+            format_internal_readiness_failure("exit code: 28", stderr),
+            "runtime-internal readiness request failed: curl: (7) Failed to connect\r\ncurl: (28) Operation timed out"
+        );
+    }
+
+    #[test]
+    fn runtime_health_classification_distinguishes_service_and_host_failures() {
+        assert_eq!(
+            classify_runtime_release_health(
+                Err(InternalBackendHealthError::Service(
+                    "connection refused".to_string()
+                )),
+                || panic!("host probe must not run when the internal service is unhealthy"),
+                || panic!("confirmation must not run when the internal service is unhealthy")
+            ),
+            RuntimeReleaseHealth::ServiceUnhealthy("connection refused".to_string())
+        );
+
+        assert_eq!(
+            classify_runtime_release_health(
+                Ok(()),
+                || Err("connection timed out".to_string()),
+                || Ok(())
+            ),
+            RuntimeReleaseHealth::HostConnectivity(
+                "runtime-internal API is healthy, but Windows cannot reach it: connection timed out"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            classify_runtime_release_health(
+                Ok(()),
+                || Ok(()),
+                || panic!("confirmation must not run when the host probe succeeds")
+            ),
+            RuntimeReleaseHealth::Ready
+        );
+    }
+
+    #[test]
+    fn runtime_health_classification_rechecks_internal_health_after_host_failure() {
+        assert_eq!(
+            classify_runtime_release_health(
+                Ok(()),
+                || Err("connection timed out".to_string()),
+                || {
+                    Err(InternalBackendHealthError::Service(
+                        "service stopped during the host probe".to_string(),
+                    ))
+                }
+            ),
+            RuntimeReleaseHealth::ServiceUnhealthy(
+                "service stopped during the host probe".to_string()
+            )
+        );
+
+        assert_eq!(
+            classify_runtime_release_health(
+                Ok(()),
+                || Err("connection timed out".to_string()),
+                || {
+                    Err(InternalBackendHealthError::Unknown(
+                        "confirmation probe timed out".to_string(),
+                    ))
+                }
+            ),
+            RuntimeReleaseHealth::Unknown("confirmation probe timed out".to_string())
+        );
+    }
+
+    #[test]
+    fn runtime_health_classification_preserves_unknown_probe_failures() {
+        assert_eq!(
+            classify_runtime_release_health(
+                Err(InternalBackendHealthError::Unknown(
+                    "wsl probe timed out".to_string()
+                )),
+                || panic!("host probe must not hide an indeterminate WSL probe"),
+                || panic!("confirmation must not hide an indeterminate WSL probe")
+            ),
+            RuntimeReleaseHealth::Unknown("wsl probe timed out".to_string())
+        );
+    }
 
     #[test]
     fn removes_interior_nuls_from_wsl_distribution_names() {
@@ -2721,7 +3060,7 @@ mod tests {
 
     #[cfg(target_os = "windows")]
     #[test]
-    fn blocks_existing_unmanaged_or_reparse_targets() {
+    fn blocks_every_non_empty_or_reparse_import_target() {
         let unmanaged = TargetDirectoryProbe {
             exists: true,
             is_directory: true,
@@ -2744,7 +3083,18 @@ mod tests {
             ownership_valid: true,
             ..TargetDirectoryProbe::default()
         };
-        assert!(target_directory_blockers(&managed, "E:\\DroneDream").is_empty());
+        let managed_blockers = target_directory_blockers(&managed, "E:\\DroneDream");
+        assert!(managed_blockers
+            .iter()
+            .any(|blocker| blocker.contains("cannot be reused for a fresh WSL import")));
+
+        let empty = TargetDirectoryProbe {
+            exists: true,
+            is_directory: true,
+            is_empty: true,
+            ..TargetDirectoryProbe::default()
+        };
+        assert!(target_directory_blockers(&empty, "E:\\DroneDream").is_empty());
     }
 
     #[cfg(target_os = "windows")]

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
+
 
 def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     monkeypatch.delenv("SIMULATOR_BACKEND", raising=False)
@@ -16,6 +18,17 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert data["simulators"]["authoritative"] is False
     assert data["optimizers"]["authoritative"] is False
     assert data["optimizers"]["configuration_scope"] == "api_process"
+    assert data["optimizers"]["selection_profile"] == "accuracy_first"
+    assert data["optimizers"]["recommended_strategy"] == "optimizer_portfolio"
+    experimental_ids = list(EXPERIMENTAL_OPTIMIZER_STRATEGIES)
+    assert data["optimizers"]["experimental_strategy_ids"] == experimental_ids
+    for strategy in experimental_ids:
+        assert data["optimizers"]["items"][strategy] == {
+            "ready": True,
+            "status": "experimental",
+            "experimental": True,
+            "selection_profile": "accuracy_first",
+        }
     assert data["simulators"]["items"]["mock"] == {
         "selectable": True,
         "configured": True,
@@ -45,7 +58,13 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert real_cli["status"] == "not_configured"
     assert real_cli["max_concurrency_per_host_without_instance_allocator"] == 1
     assert real_cli["instance_allocation"] == "operator_managed"
-    assert real_cli["bundled_runner_advanced_effects"] == []
+    assert real_cli["bundled_runner_advanced_effects"] == ["obstacles"]
+    scenario_effects = real_cli["scenario_effect_contract"]
+    assert scenario_effects["physically_applied"] == ["obstacles"]
+    assert scenario_effects["obstacles"]["mechanism"] == "gazebo_entity_factory"
+    assert "probabilistic GPS dropout" in scenario_effects[
+        "requires_runtime_extension"
+    ]
     assert real_cli["unverified_effect_passthrough_opt_in"] is True
     assert data["optimizers"]["items"]["gpt"]["ready"] is False
     serialized = response.text
@@ -111,6 +130,20 @@ def test_capabilities_surfaces_invalid_worker_override(client, monkeypatch) -> N
     data = client.get("/api/v1/capabilities").json()["data"]
 
     simulators = data["simulators"]
+    assert simulators["worker_override_supported"] is False
+    assert simulators["items"]["mock"]["status"] == "invalid_override"
+    assert simulators["items"]["real_cli"]["status"] == "invalid_override"
+    assert simulators["items"]["mock"]["ready"] is False
+    assert simulators["items"]["real_cli"]["ready"] is False
+
+
+def test_capabilities_rejects_internal_real_stub_override(client, monkeypatch) -> None:
+    monkeypatch.setenv("SIMULATOR_BACKEND", "real_stub")
+
+    data = client.get("/api/v1/capabilities").json()["data"]
+
+    simulators = data["simulators"]
+    assert simulators["worker_override"] == "real_stub"
     assert simulators["worker_override_supported"] is False
     assert simulators["items"]["mock"]["status"] == "invalid_override"
     assert simulators["items"]["real_cli"]["status"] == "invalid_override"

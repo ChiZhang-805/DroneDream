@@ -5,6 +5,10 @@ from __future__ import annotations
 import math
 from typing import Any, cast
 
+_MAX_TELEMETRY_SAMPLES = 200_000
+_MAX_REFERENCE_POINTS = 10_000
+_MAX_SCHEMA_ERRORS = 100
+
 
 def _is_number(value: Any) -> bool:
     return (
@@ -39,11 +43,16 @@ def validate_telemetry_payload(payload: object) -> list[str]:
     if not samples:
         errors.append("telemetry samples[] must not be empty")
         return errors
+    if len(samples) > _MAX_TELEMETRY_SAMPLES:
+        return [f"telemetry samples[] cannot exceed {_MAX_TELEMETRY_SAMPLES} items"]
 
     previous_t: float | None = None
     for idx, sample in enumerate(samples):
         if not isinstance(sample, dict):
             errors.append(f"telemetry sample[{idx}] must be an object")
+            if len(errors) >= _MAX_SCHEMA_ERRORS:
+                errors.append("telemetry validation stopped after too many errors")
+                break
             continue
 
         for key in ("t", "x", "y", "z"):
@@ -69,6 +78,9 @@ def validate_telemetry_payload(payload: object) -> list[str]:
         ):
             if key in sample and sample[key] is not None and not _is_number(sample[key]):
                 errors.append(f"telemetry sample[{idx}] field '{key}' must be numeric")
+        if len(errors) >= _MAX_SCHEMA_ERRORS:
+            errors.append("telemetry validation stopped after too many errors")
+            break
 
     return errors
 
@@ -87,13 +99,23 @@ def validate_reference_track_payload(payload: object) -> list[str]:
     if not isinstance(points, list):
         errors.append("reference track payload must contain reference_track[]")
         return errors
+    if not points:
+        return ["reference_track[] must not be empty"]
+    if len(points) > _MAX_REFERENCE_POINTS:
+        return [f"reference_track[] cannot exceed {_MAX_REFERENCE_POINTS} items"]
 
     for idx, point in enumerate(points):
         if not isinstance(point, dict):
             errors.append(f"reference_track[{idx}] must be an object")
+            if len(errors) >= _MAX_SCHEMA_ERRORS:
+                errors.append("reference track validation stopped after too many errors")
+                break
             continue
         for axis in ("x", "y", "z"):
             if not _is_number(point.get(axis)):
                 errors.append(f"reference_track[{idx}] missing numeric '{axis}'")
+        if len(errors) >= _MAX_SCHEMA_ERRORS:
+            errors.append("reference track validation stopped after too many errors")
+            break
 
     return errors

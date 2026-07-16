@@ -166,6 +166,10 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         /Search budget exhausted — showing best-so-far parameters/i,
       ),
     ).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Progress" })).toHaveAttribute(
+      "aria-valuenow",
+      "100",
+    );
     await waitFor(() =>
       expect(apiClient.getJobReport).toHaveBeenCalledWith(job.id),
     );
@@ -275,6 +279,44 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     renderWithJob(job.id);
 
     expect(await screen.findByText(/CMA-ES Gen 2/)).toBeInTheDocument();
+  });
+
+  it("renders the portfolio with a localized name and accuracy-first description", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "optimizer_portfolio",
+    });
+    const trials: TrialSummary[] = [
+      {
+        id: "tri_portfolio_1",
+        candidate_id: "cand_portfolio_1",
+        seed: 31,
+        scenario_type: "nominal",
+        status: "COMPLETED",
+        score: 0.6,
+        pass_flag: true,
+        candidate_label: "optimizer_portfolio_gen_2",
+        candidate_source_type: "optimizer",
+        candidate_optimizer_strategy: "turbo",
+        candidate_is_baseline: false,
+        candidate_is_best: false,
+        candidate_generation_index: 2,
+      },
+    ];
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue(trials);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(
+      await screen.findByText(/TuRBO-inspired trust-region BO · Gen 2/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Splits budget across six engines and favors verified gains/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("optimizer_portfolio")).toBeNull();
   });
 
   it("renders a PASS/FAIL badge per completed trial based on pass_flag", async () => {

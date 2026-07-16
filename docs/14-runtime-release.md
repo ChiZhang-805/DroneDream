@@ -1,4 +1,9 @@
-# DroneDreamRuntime signed release pipeline
+# DroneDreamRuntime manifest-signing and release pipeline
+
+The detached Ed25519 signature in this document authenticates the Runtime
+manifest and payload parts. It is not Windows Authenticode signing and does not
+establish a Windows publisher identity for the NSIS executable. The current
+`0.3.18` preview installer remains unsigned and can trigger SmartScreen.
 
 The Windows installer downloads a dedicated WSL2 distribution; it never
 moves, upgrades, or unregisters an existing Ubuntu distribution. A user may
@@ -53,6 +58,36 @@ installer is unsigned and can trigger Windows SmartScreen. Treat it as a
 closed-beta package until code signing and the full clean-machine journey are
 verified.
 
+## Runtime failure diagnostics and retention
+
+If the imported distribution starts but does not become ready, the desktop
+installer distinguishes three outcomes instead of reporting every timeout as
+the same failure: a Runtime-internal service failure, a healthy Runtime that
+Windows cannot reach through localhost, or an indeterminate health result.
+Before unregistering a distribution created by that failed attempt, it captures
+a bounded snapshot of the managed systemd units, their recent journals,
+listening sockets, WSL networking, and the Runtime-internal readiness response.
+
+The report is written as an ordinary file below the marker-owned sibling cache:
+`X:\DroneDream.download-cache\diagnostics\runtime-health-<timestamp>-<id>.log`.
+It is never written below `%TEMP%`, the desktop-program directory, or the WSL
+import target. The writer revalidates the cache marker, rejects links and
+reparse points, requires the diagnostics directory and report to resolve
+directly below that cache, creates a unique file without overwriting an existing
+report, removes control characters, redacts credential-like lines, and caps the
+result at 512 KiB. Rotation retains at most ten reports and 5 MiB in total,
+while failing closed on link-like or otherwise unsafe matching entries. The UI
+receives only this already-validated local path; it does not turn it into a URL
+or execute it.
+
+Failed-import rollback deliberately preserves the report and authenticated
+download data so a retry does not destroy its own evidence. Ordinary desktop
+uninstall also preserves `DroneDreamRuntime`, `X:\DroneDream`, the sibling
+download cache, and these reports. The NSIS **delete application data** choice
+is scoped to the desktop bundle's `%APPDATA%`/`%LOCALAPPDATA%` state and does not
+claim ownership of Runtime storage. Cache removal remains a separate,
+explicitly destructive maintenance operation.
+
 ## Published assets
 
 Each immutable beta GitHub Release contains only these files:
@@ -74,7 +109,7 @@ reassembles the original uncompressed tar. `compression` is deliberately
 `none` in schema version 1, so the verified tar can be passed directly to:
 
 ```powershell
-wsl.exe --import DroneDreamRuntime <chosen-directory> <verified-rootfs.tar> --version 2
+wsl.exe --import DroneDreamRuntime "<chosen-directory>" "<verified-rootfs.tar>" --version 2
 ```
 
 The installer obtains the signature by appending `.sig` to the manifest URL.

@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { NewJob } from "../pages/NewJob";
 import { apiClient, ApiClientError } from "../api/client";
-import type { Job } from "../types/api";
+import {
+  EXPERIMENT_DRAFT_KEY,
+  LEGACY_EXPERIMENT_DRAFT_KEY,
+} from "../features/experiment/draftStorage";
+import type { BackendCapabilitiesResponse, Job } from "../types/api";
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -14,24 +18,84 @@ vi.mock("react-router-dom", async () => {
   );
   return { ...actual, useNavigate: () => navigateMock };
 });
-function renderPage() {
+interface RenderPageOptions {
+  confirmName?: boolean;
+  experimentName?: string;
+}
+
+function renderPage({
+  confirmName = true,
+  experimentName,
+}: RenderPageOptions = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const result = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <NewJob />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  if (confirmName) {
+    const input = within(screen.getByRole("dialog", { name: /New Tuning Experiment/i }))
+      .getByRole("textbox") as HTMLInputElement;
+    const nextName = experimentName ?? (input.value || "test-experiment");
+    fireEvent.change(input, { target: { value: nextName } });
+    fireEvent.click(screen.getByRole("button", { name: /^Continue$/i }));
+  }
+  return result;
+}
+
+function selectMode(mode: "basic" | "advanced" | "expert"): void {
+  fireEvent.change(screen.getByLabelText(/Tuning experience level/i), {
+    target: { value: mode },
+  });
+}
+
+function selectObjective(profile: "stable" | "fast" | "smooth" | "robust" | "custom"): void {
+  fireEvent.change(screen.getByLabelText(/Objective profile/i), {
+    target: { value: profile },
+  });
+}
+
+const STEP_LABELS = [
+  "Flight Setup",
+  "Parameters",
+  "Scenarios",
+  "Constraints & budget",
+  "Review",
+] as const;
+
+function activeStepIndex(): number {
+  const progress = screen.getByRole("navigation", { name: /Experiment setup progress/i });
+  const steps = within(progress).getAllByRole("listitem");
+  return steps.findIndex((item) => item.getAttribute("aria-current") === "step");
+}
+
+function stepIndex(name: RegExp): number {
+  return STEP_LABELS.findIndex((label) => name.test(label));
 }
 
 function openStep(name: RegExp): void {
-  fireEvent.click(screen.getByRole("button", { name }));
+  const target = stepIndex(name);
+  if (target < 0) throw new Error(`Unknown wizard step: ${name}`);
+  let current = activeStepIndex();
+  for (let attempts = 0; current !== target && attempts < STEP_LABELS.length; attempts += 1) {
+    fireEvent.click(
+      screen.getByRole("button", { name: current < target ? /^Next$/i : /^Back$/i }),
+    );
+    const next = activeStepIndex();
+    if (next === current) {
+      throw new Error(`Wizard did not advance from ${STEP_LABELS[current]}`);
+    }
+    current = next;
+  }
+  expect(current).toBe(target);
 }
 
 function createExperiment(): void {
+  openStep(/Review/i);
   fireEvent.click(screen.getByRole("button", { name: /Create Experiment/i }));
 }
 
@@ -42,22 +106,177 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("NewJob experiment wizard", () => {
-  it("renders seven steps, three modes, and a safe non-GPT default", () => {
+  it("collects the experiment name before entering the wizard and cancels back", () => {
+    const first = renderPage({ confirmName: false });
+
+    expect(screen.getByRole("dialog", { name: /New Tuning Experiment/i })).toBeVisible();
+    expect(screen.queryByRole("navigation", { name: /Experiment setup progress/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Continue$/i }));
+    expect(screen.getByText(/^Required$/i)).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText(/Experiment name/i), {
+      target: { value: "wind-study" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Continue$/i }));
+
+    expect(screen.getByRole("navigation", { name: /Experiment setup progress/i })).toBeVisible();
+    expect(screen.queryByLabelText(/Experiment name/i)).toBeNull();
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("wind-study");
+
+    first.unmount();
+    renderPage({ confirmName: false });
+    fireEvent.click(screen.getByRole("button", { name: /^Cancel$/i }));
+    expect(navigateMock).toHaveBeenCalledWith(-1);
+  });
+
+  it("renders five locked steps, a combined flight setup, and a safe non-GPT default", () => {
     renderPage();
 
     expect(screen.getByRole("heading", { name: /New Tuning Experiment/i })).toBeVisible();
-    expect(screen.getAllByRole("button", { name: /Vehicle & PX4|Objective|Parameters|Scenarios|Flight track|Constraints & budget|Review/i })).toHaveLength(7);
-    expect(screen.getByRole("radio", { name: /^Basic/i })).toHaveAttribute("aria-checked", "true");
+    const progress = screen.getByRole("navigation", { name: /Experiment setup progress/i });
+    const progressItems = within(progress).getAllByRole("listitem");
+    expect(progressItems).toHaveLength(5);
+    expect(progressItems.map((item) => item.textContent?.replace(/^\d+/, "").trim())).toEqual(
+      [...STEP_LABELS],
+    );
+    expect(within(progress).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByRole("heading", { name: "Flight Setup" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Vehicle & PX4 Profile" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Optimization Objective" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Flight Track Configuration" })).toBeVisible();
+    const modeSelector = screen.getByLabelText(/Tuning experience level/i);
+    expect(modeSelector).toHaveValue("basic");
+    expect(modeSelector.closest(".form-grid")).not.toBeNull();
+    expect(modeSelector.closest(".section-card")).not.toBeNull();
+    expect(screen.getByLabelText(/Objective profile/i)).toHaveValue("robust");
+    expect(screen.queryByLabelText(/Experiment name/i)).toBeNull();
+    expect(screen.queryByText(/selected track is generated from these dimensions/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Convert to editable waypoints/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Create Experiment/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Save draft|Reset defaults/i })).toBeNull();
 
     openStep(/Constraints & budget/i);
-    expect(screen.getByLabelText(/Optimizer Strategy/i)).toHaveValue("heuristic");
-    expect(screen.queryByLabelText(/LLM API Key/i)).toBeNull();
-    expect(screen.getByLabelText(/Maximum total trials/i)).toHaveValue(100);
-    expect(screen.getByLabelText(/Max Iterations/i)).toHaveAttribute("max", "100");
+    expect(screen.getByLabelText(/Optimizer Strategy/i)).toHaveValue(
+      "optimizer_portfolio",
+    );
+    expect(
+      screen.getByRole("option", {
+        name: "Accuracy-first optimizer portfolio (Recommended)",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Failure-aware constrained MOBO" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Multi-fidelity constrained MOBO" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "TuRBO-inspired trust-region BO" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "SAAS-inspired constrained BO" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Surrogate-assisted CMA-ES" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "BIPOP-inspired CMA-ES" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Model API key/i)).toBeNull();
+    expect(screen.getByLabelText(/Maximum total trials/i)).toHaveValue(220);
+    expect(screen.getByLabelText(/Maximum iterations/i)).toHaveAttribute("max", "100");
     expect(screen.getByLabelText(/Maximum total trials/i)).toHaveAttribute("max", "10000");
+    expect(screen.queryByText("Synthetic workflow simulator")).not.toBeInTheDocument();
+    expect(screen.queryByText("Experimental accuracy-first strategy")).not.toBeInTheDocument();
+    expect(screen.queryByText("Estimated upper-bound plan")).not.toBeInTheDocument();
+  });
+
+  it("persists a validated Next transition immediately and keeps completed steps after Back", () => {
+    const first = renderPage({ experimentName: "step-state-study" });
+    fireEvent.change(screen.getByLabelText(/Airframe/i), {
+      target: { value: "quad_x" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^Next$/i }));
+
+    const saved = JSON.parse(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY) ?? "null") as {
+      active_step: number;
+      completed_steps: number[];
+      form: { display_name: string; airframe: string };
+    };
+    expect(saved.active_step).toBe(1);
+    expect(saved.completed_steps).toEqual([0]);
+    expect(saved.form).toMatchObject({
+      display_name: "step-state-study",
+      airframe: "quad_x",
+    });
+
+    openStep(/Constraints & budget/i);
+    fireEvent.click(screen.getByRole("button", { name: /^Back$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Back$/i }));
+    expect(activeStepIndex()).toBe(1);
+
+    const progress = screen.getByRole("navigation", { name: /Experiment setup progress/i });
+    const progressItems = within(progress).getAllByRole("listitem");
+    expect(progressItems[0]).toHaveClass("wizard-step-complete");
+    expect(progressItems[0]).toHaveTextContent("✓");
+    expect(progressItems[1]).toHaveAttribute("aria-current", "step");
+    expect(progressItems[1]).not.toHaveClass("wizard-step-complete");
+    expect(progressItems[2]).toHaveClass("wizard-step-complete");
+    expect(progressItems[2]).toHaveTextContent("✓");
+    expect(progressItems[3]).not.toHaveClass("wizard-step-complete");
+    expect(progressItems[4]).not.toHaveClass("wizard-step-complete");
+
+    const savedAfterBack = JSON.parse(
+      window.localStorage.getItem(EXPERIMENT_DRAFT_KEY) ?? "null",
+    ) as { active_step: number; completed_steps: number[] };
+    expect(savedAfterBack).toMatchObject({
+      active_step: 1,
+      completed_steps: [0, 1, 2],
+    });
+
+    first.unmount();
+    renderPage();
+    const restoredProgress = screen.getByRole("navigation", {
+      name: /Experiment setup progress/i,
+    });
+    const restoredItems = within(restoredProgress).getAllByRole("listitem");
+    expect(restoredItems[0]).toHaveClass("wizard-step-complete");
+    expect(restoredItems[1]).toHaveAttribute("aria-current", "step");
+    expect(restoredItems[2]).toHaveClass("wizard-step-complete");
+    expect(restoredItems[3]).not.toHaveClass("wizard-step-complete");
+    expect(restoredItems[4]).not.toHaveClass("wizard-step-complete");
+  });
+
+  it("updates concise guidance when semantic options change", () => {
+    renderPage();
+
+    expect(screen.getByText("A full circle centered on X/Y with the chosen radius.")).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/Track Type/i), { target: { value: "u_turn" } });
+    expect(screen.getByText("Two straight legs joined by one semicircular turn.")).toBeVisible();
+
+    expect(screen.getByText("Standard Gazebo x500 quadrotor configuration.")).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/Airframe/i), { target: { value: "quad_x" } });
+    expect(screen.getByText("Generic X-layout quadrotor configuration.")).toBeVisible();
+
+    expect(screen.getByText("No Gazebo window; faster for automated tuning.")).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/^Gazebo rendering$/i), { target: { value: "false" } });
+    expect(screen.getByText("Shows Gazebo graphics for visual observation.")).toBeVisible();
+
+    selectObjective("fast");
+    expect(screen.getByText("Rewards shorter completion time while staying valid.")).toBeVisible();
+
+    openStep(/Scenarios/i);
+    expect(screen.getByText("Applies moderate sensor noise to noise cases.")).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/Sensor noise level/i), { target: { value: "high" } });
+    expect(screen.getByText("Applies severe sensor noise for stress testing.")).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/Matched random conditions/i), { target: { value: "false" } });
+    expect(screen.getByText("Candidates receive independently sampled conditions.")).toBeVisible();
+
+    openStep(/Constraints & budget/i);
+    expect(screen.getByText("Checks the workflow with deterministic synthetic scores.")).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/Simulator Backend/i), { target: { value: "real_cli" } });
+    expect(screen.getByText("Runs real PX4 SITL and Gazebo flight physics.")).toBeVisible();
   });
 
   it("submits per-job Gazebo runtime controls for reproducible parallel runs", async () => {
@@ -65,8 +284,8 @@ describe("NewJob experiment wizard", () => {
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_runtime" } as Job);
     renderPage();
-    expect(screen.getByLabelText(/Disable Gazebo rendering/i)).toBeChecked();
-    fireEvent.click(screen.getByRole("radio", { name: /^Advanced/i }));
+    expect(screen.getByLabelText(/^Gazebo rendering$/i)).toHaveValue("true");
+    selectMode("advanced");
     fireEvent.change(screen.getByLabelText(/Simulation speed factor/i), {
       target: { value: "2.5" },
     });
@@ -84,21 +303,20 @@ describe("NewJob experiment wizard", () => {
     });
   });
 
-  it("moves to the hidden field's step and surfaces validation errors", async () => {
+  it("disables Next while the current step is invalid", () => {
     const createSpy = vi.spyOn(apiClient, "createJob").mockResolvedValue({ id: "unused" } as Job);
     renderPage();
 
-    openStep(/Flight track/i);
+    openStep(/Flight Setup/i);
     fireEvent.change(screen.getByLabelText(/Altitude/i), { target: { value: "25" } });
-    openStep(/Vehicle & PX4/i);
-    createExperiment();
-
-    expect(await screen.findByText(/Must be between 1.0 and 20.0/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
     expect(screen.getByLabelText(/Altitude/i)).toBeVisible();
+    expect(activeStepIndex()).toBe(0);
+    expect(screen.queryByRole("button", { name: /Create Experiment/i })).toBeNull();
     expect(createSpy).not.toHaveBeenCalled();
   });
 
-  it("fails closed when the selected PX4 version has no matching parameter catalog", async () => {
+  it("fails closed when the selected PX4 version has no matching parameter catalog", () => {
     const createSpy = vi
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "unused" } as Job);
@@ -107,39 +325,61 @@ describe("NewJob experiment wizard", () => {
       target: { value: "v1.17" },
     });
 
-    createExperiment();
-
-    expect(await screen.findByText(/No compatible parameter catalog is loaded for PX4 v1.17/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(0);
     expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it("validates the tuning objective before leaving the combined flight setup", () => {
+    renderPage();
+    selectMode("advanced");
+    for (const label of [
+      /Tracking accuracy weight/i,
+      /Completion speed weight/i,
+      /Smoothness weight/i,
+      /Robust pass-rate weight/i,
+    ]) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value: "0" } });
+    }
+
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(0);
   });
 
   it("validates custom JSON and keeps it synchronized with the waypoint editor", async () => {
     const createSpy = vi.spyOn(apiClient, "createJob").mockResolvedValue({ id: "unused" } as Job);
     renderPage();
-    openStep(/Flight track/i);
+    openStep(/Flight Setup/i);
 
     fireEvent.change(screen.getByLabelText(/Track Type/i), { target: { value: "custom" } });
+    fireEvent.click(screen.getByRole("button", { name: /Edit custom track/i }));
     expect(screen.getAllByRole("button", { name: /Remove waypoint/i })).toHaveLength(3);
     fireEvent.click(screen.getByRole("button", { name: /Add waypoint/i }));
     expect(screen.getAllByRole("button", { name: /Remove waypoint/i })).toHaveLength(4);
     fireEvent.click(screen.getByRole("button", { name: /Undo/i }));
     expect(screen.getAllByRole("button", { name: /Remove waypoint/i })).toHaveLength(3);
 
+    fireEvent.click(screen.getByRole("button", { name: /JSON import \/ export/i }));
+    expect(screen.getByRole("dialog", { name: /JSON import \/ export/i })).toBeVisible();
     fireEvent.change(screen.getByLabelText(/Reference track \(JSON\)/i), {
       target: { value: '[{"x":0,"y":0}]' },
     });
-    createExperiment();
-    expect(await screen.findByText(/Custom track requires at least 2 points/i)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Close JSON import \/ export/i }));
+    expect(screen.queryByRole("dialog", { name: /JSON import \/ export/i })).toBeNull();
+    expect(screen.getByRole("dialog", { name: /Edit custom track/i })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Close track editor/i }));
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(0);
     expect(createSpy).not.toHaveBeenCalled();
   });
 
   it("lets advanced users choose real PX4 dimensions and validates ranges", async () => {
     const createSpy = vi.spyOn(apiClient, "createJob").mockResolvedValue({ id: "unused" } as Job);
     renderPage();
-    fireEvent.click(screen.getByRole("radio", { name: /^Advanced/i }));
+    selectMode("advanced");
     openStep(/Parameters/i);
 
-    expect(screen.getByLabelText(/Tune MPC_XY_P/i)).toBeChecked();
+    expect(screen.getByLabelText(/Tune MPC_XY_P/i)).toHaveValue("include");
     expect(screen.getByLabelText(/MPC_XY_P search minimum/i)).toBeVisible();
     fireEvent.change(screen.getByLabelText(/MPC_XY_P search minimum/i), {
       target: { value: "1.4" },
@@ -147,18 +387,17 @@ describe("NewJob experiment wizard", () => {
     fireEvent.change(screen.getByLabelText(/MPC_XY_P search maximum/i), {
       target: { value: "0.7" },
     });
-    createExperiment();
-
-    expect(await screen.findByText(/Search minimum must be less than maximum/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(1);
     expect(createSpy).not.toHaveBeenCalled();
   });
 
   it("applies objective profile weights and marks manual edits as custom", () => {
     renderPage();
-    fireEvent.click(screen.getByRole("radio", { name: /^Advanced/i }));
-    openStep(/Objective/i);
+    selectMode("advanced");
+    openStep(/Flight Setup/i);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Fast/i }));
+    selectObjective("fast");
     expect(screen.getByLabelText(/Tracking accuracy weight/i)).toHaveValue(0.75);
     expect(screen.getByLabelText(/Completion speed weight/i)).toHaveValue(1);
     expect(screen.getByLabelText(/Robust aggregation/i)).toHaveValue("mean");
@@ -166,7 +405,7 @@ describe("NewJob experiment wizard", () => {
     fireEvent.change(screen.getByLabelText(/Completion speed weight/i), {
       target: { value: "0.9" },
     });
-    expect(screen.getByLabelText(/Objective Profile/i)).toHaveValue("custom");
+    expect(screen.getByLabelText(/Objective profile/i)).toHaveValue("custom");
   });
 
   it("does not submit stale inactive tail-risk values", async () => {
@@ -174,8 +413,8 @@ describe("NewJob experiment wizard", () => {
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_mean" } as Job);
     renderPage();
-    fireEvent.click(screen.getByRole("radio", { name: /^Advanced/i }));
-    openStep(/Objective/i);
+    selectMode("advanced");
+    openStep(/Flight Setup/i);
     fireEvent.change(screen.getByLabelText(/CVaR alpha/i), { target: { value: "2" } });
     fireEvent.change(screen.getByLabelText(/Robust aggregation/i), {
       target: { value: "mean" },
@@ -196,34 +435,48 @@ describe("NewJob experiment wizard", () => {
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "unused" } as Job);
     renderPage();
-    fireEvent.click(screen.getByRole("radio", { name: /^Advanced/i }));
+    selectMode("advanced");
     openStep(/Parameters/i);
 
     fireEvent.change(screen.getByLabelText(/MPC_XY_P search minimum/i), {
       target: { value: "" },
     });
     expect(screen.getByLabelText(/MPC_XY_P search minimum/i)).toHaveValue(null);
-    createExperiment();
-
-    expect(await screen.findByText(/must be finite numbers/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(1);
     expect(createSpy).not.toHaveBeenCalled();
   });
 
-  it("surfaces and includes recommended companion parameters", () => {
+  it("disables Next without showing an alert when no tuning parameter is selected", () => {
     renderPage();
-    fireEvent.click(screen.getByRole("radio", { name: /^Advanced/i }));
+    selectMode("advanced");
+    openStep(/Parameters/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /Clear visible/i }));
+
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(screen.queryByText("Select at least one parameter to tune.")).toBeNull();
+  });
+
+  it("allows explicit companion selection without a visible dependency alert", () => {
+    renderPage();
+    selectMode("advanced");
     openStep(/Parameters/i);
 
     fireEvent.change(screen.getByLabelText(/Find a PX4 parameter/i), {
       target: { value: "MC_ROLLRATE_I" },
     });
-    fireEvent.click(screen.getByLabelText(/Tune MC_ROLLRATE_I/i));
-    expect(screen.getByText(/Recommended companion parameters are not selected/i)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: /Include companions/i }));
-    fireEvent.change(screen.getByLabelText(/Find a PX4 parameter/i), {
-      target: { value: "" },
+    fireEvent.change(screen.getByLabelText(/Tune MC_ROLLRATE_I/i), {
+      target: { value: "include" },
     });
-    expect(screen.getByLabelText(/Tune MC_ROLLRATE_P/i)).toBeChecked();
+    expect(screen.queryByText(/Recommended companion parameters are not selected/i)).toBeNull();
+    fireEvent.change(screen.getByLabelText(/Find a PX4 parameter/i), {
+      target: { value: "MC_ROLLRATE_P" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tune MC_ROLLRATE_P/i), {
+      target: { value: "include" },
+    });
+    expect(screen.getByLabelText(/Tune MC_ROLLRATE_P/i)).toHaveValue("include");
   });
 
   it("rejects a budget that cannot run the baseline matrix and first candidate", async () => {
@@ -232,14 +485,12 @@ describe("NewJob experiment wizard", () => {
       .mockResolvedValue({ id: "unused" } as Job);
     renderPage();
     openStep(/Constraints & budget/i);
-    expect(screen.getByText(/Estimated upper-bound plan: 99 trials/i)).toBeVisible();
     fireEvent.change(screen.getByLabelText(/Maximum total trials/i), {
-      target: { value: "21" },
+      target: { value: "1" },
     });
 
-    createExperiment();
-
-    expect(await screen.findByText(/Requires at least 22 trials/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(3);
     expect(createSpy).not.toHaveBeenCalled();
   });
 
@@ -249,18 +500,26 @@ describe("NewJob experiment wizard", () => {
       .mockResolvedValue({ id: "unused" } as Job);
     renderPage();
     openStep(/Scenarios/i);
-    fireEvent.click(screen.getByRole("button", { name: /Combined stress/i }));
-    expect(screen.getByLabelText(/Enable advanced scenario/i)).toHaveValue("yes");
+    expect(screen.queryByRole("button", { name: /Combined stress/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
+    fireEvent.change(screen.getByLabelText(/Environment presets/i), {
+      target: { value: "stress" },
+    });
+    expect(screen.getByText("Combines wind, gust, sensor, battery and payload effects.")).toBeVisible();
+    expect(screen.getAllByLabelText(/^Advanced environment$/i)[0]).toHaveValue("true");
     expect(screen.getByLabelText(/Gust magnitude/i)).toHaveValue(10);
-    fireEvent.change(screen.getByLabelText(/Obstacles JSON/i), {
+    fireEvent.change(screen.getByLabelText(/Obstacles.*JSON/i), {
       target: {
         value: '[{"type":"cylinder","x":0,"y":0,"z":0,"radius":-1,"height":2}]',
       },
     });
 
-    createExperiment();
-
-    expect(await screen.findByText(/radius must be greater than 0/i)).toBeVisible();
+    const closeButton = screen.getByRole("button", { name: /Close advanced settings/i });
+    expect(closeButton).toHaveTextContent("×");
+    expect(closeButton).toHaveAttribute("title", "Close advanced settings");
+    fireEvent.click(closeButton);
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(2);
     expect(createSpy).not.toHaveBeenCalled();
   });
 
@@ -271,17 +530,16 @@ describe("NewJob experiment wizard", () => {
     renderPage();
     openStep(/Scenarios/i);
 
-    fireEvent.click(screen.getByLabelText(/Nominal search/i));
-    fireEvent.click(screen.getByLabelText(/Wind search/i));
-    fireEvent.click(screen.getByLabelText(/Sensor-noise search/i));
-    createExperiment();
-
-    expect(await screen.findByText(/Enable at least one search scenario/i)).toBeVisible();
+    fireEvent.change(screen.getByLabelText(/Nominal search/i), { target: { value: "false" } });
+    fireEvent.change(screen.getByLabelText(/Wind search/i), { target: { value: "false" } });
+    fireEvent.change(screen.getByLabelText(/Sensor-noise search/i), { target: { value: "false" } });
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(2);
     expect(createSpy).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByLabelText(/Nominal search/i));
-    fireEvent.click(screen.getByLabelText(/Nominal holdout/i));
-    fireEvent.click(screen.getByLabelText(/Combined-stress holdout/i));
+    fireEvent.change(screen.getByLabelText(/Nominal search/i), { target: { value: "true" } });
+    fireEvent.change(screen.getByLabelText(/Nominal holdout/i), { target: { value: "true" } });
+    fireEvent.change(screen.getByLabelText(/Combined-stress holdout/i), { target: { value: "false" } });
     createExperiment();
 
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
@@ -291,59 +549,91 @@ describe("NewJob experiment wizard", () => {
     ]);
   });
 
-  it("offers a one-click nominal-only matrix for the bundled real runner", async () => {
-    const createSpy = vi
-      .spyOn(apiClient, "createJob")
-      .mockResolvedValue({ id: "job_real_nominal" } as Job);
+  it("shows verified and extension-gated PX4/Gazebo scenario capabilities", async () => {
+    vi.stubEnv("VITE_CAPABILITIES_API", "true");
+    vi.spyOn(apiClient, "getCapabilities").mockResolvedValue({
+      service_version: "test",
+      simulators: {
+        configuration_scope: "api_process",
+        authoritative: false,
+        worker_override: null,
+        worker_override_supported: true,
+        items: {
+          real_cli: {
+            ready: true,
+            status: "configured",
+            scenario_effect_contract: {
+              schema_version: "dronedream.scenario_effect_request.v1",
+              physically_applied: ["obstacles"],
+              requires_runtime_extension: ["wind vector and gust profile"],
+            },
+          },
+        },
+      },
+      optimizers: { authoritative: false, items: {} },
+      parameter_catalog: { catalog_version: "test", supported_px4_versions: ["v1.16"] },
+    } satisfies BackendCapabilitiesResponse);
     renderPage();
-    openStep(/Constraints & budget/i);
-    fireEvent.change(screen.getByLabelText(/Simulator Backend/i), {
-      target: { value: "real_cli" },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: /Use bundled nominal-only matrix/i }));
-    createExperiment();
-
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy.mock.calls[0][0].scenario_suite?.cases).toEqual([
-      expect.objectContaining({ id: "nominal-search", scenario_type: "nominal", holdout: false }),
-      expect.objectContaining({ id: "nominal-holdout", scenario_type: "nominal", holdout: true }),
-    ]);
-    expect(createSpy.mock.calls[0][0].sensor_noise_level).toBe("medium");
-    expect(createSpy.mock.calls[0][0].advanced_scenario_config).toBeNull();
+    openStep(/Scenarios/i);
+    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
+    expect(await screen.findByText(/Obstacles: verified Gazebo injection/i)).toBeInTheDocument();
+    expect(screen.getByText(/Wind, sensors, battery and payload: Runtime extension required/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Advanced effects require launcher evidence/i)).not.toBeInTheDocument();
   });
 
-  it("saves and restores a local draft without persisting an LLM secret", () => {
-    const first = renderPage();
-    fireEvent.change(screen.getByLabelText(/Experiment Name/i), {
-      target: { value: "draft-study" },
-    });
+  it("autosaves and restores a local draft without persisting an LLM secret", async () => {
+    const first = renderPage({ experimentName: "draft-study" });
     openStep(/Constraints & budget/i);
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
       target: { value: "gpt" },
     });
-    fireEvent.change(screen.getByLabelText(/LLM API Key/i), {
+    fireEvent.click(screen.getByRole("button", { name: /Configure model access/i }));
+    fireEvent.change(screen.getByLabelText(/Model API key/i), {
       target: { value: "sk-never-store-this" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Save draft/i }));
-
-    const raw = window.localStorage.getItem("drone-dream:experiment-draft:v1");
-    expect(raw).toContain("draft-study");
-    expect(raw).not.toContain("sk-never-store-this");
+    await waitFor(() => {
+      const raw = window.localStorage.getItem(EXPERIMENT_DRAFT_KEY);
+      const draft = JSON.parse(raw ?? "null") as { form?: { optimizer_strategy?: string } } | null;
+      expect(raw).toContain("draft-study");
+      expect(raw).not.toContain("sk-never-store-this");
+      expect(draft?.form?.optimizer_strategy).toBe("gpt");
+    });
 
     first.unmount();
     renderPage();
-    expect(screen.getByLabelText(/Experiment Name/i)).toHaveValue("draft-study");
-    expect(screen.getByLabelText(/LLM API Key/i)).toHaveValue("");
+    expect(screen.queryByLabelText(/Experiment Name/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Configure model access/i }));
+    expect(screen.getByLabelText(/Model API key/i)).toHaveValue("");
+    expect(screen.queryByText("Uses OpenAI's compatible chat-completions API.")).toBeNull();
+    expect(screen.queryByText("API keys are never stored in the local draft.")).toBeNull();
+    expect(screen.queryByText("Leave blank to use the backend's default model.")).toBeNull();
+    expect(screen.queryByText("Required only for a custom compatible endpoint.")).toBeNull();
+  });
+
+  it("restores the selected advanced environment preset with the draft", () => {
+    const first = renderPage({ experimentName: "preset-draft" });
+    openStep(/Scenarios/i);
+    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
+    fireEvent.change(screen.getByLabelText(/Environment presets/i), {
+      target: { value: "stress" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Close advanced settings/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Next$/i }));
+
+    first.unmount();
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /^Back$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
+    expect(screen.getByLabelText(/Environment presets/i)).toHaveValue("stress");
   });
 
   it("normalizes type-mismatched draft fields instead of crashing", () => {
     window.localStorage.setItem(
-      "drone-dream:experiment-draft:v1",
+      LEGACY_EXPERIMENT_DRAFT_KEY,
       JSON.stringify({
         schema_version: 1,
         saved_at: new Date().toISOString(),
-        active_step: 3,
+        active_step: 6,
         form: {
           display_name: "recovered-study",
           tuning_mode: "unsafe-mode",
@@ -365,18 +655,38 @@ describe("NewJob experiment wizard", () => {
     );
 
     renderPage();
-
-    expect(screen.getByLabelText(/Experiment Name/i)).toHaveValue("recovered-study");
-    expect(screen.getByRole("radio", { name: /^Basic/i })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
+    expect(activeStepIndex()).toBe(0);
+    expect(screen.getByLabelText(/Tuning experience level/i)).toHaveValue("basic");
     expect(screen.getByLabelText(/Search seeds/i)).toHaveValue("101, 202, 303");
+    const migratedRaw = window.localStorage.getItem(EXPERIMENT_DRAFT_KEY);
+    expect(migratedRaw).toContain("recovered-study");
+    expect(migratedRaw).not.toContain("must-not-restore");
+    expect(window.localStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).toBeNull();
+  });
+
+  it("keeps the historical heuristic default when restoring a draft without an optimizer", () => {
+    window.localStorage.setItem(
+      LEGACY_EXPERIMENT_DRAFT_KEY,
+      JSON.stringify({
+        schema_version: 1,
+        saved_at: new Date().toISOString(),
+        active_step: 5,
+        form: {
+          display_name: "pre-optimizer-draft",
+        },
+        selections: {},
+      }),
+    );
+
+    renderPage();
+
+    expect(activeStepIndex()).toBe(0);
+    expect(screen.getByLabelText(/Optimizer Strategy/i)).toHaveValue("heuristic");
   });
 
   it("discards unsupported or structurally invalid draft envelopes", () => {
     window.localStorage.setItem(
-      "drone-dream:experiment-draft:v1",
+      EXPERIMENT_DRAFT_KEY,
       JSON.stringify({
         schema_version: 2,
         saved_at: "not-a-date",
@@ -386,9 +696,10 @@ describe("NewJob experiment wizard", () => {
       }),
     );
 
-    renderPage();
+    renderPage({ confirmName: false });
 
-    expect(screen.getByLabelText(/Experiment Name/i)).toHaveValue("");
+    expect(within(screen.getByRole("dialog", { name: /New Tuning Experiment/i })).getByRole("textbox"))
+      .toHaveValue("");
     expect(screen.queryByDisplayValue("must-not-load")).not.toBeInTheDocument();
   });
 
@@ -397,9 +708,14 @@ describe("NewJob experiment wizard", () => {
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_created" } as Job);
     renderPage();
-    fireEvent.click(screen.getByRole("radio", { name: /^Advanced/i }));
+    selectMode("advanced");
     openStep(/Parameters/i);
-    fireEvent.click(screen.getByLabelText(/Tune MC_AIRMODE/i));
+    fireEvent.change(screen.getByLabelText(/Find a PX4 parameter/i), {
+      target: { value: "MC_AIRMODE" },
+    });
+    fireEvent.change(screen.getByLabelText(/Tune MC_AIRMODE/i), {
+      target: { value: "include" },
+    });
     openStep(/Constraints & budget/i);
     fireEvent.change(screen.getByLabelText(/Simulator Backend/i), {
       target: { value: "real_cli" },
@@ -429,7 +745,7 @@ describe("NewJob experiment wizard", () => {
     );
     expect(payload.scenario_suite?.common_random_numbers).toBe(true);
     expect(payload.scenario_suite?.cases.some((scenario) => scenario.holdout)).toBe(true);
-    expect(payload.max_total_trials).toBe(100);
+    expect(payload.max_total_trials).toBe(220);
     expect(payload.simulator_backend).toBe("real_cli");
     expect(navigateMock).toHaveBeenCalledWith("/jobs/job_created", { replace: false });
   }, 10_000);
@@ -443,28 +759,31 @@ describe("NewJob experiment wizard", () => {
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
       target: { value: "gpt" },
     });
-    fireEvent.change(screen.getByLabelText(/LLM Provider/i), {
+    fireEvent.click(screen.getByRole("button", { name: /Configure model access/i }));
+    fireEvent.change(screen.getByLabelText(/Model provider/i), {
       target: { value: "deepseek" },
     });
+    expect(screen.queryByText("Uses DeepSeek's OpenAI-compatible endpoint.")).toBeNull();
     expect(screen.getByLabelText(/Compatible API Base URL/i)).toHaveValue(
       "https://api.deepseek.com",
     );
-    expect(screen.getByLabelText(/LLM Model/i)).toHaveValue("deepseek-v4-flash");
-    fireEvent.change(screen.getByLabelText(/LLM Provider/i), {
+    expect(screen.getByLabelText(/Model name/i)).toHaveValue("deepseek-v4-flash");
+    fireEvent.change(screen.getByLabelText(/Model provider/i), {
       target: { value: "qwen" },
     });
+    expect(screen.queryByText("Uses Qwen through Alibaba Cloud DashScope.")).toBeNull();
     expect(screen.getByLabelText(/Compatible API Base URL/i)).toHaveValue(
       "https://dashscope.aliyuncs.com/compatible-mode/v1",
     );
-    expect(screen.getByLabelText(/LLM Model/i)).toHaveValue("qwen-plus");
-    createExperiment();
-    expect(await screen.findByText(/API key required when strategy is gpt/i)).toBeVisible();
+    expect(screen.getByLabelText(/Model name/i)).toHaveValue("qwen-plus");
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(3);
     expect(createSpy).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText(/LLM API Key/i), {
+    fireEvent.change(screen.getByLabelText(/Model API key/i), {
       target: { value: "dashscope-key" },
     });
-    fireEvent.change(screen.getByLabelText(/LLM Model/i), {
+    fireEvent.change(screen.getByLabelText(/Model name/i), {
       target: { value: "qwen-plus" },
     });
     createExperiment();
@@ -486,23 +805,21 @@ describe("NewJob experiment wizard", () => {
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
       target: { value: "gpt" },
     });
-    fireEvent.change(screen.getByLabelText(/LLM Provider/i), {
+    fireEvent.click(screen.getByRole("button", { name: /Configure model access/i }));
+    fireEvent.change(screen.getByLabelText(/Model provider/i), {
       target: { value: "custom" },
     });
-    fireEvent.change(screen.getByLabelText(/LLM API Key/i), {
+    fireEvent.change(screen.getByLabelText(/Model API key/i), {
       target: { value: "custom-key" },
     });
-    fireEvent.change(screen.getByLabelText(/LLM Model/i), {
+    fireEvent.change(screen.getByLabelText(/Model name/i), {
       target: { value: "custom-model" },
     });
     fireEvent.change(screen.getByLabelText(/Compatible API Base URL/i), {
       target: { value: "ftp://example.com/v1?key=bad" },
     });
-    createExperiment();
-
-    expect(
-      await screen.findByText(/absolute HTTP\(S\) URL without credentials, query, or fragment/i),
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(activeStepIndex()).toBe(3);
     expect(createSpy).not.toHaveBeenCalled();
   });
 
@@ -511,13 +828,16 @@ describe("NewJob experiment wizard", () => {
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_custom" } as Job);
     renderPage();
-    openStep(/Flight track/i);
+    openStep(/Flight Setup/i);
     fireEvent.change(screen.getByLabelText(/Track Type/i), { target: { value: "custom" } });
+    fireEvent.click(screen.getByRole("button", { name: /Edit custom track/i }));
     fireEvent.change(screen.getByLabelText(/Waypoint 2 X/i), { target: { value: "8" } });
+    fireEvent.click(screen.getByRole("button", { name: /Close track editor/i }));
     openStep(/Scenarios/i);
-    fireEvent.click(screen.getByRole("button", { name: /Show Advanced scenario/i }));
-    fireEvent.change(screen.getByLabelText(/Enable advanced scenario/i), { target: { value: "yes" } });
+    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
+    fireEvent.change(screen.getAllByLabelText(/^Advanced environment$/i)[0], { target: { value: "true" } });
     fireEvent.change(screen.getByLabelText(/Dropout rate/i), { target: { value: "0.2" } });
+    fireEvent.click(screen.getByRole("button", { name: /Close advanced settings/i }));
     createExperiment();
 
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
@@ -535,6 +855,10 @@ describe("NewJob experiment wizard", () => {
       )
       .mockResolvedValueOnce({ id: "job_legacy" } as Job);
     renderPage();
+    openStep(/Constraints & budget/i);
+    fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
+      target: { value: "heuristic" },
+    });
     createExperiment();
 
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(2));
@@ -542,6 +866,20 @@ describe("NewJob experiment wizard", () => {
     expect(createSpy.mock.calls[1][0].parameter_space).toBeUndefined();
     expect(createSpy.mock.calls[1][0].vehicle_profile).toBeUndefined();
     expect(navigateMock).toHaveBeenCalledWith("/jobs/job_legacy", { replace: false });
+  });
+
+  it("does not silently downgrade an experimental optimizer for an old backend", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockRejectedValueOnce(
+        new ApiClientError("INVALID_INPUT", "Unknown advanced fields", null, 422),
+      );
+    renderPage();
+
+    createExperiment();
+
+    expect(await screen.findByText(/experiment could not be created.*BACKEND_UPGRADE_REQUIRED/i)).toBeVisible();
+    expect(createSpy).toHaveBeenCalledTimes(1);
   });
 
   it("does not hide a normal PX4 validation failure behind the legacy fallback", async () => {
@@ -554,38 +892,32 @@ describe("NewJob experiment wizard", () => {
 
     createExperiment();
 
-    expect(await screen.findByText(/Unknown PX4 parameter MPC_BAD/i)).toBeVisible();
+    expect(await screen.findByText(/experiment could not be created.*INVALID_INPUT/i)).toBeVisible();
     expect(createSpy).toHaveBeenCalledTimes(1);
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
-  it("keeps explicit legacy baselines for PX4 parameters that are not selected", async () => {
+  it("keeps the legacy baseline defaults when PX4 parameters are not selected", async () => {
     const createSpy = vi
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_legacy_baseline" } as Job);
     renderPage();
-    openStep(/Parameters/i);
-    fireEvent.click(screen.getByText(/Legacy Job API baseline mapping/i));
-    fireEvent.change(screen.getByLabelText(/^kd_xy$/i), { target: { value: "0.7" } });
-
     createExperiment();
 
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
-    expect(createSpy.mock.calls[0][0].baseline_parameters?.kd_xy).toBe(0.7);
+    expect(createSpy.mock.calls[0][0].baseline_parameters?.kd_xy).toBe(0.2);
   });
 
   it("preserves user input and surfaces a structured API failure", async () => {
-    vi.spyOn(apiClient, "createJob").mockRejectedValue(
+    const createSpy = vi.spyOn(apiClient, "createJob").mockRejectedValue(
       new ApiClientError("NETWORK_ERROR", "Backend is unreachable.", null, 0),
     );
-    renderPage();
-    fireEvent.change(screen.getByLabelText(/Experiment Name/i), {
-      target: { value: "keep-me" },
-    });
+    renderPage({ experimentName: "keep-me" });
     createExperiment();
 
-    expect(await screen.findByText(/Backend is unreachable/i)).toBeVisible();
-    expect(screen.getByLabelText(/Experiment Name/i)).toHaveValue("keep-me");
+    expect(await screen.findByText(/experiment could not be created.*NETWORK_ERROR/i)).toBeVisible();
+    expect(createSpy.mock.calls[0][0].display_name).toBe("keep-me");
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("keep-me");
     expect(navigateMock).not.toHaveBeenCalled();
   });
 });

@@ -183,7 +183,7 @@ it is never committed. The trusted public-key file is
 anchor only. Publishing and installation fail closed for absent, malformed,
 retired, or unknown signing keys.
 
-See [the signed runtime release guide](../docs/14-runtime-release.md) for the
+See [the manifest-signed runtime release guide](../docs/14-runtime-release.md) for the
 exact schema, one-time key setup, GitHub Release asset layout, self-hosted
 workflow, and installer trust model. The workflow is manual and defaults to a
 non-publishing verification run.

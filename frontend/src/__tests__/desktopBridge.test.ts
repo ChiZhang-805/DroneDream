@@ -571,8 +571,179 @@ describe("desktop bridge", () => {
 
     invoke.mockResolvedValueOnce({
       ...installSnapshot,
+      phase: "completed",
+      resumable: false,
+      installedVersion: null,
+    });
+    await expect(getRuntimeInstallProgress()).rejects.toThrow(/requires installedVersion/i);
+
+    invoke.mockResolvedValueOnce({
+      ...installSnapshot,
+      phase: "waitingForRestart",
+      resumable: false,
+      requiresRestart: true,
+    });
+    await expect(getRuntimeInstallProgress()).rejects.toThrow(/must be resumable/i);
+
+    invoke.mockResolvedValueOnce({
+      ...installSnapshot,
+      phase: "failed",
+      resumable: false,
+      error: {
+        code: "network_error",
+        message: "Retry later",
+        retryable: true,
+        diagnosticsPath: null,
+      },
+    });
+    await expect(getRuntimeInstallProgress()).rejects.toThrow(/must match error.retryable/i);
+
+    invoke.mockResolvedValueOnce({
+      ...installSnapshot,
       phase: "teleporting",
     });
     await expect(getRuntimeInstallProgress()).rejects.toThrow(/unknown value/i);
+  });
+
+  it("normalizes optional diagnostic paths and rejects unsafe native paths", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+    const failure = {
+      ...installSnapshot,
+      phase: "failed",
+      error: {
+        code: "runtime_service_unhealthy",
+        message: "The runtime API did not become healthy.",
+        retryable: true,
+      },
+    };
+
+    invoke.mockResolvedValueOnce(failure);
+    await expect(getRuntimeInstallProgress()).resolves.toMatchObject({
+      error: { diagnosticsPath: null },
+    });
+
+    invoke.mockResolvedValueOnce({
+      ...failure,
+      error: {
+        ...failure.error,
+        diagnosticsPath: "c:\\Users\\student\\AppData\\Local\\DroneDream\\diagnostics\\install.log",
+      },
+    });
+    await expect(getRuntimeInstallProgress()).resolves.toMatchObject({
+      error: {
+        diagnosticsPath:
+          "C:\\Users\\student\\AppData\\Local\\DroneDream\\diagnostics\\install.log",
+      },
+    });
+
+    invoke.mockResolvedValueOnce({
+      ...failure,
+      error: { ...failure.error, diagnosticsPath: "diagnostics\\install.log" },
+    });
+    await expect(getRuntimeInstallProgress()).rejects.toThrow(
+      /absolute local Windows path/i,
+    );
+
+    invoke.mockResolvedValueOnce({
+      ...failure,
+      error: { ...failure.error, diagnosticsPath: "C:\\Logs\\..\\secrets.txt" },
+    });
+    await expect(getRuntimeInstallProgress()).rejects.toThrow(/unsafe Windows path segment/i);
+
+    for (const diagnosticsPath of [
+      "C:\\Logs/../secrets.txt",
+      "C:\\Logs\\CON\\install.log",
+      "C:\\Logs\\nul.txt",
+      "C:\\Logs\\line\u2028break.log",
+      "C:\\Logs\\hidden\u202Etxt.log",
+    ]) {
+      invoke.mockResolvedValueOnce({
+        ...failure,
+        error: { ...failure.error, diagnosticsPath },
+      });
+      await expect(getRuntimeInstallProgress()).rejects.toThrow(
+        /absolute local Windows path|unsafe Windows path segment/i,
+      );
+    }
+  });
+
+  it("single-lines native multiline stderr without losing its error identity", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+    const diagnosticsPath =
+      "E:\\DroneDream.download-cache\\diagnostics\\runtime-health-test.log";
+    invoke.mockResolvedValueOnce({
+      ...installSnapshot,
+      phase: "failed",
+      error: {
+        code: "runtime_service_unhealthy",
+        message:
+          "curl: (7) connection failed\r\n\tretrying WSL\0API\x7f unavailable",
+        retryable: true,
+        diagnosticsPath,
+      },
+    });
+
+    const snapshot = await getRuntimeInstallProgress();
+
+    expect(snapshot.error).toEqual({
+      code: "runtime_service_unhealthy",
+      message: "curl: (7) connection failed retrying WSL API unavailable",
+      retryable: true,
+      diagnosticsPath,
+    });
+    expect([...snapshot.error!.message].every((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint > 0x1f && codePoint !== 0x7f;
+    })).toBe(true);
+  });
+
+  it("bounds long Unicode native errors by JavaScript UTF-16 length", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+    const diagnosticsPath =
+      "E:\\DroneDream.download-cache\\diagnostics\\runtime-health-unicode.log";
+    invoke.mockResolvedValueOnce({
+      ...installSnapshot,
+      phase: "failed",
+      error: {
+        code: "runtime_health_unknown",
+        message: `error: ${"🚁".repeat(3000)} unreachable suffix`,
+        retryable: true,
+        diagnosticsPath,
+      },
+    });
+
+    const snapshot = await getRuntimeInstallProgress();
+    const error = snapshot.error;
+
+    expect(error?.code).toBe("runtime_health_unknown");
+    expect(error?.diagnosticsPath).toBe(diagnosticsPath);
+    expect(error?.message).toHaveLength(4096);
+    expect(error?.message.endsWith("…")).toBe(true);
+    expect(error?.message).not.toContain("unreachable suffix");
+    const finalContentUnit = error?.message.charCodeAt(error.message.length - 2) ?? 0;
+    expect(finalContentUnit < 0xd800 || finalContentUnit > 0xdbff).toBe(true);
+  });
+
+  it("removes Unicode bidi and format controls from native errors", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+    invoke.mockResolvedValueOnce({
+      ...installSnapshot,
+      phase: "failed",
+      error: {
+        code: "runtime_health_unknown",
+        message: "safe\u202Egnp.exe\u2066 text\u200Bafter",
+        retryable: true,
+        diagnosticsPath: null,
+      },
+    });
+
+    const snapshot = await getRuntimeInstallProgress();
+
+    expect(snapshot.error?.message).toBe("safe gnp.exe text after");
+    expect(snapshot.error?.message).not.toMatch(/[\u202E\u2066\u200B]/u);
   });
 });

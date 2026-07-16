@@ -81,6 +81,11 @@ Known JSON artifacts are validated before persistence:
 - `scenario_config_json`, `controller_parameters_json`,
   `px4_parameters_input_json`, and `simulator_launch_config_json`: the complete
   input/launch evidence needed to reproduce an environment.
+- `scenario_effect_request_json` and `scenario_effect_evidence_json`: the
+  normalized physical-effect request and the launcher's validated application
+  evidence. Static box/cylinder obstacles have a bundled Gazebo EntityFactory
+  path; other requested effects require a site Runtime extension and fail
+  closed without evidence.
 - `simulator_runtime_manifest_json`: attempt identity plus requested/observed
   firmware, scenario-effect support, simulator profile, and timeout evidence.
 

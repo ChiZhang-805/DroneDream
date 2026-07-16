@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 
 import pytest
-
 from app import models, schemas
 from app.orchestration import constants
 from app.orchestration.cma_es_optimizer import propose_next_generation
@@ -243,3 +242,36 @@ def test_cma_es_supports_user_selected_px4_parameter_space():
     )
     assert proposal.parameters["MPC_TILTMAX_AIR"].is_integer()
     assert proposal.parameters["MC_AIRMODE"] == 1.0
+
+
+def test_cma_es_ignores_corrupt_scored_history_when_selecting_center() -> None:
+    baseline = dict(constants.BASELINE_PARAMETERS)
+    corrupt = _candidate(
+        cid="corrupt",
+        generation_index=1,
+        score=-100.0,
+        label="corrupt",
+        params={**baseline, "kp_xy": float("nan")},
+    )
+    proposal = propose_next_generation(
+        job=_make_job("job_corrupt_history"),
+        candidates=[corrupt],
+        safe_ranges=constants.PARAMETER_SAFE_RANGES,
+        baseline_parameters=baseline,
+        generation_index=2,
+    )
+
+    assert "center=baseline" in proposal.strategy
+    assert all(value == value for value in proposal.parameters.values())
+
+
+@pytest.mark.parametrize("generation", [True, -1])
+def test_cma_es_rejects_invalid_generation_index(generation: object) -> None:
+    with pytest.raises(ValueError):
+        propose_next_generation(
+            job=_make_job("job_invalid_generation"),
+            candidates=[],
+            safe_ranges=constants.PARAMETER_SAFE_RANGES,
+            baseline_parameters=dict(constants.BASELINE_PARAMETERS),
+            generation_index=generation,  # type: ignore[arg-type]
+        )

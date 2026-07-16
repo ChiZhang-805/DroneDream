@@ -8,9 +8,13 @@ from types import ModuleType
 import pytest
 
 
-def test_local_storage_roundtrip(tmp_path: Path) -> None:
+def test_local_storage_roundtrip(tmp_path: Path, monkeypatch) -> None:
+    from app.config import get_settings
     from app.storage.local import LocalArtifactStorage
 
+    monkeypatch.setenv("ARTIFACT_ROOT", str(tmp_path))
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    get_settings.cache_clear()
     f = tmp_path / "x.json"
     f.write_text('{"ok":true}', encoding="utf-8")
     storage = LocalArtifactStorage()
@@ -19,6 +23,9 @@ def test_local_storage_roundtrip(tmp_path: Path) -> None:
     assert uri == str(f.resolve())
     assert storage.exists(uri)
     assert storage.read_bytes(uri) == b'{"ok":true}'
+    with pytest.raises(ValueError, match="outside allowed roots"):
+        storage.read_bytes(str(tmp_path.parent / "outside.json"))
+    get_settings.cache_clear()
 
 
 def test_s3_storage_fake_client(monkeypatch) -> None:
@@ -111,8 +118,34 @@ def test_s3_storage_fake_client(monkeypatch) -> None:
     assert storage.presign_download(uri, expires_seconds=120) == (
         "https://objects.example/signed"
     )
+    with pytest.raises(s3_module.S3StorageConfigError, match="outside configured bucket"):
+        storage.read_bytes("s3://other/prefix/jobs/j1/a.txt")
+    with pytest.raises(s3_module.S3StorageConfigError, match="outside configured prefix"):
+        storage.delete("s3://bucket/other/jobs/j1/a.txt")
     storage.check_health()
     assert fake.health_checked is True
+
+    class _MissingObjectError(Exception):
+        response = {"Error": {"Code": "NoSuchKey"}}
+
+    class _MissingClient:
+        def head_object(self, **_kwargs):
+            raise _MissingObjectError
+
+    storage._client = _MissingClient()
+    assert storage.exists(uri) is False
+
+    class _UnavailableClient:
+        def head_object(self, **_kwargs):
+            raise RuntimeError("temporary S3 outage")
+
+    storage._client = _UnavailableClient()
+    with pytest.raises(RuntimeError, match="temporary S3 outage"):
+        storage.exists(uri)
+
+    for invalid_uri in ("s3://bucket/", "s3://bucket/key?versionId=secret"):
+        with pytest.raises(s3_module.S3StorageConfigError, match="Invalid s3 uri"):
+            s3_module._parse_s3_uri(invalid_uri)
 
     get_settings.cache_clear()
 

@@ -8,19 +8,22 @@ process — never inside a request handler.
 
 from __future__ import annotations
 
+import logging
 import math
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
+from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import CandidateEvaluation, evaluate_candidate
+from app.orchestration.aggregation import candidate_is_publishable
 from app.orchestration.events import record_event
 from app.parameters import (
     classify_airframe,
@@ -32,6 +35,8 @@ from app.parameters import (
     validate_search_selections,
 )
 from app.storage import get_artifact_storage
+
+logger = logging.getLogger(__name__)
 
 
 class JobServiceError(Exception):
@@ -260,10 +265,15 @@ def _create_job_from_config(
     persist_scenario_suite: bool | None = None,
 ) -> models.Job:
     now = _now()
+    experimental_optimizer = req.optimizer_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES
     if persist_objective_config is None:
-        persist_objective_config = "objective_config" in req.model_fields_set
+        persist_objective_config = (
+            "objective_config" in req.model_fields_set or experimental_optimizer
+        )
     if persist_scenario_suite is None:
-        persist_scenario_suite = "scenario_suite" in req.model_fields_set
+        persist_scenario_suite = (
+            "scenario_suite" in req.model_fields_set or experimental_optimizer
+        )
     llm_provider = req.llm.provider if req.llm is not None else (
         "openai" if req.openai is not None else None
     )
@@ -737,18 +747,65 @@ def create_batch(
     return batch
 
 
-def list_batches(db: Session, *, user: models.User | None = None) -> list[models.BatchJob]:
+def list_batches(
+    db: Session,
+    *,
+    user: models.User | None = None,
+    page: int,
+    page_size: int,
+) -> tuple[list[models.BatchJob], int]:
     resolved_user = _resolve_user(db, user)
     owner_filter = models.BatchJob.user_id == resolved_user.id
     if get_settings().auth_mode == "disabled":
         owner_filter = or_(owner_filter, models.BatchJob.user_id.is_(None))
-    return list(
+    total = int(
+        db.scalar(
+            select(func.count()).select_from(models.BatchJob).where(owner_filter)
+        )
+        or 0
+    )
+    items = list(
         db.scalars(
             select(models.BatchJob)
             .where(owner_filter)
-            .order_by(models.BatchJob.created_at.desc())
+            .order_by(models.BatchJob.created_at.desc(), models.BatchJob.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
         )
     )
+    return items, total
+
+
+def list_job_trials(
+    db: Session,
+    job_id: str,
+    *,
+    user: models.User | None = None,
+    page: int,
+    page_size: int,
+) -> tuple[list[models.Trial], int]:
+    """Return one deterministic, bounded page without loading all job trials."""
+
+    get_job(db, job_id, user=user)
+    trial_filter = models.Trial.job_id == job_id
+    total = int(
+        db.scalar(select(func.count()).select_from(models.Trial).where(trial_filter))
+        or 0
+    )
+    items = list(
+        db.scalars(
+            select(models.Trial)
+            .options(
+                selectinload(models.Trial.metric),
+                selectinload(models.Trial.candidate),
+            )
+            .where(trial_filter)
+            .order_by(models.Trial.created_at.asc(), models.Trial.id.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    )
+    return items, total
 
 
 def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
@@ -901,22 +958,25 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
                     continue
                 raw_path = Path(storage_path)
                 if ".." in raw_path.parts:
-                    raise JobServiceError(
-                        "ARTIFACT_PATH_FORBIDDEN",
-                        "Artifact path is outside allowed roots.",
-                        http_status=403,
+                    logger.warning(
+                        "skipping out-of-root artifact during job deletion; artifact_id=%s",
+                        artifact.id,
                     )
+                    continue
                 if not storage.exists(storage_path):
                     continue
                 storage.delete(storage_path)
             except JobServiceError:
                 raise
-            except ValueError as exc:
-                raise JobServiceError(
-                    "ARTIFACT_PATH_FORBIDDEN",
-                    f"Artifact path is outside allowed roots. artifact_id={artifact.id}",
-                    http_status=403,
-                ) from exc
+            except ValueError:
+                # A stale or corrupted DB row must never make us touch a path
+                # outside configured storage roots, nor hold the job hostage.
+                # Drop the metadata with the job while leaving that path alone.
+                logger.warning(
+                    "skipping forbidden artifact path during job deletion; artifact_id=%s",
+                    artifact.id,
+                )
+                continue
             except Exception as exc:
                 raise JobServiceError(
                     "ARTIFACT_DELETE_FAILED",
@@ -1047,12 +1107,27 @@ def to_job_schema(job: models.Job) -> schemas.Job:
 def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
     candidate = trial.candidate
     source_type: schemas.CandidateSourceType | None = None
+    candidate_optimizer_strategy: schemas.OptimizerStrategy | None = None
     if candidate is not None and candidate.source_type in {
         "baseline",
         "optimizer",
         "llm_optimizer",
     }:
         source_type = candidate.source_type  # type: ignore[assignment]
+    if candidate is not None and isinstance(candidate.optimizer_metadata_json, dict):
+        raw_strategy = candidate.optimizer_metadata_json.get(
+            "child_strategy",
+            candidate.optimizer_metadata_json.get("strategy"),
+        )
+        supported_strategies = {
+            "none",
+            "heuristic",
+            "gpt",
+            "cma_es",
+            *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+        }
+        if isinstance(raw_strategy, str) and raw_strategy in supported_strategies:
+            candidate_optimizer_strategy = raw_strategy  # type: ignore[assignment]
     return schemas.TrialSummary(
         id=trial.id,
         candidate_id=trial.candidate_id,
@@ -1063,6 +1138,7 @@ def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
         pass_flag=(trial.metric.pass_flag if trial.metric is not None else None),
         candidate_label=candidate.label if candidate is not None else None,
         candidate_source_type=source_type,
+        candidate_optimizer_strategy=candidate_optimizer_strategy,
         candidate_is_baseline=bool(candidate.is_baseline) if candidate is not None else False,
         candidate_is_best=bool(candidate.is_best) if candidate is not None else False,
         candidate_generation_index=(
@@ -1087,14 +1163,10 @@ def to_trial_schema(trial: models.Trial) -> schemas.Trial:
             pass_flag=m.pass_flag,
             instability_flag=m.instability_flag,
         )
+    summary = to_trial_summary(trial)
     return schemas.Trial(
-        id=trial.id,
+        **summary.model_dump(),
         job_id=trial.job_id,
-        candidate_id=trial.candidate_id,
-        seed=trial.seed,
-        scenario_type=trial.scenario_type,  # type: ignore[arg-type]
-        status=trial.status,  # type: ignore[arg-type]
-        score=m.score if m is not None else None,
         attempt_count=trial.attempt_count,
         worker_id=trial.worker_id,
         simulator_backend=trial.simulator_backend,
@@ -1204,7 +1276,11 @@ def _metric_sample(metric: models.TrialMetric) -> dict[str, float]:
         "instability_flag": float(metric.instability_flag),
     }
     for key, raw_value in (metric.raw_metric_json or {}).items():
-        if isinstance(raw_value, (bool, int, float)):
+        if (
+            key not in values
+            and isinstance(raw_value, (bool, int, float))
+            and math.isfinite(float(raw_value))
+        ):
             values[key] = float(raw_value)
     return values
 
@@ -1214,6 +1290,72 @@ def _candidate_evaluation(
     objective_config: schemas.ObjectiveConfig,
     scenario_suite: schemas.ScenarioSuiteConfig,
 ) -> CandidateEvaluation | None:
+    aggregate = candidate.aggregated_metric_json
+    if isinstance(aggregate, dict) and "objective_values" in aggregate:
+        raw_objectives = aggregate.get("objective_values")
+        objective_names = {objective.metric for objective in objective_config.objectives}
+
+        def _finite_mapping(raw: object) -> dict[str, float] | None:
+            if not isinstance(raw, dict):
+                return None
+            result: dict[str, float] = {}
+            for raw_key, raw_value in raw.items():
+                if (
+                    not isinstance(raw_key, str)
+                    or isinstance(raw_value, bool)
+                    or not isinstance(raw_value, int | float)
+                    or not math.isfinite(float(raw_value))
+                ):
+                    return None
+                result[raw_key] = float(raw_value)
+            return result
+
+        persisted_objectives = _finite_mapping(raw_objectives)
+        persisted_constraint_values = _finite_mapping(
+            aggregate.get("constraint_values", {})
+        )
+        persisted_violations = _finite_mapping(
+            aggregate.get("constraint_violations", {})
+        )
+        scalar_loss = aggregate.get("scalar_loss")
+        total_violation = aggregate.get("total_constraint_violation", 0.0)
+        feasible = aggregate.get("feasible")
+        raw_sample_count = aggregate.get(
+            "training_completed_trial_count",
+            candidate.completed_trial_count,
+        )
+        if (
+            persisted_objectives is None
+            or not objective_names.issubset(persisted_objectives)
+            or persisted_constraint_values is None
+            or persisted_violations is None
+            or not isinstance(feasible, bool)
+            or isinstance(scalar_loss, bool)
+            or not isinstance(scalar_loss, int | float)
+            or not math.isfinite(float(scalar_loss))
+            or isinstance(total_violation, bool)
+            or not isinstance(total_violation, int | float)
+            or not math.isfinite(float(total_violation))
+            or isinstance(raw_sample_count, bool)
+            or not isinstance(raw_sample_count, int | float)
+            or not math.isfinite(float(raw_sample_count))
+            or int(raw_sample_count) != float(raw_sample_count)
+            or int(raw_sample_count) < 0
+        ):
+            return None
+        return CandidateEvaluation(
+            objectives={
+                objective.metric: persisted_objectives[objective.metric]
+                for objective in objective_config.objectives
+            },
+            constraint_values=persisted_constraint_values,
+            violations=persisted_violations,
+            feasible=feasible,
+            total_violation=float(total_violation),
+            scalar_loss=float(scalar_loss),
+            sample_count=int(raw_sample_count),
+        )
+
     samples: list[dict[str, float]] = []
     weights: list[float] = []
     training_trials = [
@@ -1226,29 +1368,83 @@ def _candidate_evaluation(
     for case in scenario_suite.cases:
         if case.enabled:
             cases_by_type.setdefault(case.scenario_type, case)
+
+    def _resolved_case(
+        trial: models.Trial,
+    ) -> tuple[str, schemas.ScenarioCaseConfig | None]:
+        scenario_config = trial.scenario_config_json or {}
+        raw_case_id = scenario_config.get("scenario_case_id")
+        if raw_case_id is not None:
+            case_id = str(raw_case_id)
+            scenario_case = cases_by_id.get(case_id)
+            if scenario_case is not None:
+                return f"id:{case_id}", scenario_case
+            fallback_case = cases_by_type.get(trial.scenario_type)
+            if fallback_case is not None:
+                return f"id:{fallback_case.id}", fallback_case
+            return f"id:{case_id}", None
+        scenario_case = cases_by_type.get(trial.scenario_type)
+        if scenario_case is not None:
+            return f"id:{scenario_case.id}", scenario_case
+        return f"type:{trial.scenario_type}", None
+
+    dispatched_per_case = Counter(
+        _resolved_case(trial)[0] for trial in training_trials
+    )
+    grouped_trials: dict[
+        str, tuple[schemas.ScenarioCaseConfig | None, list[models.Trial]]
+    ] = {}
+    for trial in training_trials:
+        group_key, scenario_case = _resolved_case(trial)
+        if group_key not in grouped_trials:
+            grouped_trials[group_key] = (scenario_case, [])
+        grouped_trials[group_key][1].append(trial)
     for trial in candidate.trials:
         if trial.status != "COMPLETED" or trial.metric is None:
             continue
         if bool((trial.scenario_config_json or {}).get("holdout")):
             continue
         samples.append(_metric_sample(trial.metric))
-        scenario_config: dict[str, Any] = trial.scenario_config_json or {}
-        case_id = scenario_config.get("scenario_case_id") or scenario_config.get("_case_id")
-        scenario_case = cases_by_id.get(str(case_id)) if case_id is not None else None
-        if scenario_case is None:
-            scenario_case = cases_by_type.get(trial.scenario_type)
-        weights.append(scenario_case.weight if scenario_case is not None else 1.0)
+        group_key, scenario_case = _resolved_case(trial)
+        weights.append(
+            (float(scenario_case.weight) if scenario_case is not None else 1.0)
+            / dispatched_per_case[group_key]
+        )
     if not samples:
         return None
-    pass_rate = sum(sample.get("pass_flag", 0.0) for sample in samples) / max(
-        1, len(training_trials)
+    weight_total = sum(
+        float(scenario_case.weight) if scenario_case is not None else 1.0
+        for scenario_case, _case_trials in grouped_trials.values()
     )
-    failed_rate = sum(1 for trial in training_trials if trial.status == "FAILED") / max(
-        1, len(training_trials)
-    )
+    weighted_completion = 0.0
+    weighted_failure = 0.0
+    weighted_pass = 0.0
+    for scenario_case, case_trials in grouped_trials.values():
+        case_weight = (
+            float(scenario_case.weight) if scenario_case is not None else 1.0
+        )
+        denominator = len(case_trials)
+        weighted_completion += case_weight * sum(
+            trial.status == "COMPLETED" and trial.metric is not None
+            for trial in case_trials
+        ) / denominator
+        weighted_failure += case_weight * sum(
+            trial.status == "FAILED" for trial in case_trials
+        ) / denominator
+        weighted_pass += case_weight * sum(
+            trial.status == "COMPLETED"
+            and trial.metric is not None
+            and trial.metric.pass_flag
+            for trial in case_trials
+        ) / denominator
+    completion_rate = weighted_completion / weight_total
+    failed_rate = weighted_failure / weight_total
+    pass_rate = weighted_pass / weight_total
     for sample in samples:
+        sample["completion_rate"] = completion_rate
         sample["pass_rate"] = pass_rate
         sample["failed_trial_rate"] = failed_rate
+        sample["failure_rate"] = failed_rate
     try:
         return evaluate_candidate(samples, objective_config, sample_weights=weights)
     except ValueError:
@@ -1272,7 +1468,7 @@ def optimization_history(job: models.Job) -> schemas.OptimizationHistory:
     )
     for candidate in ordered_candidates:
         evaluation = _candidate_evaluation(candidate, objective_config, scenario_suite)
-        if evaluation is not None:
+        if evaluation is not None and candidate_is_publishable(candidate):
             pareto_points.append(
                 ParetoPoint(
                     id=candidate.id,
@@ -1290,6 +1486,11 @@ def optimization_history(job: models.Job) -> schemas.OptimizationHistory:
                 label=candidate.label,
                 parameters=dict(candidate.parameter_json or {}),
                 proposal_reason=candidate.proposal_reason,
+                optimizer_metadata=(
+                    dict(candidate.optimizer_metadata_json)
+                    if candidate.optimizer_metadata_json is not None
+                    else None
+                ),
                 parent_candidate_id=candidate.parent_candidate_id,
                 aggregated_score=candidate.aggregated_score,
                 aggregated_metrics=(

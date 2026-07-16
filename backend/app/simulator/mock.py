@@ -282,7 +282,9 @@ class MockSimulatorAdapter(SimulatorAdapter):
             except (TypeError, ValueError):
                 turbulence_penalty = 0.075
 
-        rng = random.Random(ctx.seed * 31 + sum(ord(c) for c in ctx.scenario_type))
+        rng = random.Random(  # noqa: S311 - deterministic simulator noise
+            ctx.seed * 31 + sum(ord(c) for c in ctx.scenario_type)
+        )
         jitter = rng.uniform(-0.04, 0.04)
 
         rmse = max(

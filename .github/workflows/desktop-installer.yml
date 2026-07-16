@@ -35,6 +35,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Verify release version consistency
         shell: pwsh
@@ -134,12 +136,12 @@ jobs:
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check
+          cargo fmt --all --manifest-path desktop/src-tauri/Cargo.toml -- --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo clippy --release --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # Release-profile tests reuse most compiled artifacts in the NSIS build.
-          cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml
+          cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify pinned NSIS template
@@ -268,6 +270,16 @@ jobs:
 
           $appProcess = $null
           $uninstaller = Join-Path $installDirFull "uninstall.exe"
+          # Ordinary desktop uninstall must preserve app-owned diagnostic state.
+          # The interactive "delete app data" checkbox is the only operation
+          # allowed to remove this bundle-owned directory. Runtime diagnostics
+          # live in the separately marker-owned download cache and are even
+          # further outside the uninstaller's ownership boundary.
+          $appDataRoot = Join-Path $env:LOCALAPPDATA "io.dronedream.desktop"
+          $diagnosticRoot = Join-Path $appDataRoot "diagnostics"
+          $diagnosticSentinel = Join-Path $diagnosticRoot "ci-uninstall-preserve.txt"
+          New-Item -ItemType Directory -Force -Path $diagnosticRoot | Out-Null
+          Set-Content -LiteralPath $diagnosticSentinel -Encoding utf8 -Value "preserve"
           try {
             $installProcess = Start-Process -FilePath $installer.FullName `
               -ArgumentList @("/S", "/D=$installDirFull") -Wait -PassThru
@@ -375,6 +387,10 @@ jobs:
           if (Test-Path -LiteralPath $installDirFull) {
             throw "Silent uninstaller left the installation directory behind: $installDirFull"
           }
+          if (-not (Test-Path -LiteralPath $diagnosticSentinel -PathType Leaf)) {
+            throw "Ordinary uninstall erased app diagnostic state without explicit consent"
+          }
+          Remove-Item -LiteralPath $appDataRoot -Recurse -Force
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

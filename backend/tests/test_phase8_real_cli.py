@@ -10,7 +10,12 @@ import time
 from pathlib import Path
 
 import pytest
-
+from app.simulator.artifact_schema import (
+    _MAX_REFERENCE_POINTS,
+    _MAX_TELEMETRY_SAMPLES,
+    validate_reference_track_payload,
+    validate_telemetry_payload,
+)
 from app.simulator.base import (
     FAILURE_ADAPTER_UNAVAILABLE,
     FAILURE_CANCELLED,
@@ -21,10 +26,13 @@ from app.simulator.base import (
 )
 from app.simulator.real_cli import (
     _MAX_KNOWN_JSON_ARTIFACT_BYTES,
+    _MAX_RESULT_ARTIFACTS,
+    _MAX_RESULT_BYTES,
     RealCliSimulatorAdapter,
     _build_command,
     _effective_timeout_seconds,
     _load_result_payload,
+    _parse_artifacts,
     _parse_metrics,
     _read_log_tail,
     _trial_input_payload,
@@ -249,6 +257,18 @@ def test_trial_input_payload_includes_advanced_scenario_config() -> None:
     )
     payload = _trial_input_payload(ctx, Path("/tmp/out.json"))
     assert payload["advanced_scenario_config"]["wind_gusts"]["enabled"] is True
+    effect_request = payload["scenario_effect_request"]
+    assert effect_request["schema_version"] == "dronedream.scenario_effect_request.v1"
+    assert effect_request["execution_identity"] == payload["execution_identity"]
+    assert [item["effect_id"] for item in effect_request["effects"]] == [
+        "wind_gusts"
+    ]
+    assert effect_request["effects"][0]["requested_value"] == {
+        "enabled": True,
+        "magnitude_mps": 1.2,
+        "direction_deg": 90.0,
+        "period_s": 5.0,
+    }
 
 
 def test_trial_input_payload_carries_vehicle_profile_and_real_px4_parameters() -> None:
@@ -501,6 +521,7 @@ def test_real_cli_timeout_scales_for_slow_simulation_with_bounded_multiplier() -
     assert _effective_timeout_seconds(300.0, 2.0) == 300.0
     assert _effective_timeout_seconds(300.0, 0.5) == 600.0
     assert _effective_timeout_seconds(300.0, 0.1) == 3_000.0
+    assert _effective_timeout_seconds(50_000.0, 0.1) == 86_400.0
     with pytest.raises(ValueError, match=r"\[0\.1, 100\]"):
         _effective_timeout_seconds(300.0, 0.01)
 
@@ -724,7 +745,78 @@ def test_result_loader_reports_decoder_recursion_as_contract_error(
         _load_result_payload(result_path)
 
 
-@pytest.mark.parametrize("timeout", ["0", "-1", "nan", "invalid"])
+def test_result_loader_bounds_actual_bytes_read(tmp_path: Path) -> None:
+    result_path = tmp_path / "trial_result.json"
+    result_path.write_bytes(b"{" + b" " * _MAX_RESULT_BYTES + b"}")
+    with pytest.raises(ValueError, match="byte contract limit"):
+        _load_result_payload(result_path)
+
+
+def test_result_contract_bounds_artifact_count_and_metadata_lengths() -> None:
+    artifact = {
+        "artifact_type": "worker_log",
+        "storage_path": "worker.log",
+    }
+    with pytest.raises(ValueError, match="cannot contain more"):
+        _parse_artifacts({"artifacts": [artifact] * (_MAX_RESULT_ARTIFACTS + 1)})
+    with pytest.raises(ValueError, match="artifact requires"):
+        _parse_artifacts(
+            {
+                "artifacts": [
+                    {
+                        "artifact_type": "x" * 33,
+                        "storage_path": "worker.log",
+                    }
+                ]
+            }
+        )
+    oversized_file = dict(artifact, file_size_bytes=2**63)
+    with pytest.raises(ValueError, match="signed 64-bit"):
+        _parse_artifacts({"artifacts": [oversized_file]})
+    with pytest.raises(ValueError, match="must be an array"):
+        _parse_artifacts({"artifacts": 0})
+    with pytest.raises(ValueError, match="display_name must be a string"):
+        _parse_artifacts({"artifacts": [dict(artifact, display_name=7)]})
+    with pytest.raises(ValueError, match="mime_type must be a string"):
+        _parse_artifacts({"artifacts": [dict(artifact, mime_type={})]})
+
+
+def test_known_artifact_schemas_bound_array_sizes_and_error_counts() -> None:
+    telemetry_errors = validate_telemetry_payload(
+        {
+            "schema_version": "dronedream.telemetry.v1",
+            "samples": [{}] * (_MAX_TELEMETRY_SAMPLES + 1),
+        }
+    )
+    assert telemetry_errors == [
+        f"telemetry samples[] cannot exceed {_MAX_TELEMETRY_SAMPLES} items"
+    ]
+    assert len(
+        validate_telemetry_payload(
+            {
+                "schema_version": "dronedream.telemetry.v1",
+                "samples": [None] * 1_000,
+            }
+        )
+    ) <= 101
+    assert validate_reference_track_payload(
+        {
+            "schema_version": "dronedream.reference_track.v1",
+            "reference_track": [],
+        }
+    ) == ["reference_track[] must not be empty"]
+    reference_errors = validate_reference_track_payload(
+        {
+            "schema_version": "dronedream.reference_track.v1",
+            "reference_track": [{}] * (_MAX_REFERENCE_POINTS + 1),
+        }
+    )
+    assert reference_errors == [
+        f"reference_track[] cannot exceed {_MAX_REFERENCE_POINTS} items"
+    ]
+
+
+@pytest.mark.parametrize("timeout", ["0", "-1", "nan", "invalid", "86401"])
 def test_real_cli_rejects_nonpositive_or_invalid_timeout(
     monkeypatch, tmp_path, timeout: str
 ) -> None:

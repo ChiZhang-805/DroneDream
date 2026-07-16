@@ -15,9 +15,13 @@ type Point3 = { x: number; y: number; z: number };
 const REMOTE_ARC_START: Point3 = { x: 0.5, y: 0.2, z: -5.5 };
 const REMOTE_ARC_CONTROL: Point3 = { x: -6.25, y: 0.2, z: -9 };
 const REMOTE_ARC_END: Point3 = { x: -8, y: -0.6, z: -4.5 };
-const REMOTE_ARC_SAMPLES = 160;
+// Dense arc-length sampling keeps the remote half-orbit visually uniform even
+// on high-refresh displays, where a coarse lookup table can expose tiny speed
+// changes between adjacent Bézier segments.
+const REMOTE_ARC_SAMPLES = 512;
 
 function clamp(value: number) {
+  if (!Number.isFinite(value)) return value === Number.POSITIVE_INFINITY ? 1 : 0;
   return Math.min(1, Math.max(0, value));
 }
 

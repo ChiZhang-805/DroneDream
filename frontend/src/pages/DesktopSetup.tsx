@@ -13,7 +13,6 @@ import {
   getRuntimeInstallPlan,
   isDesktopRuntime,
   probeRuntimeStatus,
-  probeSystemPrerequisites,
   repairRuntime,
   startRuntime,
   startRuntimeInstall,
@@ -32,7 +31,9 @@ import type {
 } from "../desktop/bridge";
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
+import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
+  clearRuntimeAutoStartFailure,
   isOverallDesktopReady,
   isRuntimeConfirmedMissing,
   isRuntimeFullyReady,
@@ -69,6 +70,11 @@ interface InstallState {
   snapshot: RuntimeInstallSnapshot | null;
   commandError: string | null;
   commandBusy: boolean;
+}
+
+interface LauncherFailureCopy {
+  titleKey: TranslationKey;
+  hintKey: TranslationKey;
 }
 
 interface InstallerHandoffState {
@@ -213,6 +219,19 @@ function isActiveInstall(snapshot: RuntimeInstallSnapshot | null): boolean {
   return snapshot !== null && ACTIVE_INSTALL_PHASES.has(snapshot.phase);
 }
 
+function runtimeInstallPercent(
+  downloaded: number,
+  total: number | null,
+): number | null {
+  if (
+    total === null ||
+    !Number.isFinite(total) ||
+    total <= 0 ||
+    !Number.isFinite(downloaded)
+  ) return null;
+  return Math.max(0, Math.min(100, Math.round((downloaded / total) * 100)));
+}
+
 function replaceIssues(
   current: ProbeIssue[],
   sources: ProbeIssueSource[],
@@ -231,6 +250,28 @@ function probeIssue(
   reason: unknown,
 ): ProbeIssue {
   return { source, command, message: errorMessage(reason) };
+}
+
+function runtimeHealthFailureCopy(code: string | undefined): LauncherFailureCopy | null {
+  switch (code) {
+    case "runtime_service_unhealthy":
+      return {
+        titleKey: "launcher.error.runtimeServiceTitle",
+        hintKey: "launcher.error.runtimeServiceHint",
+      };
+    case "runtime_host_connectivity":
+      return {
+        titleKey: "launcher.error.hostConnectivityTitle",
+        hintKey: "launcher.error.hostConnectivityHint",
+      };
+    case "runtime_health_unknown":
+      return {
+        titleKey: "launcher.error.healthUnknownTitle",
+        hintKey: "launcher.error.healthUnknownHint",
+      };
+    default:
+      return null;
+  }
 }
 
 export function DesktopSetup() {
@@ -325,8 +366,19 @@ export function DesktopSetup() {
       !isRuntimeFullyReady(state.runtime)
       ? state.runtime.diagnostics.join("\n") || t("desktop.runtimeNeedsRepair")
       : null,
+    installState.snapshot?.phase === "completed" &&
+      state.prerequisitesFresh &&
+      state.runtimeFresh &&
+      !localRuntimeReady
+      ? t("desktop.installCompletionUnconfirmed")
+      : null,
   ].filter((detail): detail is string => Boolean(detail));
-  const launcherErrorFingerprint = launcherErrorDetails.join("\n");
+  const runtimeInstallError = installState.snapshot?.error ?? null;
+  const runtimeHealthCopy = runtimeHealthFailureCopy(runtimeInstallError?.code);
+  const launcherErrorFingerprint = [
+    ...launcherErrorDetails,
+    runtimeInstallError?.diagnosticsPath,
+  ].filter((detail): detail is string => Boolean(detail)).join("\n");
   const launcherErrorVisible = launcherErrorFingerprint.length > 0 &&
     dismissedLauncherError !== launcherErrorFingerprint;
   const requestedFeature = searchParams.get("required");
@@ -334,9 +386,7 @@ export function DesktopSetup() {
     ? t("runtimeGate.featureExperiment")
     : requestedFeature === "job"
       ? t("runtimeGate.featureJob")
-      : requestedFeature === "batch"
-        ? t("runtimeGate.featureBatch")
-        : null;
+      : null;
 
   useEffect(() => {
     componentMounted.current = true;
@@ -358,7 +408,7 @@ export function DesktopSetup() {
     }));
 
     const [prerequisites, runtime] = await Promise.allSettled([
-      probeSystemPrerequisites(),
+      probeSystemPrerequisitesWithStartupGrace(),
       probeRuntimeStatus(),
     ]);
     if (requestId.current !== currentRequest) return;
@@ -592,12 +642,14 @@ export function DesktopSetup() {
     setRuntimeCommandBusy(true);
     try {
       const runtime = action === "start" ? await startRuntime() : await repairRuntime();
+      if (isRuntimeFullyReady(runtime)) clearRuntimeAutoStartFailure();
       setState((current) => ({
         ...current,
         runtime,
         runtimeFresh: true,
         issues: replaceIssues(current.issues, ["runtime"], []),
       }));
+      await refreshRuntimeAccess();
     } catch (error) {
       setRuntimeCommandError(
         `${action === "start" ? "start_runtime" : "repair_runtime"}: ${errorMessage(error)}`,
@@ -605,7 +657,7 @@ export function DesktopSetup() {
     } finally {
       setRuntimeCommandBusy(false);
     }
-  }, [desktopAvailable, runtimeCommandBusy]);
+  }, [desktopAvailable, refreshRuntimeAccess, runtimeCommandBusy]);
 
   const pollingOperationId = installState.snapshot?.operationId;
   const pollingPhase = installState.snapshot?.phase;
@@ -1134,8 +1186,9 @@ export function DesktopSetup() {
                 </button>
               </div>
             ) : null}
-            {(showInstallPlanner && state.plan) ||
-            (installState.snapshot && installState.snapshot.phase !== "idle") ? (
+            {installState.snapshot?.phase !== "completed" &&
+            ((showInstallPlanner && state.plan) ||
+              (installState.snapshot && installState.snapshot.phase !== "idle")) ? (
               !installActive ? (
                 <RuntimeInstallControls
                   launcherMode
@@ -1260,7 +1313,10 @@ export function DesktopSetup() {
 
         {launcherErrorVisible ? (
           <LauncherErrorDialog
+            title={t(runtimeHealthCopy?.titleKey ?? "launcher.errorTitle")}
+            hint={t(runtimeHealthCopy?.hintKey ?? "launcher.errorHint")}
             details={launcherErrorDetails}
+            diagnosticsPath={runtimeInstallError?.diagnosticsPath ?? null}
             expanded={launcherErrorExpanded}
             busy={busy}
             onToggleDetails={() => setLauncherErrorExpanded((current) => !current)}
@@ -2220,15 +2276,16 @@ function RuntimeLauncherHero({
   const active = isActiveInstall(snapshot);
   const total = snapshot?.bytesTotal ?? null;
   const downloaded = snapshot?.bytesDownloaded ?? 0;
-  const percent = total && total > 0
-    ? Math.min(100, Math.round((downloaded / total) * 100))
-    : ready || phase === "completed"
-      ? 100
-      : null;
+  const measuredPercent = runtimeInstallPercent(downloaded, total);
+  const percent = measuredPercent ?? (ready || phase === "completed" ? 100 : null);
   const status = ready
     ? t("launcher.status.ready")
-    : commandBusy
+    : commandBusy && active
       ? t("launcher.status.pausing")
+      : commandBusy
+        ? t("launcher.status.queued")
+      : phase === "completed"
+        ? t("launcher.status.healthChecking")
       : (checking || automaticStartPending) && phase === "idle"
         ? t("launcher.status.checking")
         : t(LAUNCHER_STATUS_KEYS[phase]);
@@ -2242,7 +2299,14 @@ function RuntimeLauncherHero({
       </div>
 
       <div className="launcher-progress-panel" role="status" aria-live="polite">
-        <div className={`launcher-progress-track${percent === null && (active || checking) ? " indeterminate" : ""}`}>
+        <div
+          className={`launcher-progress-track${percent === null && (active || checking) ? " indeterminate" : ""}`}
+          role="progressbar"
+          aria-label={t("desktop.downloadProgress")}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent ?? undefined}
+        >
           <span style={{ width: `${percent ?? 0}%` }} />
         </div>
         <div className="launcher-progress-footer">
@@ -2272,7 +2336,10 @@ function RuntimeLauncherHero({
 }
 
 function LauncherErrorDialog({
+  title,
+  hint,
   details,
+  diagnosticsPath,
   expanded,
   busy,
   onToggleDetails,
@@ -2280,7 +2347,10 @@ function LauncherErrorDialog({
   onCancelAutomatic,
   onDismiss,
 }: {
+  title: string;
+  hint: string;
   details: string[];
+  diagnosticsPath: string | null;
   expanded: boolean;
   busy: boolean;
   onToggleDetails: () => void;
@@ -2289,17 +2359,105 @@ function LauncherErrorDialog({
   onDismiss: () => void;
 }) {
   const { t } = useI18n();
+  const dialogRef = useRef<HTMLElement>(null);
+  const onDismissRef = useRef(onDismiss);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  useEffect(() => {
+    setCopyStatus("idle");
+  }, [diagnosticsPath]);
+
+  const copyDiagnosticsPath = useCallback(async () => {
+    if (!diagnosticsPath) return;
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
+      await navigator.clipboard.writeText(diagnosticsPath);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+  }, [diagnosticsPath]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const focusFrame = requestAnimationFrame(() => {
+      dialogRef.current?.querySelector<HTMLElement>("button:not(:disabled)")?.focus();
+    });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onDismissRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), '
+          + 'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      )].filter((element) => !element.hasAttribute("hidden"));
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
+  }, []);
+
   return (
     <div className="launcher-error-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="launcher-error-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="launcher-error-title"
       >
         <div className="launcher-error-symbol" aria-hidden="true">!</div>
-        <h2 id="launcher-error-title">{t("launcher.errorTitle")}</h2>
-        <p>{t("launcher.errorHint")}</p>
+        <h2 id="launcher-error-title">{title}</h2>
+        <p>{hint}</p>
+        {diagnosticsPath ? (
+          <div className="launcher-error-log-path">
+            <span>{t("launcher.diagnosticsPath")}</span>
+            <code>{diagnosticsPath}</code>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void copyDiagnosticsPath()}
+            >
+              {t("launcher.copyDiagnosticsPath")}
+            </button>
+            <span className="launcher-copy-status" role="status" aria-live="polite">
+              {copyStatus === "copied"
+                ? t("launcher.diagnosticsPathCopied")
+                : copyStatus === "failed"
+                  ? t("launcher.diagnosticsPathCopyFailed")
+                  : ""}
+            </span>
+          </div>
+        ) : null}
         {expanded ? (
           <pre className="launcher-error-details">{details.join("\n\n")}</pre>
         ) : null}
@@ -2399,9 +2557,7 @@ function RuntimeInstallControls({
     Boolean(snapshot?.resumable || snapshot?.error?.retryable);
   const total = snapshot?.bytesTotal ?? null;
   const downloaded = snapshot?.bytesDownloaded ?? 0;
-  const percent = total && total > 0
-    ? Math.min(100, Math.round((downloaded / total) * 100))
-    : null;
+  const percent = runtimeInstallPercent(downloaded, total);
   const currentProgressIndex = INSTALL_PROGRESS_PHASES.indexOf(phase);
   const automaticStartWillRun =
     automaticStartPending && !automaticStartUncertain;

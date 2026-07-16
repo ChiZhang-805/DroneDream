@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -11,51 +11,83 @@ import {
 } from "../types/api";
 import { SectionCard } from "../components/SectionCard";
 import { StatusBadge } from "../components/StatusBadge";
+import { statusTranslationKey } from "../components/statusLabels";
 import { type Column } from "../components/DataTable";
 import { Loading, ErrorState } from "../components/States";
 import { RuntimeAccessNotice } from "../components/RuntimeAccessNotice";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useI18n } from "../i18n/I18nProvider";
+import type { TranslationKey } from "../i18n/I18nProvider";
 import { formatDateTime } from "../utils/format";
+import { openAppSettings } from "../appSettings";
 
-const COLUMNS: Column<Job>[] = [
+type Translator = ReturnType<typeof useI18n>["t"];
+
+const TRACK_LABELS: Record<TrackType, TranslationKey> = {
+  circle: "wizard.track.circle",
+  u_turn: "wizard.track.uTurn",
+  lemniscate: "wizard.track.lemniscate",
+  custom: "wizard.track.custom",
+};
+
+const OBJECTIVE_LABELS: Record<ObjectiveProfile, TranslationKey> = {
+  stable: "wizard.objective.stable",
+  fast: "wizard.objective.fast",
+  smooth: "wizard.objective.smooth",
+  robust: "wizard.objective.robust",
+  custom: "wizard.objective.custom",
+};
+
+const DELETABLE_JOB_STATUSES: ReadonlySet<JobStatus> = new Set([
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+]);
+
+function buildColumns(t: Translator): Column<Job>[] {
+  return [
   {
     key: "id",
-    header: "Job ID",
+    header: t("history.jobId"),
     render: (j) => (
       <Link to={`/jobs/${j.id}`}>
         <code>{j.id}</code>
       </Link>
     ),
   },
-  { key: "track_type", header: "Track Type", render: (j) => j.track_type },
+  {
+    key: "track_type",
+    header: t("history.trackType"),
+    render: (j) => t(TRACK_LABELS[j.track_type]),
+  },
   {
     key: "objective_profile",
-    header: "Objective Profile",
-    render: (j) => j.objective_profile,
+    header: t("history.objectiveProfile"),
+    render: (j) => t(OBJECTIVE_LABELS[j.objective_profile]),
   },
   {
     key: "status",
-    header: "Status",
+    header: t("history.status"),
     render: (j) => <StatusBadge status={j.status} />,
   },
   {
     key: "created_at",
-    header: "Created At",
+    header: t("history.createdAt"),
     render: (j) => formatDateTime(j.created_at),
   },
   {
     key: "updated_at",
-    header: "Updated At",
+    header: t("history.updatedAt"),
     render: (j) => formatDateTime(j.updated_at),
   },
   {
     key: "action",
-    header: "Action",
+    header: t("history.action"),
     align: "right",
-    render: (j) => <Link to={`/jobs/${j.id}`}>View</Link>,
+    render: (j) => <Link to={`/jobs/${j.id}`}>{t("history.view")}</Link>,
   },
-];
+  ];
+}
 
 export function History() {
   const queryClient = useQueryClient();
@@ -74,7 +106,50 @@ export function History() {
   const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const terminal = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
+  const deleteCancelRef = useRef<HTMLButtonElement>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const columns = useMemo(() => buildColumns(t), [t]);
+
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    deleteCancelRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
+    };
+  }, [deleteTarget]);
+
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isDeleting) {
+        setDeleteTarget(null);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(deleteDialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? []);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [deleteTarget, isDeleting]);
+
   async function saveName(job: Job, rawName: string) {
     const nextName = rawName.trim();
     setSaveError(null);
@@ -83,7 +158,7 @@ export function History() {
       setEditingId(null);
       await query.refetch();
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Failed to save job name");
+      setSaveError(e instanceof Error ? e.message : t("history.saveFailed"));
     }
   }
 
@@ -120,7 +195,7 @@ export function History() {
       await query.refetch();
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : "Failed to delete job");
+      setDeleteError(e instanceof Error ? e.message : t("history.deleteFailed"));
     } finally {
       setIsDeleting(false);
     }
@@ -130,25 +205,26 @@ export function History() {
     <section className="stack-md">
       <header className="page-header">
         <div>
-          <h1>History / Reports</h1>
+          <h1>{t("history.title")}</h1>
           <p className="page-header-subtitle">
-            Every job you have created, filterable by status, track, and
-            objective.
+            {t("history.subtitle")}
           </p>
         </div>
         <div className="page-header-actions">
           {runtimeAccess.canUseRuntime ? (
             <Link to="/jobs/new" className="btn btn-primary">
-              + New Job
+              {t("history.newJob")}
             </Link>
-          ) : runtimeAccess.status === "checking" ? (
+          ) : runtimeAccess.status === "checking" || runtimeAccess.status === "starting" ? (
             <button type="button" className="btn btn-primary" disabled>
-              {t("runtimeGate.checkingShort")}
+              {runtimeAccess.status === "starting"
+                ? t("runtimeGate.startingShort")
+                : t("runtimeGate.checkingShort")}
             </button>
           ) : (
-            <Link to="/desktop/setup" className="btn btn-primary">
+            <button type="button" className="btn btn-primary" onClick={openAppSettings}>
               {t("runtimeGate.openSetup")}
-            </Link>
+            </button>
           )}
         </div>
       </header>
@@ -157,10 +233,10 @@ export function History() {
         <RuntimeAccessNotice page="history" />
       ) : (
         <>
-      <SectionCard title="Filters">
+      <SectionCard title={t("history.filters")}>
         <div className="filter-bar">
           <div className="form-field">
-            <label htmlFor="filter-status">Status</label>
+            <label htmlFor="filter-status">{t("history.status")}</label>
             <select
               id="filter-status"
               value={statusFilter}
@@ -168,16 +244,16 @@ export function History() {
                 setStatusFilter(e.target.value as JobStatus | "ALL")
               }
             >
-              <option value="ALL">All</option>
+              <option value="ALL">{t("history.all")}</option>
               {JOB_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {t(statusTranslationKey(s))}
                 </option>
               ))}
             </select>
           </div>
           <div className="form-field">
-            <label htmlFor="filter-track">Track Type</label>
+            <label htmlFor="filter-track">{t("history.trackType")}</label>
             <select
               id="filter-track"
               value={trackFilter}
@@ -185,16 +261,16 @@ export function History() {
                 setTrackFilter(e.target.value as TrackType | "ALL")
               }
             >
-              <option value="ALL">All</option>
-              {TRACK_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              <option value="ALL">{t("history.all")}</option>
+              {TRACK_TYPES.map((track) => (
+                <option key={track} value={track}>
+                  {t(TRACK_LABELS[track])}
                 </option>
               ))}
             </select>
           </div>
           <div className="form-field">
-            <label htmlFor="filter-objective">Objective</label>
+            <label htmlFor="filter-objective">{t("history.objective")}</label>
             <select
               id="filter-objective"
               value={objectiveFilter}
@@ -202,10 +278,10 @@ export function History() {
                 setObjectiveFilter(e.target.value as ObjectiveProfile | "ALL")
               }
             >
-              <option value="ALL">All</option>
+              <option value="ALL">{t("history.all")}</option>
               {OBJECTIVE_PROFILES.map((p) => (
                 <option key={p} value={p}>
-                  {p}
+                  {t(OBJECTIVE_LABELS[p])}
                 </option>
               ))}
             </select>
@@ -219,12 +295,12 @@ export function History() {
               setObjectiveFilter("ALL");
             }}
           >
-            Clear filters
+            {t("history.clearFilters")}
           </button>
         </div>
       </SectionCard>
 
-      <SectionCard title="Jobs">
+      <SectionCard title={t("history.jobs")}>
         {saveError ? <ErrorState description={saveError} /> : null}
         <div style={{ marginBottom: 12 }}>
           <button
@@ -235,17 +311,17 @@ export function History() {
               navigate(`/compare?job_ids=${encodeURIComponent(selectedIds.join(","))}`)
             }
           >
-            Compare selected ({selectedIds.length})
+            {t("history.compareSelected", { count: selectedIds.length })}
           </button>
         </div>
         {query.isLoading ? (
-          <Loading label="Loading jobs…" />
+          <Loading label={t("history.loading")} />
         ) : query.isError ? (
           <ErrorState
             description={
               query.error instanceof ApiClientError
                 ? query.error.message
-                : "Failed to load jobs."
+                : t("history.loadFailed")
             }
             action={
               <button
@@ -253,18 +329,19 @@ export function History() {
                 type="button"
                 onClick={() => query.refetch()}
               >
-                Retry
+                {t("history.retry")}
               </button>
             }
           />
         ) : (
+          <div className="data-table-wrapper">
           <table className="data-table history-table-centered">
             <thead>
               <tr>
-                <th>Select</th>
-                <th>Job Name</th>
-                {COLUMNS.map((c) => <th key={String(c.key)}>{c.header}</th>)}
-                <th>Delete</th>
+                <th>{t("history.select")}</th>
+                <th>{t("history.jobName")}</th>
+                {columns.map((c) => <th key={String(c.key)}>{c.header}</th>)}
+                <th>{t("history.delete")}</th>
               </tr>
             </thead>
             <tbody>
@@ -272,9 +349,10 @@ export function History() {
                 <tr key={j.id}>
                   <td>
                     <input
-                      aria-label={`select-${j.id}`}
+                      aria-label={t("history.selectJob", { id: j.id })}
                       type="checkbox"
                       checked={selectedIds.includes(j.id)}
+                      disabled={selectedIds.length >= 10 && !selectedIds.includes(j.id)}
                       onChange={(e) =>
                         setSelectedIds((prev) =>
                           e.target.checked
@@ -288,48 +366,57 @@ export function History() {
                     <div className="history-job-name-cell">
                     {editingId === j.id ? (
                       <>
-                        <input aria-label={`job-name-${j.id}`} value={editingNames[j.id] ?? (j.display_name ?? "")} onChange={(e) => setEditingNames((prev) => ({ ...prev, [j.id]: e.target.value }))} />
-                        <button type="button" className="btn btn-ghost" onClick={() => void saveName(j, editingNames[j.id] ?? (j.display_name ?? ""))}>Save</button>
-                        <button type="button" className="btn btn-ghost" onClick={() => { setEditingId(null); setEditingNames((prev) => ({ ...prev, [j.id]: j.display_name ?? "" })); }}>Cancel</button>
+                        <input aria-label={t("history.jobNameFor", { id: j.id })} value={editingNames[j.id] ?? (j.display_name ?? "")} onChange={(e) => setEditingNames((prev) => ({ ...prev, [j.id]: e.target.value }))} />
+                        <button type="button" className="btn btn-ghost" onClick={() => void saveName(j, editingNames[j.id] ?? (j.display_name ?? ""))}>{t("history.save")}</button>
+                        <button type="button" className="btn btn-ghost" onClick={() => { setEditingId(null); setEditingNames((prev) => ({ ...prev, [j.id]: j.display_name ?? "" })); }}>{t("history.cancel")}</button>
                       </>
                     ) : (
                       <>
-                        <span>{j.display_name?.trim() || "Unnamed"}</span>
-                        <button type="button" className="btn btn-ghost" onClick={() => setEditingId(j.id)}>Edit</button>
+                        <span>{j.display_name?.trim() || t("history.unnamed")}</span>
+                        <button type="button" className="btn btn-ghost" onClick={() => setEditingId(j.id)}>{t("history.edit")}</button>
                       </>
                     )}
                     </div>
                   </td>
-                  {COLUMNS.map((c) => (
+                  {columns.map((c) => (
                     <td key={String(c.key)}>{c.render(j)}</td>
                   ))}
                   <td>
                     <button
                       type="button"
                       className="btn btn-danger"
-                      disabled={!terminal.has(j.status)}
-                      title={!terminal.has(j.status) ? "active job cannot be deleted" : "Delete job"}
-                      onClick={() => setDeleteTarget(j)}
+                      disabled={!DELETABLE_JOB_STATUSES.has(j.status)}
+                      title={!DELETABLE_JOB_STATUSES.has(j.status) ? t("history.activeCannotDelete") : t("history.deleteJob")}
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeleteTarget(j);
+                      }}
                     >
-                      Delete
+                      {t("history.delete")}
                     </button>
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 3}>{t("history.empty")}</td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
+          </div>
         )}
       </SectionCard>
       {deleteTarget ? (
         <div className="confirm-dialog-backdrop" role="presentation">
-          <div className="confirm-dialog-card" role="dialog" aria-modal="true" aria-labelledby="delete-job-dialog-title">
-            <h3 id="delete-job-dialog-title">确认删除 job</h3>
-            <p>将删除 {deleteTarget.display_name?.trim() || deleteTarget.id} 及其相关文件，且不可恢复。</p>
+          <div ref={deleteDialogRef} className="confirm-dialog-card" role="dialog" aria-modal="true" aria-labelledby="delete-job-dialog-title">
+            <h3 id="delete-job-dialog-title">{t("history.confirmDeleteTitle")}</h3>
+            <p>{t("history.confirmDeleteBody", { name: deleteTarget.display_name?.trim() || deleteTarget.id })}</p>
             {deleteError ? <p className="form-error">{deleteError}</p> : null}
             <div className="confirm-dialog-actions">
-              <button type="button" className="btn btn-ghost" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>取消</button>
+              <button ref={deleteCancelRef} type="button" className="btn btn-ghost" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>{t("history.cancel")}</button>
               <button type="button" className="btn btn-danger" onClick={() => void confirmDelete()} disabled={isDeleting}>
-                {isDeleting ? "删除中..." : "确定删除"}
+                {isDeleting ? t("history.deleting") : t("history.confirmDelete")}
               </button>
             </div>
           </div>

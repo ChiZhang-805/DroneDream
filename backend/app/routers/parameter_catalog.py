@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Annotated, Literal, cast
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StrictFloat, StrictInt
 
 from app.parameters import (
@@ -34,6 +34,7 @@ from app.response import ok
 
 router = APIRouter(prefix="/parameter-catalog", tags=["parameter-catalog"])
 NumberInput = StrictInt | StrictFloat
+ChoiceInput = Annotated[str, Field(max_length=128)] | NumberInput
 
 
 class SearchSelectionInput(BaseModel):
@@ -51,9 +52,9 @@ class SearchSelectionInput(BaseModel):
     # Compatibility with the Job.parameter_space contract. These fields are
     # preserved for UI round-tripping while the catalog owns type and safety.
     step: NumberInput | None = None
-    scale: str | None = None
-    value_type: str | None = None
-    choices: list[str | NumberInput] | None = None
+    scale: Literal["linear", "log"] | None = None
+    value_type: Literal["float", "integer", "boolean", "enum"] | None = None
+    choices: list[ChoiceInput] | None = Field(default=None, max_length=128)
     enabled: bool = True
     locked: bool = False
 
@@ -83,13 +84,13 @@ def _bad_catalog_request(exc: ValueError) -> HTTPException:
 
 @router.get("")
 def read_parameter_catalog(
-    px4_version: str = Query(default="main"),
-    vehicle_type: str = Query(default="multicopter"),
-    airframe: str = Query(default="x500"),
-    group: str | None = Query(default=None),
-    control_loop: str | None = Query(default=None),
-    axis: str | None = Query(default=None),
-    risk: str | None = Query(default=None),
+    px4_version: str = Query(default="main", min_length=1, max_length=64),
+    vehicle_type: str = Query(default="multicopter", min_length=1, max_length=64),
+    airframe: str = Query(default="x500", min_length=1, max_length=128),
+    group: str | None = Query(default=None, max_length=64),
+    control_loop: str | None = Query(default=None, max_length=64),
+    axis: str | None = Query(default=None, max_length=64),
+    risk: str | None = Query(default=None, max_length=64),
 ) -> dict[str, object]:
     """List the versioned multicopter catalog, optionally filtered by group."""
 
@@ -110,9 +111,9 @@ def read_parameter_catalog(
 
 @router.get("/groups")
 def read_parameter_groups(
-    px4_version: str = Query(default="main"),
-    vehicle_type: str = Query(default="multicopter"),
-    airframe: str = Query(default="x500"),
+    px4_version: str = Query(default="main", min_length=1, max_length=64),
+    vehicle_type: str = Query(default="multicopter", min_length=1, max_length=64),
+    airframe: str = Query(default="x500", min_length=1, max_length=128),
 ) -> dict[str, object]:
     """Return UI group metadata and recommended inside-out tuning order."""
 
@@ -127,8 +128,7 @@ def read_parameter_groups(
             "catalog_version": CATALOG_VERSION,
             "source": CATALOG_SOURCE,
             "source_url": (
-                "https://docs.px4.io/"
-                f"{normalized_version}/en/advanced_config/parameter_reference"
+                f"https://docs.px4.io/{normalized_version}/en/advanced_config/parameter_reference"
             ),
             "px4_version": normalized_version,
             "supported_px4_versions": list(SUPPORTED_PX4_VERSIONS),
@@ -155,9 +155,9 @@ def read_parameter_groups(
 
 @router.get("/presets")
 def read_tuning_presets(
-    px4_version: str = Query(default="main"),
-    vehicle_type: str = Query(default="multicopter"),
-    airframe: str = Query(default="x500"),
+    px4_version: str = Query(default="main", min_length=1, max_length=64),
+    vehicle_type: str = Query(default="multicopter", min_length=1, max_length=64),
+    airframe: str = Query(default="x500", min_length=1, max_length=128),
 ) -> dict[str, object]:
     """Return ordered, catalog-compatible starting points for guided tuning."""
 
@@ -201,9 +201,7 @@ def validate_parameter_search_space(
         )
         normalized_names = [selection.name.strip().upper() for selection in request.selections]
         enabled_names = {
-            selection.name.strip().upper()
-            for selection in request.selections
-            if selection.enabled
+            selection.name.strip().upper() for selection in request.selections if selection.enabled
         }
         enabled_selection_by_name = {
             selection.name.strip().upper(): selection
@@ -308,10 +306,16 @@ def validate_parameter_search_space(
                 counterpart_max = (
                     counterpart.initial_value if counterpart.locked else counterpart.search_max
                 )
-                assert selection_min is not None
-                assert selection_max is not None
-                assert counterpart_min is not None
-                assert counterpart_max is not None
+                if (
+                    selection_min is None
+                    or selection_max is None
+                    or counterpart_min is None
+                    or counterpart_max is None
+                ):
+                    # Base selection validation already reports the missing
+                    # range. Coupling analysis must not turn that user error
+                    # into an assertion-driven HTTP 500.
+                    continue
                 less_equal = dependency.kind == "less_than_or_equal"
                 impossible = (less_equal and selection_min > counterpart_max) or (
                     not less_equal and selection_max < counterpart_min
@@ -416,10 +420,10 @@ def validate_parameter_search_space(
 
 @router.get("/{parameter_name}")
 def read_parameter(
-    parameter_name: str,
-    px4_version: str = Query(default="main"),
-    vehicle_type: str = Query(default="multicopter"),
-    airframe: str = Query(default="x500"),
+    parameter_name: str = Path(min_length=1, max_length=32),
+    px4_version: str = Query(default="main", min_length=1, max_length=64),
+    vehicle_type: str = Query(default="multicopter", min_length=1, max_length=64),
+    airframe: str = Query(default="x500", min_length=1, max_length=128),
 ) -> dict[str, object]:
     """Read one catalog entry by its real PX4 parameter name."""
 

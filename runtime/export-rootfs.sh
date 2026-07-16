@@ -8,6 +8,17 @@ output=${3:?usage: export-rootfs.sh IMAGE SMOKE_REPORT OUTPUT_TAR}
 max_bytes=$((12 * 1024 * 1024 * 1024))
 work=$(mktemp -d)
 container=
+partial="$output.partial"
+
+# Release artifacts are immutable.  Refuse stale or operator-supplied paths
+# before Docker is touched; silently replacing a tarball or one of its
+# integrity sidecars could make smoke evidence describe different bytes.
+for artifact in "$output" "$partial" "$output.sha256" "$output.manifest.json"; do
+  if [[ -e "$artifact" || -L "$artifact" ]]; then
+    echo "release export refuses to overwrite existing path: $artifact" >&2
+    exit 2
+  fi
+done
 
 cleanup() {
   if [[ -n "$container" ]]; then
@@ -47,8 +58,6 @@ python3 "$root/runtime/tools/runtime_manifest.py" validate \
 docker cp "$work/promoted.json" "$container:/opt/dronedream/runtime-manifest.json"
 
 mkdir -p "$(dirname "$output")"
-partial="$output.partial"
-rm -f "$partial"
 docker export --output "$partial" "$container"
 bytes=$(stat --format='%s' "$partial")
 if (( bytes > max_bytes )); then

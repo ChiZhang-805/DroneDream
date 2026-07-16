@@ -63,9 +63,15 @@ def _oriented_value(point: ParetoPoint, metric: str) -> float:
 
 
 def representative_points(points: Sequence[ParetoPoint]) -> dict[str, ParetoPoint]:
-    """Pick a balanced recommendation plus each objective-specific extreme."""
+    """Pick safe representative recommendations from the feasible Pareto front.
 
-    front = nondominated_front(points)
+    The diagnostic Pareto front may contain least-violating points when every
+    experiment is infeasible.  Those points are useful for deciding where to
+    search next, but must never be exposed as parameter recommendations that
+    appear to satisfy the user's constraints.
+    """
+
+    front = nondominated_front([point for point in points if point.feasible])
     if not front:
         return {}
     metrics = list(front[0].objectives)

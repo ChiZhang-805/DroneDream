@@ -4,7 +4,19 @@
   "title": "DroneDreamRuntime manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "version", "runtimeId", "components", "smokeTests"],
+  "required": [
+    "schemaVersion",
+    "version",
+    "runtimeId",
+    "target",
+    "source",
+    "components",
+    "componentDetails",
+    "locks",
+    "smokeTests",
+    "smokeReport",
+    "artifact"
+  ],
   "properties": {
     "schemaVersion": {"const": 1},
     "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},

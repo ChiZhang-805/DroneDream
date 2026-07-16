@@ -7,15 +7,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, select, text
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
-
 from app import models
 from app.config import Settings
 from app.db import Base
 from app.storage.cleanup import (
     ArtifactCleanupResult,
+    _open_absolute_directory_no_follow,
     cleanup_local_artifacts,
     platform_supports_safe_artifact_unlink,
 )
@@ -23,6 +20,9 @@ from app.storage.registration import (
     ArtifactRegistrationClosed,
     guard_artifact_registration,
 )
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 
 
 @pytest.fixture()
@@ -114,6 +114,31 @@ def _artifact(
     )
 
 
+def test_directory_walk_closes_descriptor_when_interrupted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opened: list[tuple[str, int | None]] = []
+    closed: list[int] = []
+
+    def fake_open(path: str, _flags: int, *, dir_fd: int | None = None) -> int:
+        opened.append((path, dir_fd))
+        if len(opened) == 1:
+            return 41
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(os, "open", fake_open)
+    monkeypatch.setattr(os, "close", closed.append)
+    target = Path("C:/managed/artifacts") if os.name == "nt" else Path("/managed/artifacts")
+
+    with pytest.raises(KeyboardInterrupt):
+        _open_absolute_directory_no_follow(target)
+
+    anchor = Path(target.anchor)
+    first_component = target.relative_to(anchor).parts[0]
+    assert opened == [(str(anchor), None), (first_component, 41)]
+    assert closed == [41]
+
+
 def test_disabled_default_and_manual_dry_run_never_delete(tmp_path: Path, db: Session) -> None:
     now = datetime(2026, 7, 11, tzinfo=timezone.utc)
     root = tmp_path / "artifacts"
@@ -127,9 +152,7 @@ def test_disabled_default_and_manual_dry_run_never_delete(tmp_path: Path, db: Se
     assert disabled.status == "disabled"
     assert disabled.scanned_files == 0
 
-    preview = _cleanup(
-        db, settings=settings, now=now, dry_run=True, force_scan=True
-    )
+    preview = _cleanup(db, settings=settings, now=now, dry_run=True, force_scan=True)
     assert preview.status == "dry_run"
     assert preview.planned_files == 1
     assert preview.planned_bytes == 7
@@ -156,9 +179,7 @@ def test_age_cleanup_commits_rows_and_event_before_unlink_and_protects_jobs(
     db.add_all(
         [
             _artifact("art_active", job_id=active.id, path=active_file, created_at=old_time),
-            _artifact(
-                "art_old", job_id=old_terminal.id, path=old_file, created_at=old_time
-            ),
+            _artifact("art_old", job_id=old_terminal.id, path=old_file, created_at=old_time),
             _artifact(
                 "art_recent",
                 job_id=recent_terminal.id,
@@ -259,9 +280,7 @@ def test_shared_active_reference_blocks_capacity_eviction(tmp_path: Path, db: Se
     db.add_all([active, terminal])
     db.add_all(
         [
-            _artifact(
-                "art_shared_active", job_id=active.id, path=path, created_at=old_time
-            ),
+            _artifact("art_shared_active", job_id=active.id, path=path, created_at=old_time),
             _artifact(
                 "art_shared_terminal",
                 job_id=terminal.id,
@@ -295,9 +314,7 @@ def test_unlink_failure_leaves_retryable_orphan_without_database_reference(
     job = _job("job_unlink_failure", status="COMPLETED", timestamp=old_time)
     path = _file(root, job.id, "payload.bin", 9, old_time)
     db.add(job)
-    db.add(
-        _artifact("art_unlink_failure", job_id=job.id, path=path, created_at=old_time)
-    )
+    db.add(_artifact("art_unlink_failure", job_id=job.id, path=path, created_at=old_time))
     db.commit()
     settings = _settings(root, artifact_retention_max_age_seconds=3600)
 
@@ -306,9 +323,7 @@ def test_unlink_failure_leaves_retryable_orphan_without_database_reference(
         context.setattr(
             Path,
             "unlink",
-            lambda _path, *args, **kwargs: (_ for _ in ()).throw(
-                PermissionError("locked")
-            ),
+            lambda _path, *args, **kwargs: (_ for _ in ()).throw(PermissionError("locked")),
         )
         failed = _cleanup(db, settings=settings, now=now)
 
@@ -615,9 +630,7 @@ def test_sqlite_registration_guard_holds_reserved_writer_lock(tmp_path: Path) ->
         setup.commit()
 
     with Session(engine) as writer, Session(engine) as cleanup:
-        guard_artifact_registration(
-            writer, owner_type="job", owner_id="job_registration_lock"
-        )
+        guard_artifact_registration(writer, owner_type="job", owner_id="job_registration_lock")
         with pytest.raises(OperationalError):
             cleanup.execute(text("BEGIN IMMEDIATE"))
         cleanup.rollback()

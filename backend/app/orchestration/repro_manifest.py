@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import platform
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -44,18 +45,42 @@ def _find_repo_root(start: Path) -> Path | None:
 
 
 def _safe_git_output(repo_root: Path, *args: str) -> str | None:
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        return None
     try:
-        proc = subprocess.run(
-            ["git", *args],
+        proc = subprocess.run(  # noqa: S603 - resolved executable; internal arguments.
+            [git_executable, *args],
             cwd=repo_root,
             check=True,
             capture_output=True,
             text=True,
+            timeout=5,
         )
-    except Exception:
+    except (OSError, subprocess.SubprocessError, UnicodeError):
         return None
     out = proc.stdout.strip()
     return out or None
+
+
+def _safe_git_dirty(repo_root: Path) -> bool | None:
+    """Distinguish a clean worktree from a failed ``git status`` command."""
+
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        return None
+    try:
+        proc = subprocess.run(  # noqa: S603 - resolved executable; fixed arguments.
+            [git_executable, "status", "--porcelain"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError, UnicodeError):
+        return None
+    return bool(proc.stdout.strip())
 
 
 def _git_info() -> dict[str, Any]:
@@ -69,18 +94,17 @@ def _git_info() -> dict[str, Any]:
 
     commit_hash = _safe_git_output(repo_root, "rev-parse", "HEAD")
     branch = _safe_git_output(repo_root, "rev-parse", "--abbrev-ref", "HEAD")
-    dirty = _safe_git_output(repo_root, "status", "--porcelain")
     return {
         "commit_hash": commit_hash,
         "branch": branch,
-        "dirty_working_tree": (bool(dirty) if dirty is not None else None),
+        "dirty_working_tree": _safe_git_dirty(repo_root),
     }
 
 
 def _app_version() -> str:
     try:
         return metadata.version("drone-dream-backend")
-    except Exception:
+    except metadata.PackageNotFoundError:
         return "0.1.0"
 
 
@@ -116,16 +140,18 @@ def _is_sensitive_key(name: str) -> bool:
     return any(token in upper for token in _SENSITIVE_ENV_TOKENS)
 
 
-def _sanitize_payload(payload: Any) -> Any:
+def sanitize_payload(payload: Any) -> Any:
+    """Recursively remove values stored under secret-like JSON keys."""
+
     if isinstance(payload, dict):
         clean: dict[str, Any] = {}
         for key, value in payload.items():
             if _is_sensitive_key(str(key)):
                 continue
-            clean[key] = _sanitize_payload(value)
+            clean[key] = sanitize_payload(value)
         return clean
     if isinstance(payload, list):
-        return [_sanitize_payload(item) for item in payload]
+        return [sanitize_payload(item) for item in payload]
     return payload
 
 
@@ -137,7 +163,10 @@ def _candidate_summaries(job: models.Job) -> list[dict[str, Any]]:
             "label": c.label,
             "generation": c.generation_index,
             "source": c.source_type,
+            "parameters": sanitize_payload(c.parameter_json),
             "aggregated_score": c.aggregated_score,
+            "aggregated_feedback": sanitize_payload(c.aggregated_metric_json),
+            "optimizer_metadata": sanitize_payload(c.optimizer_metadata_json),
         }
         for c in rows
     ]
@@ -150,7 +179,7 @@ def _trial_summaries(job: models.Job) -> list[dict[str, Any]]:
             "trial_id": t.id,
             "candidate_id": t.candidate_id,
             "scenario_type": t.scenario_type,
-            "scenario_config_json": _sanitize_payload(t.scenario_config_json),
+            "scenario_config_json": sanitize_payload(t.scenario_config_json),
             "seed": t.seed,
             "status": t.status,
             "metrics_summary": {
@@ -228,7 +257,7 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
             },
             "sensor_noise": job.sensor_noise_level,
             "objective_profile": job.objective_profile,
-            "job_config": _sanitize_payload(job_config),
+            "job_config": sanitize_payload(job_config),
             "simulator_backend_requested": job.simulator_backend_requested,
             "optimizer_strategy": job.optimizer_strategy,
             "acceptance_criteria": acceptance_criteria,
@@ -245,8 +274,9 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
                 "generation_index": best.generation_index,
                 "source_type": best.source_type,
                 "aggregated_score": best.aggregated_score,
+                "optimizer_metadata": sanitize_payload(best.optimizer_metadata_json),
             },
-            "best_parameters": _sanitize_payload(dict(best.parameter_json or {})),
+            "best_parameters": sanitize_payload(dict(best.parameter_json or {})),
             "candidate_summaries": _candidate_summaries(job),
         },
         "simulator": {
@@ -256,7 +286,7 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
             "px4_git_commit": _px4_git_commit(px4_dir),
             # Per-job values are authoritative for an experiment. Environment
             # values below only describe the process that exported the report.
-            "effective_vehicle_profile": _sanitize_payload(job.vehicle_profile_json),
+            "effective_vehicle_profile": sanitize_payload(job.vehicle_profile_json),
         },
         "llm": {
             "openai_model": job.openai_model,
@@ -270,4 +300,4 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
     }
 
 
-__all__ = ["build_repro_manifest"]
+__all__ = ["build_repro_manifest", "sanitize_payload"]

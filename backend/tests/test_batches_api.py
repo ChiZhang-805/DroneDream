@@ -47,6 +47,35 @@ def test_invalid_child_job_rolls_back_all(client: TestClient) -> None:
     assert jobs_resp.json()["data"]["total"] == 0
 
 
+def test_list_batches_is_bounded_and_reports_total(client: TestClient) -> None:
+    for index in range(3):
+        response = client.post(
+            "/api/v1/batches",
+            json={
+                "name": f"page-{index}",
+                "jobs": [{**HEURISTIC_JOB_PAYLOAD}],
+            },
+        )
+        assert response.status_code == 200, response.text
+
+    first = client.get("/api/v1/batches?page=1&page_size=2")
+    assert first.status_code == 200, first.text
+    first_data = first.json()["data"]
+    assert first_data["total"] == 3
+    assert first_data["page"] == 1
+    assert first_data["page_size"] == 2
+    assert len(first_data["items"]) == 2
+
+    second = client.get("/api/v1/batches?page=2&page_size=2")
+    assert second.status_code == 200, second.text
+    second_data = second.json()["data"]
+    assert second_data["total"] == 3
+    assert len(second_data["items"]) == 1
+    assert {
+        item["id"] for item in first_data["items"]
+    }.isdisjoint({item["id"] for item in second_data["items"]})
+
+
 def test_batch_detail_aggregates_progress(client: TestClient) -> None:
     payload = {
         "name": "agg",
@@ -126,10 +155,9 @@ def test_cancel_batch_purges_all_child_gpt_secrets(
     assert cancelled.status_code == 200, cancelled.text
     assert cancelled.json()["data"]["status"] == "CANCELLED"
 
-    from sqlalchemy import select
-
     from app import models
     from app.db import SessionLocal
+    from sqlalchemy import select
 
     with SessionLocal() as db:
         batch = db.get(models.BatchJob, batch_id)

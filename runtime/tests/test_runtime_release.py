@@ -80,8 +80,7 @@ class RuntimeReleaseTests(unittest.TestCase):
             "smoke_report_path": report,
             "output_directory": directory / "release",
             "base_url": (
-                "https://github.com/ChiZhang-805/DroneDream/releases/download/"
-                "runtime-v0.1.0-beta.1"
+                "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.1"
             ),
             "build_timestamp": "2026-07-12T00:00:00Z",
             "part_bytes": 7,
@@ -107,34 +106,22 @@ class RuntimeReleaseTests(unittest.TestCase):
             directory = Path(name)
             rootfs, manifest_path = self._package(directory)
             manifest = runtime_release.load_json(manifest_path)
-            self.assertEqual(
-                manifest_path.read_bytes(), runtime_release.canonical_bytes(manifest)
-            )
+            self.assertEqual(manifest_path.read_bytes(), runtime_release.canonical_bytes(manifest))
             self.assertEqual(manifest["runtime"]["id"], "DroneDreamRuntime")
-            self.assertEqual(
-                manifest["requirements"]["targetPathHint"], "X:\\DroneDream"
-            )
+            self.assertEqual(manifest["requirements"]["targetPathHint"], "X:\\DroneDream")
             self.assertEqual(manifest["artifact"]["compression"], "none")
             self.assertGreater(len(manifest["artifact"]["parts"]), 1)
             self.assertTrue(
-                all(
-                    part["sizeBytes"] < 2 * 1024**3
-                    for part in manifest["artifact"]["parts"]
-                )
+                all(part["sizeBytes"] < 2 * 1024**3 for part in manifest["artifact"]["parts"])
             )
             self.assertTrue(
-                all(
-                    part["url"].startswith("https://")
-                    for part in manifest["artifact"]["parts"]
-                )
+                all(part["url"].startswith("https://") for part in manifest["artifact"]["parts"])
             )
 
             signature, keyring, private_key = self._sign(directory, manifest_path)
             if os.name != "nt":
                 self.assertEqual(stat.S_IMODE(private_key.stat().st_mode), 0o600)
-            runtime_release.verify_release(
-                manifest_path, signature, keyring, manifest_path.parent
-            )
+            runtime_release.verify_release(manifest_path, signature, keyring, manifest_path.parent)
             output = directory / "reassembled.tar"
             runtime_release.reassemble_release(
                 manifest_path,
@@ -171,19 +158,13 @@ class RuntimeReleaseTests(unittest.TestCase):
             _, manifest_path = self._package(directory)
             signature, _, _ = self._sign(directory, manifest_path)
             empty_keyring = RUNTIME / "release-public-keys.json"
-            with self.assertRaisesRegex(
-                runtime_release.ReleaseError, "trusted keyring"
-            ):
-                runtime_release.verify_signature(
-                    manifest_path, signature, empty_keyring
-                )
+            with self.assertRaisesRegex(runtime_release.ReleaseError, "trusted keyring"):
+                runtime_release.verify_signature(manifest_path, signature, empty_keyring)
 
             manifest = runtime_release.load_json(manifest_path)
             manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
             with self.assertRaisesRegex(runtime_release.ReleaseError, "not canonical"):
-                runtime_release.verify_signature(
-                    manifest_path, signature, empty_keyring
-                )
+                runtime_release.verify_signature(manifest_path, signature, empty_keyring)
 
     def test_retired_key_is_structurally_valid_but_cannot_verify_new_release(
         self,
@@ -197,9 +178,7 @@ class RuntimeReleaseTests(unittest.TestCase):
             keyring_path.write_text(json.dumps(keyring), encoding="utf-8")
 
             self.assertEqual(runtime_release.validate_keyring(keyring), {})
-            with self.assertRaisesRegex(
-                runtime_release.ReleaseError, "trusted keyring"
-            ):
+            with self.assertRaisesRegex(runtime_release.ReleaseError, "trusted keyring"):
                 runtime_release.verify_signature(manifest_path, signature, keyring_path)
 
     def test_failed_or_mismatched_smoke_evidence_cannot_be_packaged(self) -> None:
@@ -307,15 +286,11 @@ class RuntimeReleaseTests(unittest.TestCase):
         )
         self.assertEqual(manifest_schema["properties"]["schemaVersion"]["const"], 1)
         self.assertEqual(
-            manifest_schema["properties"]["artifact"]["properties"]["compression"][
-                "const"
-            ],
+            manifest_schema["properties"]["artifact"]["properties"]["compression"]["const"],
             "none",
         )
         self.assertEqual(
-            manifest_schema["properties"]["requirements"]["properties"][
-                "targetPathHint"
-            ]["const"],
+            manifest_schema["properties"]["requirements"]["properties"]["targetPathHint"]["const"],
             "X:\\DroneDream",
         )
 

@@ -1,11 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, matchPath, useLocation } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { isDesktopRuntime } from "./desktop/bridge";
+import type { RuntimeComponentState } from "./desktop/bridge";
 import {
   DesktopRuntimeAccessProvider,
   useDesktopRuntimeAccess,
 } from "./desktop/access";
+import type { DesktopRuntimeAccess } from "./desktop/access";
+import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
+import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
 
@@ -19,10 +24,7 @@ const NAV_ITEMS: {
 }[] = [
   { to: "/", desktopTo: "/dashboard", labelKey: "app.dashboard", end: true },
   { to: "/jobs/new", labelKey: "app.newExperiment", requiresRuntime: true },
-  { to: "/batches/new", labelKey: "app.newBatch", end: true, requiresRuntime: true },
-  { to: "/batches", labelKey: "app.batches", end: true, requiresRuntime: true },
   { to: "/history", labelKey: "app.history" },
-  { to: "/desktop/setup", labelKey: "app.desktopSetup" },
   { to: "/ece498", label: "ECE498" },
 ];
 
@@ -46,33 +48,271 @@ function LanguageRegionIcon({ region }: { region: "west" | "east" }) {
   );
 }
 
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 8.25A3.75 3.75 0 1 0 12 15.75 3.75 3.75 0 0 0 12 8.25Z" />
+      <path d="M19.3 13.48c.04-.48.04-.96 0-1.44l1.66-1.3-1.78-3.08-1.98.8a8.2 8.2 0 0 0-1.24-.72l-.3-2.1h-3.56l-.3 2.1c-.44.2-.85.44-1.24.72l-1.98-.8-1.78 3.08 1.66 1.3a8.8 8.8 0 0 0 0 1.44l-1.66 1.3 1.78 3.08 1.98-.8c.39.28.8.52 1.24.72l.3 2.1h3.56l.3-2.1c.44-.2.85-.44 1.24-.72l1.98.8 1.78-3.08-1.66-1.3Z" />
+    </svg>
+  );
+}
+
+type RuntimeHealthLevel = "unknown" | "healthy" | "warning" | "error";
+
+const COMPONENT_STATE_KEY: Record<RuntimeComponentState, TranslationKey> = {
+  ready: "desktop.component.ready",
+  missing: "desktop.component.missing",
+  stopped: "desktop.component.stopped",
+  unhealthy: "desktop.component.unhealthy",
+  unknown: "desktop.component.unknown",
+};
+
+function runtimeHealthLevel(access: DesktopRuntimeAccess): RuntimeHealthLevel {
+  if (!access.desktopRuntime) return "unknown";
+  if (!access.snapshot) return "unknown";
+  if (!access.snapshot.ready) return "error";
+  const { prerequisites, runtime } = access.snapshot;
+  const hasWarning = prerequisites.probeErrors.length > 0 ||
+    runtime.diagnostics.length > 0 ||
+    runtime.components.some((component) =>
+      !component.required && component.status !== "ready"
+    );
+  return hasWarning ? "warning" : "healthy";
+}
+
+function SettingsDialog({
+  access,
+  closeRef,
+  onClose,
+}: {
+  access: DesktopRuntimeAccess;
+  closeRef: RefObject<HTMLButtonElement>;
+  onClose: () => void;
+}) {
+  const { locale, setLocale, t } = useI18n();
+  const level = runtimeHealthLevel(access);
+  const snapshot = access.snapshot;
+  const details: string[] = [];
+  if (snapshot) {
+    const { prerequisites, runtime } = snapshot;
+    if (!prerequisites.supported) details.push(t("settings.runtime.unsupportedSystem"));
+    if (!prerequisites.windows) details.push(t("settings.runtime.windowsMissing"));
+    if (!prerequisites.wsl.executableAvailable) details.push(t("settings.runtime.wslMissing"));
+    if (!prerequisites.memory || prerequisites.memory.totalBytes < MINIMUM_MEMORY_BYTES) {
+      details.push(t("settings.runtime.memoryLow"));
+    }
+    details.push(...prerequisites.probeErrors);
+    if (!runtime.installed) details.push(t("settings.runtime.notInstalled"));
+    else if (!runtime.running) details.push(t("settings.runtime.notRunning"));
+    for (const component of runtime.components) {
+      if (component.status === "ready") continue;
+      details.push(
+        `${component.label}: ${t(COMPONENT_STATE_KEY[component.status])}` +
+          (component.detail ? ` — ${component.detail}` : ""),
+      );
+    }
+    details.push(...runtime.diagnostics);
+  } else if (!access.isChecking) {
+    details.push(t("settings.runtime.noResult"));
+  }
+  const uniqueDetails = [...new Set(details.filter(Boolean))];
+  const statusLabel = access.isChecking
+    ? t("settings.runtime.checking")
+    : level === "healthy"
+      ? t("settings.runtime.healthy")
+      : level === "warning"
+        ? t("settings.runtime.warning")
+        : level === "error"
+          ? t("settings.runtime.error")
+          : t("settings.runtime.unknown");
+  const statusIcon = access.isChecking
+    ? "…"
+    : level === "healthy"
+      ? "✓"
+      : level === "warning"
+        ? "!"
+        : level === "error"
+          ? "×"
+          : "?";
+  const lastChecked = access.lastFullCheckAt
+    ? new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
+        dateStyle: "short",
+        timeStyle: "medium",
+      }).format(access.lastFullCheckAt)
+    : t("settings.runtime.neverChecked");
+
+  return (
+    <section
+      className="launcher-settings-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="launcher-settings-title"
+    >
+      <div className="launcher-settings-heading">
+        <h2 id="launcher-settings-title">{t("app.settingsTitle")}</h2>
+        <button
+          ref={closeRef}
+          type="button"
+          className="launcher-settings-close"
+          aria-label={t("app.closeSettings")}
+          onClick={onClose}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+      <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
+        <button
+          type="button"
+          className={locale === "en" ? "selected" : undefined}
+          aria-label={t("app.languageEnglish")}
+          aria-pressed={locale === "en"}
+          onClick={() => setLocale("en")}
+        >
+          <LanguageRegionIcon region="west" />
+          <strong>{t("app.languageEnglish")}</strong>
+          <i aria-hidden="true">✓</i>
+        </button>
+        <button
+          type="button"
+          className={locale === "zh-CN" ? "selected" : undefined}
+          aria-label={t("app.languageChinese")}
+          aria-pressed={locale === "zh-CN"}
+          onClick={() => setLocale("zh-CN")}
+        >
+          <LanguageRegionIcon region="east" />
+          <strong>{t("app.languageChinese")}</strong>
+          <i aria-hidden="true">✓</i>
+        </button>
+      </fieldset>
+      {access.desktopRuntime ? (
+        <section className="settings-runtime-panel" aria-labelledby="settings-runtime-title">
+          <div className="settings-runtime-heading">
+            <div>
+              <h3 id="settings-runtime-title">{t("settings.runtime.title")}</h3>
+            </div>
+            <button
+              type="button"
+              className="btn settings-runtime-check"
+              disabled={access.isChecking}
+              onClick={() => void access.refresh()}
+            >
+              {access.isChecking
+                ? t("settings.runtime.checking")
+                : t("settings.runtime.checkNow")}
+            </button>
+          </div>
+          <div
+            className={`settings-runtime-status settings-runtime-status-${access.isChecking ? "checking" : level}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="settings-runtime-status-icon" aria-hidden="true">{statusIcon}</span>
+            <div>
+              <strong>{statusLabel}</strong>
+              <small>{t("settings.runtime.lastChecked")}: {lastChecked}</small>
+            </div>
+          </div>
+          {!access.isChecking && level !== "healthy" && uniqueDetails.length > 0 ? (
+            <details className="settings-runtime-details">
+              <summary>{t("settings.runtime.viewDetails")}</summary>
+              <div className="settings-runtime-details-scroll">
+                <ul>
+                  {uniqueDetails.map((detail) => <li key={detail}>{detail}</li>)}
+                </ul>
+              </div>
+            </details>
+          ) : null}
+        </section>
+      ) : null}
+    </section>
+  );
+}
+
 function AppShellContent() {
   const location = useLocation();
   const desktopRuntime = isDesktopRuntime();
   const runtimeAccess = useDesktopRuntimeAccess();
-  const { locale, setLocale, t } = useI18n();
+  const { t } = useI18n();
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
+  const experimentWizardMode = location.pathname === "/jobs/new";
+  const runtimeIsBusy = runtimeAccess.status === "checking" ||
+    runtimeAccess.status === "starting";
   const runtimeNavDescription = runtimeAccess.status === "checking"
     ? t("runtimeGate.navChecking")
-    : t("runtimeGate.navLocked");
+    : runtimeAccess.status === "starting"
+      ? t("runtimeGate.navStarting")
+      : t("runtimeGate.navLocked");
+
+  const closeSettings = useCallback(() => {
+    setLauncherSettingsOpen(false);
+    // The trigger is inert while the modal is open. Restore focus on the next
+    // frame, after the dialog effect has removed inert from the app shell.
+    requestAnimationFrame(() => launcherSettingsButtonRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    const openSettings = () => setLauncherSettingsOpen(true);
+    window.addEventListener(OPEN_APP_SETTINGS_EVENT, openSettings);
+    return () => window.removeEventListener(OPEN_APP_SETTINGS_EVENT, openSettings);
+  }, []);
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("settings") === "runtime") {
+      setLauncherSettingsOpen(true);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (!launcherSettingsOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const inertTargets = Array.from(document.querySelectorAll<HTMLElement>(
+      ".launcher-chrome, .launcher-main, .app-sidebar, .app-header, .app-main, .app-footer, .skip-link",
+    ));
+    const previousInertStates = inertTargets.map((target) => target.inert);
+    document.body.style.overflow = "hidden";
+    inertTargets.forEach((target) => { target.inert = true; });
     const focusFrame = requestAnimationFrame(() => launcherSettingsCloseRef.current?.focus());
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setLauncherSettingsOpen(false);
-      launcherSettingsButtonRef.current?.focus();
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeSettings();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = launcherSettingsCloseRef.current?.closest<HTMLElement>(
+        '[role="dialog"]',
+      );
+      if (!dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), '
+          + 'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      )].filter((element) => !element.hasAttribute("hidden"));
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("keydown", handleDialogKeyDown);
     return () => {
+      document.body.style.overflow = previousOverflow;
+      inertTargets.forEach((target, index) => {
+        target.inert = previousInertStates[index] ?? false;
+      });
       cancelAnimationFrame(focusFrame);
-      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("keydown", handleDialogKeyDown);
     };
-  }, [launcherSettingsOpen]);
+  }, [closeSettings, launcherSettingsOpen]);
 
   if (launcherMode) {
     return (
@@ -99,6 +339,8 @@ function AppShellContent() {
               <span aria-hidden="true" />
               {runtimeAccess.status === "checking"
                 ? t("runtimeGate.checkingShort")
+                : runtimeAccess.status === "starting"
+                  ? t("runtimeGate.startingShort")
                 : runtimeAccess.status === "ready"
                   ? t("desktop.ready")
                   : t("runtimeGate.requiredShort")}
@@ -112,10 +354,7 @@ function AppShellContent() {
               aria-expanded={launcherSettingsOpen}
               onClick={() => setLauncherSettingsOpen(true)}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 8.25A3.75 3.75 0 1 0 12 15.75 3.75 3.75 0 0 0 12 8.25Z" />
-                <path d="M19.3 13.48c.04-.48.04-.96 0-1.44l1.66-1.3-1.78-3.08-1.98.8a8.2 8.2 0 0 0-1.24-.72l-.3-2.1h-3.56l-.3 2.1c-.44.2-.85.44-1.24.72l-1.98-.8-1.78 3.08 1.66 1.3a8.8 8.8 0 0 0 0 1.44l-1.66 1.3 1.78 3.08 1.98-.8c.39.28.8.52 1.24.72l.3 2.1h3.56l.3-2.1c.44-.2.85-.44 1.24-.72l1.98.8 1.78-3.08-1.66-1.3Z" />
-              </svg>
+              <SettingsIcon />
             </button>
           </div>
         </header>
@@ -125,64 +364,14 @@ function AppShellContent() {
             role="presentation"
             onMouseDown={(event) => {
               if (event.target !== event.currentTarget) return;
-              setLauncherSettingsOpen(false);
-              launcherSettingsButtonRef.current?.focus();
+              closeSettings();
             }}
           >
-            <section
-              className="launcher-settings-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="launcher-settings-title"
-            >
-              <div className="launcher-settings-heading">
-                <h2 id="launcher-settings-title">{t("app.settingsTitle")}</h2>
-                <button
-                  ref={launcherSettingsCloseRef}
-                  type="button"
-                  className="launcher-settings-close"
-                  aria-label={t("app.closeSettings")}
-                  onClick={() => {
-                    setLauncherSettingsOpen(false);
-                    launcherSettingsButtonRef.current?.focus();
-                  }}
-                >
-                  <span aria-hidden="true">×</span>
-                </button>
-              </div>
-              <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
-                <button
-                  type="button"
-                  className={locale === "en" ? "selected" : undefined}
-                  aria-label={t("app.languageEnglish")}
-                  aria-pressed={locale === "en"}
-                  onClick={() => {
-                    setLocale("en");
-                    setLauncherSettingsOpen(false);
-                    launcherSettingsButtonRef.current?.focus();
-                  }}
-                >
-                  <LanguageRegionIcon region="west" />
-                  <strong>{t("app.languageEnglish")}</strong>
-                  <i aria-hidden="true">✓</i>
-                </button>
-                <button
-                  type="button"
-                  className={locale === "zh-CN" ? "selected" : undefined}
-                  aria-label={t("app.languageChinese")}
-                  aria-pressed={locale === "zh-CN"}
-                  onClick={() => {
-                    setLocale("zh-CN");
-                    setLauncherSettingsOpen(false);
-                    launcherSettingsButtonRef.current?.focus();
-                  }}
-                >
-                  <LanguageRegionIcon region="east" />
-                  <strong>{t("app.languageChinese")}</strong>
-                  <i aria-hidden="true">✓</i>
-                </button>
-              </fieldset>
-            </section>
+            <SettingsDialog
+              access={runtimeAccess}
+              closeRef={launcherSettingsCloseRef}
+              onClose={closeSettings}
+            />
           </div>
         ) : null}
         <main id="main-content" className="launcher-main" tabIndex={-1}>
@@ -193,7 +382,7 @@ function AppShellContent() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}>
       <a
         className="skip-link"
         href="#main-content"
@@ -222,12 +411,6 @@ function AppShellContent() {
               item.requiresRuntime &&
               runtimeAccess.status !== "ready",
             );
-            const isBatchesItem = destination === "/batches";
-            const isBatchesActive =
-              isBatchesItem &&
-              location.pathname !== "/batches/new" &&
-              (Boolean(matchPath("/batches", location.pathname)) ||
-                Boolean(matchPath("/batches/:batchId", location.pathname)));
 
             return (
               <NavLink
@@ -238,10 +421,6 @@ function AppShellContent() {
                 aria-describedby={runtimeLocked ? "runtime-nav-description" : undefined}
                 className={({ isActive }) => {
                   const classes = runtimeLocked ? ["runtime-locked"] : [];
-                  if (isBatchesItem) {
-                    if (isBatchesActive) classes.push("active");
-                    return classes.length > 0 ? classes.join(" ") : undefined;
-                  }
                   if (isActive) classes.push("active");
                   return classes.length > 0 ? classes.join(" ") : undefined;
                 }}
@@ -249,8 +428,10 @@ function AppShellContent() {
                 <span>{item.labelKey ? t(item.labelKey) : item.label}</span>
                 {runtimeLocked ? (
                   <span className="nav-runtime-badge" aria-hidden="true">
-                    {runtimeAccess.status === "checking"
-                      ? t("runtimeGate.checkingShort")
+                    {runtimeIsBusy
+                      ? runtimeAccess.status === "starting"
+                        ? t("runtimeGate.startingShort")
+                        : t("runtimeGate.checkingShort")
                       : `🔒 ${t("runtimeGate.requiredShort")}`}
                   </span>
                 ) : null}
@@ -262,35 +443,49 @@ function AppShellContent() {
           <span className="phase-pill">{t("app.previewVersion")}</span>
         </div>
       </aside>
-      <div className="app-body">
+      <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
           <div className="app-header-title">DroneDream — {t("app.platform")}</div>
           <div className="app-header-meta">
             <span className="env-chip">
               {desktopRuntime ? t("app.desktopEnvironment") : t("app.webEnvironment")}
             </span>
-            <label className="language-switcher">
-              <span className="sr-only">{t("app.language")}</span>
-              <select
-                aria-label={t("app.language")}
-                value={locale}
-                onChange={(event) =>
-                  setLocale(event.target.value === "zh-CN" ? "zh-CN" : "en")
-                }
-              >
-                <option value="en">EN</option>
-                <option value="zh-CN">中文</option>
-              </select>
-            </label>
+            <button
+              ref={launcherSettingsButtonRef}
+              type="button"
+              className="launcher-settings-button"
+              aria-label={t("app.settings")}
+              aria-haspopup="dialog"
+              aria-expanded={launcherSettingsOpen}
+              onClick={() => setLauncherSettingsOpen(true)}
+            >
+              <SettingsIcon />
+            </button>
           </div>
         </header>
-        <main id="main-content" className="app-main" tabIndex={-1}>
+        {launcherSettingsOpen ? (
+          <div
+            className="launcher-settings-backdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target !== event.currentTarget) return;
+              closeSettings();
+            }}
+          >
+            <SettingsDialog
+              access={runtimeAccess}
+              closeRef={launcherSettingsCloseRef}
+              onClose={closeSettings}
+            />
+          </div>
+        ) : null}
+        <main id="main-content" className={`app-main${experimentWizardMode ? " app-main-wizard" : ""}`} tabIndex={-1}>
           <Outlet />
         </main>
         <footer className="app-footer">
           <div className="app-footer-content">
-            <span>Author: Chi Zhang</span>
-            <span>Contact: cz005623@gmail.com</span>
+            <span>{t("app.author")}: Chi Zhang</span>
+            <span>{t("app.contact")}: cz005623@gmail.com</span>
           </div>
         </footer>
       </div>

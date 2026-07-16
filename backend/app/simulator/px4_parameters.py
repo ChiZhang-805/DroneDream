@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from app.parameters import CATALOG_VERSION, get_parameter, normalize_px4_version
-from app.parameters.models import Number
+from app.parameters.models import Number, ParameterDefinition
 from app.parameters.validation import validate_parameter_values
 
 EVIDENCE_SCHEMA_VERSION = "dronedream.px4_parameter_evidence.v1"
@@ -37,6 +37,20 @@ class ParameterReadbackError(ParameterApplicationError):
     def __init__(self, mismatches: Mapping[str, Mapping[str, object]]) -> None:
         self.mismatches = dict(mismatches)
         super().__init__(f"PX4 parameter readback mismatch: {', '.join(self.mismatches)}")
+
+
+def _require_parameter_definition(
+    name: str,
+    *,
+    px4_version: str | None,
+) -> ParameterDefinition:
+    definition = get_parameter(name, px4_version=px4_version)
+    if definition is None:
+        raise ParameterApplicationError(
+            f"Validated PX4 parameter {name!r} is missing from catalog version "
+            f"{px4_version or 'default'}"
+        )
+    return definition
 
 
 class PX4ParameterClient(Protocol):
@@ -71,10 +85,11 @@ class MavsdkParameterClient:
     def close(self) -> None:
         """Release an embedded MAVSDK server before the Offboard client starts."""
 
-        stop_server = getattr(self._owner, "_stop_mavsdk_server", None)
+        owner = self._owner
+        self._owner = None
+        stop_server = getattr(owner, "_stop_mavsdk_server", None)
         if callable(stop_server):
             stop_server()
-        self._owner = None
 
 
 @dataclass(frozen=True)
@@ -103,8 +118,7 @@ def build_px4_parameter_environment(
     )
     result: dict[str, str] = {}
     for name, value in normalized.items():
-        definition = get_parameter(name, px4_version=px4_version)
-        assert definition is not None
+        definition = _require_parameter_definition(name, px4_version=px4_version)
         rendered = (
             str(int(value)) if definition.value_type == "int" else format(float(value), ".15g")
         )
@@ -186,8 +200,7 @@ async def _read_all(
 ) -> dict[str, Number]:
     values: dict[str, Number] = {}
     for name in names:
-        definition = get_parameter(name, px4_version=px4_version)
-        assert definition is not None
+        definition = _require_parameter_definition(name, px4_version=px4_version)
         value = await client.get_parameter(name, definition.value_type)
         values[name] = int(value) if definition.value_type == "int" else float(value)
     return values
@@ -201,8 +214,7 @@ def _readback_mismatches(
 ) -> dict[str, dict[str, object]]:
     mismatches: dict[str, dict[str, object]] = {}
     for name, expected in requested.items():
-        definition = get_parameter(name, px4_version=px4_version)
-        assert definition is not None
+        definition = _require_parameter_definition(name, px4_version=px4_version)
         actual = applied.get(name)
         tolerance = (
             0.0 if definition.value_type == "int" else max(float(definition.step) / 10.0, 1e-6)
@@ -239,8 +251,7 @@ def _reject_reboot_required_live_parameters(
 
     requires_restart: list[str] = []
     for name in requested:
-        definition = get_parameter(name, px4_version=px4_version)
-        assert definition is not None
+        definition = _require_parameter_definition(name, px4_version=px4_version)
         if definition.requires_reboot or definition.apply_policy == "reboot":
             requires_restart.append(name)
     if not requires_restart:
@@ -251,6 +262,40 @@ def _reject_reboot_required_live_parameters(
         f"parameters: {rendered}. Start a fresh SITL process with PX4_PARAM_* "
         "startup overrides, then perform readback verification before flight."
     )
+
+
+async def _restore_parameters(
+    client: PX4ParameterClient,
+    before: Mapping[str, Number],
+    written_names: list[str],
+    *,
+    px4_version: str,
+) -> dict[str, str]:
+    """Best-effort rollback with readback verification."""
+
+    errors: dict[str, str] = {}
+    for name in reversed(written_names):
+        definition = _require_parameter_definition(name, px4_version=px4_version)
+        try:
+            await client.set_parameter(name, before[name], definition.value_type)
+        except Exception as exc:  # pragma: no cover - transport-specific failure
+            errors[name] = str(exc)
+    for name in reversed(written_names):
+        if name in errors:
+            continue
+        definition = _require_parameter_definition(name, px4_version=px4_version)
+        try:
+            actual = await client.get_parameter(name, definition.value_type)
+            mismatch = _readback_mismatches(
+                {name: before[name]},
+                {name: actual},
+                px4_version=px4_version,
+            )
+            if mismatch:
+                errors[name] = "rollback readback did not match the original value"
+        except Exception as exc:  # pragma: no cover - transport-specific failure
+            errors[name] = f"rollback readback failed: {exc}"
+    return errors
 
 
 async def apply_and_verify_parameters(
@@ -284,6 +329,7 @@ async def apply_and_verify_parameters(
 
     before: dict[str, Number] = {}
     applied: dict[str, Number] = {}
+    written_names: list[str] = []
     try:
         _reject_reboot_required_live_parameters(
             normalized,
@@ -300,11 +346,23 @@ async def apply_and_verify_parameters(
             context=context,
         )
         for name, value in normalized.items():
-            definition = get_parameter(name, px4_version=normalized_version)
-            assert definition is not None
+            definition = _require_parameter_definition(
+                name,
+                px4_version=normalized_version,
+            )
+            # Track before awaiting: an acknowledgement can be lost after PX4
+            # has already committed the value. Restoring the old value is safe
+            # even when the failed write never reached the vehicle.
+            written_names.append(name)
             await client.set_parameter(name, value, definition.value_type)
         applied = await _read_all(client, names, px4_version=normalized_version)
     except Exception as exc:
+        transaction_rollback_errors = await _restore_parameters(
+            client,
+            before,
+            written_names,
+            px4_version=normalized_version,
+        )
         if not (evidence_dir / BEFORE_EVIDENCE_NAME).exists():
             _write_evidence(
                 evidence_dir,
@@ -326,11 +384,25 @@ async def apply_and_verify_parameters(
             px4_version=normalized_version,
             context=context,
             status="error",
-            verification={"verified": False, "error": str(exc)},
+            verification={
+                "verified": False,
+                "error": str(exc),
+                "rollback_attempted": bool(written_names),
+                "rollback_succeeded": bool(written_names) and not transaction_rollback_errors,
+                "rollback_errors": transaction_rollback_errors,
+            },
         )
         raise ParameterApplicationError(f"PX4 parameter transaction failed: {exc}") from exc
 
     mismatches = _readback_mismatches(normalized, applied, px4_version=normalized_version)
+    mismatch_rollback_errors: dict[str, str] = {}
+    if mismatches:
+        mismatch_rollback_errors = await _restore_parameters(
+            client,
+            before,
+            written_names,
+            px4_version=normalized_version,
+        )
     _write_evidence(
         evidence_dir,
         filename=APPLIED_EVIDENCE_NAME,
@@ -340,7 +412,19 @@ async def apply_and_verify_parameters(
         px4_version=normalized_version,
         context=context,
         status="mismatch" if mismatches else "ok",
-        verification={"verified": not mismatches, "mismatches": mismatches},
+        verification={
+            "verified": not mismatches,
+            "mismatches": mismatches,
+            **(
+                {
+                    "rollback_attempted": True,
+                    "rollback_succeeded": not mismatch_rollback_errors,
+                    "rollback_errors": mismatch_rollback_errors,
+                }
+                if mismatches
+                else {}
+            ),
+        },
     )
     if mismatches:
         raise ParameterReadbackError(mismatches)
@@ -537,25 +621,43 @@ async def connect_mavsdk_parameter_client(
 ) -> MavsdkParameterClient:
     """Connect MAVSDK lazily and return its parameter-only adapter."""
 
+    if (
+        isinstance(timeout_seconds, bool)
+        or not isinstance(timeout_seconds, (int, float))
+        or not math.isfinite(timeout_seconds)
+        or timeout_seconds <= 0
+    ):
+        raise ParameterApplicationError(
+            "MAVSDK parameter timeout must be a finite number greater than zero"
+        )
+
     try:
         from mavsdk import System
     except ModuleNotFoundError as exc:  # pragma: no cover - depends on simulator image
         raise ParameterApplicationError("mavsdk is required for PX4 parameter readback") from exc
 
     system = System()
-    await system.connect(system_address=connection)
-
-    async def _wait_connected() -> None:
-        async for state in system.core.connection_state():
-            if state.is_connected:
-                return
-
     try:
+        await system.connect(system_address=connection)
+
+        async def _wait_connected() -> None:
+            async for state in system.core.connection_state():
+                if state.is_connected:
+                    return
+
         await asyncio.wait_for(_wait_connected(), timeout=timeout_seconds)
-    except TimeoutError as exc:
-        raise ParameterApplicationError(
-            f"MAVSDK parameter connection timed out after {timeout_seconds}s"
-        ) from exc
+    except BaseException as exc:
+        # ``mavsdk.System`` may have spawned an embedded mavsdk_server before
+        # connection succeeds. A timeout/cancellation must release it even
+        # though no MavsdkParameterClient is returned to the caller's finally.
+        stop_server = getattr(system, "_stop_mavsdk_server", None)
+        if callable(stop_server):
+            stop_server()
+        if isinstance(exc, TimeoutError):
+            raise ParameterApplicationError(
+                f"MAVSDK parameter connection timed out after {timeout_seconds}s"
+            ) from exc
+        raise
     return MavsdkParameterClient(system.param, owner=system)
 
 

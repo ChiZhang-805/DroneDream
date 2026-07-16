@@ -22,6 +22,49 @@ class ParameterDomain:
     enabled: bool = True
     locked: bool = False
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name:
+            raise ValueError("parameter domain name must be a non-empty string")
+        numeric_fields = {
+            "baseline": self.baseline,
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+        }
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or not math.isfinite(float(value))
+            for value in numeric_fields.values()
+        ):
+            raise ValueError("parameter domain bounds and baseline must be finite numbers")
+        if self.minimum > self.maximum:
+            raise ValueError("parameter domain minimum cannot exceed maximum")
+        if not self.minimum <= self.baseline <= self.maximum:
+            raise ValueError("parameter domain baseline must be inside its bounds")
+        if self.step is not None and (
+            isinstance(self.step, bool)
+            or not isinstance(self.step, int | float)
+            or not math.isfinite(float(self.step))
+            or self.step <= 0
+        ):
+            raise ValueError("parameter domain step must be finite and > 0")
+        if self.scale not in {"linear", "log"}:
+            raise ValueError("parameter domain scale must be linear or log")
+        if self.scale == "log" and self.minimum <= 0:
+            raise ValueError("log-scaled parameter domains require a positive minimum")
+        if self.value_type not in {"float", "integer", "boolean", "enum"}:
+            raise ValueError("unsupported parameter domain value_type")
+        if any(
+            isinstance(choice, bool)
+            or not isinstance(choice, int | float)
+            or not math.isfinite(float(choice))
+            or not self.minimum <= float(choice) <= self.maximum
+            for choice in self.choices
+        ):
+            raise ValueError("parameter choices must be finite and inside the bounds")
+        if len(set(self.choices)) != len(self.choices):
+            raise ValueError("parameter choices must be unique")
+
     @classmethod
     def from_schema(cls, value: ParameterSelection) -> ParameterDomain:
         return cls(
@@ -44,6 +87,12 @@ class ParameterDomain:
     def from_unit(self, unit_value: float) -> float:
         """Map a value in [0, 1] to the parameter's native domain."""
 
+        if (
+            isinstance(unit_value, bool)
+            or not isinstance(unit_value, int | float)
+            or not math.isfinite(float(unit_value))
+        ):
+            raise ValueError(f"{self.name} unit coordinate must be finite")
         unit = max(0.0, min(1.0, float(unit_value)))
         if not self.tunable:
             return self.project(self.baseline)
@@ -76,7 +125,11 @@ class ParameterDomain:
     def project(self, raw_value: float) -> float:
         """Clamp and snap an arbitrary proposal to a firmware-valid value."""
 
-        if not math.isfinite(raw_value):
+        if (
+            isinstance(raw_value, bool)
+            or not isinstance(raw_value, int | float)
+            or not math.isfinite(float(raw_value))
+        ):
             raise ValueError(f"{self.name} must be finite")
         value = max(self.minimum, min(self.maximum, float(raw_value)))
         if self.choices:

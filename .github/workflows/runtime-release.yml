@@ -32,10 +32,14 @@ jobs:
       IMAGE: dronedream/runtime:${{ github.run_id }}-${{ github.run_attempt }}
       RELEASE_TAG: ${{ inputs.release_tag }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+          # The build executes pinned third-party setup code. Do not leave the
+          # workflow's contents:write credential in the checkout's Git config;
+          # only the explicit publish steps below receive GH_TOKEN.
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
 
@@ -71,6 +75,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
+          # A pushed tag is already immutable release state even when a
+          # previous attempt failed before creating the GitHub Release object.
+          # Query the remote directly and fail closed on transport/auth errors;
+          # otherwise `gh release create --target` could publish new payloads
+          # under a stale tag.
+          set +e
+          git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1
+          tag_status=$?
+          set -e
+          if [[ "$tag_status" -eq 0 ]]; then
+            echo "release tag already exists and will never be reused: $RELEASE_TAG" >&2
+            exit 2
+          fi
+          if [[ "$tag_status" -ne 2 ]]; then
+            echo "could not verify that the release tag is unused: $RELEASE_TAG" >&2
+            exit 2
+          fi
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "release already exists and will never be overwritten: $RELEASE_TAG" >&2
             exit 2

@@ -25,7 +25,7 @@ describe("GazeboLivePanel", () => {
     expect(parsed.searchParams.get("resize")).toBe("scale");
     expect(parsed.searchParams.get("view_clip")).toBe("0");
     expect(
-      screen.getByText(/optional and intended for Runpod demo\/debug mode/i),
+      screen.getByText(/live view is optional.*remains headless/i),
     ).toBeInTheDocument();
   });
 });

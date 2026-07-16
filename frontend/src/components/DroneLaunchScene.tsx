@@ -1,15 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
 
 import { useI18n } from "../i18n/I18nProvider";
+import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import {
   DRONE_STARFLIGHT_DURATION_SECONDS,
   getDroneStarflightPose,
 } from "./droneStarflight";
+import {
+  AdaptiveDprController,
+  DRONE_IDLE_FPS,
+  DRONE_INTERACTION_TAIL_MS,
+  DRONE_INTERACTIVE_FPS,
+  estimateRefreshInterval,
+  renderGapBudget,
+  shouldRunDroneRenderLoop,
+} from "./droneRenderPerformance";
 
 type DroneLaunchSceneProps = {
   active?: boolean;
   progress?: number | null;
+  starflightControllerRef?: MutableRefObject<(() => void) | null>;
+  visualOffsetX?: number;
 };
 
 const CARBON = 0x171827;
@@ -19,12 +31,18 @@ const MAGENTA = 0xff4fd8;
 const CYAN = 0x54e8ff;
 
 function disposeScene(root: THREE.Object3D) {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
   root.traverse((object) => {
     const mesh = object as THREE.Mesh;
-    mesh.geometry?.dispose();
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const material of materials) material?.dispose();
+    if (mesh.geometry) geometries.add(mesh.geometry);
+    const objectMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of objectMaterials) {
+      if (material) materials.add(material);
+    }
   });
+  geometries.forEach((geometry) => geometry.dispose());
+  materials.forEach((material) => material.dispose());
 }
 
 function tubeBetween(
@@ -234,6 +252,17 @@ function buildDrone() {
   return { drone, rotors };
 }
 
+function createSeededRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
+  };
+}
+
 function makeRadialTexture(stops: Array<[number, string]>, size = 128) {
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -256,12 +285,14 @@ function buildStarLayer({
   size,
   opacity,
   texture,
+  random,
   accent = false,
 }: {
   count: number;
   size: number;
   opacity: number;
   texture: THREE.Texture | null;
+  random: () => number;
   accent?: boolean;
 }) {
   const positions = new Float32Array(count * 3);
@@ -274,12 +305,12 @@ function buildStarLayer({
   ];
   for (let index = 0; index < count; index += 1) {
     const spread = accent ? 17 : 24;
-    positions[index * 3] = (Math.random() - 0.5) * spread;
-    positions[index * 3 + 1] = (Math.random() - 0.38) * (accent ? 10 : 14);
-    positions[index * 3 + 2] = -3.5 - Math.random() * (accent ? 10 : 19);
-    const color = palette[Math.floor(Math.random() * palette.length)]
+    positions[index * 3] = (random() - 0.5) * spread;
+    positions[index * 3 + 1] = (random() - 0.38) * (accent ? 10 : 14);
+    positions[index * 3 + 2] = -3.5 - random() * (accent ? 10 : 19);
+    const color = palette[Math.floor(random() * palette.length)]
       .clone()
-      .multiplyScalar(0.72 + Math.random() * 0.42);
+      .multiplyScalar(0.72 + random() * 0.42);
     colors[index * 3] = color.r;
     colors[index * 3 + 1] = color.g;
     colors[index * 3 + 2] = color.b;
@@ -302,23 +333,26 @@ function buildStarLayer({
   return { points: new THREE.Points(geometry, material), material };
 }
 
-function buildGalacticDust(texture: THREE.Texture | null) {
-  const count = 440;
+function buildGalacticDust(
+  texture: THREE.Texture | null,
+  random: () => number,
+  count: number,
+) {
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   const cyan = new THREE.Color(0x54dfff);
   const violet = new THREE.Color(0xa56cff);
   const magenta = new THREE.Color(0xff63d8);
   for (let index = 0; index < count; index += 1) {
-    const distance = (Math.random() - 0.5) * 18;
+    const distance = (random() - 0.5) * 18;
     positions[index * 3] = distance;
-    positions[index * 3 + 1] = distance * 0.18 + (Math.random() - 0.5) * 1.35;
-    positions[index * 3 + 2] = -6 - Math.random() * 10;
-    const mix = Math.random();
+    positions[index * 3 + 1] = distance * 0.18 + (random() - 0.5) * 1.35;
+    positions[index * 3 + 2] = -6 - random() * 10;
+    const mix = random();
     const color = mix < 0.45
       ? cyan.clone().lerp(violet, mix / 0.45)
       : violet.clone().lerp(magenta, (mix - 0.45) / 0.55);
-    color.multiplyScalar(0.45 + Math.random() * 0.45);
+    color.multiplyScalar(0.45 + random() * 0.45);
     colors[index * 3] = color.r;
     colors[index * 3 + 1] = color.g;
     colors[index * 3 + 2] = color.b;
@@ -343,12 +377,23 @@ function buildGalacticDust(texture: THREE.Texture | null) {
   return { dust, material };
 }
 
-export function DroneLaunchScene({ active = false, progress = null }: DroneLaunchSceneProps) {
+export function DroneLaunchScene({
+  active = false,
+  progress = null,
+  starflightControllerRef,
+  visualOffsetX = 0,
+}: DroneLaunchSceneProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const attitudeValueRef = useRef<HTMLSpanElement>(null);
+  const activeRef = useRef(active);
   const [fallback, setFallback] = useState(false);
   const [starflightActive, setStarflightActive] = useState(false);
   const { locale, t } = useI18n();
+  const reducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -359,29 +404,66 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       return;
     }
 
+    const random = createSeededRandom(0x4452_444d);
+    const qualityController = new AdaptiveDprController(window.devicePixelRatio, performance.now());
+
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance",
+      });
     } catch {
       setFallback(true);
       return;
     }
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
+    setFallback(false);
+    renderer.setPixelRatio(qualityController.currentDpr);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = false;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.25;
     renderer.domElement.className = "drone-launch-canvas";
     renderer.domElement.setAttribute("aria-hidden", "true");
+    renderer.domElement.style.cursor = reducedMotion ? "default" : "crosshair";
     host.appendChild(renderer.domElement);
+    host.dataset.renderDpr = qualityController.currentDpr.toFixed(2);
+    host.dataset.renderFps = reducedMotion ? "0" : String(DRONE_IDLE_FPS);
+    host.dataset.renderState = reducedMotion ? "static" : "idle";
+
+    let contextHealthy = true;
+    let forceShadowUpdate = true;
+    let reconcileLoop = () => undefined;
+
+    const onContextLost = (event: Event) => {
+      event.preventDefault();
+      contextHealthy = false;
+      renderer.domElement.style.visibility = "hidden";
+      reconcileLoop();
+      setFallback(true);
+    };
+    const onContextRestored = () => {
+      contextHealthy = true;
+      forceShadowUpdate = true;
+      qualityController.resetMeasurements(performance.now());
+      renderer.domElement.style.visibility = "visible";
+      reconcileLoop();
+      setFallback(false);
+    };
+    renderer.domElement.addEventListener("webglcontextlost", onContextLost);
+    renderer.domElement.addEventListener("webglcontextrestored", onContextRestored);
 
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x090319, 0.042);
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
     camera.position.set(5.3, 3.35, 7.5);
     camera.lookAt(0, 0.05, 0);
+    const visualOffsetDirection = new THREE.Vector3(0.82, 0, -0.58).normalize();
+    const visualOffset = new THREE.Vector3();
 
     const starTexture = makeRadialTexture([
       [0, "rgba(255,255,255,1)"],
@@ -408,12 +490,14 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       size: 0.082,
       opacity: 0.88,
       texture: starTexture,
+      random,
     });
     const accentStars = buildStarLayer({
       count: 240,
       size: 0.16,
       opacity: 0.94,
       texture: starTexture,
+      random,
       accent: true,
     });
     const beaconStars = buildStarLayer({
@@ -421,9 +505,14 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       size: 0.28,
       opacity: 0.98,
       texture: starTexture,
+      random,
       accent: true,
     });
-    const galacticDust = buildGalacticDust(starTexture);
+    const galacticDust = buildGalacticDust(
+      starTexture,
+      random,
+      440,
+    );
     beaconStars.points.position.z = -1.6;
     celestialBackdrop.add(
       distantStars.points,
@@ -480,13 +569,13 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
     scene.add(drone);
 
     const floor = new THREE.Mesh(
-      new THREE.CircleGeometry(5.4, 72),
+      new THREE.PlaneGeometry(36, 36),
       new THREE.MeshStandardMaterial({
         color: 0x0a0719,
         roughness: 0.86,
         metalness: 0.15,
         transparent: true,
-        opacity: 0.62,
+        opacity: 0.44,
       }),
     );
     floor.rotation.x = -Math.PI / 2;
@@ -494,7 +583,7 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
     floor.receiveShadow = true;
     scene.add(floor);
 
-    const grid = new THREE.GridHelper(12, 28, MAGENTA, 0x34244f);
+    const grid = new THREE.GridHelper(28, 56, MAGENTA, 0x34244f);
     grid.position.y = -1.23;
     const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
     gridMaterials.forEach((material) => {
@@ -523,10 +612,10 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
     const particleCount = 240;
     const particlePositions = new Float32Array(particleCount * 3);
     for (let index = 0; index < particleCount; index += 1) {
-      const radius = 2.3 + Math.random() * 4.1;
-      const angle = Math.random() * Math.PI * 2;
+      const radius = 2.3 + random() * 4.1;
+      const angle = random() * Math.PI * 2;
       particlePositions[index * 3] = Math.cos(angle) * radius;
-      particlePositions[index * 3 + 1] = -0.9 + Math.random() * 4.5;
+      particlePositions[index * 3 + 1] = -0.9 + random() * 4.5;
       particlePositions[index * 3 + 2] = Math.sin(angle) * radius;
     }
     const particleGeometry = new THREE.BufferGeometry();
@@ -548,70 +637,215 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
     const pointerTarget = new THREE.Vector2();
     const pointerNdc = new THREE.Vector2();
     const raycaster = new THREE.Raycaster();
-    const clock = new THREE.Clock();
+    const droneHitSphere = new THREE.Sphere(new THREE.Vector3(), 2.55);
+    const refreshIntervals: number[] = [];
+    let sceneElapsedSeconds = 0;
     let starflightStartedAt: number | null = null;
     let lastAttitudeUpdate = -1;
+    let pendingPointerX = 0;
+    let pendingPointerY = 0;
+    let pointerDirty = false;
+    let lastHitTestAt = Number.NEGATIVE_INFINITY;
+    let cursorHitsDrone = false;
+    let interactionUntil = 0;
 
-    const updatePointerNdc = (event: PointerEvent) => {
-      const rect = host.getBoundingClientRect();
-      pointerNdc.x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
-      pointerNdc.y = -((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 + 1;
-      return rect;
+    const updatePointerNdc = (clientX: number, clientY: number, rect: DOMRect) => {
+      pointerNdc.x = ((clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
+      pointerNdc.y = -((clientY - rect.top) / Math.max(rect.height, 1)) * 2 + 1;
     };
 
-    const isDroneHit = (event: PointerEvent) => {
-      updatePointerNdc(event);
+    const isDroneHit = (clientX: number, clientY: number, rect: DOMRect) => {
+      updatePointerNdc(clientX, clientY, rect);
       raycaster.setFromCamera(pointerNdc, camera);
-      return raycaster.intersectObject(drone, true).length > 0;
+      droneHitSphere.center.copy(drone.position);
+      droneHitSphere.radius = 2.55 * drone.scale.x;
+      return raycaster.ray.intersectsSphere(droneHitSphere);
+    };
+
+    const setDroneCursorHit = (hit: boolean) => {
+      if (cursorHitsDrone === hit || starflightStartedAt !== null) return;
+      cursorHitsDrone = hit;
+      renderer.domElement.style.cursor = hit ? "pointer" : "crosshair";
     };
 
     const beginStarflight = () => {
       if (starflightStartedAt !== null || reducedMotion) return;
-      starflightStartedAt = clock.getElapsedTime();
+      starflightStartedAt = sceneElapsedSeconds;
+      interactionUntil = Number.POSITIVE_INFINITY;
       renderer.domElement.style.cursor = "progress";
       setStarflightActive(true);
     };
+    if (starflightControllerRef) starflightControllerRef.current = beginStarflight;
 
     const onPointerMove = (event: PointerEvent) => {
-      const rect = updatePointerNdc(event);
-      pointerTarget.x = ((event.clientX - rect.left) / Math.max(rect.width, 1) - 0.5) * 2;
-      pointerTarget.y = ((event.clientY - rect.top) / Math.max(rect.height, 1) - 0.5) * 2;
-      if (starflightStartedAt === null && !reducedMotion) {
-        renderer.domElement.style.cursor = isDroneHit(event) ? "pointer" : "crosshair";
-      }
+      pendingPointerX = event.clientX;
+      pendingPointerY = event.clientY;
+      pointerDirty = true;
+      interactionUntil = performance.now() + DRONE_INTERACTION_TAIL_MS;
     };
     const onPointerUp = (event: PointerEvent) => {
-      if (event.button !== 0 || starflightStartedAt !== null || !isDroneHit(event)) return;
+      if (event.button !== 0 || starflightStartedAt !== null) return;
+      interactionUntil = performance.now() + DRONE_INTERACTION_TAIL_MS;
+      const rect = host.getBoundingClientRect();
+      if (!isDroneHit(event.clientX, event.clientY, rect)) return;
       beginStarflight();
     };
-    host.addEventListener("pointermove", onPointerMove, { passive: true });
-    host.addEventListener("pointerup", onPointerUp);
+    const onPointerLeave = () => {
+      pointerDirty = false;
+      pointerTarget.set(0, 0);
+      setDroneCursorHit(false);
+    };
+    if (!reducedMotion) {
+      host.addEventListener("pointermove", onPointerMove, { passive: true });
+      host.addEventListener("pointerup", onPointerUp);
+      host.addEventListener("pointerleave", onPointerLeave, { passive: true });
+    }
 
+    let cameraDistanceScale = 1;
     const resize = () => {
       const width = Math.max(host.clientWidth, 1);
       const height = Math.max(host.clientHeight, 1);
       renderer.setSize(width, height, false);
+      forceShadowUpdate = true;
+      qualityController.resetMeasurements(performance.now());
       camera.aspect = width / height;
+      cameraDistanceScale = THREE.MathUtils.clamp(1.18 / camera.aspect, 1, 1.65);
+      const wideLayoutFactor = THREE.MathUtils.clamp((camera.aspect - 1.05) / 0.5, 0, 1);
+      visualOffset.copy(visualOffsetDirection).multiplyScalar(visualOffsetX * wideLayoutFactor);
+      telemetryRing.position.x = visualOffset.x;
+      telemetryRing.position.z = visualOffset.z;
+      particles.position.x = visualOffset.x;
+      particles.position.z = visualOffset.z;
       camera.updateProjectionMatrix();
+      if (reducedMotion) {
+        camera.position.set(
+          5.3 * cameraDistanceScale,
+          3.35 * Math.min(cameraDistanceScale, 1.28),
+          7.5 * cameraDistanceScale,
+        );
+        camera.lookAt(0, 0.02, 0);
+        renderer.render(scene, camera);
+      }
     };
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(host);
+    window.addEventListener("resize", resize, { passive: true });
     resize();
 
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let animationFrame = 0;
-    let visible = true;
-    const onVisibility = () => {
-      visible = !document.hidden;
-      if (visible && animationFrame === 0) animationFrame = requestAnimationFrame(render);
+    let inViewport = true;
+    let documentVisible = !document.hidden;
+    let exitViewportTimer: number | null = null;
+    let lastRafTimestamp = 0;
+    let lastSceneTimestamp = 0;
+    let nextRenderDue = 0;
+    let lastRenderedAt = 0;
+    let awaitingPostRenderSample = false;
+    let lastShadowUpdateAt = Number.NEGATIVE_INFINITY;
+    let renderMode: "idle" | "interactive" = "idle";
+
+    const updateRenderState = (state: "stopped" | "idle" | "interactive" | "static") => {
+      host.dataset.renderState = state;
+      host.dataset.renderFps = state === "interactive"
+        ? String(DRONE_INTERACTIVE_FPS)
+        : state === "idle"
+          ? String(DRONE_IDLE_FPS)
+          : "0";
     };
 
-    function render() {
-      animationFrame = 0;
-      if (!visible) return;
-      const elapsed = clock.getElapsedTime();
-      const motion = reducedMotion ? 0.18 : 1;
-      pointer.lerp(pointerTarget, 0.035);
+    const applyRenderDpr = (pixelRatio: number, now: number) => {
+      renderer.setPixelRatio(pixelRatio);
+      renderer.setSize(Math.max(host.clientWidth, 1), Math.max(host.clientHeight, 1), false);
+      host.dataset.renderDpr = pixelRatio.toFixed(2);
+      forceShadowUpdate = true;
+      lastSceneTimestamp = now;
+    };
+
+    const resetLoopTiming = (now: number) => {
+      lastRafTimestamp = 0;
+      lastSceneTimestamp = 0;
+      nextRenderDue = now;
+      lastRenderedAt = 0;
+      awaitingPostRenderSample = false;
+      refreshIntervals.length = 0;
+      qualityController.resetMeasurements(now);
+    };
+
+    const canRun = () => shouldRunDroneRenderLoop({
+      inViewport,
+      documentVisible,
+      contextHealthy,
+      reducedMotion,
+    });
+
+    reconcileLoop = () => {
+      const now = performance.now();
+      if (!canRun()) {
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+        resetLoopTiming(now);
+        updateRenderState(reducedMotion ? "static" : "stopped");
+        return;
+      }
+      if (animationFrame === 0) {
+        resetLoopTiming(now);
+        updateRenderState("idle");
+        animationFrame = requestAnimationFrame(tick);
+      }
+    };
+
+    const onVisibility = () => {
+      documentVisible = !document.hidden;
+      reconcileLoop();
+    };
+
+    const initialRect = host.getBoundingClientRect();
+    inViewport = initialRect.bottom > 0 && initialRect.top < window.innerHeight;
+    const viewportObserver = typeof IntersectionObserver === "undefined"
+      ? null
+      : new IntersectionObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        if (entry.isIntersecting) {
+          if (exitViewportTimer !== null) window.clearTimeout(exitViewportTimer);
+          exitViewportTimer = null;
+          inViewport = true;
+          reconcileLoop();
+          return;
+        }
+        if (exitViewportTimer !== null) window.clearTimeout(exitViewportTimer);
+        exitViewportTimer = window.setTimeout(() => {
+          exitViewportTimer = null;
+          inViewport = false;
+          reconcileLoop();
+        }, 150);
+      }, { threshold: [0, 0.01] });
+    viewportObserver?.observe(host);
+
+    function renderScene(now: number, interactive: boolean) {
+      const targetInterval = 1000 /
+        (interactive ? DRONE_INTERACTIVE_FPS : DRONE_IDLE_FPS);
+      const deltaSeconds = lastSceneTimestamp > 0
+        ? Math.min((now - lastSceneTimestamp) / 1000, 0.1)
+        : targetInterval / 1000;
+      lastSceneTimestamp = now;
+      sceneElapsedSeconds += deltaSeconds;
+
+      if (pointerDirty) {
+        const rect = host!.getBoundingClientRect();
+        pointerTarget.x = ((pendingPointerX - rect.left) / Math.max(rect.width, 1) - 0.5) * 2;
+        pointerTarget.y = ((pendingPointerY - rect.top) / Math.max(rect.height, 1) - 0.5) * 2;
+        if (now - lastHitTestAt >= 1000 / 30) {
+          setDroneCursorHit(isDroneHit(pendingPointerX, pendingPointerY, rect));
+          lastHitTestAt = now;
+          pointerDirty = false;
+        }
+      }
+
+      const pointerBlend = 1 - Math.exp(-deltaSeconds * 2.14);
+      pointer.lerp(pointerTarget, pointerBlend);
+      const elapsed = sceneElapsedSeconds;
+      const motion = reducedMotion ? 0 : 1;
 
       const idleY = 0.34 + Math.sin(elapsed * 0.72) * 0.075 * motion;
       const idleYaw = -0.2 + Math.sin(elapsed * 0.18) * 0.1 * motion + pointer.x * 0.055;
@@ -620,23 +854,29 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       let flightPose = getDroneStarflightPose(0);
 
       if (starflightStartedAt !== null) {
-        const starflightProgress = (elapsed - starflightStartedAt) / DRONE_STARFLIGHT_DURATION_SECONDS;
+        const starflightProgress = (elapsed - starflightStartedAt) /
+          DRONE_STARFLIGHT_DURATION_SECONDS;
         flightPose = getDroneStarflightPose(starflightProgress);
         if (starflightProgress >= 1) {
           starflightStartedAt = null;
-          renderer.domElement.style.cursor = "crosshair";
+          interactionUntil = now + DRONE_INTERACTION_TAIL_MS;
+          renderer.domElement.style.cursor = cursorHitsDrone ? "pointer" : "crosshair";
           setStarflightActive(false);
         }
       }
 
-      drone.position.set(flightPose.x, idleY + flightPose.y, flightPose.z);
+      drone.position.set(
+        flightPose.x + visualOffset.x,
+        idleY + flightPose.y,
+        flightPose.z + visualOffset.z,
+      );
       drone.scale.setScalar(flightPose.scale);
       drone.rotation.y = idleYaw + flightPose.yaw;
       drone.rotation.x = idlePitch + flightPose.pitch;
       drone.rotation.z = idleRoll + flightPose.roll;
       rotors.forEach((rotor, index) => {
-        const rotorSpeed = active || starflightStartedAt !== null ? 0.72 : 0.34;
-        rotor.rotation.y += rotorSpeed * (index % 2 === 0 ? 1 : -1) * motion;
+        const rotorSpeed = activeRef.current || starflightStartedAt !== null ? 43.2 : 20.4;
+        rotor.rotation.y += rotorSpeed * deltaSeconds * (index % 2 === 0 ? 1 : -1) * motion;
       });
       telemetryRing.rotation.y = elapsed * 0.055 * motion;
       particles.rotation.y = elapsed * 0.012 * motion;
@@ -649,28 +889,95 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       galacticDust.material.opacity = 0.27 + Math.sin(elapsed * 0.2) * 0.035 * motion;
       cyanNebulaMaterial.opacity = 0.31 + Math.sin(elapsed * 0.12) * 0.035 * motion;
       magentaNebulaMaterial.opacity = 0.27 + Math.sin(elapsed * 0.1 + 2.2) * 0.04 * motion;
-      camera.position.x = 5.3 + pointer.x * 0.28;
-      camera.position.y = 3.35 - pointer.y * 0.16;
+      camera.position.x = (5.3 + pointer.x * 0.28) * cameraDistanceScale;
+      camera.position.y = (3.35 - pointer.y * 0.16) * Math.min(cameraDistanceScale, 1.28);
+      camera.position.z = 7.5 * cameraDistanceScale;
       camera.lookAt(0, 0.02, 0);
       if (elapsed - lastAttitudeUpdate >= 0.1 && attitudeValueRef.current) {
         const rollDegrees = THREE.MathUtils.radToDeg(drone.rotation.z);
         attitudeValueRef.current.textContent = `${rollDegrees >= 0 ? "+" : ""}${rollDegrees.toFixed(1)}°`;
         lastAttitudeUpdate = elapsed;
       }
+
+      const shadowInterval = interactive ? 1000 / 30 : 1000 / 15;
+      if (forceShadowUpdate || now - lastShadowUpdateAt >= shadowInterval) {
+        renderer.shadowMap.needsUpdate = true;
+        forceShadowUpdate = false;
+        lastShadowUpdateAt = now;
+      }
       renderer.render(scene, camera);
-      animationFrame = requestAnimationFrame(render);
+      lastRenderedAt = now;
+      awaitingPostRenderSample = true;
+    }
+
+    function tick(now: number) {
+      animationFrame = 0;
+      if (!canRun()) return;
+
+      if (lastRafTimestamp > 0) {
+        const refreshGap = now - lastRafTimestamp;
+        if (refreshGap >= 4 && refreshGap <= 50) {
+          refreshIntervals.push(refreshGap);
+          if (refreshIntervals.length > 90) refreshIntervals.shift();
+        }
+      }
+      lastRafTimestamp = now;
+
+      const interactive = starflightStartedAt !== null || now < interactionUntil;
+      const nextMode = interactive ? "interactive" : "idle";
+      if (renderMode !== nextMode) {
+        renderMode = nextMode;
+        nextRenderDue = now;
+        updateRenderState(nextMode);
+      }
+
+      if (awaitingPostRenderSample && lastRenderedAt > 0) {
+        awaitingPostRenderSample = false;
+        const refreshInterval = estimateRefreshInterval(refreshIntervals);
+        const changedDpr = qualityController.recordFrameGap({
+          gapMs: now - lastRenderedAt,
+          budgetMs: renderGapBudget(refreshInterval),
+          now,
+          interactive,
+        });
+        if (changedDpr !== null) applyRenderDpr(changedDpr, now);
+      }
+
+      const frameInterval = 1000 /
+        (interactive ? DRONE_INTERACTIVE_FPS : DRONE_IDLE_FPS);
+      if (nextRenderDue <= 0) nextRenderDue = now;
+      if (now + 0.5 >= nextRenderDue) {
+        const missedFrames = Math.max(0, Math.floor((now - nextRenderDue) / frameInterval));
+        nextRenderDue += (missedFrames + 1) * frameInterval;
+        renderScene(now, interactive);
+      }
+
+      animationFrame = requestAnimationFrame(tick);
     }
 
     document.addEventListener("visibilitychange", onVisibility);
-    animationFrame = requestAnimationFrame(render);
+    if (reducedMotion) {
+      updateRenderState("static");
+      renderScene(performance.now(), false);
+    } else {
+      reconcileLoop();
+    }
 
     return () => {
-      visible = false;
+      inViewport = false;
+      documentVisible = false;
       if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (exitViewportTimer !== null) window.clearTimeout(exitViewportTimer);
       document.removeEventListener("visibilitychange", onVisibility);
       host.removeEventListener("pointermove", onPointerMove);
       host.removeEventListener("pointerup", onPointerUp);
+      host.removeEventListener("pointerleave", onPointerLeave);
+      if (starflightControllerRef) starflightControllerRef.current = null;
+      viewportObserver?.disconnect();
       resizeObserver.disconnect();
+      window.removeEventListener("resize", resize);
+      renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
+      renderer.domElement.removeEventListener("webglcontextrestored", onContextRestored);
       disposeScene(scene);
       starTexture?.dispose();
       cyanNebulaTexture?.dispose();
@@ -679,7 +986,7 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [active]);
+  }, [reducedMotion, starflightControllerRef, visualOffsetX]);
 
   return (
     <div
@@ -689,11 +996,11 @@ export function DroneLaunchScene({ active = false, progress = null }: DroneLaunc
       data-flight-state={starflightActive ? "starflight" : "hover"}
     >
       <div className="drone-launch-aura" aria-hidden="true" />
-      <div
+      <h1
         className={`drone-launch-tagline drone-launch-tagline-${locale === "zh-CN" ? "zh" : "en"}${starflightActive ? " is-hidden" : ""}`}
       >
         {t("launcher.tagline")}
-      </div>
+      </h1>
       <div className="drone-launch-hud drone-launch-hud-left" aria-hidden="true">
         <span>{t("launcher.telemetry.system")}</span>
         <strong>{active

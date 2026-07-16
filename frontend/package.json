@@ -1,7 +1,7 @@
 {
   "name": "drone-dream-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.18",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,10 +9,14 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
+    "site:dev": "vite --config vite.site.config.ts --open /site.html",
+    "site:build": "tsc -b && vite build --config vite.site.config.ts",
+    "site:preview": "vite preview --config vite.site.config.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fontsource-variable/space-grotesk": "^5.2.10",
     "@tanstack/react-query": "^5.51.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

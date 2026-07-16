@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from app import db, models
 from app.config import get_settings
+from fastapi.testclient import TestClient
 
 PAYLOAD = {
     "track_type": "circle",
@@ -26,6 +25,14 @@ def test_demo_token_requires_auth(client: TestClient, monkeypatch) -> None:
     get_settings.cache_clear()
     resp = client.post("/api/v1/jobs", json=PAYLOAD)
     assert resp.status_code == 401
+
+    oversized = client.post(
+        "/api/v1/jobs",
+        headers={"Authorization": "Bearer " + "x" * 16_385},
+        json=PAYLOAD,
+    )
+    assert oversized.status_code == 401
+    assert "x" * 100 not in oversized.text
 
 
 def test_demo_token_isolates_jobs_by_user(client: TestClient, monkeypatch) -> None:

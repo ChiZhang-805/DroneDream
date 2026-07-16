@@ -17,6 +17,13 @@ from pathlib import Path
 import pytest
 
 
+def _clear_settings_cache() -> None:
+    """Clear the currently loaded config module, not a stale pre-reload alias."""
+
+    config_module = importlib.import_module("app.config")
+    config_module.get_settings.cache_clear()
+
+
 @pytest.fixture()
 def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     """Reload the backend against an isolated SQLite DB."""
@@ -327,6 +334,7 @@ def test_real_cli_job_artifacts_are_real_files_and_idempotent(ctx, tmp_path, mon
     models = ctx["models"]
     db_module = ctx["db_module"]
     monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
 
     with db_module.SessionLocal() as db:
         job = models.Job(
@@ -407,6 +415,7 @@ def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
     models = ctx["models"]
     db_module = ctx["db_module"]
     monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
 
     with db_module.SessionLocal() as db:
         job = models.Job(
@@ -485,6 +494,14 @@ def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
             .all()
         )
         assert len(rows) == 1
+
+
+def test_pdf_renderer_uses_unicode_cid_font_for_chinese_text() -> None:
+    from app.services.pdf_report import _build_pdf
+
+    pdf = _build_pdf(["蝶 梦 水 云 乡"])
+    assert b"/Encoding /UniGB-UCS2-H" in pdf
+    assert "蝶 梦 水 云 乡".encode("utf-16-be").hex().upper().encode("ascii") in pdf
 
 
 def test_generate_job_pdf_report_creates_expected_file(ctx, tmp_path):
@@ -684,12 +701,15 @@ def test_generate_job_pdf_report_paginates_and_includes_all_candidates_trials(ct
         assert path.exists()
         assert path.name == f"{job.id} report.pdf"
         assert body.startswith(b"%PDF")
-        assert b"cand_large_000" in body
-        assert b"cand_large_020" in body
-        assert b"tri_large_000" in body
-        assert b"tri_large_063" in body
-        assert b"Page 1 /" in body
-        assert b"Page 2 /" in body
+        def pdf_text(value: str) -> bytes:
+            return value.encode("utf-16-be").hex().upper().encode("ascii")
+
+        assert pdf_text("cand_large_000") in body
+        assert pdf_text("cand_large_020") in body
+        assert pdf_text("tri_large_000") in body
+        assert pdf_text("tri_large_063") in body
+        assert pdf_text("Page 1 /") in body
+        assert pdf_text("Page 2 /") in body
 
 
 def test_generate_job_pdf_report_excludes_secret_values(ctx, tmp_path):
@@ -796,6 +816,9 @@ def test_repro_manifest_generated_for_mock_job(ctx):
         assert "track_type" in payload["job"]
         assert "acceptance_criteria" in payload["job"]
         assert "candidate_summaries" in payload["optimizer"]
+        candidate_summary = payload["optimizer"]["candidate_summaries"][0]
+        assert "parameters" in candidate_summary
+        assert "aggregated_feedback" in candidate_summary
 
 
 def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
@@ -803,6 +826,7 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
     models = ctx["models"]
     db_module = ctx["db_module"]
     monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
 
     with db_module.SessionLocal() as db:
         job = models.Job(
@@ -909,6 +933,7 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
     monkeypatch.setenv("APP_SECRET_KEY", "top-secret")
     monkeypatch.setenv("SERVICE_TOKEN", "tok-secret")
     monkeypatch.setenv("DB_PASSWORD", "db-secret")
+    _clear_settings_cache()
 
     with db_module.SessionLocal() as db:
         job = models.Job(
@@ -1011,6 +1036,8 @@ def test_build_job_report_lines_includes_new_sections(ctx):
                 },
             },
             is_best=True,
+            trial_count=1,
+            completed_trial_count=1,
         )
         db.add_all([baseline, best])
         db.flush()

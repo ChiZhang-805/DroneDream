@@ -10,6 +10,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from app.simulator.scenario_effects import (
+    EVIDENCE_ARTIFACT_NAME,
+    build_scenario_effect_request,
+    validate_scenario_effect_evidence,
+)
 
 WRAPPER = (
     Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "local_px4_launch_wrapper.py"
@@ -303,8 +308,10 @@ def test_ulog_to_telemetry_json_writes_schema_with_attitude_groundtruth_fallback
 
     monkeypatch.setitem(sys.modules, "pyulog", SimpleNamespace(ULog=FakeULog))
     output_path = tmp_path / "telemetry.json"
+    ulog_path = tmp_path / "sample.ulg"
+    ulog_path.write_bytes(b"test ULog fixture")
     wrapper.ulog_to_telemetry_json(
-        tmp_path / "sample.ulg",
+        ulog_path,
         output_path,
         vehicle="x500",
         world="default",
@@ -330,13 +337,234 @@ def test_ulog_to_telemetry_json_fails_when_vehicle_local_position_missing(
             self.data_list = [_fake_dataset("vehicle_status", {"nav_state": [1]})]
 
     monkeypatch.setitem(sys.modules, "pyulog", SimpleNamespace(ULog=FakeULog))
+    ulog_path = tmp_path / "sample.ulg"
+    ulog_path.write_bytes(b"test ULog fixture")
     with pytest.raises(ValueError, match="vehicle_local_position"):
         wrapper.ulog_to_telemetry_json(
-            tmp_path / "sample.ulg",
+            ulog_path,
             tmp_path / "telemetry.json",
             "x500",
             "default",
         )
+
+
+def test_ulog_conversion_downsamples_evenly_and_preserves_endpoints(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake_ulog = _fake_ulog_with_groundtruth_yaw()
+    local_position = fake_ulog.data_list[0]
+    local_position.data = {
+        "timestamp": [index * 1_000_000 for index in range(6)],
+        "x": [float(index) for index in range(6)],
+        "y": [0.0] * 6,
+        "z": [-3.0] * 6,
+        "vx": [1.0] * 6,
+        "vy": [0.0] * 6,
+        "vz": [0.0] * 6,
+    }
+
+    class FakeULog:
+        def __init__(self, _path: str):
+            self.data_list = fake_ulog.data_list
+
+    monkeypatch.setitem(sys.modules, "pyulog", SimpleNamespace(ULog=FakeULog))
+    monkeypatch.setattr(wrapper, "MAX_TELEMETRY_SAMPLES", 3)
+    ulog_path = tmp_path / "sample.ulg"
+    ulog_path.write_bytes(b"test ULog fixture")
+    output_path = tmp_path / "telemetry.json"
+
+    wrapper.ulog_to_telemetry_json(ulog_path, output_path, "x500", "default")
+
+    samples = json.loads(output_path.read_text(encoding="utf-8"))["samples"]
+    assert [sample["x"] for sample in samples] == [0.0, 2.0, 5.0]
+    assert [sample["t"] for sample in samples] == [0.0, 2.0, 5.0]
+
+
+def _obstacle_effect() -> dict[str, object]:
+    return {
+        "effect_id": "obstacles",
+        "source": "advanced_scenario_config.obstacles",
+        "requested_value": [
+            {
+                "type": "box",
+                "x": 1.0,
+                "y": 2.0,
+                "z": 0.5,
+                "size_x": 1.0,
+                "size_y": 2.0,
+                "size_z": 1.0,
+            }
+        ],
+        "launcher_input": {},
+        "mechanism": "gazebo_entity_factory",
+        "capability": {"status": "available", "reason": "test"},
+    }
+
+
+def test_obstacle_sdf_and_entity_factory_ack_are_verifiable(tmp_path: Path, monkeypatch) -> None:
+    responses = [
+        SimpleNamespace(
+            returncode=0,
+            stdout="/world/default/create\n/world/default/remove\n",
+            stderr="",
+        ),
+        SimpleNamespace(returncode=0, stdout="data: true\n", stderr=""),
+    ]
+    commands: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        return responses.pop(0)
+
+    monkeypatch.setattr(wrapper, "_gazebo_cli", lambda: "/usr/bin/gz")
+    monkeypatch.setattr(wrapper.subprocess, "run", fake_run)
+
+    record = wrapper._apply_obstacle_effect(
+        _obstacle_effect(),
+        run_dir=tmp_path,
+        world="default",
+    )
+
+    assert record["status"] == "applied"
+    entity = record["evidence"]["created_entities"][0]
+    assert entity["response_data"] is True
+    assert len(entity["sdf_sha256"]) == 64
+    sdf = Path(entity["sdf_path"])
+    assert sdf.is_file()
+    assert "<static>true</static>" in sdf.read_text(encoding="utf-8")
+    assert commands[1][commands[1].index("-s") + 1] == "/world/default/create"
+    assert "gz.msgs.EntityFactory" in commands[1]
+    assert "gz.msgs.Boolean" in commands[1]
+
+
+def test_preflight_reports_each_unsupported_effect_without_partial_launch() -> None:
+    request = build_scenario_effect_request(
+        execution_identity={"trial_id": "t"},
+        scenario_type="nominal",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 1.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={
+            "obstacles": [_obstacle_effect()["requested_value"][0]],
+            "sensor_degradation": {"dropout_rate": 0.2},
+        },
+    )
+
+    records = wrapper._preflight_scenario_effects(request, site_dry_run=False)
+
+    assert records is not None
+    by_id = {item["effect_id"]: item for item in records}
+    assert by_id["obstacles"]["status"] == "skipped"
+    assert by_id["obstacles"]["capability"]["status"] == "available"
+    assert by_id["job_config.wind"]["status"] == "unsupported"
+    assert by_id["sensor_degradation.dropout_rate"]["status"] == "unsupported"
+    assert "not a probabilistic dropout rate" in by_id["sensor_degradation.dropout_rate"]["reason"]
+
+
+def test_site_dry_run_writes_explicit_unphysical_effect_evidence(
+    tmp_path: Path,
+) -> None:
+    args = _make_args(tmp_path)
+    request = build_scenario_effect_request(
+        execution_identity={"trial_id": "t"},
+        scenario_type="nominal",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={
+            "obstacles": [_obstacle_effect()["requested_value"][0]],
+        },
+    )
+    request_path = tmp_path / "effect-request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    evidence_path = tmp_path / "run" / EVIDENCE_ARTIFACT_NAME
+    env = os.environ.copy()
+    env.update(
+        {
+            "PX4_SITE_DRY_RUN": "true",
+            "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH": str(request_path),
+            "PX4_TRIAL_SCENARIO_EFFECT_EVIDENCE_PATH": str(evidence_path),
+        }
+    )
+
+    proc = subprocess.run(
+        [sys.executable, str(WRAPPER), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+    normalized = validate_scenario_effect_evidence(request, payload)
+    assert normalized["unsupported_effects"] == ["obstacles"]
+    assert "fixture telemetry" in payload["effects"][0]["reason"]
+
+
+@pytest.mark.parametrize("raw", ["nan", "inf", "-inf"])
+def test_wrapper_rejects_non_finite_environment_numbers(raw: str) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        wrapper._parse_float(raw, default=1.0)
+
+
+def test_track_marker_timeout_is_bounded_and_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    args = SimpleNamespace(run_dir=run_dir, stdout_log=run_dir / "stdout.log")
+    stderr_log = run_dir / "stderr.log"
+    monkeypatch.setattr(wrapper, "_build_track_marker_command", lambda _args: "marker")
+
+    def timeout(*_args: object, **_kwargs: object) -> None:
+        raise subprocess.TimeoutExpired("marker", 1, output="partial", stderr="late")
+
+    monkeypatch.setattr(wrapper.subprocess, "run", timeout)
+    monkeypatch.setenv("PX4_GAZEBO_TRACK_MARKER_PROCESS_TIMEOUT_SECONDS", "1")
+
+    assert wrapper._run_track_marker(args, stderr_log) == 124
+    assert (run_dir / "track_marker_stdout.log").read_text() == "partial"
+    assert "timed out" in stderr_log.read_text()
+
+
+def test_offboard_timeout_is_bounded_and_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    args = SimpleNamespace(run_dir=run_dir, stdout_log=run_dir / "stdout.log")
+    stderr_log = run_dir / "stderr.log"
+    monkeypatch.setattr(wrapper, "_build_offboard_executor_argv", lambda _args: ["offboard"])
+
+    def timeout(*_args: object, **_kwargs: object) -> None:
+        raise subprocess.TimeoutExpired("offboard", 30)
+
+    monkeypatch.setattr(wrapper.subprocess, "run", timeout)
+    monkeypatch.setenv("PX4_OFFBOARD_PROCESS_TIMEOUT_SECONDS", "30")
+
+    assert wrapper._run_offboard_executor(args, stderr_log) == 124
+    assert "timed out" in stderr_log.read_text()
+
+
+def test_json_and_normalized_telemetry_limits_fail_before_unbounded_processing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    oversized = tmp_path / "oversized.json"
+    oversized.write_bytes(b"{" + b" " * 32 + b"}")
+    monkeypatch.setattr(wrapper, "MAX_JSON_BYTES", 16)
+    with pytest.raises(ValueError, match="exceeds"):
+        wrapper._json_load(oversized)
+
+    monkeypatch.setattr(wrapper, "MAX_TELEMETRY_SAMPLES", 1)
+    payload = _basic_telemetry()
+    payload["samples"].append(dict(payload["samples"][0], t=1.0))
+    with pytest.raises(ValueError, match="sample contract limit"):
+        wrapper._normalize_telemetry_payload(payload)
 
 
 def test_wrapper_real_mode_ulog_uses_px4_ulog_path(tmp_path: Path):

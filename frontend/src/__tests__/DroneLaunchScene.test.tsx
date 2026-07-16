@@ -25,6 +25,8 @@ describe("DroneLaunchScene localization", () => {
     renderScene("en");
 
     expect(screen.getByText("PX4 / SITL")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Let Every Flight Flow Like a Dream" }))
+      .toBeInTheDocument();
     expect(screen.getByText("LINK ACTIVE")).toBeInTheDocument();
     expect(screen.getByText("ATTITUDE")).toBeInTheDocument();
     expect(screen.getByText(/HOLD/)).toBeInTheDocument();
@@ -36,6 +38,8 @@ describe("DroneLaunchScene localization", () => {
     renderScene("zh-CN");
 
     expect(screen.getByText("PX4 / 软件在环")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "蝶 梦 水 云 乡" }))
+      .toBeInTheDocument();
     expect(screen.getByText("链路已连接")).toBeInTheDocument();
     expect(screen.getByText("飞行姿态")).toBeInTheDocument();
     expect(screen.getByText(/悬停/)).toBeInTheDocument();
@@ -112,8 +116,22 @@ describe("drone starflight trajectory", () => {
     expect(middleBefore / middleAfter).toBeLessThan(1.1);
   });
 
+  it("keeps every sampled pose finite and physically scaled", () => {
+    for (let index = 0; index <= 1_000; index += 1) {
+      const pose = getDroneStarflightPose(index / 1_000);
+      expect(Object.values(pose).every(Number.isFinite)).toBe(true);
+      expect(pose.scale).toBeGreaterThan(0);
+      expect(pose.scale).toBeLessThanOrEqual(1);
+    }
+  });
+
   it("clamps trajectory progress outside the animation range", () => {
     expect(getDroneStarflightPose(-1)).toEqual(getDroneStarflightPose(0));
     expect(getDroneStarflightPose(2)).toEqual(getDroneStarflightPose(1));
+    expect(getDroneStarflightPose(Number.NaN)).toEqual(getDroneStarflightPose(0));
+    expect(getDroneStarflightPose(Number.NEGATIVE_INFINITY))
+      .toEqual(getDroneStarflightPose(0));
+    expect(getDroneStarflightPose(Number.POSITIVE_INFINITY))
+      .toEqual(getDroneStarflightPose(1));
   });
 });

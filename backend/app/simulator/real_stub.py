@@ -1,9 +1,9 @@
-"""Placeholder adapter for the future PX4/Gazebo integration.
+"""Internal test adapter that always reports the simulator as unavailable.
 
-This exists so the selection surface is real and testable — picking
-``SIMULATOR_BACKEND=real_stub`` at deploy time must fail loudly rather than
-silently falling back to the mock. Phase 4 explicitly does *not* integrate
-a real simulator.
+The adapter preserves regression coverage for failure handling without
+pretending to be a real PX4/Gazebo implementation. The runtime factory rejects
+``real_stub`` outside ``APP_ENV=test`` and the public API schema never exposes
+it as a selectable backend.
 """
 
 from __future__ import annotations
@@ -18,14 +18,14 @@ from app.simulator.base import (
 
 
 class RealSimulatorAdapterStub(SimulatorAdapter):
-    """Stub backend for future PX4/Gazebo integration.
+    """Test backend for exercising structured adapter-unavailable failures.
 
     Two behaviours are exposed so callers can choose between a hard failure
     (``run_trial`` raising) and a soft failure (``run_trial`` returning a
     structured unavailable result). The default is the soft failure so the
-    worker never crashes when an operator mis-configures the backend; the
-    trial is simply marked ``FAILED`` with a clear ``ADAPTER_UNAVAILABLE``
-    code and the job manager decides whether the whole job should fail.
+    worker records a structured ``ADAPTER_UNAVAILABLE`` result instead of
+    crashing. Production and development callers cannot select this adapter
+    through the factory.
     """
 
     backend_name = "real_stub"
@@ -38,8 +38,8 @@ class RealSimulatorAdapterStub(SimulatorAdapter):
     def run_trial(self, ctx: TrialContext) -> TrialResult:  # noqa: D401 — docstring inherited
         if self.raise_on_run:
             raise NotImplementedError(
-                "RealSimulatorAdapterStub is not implemented; PX4/Gazebo "
-                "integration arrives in a later phase."
+                "RealSimulatorAdapterStub is an internal failure-path test adapter "
+                "and cannot execute PX4/Gazebo."
             )
         return TrialResult(
             success=False,
@@ -47,8 +47,8 @@ class RealSimulatorAdapterStub(SimulatorAdapter):
             failure=TrialFailure(
                 code=FAILURE_ADAPTER_UNAVAILABLE,
                 reason=(
-                    "Real simulator backend is not available in the MVP. "
-                    "Set SIMULATOR_BACKEND=mock or install a real adapter."
+                    "The internal real_stub test adapter cannot run a simulation. "
+                    "Use mock for workflow tests or configure real_cli for PX4/Gazebo."
                 ),
             ),
             log_excerpt=f"[real_stub] scenario={ctx.scenario_type} UNAVAILABLE",
