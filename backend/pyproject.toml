@@ -54,7 +54,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 ignore = ["UP017"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app"]
+known-first-party = ["app", "scripts"]
 
 [tool.mypy]
 python_version = "3.11"
