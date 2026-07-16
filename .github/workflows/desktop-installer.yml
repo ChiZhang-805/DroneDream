@@ -390,7 +390,54 @@ jobs:
           if (-not (Test-Path -LiteralPath $diagnosticSentinel -PathType Leaf)) {
             throw "Ordinary uninstall erased app diagnostic state without explicit consent"
           }
-          Remove-Item -LiteralPath $appDataRoot -Recurse -Force
+
+          # WebView2 may keep its BrowserMetrics file open briefly after the
+          # Tauri parent exits. Stop only WebView2 children that reference this
+          # app-owned profile, then retry the runner-only cleanup. The lifecycle
+          # assertions above remain strict; an ephemeral metrics-file lock must
+          # not turn a successful install/uninstall validation into a product
+          # failure.
+          $appDataToken = Split-Path -Leaf $appDataRoot
+          @(
+            Get-CimInstance Win32_Process `
+              -Filter "Name = 'msedgewebview2.exe'" `
+              -ErrorAction SilentlyContinue
+          ) |
+            Where-Object {
+              $_.CommandLine -and $_.CommandLine.Contains(
+                $appDataToken,
+                [System.StringComparison]::OrdinalIgnoreCase
+              )
+            } |
+            ForEach-Object {
+              Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            }
+
+          $cleanupError = $null
+          foreach ($cleanupAttempt in 1..6) {
+            try {
+              if (Test-Path -LiteralPath $appDataRoot) {
+                Remove-Item -LiteralPath $appDataRoot -Recurse -Force -ErrorAction Stop
+              }
+              if (Test-Path -LiteralPath $appDataRoot) {
+                throw "The application data directory still exists"
+              }
+              $cleanupError = $null
+              break
+            }
+            catch {
+              $cleanupError = $_.Exception.Message
+              if ($cleanupAttempt -lt 6) {
+                Start-Sleep -Milliseconds (500 * $cleanupAttempt)
+              }
+            }
+          }
+          if (Test-Path -LiteralPath $appDataRoot) {
+            Write-Warning (
+              "Runner cleanup left a locked WebView2 metrics file after " +
+              "six attempts; lifecycle assertions passed. Last error: $cleanupError"
+            )
+          }
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
