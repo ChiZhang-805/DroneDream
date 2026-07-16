@@ -16,6 +16,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy.orm import Session
+
 from app.simulator import (
     ArtifactMetadata,
     MockSimulatorAdapter,
@@ -24,7 +26,6 @@ from app.simulator import (
     TrialFailure,
     TrialResult,
 )
-from sqlalchemy.orm import Session
 
 _EXAMPLE_SIM = (
     Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "example_real_simulator.py"

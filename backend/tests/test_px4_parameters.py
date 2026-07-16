@@ -7,6 +7,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
+
 from app.parameters import ParameterValueValidationError
 from app.simulator import px4_parameters as px4_parameter_module
 from app.simulator.px4_parameters import (

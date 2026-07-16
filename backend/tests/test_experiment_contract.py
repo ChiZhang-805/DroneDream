@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from app.parameters import CATALOG_VERSION
 from fastapi.testclient import TestClient
+
+from app.parameters import CATALOG_VERSION
 
 
 def _advanced_job_payload() -> dict[str, object]:

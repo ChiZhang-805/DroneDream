@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
+
 from app.simulator.base import FAILURE_ADAPTER_UNAVAILABLE, FAILURE_TIMEOUT, JobConfig, TrialContext
 from app.simulator.real_cli import RealCliSimulatorAdapter
 

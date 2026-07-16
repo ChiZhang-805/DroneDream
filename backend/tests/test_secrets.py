@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from app.secrets import SecretStoreError, decrypt_secret, encrypt_secret, is_configured
 
 

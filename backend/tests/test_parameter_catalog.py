@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from app.parameters import (
     CATALOG_VERSION,
     ParameterValueValidationError,

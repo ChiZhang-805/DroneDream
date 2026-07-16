@@ -4,6 +4,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+
 from app import models
 from app.orchestration import events, runner, trial_executor, worker_presence
 

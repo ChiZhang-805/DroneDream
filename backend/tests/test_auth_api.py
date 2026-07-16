@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from fastapi.testclient import TestClient
+
 from app import db, models
 from app.config import get_settings
-from fastapi.testclient import TestClient
 
 PAYLOAD = {
     "track_type": "circle",

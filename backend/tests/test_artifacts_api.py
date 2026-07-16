@@ -3,8 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import quote
 
-from app import db, models
 from fastapi.testclient import TestClient
+
+from app import db, models
 
 
 def _seed_job() -> str:

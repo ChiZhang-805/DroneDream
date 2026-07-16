@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from sqlalchemy import create_engine, select, text
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
+
 from app import models
 from app.config import Settings
 from app.db import Base
@@ -20,9 +24,6 @@ from app.storage.registration import (
     ArtifactRegistrationClosed,
     guard_artifact_registration,
 )
-from sqlalchemy import create_engine, select, text
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
 
 
 @pytest.fixture()

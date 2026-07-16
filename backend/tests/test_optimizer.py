@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from types import SimpleNamespace
 
 import pytest
+
 from app import models, schemas
 from app.orchestration import acceptance, aggregation, constants, job_manager
 from app.orchestration.optimizer import (

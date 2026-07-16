@@ -5,13 +5,14 @@ from __future__ import annotations
 import math
 
 import pytest
+from pydantic import ValidationError
+
 from app.schemas import (
     JobCreateRequest,
     JobsCompareRequest,
     OpenAIConfig,
     ParameterSelection,
 )
-from pydantic import ValidationError
 
 
 @pytest.mark.parametrize(

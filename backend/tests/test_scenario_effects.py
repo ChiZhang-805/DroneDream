@@ -5,6 +5,7 @@ import hashlib
 import json
 
 import pytest
+
 from app.simulator.scenario_effects import (
     ScenarioEffectContractError,
     build_scenario_effect_evidence,

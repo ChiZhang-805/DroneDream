@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from app.schemas import JobCreateRequest
 from pydantic import ValidationError
+
+from app.schemas import JobCreateRequest
 
 
 def _base_payload() -> dict:

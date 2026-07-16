@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 import pytest
+
 from app.simulator.artifact_schema import (
     _MAX_REFERENCE_POINTS,
     _MAX_TELEMETRY_SAMPLES,

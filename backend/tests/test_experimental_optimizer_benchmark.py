@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import pytest
+
 from scripts.benchmark_experimental_optimizers import (
     _evaluate,
     _search_space,

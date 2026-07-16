@@ -5,6 +5,7 @@ from dataclasses import replace
 from typing import cast
 
 import pytest
+
 from app.optimization import bayesian_optimizers
 from app.optimization.bayesian_optimizers import propose_bayesian_candidates
 from app.optimization.domain import ParameterDomain, SearchSpace

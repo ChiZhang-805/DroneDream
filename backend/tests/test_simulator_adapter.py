@@ -12,8 +12,9 @@ import sys
 from collections.abc import Iterator
 from types import SimpleNamespace
 
-import app.simulator.factory as simulator_factory
 import pytest
+
+import app.simulator.factory as simulator_factory
 from app.simulator import (
     ArtifactMetadata,
     JobConfig,

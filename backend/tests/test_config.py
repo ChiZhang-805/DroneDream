@@ -3,8 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from app.config import Settings, get_settings
 from pydantic import ValidationError
+
+from app.config import Settings, get_settings
 
 
 def test_default_cors_origins_include_web_and_desktop_clients() -> None:

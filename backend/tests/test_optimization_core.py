@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import pytest
+from pydantic import ValidationError
+
 from app.optimization.design import halton_design
 from app.optimization.domain import ParameterDomain, SearchSpace
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
@@ -16,7 +18,6 @@ from app.schemas import (
     ScenarioCaseConfig,
     ScenarioSuiteConfig,
 )
-from pydantic import ValidationError
 
 
 def _parameter_space() -> list[ParameterSelection]:

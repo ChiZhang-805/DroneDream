@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 import pytest
+
 from app import models, schemas
 from app.orchestration import constants
 from app.orchestration.cma_es_optimizer import propose_next_generation

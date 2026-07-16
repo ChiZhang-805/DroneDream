@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
 from app.simulator.scenario_effects import (
     EVIDENCE_ARTIFACT_NAME,
     build_scenario_effect_request,

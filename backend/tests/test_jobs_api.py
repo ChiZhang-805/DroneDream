@@ -106,9 +106,10 @@ def test_cancelling_gpt_job_purges_encrypted_api_key(
     cancelled = client.post(f"/api/v1/jobs/{job_id}/cancel")
     assert cancelled.status_code == 200, cancelled.text
 
+    from sqlalchemy import select
+
     from app import models
     from app.db import SessionLocal
-    from sqlalchemy import select
 
     with SessionLocal() as db:
         secret = db.scalars(
@@ -143,9 +144,10 @@ def test_gpt_job_secret_has_bounded_lifetime(client: TestClient, monkeypatch) ->
     )
     assert created.status_code == 200, created.text
 
+    from sqlalchemy import select
+
     from app import models
     from app.db import SessionLocal
-    from sqlalchemy import select
 
     with SessionLocal() as db:
         secret = db.scalars(
@@ -195,10 +197,11 @@ def test_housekeeping_wipes_expired_secret_without_worker(
 
     from datetime import timedelta
 
+    from sqlalchemy import select
+
     from app import models
     from app.db import SessionLocal
     from app.services.jobs import purge_expired_job_secrets
-    from sqlalchemy import select
 
     with SessionLocal() as db:
         secret = db.scalars(

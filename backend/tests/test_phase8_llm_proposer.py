@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
+
 from app.parameters import CATALOG_VERSION
 
 

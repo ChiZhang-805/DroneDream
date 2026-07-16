@@ -155,9 +155,10 @@ def test_cancel_batch_purges_all_child_gpt_secrets(
     assert cancelled.status_code == 200, cancelled.text
     assert cancelled.json()["data"]["status"] == "CANCELLED"
 
+    from sqlalchemy import select
+
     from app import models
     from app.db import SessionLocal
-    from sqlalchemy import select
 
     with SessionLocal() as db:
         batch = db.get(models.BatchJob, batch_id)

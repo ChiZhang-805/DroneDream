@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import sys
 
-from app.main import app, create_app
-from app.response import err, ok
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
+
+from app.main import app, create_app
+from app.response import err, ok
 
 
 def test_health_returns_ok_envelope() -> None:

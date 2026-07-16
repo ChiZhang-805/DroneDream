@@ -8,6 +8,7 @@ from typing import Literal
 
 import numpy as np
 import pytest
+
 from app.optimization import portfolio_optimizer
 from app.optimization.cma_optimizers import (
     _MAX_CONDITION_NUMBER,
