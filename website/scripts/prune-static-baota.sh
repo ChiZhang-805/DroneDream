@@ -10,7 +10,26 @@ fi
 
 base=/www/wwwroot/dronedream
 releases=$base/releases
-current=$(readlink -f "$base/current")
+if [[ ! -d $base || ! -d $releases ]]; then
+  echo "the DroneDream release root is missing: $releases" >&2
+  exit 66
+fi
+for command_name in flock readlink; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "required prune command is unavailable: $command_name" >&2
+    exit 69
+  fi
+done
+
+# Use the exact deployment lock so pruning cannot remove a candidate while a
+# release is being verified, activated, or rolled back.
+exec 9>"$base/.deploy.lock"
+if ! flock -n 9; then
+  echo "another DroneDream deployment or prune is already running" >&2
+  exit 75
+fi
+
+current=$(readlink -f "$base/current" || true)
 if [[ -z $current || $(dirname "$current") != "$releases" || ! -d $current ]]; then
   echo "the live DroneDream release is not a valid child of $releases" >&2
   exit 65
@@ -23,7 +42,7 @@ for release_id in "$@"; do
     echo "invalid retained release id: $release_id" >&2
     exit 64
   fi
-  target=$(readlink -f "$releases/$release_id")
+  target=$(readlink -f "$releases/$release_id" || true)
   if [[ -z $target || $(dirname "$target") != "$releases" || ! -d $target ]]; then
     echo "retained release is missing or unsafe: $release_id" >&2
     exit 65

@@ -1,6 +1,6 @@
 # DroneDream Desktop
 
-This directory builds the `0.3.18` Windows development-preview installer and a
+This directory builds the `0.3.19` Windows development-preview installer and a
 Tauri 2 shell around the existing React/Vite application
 in `../frontend`. It does not copy or fork the business UI, and the normal web
 commands under `frontend/` continue to work unchanged.

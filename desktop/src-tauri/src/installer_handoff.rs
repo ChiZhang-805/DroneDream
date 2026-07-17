@@ -739,7 +739,7 @@ fn quiesce_path() -> Result<std::path::PathBuf, String> {
 fn process_creation_identity(pid: u32) -> Result<Option<u64>, String> {
     use windows_sys::Win32::Foundation::{CloseHandle, FILETIME};
     use windows_sys::Win32::System::Threading::{
-        GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+        GetExitCodeProcess, GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
     };
 
     // SAFETY: OpenProcess receives a concrete PID and no inheritable handle.
@@ -752,6 +752,28 @@ fn process_creation_identity(pid: u32) -> Result<Option<u64>, String> {
                 "Unable to inspect runtime quiesce owner {pid}: {error}"
             )),
         };
+    }
+    // A terminated Windows process can remain queryable while another process
+    // still owns a handle to its process object. Comparing only its creation
+    // timestamp would therefore mistake a dead installer for a live quiesce
+    // owner and leave upgrades blocked indefinitely. Confirm that the process
+    // is still active before trusting its creation identity.
+    let mut exit_code = 0u32;
+    // SAFETY: `handle` is a valid process handle and `exit_code` is writable.
+    let exit_ok = unsafe { GetExitCodeProcess(handle, &mut exit_code) };
+    if exit_ok == 0 {
+        let error = std::io::Error::last_os_error();
+        // SAFETY: this function uniquely owns the process handle.
+        unsafe { CloseHandle(handle) };
+        return Err(format!(
+            "Unable to read runtime quiesce owner status: {error}"
+        ));
+    }
+    const STILL_ACTIVE_EXIT_CODE: u32 = 259;
+    if exit_code != STILL_ACTIVE_EXIT_CODE {
+        // SAFETY: this function uniquely owns the process handle.
+        unsafe { CloseHandle(handle) };
+        return Ok(None);
     }
     let mut creation = FILETIME {
         dwLowDateTime: 0,
@@ -1768,6 +1790,26 @@ fn unprotect_for_current_user(_: &[u8]) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn terminated_process_is_not_a_live_quiesce_owner() {
+        use std::os::windows::process::CommandExt;
+
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let mut child = std::process::Command::new("cmd.exe")
+            .args(["/d", "/c", "exit", "0"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .expect("spawn short-lived process");
+        let pid = child.id();
+        child.wait().expect("wait for short-lived process");
+
+        // `Child` deliberately remains in scope and retains its native process
+        // handle. Windows can therefore still open/query the terminated process,
+        // which is the exact state that previously stranded update quiesce.
+        assert_eq!(process_creation_identity(pid).unwrap(), None);
+    }
 
     fn fixture(mode: InstallerMode, target_root: Option<&str>) -> InstallerReceipt {
         InstallerReceipt {

@@ -1,22 +1,24 @@
 # DroneDream product website
 
-This directory contains the release and deployment wrapper for the independent
-DroneDream product/download website. The React and Three.js source lives in
-`frontend/src/site`, and the production output is `frontend/site-dist`.
+This directory contains the release tooling and BaoTa/Nginx configuration for
+the independent DroneDream product and download website. The React and Three.js
+source lives in `frontend/src/site`; the generated release is
+`frontend/site-dist`.
 
-## Build a release website
+## Build and review a release
 
-First build the current Windows installer. Then run from PowerShell:
+Build the versioned Windows installer first, then run from the repository root:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-release-site.ps1
 ```
 
-The script verifies the installer checksum, builds the static website, copies
-the exact versioned `0.3.18` preview EXE and checksum, and emits
-`downloads/latest.json`. It refuses to publish a stale or mismatched installer.
-This build does not Authenticode-sign the EXE and the site must not label it as
-a signed or production release.
+The builder reads the desktop version, verifies the installer checksum, builds
+the static site, copies the exact versioned preview EXE and checksum, writes
+`downloads/latest.json`, and generates `SHA256SUMS` for the complete site. It
+refuses stale or inconsistent artifacts. The EXE is not Authenticode-signed, so
+the website must continue to describe it as a preview rather than a signed
+production release.
 
 For local review:
 
@@ -26,30 +28,75 @@ npm.cmd --prefix frontend run site:preview
 
 Open `http://127.0.0.1:4174/`.
 
-## Alibaba Cloud deployment
+## Supported Alibaba Cloud/BaoTa deployment
 
-The recommended production layout is Ubuntu LTS + Nginx for the static site,
-with versioned EXE, video, and future Runtime payloads moved to OSS/CDN as
-traffic grows. A 2-vCPU/2-GiB server is sufficient for the static Nginx site;
-large release traffic should not be served indefinitely from its system disk.
-Do not store Alibaba Cloud AccessKeys in this repository.
+The current host uses BaoTa's Nginx installation and this release layout:
 
-1. Replace `dronedream.example.com` in both Nginx templates with the final domain.
-2. Make `/var/www/dronedream-releases` writable by the deployment account, then run
-   `scripts/deploy-static.sh user@server`. It uploads to a new release directory,
-   verifies the remote EXE SHA-256, and atomically switches
-   `/var/www/dronedream-current` while preserving older releases for rollback.
-3. Install `nginx/dronedream-bootstrap.conf`, run `nginx -t`, and reload Nginx.
-   Use Certbot's webroot flow with `/var/www/dronedream-current` to issue the first
-   certificate.
-4. Replace the bootstrap server block with `nginx/dronedream.conf`, update the
-   certificate paths if necessary, run `nginx -t` again, and reload. The production
-   template redirects HTTP to HTTPS, enables HSTS, compression, CSP, and immutable
-   caching for versioned assets.
-5. Keep only ports 80/443 public; restrict SSH to the administrator's IP and use an
-   SSH key. Never send the server password or an Alibaba Cloud AccessKey in chat.
+```text
+/www/wwwroot/dronedream/
+  releases/<version>-<UTC timestamp>/
+  current -> releases/<active release>
+  candidate -> releases/<release under validation>   # temporary
+```
 
-If an existing server was created from a WordPress image, take a snapshot before
+`deploy-static-baota.sh` verifies the archive, manifest, release metadata,
+installer checksum, security headers, and loopback-only staging vhost before it
+atomically switches `current`. Any failure restores the previous symlink and
+Nginx configuration.
+
+The supported Windows entry point is the PowerShell wrapper. Pass the private
+key **path**, never its contents:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File website/scripts/deploy-static-baota.ps1 `
+  -SshKeyPath "$HOME\.ssh\DroneDream-deploy.pem"
+```
+
+The wrapper builds the website unless `-SkipBuild` is supplied, validates every
+local manifest entry, creates a temporary archive, uploads into a private remote
+staging directory, verifies the uploaded archive SHA-256, invokes the guarded
+server deployment, removes temporary files, and probes the public page and
+hashed assets. It uses `BatchMode=yes` and `StrictHostKeyChecking=yes`; connect
+once manually and verify the server fingerprint before the first automated run.
+
+Defaults currently target the preview host:
+
+```powershell
+-Remote root@47.93.180.216
+-PublicHost 47.93.180.216
+-PublicBaseUri http://47.93.180.216/
+```
+
+Update `server_name` in the BaoTa public vhost and override all three together
+when a product domain is ready. The current bare-IP HTTP endpoint is suitable
+for preview testing only. A public production release still requires a domain,
+HTTPS certificate, and the corresponding TLS vhost.
+Keep ports 80/443 public, restrict SSH to trusted administrator addresses, and
+never commit or paste a private key or Alibaba Cloud AccessKey.
+
+### Release cleanup
+
+Run cleanup on the server. It is a dry run unless `--apply` is present and it
+uses the same lock as deployment:
+
+```bash
+bash website/scripts/prune-static-baota.sh 0.3.18-20260716T183330Z
+bash website/scripts/prune-static-baota.sh --apply 0.3.18-20260716T183330Z
+```
+
+The active release is always retained. Additional release IDs supplied on the
+command line are also retained.
+
+## Legacy generic-Nginx workflow
+
+`website/scripts/deploy-static.sh` and the templates under `website/nginx/`
+target the older `/var/www/dronedream-*` layout for a generic Ubuntu/Nginx host.
+They are retained as **legacy reference tooling** and are not the supported path
+for the current BaoTa server. Do not mix that layout with the BaoTa scripts or
+vhosts.
+
+If an existing host was created from a WordPress image, take a snapshot before
 changing Nginx or document roots. Reinstalling or replacing its system disk can
-destroy WordPress and its database, so that destructive step requires explicit
-confirmation from the owner.
+destroy WordPress and its database and therefore requires explicit owner
+approval.

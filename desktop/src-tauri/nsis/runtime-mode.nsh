@@ -445,10 +445,10 @@ Var DroneDreamValidatePathOnly
     Pop $1
     ${NSD_CreateRadioButton} 0 30u 100% 14u "$(DD_InstallAll)"
     Pop $DroneDreamFullRadio
-    ${If} $DroneDreamPlanTarget == ""
-      ${NSD_CreateLabel} 18u 47u 70% 18u "$(DD_NoRecommendedTarget)"
-    ${Else}
+    ${If} $DroneDreamPlanCanInstall == "1"
       ${NSD_CreateLabel} 18u 47u 70% 18u "$(DD_RecommendedTarget)"
+    ${Else}
+      ${NSD_CreateLabel} 18u 47u 70% 18u "$(DD_RuntimeSetupDeferred)"
     ${EndIf}
     Pop $DroneDreamRecommendedLabel
     ${NSD_CreateButton} 76% 45u 24% 17u "$(DD_RetryDetection)"
@@ -488,15 +488,11 @@ Var DroneDreamValidatePathOnly
       ${NSD_Check} $DroneDreamAppOnlyRadio
       StrCpy $DroneDreamInstallMode "install-app-only"
       StrCpy $DroneDreamRuntimeDrive ""
-      ${If} $DroneDreamModePageVisited == "0"
-        ${If} $DroneDreamPlanBlockerCode == "prerequisite-blocked"
-          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PreflightBlocked)"
-        ${ElseIf} $DroneDreamPlanBlockerCode == "no-eligible-target"
-          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_NoEligibleDrive)"
-        ${Else}
-          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PlannerFailureDetails)"
-        ${EndIf}
-      ${EndIf}
+      ; A failed Runtime preflight is not a desktop-installer failure. Keep the
+      ; page usable, select the safe app-only fallback, and leave detailed
+      ; diagnostics to DroneDream. A modal warning here used to interrupt the
+      ; normal first-run journey and briefly exposed the previous MUI page
+      ; behind the dialog while this custom page was still being constructed.
     ${EndIf}
     StrCpy $DroneDreamModePageVisited "1"
     GetDlgItem $1 $HWNDPARENT 1
@@ -522,21 +518,25 @@ Var DroneDreamValidatePathOnly
       ${NSD_Uncheck} $DroneDreamCustomRadio
       ${NSD_Uncheck} $DroneDreamAppOnlyRadio
       ShowWindow $DroneDreamRetryButton ${SW_HIDE}
-      MessageBox MB_ICONINFORMATION|MB_OK "$(DD_DetectionSucceeded)"
     ${Else}
       ${If} $DroneDreamPlanBlockerCode == "prerequisite-blocked"
         EnableWindow $DroneDreamCustomRadio 0
         EnableWindow $DroneDreamCustomDriveEdit 0
-        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PreflightBlocked)"
+        ${NSD_SetText} $DroneDreamRecommendedLabel "$(DD_RuntimeSetupDeferred)"
       ${ElseIf} $DroneDreamPlanBlockerCode == "no-eligible-target"
         EnableWindow $DroneDreamCustomRadio 1
         EnableWindow $DroneDreamCustomDriveEdit 1
-        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_NoEligibleDrive)"
+        ${NSD_SetText} $DroneDreamRecommendedLabel "$(DD_NoRecommendedTarget)"
       ${Else}
         EnableWindow $DroneDreamCustomRadio 1
         EnableWindow $DroneDreamCustomDriveEdit 1
-        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_PlannerFailureDetails)"
+        ${NSD_SetText} $DroneDreamRecommendedLabel "$(DD_PlannerUnavailable)"
       ${EndIf}
+      ${NSD_Check} $DroneDreamAppOnlyRadio
+      ${NSD_Uncheck} $DroneDreamFullRadio
+      ${NSD_Uncheck} $DroneDreamCustomRadio
+      StrCpy $DroneDreamInstallMode "install-app-only"
+      StrCpy $DroneDreamRuntimeDrive ""
     ${EndIf}
   FunctionEnd
 

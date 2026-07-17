@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
+  ReactNode,
   WheelEvent as ReactWheelEvent,
 } from "react";
 
@@ -12,6 +13,7 @@ interface TrackEditor2DProps {
   points: TrackPoint[];
   defaultAltitude: number;
   onChange: (points: TrackPoint[]) => void;
+  dataPanelFooter?: ReactNode;
 }
 
 type Axis = "x" | "y" | "z";
@@ -82,6 +84,7 @@ export function TrackEditor2D({
   points,
   defaultAltitude,
   onChange,
+  dataPanelFooter,
 }: TrackEditor2DProps) {
   const { t } = useI18n();
   const history = useRef<TrackPoint[][]>([]);
@@ -422,7 +425,7 @@ export function TrackEditor2D({
     : [];
 
   return (
-    <div className="track-editor">
+    <div className="track-editor" data-testid="track-editor-workspace">
       <div className="track-editor-toolbar">
         <div className="track-editor-actions">
           <button
@@ -522,7 +525,7 @@ export function TrackEditor2D({
         </div>
       ) : null}
 
-      <div className="track-canvas-shell">
+      <div className="track-canvas-shell" data-testid="track-editor-visual-pane">
         <svg
           className={`track-editor-canvas ${view === "3d" ? "track-editor-canvas-3d" : ""}`}
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -706,6 +709,11 @@ export function TrackEditor2D({
           </tbody>
         </table>
       </div>
+      {dataPanelFooter ? (
+        <div className="track-editor-data-footer" data-testid="track-editor-data-footer">
+          {dataPanelFooter}
+        </div>
+      ) : null}
     </div>
   );
 }

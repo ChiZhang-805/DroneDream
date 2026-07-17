@@ -3,7 +3,7 @@
 The detached Ed25519 signature in this document authenticates the Runtime
 manifest and payload parts. It is not Windows Authenticode signing and does not
 establish a Windows publisher identity for the NSIS executable. The current
-`0.3.18` preview installer remains unsigned and can trigger SmartScreen.
+`0.3.19` preview installer remains unsigned and can trigger SmartScreen.
 
 The Windows installer downloads a dedicated WSL2 distribution; it never
 moves, upgrades, or unregisters an existing Ubuntu distribution. A user may

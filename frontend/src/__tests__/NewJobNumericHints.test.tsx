@@ -22,53 +22,61 @@ function renderWizard(locale: "en" | "zh-CN") {
   );
   const nameDialog = screen.getByRole("dialog");
   fireEvent.change(screen.getByRole("textbox"), {
-    target: { value: "numeric-hints-study" },
+    target: { value: "numeric-range-study" },
   });
   fireEvent.submit(nameDialog);
   return result;
 }
 
-function advance(label: "Next" | "下一步", count: number): void {
+function control<T extends HTMLElement>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing control: ${selector}`);
+  return element;
+}
+
+function advance(count: number): void {
   for (let index = 0; index < count; index += 1) {
-    fireEvent.click(screen.getByRole("button", { name: label }));
+    fireEvent.click(control<HTMLButtonElement>(".wizard-actions .btn-primary"));
   }
 }
 
-describe("NewJob numeric field hints", () => {
+describe("NewJob compact numeric range guidance", () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
 
-  it("keeps English track dimensions and acceptance thresholds concise and discoverable", () => {
+  it("removes the single-option vehicle selector and puts ranges in controls", () => {
     renderWizard("en");
 
-    const circleHint = screen.getByText("Distance from the center to the circular path.");
-    expect(circleHint).toBeVisible();
-    expect(circleHint).toHaveAttribute("title", circleHint.textContent);
+    expect(document.querySelector("#vehicle_type")).toBeNull();
+    expect(control<HTMLInputElement>("#circle_radius_m")).toHaveAttribute("placeholder", "0–100");
+    expect(document.querySelectorAll(".wizard-panel .form-hint")).toHaveLength(0);
 
-    fireEvent.change(screen.getByLabelText("Track type"), { target: { value: "u_turn" } });
-    expect(screen.getByText("Length of each straight leg in the U-shaped path.")).toBeVisible();
-    expect(screen.getByText("Radius of the semicircle joining both straight legs.")).toBeVisible();
+    fireEvent.change(control<HTMLSelectElement>("#track_type"), { target: { value: "u_turn" } });
+    expect(control<HTMLInputElement>("#u_turn_straight_length_m")).toHaveAttribute("placeholder", "0–200");
+    expect(control<HTMLInputElement>("#u_turn_turn_radius_m")).toHaveAttribute("placeholder", "0–100");
 
-    advance("Next", 3);
-    const iterationHint = screen.getByText("Maximum optimizer update rounds before stopping.");
-    expect(iterationHint).toBeVisible();
-    expect(iterationHint).toHaveAttribute("title", iterationHint.textContent);
-    expect(screen.getByText("Desired upper bound for root-mean-square track error.")).toBeVisible();
-    expect(screen.getByText("Required successful-run fraction, from 0 to 1.")).toBeVisible();
+    advance(3);
+    expect(control<HTMLInputElement>("#max_iterations")).toHaveAttribute("placeholder", "1–100");
+    expect(control<HTMLInputElement>("#target_rmse")).toHaveAttribute("placeholder", "0–100");
+    expect(control<HTMLInputElement>("#min_pass_rate")).toHaveAttribute("placeholder", "0–1");
+    expect(document.querySelectorAll(".wizard-panel .form-hint")).toHaveLength(0);
   });
 
-  it("renders the same numeric guidance as single Chinese hint lines", () => {
+  it("keeps the compact range-only treatment identical in Chinese", () => {
     renderWizard("zh-CN");
 
-    expect(screen.getByText("圆心到圆形航迹的距离。")).toBeVisible();
-    fireEvent.change(screen.getByLabelText("航迹类型"), { target: { value: "u_turn" } });
-    expect(screen.getByText("U 型航迹中每段直线的长度。")).toBeVisible();
-    expect(screen.getByText("连接两段直线的半圆转弯半径。")).toBeVisible();
+    expect(document.querySelector("#vehicle_type")).toBeNull();
+    expect(control<HTMLInputElement>("#circle_radius_m")).toHaveAttribute("placeholder", "0–100");
+    expect(document.querySelectorAll(".wizard-panel .form-hint")).toHaveLength(0);
 
-    advance("下一步", 3);
-    expect(screen.getByText("停止前允许优化器更新的最大轮数。")).toBeVisible();
-    expect(screen.getByText("期望的航迹均方根误差上限。")).toBeVisible();
-    expect(screen.getByText("要求的成功运行比例，范围 0 至 1。")).toBeVisible();
+    fireEvent.change(control<HTMLSelectElement>("#track_type"), { target: { value: "u_turn" } });
+    expect(control<HTMLInputElement>("#u_turn_straight_length_m")).toHaveAttribute("placeholder", "0–200");
+    expect(control<HTMLInputElement>("#u_turn_turn_radius_m")).toHaveAttribute("placeholder", "0–100");
+
+    advance(3);
+    expect(control<HTMLInputElement>("#max_iterations")).toHaveAttribute("placeholder", "1–100");
+    expect(control<HTMLInputElement>("#min_pass_rate")).toHaveAttribute("placeholder", "0–1");
+    expect(document.querySelectorAll(".wizard-panel .form-hint")).toHaveLength(0);
   });
 });

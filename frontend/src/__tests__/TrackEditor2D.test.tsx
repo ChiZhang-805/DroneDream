@@ -16,7 +16,12 @@ function EditorHarness() {
   const [points, setPoints] = useState(INITIAL_POINTS);
   return (
     <I18nProvider>
-      <TrackEditor2D points={points} defaultAltitude={3} onChange={setPoints} />
+      <TrackEditor2D
+        points={points}
+        defaultAltitude={3}
+        onChange={setPoints}
+        dataPanelFooter={<button type="button">JSON import / export</button>}
+      />
       <output data-testid="track-state">{JSON.stringify(points)}</output>
     </I18nProvider>
   );
@@ -64,6 +69,20 @@ describe("TrackEditor2D", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm clear all waypoints" }));
     expect(screen.queryByRole("button", { name: /Remove waypoint \d+/ })).not.toBeInTheDocument();
     expect(screen.getByText("No waypoints")).toBeVisible();
+  });
+
+  it("exposes a visual pane beside one independently scrollable data pane", () => {
+    renderEditor();
+
+    const workspace = screen.getByTestId("track-editor-workspace");
+    const visualPane = screen.getByTestId("track-editor-visual-pane");
+    const dataPane = screen.getByTestId("track-waypoint-table-scroll");
+    const dataFooter = screen.getByTestId("track-editor-data-footer");
+
+    expect(workspace).toContainElement(visualPane);
+    expect(workspace).toContainElement(dataPane);
+    expect(workspace).toContainElement(dataFooter);
+    expect(dataFooter).toHaveTextContent("JSON import / export");
   });
 
   it("cycles through XY, XZ, YZ and interactive 3D views and edits Z by dragging", () => {

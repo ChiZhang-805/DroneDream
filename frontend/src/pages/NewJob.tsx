@@ -447,10 +447,6 @@ const PX4_VERSION_HINT_KEYS: Record<string, TranslationKey> = {
   main: "wizard.hint.px4.main",
 };
 
-const VEHICLE_TYPE_HINT_KEYS: Record<string, TranslationKey> = {
-  multicopter: "wizard.hint.vehicle.multicopter",
-};
-
 const AIRFRAME_HINT_KEYS: Record<string, TranslationKey> = {
   x500: "wizard.hint.airframe.x500",
   quad_x: "wizard.hint.airframe.quadX",
@@ -517,36 +513,6 @@ const SIMULATOR_BACKEND_HINT_KEYS: Record<SimulatorBackend, TranslationKey> = {
   real_cli: "wizard.hint.backend.realCli",
   mock: "wizard.hint.backend.mock",
 };
-
-const SCENARIO_CASE_HINT_KEYS = {
-  nominal_search_enabled: {
-    true: "wizard.hint.case.nominalSearch.enabled",
-    false: "wizard.hint.case.nominalSearch.disabled",
-  },
-  wind_search_enabled: {
-    true: "wizard.hint.case.windSearch.enabled",
-    false: "wizard.hint.case.windSearch.disabled",
-  },
-  noise_search_enabled: {
-    true: "wizard.hint.case.noiseSearch.enabled",
-    false: "wizard.hint.case.noiseSearch.disabled",
-  },
-  nominal_holdout_enabled: {
-    true: "wizard.hint.case.nominalHoldout.enabled",
-    false: "wizard.hint.case.nominalHoldout.disabled",
-  },
-  combined_holdout_enabled: {
-    true: "wizard.hint.case.combinedHoldout.enabled",
-    false: "wizard.hint.case.combinedHoldout.disabled",
-  },
-} as const satisfies Record<
-  | "nominal_search_enabled"
-  | "wind_search_enabled"
-  | "noise_search_enabled"
-  | "nominal_holdout_enabled"
-  | "combined_holdout_enabled",
-  Record<"true" | "false", TranslationKey>
->;
 
 function selectedHint(
   keys: Record<string, TranslationKey>,
@@ -1991,9 +1957,6 @@ export function NewJob() {
                     </option>
                   ))}
                 </select>
-                <span className="form-hint" title={t(`wizard.mode.${form.tuning_mode}Desc` as TranslationKey)}>
-                  {t(`wizard.mode.${form.tuning_mode}Desc` as TranslationKey)}
-                </span>
               </div>
               <Field label={t("wizard.field.px4Version")} required error={errors.px4_version} htmlFor="px4_version" hint={selectedHint(PX4_VERSION_HINT_KEYS, form.px4_version, t)}>
                 <select id="px4_version" value={form.px4_version} onChange={(event) => update("px4_version", event.target.value)}>
@@ -2007,11 +1970,6 @@ export function NewJob() {
                   <input id="firmware_commit" value={form.firmware_commit} onChange={handleTextChange("firmware_commit")} />
                 </Field>
               ) : null}
-              <Field label={t("wizard.field.vehicleType")} required error={errors.vehicle_type} htmlFor="vehicle_type" hint={selectedHint(VEHICLE_TYPE_HINT_KEYS, form.vehicle_type, t)}>
-                <select id="vehicle_type" value={form.vehicle_type} onChange={(event) => update("vehicle_type", event.target.value)}>
-                  <option value="multicopter">{t("wizard.option.multicopter")}</option>
-                </select>
-              </Field>
               <Field label={t("wizard.field.airframe")} required error={errors.airframe} htmlFor="airframe" hint={selectedHint(AIRFRAME_HINT_KEYS, form.airframe, t)}>
                 <select id="airframe" value={form.airframe} onChange={(event) => update("airframe", event.target.value)}>
                   <option value="x500">{t("wizard.option.airframeX500")}</option>
@@ -2050,10 +2008,10 @@ export function NewJob() {
               {form.tuning_mode !== "basic" ? (
                 <>
                   <Field label={t("wizard.field.simulationSpeed")} required htmlFor="simulation_speed_factor" error={errors.simulation_speed_factor} hint={t("wizard.field.simulationSpeedHint")}>
-                    <input id="simulation_speed_factor" type="number" min="0.1" max="100" step="0.1" value={form.simulation_speed_factor} onChange={handleTextChange("simulation_speed_factor")} />
+                    <input id="simulation_speed_factor" type="number" min="0.1" max="100" step="0.1" placeholder="0.1–100" value={form.simulation_speed_factor} onChange={handleTextChange("simulation_speed_factor")} />
                   </Field>
                   <Field label={t("wizard.field.instanceId")} required htmlFor="instance_id" error={errors.instance_id} hint={t("wizard.instanceIdHint")}>
-                    <input id="instance_id" type="number" min="0" max="255" step="1" value={form.instance_id} onChange={handleTextChange("instance_id")} />
+                    <input id="instance_id" type="number" min="0" max="255" step="1" placeholder="0–255" value={form.instance_id} onChange={handleTextChange("instance_id")} />
                   </Field>
                 </>
               ) : null}
@@ -2086,16 +2044,16 @@ export function NewJob() {
               <>
                 <div className="form-grid objective-weight-grid">
                   <Field label={t("wizard.field.weightTracking")} htmlFor="objective_weight_tracking" error={errors.objective_weights} hint={t("wizard.hint.weight.tracking")}>
-                    <input id="objective_weight_tracking" type="number" min="0" max="100" step="0.05" value={form.objective_weight_tracking} onChange={handleObjectiveWeightChange("objective_weight_tracking")} />
+                    <input id="objective_weight_tracking" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_tracking} onChange={handleObjectiveWeightChange("objective_weight_tracking")} />
                   </Field>
                   <Field label={t("wizard.field.weightSpeed")} htmlFor="objective_weight_speed" hint={t("wizard.hint.weight.speed")}>
-                    <input id="objective_weight_speed" type="number" min="0" max="100" step="0.05" value={form.objective_weight_speed} onChange={handleObjectiveWeightChange("objective_weight_speed")} />
+                    <input id="objective_weight_speed" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_speed} onChange={handleObjectiveWeightChange("objective_weight_speed")} />
                   </Field>
                   <Field label={t("wizard.field.weightSmoothness")} htmlFor="objective_weight_smoothness" hint={t("wizard.hint.weight.smoothness")}>
-                    <input id="objective_weight_smoothness" type="number" min="0" max="100" step="0.05" value={form.objective_weight_smoothness} onChange={handleObjectiveWeightChange("objective_weight_smoothness")} />
+                    <input id="objective_weight_smoothness" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_smoothness} onChange={handleObjectiveWeightChange("objective_weight_smoothness")} />
                   </Field>
                   <Field label={t("wizard.field.weightRobustness")} htmlFor="objective_weight_robustness" hint={t("wizard.hint.weight.robustness")}>
-                    <input id="objective_weight_robustness" type="number" min="0" max="100" step="0.05" value={form.objective_weight_robustness} onChange={handleObjectiveWeightChange("objective_weight_robustness")} />
+                    <input id="objective_weight_robustness" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_robustness} onChange={handleObjectiveWeightChange("objective_weight_robustness")} />
                   </Field>
                 </div>
                 <div className="form-grid wizard-grid-two">
@@ -2107,8 +2065,8 @@ export function NewJob() {
                       <option value="percentile">{t("wizard.aggregation.percentile")}</option>
                     </select>
                   </Field>
-                  {form.robust_aggregation === "cvar" ? <Field label={t("wizard.field.cvarAlpha")} htmlFor="cvar_alpha" error={errors.cvar_alpha} hint={t("wizard.hint.cvarAlpha")}><input id="cvar_alpha" type="number" step="0.05" value={form.cvar_alpha} onChange={handleTextChange("cvar_alpha")} /></Field> : null}
-                  {form.robust_aggregation === "percentile" ? <Field label={t("wizard.field.percentile")} htmlFor="percentile" error={errors.percentile} hint={t("wizard.hint.percentile")}><input id="percentile" type="number" step="1" value={form.percentile} onChange={handleTextChange("percentile")} /></Field> : null}
+                  {form.robust_aggregation === "cvar" ? <Field label={t("wizard.field.cvarAlpha")} htmlFor="cvar_alpha" error={errors.cvar_alpha} hint={t("wizard.hint.cvarAlpha")}><input id="cvar_alpha" type="number" min="0" max="1" step="0.05" placeholder="0–1" value={form.cvar_alpha} onChange={handleTextChange("cvar_alpha")} /></Field> : null}
+                  {form.robust_aggregation === "percentile" ? <Field label={t("wizard.field.percentile")} htmlFor="percentile" error={errors.percentile} hint={t("wizard.hint.percentile")}><input id="percentile" type="number" min="1" max="100" step="1" placeholder="1–100" value={form.percentile} onChange={handleTextChange("percentile")} /></Field> : null}
                 </div>
               </>
             ) : null}
@@ -2129,12 +2087,12 @@ export function NewJob() {
                     })}
                   </select>
                 </Field>
-                {form.track_type === "circle" ? <Field label={t("wizard.field.circleRadius")} htmlFor="circle_radius_m" error={errors.circle_radius_m} hint={t("wizard.hint.circleRadius")}><input id="circle_radius_m" type="number" step="0.1" value={form.circle_radius_m} onChange={handleTextChange("circle_radius_m")} /></Field> : null}
-                {form.track_type === "u_turn" ? <><Field label={t("wizard.field.uTurnStraight")} htmlFor="u_turn_straight_length_m" error={errors.u_turn_straight_length_m} hint={t("wizard.hint.uTurnStraight")}><input id="u_turn_straight_length_m" type="number" step="0.1" value={form.u_turn_straight_length_m} onChange={handleTextChange("u_turn_straight_length_m")} /></Field><Field label={t("wizard.field.uTurnRadius")} htmlFor="u_turn_turn_radius_m" error={errors.u_turn_turn_radius_m} hint={t("wizard.hint.uTurnRadius")}><input id="u_turn_turn_radius_m" type="number" step="0.1" value={form.u_turn_turn_radius_m} onChange={handleTextChange("u_turn_turn_radius_m")} /></Field></> : null}
-                {form.track_type === "lemniscate" ? <Field label={t("wizard.field.lemniscateScale")} htmlFor="lemniscate_scale_m" error={errors.lemniscate_scale_m} hint={t("wizard.hint.lemniscateScale")}><input id="lemniscate_scale_m" type="number" step="0.1" value={form.lemniscate_scale_m} onChange={handleTextChange("lemniscate_scale_m")} /></Field> : null}
+                {form.track_type === "circle" ? <Field label={t("wizard.field.circleRadius")} htmlFor="circle_radius_m" error={errors.circle_radius_m} hint={t("wizard.hint.circleRadius")}><input id="circle_radius_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.circle_radius_m} onChange={handleTextChange("circle_radius_m")} /></Field> : null}
+                {form.track_type === "u_turn" ? <><Field label={t("wizard.field.uTurnStraight")} htmlFor="u_turn_straight_length_m" error={errors.u_turn_straight_length_m} hint={t("wizard.hint.uTurnStraight")}><input id="u_turn_straight_length_m" type="number" min="0" max="200" step="0.1" placeholder="0–200" value={form.u_turn_straight_length_m} onChange={handleTextChange("u_turn_straight_length_m")} /></Field><Field label={t("wizard.field.uTurnRadius")} htmlFor="u_turn_turn_radius_m" error={errors.u_turn_turn_radius_m} hint={t("wizard.hint.uTurnRadius")}><input id="u_turn_turn_radius_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.u_turn_turn_radius_m} onChange={handleTextChange("u_turn_turn_radius_m")} /></Field></> : null}
+                {form.track_type === "lemniscate" ? <Field label={t("wizard.field.lemniscateScale")} htmlFor="lemniscate_scale_m" error={errors.lemniscate_scale_m} hint={t("wizard.hint.lemniscateScale")}><input id="lemniscate_scale_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.lemniscate_scale_m} onChange={handleTextChange("lemniscate_scale_m")} /></Field> : null}
                 <Field label={t("wizard.field.startX")} required htmlFor="start_x" error={errors.start_x} hint={t("wizard.hint.startX")}><input id="start_x" type="number" step="0.1" value={form.start_x} onChange={handleTextChange("start_x")} /></Field>
                 <Field label={t("wizard.field.startY")} required htmlFor="start_y" error={errors.start_y} hint={t("wizard.hint.startY")}><input id="start_y" type="number" step="0.1" value={form.start_y} onChange={handleTextChange("start_y")} /></Field>
-                <Field label={t("wizard.field.altitude")} required htmlFor="altitude_m" error={errors.altitude_m} hint={t("wizard.field.altitudeHint")}><input id="altitude_m" type="number" min="1" max="20" step="0.1" value={form.altitude_m} onChange={handleTextChange("altitude_m")} /></Field>
+                <Field label={t("wizard.field.altitude")} required htmlFor="altitude_m" error={errors.altitude_m} hint={t("wizard.field.altitudeHint")}><input id="altitude_m" type="number" min="1" max="20" step="0.1" placeholder="1–20" value={form.altitude_m} onChange={handleTextChange("altitude_m")} /></Field>
               </div>
               {form.track_type === "custom" ? (
                 <>
@@ -2172,44 +2130,48 @@ export function NewJob() {
                           points={customTrack}
                           defaultAltitude={Number(form.altitude_m) || 3}
                           onChange={(points) => update("reference_track_json", JSON.stringify(points, null, 2))}
+                          dataPanelFooter={(
+                            <>
+                              <button
+                                ref={trackJsonTriggerRef}
+                                type="button"
+                                className="btn btn-ghost btn-small track-json-trigger"
+                                onClick={() => setShowTrackJson(true)}
+                              >
+                                {t("wizard.jsonImport")}
+                              </button>
+                              {showTrackJson ? (
+                                <div className="wizard-modal-backdrop wizard-nested-modal-backdrop" role="presentation" onMouseDown={(event) => {
+                                  if (event.target !== event.currentTarget) return;
+                                  setShowTrackJson(false);
+                                  window.requestAnimationFrame(() => trackJsonTriggerRef.current?.focus());
+                                }}>
+                                  <section className="wizard-modal wizard-json-modal" role="dialog" aria-modal="true" aria-labelledby="track-json-title">
+                                    <header className="wizard-modal-header">
+                                      <h3 id="track-json-title">{t("wizard.jsonImport")}</h3>
+                                      <button
+                                        autoFocus
+                                        type="button"
+                                        className="btn btn-ghost wizard-modal-close"
+                                        aria-label={t("wizard.closeJson")}
+                                        title={t("wizard.closeJson")}
+                                        onClick={() => {
+                                          setShowTrackJson(false);
+                                          window.requestAnimationFrame(() => trackJsonTriggerRef.current?.focus());
+                                        }}
+                                      >
+                                        <span aria-hidden="true">×</span>
+                                      </button>
+                                    </header>
+                                    <Field label={t("wizard.field.referenceTrack")} required htmlFor="reference_track_json" error={errors.reference_track_json} hint={t("wizard.field.referenceTrackHint")}>
+                                      <textarea id="reference_track_json" rows={12} value={form.reference_track_json} onChange={handleTextChange("reference_track_json")} />
+                                    </Field>
+                                  </section>
+                                </div>
+                              ) : null}
+                            </>
+                          )}
                         />
-                        <button
-                          ref={trackJsonTriggerRef}
-                          type="button"
-                          className="btn btn-ghost btn-small track-json-trigger"
-                          onClick={() => setShowTrackJson(true)}
-                        >
-                          {t("wizard.jsonImport")}
-                        </button>
-                        {showTrackJson ? (
-                          <div className="wizard-modal-backdrop wizard-nested-modal-backdrop" role="presentation" onMouseDown={(event) => {
-                            if (event.target !== event.currentTarget) return;
-                            setShowTrackJson(false);
-                            window.requestAnimationFrame(() => trackJsonTriggerRef.current?.focus());
-                          }}>
-                            <section className="wizard-modal wizard-json-modal" role="dialog" aria-modal="true" aria-labelledby="track-json-title">
-                              <header className="wizard-modal-header">
-                                <h3 id="track-json-title">{t("wizard.jsonImport")}</h3>
-                                <button
-                                  autoFocus
-                                  type="button"
-                                  className="btn btn-ghost wizard-modal-close"
-                                  aria-label={t("wizard.closeJson")}
-                                  title={t("wizard.closeJson")}
-                                  onClick={() => {
-                                    setShowTrackJson(false);
-                                    window.requestAnimationFrame(() => trackJsonTriggerRef.current?.focus());
-                                  }}
-                                >
-                                  <span aria-hidden="true">×</span>
-                                </button>
-                              </header>
-                              <Field label={t("wizard.field.referenceTrack")} required htmlFor="reference_track_json" error={errors.reference_track_json} hint={t("wizard.field.referenceTrackHint")}>
-                                <textarea id="reference_track_json" rows={12} value={form.reference_track_json} onChange={handleTextChange("reference_track_json")} />
-                              </Field>
-                            </section>
-                          </div>
-                        ) : null}
                       </section>
                     </div>
                   ) : null}
@@ -2255,12 +2217,6 @@ export function NewJob() {
                       trueLabel={t("wizard.option.enabled")}
                       falseLabel={t("wizard.option.disabled")}
                     />
-                    <span
-                      className="form-hint"
-                      title={t(SCENARIO_CASE_HINT_KEYS[key][form[key] ? "true" : "false"])}
-                    >
-                      {t(SCENARIO_CASE_HINT_KEYS[key][form[key] ? "true" : "false"])}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -2275,7 +2231,7 @@ export function NewJob() {
                   south: "wizard.field.windSouth",
                   west: "wizard.field.windWest",
                 } as const;
-                return <Field key={key} label={t(labelKeys[direction])} required htmlFor={key} error={errors[key]} hint={t("wizard.field.windHint")}><input id={key} type="number" step="0.1" value={form[key]} onChange={handleTextChange(key)} /></Field>;
+                return <Field key={key} label={t(labelKeys[direction])} required htmlFor={key} error={errors[key]} hint={t("wizard.field.windHint")}><input id={key} type="number" min="-10" max="10" step="0.1" placeholder="-10–10" value={form[key]} onChange={handleTextChange(key)} /></Field>;
               })}
               <Field label={t("wizard.field.sensorNoise")} required htmlFor="sensor_noise_level" error={errors.sensor_noise_level} hint={t(SENSOR_NOISE_HINT_KEYS[form.sensor_noise_level])}>
                 <select id="sensor_noise_level" value={form.sensor_noise_level} onChange={(event) => update("sensor_noise_level", event.target.value as SensorNoiseLevel)}>
@@ -2349,16 +2305,16 @@ export function NewJob() {
                   <div className="form-grid wizard-modal-grid">
                     <Field label={t("wizard.field.advancedScenario")} htmlFor="advanced_enabled" hint={t(form.advanced_enabled ? "wizard.hint.advanced.enabled" : "wizard.hint.advanced.disabled")}><BooleanSelect id="advanced_enabled" value={form.advanced_enabled} onChange={(value) => update("advanced_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
                     <Field label={t("wizard.field.gustEnabled")} htmlFor="gust_enabled" hint={t(form.gust_enabled ? "wizard.hint.gust.enabled" : "wizard.hint.gust.disabled")}><BooleanSelect id="gust_enabled" value={form.gust_enabled} onChange={(value) => update("gust_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
-                    <Field label={t("wizard.field.gustMagnitude")} htmlFor="gust_magnitude_mps" error={errors.gust_magnitude_mps} hint={t("wizard.hint.gustMagnitude")}><input id="gust_magnitude_mps" type="number" step="0.1" value={form.gust_magnitude_mps} onChange={handleTextChange("gust_magnitude_mps")} /></Field>
-                    <Field label={t("wizard.field.gustDirection")} htmlFor="gust_direction_deg" error={errors.gust_direction_deg} hint={t("wizard.hint.gustDirection")}><input id="gust_direction_deg" type="number" step="1" value={form.gust_direction_deg} onChange={handleTextChange("gust_direction_deg")} /></Field>
-                    <Field label={t("wizard.field.gustPeriod")} htmlFor="gust_period_s" error={errors.gust_period_s} hint={t("wizard.hint.gustPeriod")}><input id="gust_period_s" type="number" step="0.1" value={form.gust_period_s} onChange={handleTextChange("gust_period_s")} /></Field>
-                    <Field label={t("wizard.field.gpsNoise")} htmlFor="gps_noise_m" error={errors.gps_noise_m} hint={t("wizard.hint.gpsNoise")}><input id="gps_noise_m" type="number" step="0.1" value={form.gps_noise_m} onChange={handleTextChange("gps_noise_m")} /></Field>
-                    <Field label={t("wizard.field.baroNoise")} htmlFor="baro_noise_m" error={errors.baro_noise_m} hint={t("wizard.hint.baroNoise")}><input id="baro_noise_m" type="number" step="0.1" value={form.baro_noise_m} onChange={handleTextChange("baro_noise_m")} /></Field>
-                    <Field label={t("wizard.field.imuNoiseScale")} htmlFor="imu_noise_scale" error={errors.imu_noise_scale} hint={t("wizard.hint.imuNoiseScale")}><input id="imu_noise_scale" type="number" step="0.1" value={form.imu_noise_scale} onChange={handleTextChange("imu_noise_scale")} /></Field>
-                    <Field label={t("wizard.field.dropoutRate")} htmlFor="dropout_rate" error={errors.dropout_rate} hint={t("wizard.hint.dropoutRate")}><input id="dropout_rate" type="number" step="0.01" value={form.dropout_rate} onChange={handleTextChange("dropout_rate")} /></Field>
-                    <Field label={t("wizard.field.batteryInitial")} htmlFor="battery_initial_percent" error={errors.battery_initial_percent} hint={t("wizard.hint.batteryInitial")}><input id="battery_initial_percent" type="number" step="1" value={form.battery_initial_percent} onChange={handleTextChange("battery_initial_percent")} /></Field>
+                    <Field label={t("wizard.field.gustMagnitude")} htmlFor="gust_magnitude_mps" error={errors.gust_magnitude_mps} hint={t("wizard.hint.gustMagnitude")}><input id="gust_magnitude_mps" type="number" min="0" max="30" step="0.1" placeholder="0–30" value={form.gust_magnitude_mps} onChange={handleTextChange("gust_magnitude_mps")} /></Field>
+                    <Field label={t("wizard.field.gustDirection")} htmlFor="gust_direction_deg" error={errors.gust_direction_deg} hint={t("wizard.hint.gustDirection")}><input id="gust_direction_deg" type="number" min="0" max="359" step="1" placeholder="0–359" value={form.gust_direction_deg} onChange={handleTextChange("gust_direction_deg")} /></Field>
+                    <Field label={t("wizard.field.gustPeriod")} htmlFor="gust_period_s" error={errors.gust_period_s} hint={t("wizard.hint.gustPeriod")}><input id="gust_period_s" type="number" min="0" max="300" step="0.1" placeholder="0–300" value={form.gust_period_s} onChange={handleTextChange("gust_period_s")} /></Field>
+                    <Field label={t("wizard.field.gpsNoise")} htmlFor="gps_noise_m" error={errors.gps_noise_m} hint={t("wizard.hint.gpsNoise")}><input id="gps_noise_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.gps_noise_m} onChange={handleTextChange("gps_noise_m")} /></Field>
+                    <Field label={t("wizard.field.baroNoise")} htmlFor="baro_noise_m" error={errors.baro_noise_m} hint={t("wizard.hint.baroNoise")}><input id="baro_noise_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.baro_noise_m} onChange={handleTextChange("baro_noise_m")} /></Field>
+                    <Field label={t("wizard.field.imuNoiseScale")} htmlFor="imu_noise_scale" error={errors.imu_noise_scale} hint={t("wizard.hint.imuNoiseScale")}><input id="imu_noise_scale" type="number" min="0" max="10" step="0.1" placeholder="0–10" value={form.imu_noise_scale} onChange={handleTextChange("imu_noise_scale")} /></Field>
+                    <Field label={t("wizard.field.dropoutRate")} htmlFor="dropout_rate" error={errors.dropout_rate} hint={t("wizard.hint.dropoutRate")}><input id="dropout_rate" type="number" min="0" max="1" step="0.01" placeholder="0–1" value={form.dropout_rate} onChange={handleTextChange("dropout_rate")} /></Field>
+                    <Field label={t("wizard.field.batteryInitial")} htmlFor="battery_initial_percent" error={errors.battery_initial_percent} hint={t("wizard.hint.batteryInitial")}><input id="battery_initial_percent" type="number" min="0" max="100" step="1" placeholder="0–100" value={form.battery_initial_percent} onChange={handleTextChange("battery_initial_percent")} /></Field>
                     <Field label={t("wizard.field.batteryVoltageSag")} htmlFor="battery_voltage_sag" hint={t(form.battery_voltage_sag ? "wizard.hint.batterySag.enabled" : "wizard.hint.batterySag.disabled")}><BooleanSelect id="battery_voltage_sag" value={form.battery_voltage_sag} onChange={(value) => update("battery_voltage_sag", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
-                    <Field label={t("wizard.field.payloadMass")} htmlFor="mass_payload_kg" error={errors.mass_payload_kg} hint={t("wizard.hint.payloadMass")}><input id="mass_payload_kg" type="number" step="0.1" value={form.mass_payload_kg} onChange={handleTextChange("mass_payload_kg")} /></Field>
+                    <Field label={t("wizard.field.payloadMass")} htmlFor="mass_payload_kg" error={errors.mass_payload_kg} hint={t("wizard.hint.payloadMass")}><input id="mass_payload_kg" type="number" min="0" max="20" step="0.1" placeholder="0–20" value={form.mass_payload_kg} onChange={handleTextChange("mass_payload_kg")} /></Field>
                   </div>
                   <Field label={t("wizard.field.obstaclesJson")} htmlFor="obstacles_json" error={errors.obstacles_json} hint={t("wizard.field.obstaclesHint")}>
                     <textarea id="obstacles_json" rows={4} value={form.obstacles_json} onChange={handleTextChange("obstacles_json")} />
@@ -2405,12 +2361,12 @@ export function NewJob() {
                   </optgroup>
                 </select>
               </Field>
-              <Field label={t("wizard.field.maxIterations")} required htmlFor="max_iterations" error={errors.max_iterations} hint={t(form.optimizer_strategy === "none" ? "wizard.field.maxIterationsNoOptimizerHint" : "wizard.hint.maxIterations")}><input id="max_iterations" type="number" min="1" max="100" step="1" value={form.max_iterations} onChange={handleTextChange("max_iterations")} /></Field>
-              <Field label={t("wizard.field.trialsPerCandidate")} required htmlFor="trials_per_candidate" error={errors.trials_per_candidate} hint={t("wizard.field.trialsPerCandidateHint")}><input id="trials_per_candidate" type="number" min="1" max="10" step="1" value={form.trials_per_candidate} onChange={handleTextChange("trials_per_candidate")} /></Field>
-              <Field label={t("wizard.field.maxTotalTrials")} required htmlFor="max_total_trials" error={errors.max_total_trials} hint={t("wizard.field.maxTotalTrialsHint")}><input id="max_total_trials" type="number" min="1" max="10000" step="1" value={form.max_total_trials} onChange={handleTextChange("max_total_trials")} /></Field>
-              <Field label={t("wizard.field.targetRmse")} htmlFor="target_rmse" error={errors.target_rmse} hint={t("wizard.hint.targetRmse")}><input id="target_rmse" type="number" step="0.01" value={form.target_rmse} onChange={handleTextChange("target_rmse")} /></Field>
-              <Field label={t("wizard.field.targetMaxError")} htmlFor="target_max_error" error={errors.target_max_error} hint={t("wizard.hint.targetMaxError")}><input id="target_max_error" type="number" step="0.01" value={form.target_max_error} onChange={handleTextChange("target_max_error")} /></Field>
-              <Field label={t("wizard.field.minPassRate")} required htmlFor="min_pass_rate" error={errors.min_pass_rate} hint={t("wizard.hint.minPassRate")}><input id="min_pass_rate" type="number" min="0" max="1" step="0.05" value={form.min_pass_rate} onChange={handleTextChange("min_pass_rate")} /></Field>
+              <Field label={t("wizard.field.maxIterations")} required htmlFor="max_iterations" error={errors.max_iterations} hint={t(form.optimizer_strategy === "none" ? "wizard.field.maxIterationsNoOptimizerHint" : "wizard.hint.maxIterations")}><input id="max_iterations" type="number" min="1" max="100" step="1" placeholder="1–100" value={form.max_iterations} onChange={handleTextChange("max_iterations")} /></Field>
+              <Field label={t("wizard.field.trialsPerCandidate")} required htmlFor="trials_per_candidate" error={errors.trials_per_candidate} hint={t("wizard.field.trialsPerCandidateHint")}><input id="trials_per_candidate" type="number" min="1" max="10" step="1" placeholder="1–10" value={form.trials_per_candidate} onChange={handleTextChange("trials_per_candidate")} /></Field>
+              <Field label={t("wizard.field.maxTotalTrials")} required htmlFor="max_total_trials" error={errors.max_total_trials} hint={t("wizard.field.maxTotalTrialsHint")}><input id="max_total_trials" type="number" min="1" max="10000" step="1" placeholder="1–10000" value={form.max_total_trials} onChange={handleTextChange("max_total_trials")} /></Field>
+              <Field label={t("wizard.field.targetRmse")} htmlFor="target_rmse" error={errors.target_rmse} hint={t("wizard.hint.targetRmse")}><input id="target_rmse" type="number" min="0" max="100" step="0.01" placeholder="0–100" value={form.target_rmse} onChange={handleTextChange("target_rmse")} /></Field>
+              <Field label={t("wizard.field.targetMaxError")} htmlFor="target_max_error" error={errors.target_max_error} hint={t("wizard.hint.targetMaxError")}><input id="target_max_error" type="number" min="0" max="100" step="0.01" placeholder="0–100" value={form.target_max_error} onChange={handleTextChange("target_max_error")} /></Field>
+              <Field label={t("wizard.field.minPassRate")} required htmlFor="min_pass_rate" error={errors.min_pass_rate} hint={t("wizard.hint.minPassRate")}><input id="min_pass_rate" type="number" min="0" max="1" step="0.05" placeholder="0–1" value={form.min_pass_rate} onChange={handleTextChange("min_pass_rate")} /></Field>
             </div>
             {form.simulator_backend === "real_cli" && !capabilitiesUnavailable && !realCliCapability?.ready ? (
               <Alert
@@ -2617,12 +2573,12 @@ interface FieldProps {
   children: ReactNode;
 }
 
-function Field({ label, htmlFor, required, error, hint, children }: FieldProps) {
+function Field({ label, htmlFor, required, error, children }: FieldProps) {
   return (
     <div className={`form-field${error ? " form-field-error" : ""}`}>
       <label htmlFor={htmlFor} className={required ? "form-field-required" : undefined}>{label}</label>
       {children}
-      {error ? <span className="form-error" role="alert">{error}</span> : hint ? <span className="form-hint" title={hint}>{hint}</span> : null}
+      {error ? <span className="form-error" role="alert">{error}</span> : null}
     </div>
   );
 }

@@ -248,35 +248,36 @@ describe("NewJob experiment wizard", () => {
     expect(restoredItems[4]).not.toHaveClass("wizard-step-complete");
   });
 
-  it("updates concise guidance when semantic options change", () => {
+  it("keeps semantic option changes compact without helper paragraphs", () => {
     renderPage();
 
-    expect(screen.getByText("A full circle centered on X/Y with the chosen radius.")).toBeVisible();
+    expect(screen.queryByText("A full circle centered on X/Y with the chosen radius.")).toBeNull();
     fireEvent.change(screen.getByLabelText(/Track Type/i), { target: { value: "u_turn" } });
-    expect(screen.getByText("Two straight legs joined by one semicircular turn.")).toBeVisible();
+    expect(screen.getByLabelText(/Straight length/i)).toBeVisible();
+    expect(screen.queryByText("Two straight legs joined by one semicircular turn.")).toBeNull();
 
-    expect(screen.getByText("Standard Gazebo x500 quadrotor configuration.")).toBeVisible();
     fireEvent.change(screen.getByLabelText(/Airframe/i), { target: { value: "quad_x" } });
-    expect(screen.getByText("Generic X-layout quadrotor configuration.")).toBeVisible();
+    expect(screen.getByLabelText(/Airframe/i)).toHaveValue("quad_x");
+    expect(screen.queryByText("Generic X-layout quadrotor configuration.")).toBeNull();
 
-    expect(screen.getByText("No Gazebo window; faster for automated tuning.")).toBeVisible();
     fireEvent.change(screen.getByLabelText(/^Gazebo rendering$/i), { target: { value: "false" } });
-    expect(screen.getByText("Shows Gazebo graphics for visual observation.")).toBeVisible();
+    expect(screen.getByLabelText(/^Gazebo rendering$/i)).toHaveValue("false");
+    expect(screen.queryByText("Shows Gazebo graphics for visual observation.")).toBeNull();
 
     selectObjective("fast");
-    expect(screen.getByText("Rewards shorter completion time while staying valid.")).toBeVisible();
+    expect(screen.queryByText("Rewards shorter completion time while staying valid.")).toBeNull();
 
     openStep(/Scenarios/i);
-    expect(screen.getByText("Applies moderate sensor noise to noise cases.")).toBeVisible();
     fireEvent.change(screen.getByLabelText(/Sensor noise level/i), { target: { value: "high" } });
-    expect(screen.getByText("Applies severe sensor noise for stress testing.")).toBeVisible();
+    expect(screen.getByLabelText(/Sensor noise level/i)).toHaveValue("high");
+    expect(screen.queryByText("Applies severe sensor noise for stress testing.")).toBeNull();
     fireEvent.change(screen.getByLabelText(/Matched random conditions/i), { target: { value: "false" } });
-    expect(screen.getByText("Candidates receive independently sampled conditions.")).toBeVisible();
+    expect(screen.getByLabelText(/Matched random conditions/i)).toHaveValue("false");
 
     openStep(/Constraints & budget/i);
-    expect(screen.getByText("Checks the workflow with deterministic synthetic scores.")).toBeVisible();
     fireEvent.change(screen.getByLabelText(/Simulator Backend/i), { target: { value: "real_cli" } });
-    expect(screen.getByText("Runs real PX4 SITL and Gazebo flight physics.")).toBeVisible();
+    expect(screen.getByLabelText(/Simulator Backend/i)).toHaveValue("real_cli");
+    expect(screen.queryByText("Runs real PX4 SITL and Gazebo flight physics.")).toBeNull();
   });
 
   it("submits per-job Gazebo runtime controls for reproducible parallel runs", async () => {
@@ -359,7 +360,9 @@ describe("NewJob experiment wizard", () => {
     fireEvent.click(screen.getByRole("button", { name: /Undo/i }));
     expect(screen.getAllByRole("button", { name: /Remove waypoint/i })).toHaveLength(3);
 
-    fireEvent.click(screen.getByRole("button", { name: /JSON import \/ export/i }));
+    const jsonTrigger = screen.getByRole("button", { name: /JSON import \/ export/i });
+    expect(jsonTrigger.closest(".track-editor-data-footer")).not.toBeNull();
+    fireEvent.click(jsonTrigger);
     expect(screen.getByRole("dialog", { name: /JSON import \/ export/i })).toBeVisible();
     fireEvent.change(screen.getByLabelText(/Reference track \(JSON\)/i), {
       target: { value: '[{"x":0,"y":0}]' },
@@ -505,7 +508,7 @@ describe("NewJob experiment wizard", () => {
     fireEvent.change(screen.getByLabelText(/Environment presets/i), {
       target: { value: "stress" },
     });
-    expect(screen.getByText("Combines wind, gust, sensor, battery and payload effects.")).toBeVisible();
+    expect(screen.queryByText("Combines wind, gust, sensor, battery and payload effects.")).toBeNull();
     expect(screen.getAllByLabelText(/^Advanced environment$/i)[0]).toHaveValue("true");
     expect(screen.getByLabelText(/Gust magnitude/i)).toHaveValue(10);
     fireEvent.change(screen.getByLabelText(/Obstacles.*JSON/i), {

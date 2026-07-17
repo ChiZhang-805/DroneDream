@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# LEGACY: this targets the generic /var/www layout, not the active BaoTa host.
+# Current releases must use deploy-static-baota.ps1/deploy-static-baota.sh.
+echo "warning: deploy-static.sh is the legacy generic-Nginx workflow" >&2
+
 if [[ $# -ne 1 ]]; then
   echo "Usage: $0 user@server" >&2
   exit 2

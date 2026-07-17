@@ -93,6 +93,34 @@ jobs:
           npm --prefix frontend run build
           npm --prefix frontend run site:build
 
+      - name: Install Chromium for the public-site visual contract
+        run: npx --prefix frontend playwright install --with-deps chromium
+
+      - name: Enforce bilingual copy rhythm and responsive layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix frontend run site:preview -- --host 127.0.0.1 --port 4174 >"$RUNNER_TEMP/dronedream-site-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:4174/site.html >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$preview_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/dronedream-site-preview.log"
+              exit 1
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              cat "$RUNNER_TEMP/dronedream-site-preview.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 1440 1000 0.80 "$RUNNER_TEMP/site-audit-1440.json"
+          node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 2048 1280 0.80 "$RUNNER_TEMP/site-audit-2048.json"
+          node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 390 844 0.80 "$RUNNER_TEMP/site-audit-mobile.json" layout-only
+
   runtime-contract:
     name: Runtime / Static contract
     runs-on: ubuntu-24.04

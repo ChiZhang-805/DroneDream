@@ -2114,7 +2114,28 @@ a {
 }
 
 .wizard-track-modal {
-  width: min(1180px, 100%);
+  width: min(1420px, calc(100vw - 2rem));
+  height: min(88dvh, 820px);
+  max-height: min(88dvh, 820px);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+.wizard-track-modal > .wizard-modal-header {
+  position: relative;
+  top: auto;
+  width: 100%;
+  margin: 0;
+  padding: 0.78rem 0.95rem;
+  border-radius: 13px 13px 0 0;
+}
+
+.wizard-track-modal > .track-editor {
+  flex: 1 1 auto;
+  padding: 0.8rem;
+  overflow: hidden;
 }
 
 .wizard-name-modal {
@@ -2123,6 +2144,25 @@ a {
 
 .wizard-json-modal {
   width: min(720px, 100%);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+.wizard-json-modal > .wizard-modal-header {
+  position: relative;
+  top: auto;
+  width: 100%;
+  margin: 0;
+  padding: 0.78rem 0.95rem;
+  border-radius: 13px 13px 0 0;
+}
+
+.wizard-json-modal > .form-field {
+  min-height: 0;
+  padding: 0.8rem;
+  overflow: auto;
 }
 
 .wizard-nested-modal-backdrop {
@@ -2130,6 +2170,7 @@ a {
 }
 
 .track-json-trigger {
+  width: 100%;
   align-self: stretch;
   justify-content: flex-start;
 }
@@ -2246,9 +2287,7 @@ a {
   max-height: min(58dvh, 480px);
 }
 
-.wizard-track-modal .track-waypoint-table-wrap {
-  max-height: min(24vh, 190px);
-}
+.wizard-track-modal .track-waypoint-table-wrap { max-height: none; }
 
 .scenario-preset-bar,
 .review-issue-links {
@@ -2397,16 +2436,20 @@ a {
 }
 
 .track-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  display: grid;
+  grid-template:
+    "view-toolbar data-toolbar" auto
+    "visual confirm" auto
+    "visual data" minmax(0, 1fr)
+    "visual data-footer" auto
+    / minmax(0, 1.35fr) minmax(470px, 0.9fr);
+  gap: 0.55rem 0.75rem;
   min-height: 0;
   margin-top: 0;
 }
 
 .track-editor-toolbar {
-  align-items: center;
-  justify-content: space-between;
+  display: contents;
 }
 
 .track-editor-actions,
@@ -2415,6 +2458,16 @@ a {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.track-editor-actions {
+  grid-area: data-toolbar;
+  justify-self: start;
+}
+
+.track-view-switcher {
+  grid-area: view-toolbar;
+  justify-self: end;
 }
 
 .track-icon-button {
@@ -2528,6 +2581,7 @@ a {
 }
 
 .track-clear-confirm {
+  grid-area: confirm;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2550,13 +2604,18 @@ a {
 }
 
 .track-canvas-shell {
+  grid-area: visual;
+  display: flex;
   min-height: 0;
+  overflow: hidden;
   border-radius: 10px;
 }
 
 .track-editor-canvas {
   width: 100%;
-  max-height: min(43vh, 390px);
+  height: 100%;
+  max-height: none;
+  min-height: 0;
   touch-action: none;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
@@ -2634,7 +2693,87 @@ a {
 .track-axis-label { fill: var(--text-muted); font-size: 11px; }
 
 .track-waypoint-table-wrap {
+  grid-area: data;
+  min-height: 0;
+  overflow: auto;
   scroll-behavior: smooth;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+}
+
+.track-editor-data-footer {
+  grid-area: data-footer;
+  min-width: 0;
+}
+
+@media (max-width: 1050px) {
+  .wizard-track-modal {
+    width: min(900px, calc(100vw - 1rem));
+    height: min(94dvh, 900px);
+    max-height: min(94dvh, 900px);
+  }
+
+  .track-editor {
+    grid-template:
+      "view-toolbar data-toolbar" auto
+      "visual visual" minmax(260px, 1fr)
+      "confirm confirm" auto
+      "data data" minmax(180px, 0.72fr)
+      "data-footer data-footer" auto
+      / minmax(0, 1fr) auto;
+  }
+
+  .track-view-switcher {
+    justify-self: start;
+  }
+
+  .track-editor-actions {
+    justify-self: end;
+  }
+}
+
+@media (max-width: 600px) {
+  .wizard-track-modal {
+    width: calc(100vw - 0.5rem);
+    height: calc(100dvh - 0.5rem);
+    max-height: calc(100dvh - 0.5rem);
+    padding: 0;
+    border-radius: 11px;
+  }
+
+  .wizard-track-modal > .wizard-modal-header {
+    padding: 0.65rem 0.7rem;
+    border-radius: 10px 10px 0 0;
+  }
+
+  .wizard-track-modal > .track-editor {
+    padding: 0.55rem;
+  }
+
+  .track-editor {
+    gap: 0.45rem;
+    grid-template:
+      "view-toolbar" auto
+      "data-toolbar" auto
+      "visual" minmax(220px, 1fr)
+      "confirm" auto
+      "data" minmax(150px, 0.72fr)
+      "data-footer" auto
+      / minmax(0, 1fr);
+  }
+
+  .track-view-switcher,
+  .track-editor-actions {
+    justify-self: stretch;
+  }
+
+  .track-view-switcher {
+    justify-content: space-between;
+  }
+
+  .track-editor-actions {
+    justify-content: flex-end;
+  }
 }
 
 .track-waypoint-table tbody tr {
@@ -4983,4 +5122,644 @@ a {
     transition: none;
     animation: none;
   }
+}
+
+/* --------------------------------------------------------------------------
+   Operational workspace: calm light theme
+
+   The immersive launcher intentionally keeps its dark starfield treatment.
+   Everything after entering the product uses a high-legibility light canvas
+   with DroneDream pink/purple reserved for actions, focus, and status.
+   -------------------------------------------------------------------------- */
+
+.app-shell:not(.app-shell-launcher) {
+  color-scheme: light;
+  --bg: #f7f7fb;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #faf6fb;
+  --bg-subtle: #f3edf6;
+  --border: #e7dfe9;
+  --border-strong: #d4c1da;
+  --text: #1e1721;
+  --text-muted: #756c79;
+  --text-dim: #443b48;
+  --primary: #c642ad;
+  --primary-strong: #8d43cc;
+  --success: #157e61;
+  --warning: #a56500;
+  --danger: #c83b67;
+  --active: #a43db1;
+  --focus-ring: 0 0 0 3px rgba(198, 66, 173, 0.18);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 92% 5%, rgba(234, 157, 224, 0.14), transparent 28rem),
+    radial-gradient(circle at 8% 92%, rgba(141, 67, 204, 0.08), transparent 30rem),
+    var(--bg);
+  color: var(--text);
+}
+
+.app-shell:not(.app-shell-launcher) a {
+  color: #8a319d;
+}
+
+.app-shell:not(.app-shell-launcher) .app-sidebar {
+  background: rgba(255, 255, 255, 0.96);
+  border-right-color: var(--border);
+  box-shadow: 12px 0 32px rgba(71, 45, 78, 0.04);
+}
+
+.app-shell:not(.app-shell-launcher) .app-sidebar-brand,
+.app-shell:not(.app-shell-launcher) .app-header-title,
+.app-shell:not(.app-shell-launcher) .app-sidebar-footer,
+.app-shell:not(.app-shell-launcher) .app-footer {
+  color: var(--text);
+}
+
+.app-shell:not(.app-shell-launcher) .app-nav-link {
+  color: #554b59;
+}
+
+.app-shell:not(.app-shell-launcher) .app-nav-link:hover {
+  background: #faf1f9;
+  color: #8b328f;
+}
+
+.app-shell:not(.app-shell-launcher) .app-nav-link-active {
+  background: linear-gradient(90deg, #f9e9f6, #f2eafb);
+  color: #8b328f;
+  box-shadow: inset 3px 0 0 #cb4eb3;
+}
+
+.app-shell:not(.app-shell-launcher) .app-sidebar-footer,
+.app-shell:not(.app-shell-launcher) .app-footer {
+  border-color: var(--border);
+}
+
+.app-shell:not(.app-shell-launcher) .app-header {
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom-color: var(--border);
+  box-shadow: 0 8px 24px rgba(67, 42, 74, 0.04);
+  backdrop-filter: blur(18px);
+}
+
+.app-shell:not(.app-shell-launcher) .app-main,
+.app-shell:not(.app-shell-launcher) .app-main-wizard,
+.app-shell:not(.app-shell-launcher) .app-footer {
+  background: transparent;
+}
+
+.app-shell:not(.app-shell-launcher) .app-header-meta,
+.app-shell:not(.app-shell-launcher) .app-footer-content,
+.app-shell:not(.app-shell-launcher) .muted,
+.app-shell:not(.app-shell-launcher) .section-card-description,
+.app-shell:not(.app-shell-launcher) .form-hint {
+  color: var(--text-muted);
+}
+
+.app-shell:not(.app-shell-launcher) .language-switcher select,
+.app-shell:not(.app-shell-launcher) .form-field input,
+.app-shell:not(.app-shell-launcher) .form-field select,
+.app-shell:not(.app-shell-launcher) .form-field textarea,
+.app-shell:not(.app-shell-launcher) .parameter-search input,
+.app-shell:not(.app-shell-launcher) .parameter-filter select,
+.app-shell:not(.app-shell-launcher) .parameter-table input[type="number"],
+.app-shell:not(.app-shell-launcher) .parameter-use-select,
+.app-shell:not(.app-shell-launcher) .scenario-case-option select,
+.app-shell:not(.app-shell-launcher) .track-speed-input,
+.app-shell:not(.app-shell-launcher) .waypoint-input {
+  background: #ffffff;
+  border-color: var(--border-strong);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(50, 28, 58, 0.03);
+}
+
+.app-shell:not(.app-shell-launcher) input::placeholder,
+.app-shell:not(.app-shell-launcher) textarea::placeholder {
+  color: #aaa0ae;
+  opacity: 1;
+}
+
+.app-shell:not(.app-shell-launcher) .form-field input:hover,
+.app-shell:not(.app-shell-launcher) .form-field select:hover,
+.app-shell:not(.app-shell-launcher) .form-field textarea:hover,
+.app-shell:not(.app-shell-launcher) .parameter-search input:hover,
+.app-shell:not(.app-shell-launcher) .parameter-filter select:hover {
+  border-color: #c895d1;
+}
+
+.app-shell:not(.app-shell-launcher) .form-field input:focus,
+.app-shell:not(.app-shell-launcher) .form-field select:focus,
+.app-shell:not(.app-shell-launcher) .form-field textarea:focus,
+.app-shell:not(.app-shell-launcher) .parameter-search input:focus,
+.app-shell:not(.app-shell-launcher) .parameter-filter select:focus,
+.app-shell:not(.app-shell-launcher) .parameter-use-select:focus,
+.app-shell:not(.app-shell-launcher) .scenario-case-option select:focus {
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.app-shell:not(.app-shell-launcher) .form-field label,
+.app-shell:not(.app-shell-launcher) .wizard-field-label,
+.app-shell:not(.app-shell-launcher) .parameter-summary-label {
+  color: #4b404f;
+}
+
+.app-shell:not(.app-shell-launcher) .form-field-required::after {
+  color: #d43e77;
+}
+
+.app-shell:not(.app-shell-launcher) .form-error {
+  color: var(--danger);
+}
+
+.app-shell:not(.app-shell-launcher) .btn {
+  background: #ffffff;
+  border-color: var(--border-strong);
+  color: #4c3b51;
+  box-shadow: 0 2px 7px rgba(66, 38, 75, 0.06);
+}
+
+.app-shell:not(.app-shell-launcher) .btn:hover:not(:disabled) {
+  background: #faf1fa;
+  border-color: #c97ad0;
+  color: #8b328f;
+}
+
+.app-shell:not(.app-shell-launcher) .btn-primary {
+  background: linear-gradient(120deg, #a94acf, #ed62b6);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 9px 22px rgba(184, 62, 172, 0.22);
+}
+
+.app-shell:not(.app-shell-launcher) .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(120deg, #963bc3, #df50aa);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.app-shell:not(.app-shell-launcher) .btn-ghost {
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell:not(.app-shell-launcher) .btn-danger {
+  background: #fff2f6;
+  border-color: #efb3c6;
+  color: #a92855;
+}
+
+.app-shell:not(.app-shell-launcher) .section-card,
+.app-shell:not(.app-shell-launcher) .metric-card,
+.app-shell:not(.app-shell-launcher) .artifact-card,
+.app-shell:not(.app-shell-launcher) .data-table-wrapper,
+.app-shell:not(.app-shell-launcher) .wizard-stepper,
+.app-shell:not(.app-shell-launcher) .wizard-actions,
+.app-shell:not(.app-shell-launcher) .mode-selector,
+.app-shell:not(.app-shell-launcher) .objective-card,
+.app-shell:not(.app-shell-launcher) .parameter-selector,
+.app-shell:not(.app-shell-launcher) .parameter-summary-bar,
+.app-shell:not(.app-shell-launcher) .parameter-group,
+.app-shell:not(.app-shell-launcher) .wizard-subsection,
+.app-shell:not(.app-shell-launcher) .scenario-case-selector,
+.app-shell:not(.app-shell-launcher) .scenario-case-option,
+.app-shell:not(.app-shell-launcher) .scenario-preset-bar,
+.app-shell:not(.app-shell-launcher) .scenario-capability-strip,
+.app-shell:not(.app-shell-launcher) .review-card,
+.app-shell:not(.app-shell-launcher) .replay-panel,
+.app-shell:not(.app-shell-launcher) .environment-card {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: 0 10px 28px rgba(66, 38, 75, 0.06);
+}
+
+.app-shell:not(.app-shell-launcher) .section-card-header,
+.app-shell:not(.app-shell-launcher) .parameter-group-header,
+.app-shell:not(.app-shell-launcher) .wizard-actions {
+  border-color: var(--border);
+}
+
+.app-shell:not(.app-shell-launcher) .section-card-title,
+.app-shell:not(.app-shell-launcher) .metric-value,
+.app-shell:not(.app-shell-launcher) .parameter-summary-value,
+.app-shell:not(.app-shell-launcher) .parameter-name,
+.app-shell:not(.app-shell-launcher) .parameter-label,
+.app-shell:not(.app-shell-launcher) .parameter-group-header h3,
+.app-shell:not(.app-shell-launcher) .wizard-subsection > h3 {
+  color: var(--text);
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-eyebrow,
+.app-shell:not(.app-shell-launcher) .page-eyebrow,
+.app-shell:not(.app-shell-launcher) .experiment-header-eyebrow {
+  color: #b23dad;
+}
+
+.app-shell:not(.app-shell-launcher) .experiment-header h1,
+.app-shell:not(.app-shell-launcher) .page-header h1 {
+  color: #251929;
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-stepper li {
+  color: #7e7282;
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-stepper .wizard-step-active {
+  background: linear-gradient(90deg, #fae8f5, #f1e7fb);
+  color: #8d3398;
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-step-number {
+  background: #ffffff;
+  border-color: #cdbbd3;
+  color: #76687c;
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-step-active .wizard-step-number,
+.app-shell:not(.app-shell-launcher) .wizard-step-complete .wizard-step-number {
+  background: linear-gradient(135deg, #b34bd0, #e95fb7);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-step-error .wizard-step-number {
+  background: #fff0f4;
+  border-color: #dc5c82;
+  color: #b92755;
+}
+
+.app-shell:not(.app-shell-launcher) .objective-card:hover,
+.app-shell:not(.app-shell-launcher) .objective-card-selected,
+.app-shell:not(.app-shell-launcher) .mode-option-active {
+  background: #fbecf8;
+  border-color: #d267c7;
+  color: #77297c;
+}
+
+.app-shell:not(.app-shell-launcher) .parameter-selector-controls,
+.app-shell:not(.app-shell-launcher) .parameter-table-wrap,
+.app-shell:not(.app-shell-launcher) .track-waypoint-table-wrap {
+  scrollbar-color: #c99bcf #f2ebf4;
+}
+
+.app-shell:not(.app-shell-launcher) .parameter-group-header {
+  background: #fcf8fc;
+}
+
+.app-shell:not(.app-shell-launcher) .parameter-table,
+.app-shell:not(.app-shell-launcher) .data-table,
+.app-shell:not(.app-shell-launcher) .track-waypoint-table {
+  background: #ffffff;
+  color: var(--text);
+}
+
+.app-shell:not(.app-shell-launcher) .parameter-table thead th,
+.app-shell:not(.app-shell-launcher) .data-table thead,
+.app-shell:not(.app-shell-launcher) .data-table th,
+.app-shell:not(.app-shell-launcher) .track-waypoint-table th {
+  background: #f6f0f7;
+  border-color: var(--border);
+  color: #5a4c5e;
+}
+
+.app-shell:not(.app-shell-launcher) .parameter-table td,
+.app-shell:not(.app-shell-launcher) .data-table td,
+.app-shell:not(.app-shell-launcher) .track-waypoint-table td {
+  border-color: var(--border);
+}
+
+.app-shell:not(.app-shell-launcher) .parameter-row-selected {
+  background: #fff6fd;
+}
+
+.app-shell:not(.app-shell-launcher) .parameter-description,
+.app-shell:not(.app-shell-launcher) .parameter-bounds,
+.app-shell:not(.app-shell-launcher) .parameter-dependencies,
+.app-shell:not(.app-shell-launcher) .parameter-choices,
+.app-shell:not(.app-shell-launcher) .parameter-metadata {
+  color: var(--text-muted);
+}
+
+.app-shell:not(.app-shell-launcher) code,
+.app-shell:not(.app-shell-launcher) .code-chip {
+  background: #f1e9f3;
+  color: #71317d;
+}
+
+.app-shell:not(.app-shell-launcher) .alert {
+  background: #ffffff;
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: 0 7px 22px rgba(66, 38, 75, 0.05);
+}
+
+.app-shell:not(.app-shell-launcher) .alert-success {
+  background: #effaf6;
+  border-color: #a8dfcb;
+  color: #16674f;
+}
+
+.app-shell:not(.app-shell-launcher) .alert-warning {
+  background: #fff9eb;
+  border-color: #ead39e;
+  color: #805200;
+}
+
+.app-shell:not(.app-shell-launcher) .alert-danger,
+.app-shell:not(.app-shell-launcher) .alert-error {
+  background: #fff1f5;
+  border-color: #efb1c4;
+  color: #a52b54;
+}
+
+.app-shell:not(.app-shell-launcher) .status-badge,
+.app-shell:not(.app-shell-launcher) .phase-pill,
+.app-shell:not(.app-shell-launcher) .env-chip {
+  background: #f5edf7;
+  border-color: #ddcae2;
+  color: #704277;
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-modal-backdrop,
+.app-shell:not(.app-shell-launcher) .wizard-nested-modal-backdrop,
+.app-shell:not(.app-shell-launcher) .confirm-dialog-backdrop {
+  background: rgba(31, 18, 35, 0.46);
+  backdrop-filter: blur(5px);
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-modal,
+.app-shell:not(.app-shell-launcher) .confirm-dialog-card {
+  color-scheme: light;
+  background: #ffffff;
+  border-color: #dbc9df;
+  color: var(--text);
+  box-shadow: 0 28px 80px rgba(41, 24, 47, 0.24);
+  scrollbar-color: #c99bcf #f2ebf4;
+  scrollbar-gutter: auto;
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-modal-header {
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom-color: var(--border);
+  color: var(--text);
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-track-modal > .track-editor {
+  background: #faf7fb;
+}
+
+.app-shell:not(.app-shell-launcher) .track-editor-canvas {
+  border-color: #d9c9dd;
+  background: #ffffff;
+}
+
+.app-shell:not(.app-shell-launcher) .track-editor-bg {
+  fill: #ffffff;
+}
+
+.app-shell:not(.app-shell-launcher) .track-editor-canvas-3d {
+  background:
+    radial-gradient(circle at 50% 45%, rgba(183, 92, 190, 0.09), transparent 44%),
+    #ffffff;
+}
+
+.app-shell:not(.app-shell-launcher) .track-grid-line {
+  stroke: rgba(111, 70, 120, 0.12);
+}
+
+.app-shell:not(.app-shell-launcher) .track-3d-grid-line {
+  stroke: rgba(111, 70, 120, 0.14);
+}
+
+.app-shell:not(.app-shell-launcher) .track-path-line {
+  stroke: #c642ad;
+}
+
+.app-shell:not(.app-shell-launcher) .track-icon-button {
+  color: #5d4d62;
+  border-color: #d9c9dd;
+  background: #ffffff;
+  box-shadow: 0 2px 7px rgba(66, 38, 75, 0.05);
+}
+
+.app-shell:not(.app-shell-launcher) .track-icon-button:hover:not(:disabled),
+.app-shell:not(.app-shell-launcher) .track-icon-button:focus-visible {
+  color: #8b328f;
+  border-color: #c97ad0;
+  background: #faf1fa;
+}
+
+.app-shell:not(.app-shell-launcher) .track-icon-button-danger {
+  color: #a92855;
+  border-color: #efb3c6;
+  background: #fff2f6;
+}
+
+.app-shell:not(.app-shell-launcher) .track-icon-button-danger:hover:not(:disabled),
+.app-shell:not(.app-shell-launcher) .track-icon-button-danger:focus-visible {
+  color: #992148;
+  border-color: #dc7696;
+  background: #ffe8ef;
+}
+
+.app-shell:not(.app-shell-launcher) .track-view-switcher {
+  border-color: #dfd1e2;
+  background: #ffffff;
+}
+
+.app-shell:not(.app-shell-launcher) .track-view-label {
+  color: #4b404f;
+}
+
+.app-shell:not(.app-shell-launcher) .track-clear-confirm {
+  color: #8f244d;
+  border-color: #efb3c6;
+  background: #fff2f6;
+}
+
+.app-shell:not(.app-shell-launcher) .track-waypoint-table-wrap {
+  border-color: #d9c9dd;
+  background: #ffffff;
+}
+
+.app-shell:not(.app-shell-launcher) .track-waypoint-table input {
+  color: var(--text);
+  border-color: #d9c9dd;
+  background: #ffffff;
+}
+
+.app-shell:not(.app-shell-launcher) .track-waypoint-table tbody tr:hover,
+.app-shell:not(.app-shell-launcher) .track-waypoint-row-selected {
+  background: #f7effa;
+}
+
+.app-shell:not(.app-shell-launcher) .track-waypoint-row-selected {
+  box-shadow: inset 3px 0 0 #b747bf;
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-modal-close {
+  background: #f7f0f8;
+  border-color: #dbc9df;
+  color: #5d4d62;
+}
+
+.app-shell:not(.app-shell-launcher) .wizard-modal-close:hover {
+  background: #f1e3f2;
+  color: #8b328f;
+}
+
+.app-shell:not(.app-shell-launcher) .scenario-capability-strip > span {
+  background: #f7f1f8;
+  border-color: #e1d5e4;
+  color: #625668;
+}
+
+.app-shell:not(.app-shell-launcher) .scenario-capability-strip > span.is-ready {
+  background: #eff9f5;
+  border-color: #a9dcc9;
+  color: #17664f;
+}
+
+.app-shell:not(.app-shell-launcher) .loading-state,
+.app-shell:not(.app-shell-launcher) .empty-state {
+  color: var(--text-muted);
+}
+
+.app-shell:not(.app-shell-launcher) .spinner {
+  border-color: #eaddec;
+  border-top-color: var(--primary);
+}
+
+@media (max-width: 760px) {
+  .app-shell:not(.app-shell-launcher) .app-sidebar,
+  .app-shell:not(.app-shell-launcher) .app-header {
+    background: rgba(255, 255, 255, 0.97);
+  }
+}
+
+/* The settings surface is shared with the dark first-run launcher. Keep the
+   launcher's cinematic treatment, but present it as a light workspace dialog
+   once the user is inside the operational application. */
+.app-shell:not(.app-shell-launcher) .launcher-settings-backdrop {
+  background: rgba(31, 18, 35, 0.42);
+  backdrop-filter: blur(5px);
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-settings-dialog {
+  color-scheme: light;
+  background: #ffffff;
+  border-color: #dbc9df;
+  color: var(--text);
+  box-shadow: 0 28px 80px rgba(41, 24, 47, 0.24);
+  scrollbar-color: #c99bcf #f2ebf4;
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-settings-close {
+  background: #f7f0f8;
+  border-color: #dbc9df;
+  color: #5d4d62;
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-settings-close:hover,
+.app-shell:not(.app-shell-launcher) .launcher-settings-close:focus-visible {
+  background: #f1e3f2;
+  border-color: #d267c7;
+  color: #8b328f;
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-language-options button {
+  background: #ffffff;
+  border-color: #dfd1e2;
+  color: var(--text);
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-language-options button:hover,
+.app-shell:not(.app-shell-launcher) .launcher-language-options button:focus-visible {
+  background: #fcf6fc;
+  border-color: #d267c7;
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-language-options button.selected {
+  background: #fbecf8;
+  border-color: #d267c7;
+  color: #77297c;
+  box-shadow: 0 10px 26px rgba(174, 65, 172, 0.09);
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-language-options button.selected i {
+  color: #b936aa;
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-language-icon {
+  background: #edf9fc;
+  color: #1988a2;
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-language-icon-east {
+  background: #f8eaf8;
+  color: #a637a2;
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-language-icon .launcher-language-region {
+  stroke: #ffffff;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-panel {
+  border-top-color: var(--border);
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-status {
+  background: #ffffff;
+  border-color: var(--border);
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-status small {
+  color: var(--text-muted);
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-status-healthy {
+  background: #effaf6;
+  border-color: #a8dfcb;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-status-healthy .settings-runtime-status-icon {
+  background: #d8f4e9;
+  color: #167052;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-status-warning {
+  background: #fff9eb;
+  border-color: #ead39e;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-status-warning .settings-runtime-status-icon {
+  background: #fff0c5;
+  color: #8a5a00;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-status-error {
+  background: #fff1f5;
+  border-color: #efb1c4;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-status-error .settings-runtime-status-icon {
+  background: #ffe0e9;
+  color: #b92755;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-status-checking .settings-runtime-status-icon {
+  background: #edf9fc;
+  color: #1988a2;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-details {
+  background: #faf7fb;
+  border-color: var(--border);
+}
+
+.app-shell:not(.app-shell-launcher) .settings-runtime-details summary,
+.app-shell:not(.app-shell-launcher) .settings-runtime-details-scroll ul {
+  color: var(--text-muted);
 }

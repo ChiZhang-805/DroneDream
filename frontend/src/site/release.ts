@@ -11,13 +11,13 @@ export type WebsiteRelease = {
 declare const __DRONEDREAM_RELEASE__: WebsiteRelease;
 
 const developmentFallbackRelease: WebsiteRelease = {
-  version: "0.3.18",
-  fileName: "DroneDream_0.3.18_x64-setup.exe",
-  downloadUrl: "/downloads/DroneDream_0.3.18_x64-setup.exe",
-  checksumUrl: "/downloads/DroneDream_0.3.18_x64-setup.exe.sha256",
-  sha256: "5ce2247421a6c82d884d656c9e55dde7b24144b70a66dbdf71bb6d7197923a4e",
-  sizeBytes: 5_363_093,
-  publishedAt: "2026-07-15",
+  version: "0.3.19",
+  fileName: "DroneDream_0.3.19_x64-setup.exe",
+  downloadUrl: "/downloads/DroneDream_0.3.19_x64-setup.exe",
+  checksumUrl: "/downloads/DroneDream_0.3.19_x64-setup.exe.sha256",
+  sha256: "38eb6dc3efadee0b1f6c57d72a9bebf0a20c3c5f253514cd18e5a17c93b69561",
+  sizeBytes: 5_379_861,
+  publishedAt: "2026-07-17",
 };
 
 export const fallbackRelease: WebsiteRelease =

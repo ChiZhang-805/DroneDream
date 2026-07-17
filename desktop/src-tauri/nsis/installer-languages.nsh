@@ -18,6 +18,8 @@ LangString DD_RecommendedTarget ${LANG_ENGLISH} "Recommended Runtime location: $
 LangString DD_RecommendedTarget ${LANG_SIMPCHINESE} "推荐的 Runtime 位置：$DroneDreamPlanTarget"
 LangString DD_NoRecommendedTarget ${LANG_ENGLISH} "No eligible Runtime drive was detected automatically."
 LangString DD_NoRecommendedTarget ${LANG_SIMPCHINESE} "未能自动检测到符合条件的 Runtime 磁盘。"
+LangString DD_RuntimeSetupDeferred ${LANG_ENGLISH} "Runtime setup will continue inside the desktop application."
+LangString DD_RuntimeSetupDeferred ${LANG_SIMPCHINESE} "运行环境将在桌面程序中继续设置。"
 LangString DD_CustomDrive ${LANG_ENGLISH} "Choose a Runtime drive"
 LangString DD_CustomDrive ${LANG_SIMPCHINESE} "自定义 Runtime 磁盘"
 LangString DD_CustomDriveHint ${LANG_ENGLISH} "Enter a drive such as E:. Runtime will use X:\DroneDream."

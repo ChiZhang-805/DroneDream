@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import appIcon from "../../../desktop/src-tauri/icons/128x128.png";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
@@ -41,26 +41,38 @@ const content = {
     clickDrone: "Click the drone to begin a starflight",
     scroll: "Scroll to explore",
     productEyebrow: "ONE CONTINUOUS WORKFLOW",
-    productTitle: "From a tuning question to a defensible result.",
+    productTitle: "From question to defensible result.",
     productBody:
-      "DroneDream keeps parameter choices, simulation evidence, optimizer decisions, and reports in one reproducible experiment.",
+      "Parameters, simulations, decisions, and reports stay together in one reproducible experiment.",
     demoPhases: [
       {
         label: "01 · Define",
-        title: "Describe the flight you actually need",
-        body: "Choose the airframe, PX4 parameters, Gazebo world, trajectory, constraints, and acceptance criteria.",
+        title: "Define the target flight",
+        body: [
+          "Choose vehicle, PX4 controls, world, and route.",
+          "Set safety limits, trial budget, and acceptance.",
+          "Give every simulation a clear measurable target for review.",
+        ],
         status: "Experiment configured",
       },
       {
         label: "02 · Search",
-        title: "Let optimizers propose the next trial",
-        body: "Run Bayesian, CMA-ES, trust-region, and portfolio strategies against the evidence returned by simulation.",
+        title: "Choose the next candidate",
+        body: [
+          "Combine history with fresh simulation feedback.",
+          "Coordinate Bayesian, CMA-ES, and trust-region search.",
+          "Propose the most informative candidate for the next trial.",
+        ],
         status: "Candidate 24 / 60",
       },
       {
         label: "03 · Verify",
-        title: "Compare more than a single score",
-        body: "Review feasibility, tracking error, overshoot, settling time, robustness, and the Pareto trade-off before exporting parameters.",
+        title: "Compare the evidence",
+        body: [
+          "Check feasibility, error, overshoot, and settling.",
+          "Compare robustness, repeats, and Pareto trade-offs.",
+          "Keep the evidence behind every accepted candidate.",
+        ],
         status: "Acceptance passed",
       },
     ],
@@ -68,29 +80,65 @@ const content = {
     parameterTitle: "Live candidate",
     parameters: ["MC_ROLL_P", "MC_PITCHRATE_I", "MPC_XY_VEL_P_ACC"],
     workflowEyebrow: "BUILT AROUND THE EXPERIMENT",
-    workflowTitle: "The repetitive work becomes the software's job.",
+    workflowTitle: "Let software handle the repetition.",
     workflow: [
-      ["Define", "Set the vehicle, world, route, limits, and success criteria."],
-      ["Select", "Tune only the PX4 parameters you choose, within guarded ranges."],
-      ["Simulate", "Run isolated PX4 and Gazebo trials with structured artifacts."],
-      ["Decide", "Rank feasible candidates and preserve the evidence behind them."],
+      ["Define", "Set vehicle, route, limits, and success."],
+      ["Select", "Tune chosen PX4 parameters in safe ranges."],
+      ["Simulate", "Run isolated PX4 / Gazebo trials."],
+      ["Decide", "Rank feasible candidates and retain evidence."],
     ],
-    capabilitiesEyebrow: "DESIGNED FOR SERIOUS ITERATION",
-    capabilitiesTitle: "A local flight laboratory, not another parameter form.",
+    workflowVisualLabel: "An automated closed loop from flight task to evidence-backed decision",
+    capabilitiesEyebrow: "BUILT FOR ITERATION",
+    capabilitiesTitle: "A local flight lab, not a parameter form.",
     capabilities: [
-      ["Selective tuning", "Choose individual control parameters or a curated group instead of searching everything blindly.", "sliders"],
-      ["Seven strategy portfolio", "Compare complementary experimental optimizers and route each experiment to an appropriate search strategy.", "orbit"],
-      ["Isolated runtime", "Keep PX4, Gazebo, workers, and artifacts inside a dedicated WSL2 environment without reusing personal distributions.", "shield"],
-      ["Evidence-first reports", "Trace every candidate back to its scenario, seed, logs, metrics, constraints, and reproducibility manifest.", "report"],
+      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore only the control surface your experiment needs, leaving unrelated dimensions untouched."], "sliders"],
+      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain before ranking the final winner under the same independent validation suite."], "orbit"],
+      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Resume, diagnose, and clean failed simulations before the next isolated trial begins safely."], "shield"],
+      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce every decision from evidence together with its complete experiment history."], "report"],
+    ],
+    capabilityOpen: "Open details for",
+    capabilityBack: "Return to overview",
+    capabilityPrevious: "Previous detail",
+    capabilityNext: "Next detail",
+    capabilityDetails: [
+      [
+        ["MPC_XY_P", "Turns horizontal position error into a velocity target; tune it with the velocity loop to avoid abrupt corrections."],
+        ["MPC_XY_VEL_P_ACC", "Turns horizontal velocity error into acceleration demand and strongly shapes tracking response and overshoot."],
+        ["MPC_Z_P", "Converts altitude error into climb-rate demand; coordinate it with vertical speed and acceleration limits."],
+        ["MC_ROLLRATE_P", "Sets proportional roll-rate correction and directly affects response speed, damping, and oscillation risk."],
+        ["MC_PITCHRATE_I", "Removes persistent pitch-rate bias while guarded bounds prevent integral windup during long maneuvers."],
+      ],
+      [
+        ["Failure-aware constrained MOBO", "Models objectives, feasibility, and failed simulations together so unsafe regions consume less budget."],
+        ["Multi-fidelity constrained MOBO", "Splits budget between quick screening and full validation under hard constraints before expensive trials."],
+        ["TuRBO trust-region BO", "Searches coupled parameters in adaptive local regions that expand after verified gains and contract after setbacks."],
+        ["SAAS constrained BO", "Finds influential axes in high-dimensional spaces before spending full trials on weak or irrelevant dimensions."],
+        ["Surrogate-assisted CMA-ES", "Combines a response surrogate with covariance adaptation for continuous search across expensive trials."],
+        ["BIPOP CMA-ES", "Alternates restart populations to escape local optima and deceptive regions while preserving global exploration."],
+        ["Accuracy-first portfolio", "Allocates trials across six engines and ranks only independently verified gains under shared validation rules."],
+      ],
+      [
+        ["Dedicated WSL2", "Runs the DroneDream distribution independently and never reuses or modifies a personal Ubuntu environment."],
+        ["Trial isolation", "Assigns each PX4 / Gazebo run its own ports, process group, temporary files, and termination boundary."],
+        ["Pinned inputs", "Records firmware, model, world, route, parameters, seeds, and environment effects before repeatable execution."],
+        ["Recovery and cleanup", "Exports failure diagnostics, preserves artifacts, and safely removes abandoned processes before the next clean launch."],
+      ],
+      [
+        ["Configuration snapshot", "Stores the vehicle, firmware, ranges, optimizer, constraints, and trial budget for every tested candidate."],
+        ["Scenario identity", "Links each result to its world, route, disturbances, seeds, and acceptance criteria for direct comparison."],
+        ["Logs and metrics", "Keeps telemetry, process logs, tracking metrics, failures, and artifacts together in one auditable result."],
+        ["Pareto evidence", "Shows feasible trade-offs across error, overshoot, settling, robustness, and cost without hiding constraints."],
+        ["Reproducibility manifest", "Hashes critical inputs and identifies the runtime so another machine can audit the same decision later."],
+      ],
     ],
     manualEyebrow: "GET STARTED",
-    manualTitle: "Three steps from download to your first experiment.",
+    manualTitle: "Tune in 3 steps.",
     manualSteps: [
-      ["Install the desktop app", "Run the Windows installer and keep the recommended application folder."],
-      ["Prepare DroneDreamRuntime", "The launcher downloads and verifies the isolated PX4 / Gazebo runtime. Existing Ubuntu distributions stay untouched."],
-      ["Create an experiment", "Follow the five-step wizard, validate each stage, then start the tuning run."],
+      ["Install the app", "Run the Windows installer in the recommended folder."],
+      ["Prepare the runtime", "Install isolated PX4 / Gazebo without changing Ubuntu."],
+      ["Create an experiment", "Complete five validated steps, then start tuning."],
     ],
-    openManual: "Read the full manual",
+    openManual: "Full manual",
     manualDialogTitle: "DroneDream quick-start manual",
     manualDialogIntro:
       "This guide covers the complete customer path from a verified EXE to a first local tuning experiment.",
@@ -100,30 +148,23 @@ const content = {
       ["2 · Install the desktop application", ["Download the versioned EXE from this page and verify its SHA-256 if required.", "Run the installer, choose one interface language, and keep the recommended application folder.", "The current preview is unsigned, so SmartScreen may require More info → Run anyway."]],
       ["3 · Prepare DroneDreamRuntime", ["Open DroneDream and start Runtime installation from the launch screen.", "Keep the app open while it downloads, verifies, imports, starts, and checks PX4 / Gazebo.", "The dedicated distribution does not replace or modify an existing personal Ubuntu distribution."]],
       ["4 · Create the first experiment", ["Choose a mode, vehicle, PX4 version, Gazebo model, and world.", "Complete the five wizard stages in order; future stages stay locked until the current stage validates.", "Select parameters and ranges, define the scenario and route, set constraints and budget, then review and create."]],
-      ["5 · Read and preserve the result", ["Compare feasible candidates using individual metrics and Pareto trade-offs, not only a combined score.", "Keep logs, artifacts, seeds, parameter snapshots, and the reproducibility manifest with the report.", "Do not apply experimental parameters to real hardware without independent safety review and controlled flight testing."]],
+      ["5 · Read and preserve the result", ["Compare feasible candidates using individual metrics and Pareto trade-offs, not only a combined score.", "Keep logs, artifacts, seeds, parameter snapshots, and the reproducibility manifest with the report.", "Do not use experimental parameters on real hardware without an independent safety review."]],
     ],
     integrityTitle: "Download integrity",
     integrityText: "The SHA-256 shown on this page must exactly match the value calculated from the downloaded EXE.",
     github: "View source on GitHub",
-    downloadEyebrow: "WINDOWS DEVELOPMENT PREVIEW",
-    downloadTitle: "Bring the tuning workspace to your own machine.",
+    downloadEyebrow: "WINDOWS PREVIEW",
+    downloadTitle: "Run DroneDream on your PC.",
     downloadBody:
-      "The desktop installer is small. DroneDreamRuntime is downloaded separately only when required and can be placed on a non-system NTFS drive.",
+      "Install the app first, then place its isolated Runtime on any eligible NTFS drive.",
     downloadAgain: "Download DroneDream",
     version: "Version",
     size: "Installer size",
     platform: "Platform",
     platformValue: "Windows x64",
     released: "Released",
-    checksum: "SHA-256",
-    copyChecksum: "Copy checksum",
-    copied: "Copied",
-    checksumFile: "Checksum file",
     previewNote:
-      "Development preview · currently unsigned. Windows SmartScreen may ask you to confirm before running it.",
-    requirementsTitle: "Before installing",
-    requirements:
-      "Windows 10/11 x64, WSL2 support, at least 52 GiB free for the complete local runtime, and a stable connection for the first download.",
+      "Unsigned preview · Windows SmartScreen confirmation may be required.",
     footerLine: "Local-first autonomous control-parameter tuning for PX4 and Gazebo.",
     privacy: "No account is required for local preview workflows.",
   },
@@ -153,26 +194,38 @@ const content = {
     clickDrone: "点击无人机，开启一次星际巡航",
     scroll: "向下探索",
     productEyebrow: "一条完整的调优链路",
-    productTitle: "从一个控制问题，到一份经得起检查的结果。",
+    productTitle: "从控制问题，到可信结果。",
     productBody:
-      "DroneDream 将参数选择、仿真证据、算法决策和最终报告保存在同一个可复现实验中。",
+      "参数、仿真、决策和报告都保存在同一个可复现实验中。",
     demoPhases: [
       {
         label: "01 · 定义",
-        title: "描述你真正需要的飞行任务",
-        body: "选择机架、PX4 参数、Gazebo 世界、飞行轨迹、约束条件和验收标准。",
+        title: "定义目标飞行任务",
+        body: [
+          "选择机型、PX4 参数、仿真世界与飞行航迹。",
+          "同步设置安全边界、试验预算与验收条件。",
+          "让每次仿真都有清晰且可衡量的目标，便于后续客观比较。",
+        ],
         status: "实验配置完成",
       },
       {
         label: "02 · 搜索",
-        title: "让优化器决定下一组候选参数",
-        body: "根据仿真反馈，组合使用贝叶斯、CMA-ES、信赖域和策略组合等实验算法。",
+        title: "选择下一组候选",
+        body: [
+          "结合历史结果与最新一轮仿真反馈。",
+          "协同贝叶斯、CMA-ES 与信赖域搜索。",
+          "为下一次试验提出信息价值最高的候选参数组合方案。",
+        ],
         status: "候选方案 24 / 60",
       },
       {
         label: "03 · 验证",
-        title: "比较的不只是一个总分",
-        body: "同时检查可行性、跟踪误差、超调量、稳定时间、鲁棒性和 Pareto 权衡，再导出参数。",
+        title: "用证据比较结果",
+        body: [
+          "核对可行性、跟踪误差、超调与稳定时间。",
+          "比较鲁棒性、重复试验结果与 Pareto 权衡。",
+          "为每个通过验收的候选方案保留完整证据与复核依据。",
+        ],
         status: "通过验收条件",
       },
     ],
@@ -180,29 +233,65 @@ const content = {
     parameterTitle: "当前候选参数",
     parameters: ["MC_ROLL_P", "MC_PITCHRATE_I", "MPC_XY_VEL_P_ACC"],
     workflowEyebrow: "围绕真实实验设计",
-    workflowTitle: "把重复而繁琐的工作交给软件。",
+    workflowTitle: "把重复工作交给软件。",
     workflow: [
-      ["定义任务", "设置机型、世界、航迹、边界和成功标准。"],
-      ["选择参数", "只调节你选中的 PX4 参数，并使用经过保护的搜索范围。"],
-      ["自动仿真", "在隔离环境中运行 PX4 与 Gazebo，并生成结构化产物。"],
-      ["比较决策", "筛选可行候选方案，同时保留每个结论背后的证据。"],
+      ["定义任务", "设置机型、航迹、安全边界与验收条件。"],
+      ["选择参数", "仅在受控范围内调节选定的 PX4 参数。"],
+      ["自动仿真", "隔离运行 PX4 / Gazebo 并保留试验证据。"],
+      ["比较决策", "筛选可行候选方案并保存对应决策证据。"],
     ],
-    capabilitiesEyebrow: "为认真迭代而设计",
-    capabilitiesTitle: "它是一间本地飞行实验室，而不只是参数表单。",
+    workflowVisualLabel: "从飞行任务到证据决策的自动闭环工作流",
+    capabilitiesEyebrow: "为持续迭代而设计",
+    capabilitiesTitle: "本地飞行实验室不只是参数表单",
     capabilities: [
-      ["按需选择参数", "可以选择单个控制参数或经过整理的参数组，无需盲目搜索全部变量。", "sliders"],
-      ["七种实验算法", "比较互补的优化方法，并根据实验特征选择更合适的搜索策略。", "orbit"],
-      ["隔离运行环境", "PX4、Gazebo、工作进程和产物都位于专用 WSL2 环境，不复用个人 Ubuntu。", "shield"],
-      ["证据优先报告", "每个候选方案都能追溯到场景、随机种子、日志、指标、约束和复现清单。", "report"],
+      ["按需选择参数", ["单独选择一个 PX4 参数，或直接使用整理好的控制参数组。", "为搜索范围设置安全边界，并同步声明必要的耦合依赖。", "只探索实验真正需要的控制空间，不把预算浪费在无关维度上，并始终保持预算与搜索焦点集中。"], "sliders"],
+      ["七种实验算法", ["依据实验结构与搜索空间形态匹配合适的优化算法。", "融合约束、多保真、信赖域与进化搜索共同探索候选。", "复验每一项真实收益，再通过统一的独立验证流程确定最终优胜方案、可靠结论与复核依据。"], "orbit"],
+      ["隔离运行环境", ["在专用 WSL2 中运行 PX4、Gazebo、任务进程与试验产物。", "让每次试验都与个人 Linux 文件及现有进程保持严格隔离。", "失败仿真也能安全续传、诊断和清理，并确保下一轮试验在干净环境中稳定启动与完整运行。"], "shield"],
+      ["可追溯报告", ["把每个候选方案关联到对应场景、随机种子与参数快照。", "统一保留日志、评测指标、试验产物与完整运行环境清单。", "用完整证据复现每次调优决策，同时保留实验上下文、演进过程、最终判断与完整依据。"], "report"],
+    ],
+    capabilityOpen: "查看详情",
+    capabilityBack: "返回概览",
+    capabilityPrevious: "上一项",
+    capabilityNext: "下一项",
+    capabilityDetails: [
+      [
+        ["MPC_XY_P", "将水平位置误差转换为速度目标；需要与速度环协同调节，避免修正过猛。"],
+        ["MPC_XY_VEL_P_ACC", "将水平速度误差转换为加速度需求，直接影响航迹响应速度、超调与稳定边界。"],
+        ["MPC_Z_P", "将高度误差转换为升降速度需求，需要同时考虑垂向速度、加速度限制与稳定裕度。"],
+        ["MC_ROLLRATE_P", "决定滚转角速度的比例修正强度，直接影响响应速度、阻尼、振荡风险与控制裕度。"],
+        ["MC_PITCHRATE_I", "持续消除俯仰角速度偏差，同时使用安全边界防止长时间机动中的积分饱和。"],
+      ],
+      [
+        ["失败感知约束多目标贝叶斯优化", "联合建模目标、可行性与仿真失败，让高风险区域少消耗宝贵试验预算与算力资源。"],
+        ["多保真约束多目标贝叶斯优化", "在快速筛选与完整验证之间合理分配预算，同时始终保留硬约束与统一验证标准。"],
+        ["TuRBO 信赖域贝叶斯优化", "在自适应局部区域搜索耦合参数，验证增益后扩大范围，遇到失败则及时收缩。"],
+        ["SAAS 约束贝叶斯优化", "先识别高维空间中最关键的参数轴，再把完整仿真预算投入有效维度并减少无效试验。"],
+        ["代理模型辅助 CMA-ES", "结合响应代理模型与协方差自适应，提高连续参数搜索精度、试验效率与预算利用率。"],
+        ["BIPOP CMA-ES", "交替使用不同重启种群规模，跳出局部最优并保持对复杂搜索地形的全局探索。"],
+        ["精度优先优化器组合", "在六种互补引擎间分配预算，只让通过统一复验的真实增益进入最终排名。"],
+      ],
+      [
+        ["专用 WSL2", "独立运行 DroneDream 发行版，不复用也不修改用户已有的个人 Ubuntu。"],
+        ["试验隔离", "为每次 PX4 / Gazebo 运行分配独立端口、进程组、临时文件与安全终止边界。"],
+        ["固定输入", "启动前记录固件、模型、世界、航迹、参数、种子与高级环境效果，确保可以复现。"],
+        ["恢复与清理", "失败时导出诊断并保留有效产物，随后安全清理遗留进程，为下一轮干净启动。"],
+      ],
+      [
+        ["配置快照", "保存机型、固件、参数范围、优化算法、约束条件与试验预算，覆盖每个候选方案全貌。"],
+        ["场景身份", "把结果关联到世界、航迹、扰动、验证种子与验收条件，便于直接比较与复核。"],
+        ["日志与指标", "统一保留遥测、进程日志、跟踪指标、时间、失败原因与产物，形成可审计结果。"],
+        ["Pareto 证据", "展示误差、超调、稳定时间、鲁棒性与资源成本之间的可行权衡及约束状态。"],
+        ["复现清单", "对关键输入生成哈希并标记运行环境，让其他电脑也能复现并审计同一决策。"],
+      ],
     ],
     manualEyebrow: "开始使用",
-    manualTitle: "从下载到第一次调优，只需要三个阶段。",
+    manualTitle: "三步开始调优。",
     manualSteps: [
-      ["安装桌面程序", "运行 Windows 安装包，并保留推荐的应用程序目录。"],
-      ["准备专用运行环境", "启动器会下载并验证隔离的 PX4 / Gazebo 环境，不会修改已有 Ubuntu。"],
-      ["创建调优实验", "依次完成五步向导；当前步骤验证通过后，才能进入下一步并开始调优。"],
+      ["安装桌面程序", "运行 Windows 安装包，并保留推荐目录。"],
+      ["准备运行环境", "安装隔离的 PX4 / Gazebo，不修改已有 Ubuntu。"],
+      ["创建调优实验", "依次完成五步验证，然后开始调优。"],
     ],
-    openManual: "阅读完整说明书",
+    openManual: "完整说明",
     manualDialogTitle: "DroneDream 快速使用说明书",
     manualDialogIntro: "这份说明覆盖从校验安装包到创建第一次本地调优实验的完整用户流程。",
     manualClose: "关闭说明书",
@@ -216,24 +305,17 @@ const content = {
     integrityTitle: "下载完整性",
     integrityText: "本页显示的 SHA-256 必须与下载后从 EXE 计算得到的值完全一致。",
     github: "在 GitHub 查看源码",
-    downloadEyebrow: "WINDOWS 开发预览版",
-    downloadTitle: "把自动调优工作空间带到自己的电脑。",
+    downloadEyebrow: "WINDOWS 预览版",
+    downloadTitle: "在本机运行 DroneDream。",
     downloadBody:
-      "桌面安装包本身很小；只有在需要时才会单独下载 DroneDreamRuntime，并且可以安装到非系统 NTFS 磁盘。",
+      "先安装桌面程序，再将隔离运行环境放到符合条件的 NTFS 磁盘。",
     downloadAgain: "下载 DroneDream",
     version: "版本",
     size: "安装包大小",
     platform: "平台",
     platformValue: "Windows x64",
     released: "发布日期",
-    checksum: "SHA-256",
-    copyChecksum: "复制校验值",
-    copied: "已复制",
-    checksumFile: "校验文件",
-    previewNote: "开发预览版 · 当前尚未签名，Windows SmartScreen 可能要求你确认后再运行。",
-    requirementsTitle: "安装前需要准备",
-    requirements:
-      "Windows 10/11 x64、WSL2 支持、完整本地运行环境至少 52 GiB 可用空间，以及首次下载时稳定的网络连接。",
+    previewNote: "未签名预览版 · Windows SmartScreen 可能要求确认。",
     footerLine: "面向 PX4 与 Gazebo 的本地优先无人机控制参数自动调优平台。",
     privacy: "本地预览工作流不要求注册账户。",
   },
@@ -287,6 +369,282 @@ function DownloadIcon() {
   );
 }
 
+function ArrowRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 12h14m-5-5 5 5-5 5" />
+    </svg>
+  );
+}
+
+function ScrollIcon() {
+  return (
+    <svg className="site-scroll-icon" viewBox="0 0 24 34" aria-hidden="true">
+      <path d="M12 2v27m-5-6 5 6 5-6" />
+    </svg>
+  );
+}
+
+function DocumentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 3.5h7.8l3.2 3.2v13.8h-11V3.5Z M14 3.8V7h3.2M9 11h6M9 14h6M9 17h4" />
+    </svg>
+  );
+}
+
+function GitHubIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2.7a9.4 9.4 0 0 0-3 18.3c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 0 1.6 1.1 1.6 1.1.9 1.6 2.4 1.1 2.9.9.1-.7.4-1.1.7-1.4-2.3-.3-4.6-1.1-4.6-4.7 0-1 .4-1.9 1-2.5-.1-.3-.4-1.3.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.3.2 2.3.1 2.6.6.6 1 1.5 1 2.5 0 3.6-2.4 4.4-4.6 4.7.4.3.7 1 .7 1.9v2.8c0 .3.2.6.7.5A9.4 9.4 0 0 0 12 2.7Z" />
+    </svg>
+  );
+}
+
+type WorkflowStep = readonly [string, string];
+type CapabilityDetail = readonly [string, string];
+
+function WorkflowStepIcon({ index }: { index: number }) {
+  return (
+    <svg viewBox="0 0 96 96" aria-hidden="true" focusable="false">
+      <circle className="site-workflow-node-aura" cx="48" cy="48" r="43" />
+      <circle className="site-workflow-node-ring" cx="48" cy="48" r="34" />
+      {index === 0 ? (
+        <>
+          <path className="site-workflow-icon-line" d="M29 59V35h38v24H29Zm7-16c5 0 6 10 12 10s8-10 15-7" />
+          <circle className="site-workflow-icon-dot" cx="36" cy="43" r="2.8" />
+          <circle className="site-workflow-icon-dot" cx="63" cy="46" r="2.8" />
+        </>
+      ) : null}
+      {index === 1 ? (
+        <>
+          <path className="site-workflow-icon-line" d="M29 36h38M29 48h38M29 60h38" />
+          <circle className="site-workflow-control" cx="41" cy="36" r="4.2" />
+          <circle className="site-workflow-control" cx="58" cy="48" r="4.2" />
+          <circle className="site-workflow-control" cx="46" cy="60" r="4.2" />
+        </>
+      ) : null}
+      {index === 2 ? (
+        <>
+          <rect className="site-workflow-chamber" x="29" y="31" width="38" height="34" rx="7" />
+          <path className="site-workflow-icon-line" d="M36 40h24M36 48h18M36 56h27" />
+          <circle className="site-workflow-icon-dot" cx="62" cy="40" r="2.6" />
+          <circle className="site-workflow-icon-dot" cx="56" cy="48" r="2.6" />
+          <circle className="site-workflow-icon-dot" cx="64" cy="56" r="2.6" />
+        </>
+      ) : null}
+      {index === 3 ? (
+        <>
+          <path className="site-workflow-icon-line" d="M29 63V50h8v13M42 63V40h8v23M55 63V32h8v31" />
+          <path className="site-workflow-check" d="m52 45 7 7 13-17" />
+        </>
+      ) : null}
+    </svg>
+  );
+}
+
+function WorkflowLoopVisual({
+  label,
+  reducedMotion,
+  steps,
+}: {
+  label: string;
+  reducedMotion: boolean;
+  steps: readonly WorkflowStep[];
+}) {
+  // Match the desktop visual's 1200 x 400 coordinate space. The rail passes
+  // through each icon centre and stays above every title and description.
+  const route = "M150 68 C250 68 350 150 450 150 S650 68 750 68 S950 150 1050 150";
+  return (
+    <figure
+      className={`site-workflow-visual${reducedMotion ? " is-reduced-motion" : ""}`}
+      aria-labelledby="site-workflow-caption"
+      data-reveal
+    >
+      <figcaption id="site-workflow-caption" className="site-sr-only">{label}</figcaption>
+      <svg className="site-workflow-route" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="site-workflow-rail" x1="0" x2="1">
+            <stop offset="0" stopColor="#68e8ff" />
+            <stop offset=".52" stopColor="#9b72ff" />
+            <stop offset="1" stopColor="#f166d8" />
+          </linearGradient>
+          <radialGradient id="site-workflow-node-glow">
+            <stop stopColor="#9b72ff" stopOpacity=".34" />
+            <stop offset="1" stopColor="#9b72ff" stopOpacity="0" />
+          </radialGradient>
+          <filter id="site-workflow-soft-glow" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        <path className="site-workflow-return" d="M1050 150 C930 330 360 330 150 68" />
+        <path id="site-workflow-route" className="site-workflow-rail-glow" d={route} />
+        <path className="site-workflow-rail" d={route} />
+
+        <circle className="site-workflow-packet" r="5" filter="url(#site-workflow-soft-glow)">
+          {!reducedMotion ? (
+            <animateMotion dur="8s" repeatCount="indefinite" path={route} />
+          ) : null}
+        </circle>
+        <circle className="site-workflow-packet site-workflow-packet-secondary" r="4">
+          {!reducedMotion ? (
+            <animateMotion dur="8s" begin="-4s" repeatCount="indefinite" path={route} />
+          ) : null}
+        </circle>
+      </svg>
+      <ol className="site-workflow-steps">
+        {steps.map(([title, description], index) => (
+          <li key={`site-workflow-step-${index}`} data-reveal>
+            <span className="site-workflow-step-icon"><WorkflowStepIcon index={index} /></span>
+            <h3>{title}</h3>
+            <p data-copy-block data-copy-id={`workflow-${index}`}>{description}</p>
+          </li>
+        ))}
+      </ol>
+    </figure>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d={direction === "left" ? "m15 5-7 7 7 7" : "m9 5 7 7-7 7"} />
+    </svg>
+  );
+}
+
+function FlipBackIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8 7H4v-4M4.5 7.2A9 9 0 1 1 3 14" />
+    </svg>
+  );
+}
+
+function CapabilityCard({
+  index,
+  title,
+  summary,
+  icon,
+  details,
+  openLabel,
+  backLabel,
+  previousLabel,
+  nextLabel,
+}: {
+  index: number;
+  title: string;
+  summary: readonly string[];
+  icon: IconName;
+  details: readonly CapabilityDetail[];
+  openLabel: string;
+  backLabel: string;
+  previousLabel: string;
+  nextLabel: string;
+}) {
+  const [flipped, setFlipped] = useState(false);
+  const [detailIndex, setDetailIndex] = useState(0);
+  const frontRef = useRef<HTMLButtonElement>(null);
+  const backRef = useRef<HTMLButtonElement>(null);
+  const pendingFocusRef = useRef<"front" | "back" | null>(null);
+  const detail = details[detailIndex] ?? details[0];
+  const detailId = `site-capability-${index}-details`;
+
+  useLayoutEffect(() => {
+    const target = pendingFocusRef.current;
+    if (!target) return;
+    pendingFocusRef.current = null;
+    (target === "back" ? backRef.current : frontRef.current)?.focus({ preventScroll: true });
+  }, [flipped]);
+
+  const showDetails = () => {
+    pendingFocusRef.current = "back";
+    setFlipped(true);
+  };
+  const showOverview = () => {
+    pendingFocusRef.current = "front";
+    setFlipped(false);
+  };
+  const move = (delta: number) => {
+    setDetailIndex((current) => (current + delta + details.length) % details.length);
+  };
+
+  return (
+    <article
+      className={`site-capability-card card-${index + 1}${flipped ? " is-flipped" : ""}`}
+      data-reveal
+    >
+      <div className="site-capability-card-inner">
+        <button
+          ref={frontRef}
+          type="button"
+          className="site-capability-face site-capability-front"
+          aria-expanded={flipped}
+          aria-controls={detailId}
+          aria-label={`${openLabel} ${title}`}
+          aria-hidden={flipped}
+          tabIndex={flipped ? -1 : 0}
+          onClick={showDetails}
+        >
+          <span className="site-capability-front-heading">
+            <span className="site-feature-icon"><FeatureIcon name={icon} /></span>
+            <span role="heading" aria-level={3}>{title}</span>
+          </span>
+          <span className="site-capability-summary" data-copy-block data-copy-id={`capability-summary-${index}`}>
+            {summary.map((line) => <span key={line}>{line}</span>)}
+          </span>
+        </button>
+
+        <section
+          id={detailId}
+          className="site-capability-face site-capability-back"
+          aria-hidden={!flipped}
+          aria-label={title}
+        >
+          <header>
+            <span className="site-feature-icon"><FeatureIcon name={icon} /></span>
+            <button
+              ref={backRef}
+              type="button"
+              className="site-capability-flip-back"
+              aria-label={`${backLabel}: ${title}`}
+              tabIndex={flipped ? 0 : -1}
+              onClick={showOverview}
+            >
+              <FlipBackIcon />
+            </button>
+          </header>
+          <div className="site-capability-entry" aria-live="polite" aria-atomic="true">
+            <h3>{detail?.[0]}</h3>
+            <p data-copy-block data-copy-id={`capability-detail-${index}-${detailIndex}`}>{detail?.[1]}</p>
+          </div>
+          <nav aria-label={title}>
+            <button
+              type="button"
+              aria-label={previousLabel}
+              tabIndex={flipped ? 0 : -1}
+              onClick={() => move(-1)}
+            >
+              <ChevronIcon direction="left" />
+            </button>
+            <span>{detailIndex + 1} / {details.length}</span>
+            <button
+              type="button"
+              aria-label={nextLabel}
+              tabIndex={flipped ? 0 : -1}
+              onClick={() => move(1)}
+            >
+              <ChevronIcon direction="right" />
+            </button>
+          </nav>
+        </section>
+      </div>
+    </article>
+  );
+}
+
 function StarflightIcon() {
   return (
     <svg className="site-starflight-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -302,7 +660,6 @@ export function SiteApp() {
   const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [checksumCopied, setChecksumCopied] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -310,7 +667,6 @@ export function SiteApp() {
   const manualTriggerRef = useRef<HTMLButtonElement>(null);
   const manualCloseRef = useRef<HTMLButtonElement>(null);
   const manualDialogRef = useRef<HTMLElement>(null);
-  const checksumResetTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     document.title = copy.metaTitle;
@@ -349,7 +705,13 @@ export function SiteApp() {
   }, []);
 
   useEffect(() => {
-    const targetId = decodeURIComponent(window.location.hash.replace(/^#/u, ""));
+    const encodedTargetId = window.location.hash.replace(/^#/u, "");
+    let targetId = encodedTargetId;
+    try {
+      targetId = decodeURIComponent(encodedTargetId);
+    } catch {
+      // A malformed external hash must never prevent the public site from rendering.
+    }
     if (!targetId) return;
     const frame = window.requestAnimationFrame(() => {
       const target = document.getElementById(targetId);
@@ -381,7 +743,7 @@ export function SiteApp() {
 
   useEffect(() => {
     const nodes = Array.from(document.querySelectorAll<HTMLElement>(
-      ".site-hero, .site-product-demo",
+      ".site-hero, .site-product-demo, .site-workflow-visual",
     ));
     if (!("IntersectionObserver" in window)) {
       nodes.forEach((node) => node.classList.add("is-motion-visible"));
@@ -390,6 +752,11 @@ export function SiteApp() {
     const observer = new IntersectionObserver(
       (entries) => entries.forEach((entry) => {
         entry.target.classList.toggle("is-motion-visible", entry.isIntersecting);
+        if (!(entry.target instanceof HTMLElement) || !entry.target.classList.contains("site-workflow-visual")) return;
+        const svg = entry.target.querySelector<SVGSVGElement>("svg");
+        if (!svg || typeof svg.pauseAnimations !== "function") return;
+        if (entry.isIntersecting) svg.unpauseAnimations();
+        else svg.pauseAnimations();
       }),
       { rootMargin: "160px 0px", threshold: 0.01 },
     );
@@ -438,12 +805,6 @@ export function SiteApp() {
     };
   }, [manualOpen]);
 
-  useEffect(() => () => {
-    if (checksumResetTimerRef.current !== null) {
-      window.clearTimeout(checksumResetTimerRef.current);
-    }
-  }, []);
-
   useEffect(() => {
     if (!menuOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -457,22 +818,6 @@ export function SiteApp() {
 
   const currentPhase = copy.demoPhases[activePhase];
   const displaySize = useMemo(() => formatBinarySize(release.sizeBytes), [release.sizeBytes]);
-
-  const copyChecksum = async () => {
-    try {
-      await navigator.clipboard.writeText(release.sha256);
-      setChecksumCopied(true);
-      if (checksumResetTimerRef.current !== null) {
-        window.clearTimeout(checksumResetTimerRef.current);
-      }
-      checksumResetTimerRef.current = window.setTimeout(() => {
-        checksumResetTimerRef.current = null;
-        setChecksumCopied(false);
-      }, 1_800);
-    } catch {
-      setChecksumCopied(false);
-    }
-  };
 
   const selectPhaseFromKeyboard = (
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -503,7 +848,7 @@ export function SiteApp() {
   };
 
   return (
-    <div className="dd-site">
+    <div className="dd-site" data-locale={locale}>
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
         <a className="site-brand" href="#home" onClick={closeMenu} aria-label="DroneDream">
@@ -530,6 +875,7 @@ export function SiteApp() {
             {copy.language}
           </button>
           <a className="site-header-download" href={release.downloadUrl} download={release.fileName}>
+            <DownloadIcon />
             {copy.downloadShort}
           </a>
           <button
@@ -550,7 +896,7 @@ export function SiteApp() {
       <main id="main-content">
         <section className="site-hero" id="home" aria-labelledby="hero-title">
           <div className="site-hero-scene" aria-hidden="true">
-            <DroneLaunchScene active starflightControllerRef={droneFlightRef} visualOffsetX={1.35} />
+            <DroneLaunchScene active starflightControllerRef={droneFlightRef} visualOffsetX={1.58} />
           </div>
           <div className="site-hero-shade" aria-hidden="true" />
           <div className="site-shell site-hero-layout">
@@ -565,7 +911,10 @@ export function SiteApp() {
                   <DownloadIcon />
                   {copy.downloadWindows}
                 </a>
-                <a className="site-button site-button-ghost" href="#product">{copy.explore}</a>
+                <a className="site-button site-button-ghost" href="#product">
+                  <ArrowRightIcon />
+                  {copy.explore}
+                </a>
               </div>
               <div className="site-release-line" aria-label={`${copy.version} ${release.version}`}>
                 <span className="site-live-dot" />
@@ -587,7 +936,7 @@ export function SiteApp() {
           </div>
           <a className="site-scroll-cue" href="#product">
             <span>{copy.scroll}</span>
-            <i aria-hidden="true" />
+            <ScrollIcon />
           </a>
         </section>
 
@@ -596,14 +945,14 @@ export function SiteApp() {
             <div className="site-section-heading" data-reveal>
               <p className="site-eyebrow">{copy.productEyebrow}</p>
               <h2>{copy.productTitle}</h2>
-              <p>{copy.productBody}</p>
+              <p data-copy-block data-copy-id="product-body">{copy.productBody}</p>
             </div>
             <div className="site-product-demo" data-reveal>
               <div className="site-demo-copy">
                 <div className="site-phase-tabs" role="tablist" aria-label={copy.productEyebrow}>
                   {copy.demoPhases.map((phase, index) => (
                     <button
-                      key={phase.label}
+                      key={`site-phase-tab-${index}`}
                       type="button"
                       role="tab"
                       id={`site-phase-tab-${index}`}
@@ -621,7 +970,7 @@ export function SiteApp() {
                 </div>
                 {copy.demoPhases.map((phase, index) => (
                   <div
-                    key={phase.label}
+                    key={`site-phase-panel-${index}`}
                     id={`site-phase-panel-${index}`}
                     className="site-phase-copy"
                     role="tabpanel"
@@ -631,7 +980,11 @@ export function SiteApp() {
                   >
                     <span>{phase.label}</span>
                     <h3>{phase.title}</h3>
-                    <p>{phase.body}</p>
+                    <p className="site-phase-description" data-copy-block data-copy-id={`phase-${index}`}>
+                      {phase.body.map((line, lineIndex) => (
+                        <span key={`site-phase-line-${index}-${lineIndex}`}>{line}</span>
+                      ))}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -643,7 +996,7 @@ export function SiteApp() {
                 <div className="site-demo-grid">
                   <div className="site-demo-chart">
                     <div className="site-chart-labels">
-                      {copy.metricLabels.map((label, index) => <span key={label} style={{ "--index": index } as React.CSSProperties}>{label}</span>)}
+                      {copy.metricLabels.map((label, index) => <span key={`site-metric-${index}`} style={{ "--index": index } as React.CSSProperties}>{label}</span>)}
                     </div>
                     <svg viewBox="0 0 640 280" preserveAspectRatio="none" aria-hidden="true">
                       <defs>
@@ -668,7 +1021,7 @@ export function SiteApp() {
                   <aside className="site-parameter-stack">
                     <p>{copy.parameterTitle}</p>
                     {copy.parameters.map((parameter, index) => (
-                      <div key={parameter}>
+                      <div key={`site-parameter-${index}`}>
                         <span>{parameter}</span>
                         <strong>{[6.84, 0.19, 1.72][index].toFixed(2)}</strong>
                         <i><b style={{ width: `${[72, 43, 61][index]}%` }} /></i>
@@ -688,30 +1041,34 @@ export function SiteApp() {
               <p className="site-eyebrow">{copy.workflowEyebrow}</p>
               <h2>{copy.workflowTitle}</h2>
             </div>
-            <ol className="site-workflow-list">
-              {copy.workflow.map(([title, description], index) => (
-                <li key={title} data-reveal>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <div><h3>{title}</h3><p>{description}</p></div>
-                </li>
-              ))}
-            </ol>
+            <WorkflowLoopVisual
+              label={copy.workflowVisualLabel}
+              reducedMotion={reducedMotion}
+              steps={copy.workflow}
+            />
           </div>
         </section>
 
-        <section className="site-section site-capabilities">
+        <section className="site-section site-capabilities" id="capabilities">
           <div className="site-shell">
             <div className="site-section-heading" data-reveal>
               <p className="site-eyebrow">{copy.capabilitiesEyebrow}</p>
               <h2>{copy.capabilitiesTitle}</h2>
             </div>
             <div className="site-capability-grid">
-              {copy.capabilities.map(([title, description, icon], index) => (
-                <article key={title} className={`site-capability-card card-${index + 1}`} data-reveal>
-                  <span className="site-feature-icon"><FeatureIcon name={icon as IconName} /></span>
-                  <h3>{title}</h3>
-                  <p>{description}</p>
-                </article>
+              {copy.capabilities.map(([title, summary, icon], index) => (
+                <CapabilityCard
+                  key={`site-capability-${index}`}
+                  index={index}
+                  title={title}
+                  summary={summary}
+                  icon={icon as IconName}
+                  details={copy.capabilityDetails[index]}
+                  openLabel={copy.capabilityOpen}
+                  backLabel={copy.capabilityBack}
+                  previousLabel={copy.capabilityPrevious}
+                  nextLabel={copy.capabilityNext}
+                />
               ))}
             </div>
           </div>
@@ -723,15 +1080,15 @@ export function SiteApp() {
               <p className="site-eyebrow">{copy.manualEyebrow}</p>
               <h2>{copy.manualTitle}</h2>
               <div className="site-manual-links">
-                <button ref={manualTriggerRef} type="button" onClick={() => setManualOpen(true)}>{copy.openManual}<span aria-hidden="true">↗</span></button>
-                <a href={GITHUB_URL} target="_blank" rel="noreferrer">{copy.github}<span aria-hidden="true">↗</span></a>
+                <button ref={manualTriggerRef} type="button" onClick={() => setManualOpen(true)}><DocumentIcon /><span>{copy.openManual}</span></button>
+                <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>{copy.github}</span></a>
               </div>
             </div>
             <ol className="site-manual-steps">
               {copy.manualSteps.map(([title, description], index) => (
-                <li key={title} data-reveal>
+                <li key={`site-manual-step-${index}`} data-reveal>
                   <span>{index + 1}</span>
-                  <div><h3>{title}</h3><p>{description}</p></div>
+                  <div><h3>{title}</h3><p data-copy-block data-copy-id={`manual-step-${index}`}>{description}</p></div>
                 </li>
               ))}
             </ol>
@@ -745,7 +1102,7 @@ export function SiteApp() {
               <div className="site-download-copy">
                 <p className="site-eyebrow">{copy.downloadEyebrow}</p>
                 <h2>{copy.downloadTitle}</h2>
-                <p>{copy.downloadBody}</p>
+                <p data-copy-block data-copy-id="download-body">{copy.downloadBody}</p>
                 <a className="site-button site-button-primary" href={release.downloadUrl} download={release.fileName}>
                   <DownloadIcon />
                   {copy.downloadAgain}
@@ -759,18 +1116,6 @@ export function SiteApp() {
                   <div><dt>{copy.platform}</dt><dd>{copy.platformValue}</dd></div>
                   <div><dt>{copy.released}</dt><dd>{release.publishedAt}</dd></div>
                 </dl>
-                <div className="site-checksum">
-                  <span>{copy.checksum}</span>
-                  <code title={release.sha256}>{release.sha256}</code>
-                  <div>
-                    <button type="button" onClick={copyChecksum}>{checksumCopied ? copy.copied : copy.copyChecksum}</button>
-                    <a href={release.checksumUrl} download>{copy.checksumFile}</a>
-                  </div>
-                </div>
-                <details>
-                  <summary>{copy.requirementsTitle}</summary>
-                  <p>{copy.requirements}</p>
-                </details>
               </div>
             </div>
           </div>
@@ -789,20 +1134,20 @@ export function SiteApp() {
               <div>
                 <p className="site-eyebrow">{copy.manualEyebrow}</p>
                 <h2 id="site-manual-title">{copy.manualDialogTitle}</h2>
-                <p>{copy.manualDialogIntro}</p>
+                <p data-copy-block data-copy-id="manual-dialog-intro">{copy.manualDialogIntro}</p>
               </div>
               <button ref={manualCloseRef} type="button" aria-label={copy.manualClose} onClick={closeManual}>×</button>
             </header>
             <div className="site-manual-dialog-body">
-              {copy.manualChapters.map(([title, items]) => (
-                <article key={title}>
+              {copy.manualChapters.map(([title, items], chapterIndex) => (
+                <article key={`site-manual-chapter-${chapterIndex}`}>
                   <h3>{title}</h3>
-                  <ul>{items.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <ul>{items.map((item, itemIndex) => <li key={`site-manual-item-${chapterIndex}-${itemIndex}`} data-copy-block data-copy-id={`manual-chapter-${chapterIndex}-${itemIndex}`}>{item}</li>)}</ul>
                 </article>
               ))}
               <aside>
                 <strong>{copy.integrityTitle}</strong>
-                <p>{copy.integrityText}</p>
+                <p data-copy-block data-copy-id="integrity-text">{copy.integrityText}</p>
                 <code>{release.sha256}</code>
               </aside>
             </div>
@@ -813,9 +1158,9 @@ export function SiteApp() {
       <footer className="site-footer">
         <div className="site-shell">
           <div className="site-footer-brand"><img src={appIcon} alt="" /><strong>DroneDream</strong></div>
-          <p>{copy.footerLine}</p>
-          <span>{copy.privacy}</span>
-          <a href={GITHUB_URL} target="_blank" rel="noreferrer">GitHub ↗</a>
+          <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
+          <span data-copy-block data-copy-id="footer-privacy">{copy.privacy}</span>
+          <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
         </div>
       </footer>
     </div>

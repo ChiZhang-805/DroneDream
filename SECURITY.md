@@ -44,5 +44,5 @@ selection or configuration value alone is not proof of a simulated effect.
 - Keep authentication enabled on every network-accessible deployment.
 - Verify installer and Runtime SHA-256 values; use signed release manifests
   when publishing Runtime images. Runtime Ed25519 signatures do not sign the
-  Windows executable. The current `0.3.18` NSIS preview is not
+  Windows executable. The current `0.3.19` NSIS preview is not
   Authenticode-signed and must not be presented as a trusted-publisher release.
