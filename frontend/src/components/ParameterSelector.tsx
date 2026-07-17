@@ -27,6 +27,22 @@ const GROUP_KEYS: Record<string, TranslationKey> = {
   filters: "parameter.group.filters",
 };
 
+type ParameterActionIconName = "expand" | "collapse" | "select" | "clear";
+
+function ParameterActionIcon({ name }: { name: ParameterActionIconName }) {
+  if (name === "select") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.2 17 19 7" /></svg>;
+  }
+  if (name === "clear") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17" /></svg>;
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d={name === "expand" ? "m6.5 9 5.5 5.5L17.5 9" : "m6.5 15 5.5-5.5 5.5 5.5"} />
+    </svg>
+  );
+}
+
 export function ParameterSelector({
   catalog,
   mode,
@@ -38,14 +54,7 @@ export function ParameterSelector({
   const [query, setQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
   const [selectionFilter, setSelectionFilter] = useState<"all" | "selected" | "unselected">("all");
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    () => {
-      const firstSelectedGroup = catalog.find(
-        (parameter) => selections[parameter.name]?.selected,
-      )?.group;
-      return new Set(firstSelectedGroup ? [firstSelectedGroup] : []);
-    },
-  );
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
   const normalizedQuery = query.trim().toLowerCase();
   const groups = useMemo(
     () => [...new Set(catalog.map((parameter) => parameter.group))],
@@ -162,17 +171,17 @@ export function ParameterSelector({
         </label>
         {mode !== "basic" ? (
           <>
-            <button type="button" className="btn btn-ghost btn-small" onClick={() => setGroupSelected(filtered, true)}>
-              {t("parameter.selectVisible")}
+            <button type="button" className="btn btn-ghost parameter-icon-btn" aria-label={t("parameter.selectVisible")} title={t("parameter.selectVisible")} onClick={() => setGroupSelected(filtered, true)}>
+              <ParameterActionIcon name="select" />
             </button>
-            <button type="button" className="btn btn-ghost btn-small" onClick={() => setGroupSelected(filtered, false)}>
-              {t("parameter.clearVisible")}
+            <button type="button" className="btn btn-ghost parameter-icon-btn" aria-label={t("parameter.clearVisible")} title={t("parameter.clearVisible")} onClick={() => setGroupSelected(filtered, false)}>
+              <ParameterActionIcon name="clear" />
             </button>
           </>
         ) : null}
       </div>
 
-      <div className="parameter-groups">
+      <div className={`parameter-groups${expandedGroups.size === 0 && !filtersActive ? " parameter-groups-collapsed" : ""}`}>
         {groupCatalog(filtered).map(([group, parameters]) => {
           const expanded = filtersActive || expandedGroups.has(group);
           const groupLabel = GROUP_KEYS[group] ? t(GROUP_KEYS[group]) : t("parameter.group.other");
@@ -186,19 +195,20 @@ export function ParameterSelector({
               <div className="parameter-group-actions">
                 <button
                   type="button"
-                  className="btn btn-ghost btn-small"
+                  className="btn btn-ghost parameter-icon-btn"
                   aria-expanded={expanded}
                   aria-label={`${expanded ? t("parameter.collapseGroup") : t("parameter.expandGroup")}: ${groupLabel}`}
+                  title={expanded ? t("parameter.collapseGroup") : t("parameter.expandGroup")}
                   disabled={filtersActive}
                   onClick={() => toggleGroup(group)}
                 >
-                  {expanded ? t("parameter.collapseGroup") : t("parameter.expandGroup")}
+                  <ParameterActionIcon name={expanded ? "collapse" : "expand"} />
                 </button>
-                <button type="button" className="btn btn-ghost btn-small" aria-label={`${t("parameter.selectGroup")}: ${groupLabel}`} onClick={() => setGroupSelected(parameters, true)}>
-                  {t("parameter.selectGroup")}
+                <button type="button" className="btn btn-ghost parameter-icon-btn" aria-label={`${t("parameter.selectGroup")}: ${groupLabel}`} title={t("parameter.selectGroup")} onClick={() => setGroupSelected(parameters, true)}>
+                  <ParameterActionIcon name="select" />
                 </button>
-                <button type="button" className="btn btn-ghost btn-small" aria-label={`${t("parameter.clearGroup")}: ${groupLabel}`} onClick={() => setGroupSelected(parameters, false)}>
-                  {t("parameter.clearGroup")}
+                <button type="button" className="btn btn-ghost parameter-icon-btn" aria-label={`${t("parameter.clearGroup")}: ${groupLabel}`} title={t("parameter.clearGroup")} onClick={() => setGroupSelected(parameters, false)}>
+                  <ParameterActionIcon name="clear" />
                 </button>
               </div>
             </header>

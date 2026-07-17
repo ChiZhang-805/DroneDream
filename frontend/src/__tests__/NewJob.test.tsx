@@ -150,7 +150,7 @@ describe("NewJob experiment wizard", () => {
     expect(screen.getByRole("heading", { name: "Flight Track Configuration" })).toBeVisible();
     const modeSelector = screen.getByLabelText(/Tuning experience level/i);
     expect(modeSelector).toHaveValue("basic");
-    expect(modeSelector.closest(".form-grid")).not.toBeNull();
+    expect(modeSelector.closest(".wizard-full-row")).not.toBeNull();
     expect(modeSelector.closest(".section-card")).not.toBeNull();
     expect(screen.getByLabelText(/Objective profile/i)).toHaveValue("robust");
     expect(screen.queryByLabelText(/Experiment name/i)).toBeNull();
@@ -381,6 +381,7 @@ describe("NewJob experiment wizard", () => {
     renderPage();
     selectMode("advanced");
     openStep(/Parameters/i);
+    fireEvent.click(screen.getByRole("button", { name: /Expand: Horizontal Motion Control/i }));
 
     expect(screen.getByLabelText(/Tune MPC_XY_P/i)).toHaveValue("include");
     expect(screen.getByLabelText(/MPC_XY_P search minimum/i)).toBeVisible();
@@ -440,6 +441,7 @@ describe("NewJob experiment wizard", () => {
     renderPage();
     selectMode("advanced");
     openStep(/Parameters/i);
+    fireEvent.click(screen.getByRole("button", { name: /Expand: Horizontal Motion Control/i }));
 
     fireEvent.change(screen.getByLabelText(/MPC_XY_P search minimum/i), {
       target: { value: "" },
@@ -504,21 +506,21 @@ describe("NewJob experiment wizard", () => {
     renderPage();
     openStep(/Scenarios/i);
     expect(screen.queryByRole("button", { name: /Combined stress/i })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
     fireEvent.change(screen.getByLabelText(/Environment presets/i), {
       target: { value: "stress" },
     });
     expect(screen.queryByText("Combines wind, gust, sensor, battery and payload effects.")).toBeNull();
-    expect(screen.getAllByLabelText(/^Advanced environment$/i)[0]).toHaveValue("true");
+    expect(screen.getByLabelText(/^Advanced environment$/i)).toHaveValue("true");
     expect(screen.getByLabelText(/Gust magnitude/i)).toHaveValue(10);
-    fireEvent.change(screen.getByLabelText(/Obstacles.*JSON/i), {
+    fireEvent.click(screen.getByRole("button", { name: /Edit obstacles/i }));
+    const obstacleDialog = screen.getByRole("dialog", { name: /Obstacles.*JSON/i });
+    fireEvent.change(within(obstacleDialog).getByRole("textbox"), {
       target: {
         value: '[{"type":"cylinder","x":0,"y":0,"z":0,"radius":-1,"height":2}]',
       },
     });
 
     const closeButton = screen.getByRole("button", { name: /Close advanced settings/i });
-    expect(closeButton).toHaveTextContent("×");
     expect(closeButton).toHaveAttribute("title", "Close advanced settings");
     fireEvent.click(closeButton);
     expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
@@ -578,9 +580,10 @@ describe("NewJob experiment wizard", () => {
     } satisfies BackendCapabilitiesResponse);
     renderPage();
     openStep(/Scenarios/i);
-    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
-    expect(await screen.findByText(/Obstacles: verified Gazebo injection/i)).toBeInTheDocument();
-    expect(screen.getByText(/Wind, sensors, battery and payload: Runtime extension required/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Advanced environment$/i)).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Edit obstacles/i })).toBeEnabled();
+    expect(screen.queryByText(/Obstacles: verified Gazebo injection/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Wind, sensors, battery and payload: Runtime extension required/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Advanced effects require launcher evidence/i)).not.toBeInTheDocument();
   });
 
@@ -616,17 +619,14 @@ describe("NewJob experiment wizard", () => {
   it("restores the selected advanced environment preset with the draft", () => {
     const first = renderPage({ experimentName: "preset-draft" });
     openStep(/Scenarios/i);
-    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
     fireEvent.change(screen.getByLabelText(/Environment presets/i), {
       target: { value: "stress" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Close advanced settings/i }));
     fireEvent.click(screen.getByRole("button", { name: /^Next$/i }));
 
     first.unmount();
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /^Back$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
     expect(screen.getByLabelText(/Environment presets/i)).toHaveValue("stress");
   });
 
@@ -837,10 +837,8 @@ describe("NewJob experiment wizard", () => {
     fireEvent.change(screen.getByLabelText(/Waypoint 2 X/i), { target: { value: "8" } });
     fireEvent.click(screen.getByRole("button", { name: /Close track editor/i }));
     openStep(/Scenarios/i);
-    fireEvent.click(screen.getByRole("button", { name: /Advanced environment settings/i }));
-    fireEvent.change(screen.getAllByLabelText(/^Advanced environment$/i)[0], { target: { value: "true" } });
+    fireEvent.change(screen.getByLabelText(/^Advanced environment$/i), { target: { value: "true" } });
     fireEvent.change(screen.getByLabelText(/Dropout rate/i), { target: { value: "0.2" } });
-    fireEvent.click(screen.getByRole("button", { name: /Close advanced settings/i }));
     createExperiment();
 
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));

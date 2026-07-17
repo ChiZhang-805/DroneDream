@@ -51,8 +51,8 @@ function LanguageRegionIcon({ region }: { region: "west" | "east" }) {
 function SettingsIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 8.25A3.75 3.75 0 1 0 12 15.75 3.75 3.75 0 0 0 12 8.25Z" />
-      <path d="M19.3 13.48c.04-.48.04-.96 0-1.44l1.66-1.3-1.78-3.08-1.98.8a8.2 8.2 0 0 0-1.24-.72l-.3-2.1h-3.56l-.3 2.1c-.44.2-.85.44-1.24.72l-1.98-.8-1.78 3.08 1.66 1.3a8.8 8.8 0 0 0 0 1.44l-1.66 1.3 1.78 3.08 1.98-.8c.39.28.8.52 1.24.72l.3 2.1h3.56l.3-2.1c.44-.2.85-.44 1.24-.72l1.98.8 1.78-3.08-1.66-1.3Z" />
+      <circle cx="12" cy="12" r="3.15" />
+      <path d="M19.45 13.25a7.9 7.9 0 0 0 0-2.5l2-1.55-2-3.46-2.48 1a8.4 8.4 0 0 0-2.17-1.25L14.45 2h-4.9L9.2 5.49a8.4 8.4 0 0 0-2.17 1.25l-2.48-1-2 3.46 2 1.55a7.9 7.9 0 0 0 0 2.5l-2 1.55 2 3.46 2.48-1a8.4 8.4 0 0 0 2.17 1.25L9.55 22h4.9l.35-3.49a8.4 8.4 0 0 0 2.17-1.25l2.48 1 2-3.46-2-1.55Z" />
     </svg>
   );
 }
@@ -447,9 +447,6 @@ function AppShellContent() {
         <header className="app-header">
           <div className="app-header-title">DroneDream — {t("app.platform")}</div>
           <div className="app-header-meta">
-            <span className="env-chip">
-              {desktopRuntime ? t("app.desktopEnvironment") : t("app.webEnvironment")}
-            </span>
             <button
               ref={launcherSettingsButtonRef}
               type="button"

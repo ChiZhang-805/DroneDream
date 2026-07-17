@@ -8,7 +8,7 @@ import { MetricCard } from "../components/MetricCard";
 import { SectionCard } from "../components/SectionCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { DataTable, type Column } from "../components/DataTable";
-import { Loading, Empty, ErrorState } from "../components/States";
+import { Loading, ErrorState } from "../components/States";
 import { RuntimeAccessNotice } from "../components/RuntimeAccessNotice";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useI18n } from "../i18n/I18nProvider";
@@ -89,8 +89,8 @@ export function Dashboard() {
   });
 
   return (
-    <section className="stack-md">
-      <header className="page-header">
+    <section className="dashboard-page">
+      <header className="page-header dashboard-header">
         <div>
           <h1>{t("dashboard.title")}</h1>
           <p className="page-header-subtitle">
@@ -148,15 +148,15 @@ function DashboardBody({ jobs }: { jobs: Job[] }) {
   const { t } = useI18n();
   const counts = countByStatus(jobs);
   const columns = buildJobColumns(t);
+  const recentJobs = jobs.slice(0, 5);
 
   return (
-    <>
+    <div className="dashboard-body">
       <SectionCard title={t("dashboard.statusSummary")}>
         <div className="metric-grid">
           <MetricCard
             label={t("dashboard.totalJobs")}
             value={jobs.length}
-            sub={t("dashboard.lastTenJobs")}
           />
           <MetricCard
             label={t("dashboard.active")}
@@ -167,7 +167,6 @@ function DashboardBody({ jobs }: { jobs: Job[] }) {
               (counts.FINALIZING ?? 0) +
               (counts.CREATED ?? 0)
             }
-            sub={t("dashboard.activeDescription")}
             tone="muted"
           />
           <MetricCard
@@ -190,26 +189,26 @@ function DashboardBody({ jobs }: { jobs: Job[] }) {
 
       <SectionCard
         title={t("dashboard.recentJobs")}
-        actions={<Link to="/history">{t("dashboard.viewAll")}</Link>}
+        actions={(
+          <Link to="/history" className="dashboard-view-all">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h13M14 7l5 5-5 5" />
+            </svg>
+            <span>{t("dashboard.viewAll")}</span>
+          </Link>
+        )}
       >
-        <DataTable
-          columns={columns}
-          rows={jobs}
-          rowKey={(j) => j.id}
-          emptyState={
-            <Empty
-              title={t("dashboard.emptyTitle")}
-              description={t("dashboard.emptyDescription")}
-              action={
-                <Link to="/jobs/new" className="btn btn-primary">
-                  {t("dashboard.newJob")}
-                </Link>
-              }
-            />
-          }
-        />
+        {recentJobs.length > 0 ? (
+          <DataTable
+            columns={columns}
+            rows={recentJobs}
+            rowKey={(j) => j.id}
+          />
+        ) : (
+          <div className="dashboard-empty-jobs" aria-hidden="true" />
+        )}
       </SectionCard>
-    </>
+    </div>
   );
 }
 

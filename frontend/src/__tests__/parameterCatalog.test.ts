@@ -115,7 +115,7 @@ describe("parameter catalog compatibility", () => {
   });
 
   it("creates mode presets and emits only checked dimensions", () => {
-    expect(BUILTIN_PARAMETER_CATALOG.parameters).toHaveLength(28);
+    expect(BUILTIN_PARAMETER_CATALOG.parameters).toHaveLength(31);
     expect(
       BUILTIN_PARAMETER_CATALOG.parameters.find((item) => item.name === "MC_AIRMODE"),
     ).toMatchObject({ value_type: "integer", safe_min: 0, safe_max: 2 });
@@ -145,6 +145,6 @@ describe("parameter catalog compatibility", () => {
     } as never);
 
     expect(result.source).toBe("builtin");
-    expect(result.parameters).toHaveLength(28);
+    expect(result.parameters).toHaveLength(31);
   });
 });

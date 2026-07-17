@@ -125,7 +125,7 @@ afterEach(() => {
 
     expect(await screen.findByText("Runtime data is not available yet"))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Overview" }))
+    expect(screen.getByRole("link", { name: "Dashboard" }))
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "Run History" }))
       .not.toHaveClass("runtime-locked");

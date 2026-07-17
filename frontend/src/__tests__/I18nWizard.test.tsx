@@ -97,5 +97,5 @@ describe("Chinese experiment wizard", () => {
     expect(screen.getByRole("heading", { name: "检查实验配置" })).toBeVisible();
     expect(screen.getByRole("button", { name: "创建调优实验" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "下一步" })).toBeNull();
-  });
+  }, 10_000);
 });

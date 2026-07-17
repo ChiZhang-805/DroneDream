@@ -36,7 +36,13 @@ describe("ParameterSelector compact parameter table", () => {
       </I18nProvider>,
     );
 
-    expect(screen.getByRole("heading", { name: "Motion limits" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Motion Boundary Control" })).toBeVisible();
+    expect(screen.queryByLabelText("Tune MPC_ACC_HOR")).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Expand: Motion Boundary Control",
+      }),
+    );
     expect(screen.getByText("MPC_ACC_HOR_MAX")).toBeVisible();
     expect(screen.queryByText(/Apply:/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Absolute range/i)).not.toBeInTheDocument();
@@ -78,6 +84,11 @@ describe("ParameterSelector compact parameter table", () => {
       </I18nProvider>,
     );
 
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Expand: Horizontal Motion Control",
+      }),
+    );
     expect(screen.getByLabelText("Tune MPC_XY_P")).toBeEnabled();
     expect(screen.getByLabelText("MPC_XY_P search minimum")).toBeInTheDocument();
     expect(screen.getByLabelText("MPC_XY_P search maximum")).toBeInTheDocument();

@@ -48,6 +48,12 @@ const BUILTIN_PARAMETER_ZH: Record<string, { label: string; description: string 
   IMU_GYRO_CUTOFF: { label: "陀螺仪低通截止频率", description: "设置发送给控制器的陀螺仪二阶低通截止频率。" },
 };
 
+const BUILTIN_THRUST_PARAMETER_ZH: Record<string, { label: string; description: string }> = {
+  MPC_THR_MIN: { label: "最小总推力", description: "升降速度模式下保留的最小推力与控制权限。" },
+  MPC_THR_HOVER: { label: "悬停推力", description: "维持稳定悬停所需的归一化垂直推力。" },
+  MPC_THR_MAX: { label: "最大总推力", description: "升降速度控制模式允许使用的最大总推力。" },
+};
+
 interface BuiltinParameterOptions {
   unit?: string;
   risk?: ParameterRisk;
@@ -71,7 +77,7 @@ function builtinParameter(
   step: number,
   options: BuiltinParameterOptions = {},
 ): PX4ParameterDefinition {
-  const chinese = BUILTIN_PARAMETER_ZH[name];
+  const chinese = BUILTIN_PARAMETER_ZH[name] ?? BUILTIN_THRUST_PARAMETER_ZH[name];
   return {
     name,
     label,
@@ -134,7 +140,10 @@ export const BUILTIN_PARAMETER_CATALOG: ParameterCatalogResponse = {
     builtinParameter("MPC_ACC_HOR_MAX", "Maximum horizontal acceleration", "motion_limits", "Upper horizontal acceleration limit where applicable.", [2, 15], [3, 10], 5, 1, { unit: "m/s²" }),
     builtinParameter("MPC_JERK_AUTO", "Autonomous jerk limit", "motion_limits", "Maximum acceleration slew in autonomous modes.", [1, 80], [2, 20], 4, 1, { unit: "m/s³" }),
     builtinParameter("MPC_TILTMAX_AIR", "Maximum in-air tilt", "motion_limits", "Maximum tilt used by velocity and acceleration controlled flight modes.", [20, 89], [25, 60], 45, 1, { unit: "deg", risk: "high" }),
-    builtinParameter("MC_AIRMODE", "Multicopter air-mode", "motion_limits", "Mixer control-authority policy at very low and high throttle (0, 1, or 2).", [0, 2], [0, 2], 0, 1, {
+    builtinParameter("MPC_THR_MIN", "Minimum collective thrust", "thrust_and_authority", "Minimum thrust retained for control authority in climb-rate modes.", [0.05, 0.5], [0.08, 0.25], 0.12, 0.01, { unit: "norm", risk: "high", dependencies: ["MPC_THR_HOVER", "MC_AIRMODE"] }),
+    builtinParameter("MPC_THR_HOVER", "Hover thrust", "thrust_and_authority", "Normalized vertical thrust required to maintain a stable hover.", [0.1, 0.8], [0.25, 0.6], 0.5, 0.01, { unit: "norm", risk: "high", dependencies: ["MPC_THR_MAX"] }),
+    builtinParameter("MPC_THR_MAX", "Maximum collective thrust", "thrust_and_authority", "Maximum collective thrust allowed in climb-rate controlled modes.", [0, 1], [0.6, 1], 1, 0.05, { unit: "norm", risk: "high" }),
+    builtinParameter("MC_AIRMODE", "Multicopter air-mode", "thrust_and_authority", "Mixer control-authority policy at very low and high throttle (0, 1, or 2).", [0, 2], [0, 2], 0, 1, {
       valueType: "integer",
       risk: "high",
       choices: [

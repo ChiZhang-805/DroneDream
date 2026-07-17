@@ -321,6 +321,8 @@ const OBJECTIVE_WEIGHT_PRESETS: Record<
     | "objective_weight_smoothness"
     | "objective_weight_robustness"
     | "robust_aggregation"
+    | "cvar_alpha"
+    | "percentile"
   >
 > = {
   stable: {
@@ -329,6 +331,8 @@ const OBJECTIVE_WEIGHT_PRESETS: Record<
     objective_weight_smoothness: "0.75",
     objective_weight_robustness: "0.8",
     robust_aggregation: "mean",
+    cvar_alpha: "0.2",
+    percentile: "95",
   },
   fast: {
     objective_weight_tracking: "0.75",
@@ -336,6 +340,8 @@ const OBJECTIVE_WEIGHT_PRESETS: Record<
     objective_weight_smoothness: "0.2",
     objective_weight_robustness: "0.4",
     robust_aggregation: "mean",
+    cvar_alpha: "0.2",
+    percentile: "95",
   },
   smooth: {
     objective_weight_tracking: "0.75",
@@ -343,6 +349,8 @@ const OBJECTIVE_WEIGHT_PRESETS: Record<
     objective_weight_smoothness: "1",
     objective_weight_robustness: "0.65",
     robust_aggregation: "mean",
+    cvar_alpha: "0.2",
+    percentile: "95",
   },
   robust: {
     objective_weight_tracking: "1",
@@ -350,6 +358,8 @@ const OBJECTIVE_WEIGHT_PRESETS: Record<
     objective_weight_smoothness: "0.35",
     objective_weight_robustness: "1",
     robust_aggregation: "cvar",
+    cvar_alpha: "0.2",
+    percentile: "95",
   },
 };
 
@@ -416,20 +426,6 @@ const FIELD_STEPS: Record<string, number> = {
   llm_model: 3,
   llm_base_url: 3,
 };
-
-const ADVANCED_SCENARIO_ERROR_FIELDS = new Set([
-  "advanced_enabled",
-  "gps_noise_m",
-  "baro_noise_m",
-  "imu_noise_scale",
-  "dropout_rate",
-  "battery_initial_percent",
-  "mass_payload_kg",
-  "gust_magnitude_mps",
-  "gust_direction_deg",
-  "gust_period_s",
-  "obstacles_json",
-]);
 
 const SIMULATOR_WORLD_KEYS: Record<string, TranslationKey> = {
   default: "wizard.world.default",
@@ -502,13 +498,6 @@ const SENSOR_NOISE_HINT_KEYS: Record<SensorNoiseLevel, TranslationKey> = {
   high: "wizard.hint.noise.high",
 };
 
-const SCENARIO_PRESET_HINT_KEYS: Record<ScenarioPreset, TranslationKey> = {
-  nominal: "wizard.hint.preset.nominal",
-  wind: "wizard.hint.preset.wind",
-  sensor: "wizard.hint.preset.sensor",
-  stress: "wizard.hint.preset.stress",
-};
-
 const SIMULATOR_BACKEND_HINT_KEYS: Record<SimulatorBackend, TranslationKey> = {
   real_cli: "wizard.hint.backend.realCli",
   mock: "wizard.hint.backend.mock",
@@ -536,7 +525,7 @@ function llmProviderLabel(provider: string, t: Translate): string {
 }
 
 function opensAdvancedScenarioDialog(errorKey: string): boolean {
-  return ADVANCED_SCENARIO_ERROR_FIELDS.has(errorKey);
+  return errorKey === "obstacles_json";
 }
 
 function opensTrackDialog(errorKey: string): boolean {
@@ -1697,7 +1686,17 @@ export function NewJob() {
   }
 
   function changeMode(mode: TuningMode): void {
-    update("tuning_mode", mode);
+    setForm((previous) => {
+      const profile = mode === "basic" && previous.objective_profile === "custom"
+        ? "robust"
+        : previous.objective_profile;
+      return {
+        ...previous,
+        tuning_mode: mode,
+        objective_profile: profile,
+        ...(mode === "basic" && profile !== "custom" ? OBJECTIVE_WEIGHT_PRESETS[profile] : {}),
+      };
+    });
     applyModePreset(mode);
   }
 
@@ -1847,10 +1846,6 @@ export function NewJob() {
     form.combined_holdout_enabled,
   ].filter(Boolean).length;
   const realCliCapability = capabilities?.simulators.items.real_cli;
-  const bundledPhysicalEffects = realCliCapability?.scenario_effect_contract?.physically_applied
-    ?? realCliCapability?.bundled_runner_advanced_effects
-    ?? [];
-  const bundledObstaclesVerified = bundledPhysicalEffects.includes("obstacles");
   const gptCapability = capabilities?.optimizers.items.gpt;
   const preflightErrors = validate(form, selections, catalog, capabilities, t);
   const preflightSteps = [...new Set(
@@ -1941,23 +1936,23 @@ export function NewJob() {
         <div hidden={step !== 0} className="wizard-panel">
           <SectionCard title={t("wizard.section.flightSetup")}>
             <div className="wizard-flight-setup">
+            <div className="form-field wizard-mode-field wizard-full-row">
+              <label className="wizard-field-label" htmlFor="tuning_mode">{t("wizard.aria.modeSelector")}</label>
+              <select
+                id="tuning_mode"
+                value={form.tuning_mode}
+                onChange={(event) => changeMode(event.target.value as TuningMode)}
+              >
+                {(["basic", "advanced", "expert"] as const).map((mode) => (
+                  <option value={mode} key={mode}>
+                    {t(`wizard.mode.${mode}` as TranslationKey)}
+                  </option>
+                ))}
+              </select>
+            </div>
             <section className="stack-sm wizard-subsection" aria-labelledby="flight-setup-vehicle-title">
               <h3 id="flight-setup-vehicle-title">{t("wizard.section.vehicle")}</h3>
               <div className="form-grid">
-              <div className="form-field wizard-mode-field">
-                <label className="wizard-field-label" htmlFor="tuning_mode">{t("wizard.aria.modeSelector")}</label>
-                <select
-                  id="tuning_mode"
-                  value={form.tuning_mode}
-                  onChange={(event) => changeMode(event.target.value as TuningMode)}
-                >
-                  {(["basic", "advanced", "expert"] as const).map((mode) => (
-                    <option value={mode} key={mode}>
-                      {t(`wizard.mode.${mode}` as TranslationKey)}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <Field label={t("wizard.field.px4Version")} required error={errors.px4_version} htmlFor="px4_version" hint={selectedHint(PX4_VERSION_HINT_KEYS, form.px4_version, t)}>
                 <select id="px4_version" value={form.px4_version} onChange={(event) => update("px4_version", event.target.value)}>
                   <option value="v1.16">v1.16</option>
@@ -2040,36 +2035,39 @@ export function NewJob() {
                   ))}
               </select>
             </Field>
-            {form.tuning_mode !== "basic" ? (
-              <>
-                <div className="form-grid objective-weight-grid">
+            <div className="form-grid objective-weight-grid">
                   <Field label={t("wizard.field.weightTracking")} htmlFor="objective_weight_tracking" error={errors.objective_weights} hint={t("wizard.hint.weight.tracking")}>
-                    <input id="objective_weight_tracking" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_tracking} onChange={handleObjectiveWeightChange("objective_weight_tracking")} />
+                    <input id="objective_weight_tracking" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_tracking} disabled={form.tuning_mode === "basic"} onChange={handleObjectiveWeightChange("objective_weight_tracking")} />
                   </Field>
                   <Field label={t("wizard.field.weightSpeed")} htmlFor="objective_weight_speed" hint={t("wizard.hint.weight.speed")}>
-                    <input id="objective_weight_speed" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_speed} onChange={handleObjectiveWeightChange("objective_weight_speed")} />
+                    <input id="objective_weight_speed" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_speed} disabled={form.tuning_mode === "basic"} onChange={handleObjectiveWeightChange("objective_weight_speed")} />
                   </Field>
                   <Field label={t("wizard.field.weightSmoothness")} htmlFor="objective_weight_smoothness" hint={t("wizard.hint.weight.smoothness")}>
-                    <input id="objective_weight_smoothness" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_smoothness} onChange={handleObjectiveWeightChange("objective_weight_smoothness")} />
+                    <input id="objective_weight_smoothness" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_smoothness} disabled={form.tuning_mode === "basic"} onChange={handleObjectiveWeightChange("objective_weight_smoothness")} />
                   </Field>
                   <Field label={t("wizard.field.weightRobustness")} htmlFor="objective_weight_robustness" hint={t("wizard.hint.weight.robustness")}>
-                    <input id="objective_weight_robustness" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_robustness} onChange={handleObjectiveWeightChange("objective_weight_robustness")} />
+                    <input id="objective_weight_robustness" type="number" min="0" max="100" step="0.05" placeholder="0–100" value={form.objective_weight_robustness} disabled={form.tuning_mode === "basic"} onChange={handleObjectiveWeightChange("objective_weight_robustness")} />
                   </Field>
                 </div>
-                <div className="form-grid wizard-grid-two">
+                <div className="form-grid objective-tail-grid">
                   <Field label={t("wizard.field.robustAggregation")} htmlFor="robust_aggregation" error={errors.robust_aggregation} hint={t(AGGREGATION_HINT_KEYS[form.robust_aggregation])}>
-                    <select id="robust_aggregation" value={form.robust_aggregation} onChange={(event) => update("robust_aggregation", event.target.value as RobustAggregation)}>
+                    <select id="robust_aggregation" value={form.robust_aggregation} disabled={form.tuning_mode !== "expert"} onChange={(event) => update("robust_aggregation", event.target.value as RobustAggregation)}>
                       <option value="mean">{t("wizard.aggregation.mean")}</option>
                       <option value="worst">{t("wizard.aggregation.worst")}</option>
                       <option value="cvar">{t("wizard.aggregation.cvar")}</option>
                       <option value="percentile">{t("wizard.aggregation.percentile")}</option>
                     </select>
                   </Field>
-                  {form.robust_aggregation === "cvar" ? <Field label={t("wizard.field.cvarAlpha")} htmlFor="cvar_alpha" error={errors.cvar_alpha} hint={t("wizard.hint.cvarAlpha")}><input id="cvar_alpha" type="number" min="0" max="1" step="0.05" placeholder="0–1" value={form.cvar_alpha} onChange={handleTextChange("cvar_alpha")} /></Field> : null}
-                  {form.robust_aggregation === "percentile" ? <Field label={t("wizard.field.percentile")} htmlFor="percentile" error={errors.percentile} hint={t("wizard.hint.percentile")}><input id="percentile" type="number" min="1" max="100" step="1" placeholder="1–100" value={form.percentile} onChange={handleTextChange("percentile")} /></Field> : null}
+                  {form.robust_aggregation === "percentile" ? (
+                    <Field label={t("wizard.field.percentile")} htmlFor="percentile" error={errors.percentile}>
+                      <input id="percentile" type="number" min="1" max="100" step="1" placeholder="1–100" value={form.percentile} disabled={form.tuning_mode !== "expert"} onChange={handleTextChange("percentile")} />
+                    </Field>
+                  ) : (
+                    <Field label={t("wizard.field.cvarAlpha")} htmlFor="cvar_alpha" error={errors.cvar_alpha}>
+                      <input id="cvar_alpha" type="number" min="0" max="1" step="0.05" placeholder="0–1" value={form.cvar_alpha} disabled={form.tuning_mode !== "expert" || form.robust_aggregation !== "cvar"} onChange={handleTextChange("cvar_alpha")} />
+                    </Field>
+                  )}
                 </div>
-              </>
-            ) : null}
             </section>
 
             <section className="stack-sm wizard-subsection" aria-labelledby="flight-setup-track-title">
@@ -2183,8 +2181,7 @@ export function NewJob() {
         </div>
 
         <div hidden={step !== 1} className="wizard-panel">
-          {step === 1 ? (
-            <SectionCard title={t("wizard.section.parameters")}>
+          <SectionCard title={t("wizard.section.parameters")}>
             <ParameterSelector
               catalog={catalog.parameters}
               mode={form.tuning_mode}
@@ -2192,8 +2189,7 @@ export function NewJob() {
               errors={errors}
               onChange={setSelections}
             />
-            </SectionCard>
-          ) : null}
+          </SectionCard>
         </div>
 
         <div hidden={step !== 2} className="wizard-panel">
@@ -2222,7 +2218,7 @@ export function NewJob() {
               </div>
               {errors.scenario_cases ? <p id="scenario_cases_error" className="form-error">{errors.scenario_cases}</p> : null}
             </div>
-            <div className="form-grid">
+            <div className="form-grid scenario-base-grid">
               {(["north", "east", "south", "west"] as const).map((direction) => {
                 const key = `wind_${direction}` as const;
                 const labelKeys = {
@@ -2248,16 +2244,50 @@ export function NewJob() {
                 <BooleanSelect id="common_random_numbers" value={form.common_random_numbers} onChange={(value) => update("common_random_numbers", value)} trueLabel={t("wizard.option.yes")} falseLabel={t("wizard.option.no")} />
               </Field>
             </div>
-            <button ref={advancedScenarioTriggerRef} type="button" className="btn btn-ghost" onClick={() => setShowAdvancedScenario(true)}>{t("wizard.advancedSettings")}</button>
+            <section className="scenario-inline-advanced" aria-labelledby="advanced-scenario-inline-title">
+              <h3 id="advanced-scenario-inline-title">{t("wizard.advancedSettings")}</h3>
+              <div className="scenario-advanced-group">
+                <h4>{t("wizard.environmentEffects")}</h4>
+                <div className="form-grid scenario-advanced-grid">
+                  <Field label={t("wizard.scenarioPresets")} htmlFor="scenario_preset">
+                    <select id="scenario_preset" value={form.scenario_preset} onChange={(event) => applyScenarioPreset(event.target.value as ScenarioPreset)}>
+                      {(["nominal", "wind", "sensor", "stress"] as const).map((preset) => (
+                        <option key={preset} value={preset}>{t(`wizard.scenarioPreset.${preset}` as TranslationKey)}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label={t("wizard.field.advancedScenario")} htmlFor="advanced_enabled"><BooleanSelect id="advanced_enabled" value={form.advanced_enabled} onChange={(value) => update("advanced_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
+                  <Field label={t("wizard.field.gustEnabled")} htmlFor="gust_enabled"><BooleanSelect id="gust_enabled" value={form.gust_enabled} disabled={!form.advanced_enabled} onChange={(value) => update("gust_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
+                  <Field label={t("wizard.field.gustMagnitude")} htmlFor="gust_magnitude_mps" error={errors.gust_magnitude_mps}><input id="gust_magnitude_mps" type="number" min="0" max="30" step="0.1" placeholder="0–30" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_magnitude_mps} onChange={handleTextChange("gust_magnitude_mps")} /></Field>
+                  <Field label={t("wizard.field.gustDirection")} htmlFor="gust_direction_deg" error={errors.gust_direction_deg}><input id="gust_direction_deg" type="number" min="0" max="359" step="1" placeholder="0–359" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_direction_deg} onChange={handleTextChange("gust_direction_deg")} /></Field>
+                  <Field label={t("wizard.field.gustPeriod")} htmlFor="gust_period_s" error={errors.gust_period_s}><input id="gust_period_s" type="number" min="0" max="300" step="0.1" placeholder="0–300" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_period_s} onChange={handleTextChange("gust_period_s")} /></Field>
+                </div>
+              </div>
+              <div className="scenario-advanced-group">
+                <h4>{t("wizard.sensorVehicleEffects")}</h4>
+                <div className="form-grid scenario-advanced-grid">
+                  <Field label={t("wizard.field.gpsNoise")} htmlFor="gps_noise_m" error={errors.gps_noise_m}><input id="gps_noise_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" disabled={!form.advanced_enabled} value={form.gps_noise_m} onChange={handleTextChange("gps_noise_m")} /></Field>
+                  <Field label={t("wizard.field.baroNoise")} htmlFor="baro_noise_m" error={errors.baro_noise_m}><input id="baro_noise_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" disabled={!form.advanced_enabled} value={form.baro_noise_m} onChange={handleTextChange("baro_noise_m")} /></Field>
+                  <Field label={t("wizard.field.imuNoiseScale")} htmlFor="imu_noise_scale" error={errors.imu_noise_scale}><input id="imu_noise_scale" type="number" min="0" max="10" step="0.1" placeholder="0–10" disabled={!form.advanced_enabled} value={form.imu_noise_scale} onChange={handleTextChange("imu_noise_scale")} /></Field>
+                  <Field label={t("wizard.field.dropoutRate")} htmlFor="dropout_rate" error={errors.dropout_rate}><input id="dropout_rate" type="number" min="0" max="1" step="0.01" placeholder="0–1" disabled={!form.advanced_enabled} value={form.dropout_rate} onChange={handleTextChange("dropout_rate")} /></Field>
+                  <Field label={t("wizard.field.batteryInitial")} htmlFor="battery_initial_percent" error={errors.battery_initial_percent}><input id="battery_initial_percent" type="number" min="0" max="100" step="1" placeholder="0–100" disabled={!form.advanced_enabled} value={form.battery_initial_percent} onChange={handleTextChange("battery_initial_percent")} /></Field>
+                  <Field label={t("wizard.field.batteryVoltageSag")} htmlFor="battery_voltage_sag"><BooleanSelect id="battery_voltage_sag" value={form.battery_voltage_sag} disabled={!form.advanced_enabled} onChange={(value) => update("battery_voltage_sag", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
+                  <Field label={t("wizard.field.payloadMass")} htmlFor="mass_payload_kg" error={errors.mass_payload_kg}><input id="mass_payload_kg" type="number" min="0" max="20" step="0.1" placeholder="0–20" disabled={!form.advanced_enabled} value={form.mass_payload_kg} onChange={handleTextChange("mass_payload_kg")} /></Field>
+                  <div className="scenario-obstacle-action">
+                    <button ref={advancedScenarioTriggerRef} type="button" className="btn btn-ghost" onClick={() => setShowAdvancedScenario(true)}>{t("wizard.editObstacles")}</button>
+                  </div>
+                </div>
+              </div>
+            </section>
             {showAdvancedScenario ? (
               <div className="wizard-modal-backdrop" role="presentation" onMouseDown={(event) => {
                 if (event.target !== event.currentTarget) return;
                 setShowAdvancedScenario(false);
                 window.requestAnimationFrame(() => advancedScenarioTriggerRef.current?.focus());
               }}>
-                <section className="wizard-modal wizard-advanced-modal" role="dialog" aria-modal="true" aria-labelledby="advanced-scenario-title">
+                <section className="wizard-modal wizard-obstacle-modal" role="dialog" aria-modal="true" aria-labelledby="advanced-scenario-title">
                   <header className="wizard-modal-header">
-                    <h3 id="advanced-scenario-title">{t("wizard.advancedSettings")}</h3>
+                    <h3 id="advanced-scenario-title">{t("wizard.field.obstaclesJson")}</h3>
                     <button
                       autoFocus
                       type="button"
@@ -2272,52 +2302,9 @@ export function NewJob() {
                       <span aria-hidden="true">×</span>
                     </button>
                   </header>
-                  <div className="wizard-advanced-modal-body">
-                  <div className="scenario-capability-strip" aria-label={t("wizard.px4CapabilityTitle")}>
-                    <span className={bundledObstaclesVerified ? "is-ready" : "is-extension"}>
-                      <b aria-hidden="true">{bundledObstaclesVerified ? "✓" : "↗"}</b>
-                      {t(bundledObstaclesVerified
-                        ? "wizard.px4CapabilityObstaclesReady"
-                        : "wizard.px4CapabilityObstaclesExtension")}
-                    </span>
-                    <span className="is-extension">
-                      <b aria-hidden="true">↗</b>
-                      {t("wizard.px4CapabilityExtensions")}
-                    </span>
-                  </div>
-                  <Field
-                    label={t("wizard.scenarioPresets")}
-                    htmlFor="scenario_preset"
-                    hint={t(SCENARIO_PRESET_HINT_KEYS[form.scenario_preset])}
-                  >
-                    <select
-                      id="scenario_preset"
-                      value={form.scenario_preset}
-                      onChange={(event) => applyScenarioPreset(event.target.value as ScenarioPreset)}
-                    >
-                      {(["nominal", "wind", "sensor", "stress"] as const).map((preset) => (
-                        <option key={preset} value={preset}>
-                          {t(`wizard.scenarioPreset.${preset}` as TranslationKey)}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <div className="form-grid wizard-modal-grid">
-                    <Field label={t("wizard.field.advancedScenario")} htmlFor="advanced_enabled" hint={t(form.advanced_enabled ? "wizard.hint.advanced.enabled" : "wizard.hint.advanced.disabled")}><BooleanSelect id="advanced_enabled" value={form.advanced_enabled} onChange={(value) => update("advanced_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
-                    <Field label={t("wizard.field.gustEnabled")} htmlFor="gust_enabled" hint={t(form.gust_enabled ? "wizard.hint.gust.enabled" : "wizard.hint.gust.disabled")}><BooleanSelect id="gust_enabled" value={form.gust_enabled} onChange={(value) => update("gust_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
-                    <Field label={t("wizard.field.gustMagnitude")} htmlFor="gust_magnitude_mps" error={errors.gust_magnitude_mps} hint={t("wizard.hint.gustMagnitude")}><input id="gust_magnitude_mps" type="number" min="0" max="30" step="0.1" placeholder="0–30" value={form.gust_magnitude_mps} onChange={handleTextChange("gust_magnitude_mps")} /></Field>
-                    <Field label={t("wizard.field.gustDirection")} htmlFor="gust_direction_deg" error={errors.gust_direction_deg} hint={t("wizard.hint.gustDirection")}><input id="gust_direction_deg" type="number" min="0" max="359" step="1" placeholder="0–359" value={form.gust_direction_deg} onChange={handleTextChange("gust_direction_deg")} /></Field>
-                    <Field label={t("wizard.field.gustPeriod")} htmlFor="gust_period_s" error={errors.gust_period_s} hint={t("wizard.hint.gustPeriod")}><input id="gust_period_s" type="number" min="0" max="300" step="0.1" placeholder="0–300" value={form.gust_period_s} onChange={handleTextChange("gust_period_s")} /></Field>
-                    <Field label={t("wizard.field.gpsNoise")} htmlFor="gps_noise_m" error={errors.gps_noise_m} hint={t("wizard.hint.gpsNoise")}><input id="gps_noise_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.gps_noise_m} onChange={handleTextChange("gps_noise_m")} /></Field>
-                    <Field label={t("wizard.field.baroNoise")} htmlFor="baro_noise_m" error={errors.baro_noise_m} hint={t("wizard.hint.baroNoise")}><input id="baro_noise_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.baro_noise_m} onChange={handleTextChange("baro_noise_m")} /></Field>
-                    <Field label={t("wizard.field.imuNoiseScale")} htmlFor="imu_noise_scale" error={errors.imu_noise_scale} hint={t("wizard.hint.imuNoiseScale")}><input id="imu_noise_scale" type="number" min="0" max="10" step="0.1" placeholder="0–10" value={form.imu_noise_scale} onChange={handleTextChange("imu_noise_scale")} /></Field>
-                    <Field label={t("wizard.field.dropoutRate")} htmlFor="dropout_rate" error={errors.dropout_rate} hint={t("wizard.hint.dropoutRate")}><input id="dropout_rate" type="number" min="0" max="1" step="0.01" placeholder="0–1" value={form.dropout_rate} onChange={handleTextChange("dropout_rate")} /></Field>
-                    <Field label={t("wizard.field.batteryInitial")} htmlFor="battery_initial_percent" error={errors.battery_initial_percent} hint={t("wizard.hint.batteryInitial")}><input id="battery_initial_percent" type="number" min="0" max="100" step="1" placeholder="0–100" value={form.battery_initial_percent} onChange={handleTextChange("battery_initial_percent")} /></Field>
-                    <Field label={t("wizard.field.batteryVoltageSag")} htmlFor="battery_voltage_sag" hint={t(form.battery_voltage_sag ? "wizard.hint.batterySag.enabled" : "wizard.hint.batterySag.disabled")}><BooleanSelect id="battery_voltage_sag" value={form.battery_voltage_sag} onChange={(value) => update("battery_voltage_sag", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
-                    <Field label={t("wizard.field.payloadMass")} htmlFor="mass_payload_kg" error={errors.mass_payload_kg} hint={t("wizard.hint.payloadMass")}><input id="mass_payload_kg" type="number" min="0" max="20" step="0.1" placeholder="0–20" value={form.mass_payload_kg} onChange={handleTextChange("mass_payload_kg")} /></Field>
-                  </div>
+                  <div className="wizard-obstacle-modal-body">
                   <Field label={t("wizard.field.obstaclesJson")} htmlFor="obstacles_json" error={errors.obstacles_json} hint={t("wizard.field.obstaclesHint")}>
-                    <textarea id="obstacles_json" rows={4} value={form.obstacles_json} onChange={handleTextChange("obstacles_json")} />
+                    <textarea id="obstacles_json" rows={12} value={form.obstacles_json} onChange={handleTextChange("obstacles_json")} />
                   </Field>
                   <button type="button" className="btn btn-ghost btn-small" onClick={() => update("obstacles_json", OBSTACLES_JSON_EXAMPLE)}>{t("wizard.useObstacleExample")}</button>
                   </div>
@@ -2329,7 +2316,7 @@ export function NewJob() {
 
         <div hidden={step !== 3} className="wizard-panel">
           <SectionCard title={t("wizard.section.constraints")}>
-            <div className="form-grid">
+            <div className="form-grid constraints-grid">
               <Field label={t("wizard.field.simulatorBackend")} required htmlFor="simulator_backend" error={errors.simulator_backend} hint={t(SIMULATOR_BACKEND_HINT_KEYS[form.simulator_backend])}>
                 <select id="simulator_backend" value={form.simulator_backend} onChange={(event) => update("simulator_backend", event.target.value as SimulatorBackend)}>{SIMULATOR_BACKENDS.map((backend) => <option key={backend} value={backend}>{t(backend === "real_cli" ? "wizard.simulator.realCli" : "wizard.simulator.mock")}</option>)}</select>
               </Field>
@@ -2401,7 +2388,7 @@ export function NewJob() {
                 setShowLlmSettings(false);
                 window.requestAnimationFrame(() => llmSettingsTriggerRef.current?.focus());
               }}>
-                <section className="wizard-modal" role="dialog" aria-modal="true" aria-labelledby="llm-settings-title">
+                <section className="wizard-modal wizard-llm-modal" role="dialog" aria-modal="true" aria-labelledby="llm-settings-title">
                   <header className="wizard-modal-header">
                     <h3 id="llm-settings-title">{t("wizard.providerTitle")}</h3>
                     <button
@@ -2416,7 +2403,7 @@ export function NewJob() {
                       }}
                     >×</button>
                   </header>
-                  <div className="form-grid wizard-modal-grid">
+                  <div className="form-grid wizard-llm-modal-grid">
                     <Field label={t("wizard.field.llmProvider")} htmlFor="llm_provider"><select id="llm_provider" value={form.llm_provider} onChange={(event) => {
                       const provider = event.target.value;
                       update("llm_provider", provider);
@@ -2471,9 +2458,14 @@ export function NewJob() {
                 </div>
               </Alert>
             )}
-            <div className="review-grid">
+            <div className="review-grid review-grid-detailed">
               <ReviewBlock title={t("wizard.reviewVehicle")}><strong>{form.airframe} · {form.simulator_model}</strong><span>PX4 {form.px4_version}{form.firmware_commit ? ` @ ${form.firmware_commit}` : ""}</span><span>{t("wizard.review.vehicleWorld", { world: simulatorWorldLabel(form.simulator_world, t), display: t(form.simulator_headless ? "wizard.review.headless" : "wizard.review.gui") })}</span><span>{t("wizard.review.vehicleRuntime", { speed: form.simulation_speed_factor, instance: form.instance_id })}</span></ReviewBlock>
-              <ReviewBlock title={t("wizard.reviewSearch")}><strong>{t("wizard.review.parameterCount", { count: selectedCount })}</strong><span>{optimizerStrategyLabel(form.optimizer_strategy, t)} · {t(`wizard.aggregation.${form.robust_aggregation}` as TranslationKey)}</span></ReviewBlock>
+              <ReviewBlock title={t("wizard.reviewSearch")}>
+                <strong>{t("wizard.review.parameterCount", { count: selectedCount })}</strong>
+                <span>{t("wizard.review.modeObjective", { mode: t(`wizard.mode.${form.tuning_mode}` as TranslationKey), objective: t(`wizard.objective.${form.objective_profile}` as TranslationKey) })}</span>
+                <span>{t("wizard.review.objectiveWeights", { tracking: form.objective_weight_tracking, speed: form.objective_weight_speed, smoothness: form.objective_weight_smoothness, robustness: form.objective_weight_robustness })}</span>
+                <span>{optimizerStrategyLabel(form.optimizer_strategy, t)} · {t(`wizard.aggregation.${form.robust_aggregation}` as TranslationKey)}</span>
+              </ReviewBlock>
               <ReviewBlock title={t("wizard.reviewScenarios")}><strong>{t("wizard.review.searchCases", { cases: scenarioSearchCaseCount, seeds: searchSeedCount })}</strong><span>{t("wizard.review.holdoutCases", { cases: scenarioHoldoutCaseCount, seeds: scenarioHoldoutCaseCount > 0 ? parseSeedList(form.holdout_seeds).values.length : 0 })}</span><span>{t(form.advanced_enabled ? "wizard.review.advancedEnvironment" : "wizard.review.standardEnvironment")}</span></ReviewBlock>
               <ReviewBlock title={t("wizard.reviewBudget")}><strong>{t("wizard.review.trialLimit", { count: form.max_total_trials })}</strong><span>{t("wizard.review.scheduledPlan", { scheduled: estimatedTrials, planned: trialPlan.plannedTrials })}</span><span>{t("wizard.review.runsPerCandidate", { count: trialPlan.scenarioTrialsPerCandidate })}</span></ReviewBlock>
             </div>
@@ -2540,6 +2532,7 @@ function ReviewBlock({ title, children }: { title: string; children: ReactNode }
 interface BooleanSelectProps {
   id: string;
   value: boolean;
+  disabled?: boolean;
   onChange: (value: boolean) => void;
   trueLabel: string;
   falseLabel: string;
@@ -2548,6 +2541,7 @@ interface BooleanSelectProps {
 function BooleanSelect({
   id,
   value,
+  disabled = false,
   onChange,
   trueLabel,
   falseLabel,
@@ -2556,6 +2550,7 @@ function BooleanSelect({
     <select
       id={id}
       value={value ? "true" : "false"}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value === "true")}
     >
       <option value="true">{trueLabel}</option>
