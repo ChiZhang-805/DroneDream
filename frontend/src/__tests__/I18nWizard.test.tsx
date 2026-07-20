@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { I18nProvider } from "../i18n/I18nProvider";
 import { NewJob } from "../pages/NewJob";
+import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 
 function renderChineseWizard() {
   const queryClient = new QueryClient({
@@ -14,7 +15,9 @@ function renderChineseWizard() {
     <I18nProvider>
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <NewJob />
+          <ModelAccessProvider>
+            <NewJob />
+          </ModelAccessProvider>
         </MemoryRouter>
       </QueryClientProvider>
     </I18nProvider>,
@@ -40,6 +43,7 @@ function byId<T extends HTMLElement>(id: string): T {
 describe("Chinese experiment wizard", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
   });
 

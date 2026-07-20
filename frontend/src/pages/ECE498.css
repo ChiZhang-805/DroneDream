@@ -5,10 +5,19 @@
 }
 
 .app-body:has(.ece498-course-page) {
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell:has(.ece498-course-page) .app-sidebar {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .app-main:has(> .ece498-course-page) {
+  display: flex;
+  flex: 1 1 0;
   width: 100%;
   max-width: none;
   min-height: 0;
@@ -25,8 +34,8 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: clamp(0.5rem, 1vh, 0.8rem);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(0.58rem, 1.1vh, 0.9rem);
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -111,14 +120,13 @@
 }
 
 .ece498-course-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(430px, 0.95fr);
-  gap: clamp(0.75rem, 1.4vw, 1.25rem);
-  align-items: stretch;
+  position: relative;
+  display: block;
+  min-width: 0;
+  padding-right: clamp(7.2rem, 10vw, 9rem);
 }
 
 .ece498-course-intro {
-  align-self: center;
   min-width: 0;
   padding: 0.15rem clamp(0.15rem, 0.7vw, 0.65rem);
 }
@@ -129,7 +137,7 @@
 .ece498-applications > span {
   display: block;
   color: var(--ece498-cyan);
-  font-size: clamp(0.59rem, 0.66vw, 0.7rem);
+  font-size: clamp(0.64rem, 0.72vw, 0.76rem);
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: 0.16em;
@@ -137,25 +145,28 @@
 }
 
 .ece498-course-intro h1 {
-  max-width: 850px;
-  margin: 0.32rem 0 0.28rem;
-  font-size: clamp(1.9rem, 3vw, 3.5rem);
+  max-width: none;
+  margin: 0 0 0.4rem;
   font-weight: 820;
-  line-height: 0.98;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
+  line-height: 1;
+  letter-spacing: -0.04em;
 }
 
 .ece498-course-intro h1 > span {
   display: block;
-  margin-bottom: 0.34rem;
-  color: transparent;
-  font-size: 0.38em;
-  font-weight: 760;
-  letter-spacing: 0.24em;
-  background: linear-gradient(90deg, var(--ece498-cyan), #c7a0ff 54%, var(--ece498-pink));
-  background-clip: text;
-  -webkit-background-clip: text;
+  margin-bottom: 0.28rem;
+  color: var(--ece498-cyan);
+  font-size: clamp(0.72rem, 0.9vw, 0.92rem);
+  font-weight: 820;
+  letter-spacing: 0.2em;
+}
+
+.ece498-course-intro h1 > strong {
+  display: block;
+  color: #fff;
+  font-size: clamp(1.65rem, 3.15vw, 3.65rem);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .ece498-course-subtitle {
@@ -167,11 +178,73 @@
 }
 
 .ece498-course-summary {
-  max-width: 780px;
+  max-width: none;
   margin: 0;
-  color: #ad9cbb;
-  font-size: clamp(0.72rem, 0.84vw, 0.86rem);
-  line-height: 1.48;
+  color: #b9aabd;
+  font-size: clamp(0.84rem, 0.96vw, 1rem);
+  line-height: 1.58;
+}
+
+.ece498-hero-actions {
+  position: absolute;
+  top: 0;
+  right: 0.2rem;
+  display: flex;
+  gap: clamp(0.45rem, 0.75vw, 0.7rem);
+  align-items: center;
+}
+
+.ece498-course-link-button,
+.ece498-professor-button {
+  display: grid;
+  width: clamp(48px, 4.5vw, 62px);
+  aspect-ratio: 1;
+  place-items: center;
+  padding: 0;
+  color: var(--ece498-cyan);
+  border: 1px solid rgba(120, 233, 255, 0.38);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 32% 25%, rgba(120, 233, 255, 0.18), transparent 48%),
+    rgba(25, 8, 45, 0.82);
+  box-shadow: 0 0 24px rgba(120, 233, 255, 0.1), inset 0 1px rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.ece498-course-link-button {
+  color: var(--ece498-pink);
+  border-color: rgba(255, 119, 215, 0.38);
+  background:
+    radial-gradient(circle at 32% 25%, rgba(255, 119, 215, 0.18), transparent 48%),
+    rgba(25, 8, 45, 0.82);
+}
+
+.ece498-course-link-button svg,
+.ece498-professor-button svg {
+  width: 58%;
+  height: 58%;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.45;
+}
+
+.ece498-course-link-button:hover,
+.ece498-course-link-button:focus-visible,
+.ece498-professor-button:hover,
+.ece498-professor-button:focus-visible {
+  color: #fff;
+  border-color: rgba(255, 119, 215, 0.72);
+  background: rgba(73, 24, 91, 0.88);
+  transform: translateY(-2px);
+}
+
+.ece498-course-link-button:focus-visible,
+.ece498-professor-button:focus-visible {
+  outline: 2px solid var(--ece498-cyan);
+  outline-offset: 3px;
 }
 
 .ece498-professor-card {
@@ -313,11 +386,11 @@
 .ece498-story-dialog {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 0.9rem;
-  width: min(920px, 100%);
-  max-height: min(720px, calc(100dvh - 2rem));
-  padding: clamp(0.9rem, 2vw, 1.4rem);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(0.9rem, 1.6vh, 1.25rem);
+  width: min(1120px, 100%);
+  max-height: min(860px, calc(100dvh - 2rem));
+  padding: clamp(1rem, 2vw, 1.6rem);
   overflow: hidden;
   color: #f9f2ff;
   border: 1px solid rgba(202, 135, 255, 0.35);
@@ -331,7 +404,7 @@
 
 .ece498-story-dialog > header {
   display: flex;
-  align-items: start;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   padding-bottom: 0.7rem;
@@ -339,8 +412,8 @@
 }
 
 .ece498-story-dialog h2 {
-  margin: 0.22rem 0 0;
-  font-size: clamp(1.25rem, 2.4vw, 2rem);
+  margin: 0;
+  font-size: clamp(1.6rem, 2.7vw, 2.35rem);
   line-height: 1.08;
   text-wrap: balance;
 }
@@ -369,7 +442,7 @@
 
 .ece498-story-body {
   display: grid;
-  gap: 0.7rem;
+  gap: clamp(0.8rem, 1.45vh, 1.1rem);
   min-height: 0;
   padding-right: 0.35rem;
   overflow: auto;
@@ -379,53 +452,21 @@
 .ece498-story-body p {
   margin: 0;
   color: #c8b8d0;
-  font-size: clamp(0.78rem, 1.05vw, 0.94rem);
-  line-height: 1.65;
+  font-size: clamp(0.94rem, 1.12vw, 1.1rem);
+  line-height: 1.58;
+  text-align: justify;
+  text-align-last: left;
+  text-wrap: pretty;
+  hyphens: auto;
 }
 
 .ece498-story-body p:first-child::first-letter {
   float: left;
   margin: 0.06em 0.12em 0 0;
   color: var(--ece498-cyan);
-  font-size: 2.45em;
+  font-size: 3.25em;
   font-weight: 820;
   line-height: 0.84;
-}
-
-.ece498-story-harness {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.4rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(202, 135, 255, 0.18);
-}
-
-.ece498-story-harness > div {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
-.ece498-story-harness span {
-  display: grid;
-  min-width: 0;
-  flex: 1 1 auto;
-  min-height: 34px;
-  place-items: center;
-  color: #fff;
-  border: 1px solid rgba(120, 233, 255, 0.24);
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(96, 54, 163, 0.66), rgba(179, 55, 154, 0.42));
-  font-size: clamp(0.58rem, 0.8vw, 0.7rem);
-  font-weight: 820;
-  letter-spacing: 0.08em;
-}
-
-.ece498-story-harness i {
-  width: 1.2rem;
-  height: 1px;
-  flex: 0 0 1.2rem;
-  background: linear-gradient(90deg, var(--ece498-pink), var(--ece498-cyan));
 }
 
 .ece498-timeline-panel {
@@ -433,6 +474,7 @@
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: clamp(0.36rem, 0.75vh, 0.6rem);
   min-height: 0;
+  overflow: hidden;
   padding: clamp(0.58rem, 0.9vw, 0.78rem);
   border: 1px solid rgba(199, 137, 255, 0.17);
   border-radius: 15px;
@@ -442,15 +484,14 @@
 }
 
 .ece498-timeline-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
+  display: block;
 }
 
 .ece498-timeline-heading h2 {
-  margin: 0.15rem 0 0;
-  font-size: clamp(0.98rem, 1.45vw, 1.35rem);
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.12rem, 1.65vw, 1.55rem);
+  line-height: 1.16;
   letter-spacing: -0.02em;
 }
 
@@ -467,15 +508,15 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: clamp(0.26rem, 0.55vw, 0.55rem);
-  min-height: 93px;
+  min-height: 66px;
   padding-top: 4px;
 }
 
 .ece498-timeline-rail {
   position: absolute;
-  top: 38px;
-  right: 5.5%;
-  left: 5.5%;
+  top: 23.5px;
+  right: 7.1%;
+  left: 7.1%;
   height: 1px;
   overflow: visible;
   background: linear-gradient(90deg, rgba(120, 233, 255, 0.22), rgba(189, 130, 255, 0.28), rgba(255, 119, 215, 0.22));
@@ -507,10 +548,10 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto;
   justify-items: center;
   min-width: 0;
-  min-height: 88px;
+  min-height: 62px;
   padding: 0 0.2rem 0.18rem;
   color: #8f819c;
   border: 1px solid transparent;
@@ -526,20 +567,11 @@
   color: #fff;
   border-color: rgba(120, 233, 255, 0.2);
   background: linear-gradient(180deg, rgba(120, 233, 255, 0.09), rgba(189, 130, 255, 0.045));
-  transform: translateY(-2px);
 }
 
 .ece498-timeline-node:focus-visible {
   outline: 2px solid rgba(120, 233, 255, 0.72);
   outline-offset: 2px;
-}
-
-.ece498-node-index {
-  position: absolute;
-  top: 0.2rem;
-  right: 0.32rem;
-  color: rgba(210, 191, 225, 0.42);
-  font: 650 0.55rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .ece498-node-glyph {
@@ -579,7 +611,7 @@
 .ece498-node-code {
   margin-top: 0.32rem;
   color: currentColor;
-  font-size: clamp(0.59rem, 0.67vw, 0.7rem);
+  font-size: clamp(0.65rem, 0.74vw, 0.78rem);
   font-weight: 850;
   line-height: 1.1;
   letter-spacing: 0.08em;
@@ -606,93 +638,80 @@
 
 .ece498-stage-detail {
   display: grid;
-  grid-template-columns: minmax(245px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(0.55rem, 1vw, 0.9rem);
-  align-items: stretch;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(0.55rem, 0.9vh, 0.8rem);
+  height: 100%;
   min-height: 0;
-  padding: clamp(0.55rem, 0.85vw, 0.78rem);
+  padding: clamp(0.86rem, 1.2vw, 1.15rem);
   border: 1px solid rgba(120, 233, 255, 0.14);
-  border-radius: 12px;
+  border-radius: 2px;
   background:
     linear-gradient(100deg, rgba(120, 233, 255, 0.055), transparent 35%, rgba(255, 119, 215, 0.04)),
     rgba(20, 7, 34, 0.78);
-  animation: ece498-detail-arrive 220ms ease-out;
 }
 
-.ece498-stage-identity {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.62rem;
-  align-items: center;
-  min-width: 0;
-}
-
-.ece498-detail-glyph {
-  display: grid;
-  width: clamp(44px, 4.2vw, 56px);
-  height: clamp(44px, 4.2vw, 56px);
-  place-items: center;
-  color: var(--ece498-cyan);
-  border: 1px solid rgba(120, 233, 255, 0.34);
-  border-radius: 13px;
-  background: rgba(120, 233, 255, 0.06);
-}
-
-.ece498-detail-glyph svg {
-  width: 60%;
-  height: 60%;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-}
-
-.ece498-stage-identity h3 {
-  margin: 0.12rem 0 0.14rem;
+.ece498-stage-heading h3 {
+  margin: 0;
   color: #fff;
-  font-size: clamp(0.82rem, 1.08vw, 1.03rem);
+  font-size: clamp(1.18rem, 1.45vw, 1.48rem);
   line-height: 1.18;
 }
 
-.ece498-stage-identity strong {
-  display: block;
-  color: #c8b9cf;
-  font-size: clamp(0.62rem, 0.68vw, 0.7rem);
-  font-weight: 650;
-  line-height: 1.3;
-}
-
-.ece498-stage-copy {
-  align-self: center;
+.ece498-stage-sections {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-height: 0;
   min-width: 0;
-  padding-left: clamp(0.5rem, 0.8vw, 0.78rem);
-  border-left: 1px solid rgba(201, 158, 230, 0.13);
+  border-top: 1px solid rgba(201, 158, 230, 0.13);
 }
 
-.ece498-stage-copy > span {
-  margin-bottom: 0.25rem;
+.ece498-stage-copy-section {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(0.8rem, 1.15vw, 1.15rem);
+  border-right: 1px solid rgba(201, 158, 230, 0.13);
+}
+
+.ece498-stage-copy-section:last-child {
+  border-right: 0;
+}
+
+.ece498-stage-copy-section > span {
+  margin-bottom: clamp(0.62rem, 1vh, 0.9rem);
   color: #b891d2;
-  font-size: 0.58rem;
+  font-size: clamp(0.78rem, 0.86vw, 0.92rem);
+  font-weight: 760;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
-.ece498-stage-copy p {
+.ece498-stage-copy-section p {
   margin: 0;
-  color: #ad9fb5;
-  font-size: clamp(0.65rem, 0.73vw, 0.76rem);
-  line-height: 1.45;
+  color: #d2c4d9;
+  font-size: clamp(0.98rem, 1.08vw, 1.14rem);
+  line-height: 1.68;
+  text-align: justify;
+  text-align-last: left;
+  text-wrap: pretty;
+  hyphens: auto;
 }
 
-.ece498-stage-evidence {
-  border-left-color: rgba(255, 119, 215, 0.18);
+html[lang^="zh"] .ece498-course-summary,
+html[lang^="zh"] .ece498-stage-copy-section p {
+  text-wrap: pretty;
 }
 
-.ece498-stage-evidence > span {
+.ece498-stage-evidence > span,
+.ece498-stage-boundary > span {
   color: #e69dcc;
 }
 
 .ece498-course-footer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.42rem 1rem;
+  gap: 1rem;
   align-items: center;
   padding: 0.46rem 0.65rem;
   border: 1px solid rgba(189, 130, 255, 0.14);
@@ -807,16 +826,16 @@
 }
 
 @media (max-width: 1160px) {
-  .ece498-course-hero {
-    grid-template-columns: minmax(0, 0.9fr) minmax(390px, 1.1fr);
+  .ece498-stage-sections {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .ece498-stage-detail {
-    grid-template-columns: minmax(210px, 0.75fr) minmax(0, 1fr) minmax(0, 1fr);
+  .ece498-stage-copy-section:nth-child(2) {
+    border-right: 0;
   }
 
-  .ece498-applications b:nth-last-child(-n + 2) {
-    display: none;
+  .ece498-stage-copy-section:nth-child(n + 3) {
+    border-top: 1px solid rgba(201, 158, 230, 0.13);
   }
 }
 
@@ -859,9 +878,6 @@
     padding: 0.45rem;
   }
 
-  .ece498-course-footer {
-    padding-block: 0.34rem;
-  }
 }
 
 @media (max-width: 900px) {
@@ -871,12 +887,19 @@
     overflow: visible;
   }
 
+  .app-body:has(.ece498-course-page) {
+    height: auto;
+    overflow: visible;
+  }
+
   .app-main:has(> .ece498-course-page) {
+    display: block;
+    flex: 0 0 auto;
     overflow: visible;
   }
 
   .ece498-course-page {
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto auto;
     height: auto;
     min-height: 100%;
     overflow: visible;
@@ -902,25 +925,6 @@
     min-width: 672px;
   }
 
-  .ece498-stage-detail {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .ece498-stage-identity {
-    grid-column: 1 / -1;
-  }
-
-  .ece498-course-footer {
-    grid-template-columns: 1fr;
-  }
-
-  .ece498-course-links {
-    justify-content: flex-start;
-  }
-
-  .ece498-disclaimer {
-    text-align: left;
-  }
 }
 
 @media (max-width: 600px) {
@@ -937,32 +941,17 @@
     text-align: left;
   }
 
-  .ece498-stage-detail {
+  .ece498-stage-sections {
     grid-template-columns: 1fr;
   }
 
-  .ece498-stage-identity,
-  .ece498-stage-copy {
-    grid-column: auto;
+  .ece498-stage-copy-section,
+  .ece498-stage-copy-section:nth-child(2) {
+    border-right: 0;
   }
 
-  .ece498-stage-copy {
-    padding: 0.5rem 0 0;
+  .ece498-stage-copy-section + .ece498-stage-copy-section {
     border-top: 1px solid rgba(201, 158, 230, 0.13);
-    border-left: 0;
-  }
-
-  .ece498-applications {
-    display: block;
-  }
-
-  .ece498-applications > div {
-    margin-top: 0.35rem;
-    overflow-x: auto;
-  }
-
-  .ece498-course-links {
-    flex-wrap: wrap;
   }
 }
 

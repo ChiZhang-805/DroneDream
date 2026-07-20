@@ -3,10 +3,19 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, ApiClientError } from "../api/client";
-import type { Job, JobStatus, ObjectiveProfile, TrackType } from "../types/api";
+import type {
+  Job,
+  JobStatus,
+  ObjectiveProfile,
+  OptimizerStrategy,
+  SimulatorBackend,
+  TrackType,
+} from "../types/api";
 import {
   JOB_STATUSES,
   OBJECTIVE_PROFILES,
+  OPTIMIZER_STRATEGIES,
+  SIMULATOR_BACKENDS,
   TRACK_TYPES,
 } from "../types/api";
 import { SectionCard } from "../components/SectionCard";
@@ -36,6 +45,20 @@ const OBJECTIVE_LABELS: Record<ObjectiveProfile, TranslationKey> = {
   smooth: "wizard.objective.smooth",
   robust: "wizard.objective.robust",
   custom: "wizard.objective.custom",
+};
+
+const OPTIMIZER_LABELS: Record<OptimizerStrategy, TranslationKey> = {
+  none: "optimizer.none.label",
+  heuristic: "optimizer.heuristic.label",
+  gpt: "optimizer.gpt.label",
+  cma_es: "optimizer.cmaEs.label",
+  constrained_mobo: "optimizer.constrainedMobo.label",
+  multi_fidelity_mobo: "optimizer.multiFidelityMobo.label",
+  turbo: "optimizer.turbo.label",
+  saasbo: "optimizer.saasbo.label",
+  surrogate_cma_es: "optimizer.surrogateCmaEs.label",
+  bipop_cma_es: "optimizer.bipopCmaEs.label",
+  optimizer_portfolio: "optimizer.portfolio.label",
 };
 
 const DELETABLE_JOB_STATUSES: ReadonlySet<JobStatus> = new Set([
@@ -99,6 +122,9 @@ export function History() {
   const [objectiveFilter, setObjectiveFilter] = useState<
     ObjectiveProfile | "ALL"
   >("ALL");
+  const [queryFilter, setQueryFilter] = useState("");
+  const [backendFilter, setBackendFilter] = useState<SimulatorBackend | "ALL">("ALL");
+  const [optimizerFilter, setOptimizerFilter] = useState<OptimizerStrategy | "ALL">("ALL");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -170,13 +196,19 @@ export function History() {
 
   const allJobs = useMemo(() => query.data?.items ?? [], [query.data]);
   const filtered = useMemo(() => {
+    const normalizedQuery = queryFilter.trim().toLocaleLowerCase();
     return allJobs.filter(
       (j) =>
+        (normalizedQuery === "" || [j.display_name, j.id]
+          .filter(Boolean)
+          .some((value) => value!.toLocaleLowerCase().includes(normalizedQuery))) &&
         (statusFilter === "ALL" || j.status === statusFilter) &&
         (trackFilter === "ALL" || j.track_type === trackFilter) &&
-        (objectiveFilter === "ALL" || j.objective_profile === objectiveFilter),
+        (objectiveFilter === "ALL" || j.objective_profile === objectiveFilter) &&
+        (backendFilter === "ALL" || j.simulator_backend_requested === backendFilter) &&
+        (optimizerFilter === "ALL" || j.optimizer_strategy === optimizerFilter),
     );
-  }, [allJobs, statusFilter, trackFilter, objectiveFilter]);
+  }, [allJobs, backendFilter, objectiveFilter, optimizerFilter, queryFilter, statusFilter, trackFilter]);
   const canCompare = selectedIds.length >= 2 && selectedIds.length <= 10;
   async function confirmDelete() {
     if (!deleteTarget) return;
@@ -202,8 +234,8 @@ export function History() {
   }
 
   return (
-    <section className="stack-md">
-      <header className="page-header">
+    <section className="history-page">
+      <header className="page-header history-header">
         <div>
           <h1>{t("history.title")}</h1>
           <p className="page-header-subtitle">
@@ -233,8 +265,19 @@ export function History() {
         <RuntimeAccessNotice page="history" />
       ) : (
         <>
+      <div className="history-body">
       <SectionCard title={t("history.filters")}>
-        <div className="filter-bar">
+        <div className="history-filter-grid">
+          <div className="form-field history-filter-search">
+            <label htmlFor="filter-query">{t("history.search")}</label>
+            <input
+              id="filter-query"
+              type="search"
+              value={queryFilter}
+              placeholder={t("history.searchPlaceholder")}
+              onChange={(event) => setQueryFilter(event.target.value)}
+            />
+          </div>
           <div className="form-field">
             <label htmlFor="filter-status">{t("history.status")}</label>
             <select
@@ -286,13 +329,50 @@ export function History() {
               ))}
             </select>
           </div>
+          <div className="form-field">
+            <label htmlFor="filter-backend">{t("history.simulatorBackend")}</label>
+            <select
+              id="filter-backend"
+              value={backendFilter}
+              onChange={(event) =>
+                setBackendFilter(event.target.value as SimulatorBackend | "ALL")
+              }
+            >
+              <option value="ALL">{t("history.all")}</option>
+              {SIMULATOR_BACKENDS.map((backend) => (
+                <option key={backend} value={backend}>
+                  {t(backend === "real_cli" ? "wizard.simulator.realCli" : "wizard.simulator.mock")}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-field history-filter-optimizer">
+            <label htmlFor="filter-optimizer">{t("history.optimizerStrategy")}</label>
+            <select
+              id="filter-optimizer"
+              value={optimizerFilter}
+              onChange={(event) =>
+                setOptimizerFilter(event.target.value as OptimizerStrategy | "ALL")
+              }
+            >
+              <option value="ALL">{t("history.all")}</option>
+              {OPTIMIZER_STRATEGIES.map((strategy) => (
+                <option key={strategy} value={strategy}>
+                  {t(OPTIMIZER_LABELS[strategy])}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             type="button"
-            className="btn btn-ghost"
+            className="btn btn-ghost history-clear-filters"
             onClick={() => {
+              setQueryFilter("");
               setStatusFilter("ALL");
               setTrackFilter("ALL");
               setObjectiveFilter("ALL");
+              setBackendFilter("ALL");
+              setOptimizerFilter("ALL");
             }}
           >
             {t("history.clearFilters")}
@@ -302,7 +382,7 @@ export function History() {
 
       <SectionCard title={t("history.jobs")}>
         {saveError ? <ErrorState description={saveError} /> : null}
-        <div style={{ marginBottom: 12 }}>
+        <div className="history-jobs-toolbar">
           <button
             type="button"
             className="btn"
@@ -334,7 +414,7 @@ export function History() {
             }
           />
         ) : (
-          <div className="data-table-wrapper">
+          <div className="data-table-wrapper history-results">
           <table className="data-table history-table-centered">
             <thead>
               <tr>
@@ -398,7 +478,7 @@ export function History() {
                 </tr>
               ))}
               {filtered.length === 0 ? (
-                <tr>
+                <tr className="history-empty-row">
                   <td colSpan={columns.length + 3}>{t("history.empty")}</td>
                 </tr>
               ) : null}
@@ -407,6 +487,7 @@ export function History() {
           </div>
         )}
       </SectionCard>
+      </div>
       {deleteTarget ? (
         <div className="confirm-dialog-backdrop" role="presentation">
           <div ref={deleteDialogRef} className="confirm-dialog-card" role="dialog" aria-modal="true" aria-labelledby="delete-job-dialog-title">

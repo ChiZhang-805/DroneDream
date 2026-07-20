@@ -402,6 +402,8 @@ describe("DesktopSetup", () => {
       "href",
       "/dashboard",
     );
+    expect(screen.getByRole("progressbar", { name: "Runtime download progress" }))
+      .toHaveAttribute("aria-valuenow", "100");
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
   });
@@ -427,6 +429,10 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("dialog", { name: "Setup needs attention" }))
       .not.toBeInTheDocument();
     expect(screen.getByText("Checking system")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Runtime download progress" }))
+      .toHaveAttribute("aria-valuenow", "99");
 
     expect(await screen.findByRole("link", { name: "Open tuning workspace" }, {
       timeout: 3_000,

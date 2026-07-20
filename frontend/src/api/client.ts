@@ -2,7 +2,7 @@
 // desktop-runtime liveness checks, and the typed call surface used by pages.
 
 import { isDesktopRuntime } from "../desktop/bridge";
-import { ensureDesktopRuntimeLiveness } from "../desktop/readiness";
+import { getDesktopReadinessSession } from "../desktop/readiness";
 import type {
   ApiEnvelope,
   Artifact,
@@ -86,20 +86,11 @@ async function request<T>(
   requireRuntimeLiveness = false,
 ): Promise<T> {
   if (isDesktopRuntime() && requireRuntimeLiveness) {
-    try {
-      const readiness = await ensureDesktopRuntimeLiveness({ autoStart: true });
-      if (!readiness.ready) {
-        throw new ApiClientError(
-          "DESKTOP_RUNTIME_NOT_READY",
-          "The local DroneDream runtime is no longer ready. Open Settings and run the environment check again.",
-        );
-      }
-    } catch (error) {
-      if (error instanceof ApiClientError) throw error;
+    const readiness = getDesktopReadinessSession()?.snapshot;
+    if (!readiness?.ready) {
       throw new ApiClientError(
         "DESKTOP_RUNTIME_NOT_READY",
-        "Unable to verify the local DroneDream runtime. Open Settings and run the environment check again.",
-        error instanceof Error ? error.message : null,
+        "The local DroneDream runtime has not been approved for this session. Open Settings and click Check environment before starting an experiment.",
       );
     }
   }

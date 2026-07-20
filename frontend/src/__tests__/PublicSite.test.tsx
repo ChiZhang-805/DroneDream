@@ -40,6 +40,7 @@ describe("DroneDream public website", () => {
   it("renders a direct, versioned Windows download and the primary product sections", async () => {
     const { container } = renderSite();
 
+    expect(document.title).toBe("DroneDream");
     expect(screen.getByRole("heading", { name: /Tune with evidence/i })).toBeVisible();
     expect(screen.queryByText("LAB")).toBeNull();
     const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
@@ -55,7 +56,7 @@ describe("DroneDream public website", () => {
     expect(container.querySelector(".site-workflow-steps")).not.toHaveTextContent("01");
     expect(container.querySelectorAll(".site-phase-description")).toHaveLength(3);
     container.querySelectorAll(".site-phase-description").forEach((description) => {
-      expect(description.querySelectorAll(":scope > span")).toHaveLength(3);
+      expect(description.querySelectorAll(":scope > span")).toHaveLength(6);
     });
     expect(container.querySelectorAll(".site-release-card dl > div")).toHaveLength(4);
     expect(container.querySelector(".site-checksum")).toBeNull();
@@ -65,6 +66,14 @@ describe("DroneDream public website", () => {
     expect(container).not.toHaveTextContent("↗");
     expect(container.querySelectorAll(".site-manual-links svg")).toHaveLength(2);
     expect(container.querySelector(".site-footer a svg")).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Code signing policy" })).toHaveAttribute(
+      "href",
+      "https://github.com/ChiZhang-805/DroneDream/blob/main/CODE_SIGNING_POLICY.md",
+    );
+    expect(screen.getByRole("link", { name: "Privacy policy" })).toHaveAttribute(
+      "href",
+      "https://github.com/ChiZhang-805/DroneDream/blob/main/PRIVACY.md",
+    );
     expectContentLinksToUseIcons(container);
 
     const downloads = screen.getAllByRole("link", { name: /Download/i });
@@ -118,7 +127,7 @@ describe("DroneDream public website", () => {
     fireEvent.click(screen.getByRole("button", { name: "Switch to Simplified Chinese" }));
 
     expect(document.documentElement).toHaveAttribute("lang", "zh-CN");
-    expect(document.title).toBe("DroneDream — 无人机控制参数自动调优");
+    expect(document.title).toBe("DroneDream");
     expect(screen.getByRole("button", { name: "切换到英文" })).toBeVisible();
     expect(screen.getByRole("heading", { name: /让调优有章法/ })).toBeVisible();
     expect(screen.getByRole("heading", { name: /让飞行更加从容/ })).toBeVisible();
@@ -128,6 +137,8 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("heading", { name: "定义任务" }).closest("li")).toBe(workflowBefore);
     expect(screen.getByRole("heading", { name: "按需选择参数" }).closest("article")).toBe(capabilityBefore);
     expect(screen.getByRole("heading", { name: "安装桌面程序" }).closest("li")).toBe(manualStepBefore);
+    expect(screen.getByRole("link", { name: "代码签名政策" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "隐私政策" })).toBeVisible();
     expect(workflowBefore).toHaveClass("is-visible");
     expect(capabilityBefore).toHaveClass("is-visible");
     expect(manualStepBefore).toHaveClass("is-visible");
@@ -157,11 +168,11 @@ describe("DroneDream public website", () => {
 
   it("validates release metadata and formats binary sizes", () => {
     expect(fallbackRelease).toMatchObject({
-      version: "0.3.20",
-      fileName: "DroneDream_0.3.20_x64-setup.exe",
-      sha256: "8d67ca98c28c14c063459fca92b688e5b0299619d08a6f0de79dfaacd0ff7523",
-      sizeBytes: 5_382_483,
-      publishedAt: "2026-07-18",
+      version: "1.0.0",
+      fileName: "DroneDream_1.0.0_x64-setup.exe",
+      sha256: "af3d227610b5c2ad80b793512592f2c45e3792601bd8841ecdad236367723a1d",
+      sizeBytes: 5_752_402,
+      publishedAt: "2026-07-20",
     });
     expect(isWebsiteRelease(fallbackRelease)).toBe(true);
     expect(isWebsiteRelease({ ...fallbackRelease, sha256: "unsafe" })).toBe(false);
@@ -179,10 +190,10 @@ describe("DroneDream public website", () => {
   it("uses a valid same-origin non-downgrade release manifest for every download link", async () => {
     const nextRelease = {
       ...fallbackRelease,
-      version: "0.3.20",
-      fileName: "DroneDream_0.3.20_x64-setup.exe",
-      downloadUrl: "/downloads/DroneDream_0.3.20_x64-setup.exe",
-      checksumUrl: "/downloads/DroneDream_0.3.20_x64-setup.exe.sha256",
+      version: "1.0.1",
+      fileName: "DroneDream_1.0.1_x64-setup.exe",
+      downloadUrl: "/downloads/DroneDream_1.0.1_x64-setup.exe",
+      checksumUrl: "/downloads/DroneDream_1.0.1_x64-setup.exe.sha256",
       sha256: "a".repeat(64),
       sizeBytes: 5_400_000,
       publishedAt: "2026-07-16",

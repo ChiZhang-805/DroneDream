@@ -30,6 +30,16 @@ space on the selected NTFS disk. The installer is not yet Authenticode-signed,
 so Windows SmartScreen may show a warning; verify the published SHA-256 file
 before installing.
 
+## Code signing policy
+
+DroneDream publishes Windows artifacts only from its traceable GitHub Actions
+release workflow. See the [Code signing policy](CODE_SIGNING_POLICY.md) for
+release roles, signing order, key protection, artifact restrictions, and the
+boundary between Authenticode and the independent Tauri updater signature.
+Data storage, optional network services, and deletion behavior are documented
+in the [Privacy policy](PRIVACY.md); security reports follow
+[SECURITY.md](SECURITY.md).
+
 ---
 
 # Core Capabilities

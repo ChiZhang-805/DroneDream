@@ -5,7 +5,13 @@ on:
   pull_request:
     paths:
       - ".gitattributes"
+      - ".github/CODEOWNERS"
       - ".github/workflows/desktop-installer.yml"
+      - "CODE_SIGNING_POLICY.md"
+      - "PRIVACY.md"
+      - "README.md"
+      - "SECURITY.md"
+      - "VERSIONING.md"
       - "desktop/**"
       - "frontend/**"
       - "backend/**"
@@ -22,13 +28,16 @@ on:
       - "desktop-v*"
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
   windows-nsis:
     name: Windows x64 NSIS
     runs-on: windows-2022
-    timeout-minutes: 45
+    # Two SignPath requests require explicit release approval. Keep enough
+    # headroom for review without turning a stalled request into an endless job.
+    timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: "4"
 
@@ -39,6 +48,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify release version consistency
+        id: release-version
         shell: pwsh
         run: |
           $releaseTag = if ($env:GITHUB_REF_TYPE -eq "tag") {
@@ -47,6 +57,12 @@ jobs:
             ""
           }
           ./desktop/scripts/verify-desktop-version.ps1 -ReleaseTag $releaseTag
+          $desktopVersion = (
+            Get-Content -LiteralPath "desktop/src-tauri/tauri.conf.json" -Raw |
+              ConvertFrom-Json
+          ).version
+          "version=$desktopVersion" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
           $backendProjectVersionMatch = Select-String `
             -LiteralPath "backend/pyproject.toml" `
@@ -106,6 +122,10 @@ jobs:
             "ruff==0.15.21" "mypy==2.2.0" "pytest==9.1.1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Verify open-source release inventory
+        shell: pwsh
+        run: npm --prefix desktop run verify:release-source
+
       - name: Verify backend
         shell: pwsh
         working-directory: backend
@@ -148,16 +168,50 @@ jobs:
         shell: pwsh
         run: ./desktop/scripts/verify-nsis-template.ps1
 
-      - name: Build DroneDream setup executable
+      - name: Validate SignPath release configuration
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_APPLICATION_POLICY_SLUG: ${{ vars.SIGNPATH_APPLICATION_POLICY_SLUG }}
+          SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG }}
+          SIGNPATH_INSTALLER_POLICY_SLUG: ${{ vars.SIGNPATH_INSTALLER_POLICY_SLUG }}
+          SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG }}
+        run: |
+          $required = @(
+            "SIGNPATH_API_TOKEN",
+            "SIGNPATH_ORGANIZATION_ID",
+            "SIGNPATH_PROJECT_SLUG",
+            "SIGNPATH_APPLICATION_POLICY_SLUG",
+            "SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG",
+            "SIGNPATH_INSTALLER_POLICY_SLUG",
+            "SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG"
+          )
+          $missing = @($required | Where-Object {
+            [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          })
+          if ($missing.Count -gt 0) {
+            throw "Formal releases require accepted SignPath configuration: $($missing -join ', ')"
+          }
+
+      - name: Build DroneDream application or unsigned test installer
         shell: pwsh
         run: |
-          # Tauri downloads NSIS on the first hosted-runner build. Retry this
-          # one network-bearing step, while preserving the final native exit
-          # code so deterministic compiler or bundler failures still fail CI.
           $PSNativeCommandUseErrorActionPreference = $false
+          $releaseBuild = $env:GITHUB_REF -like "refs/tags/desktop-v*"
           $buildExitCode = 1
           foreach ($attempt in 1..3) {
-            npm --prefix desktop run build
+            if ($releaseBuild) {
+              # Sign the application before NSIS embeds it. Tauri's separate
+              # bundle command below packages these already signed bytes.
+              npm --prefix desktop run build -- --no-bundle
+            } else {
+              # Pull requests exercise the complete unsigned installer without
+              # obtaining or publishing a release signature.
+              npm --prefix desktop run build -- --config '{"bundle":{"createUpdaterArtifacts":false}}'
+            }
             $buildExitCode = $LASTEXITCODE
             if ($buildExitCode -eq 0) { break }
             if ($attempt -lt 3) {
@@ -166,6 +220,70 @@ jobs:
             }
           }
           if ($buildExitCode -ne 0) { exit $buildExitCode }
+
+      - name: Upload unsigned application for SignPath
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        id: upload-unsigned-application
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: DroneDream-unsigned-application
+          archive: false
+          if-no-files-found: error
+          retention-days: 1
+          path: desktop/src-tauri/target/release/drone-dream-desktop.exe
+
+      - name: Submit application signing request
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_APPLICATION_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-application.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: desktop/src-tauri/target/release/signpath/application
+          skip-decompress: true
+          parameters: |
+            version: "${{ steps.release-version.outputs.version }}"
+
+      - name: Install and verify signed application
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        run: |
+          $target = "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+          $signed = @(
+            Get-ChildItem `
+              -LiteralPath "desktop/src-tauri/target/release/signpath/application" `
+              -Recurse -Filter "drone-dream-desktop.exe" -File
+          )
+          if ($signed.Count -ne 1) {
+            throw "Expected exactly one signed application from SignPath, found $($signed.Count)."
+          }
+          Copy-Item -LiteralPath $signed[0].FullName -Destination $target -Force
+          $signature = Get-AuthenticodeSignature -LiteralPath $target
+          if ($signature.Status -ne "Valid") {
+            throw "Signed application failed Authenticode verification: $($signature.StatusMessage)"
+          }
+
+      - name: Bundle the signed application as NSIS
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $bundleExitCode = 1
+          foreach ($attempt in 1..3) {
+            npm --prefix desktop run tauri -- bundle --bundles nsis
+            $bundleExitCode = $LASTEXITCODE
+            if ($bundleExitCode -eq 0) { break }
+            if ($attempt -lt 3) {
+              Write-Warning "NSIS bundle attempt $attempt failed with exit code $bundleExitCode; retrying in 10 seconds"
+              Start-Sleep -Seconds 10
+            }
+          }
+          if ($bundleExitCode -ne 0) { exit $bundleExitCode }
 
       - name: Verify WebView2 installer health gate
         shell: pwsh
@@ -182,7 +300,60 @@ jobs:
           ./desktop/scripts/verify-installer-planner.ps1 `
             -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe"
 
-      - name: Write SHA-256 checksum
+      - name: Upload unsigned installer for SignPath
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        id: upload-unsigned-installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: DroneDream-unsigned-installer
+          archive: false
+          if-no-files-found: error
+          retention-days: 1
+          path: desktop/src-tauri/target/release/bundle/nsis/DroneDream_${{ steps.release-version.outputs.version }}_x64-setup.exe
+
+      - name: Submit installer signing request
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_INSTALLER_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: desktop/src-tauri/target/release/signpath/installer
+          skip-decompress: true
+          parameters: |
+            version: "${{ steps.release-version.outputs.version }}"
+
+      - name: Install and verify signed installer
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        run: |
+          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $target = Join-Path `
+            $bundleDir `
+            "DroneDream_${{ steps.release-version.outputs.version }}_x64-setup.exe"
+          $signed = @(
+            Get-ChildItem `
+              -LiteralPath "desktop/src-tauri/target/release/signpath/installer" `
+              -Recurse -Filter "DroneDream_*_x64-setup.exe" -File
+          )
+          if ($signed.Count -ne 1) {
+            throw "Expected exactly one signed installer from SignPath, found $($signed.Count)."
+          }
+          if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
+            throw "Unsigned installer target was not found at $target"
+          }
+          Copy-Item -LiteralPath $signed[0].FullName -Destination $target -Force
+          $signature = Get-AuthenticodeSignature -LiteralPath $target
+          if ($signature.Status -ne "Valid") {
+            throw "Signed installer failed Authenticode verification: $($signature.StatusMessage)"
+          }
+
+      - name: Write release inventory and SHA-256 checksum
         shell: pwsh
         run: |
           $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
@@ -195,6 +366,48 @@ jobs:
           $checksumPath = "$($installer.FullName).sha256"
           "$($hash.Hash.ToLowerInvariant())  $($installer.Name)" |
             Set-Content -Encoding ascii -LiteralPath $checksumPath
+          npm --prefix desktop run verify:release-source -- `
+            --output "$bundleDir/release-source-inventory.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify publisher signatures and write updater manifest
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $installer = Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File |
+            Select-Object -First 1
+          if (-not $installer) { throw "The signed installer was not produced." }
+          $application = "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+          foreach ($signedFile in @($application, $installer.FullName)) {
+            $authenticode = Get-AuthenticodeSignature -LiteralPath $signedFile
+            if ($authenticode.Status -ne "Valid") {
+              throw "Authenticode verification failed for ${signedFile}: $($authenticode.StatusMessage)"
+            }
+          }
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+            throw "A formal desktop tag requires TAURI_SIGNING_PRIVATE_KEY."
+          }
+          $updaterKeyPath = Join-Path $env:RUNNER_TEMP "dronedream-updater.key"
+          try {
+            [IO.File]::WriteAllText(
+              $updaterKeyPath,
+              $env:TAURI_SIGNING_PRIVATE_KEY,
+              (New-Object Text.UTF8Encoding($false))
+            )
+            $passwordArgument = "--password=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)"
+            node ./desktop/node_modules/@tauri-apps/cli/tauri.js signer sign `
+              --private-key-path $updaterKeyPath `
+              $passwordArgument `
+              $installer.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Tauri updater signing failed." }
+          } finally {
+            Remove-Item -LiteralPath $updaterKeyPath -Force -ErrorAction SilentlyContinue
+          }
+          ./desktop/scripts/write-updater-manifest.ps1 -BundleDirectory $bundleDir
 
       - name: Verify installer lifecycle and checksum
         shell: pwsh
@@ -290,6 +503,12 @@ jobs:
             $application = Join-Path $installDirFull "drone-dream-desktop.exe"
             if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
               throw "Installed application was not found at $application"
+            }
+            if ($env:GITHUB_REF -like "refs/tags/desktop-v*") {
+              $installedSignature = Get-AuthenticodeSignature -LiteralPath $application
+              if ($installedSignature.Status -ne "Valid") {
+                throw "Installed application failed Authenticode verification: $($installedSignature.StatusMessage)"
+              }
             }
             if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
               throw "NSIS uninstaller was not found at $uninstaller"
@@ -449,9 +668,12 @@ jobs:
           path: |
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sha256
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+            desktop/src-tauri/target/release/bundle/nsis/latest.json
+            desktop/src-tauri/target/release/bundle/nsis/release-source-inventory.json
 
-  publish-prerelease:
-    name: Publish Windows closed beta
+  publish-release:
+    name: Publish signed Windows release
     if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
     needs: windows-nsis
     runs-on: ubuntu-24.04
@@ -471,12 +693,22 @@ jobs:
           version="${GITHUB_REF_NAME#desktop-v}"
           installer="dist/DroneDream_${version}_x64-setup.exe"
           checksum="${installer}.sha256"
+          signature="${installer}.sig"
           test -f "$installer"
           test -f "$checksum"
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 2
+          test -f "$signature"
+          test -f "dist/latest.json"
+          test -f "dist/release-source-inventory.json"
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 5
           (cd dist && sha256sum --check "$(basename "$checksum")")
+          jq -e --arg version "$version" \
+            '.schemaVersion == 1 and .productName == "DroneDream" and .productVersion == $version and .repositoryLicense == "MIT" and .sourceCommit == env.GITHUB_SHA' \
+            dist/release-source-inventory.json >/dev/null
+          jq -e --arg version "$version" \
+            '.version == $version and .platforms["windows-x86_64"].signature != "" and (.platforms["windows-x86_64"].url | endswith("/DroneDream_" + $version + "_x64-setup.exe"))' \
+            dist/latest.json >/dev/null
 
-      - name: Publish immutable GitHub prerelease
+      - name: Publish immutable signed GitHub release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -490,11 +722,11 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title "DroneDream Desktop ${GITHUB_REF_NAME#desktop-v}" \
-            --notes "Unsigned Windows x64 closed beta. Verify the attached SHA-256 before installation; Windows SmartScreen may warn." \
+            --notes "DroneDream Windows x64 release: application and NSIS installer Authenticode-signed through SignPath Foundation, authenticated for in-app updates, and published with SHA-256 plus a source/dependency inventory." \
             --draft
           gh release upload "$GITHUB_REF_NAME" dist/* \
             --repo "$GITHUB_REPOSITORY"
           gh release edit "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --draft=false \
-            --prerelease
+            --latest

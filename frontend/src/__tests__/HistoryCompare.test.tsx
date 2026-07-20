@@ -43,6 +43,55 @@ describe("History compare selection", () => {
     expect(button).not.toBeDisabled();
   });
 
+  it("filters jobs by name, simulator, and optimizer and clears every filter", async () => {
+    vi.spyOn(apiClient, "listJobs").mockResolvedValue({
+      items: [
+        {
+          id: "job_real",
+          display_name: "Alpha flight",
+          track_type: "circle",
+          objective_profile: "robust",
+          simulator_backend_requested: "real_cli",
+          optimizer_strategy: "optimizer_portfolio",
+          status: "COMPLETED",
+          created_at: "2026-01-01",
+          updated_at: "2026-01-01",
+        },
+        {
+          id: "job_mock",
+          display_name: "Beta workflow",
+          track_type: "u_turn",
+          objective_profile: "stable",
+          simulator_backend_requested: "mock",
+          optimizer_strategy: "heuristic",
+          status: "FAILED",
+          created_at: "2026-01-02",
+          updated_at: "2026-01-02",
+        },
+      ],
+      page: 1,
+      page_size: 100,
+      total: 2,
+    } as never);
+    renderPage();
+
+    expect(await screen.findByText("job_real")).toBeVisible();
+    expect(screen.getByText("job_mock")).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText("Search"), { target: { value: "Alpha" } });
+    expect(screen.getByText("job_real")).toBeVisible();
+    expect(screen.queryByText("job_mock")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Simulator"), { target: { value: "real_cli" } });
+    fireEvent.change(screen.getByLabelText("Optimizer"), { target: { value: "optimizer_portfolio" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(screen.getByLabelText("Search")).toHaveValue("");
+    expect(screen.getByLabelText("Simulator")).toHaveValue("ALL");
+    expect(screen.getByLabelText("Optimizer")).toHaveValue("ALL");
+    expect(screen.getByText("job_mock")).toBeVisible();
+  });
+
   it("shows confirm modal and cancels deletion", async () => {
     const listSpy = vi.spyOn(apiClient, "listJobs").mockResolvedValue({
       items: [{ id: "job_1", track_type: "circle", objective_profile: "robust", status: "COMPLETED", created_at: "2026-01-01", updated_at: "2026-01-01" }],

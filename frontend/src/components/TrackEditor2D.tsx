@@ -13,7 +13,7 @@ interface TrackEditor2DProps {
   points: TrackPoint[];
   defaultAltitude: number;
   onChange: (points: TrackPoint[]) => void;
-  dataPanelFooter?: ReactNode;
+  dataPanelAction?: ReactNode;
 }
 
 type Axis = "x" | "y" | "z";
@@ -36,9 +36,17 @@ interface PlanarDragBounds {
   vertical: AxisBounds;
 }
 
-const WIDTH = 640;
-const HEIGHT = 360;
-const PADDING = 42;
+interface ThreeDimensionalGridSpec {
+  step: number;
+  x: AxisBounds;
+  y: AxisBounds;
+  xValues: number[];
+  yValues: number[];
+}
+
+const WIDTH = 560;
+const HEIGHT = 560;
+const PADDING = 52;
 const VIEW_ORDER: TrackView[] = ["xy", "xz", "yz", "3d"];
 const VIEW_AXES: Record<PlanarView, readonly [Axis, Axis]> = {
   xy: ["x", "y"],
@@ -60,6 +68,19 @@ function roundCoordinate(value: number): number {
 
 function clonePoints(points: TrackPoint[]): TrackPoint[] {
   return points.map((point) => ({ ...point }));
+}
+
+function niceGridStep(span: number): number {
+  const rawStep = Math.max(span, 1) / 9;
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+  const normalized = rawStep / magnitude;
+  const multiplier = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return multiplier * magnitude;
+}
+
+function gridValues(min: number, max: number, step: number): number[] {
+  const count = Math.round((max - min) / step);
+  return Array.from({ length: count + 1 }, (_value, index) => min + index * step);
 }
 
 function Icon({ name }: { name: "add" | "undo" | "trash" | "left" | "right" | "confirm" | "cancel" }) {
@@ -84,7 +105,7 @@ export function TrackEditor2D({
   points,
   defaultAltitude,
   onChange,
-  dataPanelFooter,
+  dataPanelAction,
 }: TrackEditor2DProps) {
   const { t } = useI18n();
   const history = useRef<TrackPoint[][]>([]);
@@ -107,7 +128,7 @@ export function TrackEditor2D({
   const [dragging, setDragging] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
-  const [rotation, setRotation] = useState({ yaw: -0.72, pitch: 0.58, zoom: 1 });
+  const [rotation, setRotation] = useState({ yaw: -0.72, pitch: 0.58, zoom: 1.22 });
 
   const bounds = useMemo<Record<Axis, AxisBounds>>(() => {
     const makeBounds = (axis: Axis): AxisBounds => {
@@ -127,15 +148,37 @@ export function TrackEditor2D({
     };
   }, [defaultAltitude, points]);
 
+  const threeDimensionalGridSpec = useMemo<ThreeDimensionalGridSpec>(() => {
+    const step = niceGridStep(Math.max(
+      bounds.x.max - bounds.x.min,
+      bounds.y.max - bounds.y.min,
+    ));
+    const x = {
+      min: Math.floor(bounds.x.min / step) * step,
+      max: Math.ceil(bounds.x.max / step) * step,
+    };
+    const y = {
+      min: Math.floor(bounds.y.min / step) * step,
+      max: Math.ceil(bounds.y.max / step) * step,
+    };
+    return {
+      step,
+      x,
+      y,
+      xValues: gridValues(x.min, x.max, step),
+      yValues: gridValues(y.min, y.max, step),
+    };
+  }, [bounds]);
+
   const threeDimensionalProjection = useMemo(() => {
     const centers: Record<Axis, number> = {
-      x: (bounds.x.min + bounds.x.max) / 2,
-      y: (bounds.y.min + bounds.y.max) / 2,
+      x: (threeDimensionalGridSpec.x.min + threeDimensionalGridSpec.x.max) / 2,
+      y: (threeDimensionalGridSpec.y.min + threeDimensionalGridSpec.y.max) / 2,
       z: (bounds.z.min + bounds.z.max) / 2,
     };
     const span = Math.max(
-      bounds.x.max - bounds.x.min,
-      bounds.y.max - bounds.y.min,
+      threeDimensionalGridSpec.x.max - threeDimensionalGridSpec.x.min,
+      threeDimensionalGridSpec.y.max - threeDimensionalGridSpec.y.min,
       bounds.z.max - bounds.z.min,
       1,
     );
@@ -157,7 +200,7 @@ export function TrackEditor2D({
         depth: rotatedY * cosPitch + z * sinPitch,
       };
     };
-  }, [bounds, rotation]);
+  }, [bounds.z.max, bounds.z.min, rotation, threeDimensionalGridSpec]);
 
   useEffect(() => {
     if (selected !== null && selected >= points.length) {
@@ -388,38 +431,49 @@ export function TrackEditor2D({
   const polyline = projected.map((point) => `${point.x},${point.y}`).join(" ");
   const planarAxes = view === "3d" ? null : VIEW_AXES[view];
   const threeDimensionalGrid = view === "3d"
-    ? Array.from({ length: 6 }, (_value, index) => {
-        const ratio = index / 5;
-        const x = bounds.x.min + ratio * (bounds.x.max - bounds.x.min);
-        const y = bounds.y.min + ratio * (bounds.y.max - bounds.y.min);
-        return {
-          xLine: [
-            threeDimensionalProjection({ x, y: bounds.y.min, z: bounds.z.min }),
-            threeDimensionalProjection({ x, y: bounds.y.max, z: bounds.z.min }),
-          ],
-          yLine: [
-            threeDimensionalProjection({ x: bounds.x.min, y, z: bounds.z.min }),
-            threeDimensionalProjection({ x: bounds.x.max, y, z: bounds.z.min }),
-          ],
-        };
-      })
-    : [];
+    ? {
+        xLines: threeDimensionalGridSpec.xValues.map((x) => [
+          threeDimensionalProjection({
+            x,
+            y: threeDimensionalGridSpec.y.min,
+            z: bounds.z.min,
+          }),
+          threeDimensionalProjection({
+            x,
+            y: threeDimensionalGridSpec.y.max,
+            z: bounds.z.min,
+          }),
+        ]),
+        yLines: threeDimensionalGridSpec.yValues.map((y) => [
+          threeDimensionalProjection({
+            x: threeDimensionalGridSpec.x.min,
+            y,
+            z: bounds.z.min,
+          }),
+          threeDimensionalProjection({
+            x: threeDimensionalGridSpec.x.max,
+            y,
+            z: bounds.z.min,
+          }),
+        ]),
+      }
+    : null;
   const threeDimensionalAxes = view === "3d"
     ? [
         {
           axis: "x" as const,
-          start: threeDimensionalProjection({ x: bounds.x.min, y: bounds.y.min, z: bounds.z.min }),
-          end: threeDimensionalProjection({ x: bounds.x.max, y: bounds.y.min, z: bounds.z.min }),
+          start: threeDimensionalProjection({ x: threeDimensionalGridSpec.x.min, y: threeDimensionalGridSpec.y.min, z: bounds.z.min }),
+          end: threeDimensionalProjection({ x: threeDimensionalGridSpec.x.max, y: threeDimensionalGridSpec.y.min, z: bounds.z.min }),
         },
         {
           axis: "y" as const,
-          start: threeDimensionalProjection({ x: bounds.x.min, y: bounds.y.min, z: bounds.z.min }),
-          end: threeDimensionalProjection({ x: bounds.x.min, y: bounds.y.max, z: bounds.z.min }),
+          start: threeDimensionalProjection({ x: threeDimensionalGridSpec.x.min, y: threeDimensionalGridSpec.y.min, z: bounds.z.min }),
+          end: threeDimensionalProjection({ x: threeDimensionalGridSpec.x.min, y: threeDimensionalGridSpec.y.max, z: bounds.z.min }),
         },
         {
           axis: "z" as const,
-          start: threeDimensionalProjection({ x: bounds.x.min, y: bounds.y.min, z: bounds.z.min }),
-          end: threeDimensionalProjection({ x: bounds.x.min, y: bounds.y.min, z: bounds.z.max }),
+          start: threeDimensionalProjection({ x: threeDimensionalGridSpec.x.min, y: threeDimensionalGridSpec.y.min, z: bounds.z.min }),
+          end: threeDimensionalProjection({ x: threeDimensionalGridSpec.x.min, y: threeDimensionalGridSpec.y.min, z: bounds.z.max }),
         },
       ]
     : [];
@@ -428,6 +482,11 @@ export function TrackEditor2D({
     <div className="track-editor" data-testid="track-editor-workspace">
       <div className="track-editor-toolbar">
         <div className="track-editor-actions">
+          {dataPanelAction ? (
+            <div className="track-editor-data-action" data-testid="track-editor-data-action">
+              {dataPanelAction}
+            </div>
+          ) : null}
           <button
             ref={addButtonRef}
             type="button"
@@ -464,29 +523,6 @@ export function TrackEditor2D({
           </button>
         </div>
 
-        <div className="track-view-switcher" role="group" aria-label={t("track.viewSwitcher")}>
-          <button
-            type="button"
-            className="track-icon-button"
-            onClick={() => changeView(-1)}
-            aria-label={t("track.previousView")}
-            title={t("track.previousView")}
-            data-tooltip={t("track.previousView")}
-          >
-            <Icon name="left" />
-          </button>
-          <span className="track-view-label" aria-live="polite">{viewLabel}</span>
-          <button
-            type="button"
-            className="track-icon-button"
-            onClick={() => changeView(1)}
-            aria-label={t("track.nextView")}
-            title={t("track.nextView")}
-            data-tooltip={t("track.nextView")}
-          >
-            <Icon name="right" />
-          </button>
-        </div>
       </div>
 
       {confirmingClear ? (
@@ -526,6 +562,29 @@ export function TrackEditor2D({
       ) : null}
 
       <div className="track-canvas-shell" data-testid="track-editor-visual-pane">
+        <div className="track-view-switcher" role="group" aria-label={t("track.viewSwitcher")}>
+          <button
+            type="button"
+            className="track-icon-button"
+            onClick={() => changeView(-1)}
+            aria-label={t("track.previousView")}
+            title={t("track.previousView")}
+            data-tooltip={t("track.previousView")}
+          >
+            <Icon name="left" />
+          </button>
+          <span className="track-view-label" aria-live="polite">{viewLabel}</span>
+          <button
+            type="button"
+            className="track-icon-button"
+            onClick={() => changeView(1)}
+            aria-label={t("track.nextView")}
+            title={t("track.nextView")}
+            data-tooltip={t("track.nextView")}
+          >
+            <Icon name="right" />
+          </button>
+        </div>
         <svg
           className={`track-editor-canvas ${view === "3d" ? "track-editor-canvas-3d" : ""}`}
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -556,23 +615,27 @@ export function TrackEditor2D({
 
           {view === "3d" ? (
             <g aria-hidden="true">
-              {threeDimensionalGrid.map((lines, index) => (
-                <g key={index}>
-                  <line
-                    x1={lines.xLine[0].x}
-                    y1={lines.xLine[0].y}
-                    x2={lines.xLine[1].x}
-                    y2={lines.xLine[1].y}
-                    className="track-3d-grid-line"
-                  />
-                  <line
-                    x1={lines.yLine[0].x}
-                    y1={lines.yLine[0].y}
-                    x2={lines.yLine[1].x}
-                    y2={lines.yLine[1].y}
-                    className="track-3d-grid-line"
-                  />
-                </g>
+              {threeDimensionalGrid?.xLines.map((line, index) => (
+                <line
+                  key={`x-${index}`}
+                  data-grid-axis="x"
+                  x1={line[0].x}
+                  y1={line[0].y}
+                  x2={line[1].x}
+                  y2={line[1].y}
+                  className="track-3d-grid-line"
+                />
+              ))}
+              {threeDimensionalGrid?.yLines.map((line, index) => (
+                <line
+                  key={`y-${index}`}
+                  data-grid-axis="y"
+                  x1={line[0].x}
+                  y1={line[0].y}
+                  x2={line[1].x}
+                  y2={line[1].y}
+                  className="track-3d-grid-line"
+                />
               ))}
               {threeDimensionalAxes.map((axis) => (
                 <g key={axis.axis} className={`track-3d-axis track-3d-axis-${axis.axis}`}>
@@ -709,11 +772,6 @@ export function TrackEditor2D({
           </tbody>
         </table>
       </div>
-      {dataPanelFooter ? (
-        <div className="track-editor-data-footer" data-testid="track-editor-data-footer">
-          {dataPanelFooter}
-        </div>
-      ) : null}
     </div>
   );
 }

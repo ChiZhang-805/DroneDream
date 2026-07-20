@@ -384,13 +384,14 @@ try {
     $forbiddenNeedle = if ($Language -eq "English") { $zhInstallContent } else { "Choose what to install" }
     $completionNeedle = if ($Language -eq "English") { "Installation Complete" } else { $zhInstallationComplete }
     $dismissedPlannerDialogs = @{}
+    $script:DroneDreamUnexpectedPlannerDialog = ""
     Write-Host "UI verify: waiting for Runtime selection page"
     $runtimePage = Wait-InstallerWindow -Process $process -TimeoutSeconds 90 -Condition {
         param($handle, $title, $body)
-        # A failed or blocked prerequisite probe intentionally presents one
-        # localized warning before showing the usable app-only selection page.
-        # Treat that expected modal as part of the fresh-install walkthrough;
-        # otherwise NSIS keeps the newly-created controls hidden behind it.
+        # Runtime preflight failures must render the usable app-only selection
+        # page directly. A modal here recreates the first-run interruption this
+        # verifier is meant to prevent. Dismiss it only so the test can inspect
+        # the resulting page, then fail below with the captured text.
         foreach ($installerProcessId in Get-InstallerFamilyProcessIds -RootProcessId $process.Id) {
             foreach ($window in [DroneDreamInstallerUi]::TopLevelWindows([uint32]$installerProcessId)) {
                 $windowKey = $window.ToInt64().ToString()
@@ -403,8 +404,9 @@ try {
                     -not $candidateBody.Contains("Nullsoft Install System") -and
                     -not [string]::IsNullOrWhiteSpace($candidateBody)) {
                     $dismissedPlannerDialogs[$windowKey] = $true
+                    $script:DroneDreamUnexpectedPlannerDialog = $candidateBody
                     Invoke-DialogButton -Dialog $window -ControlId 1
-                    Write-Host "UI verify: acknowledged localized Runtime preflight notice"
+                    Write-Host "UI verify: dismissed unexpected Runtime preflight dialog"
                 }
             }
         }
@@ -418,6 +420,9 @@ try {
     if ($maintenanceFlow -and $runtimePage.Body.Contains($completionNeedle)) {
         Write-Host "Interactive installer upgrade verified: language=$Language app=$ExpectedApplication"
         return
+    }
+    if (-not [string]::IsNullOrWhiteSpace($script:DroneDreamUnexpectedPlannerDialog)) {
+        throw "Runtime preflight opened an unexpected modal dialog: $script:DroneDreamUnexpectedPlannerDialog"
     }
     if (-not $runtimePage.Body.Contains($fullNeedle)) {
         throw "The full-install option was not rendered in $Language. Controls='$($runtimePage.Body)'"

@@ -190,6 +190,7 @@ if ($checksumLine -notmatch (
     throw "The published installer checksum file is inconsistent."
 }
 Test-SiteIntegrityManifest -SiteDirectory $siteDirectory -ManifestPath $manifestPath
+Write-Host "Verified local website release manifest for DroneDream $version."
 
 $publicConfigText = Get-Content -LiteralPath $publicConfig -Raw -Encoding UTF8
 $serverNamePattern = '(?m)^\s*server_name\s+' +
@@ -223,6 +224,7 @@ try {
     )
     $archiveSha256 = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).
         Hash.ToLowerInvariant()
+    Write-Host "Packed the website release archive."
 
     $prepareRemoteArguments = @()
     $prepareRemoteArguments += $sshOptions
@@ -231,6 +233,7 @@ try {
     Invoke-NativeCommand -CommandPath $sshPath `
         -CommandArguments $prepareRemoteArguments
     $remoteDirectoryCreated = $true
+    Write-Host "Prepared the remote deployment staging directory."
 
     foreach ($uploadPath in @(
             $archivePath,
@@ -243,6 +246,7 @@ try {
         $scpArguments += $uploadPath
         $scpArguments += "${Remote}:$remoteDirectory/"
         Invoke-NativeCommand -CommandPath $scpPath -CommandArguments $scpArguments
+        Write-Host "Uploaded $([IO.Path]::GetFileName($uploadPath))."
     }
 
     $remoteDeployCommand = @(
@@ -256,6 +260,7 @@ try {
     $deployArguments += $Remote
     $deployArguments += $remoteDeployCommand
     Invoke-NativeCommand -CommandPath $sshPath -CommandArguments $deployArguments
+    Write-Host "Activated the remote release; starting public verification."
 
     $publicBase = $publicUri.GetLeftPart([UriPartial]::Authority).TrimEnd('/')
     $homeResponse = Invoke-WebRequest -Uri "$publicBase/" -UseBasicParsing `
@@ -271,6 +276,29 @@ try {
     if ([string]$publicMetadata.version -ne $version -or
         ([string]$publicMetadata.sha256).ToLowerInvariant() -ne $installerSha256) {
         throw "The public release metadata does not match the deployed release."
+    }
+
+    # Treat the public download path as part of the release, not as a separate
+    # best-effort upload. A cache-busting query also verifies that Nginx applies
+    # its download rules by normalized URI rather than accidentally falling
+    # back to the generic cache policy when a query string is present.
+    $publicInstallerPath = Join-Path $temporaryRoot 'public-installer.exe'
+    $publicInstallerUri = "$publicBase$([string]$publicMetadata.downloadUrl)" +
+        "?sha256=$installerSha256"
+    $publicInstallerResponse = Invoke-WebRequest -Uri $publicInstallerUri `
+        -UseBasicParsing -OutFile $publicInstallerPath -PassThru -TimeoutSec 120
+    $publicInstallerCacheControl = Get-ResponseHeader `
+        -Response $publicInstallerResponse -Name 'Cache-Control'
+    $publicInstallerDisposition = Get-ResponseHeader `
+        -Response $publicInstallerResponse -Name 'Content-Disposition'
+    $publicInstaller = Get-Item -LiteralPath $publicInstallerPath
+    $publicInstallerSha256 = (Get-FileHash -LiteralPath $publicInstallerPath `
+        -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($publicInstaller.Length -ne $installer.Length -or
+        $publicInstallerSha256 -ne $installerSha256 -or
+        $publicInstallerCacheControl -notmatch '(?i)(?:^|,)\s*no-cache(?:,|$)' -or
+        $publicInstallerDisposition -notmatch '(?i)^attachment(?:;|$)') {
+        throw "The public installer re-download did not match the local release or download policy."
     }
 
     $assetMatches = [regex]::Matches(
@@ -296,6 +324,7 @@ try {
 
     Write-Host "Deployed DroneDream $version to $publicBase"
     Write-Host "Installer SHA-256: $installerSha256"
+    Write-Host "Verified the public installer by re-downloading and hashing it."
 } finally {
     if ($remoteDirectoryCreated) {
         try {

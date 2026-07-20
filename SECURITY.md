@@ -1,5 +1,10 @@
 # Security policy
 
+Release signatures follow the repository's
+[Code signing policy](CODE_SIGNING_POLICY.md). Local data, optional network
+connections, third-party providers, and deletion behavior are documented in
+the [Privacy policy](PRIVACY.md).
+
 ## Supported releases
 
 DroneDream is currently a development preview. Security fixes are applied to
@@ -44,5 +49,6 @@ selection or configuration value alone is not proof of a simulated effect.
 - Keep authentication enabled on every network-accessible deployment.
 - Verify installer and Runtime SHA-256 values; use signed release manifests
   when publishing Runtime images. Runtime Ed25519 signatures do not sign the
-  Windows executable. The current `0.3.20` NSIS preview is not
-  Authenticode-signed and must not be presented as a trusted-publisher release.
+  Windows executable. The `1.0.0` release candidate must not be presented as a
+  trusted-publisher release until the exact NSIS bytes pass Authenticode
+  verification.

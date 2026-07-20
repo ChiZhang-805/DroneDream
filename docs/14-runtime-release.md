@@ -2,8 +2,12 @@
 
 The detached Ed25519 signature in this document authenticates the Runtime
 manifest and payload parts. It is not Windows Authenticode signing and does not
-establish a Windows publisher identity for the NSIS executable. The current
-`0.3.20` preview installer remains unsigned and can trigger SmartScreen.
+establish a Windows publisher identity for the NSIS executable. Version `1.0.0`
+is the fixed formal-version target. Pull-request and manually dispatched
+installers remain unsigned test candidates. Formal tags enter the SignPath
+Foundation release path, which signs the application before NSIS packaging,
+signs the completed installer, and requires both publisher signatures to pass
+independent verification before publication.
 
 The Windows installer downloads a dedicated WSL2 distribution; it never
 moves, upgrades, or unregisters an existing Ubuntu distribution. A user may
@@ -53,10 +57,11 @@ path. Desktop uninstall removes neither the dedicated WSL
 distribution nor its `X:\DroneDream` root/cache. It also never modifies or
 reuses an existing Ubuntu distribution.
 
-This behavior does not remove the current release boundary: the desktop NSIS
-installer is unsigned and can trigger Windows SmartScreen. Treat it as a
-closed-beta package until code signing and the full clean-machine journey are
-verified.
+This behavior does not remove the release boundary: an unsigned desktop NSIS
+candidate can trigger Windows SmartScreen and is never a formal release.
+Publish `1.0.0` only after the two SignPath signing requests, Authenticode
+checks, updater signature, release-source inventory, and full clean-machine
+journey all pass for the exact immutable installer bytes.
 
 ## Runtime failure diagnostics and retention
 
@@ -287,7 +292,8 @@ clean supported machines with the exact published assets:
    no automatic Runtime import and with the existing Runtime preserved;
 7. a machine that already has a personal Ubuntu distribution, proving it is
    unchanged throughout the flow;
-8. unsigned SmartScreen tester instructions until Authenticode signing exists.
+8. publisher identity and timestamp inspection for both the installed
+   application and the exact released NSIS installer.
 
 Record installer version, runtime release tag/build ID, Windows build, selected
 drive, WSL state before/after, and final PX4/Gazebo readiness for each run. Do

@@ -129,18 +129,18 @@ afterEach(() => {
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "Run History" }))
       .not.toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "ECE498" }))
+    expect(screen.getByRole("link", { name: "ECE498BH" }))
       .not.toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "Experiment" }))
-      .toHaveClass("runtime-locked");
+    expect(screen.queryByRole("link", { name: "Experiment" }))
+      .not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "New Batch" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
-      .querySelectorAll("a")).toHaveLength(4);
+      .querySelectorAll("a")).toHaveLength(3);
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
-      .toHaveLength(1);
+      .toHaveLength(0);
 
     await act(async () => {
       await router.navigate("/history");
@@ -154,7 +154,7 @@ afterEach(() => {
     queryClient.clear();
   });
 
-  it("starts an owned stopped runtime once across route changes and unlocks the platform", async () => {
+  it("starts an owned stopped runtime only after the explicit settings check", async () => {
     let resolveStart: (value: typeof readyRuntime) => void = () => undefined;
     const pendingStart = new Promise<typeof readyRuntime>((resolve) => {
       resolveStart = resolve;
@@ -194,25 +194,37 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Starting the local runtime")).toBeInTheDocument();
+    expect(await screen.findByText("Runtime data is not available yet")).toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(invoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+    await waitFor(() => {
+      expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+        .toHaveLength(1);
+    });
     await act(async () => {
       await router.navigate("/history");
     });
-    expect(await screen.findByText("Starting the local runtime")).toBeInTheDocument();
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(1);
 
     resolveStart(readyRuntime);
     await waitFor(() => expect(listJobs).toHaveBeenCalled());
     expect(screen.queryByText("Starting the local runtime")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Experiment" }))
-      .not.toHaveClass("runtime-locked");
+    await act(async () => {
+      await router.navigate("/dashboard");
+    });
+    expect(await screen.findByRole("link", { name: "+ New experiment" }))
+      .toHaveAttribute("href", "/jobs/new");
+    expect(screen.queryByRole("link", { name: "Experiment" }))
+      .not.toBeInTheDocument();
 
     router.dispose();
     queryClient.clear();
   });
 
-  it("shows one actionable failure when automatic start fails", async () => {
+  it("shows one actionable failure when a manually requested start fails", async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return autoStartableRuntime;
@@ -242,6 +254,12 @@ afterEach(() => {
       </I18nProvider>,
     );
 
+    expect(await screen.findByText("Runtime data is not available yet"))
+      .toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(invoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
     expect(await screen.findByText("The local runtime could not start"))
       .toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Open settings" }).length)
@@ -290,7 +308,7 @@ afterEach(() => {
     router.dispose();
   });
 
-  it("reuses the startup result across navigation and rechecks only on demand", async () => {
+  it("never checks on workspace entry, navigation, settings open, or locale changes", async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return readyRuntime;
@@ -315,25 +333,27 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    await waitFor(() => {
-      expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
-        .toHaveLength(1);
-    });
+    expect(invoke).not.toHaveBeenCalled();
     await act(async () => {
       await router.navigate("/history?view=recent");
     });
     expect(screen.getByText("History placeholder")).toBeInTheDocument();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
-      .toHaveLength(1);
+      .toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(invoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "简体中文" }));
+    expect(invoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "English" }));
+    expect(invoke).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
-        .toHaveLength(2);
+        .toHaveLength(1);
     });
     expect(invoke.mock.calls.filter(([command]) => command === "probe_system_prerequisites"))
-      .toHaveLength(2);
+      .toHaveLength(1);
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(1);
     await waitFor(() => {

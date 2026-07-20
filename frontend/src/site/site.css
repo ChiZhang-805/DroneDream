@@ -100,7 +100,7 @@ body:has(#site-root) a {
   gap: 0.82rem;
   color: #fff;
   font-family: "Space Grotesk Variable", "Space Grotesk", Inter, "Segoe UI", sans-serif;
-  font-size: 2.35rem;
+  font-size: 2.22rem;
   font-weight: 720;
   letter-spacing: -0.05em;
   line-height: 1;
@@ -274,6 +274,10 @@ body:has(#site-root) a {
   line-height: 0.98;
 }
 
+html[lang="zh-CN"] .site-hero h1 {
+  letter-spacing: -0.015em;
+}
+
 .site-hero-line {
   display: block;
   white-space: nowrap;
@@ -399,8 +403,9 @@ body:has(#site-root) a {
   align-items: center;
   flex-direction: column;
   gap: 0.58rem;
-  color: rgba(238, 240, 250, 0.68);
-  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.78rem;
+  font-weight: 650;
   letter-spacing: 0.13em;
   text-decoration: none;
   text-transform: uppercase;
@@ -456,17 +461,17 @@ body:has(#site-root) a {
 }
 
 .site-demo-copy { display: flex; flex-direction: column; padding: 1.7rem; border-right: 1px solid rgba(32, 43, 75, 0.09); background: linear-gradient(155deg, #fff, #f7f8fd); }
-.site-phase-tabs { display: grid; gap: 0.3rem; }
-.site-phase-tabs button { position: relative; display: flex; align-items: center; gap: 0.7rem; width: 100%; padding: 0.82rem 0.85rem; overflow: hidden; border: 0; border-radius: 10px; color: #7a8093; background: transparent; font-size: 0.74rem; font-weight: 700; text-align: left; cursor: pointer; }
+.site-phase-tabs { display: grid; gap: 0.55rem; }
+.site-phase-tabs button { position: relative; display: flex; align-items: center; gap: 0.7rem; width: 100%; padding: 1rem 0.95rem; overflow: hidden; border: 0; border-radius: 12px; color: #7a8093; background: transparent; font-size: 0.86rem; font-weight: 760; text-align: left; cursor: pointer; }
 .site-phase-tabs button i { position: absolute; right: 10px; bottom: 5px; left: 10px; height: 2px; overflow: hidden; border-radius: 99px; background: rgba(29, 35, 60, 0.07); }
 .site-phase-tabs button i::after { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--site-cyan), var(--site-violet)); content: ""; }
 .site-phase-tabs button.is-active { color: #292d43; background: #eef1fa; }
 .site-phase-tabs button.is-active i::after { width: 100%; }
 .site-phase-copy { display: flex; justify-content: center; flex: 1; flex-direction: column; padding: 2rem 0.8rem 1rem; }
 .site-phase-copy[hidden] { display: none; }
-.site-phase-copy > span { color: #6d68db; font-family: ui-monospace, monospace; font-size: 0.67rem; font-weight: 700; letter-spacing: 0.12em; }
+.site-phase-copy > span { color: #6d68db; font-family: ui-monospace, monospace; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; }
 .site-phase-copy h3 { margin: 0.75rem 0 0; color: #1b1f31; font-size: clamp(1.45rem, 1.8vw, 1.9rem); letter-spacing: -0.045em; line-height: 1.12; white-space: nowrap; }
-.site-phase-copy p { margin: 1rem 0 0; color: #72798c; font-size: 0.81rem; line-height: 1.7; }
+.site-phase-copy p { margin: 1.05rem 0 0; color: #72798c; font-size: 0.84rem; line-height: 1.63; }
 .site-phase-description span { display: block; white-space: nowrap; }
 
 .site-demo-visual { position: relative; min-width: 0; padding: 1.2rem; overflow: hidden; color: #f4f6ff; background: radial-gradient(circle at 80% 15%, rgba(154, 86, 223, 0.29), transparent 32%), linear-gradient(145deg, #0b1022, #15112b 58%, #25102f); }
@@ -681,6 +686,8 @@ body:has(#site-root) a {
 .site-footer p, .site-footer span { margin: 0; font-size: .68rem; }
 .site-footer a { display: inline-flex; align-items: center; gap: .45rem; color: #bfc8ff; font-size: .7rem; text-decoration: none; }
 .site-footer a svg { width: 20px; height: 20px; fill: currentColor; }
+.site-footer-policy-links { display: flex; align-items: center; gap: 1rem; }
+.site-footer-policy-links a { white-space: nowrap; }
 
 .dd-site a:focus-visible,
 .dd-site button:focus-visible,
@@ -984,7 +991,8 @@ body:has(#site-root) a {
   .site-manual-dialog-body { padding: .7rem 1.35rem 1.35rem; }
   .site-manual-dialog-body article { grid-template-columns: 1fr; gap: .7rem; }
   .site-footer .site-shell { grid-template-columns: 1fr auto; }
-  .site-footer p, .site-footer span { grid-column: 1 / -1; }
+  .site-footer p { grid-column: 1 / -1; }
+  .site-footer-policy-links { grid-column: 1 / -1; }
 }
 
 @media (max-width: 520px) {

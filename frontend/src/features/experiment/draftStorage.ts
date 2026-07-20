@@ -20,12 +20,32 @@ export interface ExperimentDraftSchema<TForm, TSelections> {
   normalizeSelections: (value: unknown) => TSelections | null;
 }
 
-function safeStorage(): Storage | null {
+function safeDraftStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function safePersistentStorage(): Storage | null {
   if (typeof window === "undefined") return null;
   try {
     return window.localStorage;
   } catch {
     return null;
+  }
+}
+
+function discardPersistedDrafts(): void {
+  const storage = safePersistentStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(EXPERIMENT_DRAFT_KEY);
+    storage.removeItem(LEGACY_EXPERIMENT_DRAFT_KEY);
+  } catch {
+    // A denied persistent store must not block the current app session.
   }
 }
 
@@ -104,7 +124,8 @@ export function loadExperimentDraft<TForm, TSelections>(
 ):
   | ExperimentDraftEnvelope<TForm, TSelections>
   | null {
-  const storage = safeStorage();
+  discardPersistedDrafts();
+  const storage = safeDraftStorage();
   if (!storage) return null;
   try {
     const currentRaw = storage.getItem(EXPERIMENT_DRAFT_KEY);
@@ -148,7 +169,8 @@ export function loadExperimentDraft<TForm, TSelections>(
 export function saveExperimentDraft<TForm, TSelections>(
   envelope: Omit<ExperimentDraftEnvelope<TForm, TSelections>, "schema_version" | "saved_at">,
 ): string | null {
-  const storage = safeStorage();
+  discardPersistedDrafts();
+  const storage = safeDraftStorage();
   if (!storage) return null;
   const savedAt = new Date().toISOString();
   try {
@@ -173,17 +195,25 @@ export function saveExperimentDraft<TForm, TSelections>(
 }
 
 export function clearExperimentDraft(): void {
-  const storage = safeStorage();
-  if (!storage) return;
-  try {
-    storage.removeItem(EXPERIMENT_DRAFT_KEY);
-  } catch {
-    // Optional draft storage must not block resetting or creating a job.
+  for (const storage of [safeDraftStorage(), safePersistentStorage()]) {
+    if (!storage) continue;
+    try {
+      storage.removeItem(EXPERIMENT_DRAFT_KEY);
+      storage.removeItem(LEGACY_EXPERIMENT_DRAFT_KEY);
+    } catch {
+      // Optional draft storage must not block resetting or creating a job.
+    }
   }
+}
+
+export function hasExperimentDraft(): boolean {
+  const storage = safeDraftStorage();
+  if (!storage) return false;
   try {
-    storage.removeItem(LEGACY_EXPERIMENT_DRAFT_KEY);
+    return storage.getItem(EXPERIMENT_DRAFT_KEY) !== null ||
+      storage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY) !== null;
   } catch {
-    // Optional draft storage must not block resetting or creating a job.
+    return false;
   }
 }
 
@@ -191,7 +221,7 @@ export function persistStudyForJob(
   jobId: string,
   study: ExperimentStudyConfig,
 ): void {
-  const storage = safeStorage();
+  const storage = safePersistentStorage();
   if (!storage) return;
   try {
     storage.setItem(

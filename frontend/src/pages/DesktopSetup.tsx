@@ -277,7 +277,8 @@ function runtimeHealthFailureCopy(code: string | undefined): LauncherFailureCopy
 export function DesktopSetup() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
-  const { refresh: refreshRuntimeAccess } = useDesktopRuntimeAccess();
+  const runtimeAccess = useDesktopRuntimeAccess();
+  const { refresh: refreshRuntimeAccess } = runtimeAccess;
   const desktopAvailable = isDesktopRuntime();
   const requestId = useRef(0);
   const installerIntentPromise = useRef<Promise<InstallerRuntimeIntent> | null>(null);
@@ -329,6 +330,18 @@ export function DesktopSetup() {
     state.prerequisitesFresh &&
     state.runtimeFresh &&
     isOverallDesktopReady(state.prerequisites, state.runtime);
+  const workspaceReady =
+    localRuntimeReady &&
+    !state.loading &&
+    !installerHandoffState.checking &&
+    (!runtimeAccess.desktopRuntime ||
+      (runtimeAccess.status === "ready" && !runtimeAccess.isChecking));
+  const workspaceChecking =
+    state.loading ||
+    installerHandoffState.checking ||
+    runtimeAccess.isChecking ||
+    runtimeAccess.status === "checking" ||
+    runtimeAccess.status === "starting";
   const installerHandoffNeedsAttention = Boolean(
     installerHandoffState.commandError ||
     installerHandoffState.autoStartUncertain ||
@@ -1153,14 +1166,14 @@ export function DesktopSetup() {
       >
         <RuntimeLauncherHero
           snapshot={installState.snapshot}
-          ready={localRuntimeReady}
-          checking={state.loading || installerHandoffState.checking}
+          ready={workspaceReady}
+          checking={workspaceChecking}
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
           onCancel={() => void cancelInstall()}
         />
 
-        {localRuntimeReady ? (
+        {workspaceReady ? (
           <div className="launcher-ready-actions">
             <Link to="/dashboard" className="btn btn-primary launcher-primary-action">
               {t("launcher.openWorkspace")}
@@ -1216,7 +1229,7 @@ export function DesktopSetup() {
           </>
         )}
 
-        {requestedFeatureLabel && !localRuntimeReady ? (
+        {requestedFeatureLabel && !workspaceReady ? (
           <span className="sr-only">
             {t("runtimeGate.requestedFeature")}: {requestedFeatureLabel}
           </span>
@@ -2277,7 +2290,13 @@ function RuntimeLauncherHero({
   const total = snapshot?.bytesTotal ?? null;
   const downloaded = snapshot?.bytesDownloaded ?? 0;
   const measuredPercent = runtimeInstallPercent(downloaded, total);
-  const percent = measuredPercent ?? (ready || phase === "completed" ? 100 : null);
+  const percent = ready
+    ? 100
+    : measuredPercent !== null
+      ? Math.min(measuredPercent, 99)
+      : checking || automaticStartPending || phase === "completed"
+        ? 99
+        : null;
   const status = ready
     ? t("launcher.status.ready")
     : commandBusy && active

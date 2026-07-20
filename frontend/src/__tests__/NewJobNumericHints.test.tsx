@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { I18nProvider } from "../i18n/I18nProvider";
 import { NewJob } from "../pages/NewJob";
+import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 
 function renderWizard(locale: "en" | "zh-CN") {
   window.localStorage.setItem("drone-dream:locale", locale);
@@ -15,7 +16,9 @@ function renderWizard(locale: "en" | "zh-CN") {
     <I18nProvider>
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <NewJob />
+          <ModelAccessProvider>
+            <NewJob />
+          </ModelAccessProvider>
         </MemoryRouter>
       </QueryClientProvider>
     </I18nProvider>,
@@ -43,6 +46,7 @@ function advance(count: number): void {
 describe("NewJob compact numeric range guidance", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it("removes the single-option vehicle selector and puts ranges in controls", () => {

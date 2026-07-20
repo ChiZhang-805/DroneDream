@@ -1,6 +1,6 @@
 # DroneDream Desktop
 
-This directory builds the `0.3.20` Windows development-preview installer and a
+This directory builds the `1.0.0` Windows installer and a
 Tauri 2 shell around the existing React/Vite application
 in `../frontend`. It does not copy or fork the business UI, and the normal web
 commands under `frontend/` continue to work unchanged.
@@ -133,9 +133,12 @@ converts, terminates, or unregisters a user's existing Ubuntu distribution or
 bundles personal files.
 
 The Runtime's detached Ed25519 manifest signature authenticates the Runtime
-payload; it is separate from Windows Authenticode. The preview NSIS installer
-is still not Authenticode-signed. Windows may show a SmartScreen
-warning, so it must not be advertised as a production release. The
+payload; it is separate from Windows Authenticode. Formal `1.0.0` tags use
+SignPath Foundation to sign the application executable before NSIS packaging
+and then sign the completed installer. The workflow refuses to publish until
+both files report `Valid` through `Get-AuthenticodeSignature`. Pull-request and
+manual workflow artifacts remain unsigned test candidates and can still
+trigger SmartScreen. The
 NSIS package embeds Microsoft's official Evergreen WebView2 bootstrapper. It
 verifies both registration and the real runtime executable; a stale registry
 entry triggers a best-effort Microsoft repair/install attempt before DroneDream
@@ -234,11 +237,16 @@ written below `src-tauri/target/release/bundle/nsis`; the LLVM fallback uses
 
 The LLVM fallback also verifies the pinned NSIS template and the generated
 WebView2 health gate, then rewrites the SHA-256 file for the exact configured
-desktop version. Pull requests and manual desktop workflow runs retain the
-verified installer as a 14-day Actions artifact. Pushing an immutable
-`desktop-v<version>` tag whose version exactly matches the Tauri, npm, and Cargo
-metadata publishes those same two verified files as an unsigned GitHub
-prerelease; an existing release is never overwritten.
+desktop version. Pull requests and manual desktop workflow runs retain an
+unsigned verified installer as a 14-day Actions artifact for testing only.
+Pushing an immutable `desktop-v<version>` tag whose version exactly matches the
+Tauri, npm, and Cargo metadata starts the protected release path: SignPath
+manually approves and signs the application, NSIS packages those signed bytes,
+SignPath manually approves and signs the installer, and CI verifies both
+publisher signatures before creating the updater signature, checksum, source
+inventory, and immutable GitHub Release. An existing release is never
+overwritten. See `../CODE_SIGNING_POLICY.md` and
+`../docs/signpath-foundation-application.md` for the policy and configuration.
 
 For this 16 GB development machine, keep `CARGO_BUILD_JOBS=4` and never compile
 PX4 while a Gazebo GUI simulation is running. The initial beta runtime target is

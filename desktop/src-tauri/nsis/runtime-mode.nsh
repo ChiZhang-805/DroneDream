@@ -415,6 +415,12 @@ Var DroneDreamValidatePathOnly
     Push ""
     Call DroneDreamRunPlanner
     Pop $DroneDreamPlanCanInstall
+    ${If} $DroneDreamPlanCanInstall == "0"
+    ${AndIf} $DroneDreamPlanBlockerCode == "prerequisite-blocked"
+    ${AndIf} $DroneDreamPlanTarget != ""
+      Push "runtime-mode-page-create app-only-runtime-preflight target=$DroneDreamPlanTarget diagnostic=$DroneDreamPlanDiagnosticCode"
+      Call DroneDreamAppendInstallerDiagnostic
+    ${EndIf}
     StrCpy $LANGUAGE $DroneDreamInstallerLanguage
     StrCpy $DroneDreamSuggestedDrive ""
     ${If} $DroneDreamPlanTarget != ""
@@ -504,6 +510,12 @@ Var DroneDreamValidatePathOnly
     Push ""
     Call DroneDreamRunPlanner
     Pop $DroneDreamPlanCanInstall
+    ${If} $DroneDreamPlanCanInstall == "0"
+    ${AndIf} $DroneDreamPlanBlockerCode == "prerequisite-blocked"
+    ${AndIf} $DroneDreamPlanTarget != ""
+      Push "runtime-mode-retry app-only-runtime-preflight target=$DroneDreamPlanTarget diagnostic=$DroneDreamPlanDiagnosticCode"
+      Call DroneDreamAppendInstallerDiagnostic
+    ${EndIf}
     StrCpy $LANGUAGE $DroneDreamInstallerLanguage
     ${If} $DroneDreamPlanCanInstall == "1"
       StrCpy $DroneDreamSuggestedDrive $DroneDreamPlanTarget 2
@@ -563,6 +575,15 @@ Var DroneDreamValidatePathOnly
     Call DroneDreamRunPlanner
     Pop $0
     StrCpy $LANGUAGE $DroneDreamInstallerLanguage
+    ${If} $0 != "1"
+    ${AndIf} $DroneDreamPlanBlockerCode == "prerequisite-blocked"
+    ${AndIf} $DroneDreamPlanTarget != ""
+      Push "runtime-mode-page-leave app-only-runtime-preflight target=$DroneDreamPlanTarget diagnostic=$DroneDreamPlanDiagnosticCode drive=$DroneDreamRuntimeDrive"
+      Call DroneDreamAppendInstallerDiagnostic
+      StrCpy $DroneDreamInstallMode "install-app-only"
+      StrCpy $DroneDreamRuntimeDrive ""
+      Return
+    ${EndIf}
     ${If} $0 != "1"
       ${If} $DroneDreamPlanBlockerCode == "planner-error"
         MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_SelectedDriveProbeFailed)"

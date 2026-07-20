@@ -179,11 +179,50 @@ $installer = Join-Path $bundleDirectory "DroneDream_$($tauriConfig.version)_x64-
 if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
     throw "The LLVM build completed without producing the versioned installer $installer"
 }
+
+# Sign the final NSIS bytes for the in-app updater after bundling. This updater
+# signature is separate from Authenticode. Explicit --password= handles the
+# current empty-password encrypted key without an interactive prompt.
+$updaterKeyPath = $env:TAURI_SIGNING_PRIVATE_KEY_PATH
+if (-not $updaterKeyPath) {
+    $localUpdaterKey = Join-Path $env:USERPROFILE ".tauri\dronedream-updater.key"
+    if (Test-Path -LiteralPath $localUpdaterKey -PathType Leaf) {
+        $updaterKeyPath = $localUpdaterKey
+    }
+}
+if (-not $updaterKeyPath -or
+    -not (Test-Path -LiteralPath $updaterKeyPath -PathType Leaf)) {
+    throw "Set TAURI_SIGNING_PRIVATE_KEY_PATH before signing the updater artifact."
+}
+$tauriCli = Join-Path $PSScriptRoot "..\node_modules\@tauri-apps\cli\tauri.js"
+if (-not (Test-Path -LiteralPath $tauriCli -PathType Leaf)) {
+    throw "The installed Tauri CLI was not found at $tauriCli"
+}
+$updaterPasswordArgument = if ($null -eq $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+    "--password="
+} else {
+    "--password=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)"
+}
+& node.exe $tauriCli signer sign `
+    --private-key-path $updaterKeyPath `
+    $updaterPasswordArgument `
+    $installer
+if ($LASTEXITCODE -ne 0) {
+    throw "Tauri updater signing failed."
+}
+
 $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $installer
 $checksumPath = "$installer.sha256"
 "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($installer))" |
     Set-Content -Encoding ascii -LiteralPath $checksumPath
 Write-Host "Wrote verified installer checksum to $checksumPath"
+
+$updaterSignature = "${installer}.sig"
+if (-not (Test-Path -LiteralPath $updaterSignature -PathType Leaf)) {
+    throw "The signed Tauri updater artifact is missing: $updaterSignature"
+}
+& (Join-Path $PSScriptRoot "write-updater-manifest.ps1") `
+    -BundleDirectory $bundleDirectory
 
 # A developer bundle directory otherwise accumulates every historical setup
 # executable, which makes manual testing error-prone. Prune only versioned

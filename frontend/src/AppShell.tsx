@@ -2,17 +2,27 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
-import { isDesktopRuntime } from "./desktop/bridge";
-import type { RuntimeComponentState } from "./desktop/bridge";
+import { apiClient } from "./api/client";
+import { getDesktopWindowHandle, isDesktopRuntime } from "./desktop/bridge";
+import type { DesktopWindowHandle, RuntimeComponentState } from "./desktop/bridge";
 import {
   DesktopRuntimeAccessProvider,
   useDesktopRuntimeAccess,
 } from "./desktop/access";
 import type { DesktopRuntimeAccess } from "./desktop/access";
 import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
+import { useAppUpdater } from "./desktop/updater";
 import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
+import { useModelAccess } from "./features/settings/ModelAccessContext";
+import type { ModelProvider } from "./features/settings/ModelAccessContext";
+import { ModelAccessProvider } from "./features/settings/ModelAccessProvider";
+import {
+  clearExperimentDraft,
+  hasExperimentDraft,
+} from "./features/experiment/draftStorage";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
+import type { JobStatus } from "./types/api";
 
 const NAV_ITEMS: {
   to: string;
@@ -23,15 +33,52 @@ const NAV_ITEMS: {
   requiresRuntime?: boolean;
 }[] = [
   { to: "/", desktopTo: "/dashboard", labelKey: "app.dashboard", end: true },
-  { to: "/jobs/new", labelKey: "app.newExperiment", requiresRuntime: true },
   { to: "/history", labelKey: "app.history" },
-  { to: "/ece498", label: "ECE498" },
+  { to: "/ece498", label: "ECE498BH" },
 ];
+
+const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
+  "CREATED",
+  "QUEUED",
+  "RUNNING",
+  "AGGREGATING",
+  "FINALIZING",
+];
+const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
+
+interface ExitPromptState {
+  hasDraft: boolean;
+  activeJobCount: number;
+  activeJobsUnknown: boolean;
+}
+
+async function countActiveJobsBeforeExit(): Promise<number> {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutId = window.setTimeout(
+      () => reject(new Error("Timed out while checking active experiments.")),
+      ACTIVE_JOB_CHECK_TIMEOUT_MS,
+    );
+  });
+  try {
+    const pages = await Promise.race([
+      Promise.all(EXIT_GUARD_JOB_STATUSES.map((status) =>
+        apiClient.listJobs({ page: 1, page_size: 1, status })
+      )),
+      timeout,
+    ]);
+    return pages.reduce((total, page) => total + page.total, 0);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}
 
 export function AppShell() {
   return (
     <DesktopRuntimeAccessProvider>
-      <AppShellContent />
+      <ModelAccessProvider>
+        <AppShellContent />
+      </ModelAccessProvider>
     </DesktopRuntimeAccessProvider>
   );
 }
@@ -45,6 +92,15 @@ function LanguageRegionIcon({ region }: { region: "west" | "east" }) {
         <circle className="launcher-language-region" cx={region === "west" ? "8" : "16"} cy="10" r="1.65" />
       </svg>
     </span>
+  );
+}
+
+function UpdateDownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3.75v10.5m0 0 4-4m-4 4-4-4" />
+      <path d="M5.25 15.75v2.5a2 2 0 0 0 2 2h9.5a2 2 0 0 0 2-2v-2.5" />
+    </svg>
   );
 }
 
@@ -90,6 +146,7 @@ function SettingsDialog({
   onClose: () => void;
 }) {
   const { locale, setLocale, t } = useI18n();
+  const { settings: modelAccess, selectProvider, updateSettings } = useModelAccess();
   const level = runtimeHealthLevel(access);
   const snapshot = access.snapshot;
   const details: string[] = [];
@@ -184,6 +241,61 @@ function SettingsDialog({
           <i aria-hidden="true">✓</i>
         </button>
       </fieldset>
+      <section className="settings-model-panel" aria-labelledby="settings-model-title">
+        <div className="settings-model-heading">
+          <h3 id="settings-model-title">{t("settings.model.title")}</h3>
+          <span className={modelAccess.apiKey ? "configured" : undefined}>
+            <i aria-hidden="true" />
+            {t(modelAccess.apiKey ? "settings.model.configured" : "settings.model.notConfigured")}
+          </span>
+        </div>
+        <div className="settings-model-grid">
+          <label htmlFor="settings_model_provider">
+            <span>{t("wizard.field.llmProvider")}</span>
+            <select
+              id="settings_model_provider"
+              value={modelAccess.provider}
+              onChange={(event) => selectProvider(event.target.value as ModelProvider)}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="qwen">Qwen</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="custom">{t("wizard.llm.customProvider")}</option>
+            </select>
+          </label>
+          <label htmlFor="settings_model_name">
+            <span>{t("wizard.field.llmModel")}</span>
+            <input
+              id="settings_model_name"
+              value={modelAccess.model}
+              onChange={(event) => updateSettings({ model: event.target.value })}
+              placeholder={t("wizard.field.backendDefault")}
+            />
+          </label>
+          <label className="settings-model-wide" htmlFor="settings_model_api_key">
+            <span>{t("wizard.field.llmApiKey")}</span>
+            <input
+              id="settings_model_api_key"
+              type="password"
+              autoComplete="off"
+              value={modelAccess.apiKey}
+              onChange={(event) => updateSettings({ apiKey: event.target.value })}
+              placeholder={t("settings.model.apiKeyPlaceholder")}
+            />
+          </label>
+          <label className="settings-model-wide" htmlFor="settings_model_base_url">
+            <span>{t("wizard.field.llmBaseUrl")}</span>
+            <input
+              id="settings_model_base_url"
+              type="url"
+              value={modelAccess.baseUrl}
+              onChange={(event) => updateSettings({ baseUrl: event.target.value })}
+              placeholder="https://…/v1"
+            />
+          </label>
+        </div>
+        <p className="settings-model-security-note">{t("settings.model.securityNote")}</p>
+      </section>
       {access.desktopRuntime ? (
         <section className="settings-runtime-panel" aria-labelledby="settings-runtime-title">
           <div className="settings-runtime-heading">
@@ -228,23 +340,98 @@ function SettingsDialog({
   );
 }
 
+function ExitGuardDialog({
+  state,
+  onReturn,
+  onConfirmExit,
+}: {
+  state: ExitPromptState;
+  onReturn: () => void;
+  onConfirmExit: () => void;
+}) {
+  const { t } = useI18n();
+  const paragraphKey: TranslationKey = state.hasDraft
+    ? state.activeJobsUnknown
+      ? "exitGuard.draftActiveUnknown"
+      : state.activeJobCount > 0
+        ? "exitGuard.draftActive"
+        : "exitGuard.draft"
+    : state.activeJobsUnknown
+      ? "exitGuard.activeUnknown"
+      : "exitGuard.active";
+
+  return (
+    <div className="app-exit-backdrop" role="presentation">
+      <section
+        className="app-exit-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="app-exit-title"
+        aria-describedby="app-exit-description"
+      >
+        <h2 id="app-exit-title">{t("exitGuard.title")}</h2>
+        <p id="app-exit-description">
+          {t(paragraphKey, { count: state.activeJobCount })}
+        </p>
+        <div className="app-exit-actions">
+          <button type="button" className="btn" autoFocus onClick={onReturn}>
+            {t("exitGuard.return")}
+          </button>
+          <button
+            type="button"
+            className="btn app-exit-confirm"
+            onClick={onConfirmExit}
+          >
+            {t(state.hasDraft ? "exitGuard.exitDiscard" : "exitGuard.exitAnyway")}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function AppShellContent() {
   const location = useLocation();
   const desktopRuntime = isDesktopRuntime();
   const runtimeAccess = useDesktopRuntimeAccess();
+  const appUpdater = useAppUpdater();
   const { t } = useI18n();
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
+  const [exitPrompt, setExitPrompt] = useState<ExitPromptState | null>(null);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
+  const desktopWindowRef = useRef<DesktopWindowHandle | null>(null);
+  const currentPathRef = useRef(location.pathname);
+  const exitPromptRef = useRef<ExitPromptState | null>(null);
+  const exitCheckInFlightRef = useRef(false);
+  const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
+  const launcherRuntimeChecking = runtimeAccess.isChecking || runtimeIsBusy;
+  const launcherRuntimeChecked =
+    runtimeAccess.status === "ready" && !runtimeAccess.isChecking;
   const runtimeNavDescription = runtimeAccess.status === "checking"
     ? t("runtimeGate.navChecking")
     : runtimeAccess.status === "starting"
       ? t("runtimeGate.navStarting")
       : t("runtimeGate.navLocked");
+  const updateAvailable = appUpdater.status === "available";
+  const updateBusy = appUpdater.status === "checking" ||
+    appUpdater.status === "downloading" ||
+    appUpdater.status === "installing";
+  const updateTitle = appUpdater.status === "available"
+    ? t("updater.available", { version: appUpdater.availableVersion ?? "" })
+    : appUpdater.status === "checking"
+      ? t("updater.checking")
+      : appUpdater.status === "downloading"
+        ? t("updater.downloading", { progress: appUpdater.progress ?? 0 })
+        : appUpdater.status === "installing"
+          ? t("updater.installing")
+          : appUpdater.status === "error"
+            ? t("updater.error")
+            : t("updater.current");
 
   const closeSettings = useCallback(() => {
     setLauncherSettingsOpen(false);
@@ -252,6 +439,88 @@ function AppShellContent() {
     // frame, after the dialog effect has removed inert from the app shell.
     requestAnimationFrame(() => launcherSettingsButtonRef.current?.focus());
   }, []);
+
+  const returnFromExitPrompt = useCallback(() => {
+    exitPromptRef.current = null;
+    setExitPrompt(null);
+  }, []);
+
+  const confirmExit = useCallback(() => {
+    const desktopWindow = desktopWindowRef.current;
+    if (!desktopWindow) return;
+    clearExperimentDraft();
+    exitApprovedRef.current = true;
+    exitPromptRef.current = null;
+    setExitPrompt(null);
+    void desktopWindow.destroy().catch(() => {
+      exitApprovedRef.current = false;
+    });
+  }, []);
+
+  useEffect(() => {
+    currentPathRef.current = location.pathname;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    exitPromptRef.current = exitPrompt;
+  }, [exitPrompt]);
+
+  useEffect(() => {
+    if (!desktopRuntime) return;
+    const desktopWindow = getDesktopWindowHandle();
+    if (!desktopWindow) return;
+    desktopWindowRef.current = desktopWindow;
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+
+    void desktopWindow.onCloseRequested(async (event) => {
+      if (exitApprovedRef.current) return;
+      event.preventDefault();
+      if (exitCheckInFlightRef.current || exitPromptRef.current) return;
+      exitCheckInFlightRef.current = true;
+
+      const path = currentPathRef.current;
+      const hasDraft = path === "/jobs/new" || hasExperimentDraft();
+      let activeJobCount = 0;
+      let activeJobsUnknown = false;
+      if (path !== "/desktop/setup") {
+        try {
+          activeJobCount = await countActiveJobsBeforeExit();
+        } catch {
+          activeJobsUnknown = true;
+        }
+      }
+
+      const state = { hasDraft, activeJobCount, activeJobsUnknown };
+      const mustConfirm = hasDraft || activeJobCount > 0 || activeJobsUnknown;
+      if (mustConfirm) {
+        if (!cancelled) {
+          exitPromptRef.current = state;
+          setExitPrompt(state);
+        }
+      } else {
+        clearExperimentDraft();
+        exitApprovedRef.current = true;
+        try {
+          await desktopWindow.destroy();
+        } catch {
+          exitApprovedRef.current = false;
+        }
+      }
+      exitCheckInFlightRef.current = false;
+    }).then((dispose) => {
+      if (cancelled) dispose();
+      else unlisten = dispose;
+    }).catch(() => {
+      desktopWindowRef.current = null;
+    });
+
+    return () => {
+      cancelled = true;
+      desktopWindowRef.current = null;
+      unlisten?.();
+    };
+  }, [desktopRuntime]);
 
   useEffect(() => {
     const openSettings = () => setLauncherSettingsOpen(true);
@@ -314,6 +583,14 @@ function AppShellContent() {
     };
   }, [closeSettings, launcherSettingsOpen]);
 
+  const exitGuard = exitPrompt ? (
+    <ExitGuardDialog
+      state={exitPrompt}
+      onReturn={returnFromExitPrompt}
+      onConfirmExit={confirmExit}
+    />
+  ) : null;
+
   if (launcherMode) {
     return (
       <div className="app-shell app-shell-launcher">
@@ -335,14 +612,12 @@ function AppShellContent() {
             <span>DroneDream</span>
           </Link>
           <div className="launcher-chrome-actions">
-            <span className="launcher-runtime-indicator">
+            <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
               <span aria-hidden="true" />
-              {runtimeAccess.status === "checking"
+              {launcherRuntimeChecking
                 ? t("runtimeGate.checkingShort")
-                : runtimeAccess.status === "starting"
-                  ? t("runtimeGate.startingShort")
-                : runtimeAccess.status === "ready"
-                  ? t("desktop.ready")
+                : launcherRuntimeChecked
+                  ? t("runtimeGate.checkedShort")
                   : t("runtimeGate.requiredShort")}
             </span>
             <button
@@ -374,6 +649,7 @@ function AppShellContent() {
             />
           </div>
         ) : null}
+        {exitGuard}
         <main id="main-content" className="launcher-main" tabIndex={-1}>
           <Outlet />
         </main>
@@ -409,7 +685,7 @@ function AppShellContent() {
             const runtimeLocked = Boolean(
               desktopRuntime &&
               item.requiresRuntime &&
-              runtimeAccess.status !== "ready",
+              !runtimeAccess.canUseRuntime,
             );
 
             return (
@@ -440,7 +716,24 @@ function AppShellContent() {
           })}
         </nav>
         <div className="app-sidebar-footer">
-          <span className="phase-pill">{t("app.previewVersion")}</span>
+          <div className={`app-version-pill${updateAvailable ? " is-update-available" : ""}`}>
+            <span>{t("app.previewVersion")}</span>
+            {appUpdater.desktopRuntime ? (
+              <button
+                type="button"
+                className="app-update-button"
+                aria-label={updateTitle}
+                title={updateTitle}
+                disabled={updateBusy}
+                onClick={() => {
+                  if (updateAvailable) void appUpdater.installAvailableUpdate();
+                  else void appUpdater.checkForUpdates();
+                }}
+              >
+                <UpdateDownloadIcon />
+              </button>
+            ) : null}
+          </div>
         </div>
       </aside>
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
@@ -476,6 +769,7 @@ function AppShellContent() {
             />
           </div>
         ) : null}
+        {exitGuard}
         <main id="main-content" className={`app-main${experimentWizardMode ? " app-main-wizard" : ""}`} tabIndex={-1}>
           <Outlet />
         </main>

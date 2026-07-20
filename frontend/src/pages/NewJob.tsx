@@ -7,6 +7,7 @@ import { ParameterSelector } from "../components/ParameterSelector";
 import { SectionCard } from "../components/SectionCard";
 import { TrackEditor2D } from "../components/TrackEditor2D";
 import { apiClient, ApiClientError } from "../api/client";
+import { openAppSettings } from "../appSettings";
 import {
   EXPERIMENTAL_OPTIMIZER_STRATEGIES,
   LEGACY_OPTIMIZER_STRATEGIES,
@@ -45,9 +46,11 @@ import {
 } from "../features/experiment/parameterCatalog";
 import { runtimeCapabilityErrors } from "../features/experiment/capabilities";
 import {
+  optimizerStrategyCard,
   optimizerStrategyDescription,
   optimizerStrategyLabel,
 } from "../features/experiment/optimizerStrategies";
+import { useModelAccess } from "../features/settings/ModelAccessContext";
 import {
   calculateTrialPlan as calculateTrialPlanFromInputs,
   type TrialPlan,
@@ -532,7 +535,7 @@ function opensTrackDialog(errorKey: string): boolean {
   return errorKey === "reference_track_json";
 }
 
-function opensLlmDialog(errorKey: string): boolean {
+function opensModelSettings(errorKey: string): boolean {
   return errorKey.startsWith("llm_");
 }
 
@@ -1363,6 +1366,7 @@ function mergeSelections(
 export function NewJob() {
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { settings: modelAccess } = useModelAccess();
   const initialDraft = useRef(
     loadExperimentDraft({
       maxActiveStep: 4,
@@ -1373,7 +1377,10 @@ export function NewJob() {
   const [form, setForm] = useState<FormState>(() => ({
     ...DEFAULTS,
     ...(initialDraft?.form ?? {}),
-    llm_api_key: "",
+    llm_provider: modelAccess.provider,
+    llm_api_key: modelAccess.apiKey,
+    llm_model: modelAccess.model,
+    llm_base_url: modelAccess.baseUrl,
   }));
   const [catalog, setCatalog] = useState<ParameterCatalogResponse>(BUILTIN_PARAMETER_CATALOG);
   const [selections, setSelections] = useState<ParameterSelectionMap>(() =>
@@ -1397,7 +1404,6 @@ export function NewJob() {
   const [showAdvancedScenario, setShowAdvancedScenario] = useState(false);
   const [showTrackEditor, setShowTrackEditor] = useState(false);
   const [showTrackJson, setShowTrackJson] = useState(false);
-  const [showLlmSettings, setShowLlmSettings] = useState(false);
   const [showParameterReview, setShowParameterReview] = useState(false);
   const [capabilities, setCapabilities] = useState<BackendCapabilitiesResponse | null>(null);
   const [capabilitiesUnavailable, setCapabilitiesUnavailable] = useState(false);
@@ -1405,15 +1411,33 @@ export function NewJob() {
   const advancedScenarioTriggerRef = useRef<HTMLButtonElement>(null);
   const trackEditorTriggerRef = useRef<HTMLButtonElement>(null);
   const trackJsonTriggerRef = useRef<HTMLButtonElement>(null);
-  const llmSettingsTriggerRef = useRef<HTMLButtonElement>(null);
   const parameterReviewTriggerRef = useRef<HTMLButtonElement>(null);
 
-  const searchSeedCount = parseSeedList(form.search_seeds).values.length;
   const selectedCount = Object.values(selections).filter(
     (selection) => selection.selected,
   ).length;
   const trialPlan = calculateTrialPlan(form, selectedCount);
   const estimatedTrials = trialPlan.scheduledTrials;
+
+  useEffect(() => {
+    setForm((current) => {
+      if (
+        current.llm_provider === modelAccess.provider
+        && current.llm_api_key === modelAccess.apiKey
+        && current.llm_model === modelAccess.model
+        && current.llm_base_url === modelAccess.baseUrl
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        llm_provider: modelAccess.provider,
+        llm_api_key: modelAccess.apiKey,
+        llm_model: modelAccess.model,
+        llm_base_url: modelAccess.baseUrl,
+      };
+    });
+  }, [modelAccess]);
 
   useEffect(() => {
     if (import.meta.env.MODE === "test" || import.meta.env.VITE_PARAMETER_CATALOG_API === "false") {
@@ -1478,7 +1502,13 @@ export function NewJob() {
   }, [completedSteps, form, nameConfirmed, selections, step]);
 
   useEffect(() => {
-    if (nameConfirmed && !showAdvancedScenario && !showTrackEditor && !showTrackJson && !showLlmSettings && !showParameterReview) {
+    if (
+      nameConfirmed &&
+      !showAdvancedScenario &&
+      !showTrackEditor &&
+      !showTrackJson &&
+      !showParameterReview
+    ) {
       return undefined;
     }
     const handleDialogKeyDown = (event: KeyboardEvent) => {
@@ -1489,15 +1519,12 @@ export function NewJob() {
           return;
         }
         let returnFocus: HTMLButtonElement | null = null;
-        if (showTrackJson) {
-          setShowTrackJson(false);
-          returnFocus = trackJsonTriggerRef.current;
-        } else if (showParameterReview) {
+        if (showParameterReview) {
           setShowParameterReview(false);
           returnFocus = parameterReviewTriggerRef.current;
-        } else if (showLlmSettings) {
-          setShowLlmSettings(false);
-          returnFocus = llmSettingsTriggerRef.current;
+        } else if (showTrackJson) {
+          setShowTrackJson(false);
+          returnFocus = trackJsonTriggerRef.current;
         } else if (showTrackEditor) {
           setShowTrackEditor(false);
           returnFocus = trackEditorTriggerRef.current;
@@ -1532,7 +1559,14 @@ export function NewJob() {
     };
     document.addEventListener("keydown", handleDialogKeyDown);
     return () => document.removeEventListener("keydown", handleDialogKeyDown);
-  }, [nameConfirmed, navigate, showAdvancedScenario, showLlmSettings, showParameterReview, showTrackEditor, showTrackJson]);
+  }, [
+    nameConfirmed,
+    navigate,
+    showAdvancedScenario,
+    showParameterReview,
+    showTrackEditor,
+    showTrackJson,
+  ]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]): void {
     setForm((previous) => ({ ...previous, [key]: value }));
@@ -1747,7 +1781,7 @@ export function NewJob() {
       setErrors((previous) => ({ ...previous, ...nextErrors }));
       if (step === 2 && opensAdvancedScenarioDialog(firstErrorKey)) setShowAdvancedScenario(true);
       if (step === 0 && opensTrackDialog(firstErrorKey)) setShowTrackEditor(true);
-      if (step === 3 && opensLlmDialog(firstErrorKey)) setShowLlmSettings(true);
+      if (step === 3 && opensModelSettings(firstErrorKey)) openAppSettings();
       focusErrorField(firstErrorKey, catalog);
       return;
     }
@@ -1779,7 +1813,7 @@ export function NewJob() {
       setStep(firstStep);
       if (firstStep === 2 && opensAdvancedScenarioDialog(firstKey)) setShowAdvancedScenario(true);
       if (firstStep === 0 && opensTrackDialog(firstKey)) setShowTrackEditor(true);
-      if (firstStep === 3 && opensLlmDialog(firstKey)) setShowLlmSettings(true);
+      if (firstStep === 3 && opensModelSettings(firstKey)) openAppSettings();
       focusErrorField(firstKey, catalog);
       return;
     }
@@ -1825,26 +1859,7 @@ export function NewJob() {
   }
 
   const customTrack = parseReferenceTrackInput(form.reference_track_json, t).points ?? [];
-  const selectedDefinitions = catalog.parameters.filter(
-    (parameter) => selections[parameter.name]?.selected,
-  );
   const selectedParameterRows = selectedParameters(selections);
-  const visibleSelectedParameterRows = selectedParameterRows.slice(0, 6);
-  const selectedHighRiskCount = selectedDefinitions.filter(
-    (parameter) => parameter.risk === "high",
-  ).length;
-  const selectedRestartCount = selectedDefinitions.filter(
-    (parameter) => parameter.requires_reboot,
-  ).length;
-  const scenarioSearchCaseCount = [
-    form.nominal_search_enabled,
-    form.wind_search_enabled,
-    form.noise_search_enabled,
-  ].filter(Boolean).length;
-  const scenarioHoldoutCaseCount = [
-    form.nominal_holdout_enabled,
-    form.combined_holdout_enabled,
-  ].filter(Boolean).length;
   const realCliCapability = capabilities?.simulators.items.real_cli;
   const gptCapability = capabilities?.optimizers.items.gpt;
   const preflightErrors = validate(form, selections, catalog, capabilities, t);
@@ -2128,15 +2143,22 @@ export function NewJob() {
                           points={customTrack}
                           defaultAltitude={Number(form.altitude_m) || 3}
                           onChange={(points) => update("reference_track_json", JSON.stringify(points, null, 2))}
-                          dataPanelFooter={(
+                          dataPanelAction={(
                             <>
                               <button
                                 ref={trackJsonTriggerRef}
                                 type="button"
-                                className="btn btn-ghost btn-small track-json-trigger"
+                                className="track-icon-button track-json-trigger"
                                 onClick={() => setShowTrackJson(true)}
+                                aria-label={t("wizard.jsonImport")}
+                                title={t("wizard.jsonImport")}
                               >
-                                {t("wizard.jsonImport")}
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                  <path d="M7 3H4v18h3" />
+                                  <path d="M17 3h3v18h-3" />
+                                  <path d="M8 8h8m-3-3 3 3-3 3" />
+                                  <path d="M16 16H8m3-3-3 3 3 3" />
+                                </svg>
                               </button>
                               {showTrackJson ? (
                                 <div className="wizard-modal-backdrop wizard-nested-modal-backdrop" role="presentation" onMouseDown={(event) => {
@@ -2316,115 +2338,73 @@ export function NewJob() {
 
         <div hidden={step !== 3} className="wizard-panel">
           <SectionCard title={t("wizard.section.constraints")}>
-            <div className="form-grid constraints-grid">
-              <Field label={t("wizard.field.simulatorBackend")} required htmlFor="simulator_backend" error={errors.simulator_backend} hint={t(SIMULATOR_BACKEND_HINT_KEYS[form.simulator_backend])}>
-                <select id="simulator_backend" value={form.simulator_backend} onChange={(event) => update("simulator_backend", event.target.value as SimulatorBackend)}>{SIMULATOR_BACKENDS.map((backend) => <option key={backend} value={backend}>{t(backend === "real_cli" ? "wizard.simulator.realCli" : "wizard.simulator.mock")}</option>)}</select>
-              </Field>
-              <Field
-                label={t("wizard.optimizerStrategy")}
-                required
-                htmlFor="optimizer_strategy"
-                error={errors.optimizer_strategy}
-                hint={optimizerStrategyDescription(form.optimizer_strategy, t)}
-              >
-                <select id="optimizer_strategy" value={form.optimizer_strategy} onChange={(event) => {
-                  const strategy = event.target.value as OptimizerStrategy;
-                  update("optimizer_strategy", strategy);
-                  if (strategy !== "gpt") setShowLlmSettings(false);
-                }}>
-                  <optgroup label={t("wizard.optimizerExperimentalGroup")}>
-                    {EXPERIMENTAL_OPTIMIZER_STRATEGIES.map((strategy) => (
-                      <option key={strategy} value={strategy}>
-                        {optimizerStrategyLabel(strategy, t)}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label={t("wizard.optimizerLegacyGroup")}>
-                    {LEGACY_OPTIMIZER_STRATEGIES.map((strategy) => (
-                      <option key={strategy} value={strategy}>
-                        {optimizerStrategyLabel(strategy, t)}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </Field>
-              <Field label={t("wizard.field.maxIterations")} required htmlFor="max_iterations" error={errors.max_iterations} hint={t(form.optimizer_strategy === "none" ? "wizard.field.maxIterationsNoOptimizerHint" : "wizard.hint.maxIterations")}><input id="max_iterations" type="number" min="1" max="100" step="1" placeholder="1–100" value={form.max_iterations} onChange={handleTextChange("max_iterations")} /></Field>
-              <Field label={t("wizard.field.trialsPerCandidate")} required htmlFor="trials_per_candidate" error={errors.trials_per_candidate} hint={t("wizard.field.trialsPerCandidateHint")}><input id="trials_per_candidate" type="number" min="1" max="10" step="1" placeholder="1–10" value={form.trials_per_candidate} onChange={handleTextChange("trials_per_candidate")} /></Field>
-              <Field label={t("wizard.field.maxTotalTrials")} required htmlFor="max_total_trials" error={errors.max_total_trials} hint={t("wizard.field.maxTotalTrialsHint")}><input id="max_total_trials" type="number" min="1" max="10000" step="1" placeholder="1–10000" value={form.max_total_trials} onChange={handleTextChange("max_total_trials")} /></Field>
-              <Field label={t("wizard.field.targetRmse")} htmlFor="target_rmse" error={errors.target_rmse} hint={t("wizard.hint.targetRmse")}><input id="target_rmse" type="number" min="0" max="100" step="0.01" placeholder="0–100" value={form.target_rmse} onChange={handleTextChange("target_rmse")} /></Field>
-              <Field label={t("wizard.field.targetMaxError")} htmlFor="target_max_error" error={errors.target_max_error} hint={t("wizard.hint.targetMaxError")}><input id="target_max_error" type="number" min="0" max="100" step="0.01" placeholder="0–100" value={form.target_max_error} onChange={handleTextChange("target_max_error")} /></Field>
-              <Field label={t("wizard.field.minPassRate")} required htmlFor="min_pass_rate" error={errors.min_pass_rate} hint={t("wizard.hint.minPassRate")}><input id="min_pass_rate" type="number" min="0" max="1" step="0.05" placeholder="0–1" value={form.min_pass_rate} onChange={handleTextChange("min_pass_rate")} /></Field>
+            <div className="constraint-strategy-layout">
+              <div className="constraint-input-column">
+                <div className="form-grid constraints-grid">
+                  <Field label={t("wizard.field.simulatorBackend")} required htmlFor="simulator_backend" error={errors.simulator_backend} hint={t(SIMULATOR_BACKEND_HINT_KEYS[form.simulator_backend])}>
+                    <select id="simulator_backend" value={form.simulator_backend} onChange={(event) => update("simulator_backend", event.target.value as SimulatorBackend)}>{SIMULATOR_BACKENDS.map((backend) => <option key={backend} value={backend}>{t(backend === "real_cli" ? "wizard.simulator.realCli" : "wizard.simulator.mock")}</option>)}</select>
+                  </Field>
+                  <Field
+                    label={t("wizard.optimizerStrategy")}
+                    required
+                    htmlFor="optimizer_strategy"
+                    error={errors.optimizer_strategy}
+                    hint={optimizerStrategyDescription(form.optimizer_strategy, t)}
+                  >
+                    <select id="optimizer_strategy" value={form.optimizer_strategy} onChange={(event) => update("optimizer_strategy", event.target.value as OptimizerStrategy)}>
+                      <optgroup label={t("wizard.optimizerExperimentalGroup")}>
+                        {EXPERIMENTAL_OPTIMIZER_STRATEGIES.map((strategy) => (
+                          <option key={strategy} value={strategy}>
+                            {optimizerStrategyLabel(strategy, t)}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label={t("wizard.optimizerLegacyGroup")}>
+                        {LEGACY_OPTIMIZER_STRATEGIES.map((strategy) => (
+                          <option key={strategy} value={strategy}>
+                            {optimizerStrategyLabel(strategy, t)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </Field>
+                  <Field label={t("wizard.field.maxIterations")} required htmlFor="max_iterations" error={errors.max_iterations} hint={t(form.optimizer_strategy === "none" ? "wizard.field.maxIterationsNoOptimizerHint" : "wizard.hint.maxIterations")}><input id="max_iterations" type="number" min="1" max="100" step="1" placeholder="1–100" value={form.max_iterations} onChange={handleTextChange("max_iterations")} /></Field>
+                  <Field label={t("wizard.field.trialsPerCandidate")} required htmlFor="trials_per_candidate" error={errors.trials_per_candidate} hint={t("wizard.field.trialsPerCandidateHint")}><input id="trials_per_candidate" type="number" min="1" max="10" step="1" placeholder="1–10" value={form.trials_per_candidate} onChange={handleTextChange("trials_per_candidate")} /></Field>
+                  <Field label={t("wizard.field.maxTotalTrials")} required htmlFor="max_total_trials" error={errors.max_total_trials} hint={t("wizard.field.maxTotalTrialsHint")}><input id="max_total_trials" type="number" min="1" max="10000" step="1" placeholder="1–10000" value={form.max_total_trials} onChange={handleTextChange("max_total_trials")} /></Field>
+                  <Field label={t("wizard.field.targetRmse")} htmlFor="target_rmse" error={errors.target_rmse} hint={t("wizard.hint.targetRmse")}><input id="target_rmse" type="number" min="0" max="100" step="0.01" placeholder="0–100" value={form.target_rmse} onChange={handleTextChange("target_rmse")} /></Field>
+                  <Field label={t("wizard.field.targetMaxError")} htmlFor="target_max_error" error={errors.target_max_error} hint={t("wizard.hint.targetMaxError")}><input id="target_max_error" type="number" min="0" max="100" step="0.01" placeholder="0–100" value={form.target_max_error} onChange={handleTextChange("target_max_error")} /></Field>
+                  <Field label={t("wizard.field.minPassRate")} required htmlFor="min_pass_rate" error={errors.min_pass_rate} hint={t("wizard.hint.minPassRate")}><input id="min_pass_rate" type="number" min="0" max="1" step="0.05" placeholder="0–1" value={form.min_pass_rate} onChange={handleTextChange("min_pass_rate")} /></Field>
+                </div>
+                {form.simulator_backend === "real_cli" && !capabilitiesUnavailable && !realCliCapability?.ready ? (
+                  <Alert
+                    tone={capabilities?.simulators.authoritative ? "danger" : "warning"}
+                    title={t("wizard.realCliTitle")}
+                  >
+                    {t("wizard.realCliText")}
+                  </Alert>
+                ) : null}
+                {form.optimizer_strategy === "gpt" && !capabilitiesUnavailable && !gptCapability?.ready ? (
+                  <Alert
+                    tone={capabilities?.optimizers.authoritative ? "danger" : "warning"}
+                    title={t("wizard.gptPreflightTitle")}
+                  >
+                    {t("wizard.gptPreflightText")}
+                  </Alert>
+                ) : null}
+                {capabilitiesUnavailable ? (
+                  <Alert tone="warning" title={t("wizard.runtimePreflightUnavailableTitle")}>
+                    {t("wizard.runtimePreflightUnavailableText")}
+                  </Alert>
+                ) : null}
+              </div>
+              <OptimizationStrategyCard
+                strategy={form.optimizer_strategy}
+                t={t}
+                modelProvider={llmProviderLabel(form.llm_provider, t)}
+                modelName={form.llm_model}
+                modelConfigured={form.llm_api_key.trim() !== ""}
+              />
             </div>
-            {form.simulator_backend === "real_cli" && !capabilitiesUnavailable && !realCliCapability?.ready ? (
-              <Alert
-                tone={capabilities?.simulators.authoritative ? "danger" : "warning"}
-                title={t("wizard.realCliTitle")}
-              >
-                {t("wizard.realCliText")}
-              </Alert>
-            ) : null}
-            {form.optimizer_strategy === "gpt" && !capabilitiesUnavailable && !gptCapability?.ready ? (
-              <Alert
-                tone={capabilities?.optimizers.authoritative ? "danger" : "warning"}
-                title={t("wizard.gptPreflightTitle")}
-              >
-                {t("wizard.gptPreflightText")}
-              </Alert>
-            ) : null}
-            {capabilitiesUnavailable ? (
-              <Alert tone="warning" title={t("wizard.runtimePreflightUnavailableTitle")}>
-                {t("wizard.runtimePreflightUnavailableText")}
-              </Alert>
-            ) : null}
-            {form.optimizer_strategy === "gpt" ? (
-              <div className="generated-track-callout llm-provider-summary">
-                <span>{t("wizard.providerTitle")}: {llmProviderLabel(form.llm_provider, t)}</span>
-                <button ref={llmSettingsTriggerRef} type="button" className="btn btn-ghost btn-small" onClick={() => setShowLlmSettings(true)}>{t("wizard.configureProvider")}</button>
-              </div>
-            ) : null}
-            {showLlmSettings && form.optimizer_strategy === "gpt" ? (
-              <div className="wizard-modal-backdrop" role="presentation" onMouseDown={(event) => {
-                if (event.target !== event.currentTarget) return;
-                setShowLlmSettings(false);
-                window.requestAnimationFrame(() => llmSettingsTriggerRef.current?.focus());
-              }}>
-                <section className="wizard-modal wizard-llm-modal" role="dialog" aria-modal="true" aria-labelledby="llm-settings-title">
-                  <header className="wizard-modal-header">
-                    <h3 id="llm-settings-title">{t("wizard.providerTitle")}</h3>
-                    <button
-                      autoFocus
-                      type="button"
-                      className="btn btn-ghost wizard-modal-close"
-                      aria-label={t("wizard.closeProvider")}
-                      title={t("wizard.closeProvider")}
-                      onClick={() => {
-                        setShowLlmSettings(false);
-                        window.requestAnimationFrame(() => llmSettingsTriggerRef.current?.focus());
-                      }}
-                    >×</button>
-                  </header>
-                  <div className="form-grid wizard-llm-modal-grid">
-                    <Field label={t("wizard.field.llmProvider")} htmlFor="llm_provider"><select id="llm_provider" value={form.llm_provider} onChange={(event) => {
-                      const provider = event.target.value;
-                      update("llm_provider", provider);
-                      if (provider === "qwen") {
-                        update("llm_base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1");
-                        update("llm_model", "qwen-plus");
-                      } else if (provider === "deepseek") {
-                        update("llm_base_url", "https://api.deepseek.com");
-                        update("llm_model", "deepseek-v4-flash");
-                      } else {
-                        update("llm_base_url", "");
-                        update("llm_model", "");
-                      }
-                    }}><option value="openai">OpenAI</option><option value="qwen">Qwen</option><option value="deepseek">DeepSeek</option><option value="custom">{t("wizard.llm.customProvider")}</option></select></Field>
-                    <Field label={t("wizard.field.llmApiKey")} required htmlFor="llm_api_key" error={errors.llm_api_key}><input id="llm_api_key" type="password" autoComplete="off" value={form.llm_api_key} onChange={handleTextChange("llm_api_key")} /></Field>
-                    <Field label={t("wizard.field.llmModel")} htmlFor="llm_model" error={errors.llm_model}><input id="llm_model" value={form.llm_model} onChange={handleTextChange("llm_model")} placeholder={t("wizard.field.backendDefault")} /></Field>
-                    <Field label={t("wizard.field.llmBaseUrl")} htmlFor="llm_base_url" error={errors.llm_base_url}><input id="llm_base_url" type="url" value={form.llm_base_url} onChange={handleTextChange("llm_base_url")} placeholder="https://…/v1" /></Field>
-                  </div>
-                </section>
-              </div>
-            ) : null}
           </SectionCard>
         </div>
 
@@ -2449,7 +2429,7 @@ export function NewJob() {
                         setStep(issueStep);
                         if (firstIssueKey && issueStep === 2 && opensAdvancedScenarioDialog(firstIssueKey)) setShowAdvancedScenario(true);
                         if (firstIssueKey && issueStep === 0 && opensTrackDialog(firstIssueKey)) setShowTrackEditor(true);
-                        if (firstIssueKey && issueStep === 3 && opensLlmDialog(firstIssueKey)) setShowLlmSettings(true);
+                        if (firstIssueKey && issueStep === 3 && opensModelSettings(firstIssueKey)) openAppSettings();
                       }}
                     >
                       {t(WIZARD_STEPS[issueStep].key)} ({Object.keys(preflightErrors).filter((key) => errorStep(key, catalog) === issueStep).length})
@@ -2459,39 +2439,105 @@ export function NewJob() {
               </Alert>
             )}
             <div className="review-grid review-grid-detailed">
-              <ReviewBlock title={t("wizard.reviewVehicle")}><strong>{form.airframe} · {form.simulator_model}</strong><span>PX4 {form.px4_version}{form.firmware_commit ? ` @ ${form.firmware_commit}` : ""}</span><span>{t("wizard.review.vehicleWorld", { world: simulatorWorldLabel(form.simulator_world, t), display: t(form.simulator_headless ? "wizard.review.headless" : "wizard.review.gui") })}</span><span>{t("wizard.review.vehicleRuntime", { speed: form.simulation_speed_factor, instance: form.instance_id })}</span></ReviewBlock>
-              <ReviewBlock title={t("wizard.reviewSearch")}>
-                <strong>{t("wizard.review.parameterCount", { count: selectedCount })}</strong>
-                <span>{t("wizard.review.modeObjective", { mode: t(`wizard.mode.${form.tuning_mode}` as TranslationKey), objective: t(`wizard.objective.${form.objective_profile}` as TranslationKey) })}</span>
-                <span>{t("wizard.review.objectiveWeights", { tracking: form.objective_weight_tracking, speed: form.objective_weight_speed, smoothness: form.objective_weight_smoothness, robustness: form.objective_weight_robustness })}</span>
-                <span>{optimizerStrategyLabel(form.optimizer_strategy, t)} · {t(`wizard.aggregation.${form.robust_aggregation}` as TranslationKey)}</span>
+              <ReviewBlock title={t("wizard.reviewVehicle")}>
+                <ReviewFact label={t("wizard.field.px4Version")} value={form.px4_version} />
+                <ReviewFact label={t("wizard.field.firmwareCommit")} value={form.firmware_commit || t("wizard.review.notSet")} />
+                <ReviewFact label={t("wizard.field.airframe")} value={form.airframe} />
+                <ReviewFact label={t("wizard.field.gazeboModel")} value={form.simulator_model} />
+                <ReviewFact label={t("wizard.field.gazeboWorld")} value={simulatorWorldLabel(form.simulator_world, t)} />
+                <ReviewFact label={t("wizard.field.headless")} value={t(form.simulator_headless ? "wizard.option.disabled" : "wizard.option.enabled")} />
+                <ReviewFact label={t("wizard.field.simulationSpeed")} value={`×${form.simulation_speed_factor}`} />
+                <ReviewFact label={t("wizard.field.instanceId")} value={form.instance_id} />
+                <ReviewFact label={t("wizard.field.trackType")} value={t(`wizard.track.${form.track_type}` as TranslationKey)} />
+                <ReviewFact label={`${t("wizard.field.startX")} / ${t("wizard.field.startY")}`} value={`${form.start_x} / ${form.start_y}`} />
+                <ReviewFact label={t("wizard.field.altitude")} value={form.altitude_m} />
               </ReviewBlock>
-              <ReviewBlock title={t("wizard.reviewScenarios")}><strong>{t("wizard.review.searchCases", { cases: scenarioSearchCaseCount, seeds: searchSeedCount })}</strong><span>{t("wizard.review.holdoutCases", { cases: scenarioHoldoutCaseCount, seeds: scenarioHoldoutCaseCount > 0 ? parseSeedList(form.holdout_seeds).values.length : 0 })}</span><span>{t(form.advanced_enabled ? "wizard.review.advancedEnvironment" : "wizard.review.standardEnvironment")}</span></ReviewBlock>
-              <ReviewBlock title={t("wizard.reviewBudget")}><strong>{t("wizard.review.trialLimit", { count: form.max_total_trials })}</strong><span>{t("wizard.review.scheduledPlan", { scheduled: estimatedTrials, planned: trialPlan.plannedTrials })}</span><span>{t("wizard.review.runsPerCandidate", { count: trialPlan.scenarioTrialsPerCandidate })}</span></ReviewBlock>
+              <ReviewBlock title={t("wizard.reviewSearch")}>
+                <ReviewFact label={t("wizard.aria.modeSelector")} value={t(`wizard.mode.${form.tuning_mode}` as TranslationKey)} />
+                <ReviewFact label={t("wizard.field.objectiveProfile")} value={t(`wizard.objective.${form.objective_profile}` as TranslationKey)} />
+                <ReviewFact label={t("wizard.selectedParameters")} value={t("wizard.review.parameterCount", { count: selectedCount })} />
+                <ReviewFact label={t("wizard.field.weightTracking")} value={form.objective_weight_tracking} />
+                <ReviewFact label={t("wizard.field.weightSpeed")} value={form.objective_weight_speed} />
+                <ReviewFact label={t("wizard.field.weightSmoothness")} value={form.objective_weight_smoothness} />
+                <ReviewFact label={t("wizard.field.weightRobustness")} value={form.objective_weight_robustness} />
+                <ReviewFact label={t("wizard.field.robustAggregation")} value={t(`wizard.aggregation.${form.robust_aggregation}` as TranslationKey)} />
+              </ReviewBlock>
+              <ReviewBlock title={t("wizard.reviewScenarios")}>
+                <ReviewFact label={t("wizard.scenarioPresets")} value={t(`wizard.scenarioPreset.${form.scenario_preset}` as TranslationKey)} />
+                <ReviewFact label={t("wizard.case.nominalSearch")} value={t(form.nominal_search_enabled ? "wizard.option.enabled" : "wizard.option.disabled")} />
+                <ReviewFact label={t("wizard.case.windSearch")} value={t(form.wind_search_enabled ? "wizard.option.enabled" : "wizard.option.disabled")} />
+                <ReviewFact label={t("wizard.case.noiseSearch")} value={t(form.noise_search_enabled ? "wizard.option.enabled" : "wizard.option.disabled")} />
+                <ReviewFact label={t("wizard.case.nominalHoldout")} value={t(form.nominal_holdout_enabled ? "wizard.option.enabled" : "wizard.option.disabled")} />
+                <ReviewFact label={t("wizard.case.combinedHoldout")} value={t(form.combined_holdout_enabled ? "wizard.option.enabled" : "wizard.option.disabled")} />
+                <ReviewFact label={t("wizard.field.sensorNoise")} value={t(`wizard.noise.${form.sensor_noise_level}` as TranslationKey)} />
+                <ReviewFact label={t("wizard.review.windVector")} value={`N ${form.wind_north} · E ${form.wind_east} · S ${form.wind_south} · W ${form.wind_west}`} />
+                <ReviewFact label={t("wizard.field.searchSeeds")} value={form.search_seeds} />
+                <ReviewFact label={t("wizard.field.holdoutSeeds")} value={form.holdout_seeds} />
+                <ReviewFact label={t("wizard.field.commonRandomNumbers")} value={t(form.common_random_numbers ? "wizard.option.yes" : "wizard.option.no")} />
+                <ReviewFact label={t("wizard.field.advancedScenario")} value={t(form.advanced_enabled ? "wizard.option.enabled" : "wizard.option.disabled")} />
+              </ReviewBlock>
+              <ReviewBlock title={t("wizard.reviewBudget")}>
+                <ReviewFact label={t("wizard.field.simulatorBackend")} value={t(form.simulator_backend === "real_cli" ? "wizard.simulator.realCli" : "wizard.simulator.mock")} />
+                <ReviewFact label={t("wizard.optimizerStrategy")} value={optimizerStrategyLabel(form.optimizer_strategy, t)} />
+                <ReviewFact label={t("wizard.field.maxIterations")} value={form.max_iterations} />
+                <ReviewFact label={t("wizard.field.trialsPerCandidate")} value={form.trials_per_candidate} />
+                <ReviewFact label={t("wizard.field.maxTotalTrials")} value={form.max_total_trials} />
+                <ReviewFact label={t("wizard.review.scheduledLabel")} value={t("wizard.review.scheduledPlan", { scheduled: estimatedTrials, planned: trialPlan.plannedTrials })} />
+                <ReviewFact label={t("wizard.field.targetRmse")} value={form.target_rmse || t("wizard.review.notSet")} />
+                <ReviewFact label={t("wizard.field.targetMaxError")} value={form.target_max_error || t("wizard.review.notSet")} />
+                <ReviewFact label={t("wizard.field.minPassRate")} value={form.min_pass_rate} />
+              </ReviewBlock>
             </div>
-            {selectedHighRiskCount > 0 || selectedRestartCount > 0 ? (
-              <Alert tone="warning" title={t("wizard.parameterRiskTitle")}>
-                {t("wizard.review.parameterRisk", { highRisk: selectedHighRiskCount, restart: selectedRestartCount })}
-              </Alert>
-            ) : null}
-            <div className="review-parameter-list">
-              <h3>{t("wizard.selectedParameters")}</h3>
-              {visibleSelectedParameterRows.map((parameter) => <code key={parameter.name}>{parameter.name} [{parameter.search_min}, {parameter.search_max}]</code>)}
-              {selectedParameterRows.length > visibleSelectedParameterRows.length ? (
-                <button ref={parameterReviewTriggerRef} type="button" className="btn btn-ghost btn-small" onClick={() => setShowParameterReview(true)}>
-                  {t("wizard.review.moreParameters", { count: selectedParameterRows.length - visibleSelectedParameterRows.length })} · {t("wizard.viewAllParameters")}
-                </button>
-              ) : null}
-            </div>
+            <section className="review-block review-parameter-card" aria-labelledby="selected-parameters-title">
+              <div className="review-parameter-card-heading">
+                <h3 id="selected-parameters-title">
+                  <button
+                    ref={parameterReviewTriggerRef}
+                    type="button"
+                    className="review-parameter-title-button"
+                    aria-label={t("wizard.viewAllParameters")}
+                    aria-haspopup="dialog"
+                    aria-expanded={showParameterReview}
+                    onClick={() => setShowParameterReview(true)}
+                  >
+                    {t("wizard.selectedParameters")}
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M7 4h9v9M16 4 6 14M13 11v5H4V7h5" />
+                    </svg>
+                  </button>
+                </h3>
+                <span>{t("wizard.review.parameterCount", { count: selectedParameterRows.length })}</span>
+              </div>
+              <div className="review-parameter-chips review-parameter-preview" aria-hidden="true">
+                {selectedParameterRows.map((parameter) => (
+                  <code key={parameter.name}>
+                    <strong>{parameter.name}</strong>
+                    <span>{parameter.search_min} – {parameter.search_max}</span>
+                  </code>
+                ))}
+              </div>
+            </section>
             {showParameterReview ? (
-              <div className="wizard-modal-backdrop" role="presentation" onMouseDown={(event) => {
-                if (event.target !== event.currentTarget) return;
-                setShowParameterReview(false);
-                window.requestAnimationFrame(() => parameterReviewTriggerRef.current?.focus());
-              }}>
-                <section className="wizard-modal" role="dialog" aria-modal="true" aria-labelledby="parameter-review-title">
+              <div
+                className="wizard-modal-backdrop"
+                role="presentation"
+                onMouseDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  setShowParameterReview(false);
+                  window.requestAnimationFrame(() => parameterReviewTriggerRef.current?.focus());
+                }}
+              >
+                <section
+                  className="wizard-modal wizard-parameter-review-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="selected-parameters-dialog-title"
+                >
                   <header className="wizard-modal-header">
-                    <h3 id="parameter-review-title">{t("wizard.selectedParameters")}</h3>
+                    <div>
+                      <h3 id="selected-parameters-dialog-title">{t("wizard.selectedParameters")}</h3>
+                      <span>{t("wizard.review.parameterCount", { count: selectedParameterRows.length })}</span>
+                    </div>
                     <button
                       autoFocus
                       type="button"
@@ -2506,8 +2552,13 @@ export function NewJob() {
                       <span aria-hidden="true">×</span>
                     </button>
                   </header>
-                  <div className="review-parameter-list review-parameter-list-dialog">
-                    {selectedParameterRows.map((parameter) => <code key={parameter.name}>{parameter.name} [{parameter.search_min}, {parameter.search_max}]</code>)}
+                  <div className="review-parameter-modal-grid">
+                    {selectedParameterRows.map((parameter) => (
+                      <code key={parameter.name}>
+                        <strong>{parameter.name}</strong>
+                        <span>{parameter.search_min} – {parameter.search_max}</span>
+                      </code>
+                    ))}
                   </div>
                 </section>
               </div>
@@ -2526,7 +2577,11 @@ export function NewJob() {
 }
 
 function ReviewBlock({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="review-block"><h3>{title}</h3>{children}</div>;
+  return <section className="review-block"><h3>{title}</h3><dl className="review-facts">{children}</dl></section>;
+}
+
+function ReviewFact({ label, value }: { label: string; value: ReactNode }) {
+  return <div><dt>{label}</dt><dd>{value}</dd></div>;
 }
 
 interface BooleanSelectProps {
@@ -2575,5 +2630,65 @@ function Field({ label, htmlFor, required, error, children }: FieldProps) {
       {children}
       {error ? <span className="form-error" role="alert">{error}</span> : null}
     </div>
+  );
+}
+
+function OptimizationStrategyCard({
+  strategy,
+  t,
+  modelProvider,
+  modelName,
+  modelConfigured,
+}: {
+  strategy: OptimizerStrategy;
+  t: Translate;
+  modelProvider: string;
+  modelName: string;
+  modelConfigured: boolean;
+}) {
+  const presentation = optimizerStrategyCard(strategy, t);
+  const flowDetails = [
+    t("wizard.strategyCard.flowDetail1"),
+    t("wizard.strategyCard.flowDetail2"),
+    t("wizard.strategyCard.flowDetail3"),
+    t("wizard.strategyCard.flowDetail4"),
+  ];
+  const modelStatus = !modelConfigured
+    ? t("wizard.strategyCard.modelMissing")
+    : modelName.trim()
+      ? t("wizard.strategyCard.modelReady", { provider: modelProvider, model: modelName })
+      : t("wizard.strategyCard.modelDefault", { provider: modelProvider });
+
+  return (
+    <section
+      className="optimization-strategy-card"
+      aria-label={t("wizard.pipeline.aria")}
+    >
+      <header className="optimization-strategy-heading">
+        <span>{t("wizard.strategyCard.kicker")}</span>
+        <h3>{presentation.label}</h3>
+        <p>{presentation.description}</p>
+      </header>
+      <div className="optimization-strategy-flow" aria-label={t("wizard.strategyCard.flowTitle")}>
+        {presentation.flow.map((stage, index) => (
+          <div className="optimization-strategy-step" key={stage}>
+            <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <strong>{stage}</strong>
+              <small>{flowDetails[index]}</small>
+            </div>
+          </div>
+        ))}
+      </div>
+      {strategy === "gpt" ? (
+        <div className={`optimization-model-status${modelConfigured ? " configured" : ""}`}>
+          <span>{t("wizard.strategyCard.modelAccess")}</span>
+          <strong>{modelStatus}</strong>
+        </div>
+      ) : null}
+      <div className="optimization-strategy-copy">
+        <p>{presentation.detail}</p>
+      </div>
+    </section>
   );
 }

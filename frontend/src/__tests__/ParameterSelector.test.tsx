@@ -51,10 +51,13 @@ describe("ParameterSelector compact parameter table", () => {
     expect(screen.queryByText("search dimensions")).not.toBeInTheDocument();
     expect(screen.queryByText("planned trials")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Reapply preset/i })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Tune MPC_ACC_HOR")).toHaveValue("include");
-    fireEvent.change(screen.getByLabelText("Tune MPC_ACC_HOR"), {
-      target: { value: "exclude" },
-    });
+    expect(screen.getByLabelText("Tune MPC_ACC_HOR")).toBeChecked();
+    expect(screen.getByText("MPC_ACC_HOR").parentElement).toHaveTextContent(
+      "MPC_ACC_HOR:Horizontal acceleration",
+    );
+    expect(screen.getByText("Horizontal acceleration").parentElement)
+      .toBe(screen.getByText("MPC_ACC_HOR").parentElement);
+    fireEvent.click(screen.getByLabelText("Tune MPC_ACC_HOR"));
     expect(changeSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         MPC_ACC_HOR: expect.objectContaining({ selected: false }),
@@ -92,9 +95,7 @@ describe("ParameterSelector compact parameter table", () => {
     expect(screen.getByLabelText("Tune MPC_XY_P")).toBeEnabled();
     expect(screen.getByLabelText("MPC_XY_P search minimum")).toBeInTheDocument();
     expect(screen.getByLabelText("MPC_XY_P search maximum")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Tune MPC_XY_P"), {
-      target: { value: "exclude" },
-    });
+    fireEvent.click(screen.getByLabelText("Tune MPC_XY_P"));
     expect(changeSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         MPC_XY_P: expect.objectContaining({ selected: false }),

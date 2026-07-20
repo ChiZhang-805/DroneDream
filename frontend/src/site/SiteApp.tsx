@@ -13,11 +13,13 @@ import {
 } from "./release";
 
 const GITHUB_URL = "https://github.com/ChiZhang-805/DroneDream";
+const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`;
+const PRIVACY_POLICY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 
 const content = {
   en: {
     skip: "Skip to content",
-    metaTitle: "DroneDream — Autonomous PX4 tuning",
+    metaTitle: "DroneDream",
     metaDescription: "Configure, optimize, simulate, and compare PX4 control parameters in one local Windows workflow.",
     navLabel: "Primary navigation",
     nav: [
@@ -49,9 +51,12 @@ const content = {
         label: "01 · Define",
         title: "Define the target flight",
         body: [
-          "Choose vehicle, PX4 controls, world, and route.",
-          "Set safety limits, trial budget, and acceptance.",
-          "Give every simulation a clear measurable target for review.",
+          "Pick vehicle, PX4 stack, Gazebo world, and route.",
+          "Set safety limits, budget, and success metrics.",
+          "Tie every run to one repeatable flight question.",
+          "Record assumptions before spending a trial.",
+          "Make targets measurable for later review.",
+          "Start with clean rules and comparable outcomes.",
         ],
         status: "Experiment configured",
       },
@@ -59,9 +64,12 @@ const content = {
         label: "02 · Search",
         title: "Choose the next candidate",
         body: [
-          "Combine history with fresh simulation feedback.",
-          "Coordinate Bayesian, CMA-ES, and trust-region search.",
-          "Propose the most informative candidate for the next trial.",
+          "Read history, failed trials, and new feedback.",
+          "Keep bounds, coupling, and feasibility active.",
+          "Let Bayesian, trust-region, evolution compete.",
+          "Spend budget where the model still learns.",
+          "Propose candidates with clear information value.",
+          "Turn gain guessing into disciplined, evidence-led search.",
         ],
         status: "Candidate 24 / 60",
       },
@@ -70,8 +78,11 @@ const content = {
         title: "Compare the evidence",
         body: [
           "Check feasibility, error, overshoot, and settling.",
-          "Compare robustness, repeats, and Pareto trade-offs.",
-          "Keep the evidence behind every accepted candidate.",
+          "Compare repeats, robustness, and Pareto trade-offs.",
+          "Reject winners that break hidden constraints.",
+          "Keep logs, metrics, seeds, and snapshots together.",
+          "Preserve evidence for accepted control settings.",
+          "Make every result auditable by the entire flight team.",
         ],
         status: "Acceptance passed",
       },
@@ -166,11 +177,12 @@ const content = {
     previewNote:
       "Unsigned preview · Windows SmartScreen confirmation may be required.",
     footerLine: "Local-first autonomous control-parameter tuning for PX4 and Gazebo.",
-    privacy: "No account is required for local preview workflows.",
+    codeSigningPolicy: "Code signing policy",
+    privacyPolicy: "Privacy policy",
   },
   "zh-CN": {
     skip: "跳到主要内容",
-    metaTitle: "DroneDream — 无人机控制参数自动调优",
+    metaTitle: "DroneDream",
     metaDescription: "在 Windows 本地完成 PX4 控制参数选择、自动优化、可复现仿真与结果对比。",
     navLabel: "主导航",
     nav: [
@@ -202,9 +214,12 @@ const content = {
         label: "01 · 定义",
         title: "定义目标飞行任务",
         body: [
-          "选择机型、PX4 参数、仿真世界与飞行航迹。",
-          "同步设置安全边界、试验预算与验收条件。",
-          "让每次仿真都有清晰且可衡量的目标，便于后续客观比较。",
+          "选择机型、PX4 控制栈、Gazebo 世界与飞行航迹。",
+          "同步设定安全边界、试验预算与验收指标。",
+          "让每次运行都对应同一个可复现的飞行问题。",
+          "在优化器消耗试验前先记录关键假设与约束。",
+          "把目标写成可度量的指标，方便后续证据复核。",
+          "用清晰规则开始搜索，让后续结果天然可以横向比较。",
         ],
         status: "实验配置完成",
       },
@@ -212,9 +227,12 @@ const content = {
         label: "02 · 搜索",
         title: "选择下一组候选",
         body: [
-          "结合历史结果与最新一轮仿真反馈。",
-          "协同贝叶斯、CMA-ES 与信赖域搜索。",
-          "为下一次试验提出信息价值最高的候选参数组合方案。",
+          "读取历史试验、失败样本与最新仿真反馈。",
+          "持续保留参数边界、耦合关系和可行性约束。",
+          "让贝叶斯、信赖域、进化和组合搜索共同竞争。",
+          "把预算投入模型仍能学习最多信息的区域。",
+          "给出下一组候选值，并说明它的探索价值。",
+          "从手动猜增益，转向有纪律、可复核的实验搜索。",
         ],
         status: "候选方案 24 / 60",
       },
@@ -222,9 +240,12 @@ const content = {
         label: "03 · 验证",
         title: "用证据比较结果",
         body: [
-          "核对可行性、跟踪误差、超调与稳定时间。",
-          "比较鲁棒性、重复试验结果与 Pareto 权衡。",
-          "为每个通过验收的候选方案保留完整证据与复核依据。",
+          "检查可行性、跟踪误差、超调和稳定过程。",
+          "比较重复试验、鲁棒场景与 Pareto 权衡。",
+          "拒绝只靠破坏隐藏约束取得高分的候选。",
+          "把日志、指标、种子和参数快照一起保留。",
+          "为每个通过验收的控制设置留下完整证据。",
+          "让每一次调优结果都能被团队清楚复核和继续追踪。",
         ],
         status: "通过验收条件",
       },
@@ -317,7 +338,8 @@ const content = {
     released: "发布日期",
     previewNote: "未签名预览版 · Windows SmartScreen 可能要求确认。",
     footerLine: "面向 PX4 与 Gazebo 的本地优先无人机控制参数自动调优平台。",
-    privacy: "本地预览工作流不要求注册账户。",
+    codeSigningPolicy: "代码签名政策",
+    privacyPolicy: "隐私政策",
   },
 } as const;
 
@@ -1159,7 +1181,16 @@ export function SiteApp() {
         <div className="site-shell">
           <div className="site-footer-brand"><img src={appIcon} alt="" /><strong>DroneDream</strong></div>
           <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
-          <span data-copy-block data-copy-id="footer-privacy">{copy.privacy}</span>
+          <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
+            <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
+              <FeatureIcon name="shield" />
+              {copy.codeSigningPolicy}
+            </a>
+            <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
+              <DocumentIcon />
+              {copy.privacyPolicy}
+            </a>
+          </nav>
           <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
         </div>
       </footer>

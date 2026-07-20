@@ -59,10 +59,12 @@ afterEach(() => {
 });
 
 describe("environment-aware routing", () => {
-  it("uses hash routing and allows guarded routes only after a fresh ready probe", async () => {
+  it("uses cached pre-workspace readiness without rechecking guarded routes", async () => {
     const invoke = installDesktopBridge();
     window.history.replaceState(null, "", "/#/desktop/setup");
     vi.resetModules();
+    const { ensureOverallDesktopReadiness } = await import("../desktop/readiness");
+    await ensureOverallDesktopReadiness({ autoStart: false });
     const { router } = await import("../router");
 
     expect(router.state.location.pathname).toBe("/desktop/setup");
@@ -71,11 +73,10 @@ describe("environment-aware routing", () => {
     expect(invoke.mock.calls.map(([command]) => command).sort()).toEqual([
       "probe_runtime_status",
       "probe_system_prerequisites",
-      "start_runtime",
     ]);
     await router.navigate("/history");
     await router.navigate("/jobs/new");
-    expect(invoke).toHaveBeenCalledTimes(3);
+    expect(invoke).toHaveBeenCalledTimes(2);
 
     router.dispose();
   });
@@ -147,12 +148,12 @@ describe("environment-aware routing", () => {
     expect(router.state.location.pathname).toBe("/dashboard");
     expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
     expect(window.location.hash).toBe("#/dashboard?settings=runtime&required=experiment");
-    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).not.toHaveBeenCalled();
 
     router.dispose();
   });
 
-  it("automatically starts a confirmed stopped runtime before a guarded deep link", async () => {
+  it("does not probe or start a stopped runtime from a guarded deep link", async () => {
     const stoppedRuntime = {
       ...readyRuntime,
       running: false,
@@ -174,9 +175,11 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/jobs/new");
+    expect(router.state.location.pathname).toBe("/dashboard");
+    expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
+    expect(invoke).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
-      .toHaveLength(1);
+      .toHaveLength(0);
 
     router.dispose();
   });

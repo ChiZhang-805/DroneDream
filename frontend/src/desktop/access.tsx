@@ -55,6 +55,9 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
   const initialPath = useRef(location.pathname);
   const requestId = useRef(0);
   const initialSession = getDesktopReadinessSession();
+  const shouldCheckBeforeWorkspace = desktopRuntime &&
+    initialPath.current === "/desktop/setup" &&
+    !initialSession;
   const [status, setStatus] = useState<DesktopRuntimeAccessStatus>(
     desktopRuntime
       ? initialSession?.snapshot.ready
@@ -63,7 +66,9 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
           ? "startFailed"
           : initialSession
             ? "blocked"
-            : "checking"
+            : shouldCheckBeforeWorkspace
+              ? "checking"
+              : "blocked"
       : "browser",
   );
   const [snapshot, setSnapshot] = useState<DesktopReadinessSnapshot | null>(
@@ -75,7 +80,7 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
   const [lastFullCheckAt, setLastFullCheckAt] = useState<number | null>(
     desktopRuntime ? initialSession?.lastFullCheckAt ?? null : null,
   );
-  const [isChecking, setIsChecking] = useState(desktopRuntime && !initialSession);
+  const [isChecking, setIsChecking] = useState(shouldCheckBeforeWorkspace);
 
   const applySnapshot = useCallback((next: DesktopReadinessSnapshot) => {
     snapshotRef.current = next;
@@ -131,19 +136,26 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
       return;
     }
 
-    const currentRequest = ++requestId.current;
-    const hadSession = Boolean(getDesktopReadinessSession());
-    if (!hadSession) {
-      setStatus("checking");
-      setIsChecking(true);
+    // A full automatic check is allowed only on the setup screen, before the
+    // user enters the workspace. Dashboard, history, settings, and route
+    // changes must never start a probe. Inside the workspace, refresh() is the
+    // sole full-check entry point and is wired only to the explicit Settings
+    // button.
+    if (initialPath.current !== "/desktop/setup" || getDesktopReadinessSession()) {
+      setIsChecking(false);
+      return;
     }
+
+    const currentRequest = ++requestId.current;
+    setStatus("checking");
+    setIsChecking(true);
     let automaticStartAttempted = false;
     void ensureOverallDesktopReadiness({
-      autoStart: initialPath.current !== "/desktop/setup",
+      autoStart: false,
       shouldAutoStart: () => requestId.current === currentRequest,
       onStarting: () => {
         automaticStartAttempted = true;
-        if (requestId.current === currentRequest && !hadSession) setStatus("starting");
+        if (requestId.current === currentRequest) setStatus("starting");
       },
     }).then((next) => {
       if (requestId.current === currentRequest) applySnapshot(next);
@@ -163,7 +175,7 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
   const value = useMemo<DesktopRuntimeAccess>(() => ({
     desktopRuntime,
     status,
-    canUseRuntime: !desktopRuntime || status === "ready",
+    canUseRuntime: !desktopRuntime || (status === "ready" && !isChecking),
     snapshot,
     lastFullCheckAt,
     isChecking,

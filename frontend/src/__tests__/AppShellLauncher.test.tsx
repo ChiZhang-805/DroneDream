@@ -81,6 +81,7 @@ afterEach(() => {
   resetDesktopReadinessSession();
   delete window.__TAURI__;
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 describe("desktop launcher chrome", () => {
@@ -89,6 +90,8 @@ describe("desktop launcher chrome", () => {
     installDesktopBridge();
     const { router } = renderLauncher();
 
+    const checked = await screen.findByText("Checked");
+    expect(checked.closest(".launcher-runtime-indicator")).toHaveClass("is-checked");
     expect(screen.queryByRole("combobox", { name: "Language" })).not.toBeInTheDocument();
     const settings = screen.getByRole("button", { name: "Settings" });
     expect(settings).toHaveAttribute("aria-expanded", "false");
@@ -112,6 +115,25 @@ describe("desktop launcher chrome", () => {
       .toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "简体中文" }).querySelector("svg"))
       .toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText("Model provider"), {
+      target: { value: "qwen" },
+    });
+    expect(within(dialog).getByLabelText("Model name")).toHaveValue("qwen-plus");
+    expect(within(dialog).getByLabelText("Compatible API base URL")).toHaveValue(
+      "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    );
+    fireEvent.change(within(dialog).getByLabelText("Model API key"), {
+      target: { value: "session-only-key" },
+    });
+    await waitFor(() => {
+      expect(window.sessionStorage.getItem("dronedream:model-access-key:v1"))
+        .toBe("session-only-key");
+      expect(window.localStorage.getItem("dronedream:model-access:v1"))
+        .toContain("qwen-plus");
+      expect(window.localStorage.getItem("dronedream:model-access:v1"))
+        .not.toContain("session-only-key");
+    });
 
     fireEvent.click(within(dialog).getByRole("button", { name: "简体中文" }));
     await waitFor(() => {
@@ -163,7 +185,8 @@ describe("desktop launcher chrome", () => {
     await waitFor(() => expect(close).toHaveFocus());
 
     fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
-    expect(within(dialog).getByRole("button", { name: "Check environment" })).toHaveFocus();
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    expect(close).not.toHaveFocus();
     fireEvent.keyDown(document, { key: "Tab" });
     expect(close).toHaveFocus();
 

@@ -354,9 +354,7 @@ describe("apiClient envelope handling", () => {
     );
   });
 
-  it("uses only a lightweight Runtime probe before a real run and blocks stale health", async () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+  it("uses the cached manual environment result before a real run without probing again", async () => {
     const readyRuntime = {
       runtimeName: "DroneDreamRuntime",
       installed: true,
@@ -367,35 +365,34 @@ describe("apiClient envelope handling", () => {
       components: runtimeComponents,
       diagnostics: [] as string[],
     };
-    const unhealthyRuntime = {
-      ...readyRuntime,
-      ready: false,
-      components: runtimeComponents.map((component) =>
-        component.id === "local-backend"
-          ? { ...component, status: "unhealthy" }
-          : component,
-      ),
-      diagnostics: ["Backend stopped after the page was opened."],
-    };
-    let runtime = readyRuntime;
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return desktopPrerequisites;
-      if (command === "probe_runtime_status") return runtime;
+      if (command === "probe_runtime_status") return readyRuntime;
       if (command === "start_runtime") return readyRuntime;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
     await ensureOverallDesktopReadiness({ autoStart: true });
     invoke.mockClear();
-    runtime = unhealthyRuntime;
+    mockFetchOnce({ success: true, data: { id: "job_1" }, error: null });
 
-    await expect(apiClient.createJob({} as never))
-      .rejects.toMatchObject({
-        code: "DESKTOP_RUNTIME_NOT_READY",
-        httpStatus: 0,
+    await expect(apiClient.createJob({} as never)).resolves.toMatchObject({ id: "job_1" });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("blocks a real run without a cached manual check and never probes automatically", async () => {
+    const invoke = vi.fn(async () => undefined);
+    const fetchSpy = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(apiClient.createJob({} as never)).rejects.toMatchObject({
+      code: "DESKTOP_RUNTIME_NOT_READY",
+      httpStatus: 0,
     });
+    expect(invoke).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(invoke.mock.calls.map(([command]) => command)).toEqual(["probe_runtime_status"]);
   });
 
   it("does not recheck the environment for metadata-only mutations", async () => {

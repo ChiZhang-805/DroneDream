@@ -8,7 +8,7 @@ import type { RouteObject } from "react-router-dom";
 
 import { AppShell } from "./AppShell";
 import { isDesktopRuntime } from "./desktop/bridge";
-import { ensureOverallDesktopReadiness } from "./desktop/readiness";
+import { getDesktopReadinessSession } from "./desktop/readiness";
 import { Dashboard } from "./pages/Dashboard";
 import { NewJob } from "./pages/NewJob";
 import { JobDetail } from "./pages/JobDetail";
@@ -21,16 +21,9 @@ import { DesktopSetup } from "./pages/DesktopSetup";
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
   const requireDesktopReadiness = (feature: "experiment" | "job") =>
     desktopRuntime
-      ? async () => {
-          try {
-            const snapshot = await ensureOverallDesktopReadiness({ autoStart: true });
-            return snapshot.ready
-              ? null
-              : redirect(`/dashboard?settings=runtime&required=${feature}`);
-          } catch {
-            return redirect(`/dashboard?settings=runtime&required=${feature}`);
-          }
-        }
+      ? () => getDesktopReadinessSession()?.snapshot.ready
+        ? null
+        : redirect(`/dashboard?settings=runtime&required=${feature}`)
       : undefined;
   const fallbackPath = desktopRuntime ? "/dashboard" : "/";
 

@@ -230,29 +230,30 @@ export function ParameterSelector({
                     if (!selection) return null;
                     const parameterError = errors[parameter.name];
                     const localizedLabel = locale === "zh-CN"
-                      ? parameter.localized_label?.["zh-CN"] ?? parameter.name
-                      : parameter.localized_label?.en ?? parameter.name;
+                      ? parameter.localized_label?.["zh-CN"] ?? parameter.label ?? parameter.name
+                      : parameter.localized_label?.en ?? parameter.label ?? parameter.name;
                     return (
                       <tr
                         key={parameter.name}
                         className={selection.selected ? "parameter-row-selected" : undefined}
                       >
-                        <td>
-                          <select
-                            className="parameter-use-select"
+                        <td className="parameter-use-cell">
+                          <input
+                            className="parameter-use-checkbox"
+                            type="checkbox"
                             aria-label={t("parameter.aria.tune", { name: parameter.name })}
-                            value={selection.selected ? "include" : "exclude"}
+                            checked={selection.selected}
                             onChange={(event) =>
-                              patchSelection(parameter.name, { selected: event.target.value === "include" })
+                              patchSelection(parameter.name, { selected: event.target.checked })
                             }
-                          >
-                            <option value="include">{t("parameter.include")}</option>
-                            <option value="exclude">{t("parameter.exclude")}</option>
-                          </select>
+                          />
                         </td>
-                        <td>
+                        <td className="parameter-identity-cell">
+                          <div className="parameter-identity">
                           <code className="parameter-name">{parameter.name}</code>
+                          <span className="parameter-identity-separator" aria-hidden="true">:</span>
                           <span className="parameter-label">{localizedLabel}</span>
+                          </div>
                         </td>
                         <td>
                           <label className="sr-only" htmlFor={`parameter-${parameter.name}-baseline`}>

@@ -27,8 +27,10 @@ type DroneLaunchSceneProps = {
 const CARBON = 0x171827;
 const GRAPHITE = 0x30334a;
 const METAL = 0x697087;
-const MAGENTA = 0xff4fd8;
-const CYAN = 0x54e8ff;
+const CYAN = 0x68e8ff;
+const BLUE = 0x6d8cff;
+const VIOLET = 0x9b72ff;
+const MAGENTA = 0xf166d8;
 
 function disposeScene(root: THREE.Object3D) {
   const geometries = new Set<THREE.BufferGeometry>();
@@ -65,7 +67,7 @@ function tubeBetween(
   return tube;
 }
 
-function buildDrone() {
+function buildDrone(accentGlowTexture: THREE.Texture | null) {
   const drone = new THREE.Group();
   drone.name = "procedural-quadcopter";
 
@@ -89,25 +91,68 @@ function buildDrone() {
   const glass = new THREE.MeshPhysicalMaterial({
     color: 0x07121c,
     emissive: 0x0b3e56,
-    emissiveIntensity: 0.55,
+    emissiveIntensity: 0.78,
     roughness: 0.05,
     metalness: 0.2,
     transmission: 0.22,
     transparent: true,
     opacity: 0.92,
   });
-  const magentaLight = new THREE.MeshStandardMaterial({
+  const magentaLight = new THREE.MeshBasicMaterial({
     color: MAGENTA,
-    emissive: MAGENTA,
-    emissiveIntensity: 4.2,
     toneMapped: false,
   });
-  const cyanLight = new THREE.MeshStandardMaterial({
+  const cyanLight = new THREE.MeshBasicMaterial({
     color: CYAN,
-    emissive: CYAN,
-    emissiveIntensity: 4.2,
     toneMapped: false,
   });
+  const cyanHotLight = new THREE.MeshBasicMaterial({
+    color: CYAN,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const magentaHotLight = new THREE.MeshBasicMaterial({
+    color: MAGENTA,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const cyanGlow = accentGlowTexture
+    ? new THREE.SpriteMaterial({
+        map: accentGlowTexture,
+        color: CYAN,
+        transparent: true,
+        opacity: 0.96,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    : null;
+  const magentaGlow = accentGlowTexture
+    ? new THREE.SpriteMaterial({
+        map: accentGlowTexture,
+        color: MAGENTA,
+        transparent: true,
+        opacity: 0.94,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      })
+    : null;
+  const addAccentGlow = (
+    position: THREE.Vector3,
+    material: THREE.SpriteMaterial | null,
+    width: number,
+    height = width,
+  ) => {
+    if (!material) return;
+    const glow = new THREE.Sprite(material);
+    glow.position.copy(position);
+    glow.scale.set(width, height, 1);
+    glow.renderOrder = 3;
+    drone.add(glow);
+  };
 
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.48, 0.82, 10, 24), carbon);
   body.rotation.x = Math.PI / 2;
@@ -131,6 +176,21 @@ function buildDrone() {
   const batteryStripe = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.018, 0.16), cyanLight);
   batteryStripe.position.set(0, 0.523, -0.25);
   drone.add(batteryStripe);
+  const batteryStripeCore = new THREE.Mesh(
+    new THREE.BoxGeometry(0.56, 0.022, 0.048),
+    cyanHotLight,
+  );
+  batteryStripeCore.position.set(0, 0.535, -0.25);
+  drone.add(batteryStripeCore);
+  addAccentGlow(new THREE.Vector3(0, 0.56, -0.25), cyanGlow, 1.65, 0.56);
+  addAccentGlow(new THREE.Vector3(0, 0.565, -0.25), cyanGlow, 0.72, 0.22);
+
+  const cyanAccentLight = new THREE.PointLight(CYAN, 14, 3.5, 2);
+  cyanAccentLight.position.set(-0.62, 0.12, -0.18);
+  drone.add(cyanAccentLight);
+  const magentaAccentLight = new THREE.PointLight(MAGENTA, 14, 3.5, 2);
+  magentaAccentLight.position.set(0.62, 0.12, 0.18);
+  drone.add(magentaAccentLight);
 
   const motorPositions = [
     new THREE.Vector3(-1.58, 0.04, -1.3),
@@ -141,6 +201,10 @@ function buildDrone() {
   const rotors: THREE.Group[] = [];
 
   for (const [index, position] of motorPositions.entries()) {
+    const rotorColor = index % 2 === 0 ? CYAN : MAGENTA;
+    const rotorLightMaterial = index % 2 === 0 ? cyanLight : magentaLight;
+    const rotorHotLightMaterial = index % 2 === 0 ? cyanHotLight : magentaHotLight;
+    const rotorGlowMaterial = index % 2 === 0 ? cyanGlow : magentaGlow;
     const shoulder = position.clone().multiplyScalar(0.34);
     shoulder.y = 0.02;
     const elbow = position.clone().multiplyScalar(0.72);
@@ -184,14 +248,34 @@ function buildDrone() {
     secondBlade.rotation.y = Math.PI / 2 + 0.08;
     rotor.add(secondBlade);
 
+    const rotorLightGeometry = new THREE.BoxGeometry(0.98, 0.016, 0.056);
+    const rotorLightBar = new THREE.Mesh(rotorLightGeometry, rotorLightMaterial);
+    rotorLightBar.position.y = 0.061;
+    rotorLightBar.rotation.y = 0.08;
+    rotor.add(rotorLightBar);
+    const secondRotorLightBar = rotorLightBar.clone();
+    secondRotorLightBar.rotation.y = Math.PI / 2 + 0.08;
+    rotor.add(secondRotorLightBar);
+
+    const rotorCoreGeometry = new THREE.BoxGeometry(0.58, 0.019, 0.018);
+    const rotorCoreBar = new THREE.Mesh(rotorCoreGeometry, rotorHotLightMaterial);
+    rotorCoreBar.position.y = 0.071;
+    rotorCoreBar.rotation.y = 0.08;
+    rotor.add(rotorCoreBar);
+    const secondRotorCoreBar = rotorCoreBar.clone();
+    secondRotorCoreBar.rotation.y = Math.PI / 2 + 0.08;
+    rotor.add(secondRotorCoreBar);
+
     const wash = new THREE.Mesh(
       new THREE.RingGeometry(0.28, 0.76, 48),
       new THREE.MeshBasicMaterial({
-        color: index % 2 === 0 ? CYAN : MAGENTA,
+        color: rotorColor,
         transparent: true,
-        opacity: 0.075,
+        opacity: 0.19,
         side: THREE.DoubleSide,
         depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
       }),
     );
     wash.rotation.x = -Math.PI / 2;
@@ -201,13 +285,31 @@ function buildDrone() {
     drone.add(rotor);
 
     const led = new THREE.Mesh(
-      new THREE.SphereGeometry(0.055, 16, 10),
-      position.z > 0 ? magentaLight : cyanLight,
+      new THREE.SphereGeometry(0.078, 16, 10),
+      rotorLightMaterial,
     );
     led.position.copy(position);
     led.position.y -= 0.11;
     led.position.z += position.z > 0 ? 0.11 : -0.11;
     drone.add(led);
+    const ledCore = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 14, 8),
+      rotorHotLightMaterial,
+    );
+    ledCore.position.copy(led.position);
+    ledCore.position.z += position.z > 0 ? 0.055 : -0.055;
+    drone.add(ledCore);
+    addAccentGlow(
+      led.position,
+      rotorGlowMaterial,
+      0.78,
+    );
+    addAccentGlow(ledCore.position, rotorGlowMaterial, 0.32);
+
+    const rotorPointLight = new THREE.PointLight(rotorColor, 5.2, 2.2, 2);
+    rotorPointLight.position.copy(position);
+    rotorPointLight.position.y += 0.22;
+    drone.add(rotorPointLight);
   }
 
   const gimbalYaw = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.16, 24), metal);
@@ -232,6 +334,11 @@ function buildDrone() {
   const lensCore = new THREE.Mesh(new THREE.CircleGeometry(0.07, 24), cyanLight);
   lensCore.position.set(0, -0.73, 1.054);
   drone.add(lensCore);
+  const lensHotCore = new THREE.Mesh(new THREE.CircleGeometry(0.032, 24), cyanHotLight);
+  lensHotCore.position.set(0, -0.73, 1.059);
+  drone.add(lensHotCore);
+  addAccentGlow(new THREE.Vector3(0, -0.73, 1.075), cyanGlow, 0.84);
+  addAccentGlow(new THREE.Vector3(0, -0.73, 1.08), cyanGlow, 0.32);
 
   for (const x of [-0.52, 0.52]) {
     const hip = new THREE.Vector3(x, -0.3, -0.22);
@@ -244,9 +351,28 @@ function buildDrone() {
 
   const sideAccentGeometry = new THREE.BoxGeometry(0.035, 0.12, 0.74);
   for (const x of [-0.585, 0.585]) {
-    const accent = new THREE.Mesh(sideAccentGeometry, x < 0 ? cyanLight : magentaLight);
+    const isCyan = x < 0;
+    const accent = new THREE.Mesh(sideAccentGeometry, isCyan ? cyanLight : magentaLight);
     accent.position.set(x, 0.04, 0.02);
     drone.add(accent);
+    const accentCore = new THREE.Mesh(
+      new THREE.BoxGeometry(0.041, 0.045, 0.46),
+      isCyan ? cyanHotLight : magentaHotLight,
+    );
+    accentCore.position.set(x + (isCyan ? -0.004 : 0.004), 0.04, 0.02);
+    drone.add(accentCore);
+    addAccentGlow(
+      new THREE.Vector3(x + (isCyan ? -0.045 : 0.045), 0.04, 0.04),
+      isCyan ? cyanGlow : magentaGlow,
+      0.68,
+      1.15,
+    );
+    addAccentGlow(
+      new THREE.Vector3(x + (isCyan ? -0.05 : 0.05), 0.04, 0.04),
+      isCyan ? cyanGlow : magentaGlow,
+      0.28,
+      0.6,
+    );
   }
 
   return { drone, rotors };
@@ -298,10 +424,12 @@ function buildStarLayer({
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   const palette = [
-    new THREE.Color(0xe9f7ff),
-    new THREE.Color(0x86eaff),
-    new THREE.Color(0xc7b4ff),
-    new THREE.Color(0xff9ce7),
+    new THREE.Color(0xffffff),
+    new THREE.Color(0xffffff),
+    new THREE.Color(0xffffff),
+    new THREE.Color(0xffffff),
+    new THREE.Color(0xfbfdfd),
+    new THREE.Color(0xf7f9ff),
   ];
   for (let index = 0; index < count; index += 1) {
     const spread = accent ? 17 : 24;
@@ -310,7 +438,7 @@ function buildStarLayer({
     positions[index * 3 + 2] = -3.5 - random() * (accent ? 10 : 19);
     const color = palette[Math.floor(random() * palette.length)]
       .clone()
-      .multiplyScalar(0.72 + random() * 0.42);
+      .multiplyScalar(1 + random() * 0.32);
     colors[index * 3] = color.r;
     colors[index * 3 + 1] = color.g;
     colors[index * 3 + 2] = color.b;
@@ -329,6 +457,7 @@ function buildStarLayer({
     sizeAttenuation: true,
     blending: THREE.AdditiveBlending,
     fog: false,
+    toneMapped: false,
   });
   return { points: new THREE.Points(geometry, material), material };
 }
@@ -340,9 +469,9 @@ function buildGalacticDust(
 ) {
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
-  const cyan = new THREE.Color(0x54dfff);
-  const violet = new THREE.Color(0xa56cff);
-  const magenta = new THREE.Color(0xff63d8);
+  const cyan = new THREE.Color(CYAN);
+  const violet = new THREE.Color(VIOLET);
+  const magenta = new THREE.Color(MAGENTA);
   for (let index = 0; index < count; index += 1) {
     const distance = (random() - 0.5) * 18;
     positions[index * 3] = distance;
@@ -352,7 +481,7 @@ function buildGalacticDust(
     const color = mix < 0.45
       ? cyan.clone().lerp(violet, mix / 0.45)
       : violet.clone().lerp(magenta, (mix - 0.45) / 0.55);
-    color.multiplyScalar(0.45 + random() * 0.45);
+    color.multiplyScalar(0.58 + random() * 0.46);
     colors[index * 3] = color.r;
     colors[index * 3 + 1] = color.g;
     colors[index * 3 + 2] = color.b;
@@ -365,12 +494,13 @@ function buildGalacticDust(
     map: texture ?? undefined,
     alphaTest: texture ? 0.015 : 0,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.34,
     vertexColors: true,
     depthWrite: false,
     sizeAttenuation: true,
     blending: THREE.AdditiveBlending,
     fog: false,
+    toneMapped: false,
   });
   const dust = new THREE.Points(geometry, material);
   dust.rotation.z = -0.08;
@@ -467,10 +597,18 @@ export function DroneLaunchScene({
 
     const starTexture = makeRadialTexture([
       [0, "rgba(255,255,255,1)"],
-      [0.16, "rgba(235,247,255,0.98)"],
-      [0.48, "rgba(150,215,255,0.42)"],
-      [1, "rgba(130,165,255,0)"],
+      [0.12, "rgba(255,255,255,1)"],
+      [0.38, "rgba(255,255,255,0.8)"],
+      [0.68, "rgba(255,255,255,0.24)"],
+      [1, "rgba(255,255,255,0)"],
     ]);
+    const accentGlowTexture = makeRadialTexture([
+      [0, "rgba(255,255,255,1)"],
+      [0.1, "rgba(255,255,255,1)"],
+      [0.32, "rgba(255,255,255,0.52)"],
+      [0.58, "rgba(255,255,255,0.15)"],
+      [1, "rgba(255,255,255,0)"],
+    ], 256);
     const cyanNebulaTexture = makeRadialTexture([
       [0, "rgba(105,238,255,0.62)"],
       [0.2, "rgba(70,170,255,0.3)"],
@@ -487,23 +625,23 @@ export function DroneLaunchScene({
     const celestialBackdrop = new THREE.Group();
     const distantStars = buildStarLayer({
       count: 1_100,
-      size: 0.082,
-      opacity: 0.88,
+      size: 0.098,
+      opacity: 0.98,
       texture: starTexture,
       random,
     });
     const accentStars = buildStarLayer({
-      count: 240,
-      size: 0.16,
-      opacity: 0.94,
+      count: 260,
+      size: 0.2,
+      opacity: 1,
       texture: starTexture,
       random,
       accent: true,
     });
     const beaconStars = buildStarLayer({
-      count: 44,
-      size: 0.28,
-      opacity: 0.98,
+      count: 54,
+      size: 0.36,
+      opacity: 1,
       texture: starTexture,
       random,
       accent: true,
@@ -556,14 +694,14 @@ export function DroneLaunchScene({
     key.shadow.camera.near = 0.1;
     key.shadow.camera.far = 24;
     scene.add(key);
-    const cyanRim = new THREE.PointLight(CYAN, 30, 13, 2);
+    const cyanRim = new THREE.PointLight(CYAN, 52, 13, 2);
     cyanRim.position.set(-4, 1.2, 2.5);
     scene.add(cyanRim);
-    const magentaRim = new THREE.PointLight(MAGENTA, 32, 13, 2);
+    const magentaRim = new THREE.PointLight(MAGENTA, 54, 13, 2);
     magentaRim.position.set(4, 1.6, -2.6);
     scene.add(magentaRim);
 
-    const { drone, rotors } = buildDrone();
+    const { drone, rotors } = buildDrone(accentGlowTexture);
     drone.rotation.y = -0.2;
     drone.position.y = 0.35;
     scene.add(drone);
@@ -597,7 +735,7 @@ export function DroneLaunchScene({
     for (const [radius, color, opacity] of [
       [2.5, CYAN, 0.34],
       [3.25, MAGENTA, 0.22],
-      [4.05, 0x9d7bff, 0.14],
+      [4.05, VIOLET, 0.14],
     ] as const) {
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(radius, 0.012, 8, 120),
@@ -623,7 +761,7 @@ export function DroneLaunchScene({
     const particles = new THREE.Points(
       particleGeometry,
       new THREE.PointsMaterial({
-        color: 0xb7a6ff,
+        color: BLUE,
         size: 0.035,
         transparent: true,
         opacity: 0.52,
@@ -882,11 +1020,11 @@ export function DroneLaunchScene({
       particles.rotation.y = elapsed * 0.012 * motion;
       particles.position.y = Math.sin(elapsed * 0.3) * 0.08 * motion;
       celestialBackdrop.rotation.y = Math.sin(elapsed * 0.025) * 0.025 * motion;
-      distantStars.material.opacity = 0.82 + Math.sin(elapsed * 0.36) * 0.07 * motion;
-      accentStars.material.opacity = 0.87 + Math.sin(elapsed * 0.7 + 1.4) * 0.1 * motion;
-      beaconStars.material.opacity = 0.84 + Math.sin(elapsed * 1.05 + 0.8) * 0.14 * motion;
+      distantStars.material.opacity = 0.97 + Math.sin(elapsed * 0.36) * 0.03 * motion;
+      accentStars.material.opacity = 0.99 + Math.sin(elapsed * 0.7 + 1.4) * 0.01 * motion;
+      beaconStars.material.opacity = 0.99 + Math.sin(elapsed * 1.05 + 0.8) * 0.01 * motion;
       beaconStars.points.rotation.z = elapsed * 0.006 * motion;
-      galacticDust.material.opacity = 0.27 + Math.sin(elapsed * 0.2) * 0.035 * motion;
+      galacticDust.material.opacity = 0.36 + Math.sin(elapsed * 0.2) * 0.04 * motion;
       cyanNebulaMaterial.opacity = 0.31 + Math.sin(elapsed * 0.12) * 0.035 * motion;
       magentaNebulaMaterial.opacity = 0.27 + Math.sin(elapsed * 0.1 + 2.2) * 0.04 * motion;
       camera.position.x = (5.3 + pointer.x * 0.28) * cameraDistanceScale;
@@ -980,6 +1118,7 @@ export function DroneLaunchScene({
       renderer.domElement.removeEventListener("webglcontextrestored", onContextRestored);
       disposeScene(scene);
       starTexture?.dispose();
+      accentGlowTexture?.dispose();
       cyanNebulaTexture?.dispose();
       magentaNebulaTexture?.dispose();
       renderer.dispose();

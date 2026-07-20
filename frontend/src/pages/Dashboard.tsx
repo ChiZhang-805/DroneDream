@@ -93,9 +93,6 @@ export function Dashboard() {
       <header className="page-header dashboard-header">
         <div>
           <h1>{t("dashboard.title")}</h1>
-          <p className="page-header-subtitle">
-            {t("dashboard.subtitle")}
-          </p>
         </div>
         <div className="page-header-actions">
           {runtimeAccess.canUseRuntime ? (

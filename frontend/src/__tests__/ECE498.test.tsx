@@ -18,14 +18,14 @@ describe("ECE498 course tribute", () => {
     window.localStorage.removeItem("drone-dream:locale");
   });
 
-  it("renders the English course story, gratitude, and seven-stage timeline", () => {
+  it("renders a one-line English course introduction and seven-stage timeline", () => {
     renderCourse("en");
 
     expect(
-      screen.getByRole("heading", { name: /ECE 498 BH.*LLM Reasoning for Engineering/i }),
+      screen.getByRole("heading", { name: /ECE498BH.*LLM Reasoning for Engineering/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Professor Bin Hu" })).toBeInTheDocument();
-    expect(screen.getByText(/harness engineering/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Professor Bin Hu" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read the classroom story" })).toBeInTheDocument();
     expect(screen.getAllByRole("tab")).toHaveLength(7);
     expect(screen.queryByText("特别致谢")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Run Baseline/i })).not.toBeInTheDocument();
@@ -35,18 +35,17 @@ describe("ECE498 course tribute", () => {
     renderCourse("zh-CN");
 
     expect(
-      screen.getByRole("heading", { name: /ECE 498 BH.*大语言模型在工程推理中的应用/ }),
+      screen.getByRole("heading", { name: /ECE498BH.*大语言模型在工程推理中的应用/ }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "胡斌教授" })).toBeInTheDocument();
-    expect(screen.getByText(/一段学生亲历的课堂记忆/)).toBeInTheDocument();
-    expect(screen.getByText(/harness engineering/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "胡斌教授" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "展开这段课堂故事" })).toBeInTheDocument();
     expect(
       screen.queryByText("From plausible answers to verified engineering systems"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("WITH DEEP GRATITUDE")).not.toBeInTheDocument();
   });
 
-  it("switches the evidence panel on hover, focus, and click", () => {
+  it("keeps milestone details stable until a milestone is selected", () => {
     renderCourse("en");
     const panel = screen.getByRole("tabpanel");
     const productTab = screen.getByRole("tab", { name: /DRONEDREAM/i });
@@ -58,19 +57,25 @@ describe("ECE498 course tribute", () => {
 
     const hw2Tab = screen.getByRole("tab", { name: /HW2/i });
     fireEvent.mouseEnter(hw2Tab);
-    expect(hw2Tab).toHaveAttribute("aria-selected", "true");
-    expect(
-      within(panel).getByRole("heading", { name: "Put the answer inside an engineering loop" }),
-    ).toBeInTheDocument();
+    expect(productTab).toHaveAttribute("aria-selected", "true");
 
     const hw1Tab = screen.getByRole("tab", { name: /HW1/i });
     fireEvent.focus(hw1Tab);
-    expect(hw1Tab).toHaveAttribute("aria-selected", "true");
+    expect(productTab).toHaveAttribute("aria-selected", "true");
 
     const hw5Tab = screen.getByRole("tab", { name: /HW5/i });
     fireEvent.click(hw5Tab);
     expect(hw5Tab).toHaveAttribute("aria-selected", "true");
-    expect(within(panel).getByText(/Memory is a soft prior, never proof/i)).toBeInTheDocument();
+    expect(
+      within(panel).getByRole("heading", {
+        name: "Remember experience, distrust bad memory",
+      }),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText("What this stage changed")).toBeInTheDocument();
+    expect(within(panel).getByText("Measured evidence")).toBeInTheDocument();
+    expect(within(panel).getByText("Engineering method")).toBeInTheDocument();
+    expect(within(panel).getByText("Boundary to retain")).toBeInTheDocument();
+    expect(panel.querySelector(".ece498-stage-flow")).not.toBeInTheDocument();
   });
 
   it("supports arrow, Home, and End navigation across the milestone tabs", () => {
@@ -94,7 +99,7 @@ describe("ECE498 course tribute", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Read the classroom story" }));
     const dialog = screen.getByRole("dialog", {
-      name: "Why Professor Hu's course stayed with me",
+      name: "Professor Bin Hu",
     });
     expect(within(dialog).getByText(/two readings about what was then still an unfamiliar idea/i))
       .toBeInTheDocument();
@@ -109,21 +114,20 @@ describe("ECE498 course tribute", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("links only to the course and professor sources and labels the page as unofficial", () => {
+  it("keeps only the course website icon and removes the redundant footer links", () => {
     renderCourse("en");
 
     expect(screen.getByRole("link", { name: /Course website/i })).toHaveAttribute(
       "href",
       "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
     );
-    expect(screen.getByRole("link", { name: /Professor Hu's homepage/i })).toHaveAttribute(
-      "href",
-      "https://binhu7.github.io/",
-    );
+    expect(screen.queryByRole("link", { name: /Professor Hu's homepage/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Beyond drones, the method travels/i)).not.toBeInTheDocument();
+    expect(document.querySelector(".ece498-node-index")).not.toBeInTheDocument();
     for (const link of screen.getAllByRole("link")) {
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", "noreferrer");
     }
-    expect(screen.getByText(/not an official UIUC or course webpage/i)).toBeInTheDocument();
+    expect(screen.queryByText(/not an official UIUC or course webpage/i)).not.toBeInTheDocument();
   });
 });

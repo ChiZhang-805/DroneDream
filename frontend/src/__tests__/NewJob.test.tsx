@@ -10,6 +10,7 @@ import {
   LEGACY_EXPERIMENT_DRAFT_KEY,
 } from "../features/experiment/draftStorage";
 import type { BackendCapabilitiesResponse, Job } from "../types/api";
+import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -33,7 +34,9 @@ function renderPage({
   const result = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <NewJob />
+        <ModelAccessProvider>
+          <NewJob />
+        </ModelAccessProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -102,6 +105,7 @@ function createExperiment(): void {
 beforeEach(() => {
   navigateMock.mockReset();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -125,7 +129,7 @@ describe("NewJob experiment wizard", () => {
 
     expect(screen.getByRole("navigation", { name: /Experiment setup progress/i })).toBeVisible();
     expect(screen.queryByLabelText(/Experiment name/i)).toBeNull();
-    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("wind-study");
+    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("wind-study");
 
     first.unmount();
     renderPage({ confirmName: false });
@@ -160,6 +164,12 @@ describe("NewJob experiment wizard", () => {
     expect(screen.queryByRole("button", { name: /Save draft|Reset defaults/i })).toBeNull();
 
     openStep(/Constraints & budget/i);
+    expect(
+      screen.getByRole("region", { name: "Evidence-guided optimization loop" }),
+    ).toHaveTextContent("Allocate budget across engines");
+    expect(
+      screen.getByRole("region", { name: "Evidence-guided optimization loop" }),
+    ).toHaveTextContent("Verify with full simulations");
     expect(screen.getByLabelText(/Optimizer Strategy/i)).toHaveValue(
       "optimizer_portfolio",
     );
@@ -191,6 +201,28 @@ describe("NewJob experiment wizard", () => {
     expect(screen.queryByText("Estimated upper-bound plan")).not.toBeInTheDocument();
   });
 
+  it("keeps selected PX4 parameters to one preview row and opens the complete list", async () => {
+    const page = renderPage();
+    openStep(/Review/i);
+
+    const trigger = screen.getByRole("button", { name: "View all parameters" });
+    const preview = page.container.querySelector(".review-parameter-preview");
+    expect(preview).toBeInTheDocument();
+    expect(preview).toHaveClass("review-parameter-chips");
+    expect(screen.queryByRole("dialog", { name: "Selected PX4 parameters" }))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Selected PX4 parameters" });
+    expect(within(dialog).getByText(/tunable parameters/i)).toBeInTheDocument();
+    expect(within(dialog).getAllByText(/MPC_/i).length).toBeGreaterThan(0);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Selected PX4 parameters" }))
+      .not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
   it("persists a validated Next transition immediately and keeps completed steps after Back", () => {
     const first = renderPage({ experimentName: "step-state-study" });
     fireEvent.change(screen.getByLabelText(/Airframe/i), {
@@ -199,7 +231,7 @@ describe("NewJob experiment wizard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Next$/i }));
 
-    const saved = JSON.parse(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY) ?? "null") as {
+    const saved = JSON.parse(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY) ?? "null") as {
       active_step: number;
       completed_steps: number[];
       form: { display_name: string; airframe: string };
@@ -228,7 +260,7 @@ describe("NewJob experiment wizard", () => {
     expect(progressItems[4]).not.toHaveClass("wizard-step-complete");
 
     const savedAfterBack = JSON.parse(
-      window.localStorage.getItem(EXPERIMENT_DRAFT_KEY) ?? "null",
+      window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY) ?? "null",
     ) as { active_step: number; completed_steps: number[] };
     expect(savedAfterBack).toMatchObject({
       active_step: 1,
@@ -361,7 +393,9 @@ describe("NewJob experiment wizard", () => {
     expect(screen.getAllByRole("button", { name: /Remove waypoint/i })).toHaveLength(3);
 
     const jsonTrigger = screen.getByRole("button", { name: /JSON import \/ export/i });
-    expect(jsonTrigger.closest(".track-editor-data-footer")).not.toBeNull();
+    expect(jsonTrigger.closest(".track-editor-data-action")).not.toBeNull();
+    expect(jsonTrigger).toHaveAttribute("title", "JSON import / export");
+    expect(jsonTrigger).not.toHaveAttribute("data-tooltip");
     fireEvent.click(jsonTrigger);
     expect(screen.getByRole("dialog", { name: /JSON import \/ export/i })).toBeVisible();
     fireEvent.change(screen.getByLabelText(/Reference track \(JSON\)/i), {
@@ -383,7 +417,7 @@ describe("NewJob experiment wizard", () => {
     openStep(/Parameters/i);
     fireEvent.click(screen.getByRole("button", { name: /Expand: Horizontal Motion Control/i }));
 
-    expect(screen.getByLabelText(/Tune MPC_XY_P/i)).toHaveValue("include");
+    expect(screen.getByLabelText(/Tune MPC_XY_P/i)).toBeChecked();
     expect(screen.getByLabelText(/MPC_XY_P search minimum/i)).toBeVisible();
     fireEvent.change(screen.getByLabelText(/MPC_XY_P search minimum/i), {
       target: { value: "1.4" },
@@ -471,17 +505,13 @@ describe("NewJob experiment wizard", () => {
     fireEvent.change(screen.getByLabelText(/Find a PX4 parameter/i), {
       target: { value: "MC_ROLLRATE_I" },
     });
-    fireEvent.change(screen.getByLabelText(/Tune MC_ROLLRATE_I/i), {
-      target: { value: "include" },
-    });
+    fireEvent.click(screen.getByLabelText(/Tune MC_ROLLRATE_I/i));
     expect(screen.queryByText(/Recommended companion parameters are not selected/i)).toBeNull();
     fireEvent.change(screen.getByLabelText(/Find a PX4 parameter/i), {
       target: { value: "MC_ROLLRATE_P" },
     });
-    fireEvent.change(screen.getByLabelText(/Tune MC_ROLLRATE_P/i), {
-      target: { value: "include" },
-    });
-    expect(screen.getByLabelText(/Tune MC_ROLLRATE_P/i)).toHaveValue("include");
+    fireEvent.click(screen.getByLabelText(/Tune MC_ROLLRATE_P/i));
+    expect(screen.getByLabelText(/Tune MC_ROLLRATE_P/i)).toBeChecked();
   });
 
   it("rejects a budget that cannot run the baseline matrix and first candidate", async () => {
@@ -587,18 +617,15 @@ describe("NewJob experiment wizard", () => {
     expect(screen.queryByText(/Advanced effects require launcher evidence/i)).not.toBeInTheDocument();
   });
 
-  it("autosaves and restores a local draft without persisting an LLM secret", async () => {
+  it("autosaves and restores a session draft without persisting an LLM secret", async () => {
+    window.sessionStorage.setItem("dronedream:model-access-key:v1", "sk-never-store-this");
     const first = renderPage({ experimentName: "draft-study" });
     openStep(/Constraints & budget/i);
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
       target: { value: "gpt" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Configure model access/i }));
-    fireEvent.change(screen.getByLabelText(/Model API key/i), {
-      target: { value: "sk-never-store-this" },
-    });
     await waitFor(() => {
-      const raw = window.localStorage.getItem(EXPERIMENT_DRAFT_KEY);
+      const raw = window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY);
       const draft = JSON.parse(raw ?? "null") as { form?: { optimizer_strategy?: string } } | null;
       expect(raw).toContain("draft-study");
       expect(raw).not.toContain("sk-never-store-this");
@@ -606,10 +633,12 @@ describe("NewJob experiment wizard", () => {
     });
 
     first.unmount();
+    window.sessionStorage.removeItem("dronedream:model-access-key:v1");
     renderPage();
     expect(screen.queryByLabelText(/Experiment Name/i)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Configure model access/i }));
-    expect(screen.getByLabelText(/Model API key/i)).toHaveValue("");
+    expect(screen.queryByRole("button", { name: /Configure model access/i })).toBeNull();
+    expect(screen.queryByLabelText(/Model API key/i)).toBeNull();
+    expect(screen.getByText(/API key required in Settings/i)).toBeVisible();
     expect(screen.queryByText("Uses OpenAI's compatible chat-completions API.")).toBeNull();
     expect(screen.queryByText("API keys are never stored in the local draft.")).toBeNull();
     expect(screen.queryByText("Leave blank to use the backend's default model.")).toBeNull();
@@ -631,7 +660,7 @@ describe("NewJob experiment wizard", () => {
   });
 
   it("normalizes type-mismatched draft fields instead of crashing", () => {
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       LEGACY_EXPERIMENT_DRAFT_KEY,
       JSON.stringify({
         schema_version: 1,
@@ -661,14 +690,14 @@ describe("NewJob experiment wizard", () => {
     expect(activeStepIndex()).toBe(0);
     expect(screen.getByLabelText(/Tuning experience level/i)).toHaveValue("basic");
     expect(screen.getByLabelText(/Search seeds/i)).toHaveValue("101, 202, 303");
-    const migratedRaw = window.localStorage.getItem(EXPERIMENT_DRAFT_KEY);
+    const migratedRaw = window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY);
     expect(migratedRaw).toContain("recovered-study");
     expect(migratedRaw).not.toContain("must-not-restore");
-    expect(window.localStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).toBeNull();
   });
 
   it("keeps the historical heuristic default when restoring a draft without an optimizer", () => {
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       LEGACY_EXPERIMENT_DRAFT_KEY,
       JSON.stringify({
         schema_version: 1,
@@ -688,7 +717,7 @@ describe("NewJob experiment wizard", () => {
   });
 
   it("discards unsupported or structurally invalid draft envelopes", () => {
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       EXPERIMENT_DRAFT_KEY,
       JSON.stringify({
         schema_version: 2,
@@ -716,9 +745,7 @@ describe("NewJob experiment wizard", () => {
     fireEvent.change(screen.getByLabelText(/Find a PX4 parameter/i), {
       target: { value: "MC_AIRMODE" },
     });
-    fireEvent.change(screen.getByLabelText(/Tune MC_AIRMODE/i), {
-      target: { value: "include" },
-    });
+    fireEvent.click(screen.getByLabelText(/Tune MC_AIRMODE/i));
     openStep(/Constraints & budget/i);
     fireEvent.change(screen.getByLabelText(/Simulator Backend/i), {
       target: { value: "real_cli" },
@@ -754,6 +781,12 @@ describe("NewJob experiment wizard", () => {
   }, 10_000);
 
   it("supports an OpenAI-compatible Qwen optimizer only when the user opts into GPT", async () => {
+    window.localStorage.setItem("dronedream:model-access:v1", JSON.stringify({
+      provider: "qwen",
+      model: "qwen-plus",
+      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    }));
+    window.sessionStorage.setItem("dronedream:model-access-key:v1", "dashscope-key");
     const createSpy = vi
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_llm" } as Job);
@@ -762,33 +795,8 @@ describe("NewJob experiment wizard", () => {
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
       target: { value: "gpt" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Configure model access/i }));
-    fireEvent.change(screen.getByLabelText(/Model provider/i), {
-      target: { value: "deepseek" },
-    });
-    expect(screen.queryByText("Uses DeepSeek's OpenAI-compatible endpoint.")).toBeNull();
-    expect(screen.getByLabelText(/Compatible API Base URL/i)).toHaveValue(
-      "https://api.deepseek.com",
-    );
-    expect(screen.getByLabelText(/Model name/i)).toHaveValue("deepseek-v4-flash");
-    fireEvent.change(screen.getByLabelText(/Model provider/i), {
-      target: { value: "qwen" },
-    });
-    expect(screen.queryByText("Uses Qwen through Alibaba Cloud DashScope.")).toBeNull();
-    expect(screen.getByLabelText(/Compatible API Base URL/i)).toHaveValue(
-      "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    );
-    expect(screen.getByLabelText(/Model name/i)).toHaveValue("qwen-plus");
-    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
-    expect(activeStepIndex()).toBe(3);
-    expect(createSpy).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByLabelText(/Model API key/i), {
-      target: { value: "dashscope-key" },
-    });
-    fireEvent.change(screen.getByLabelText(/Model name/i), {
-      target: { value: "qwen-plus" },
-    });
+    expect(screen.queryByRole("button", { name: /Configure model access/i })).toBeNull();
+    expect(screen.getByText(/Qwen · qwen-plus/i)).toBeVisible();
     createExperiment();
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
     expect(createSpy.mock.calls[0][0].llm).toEqual({
@@ -800,6 +808,12 @@ describe("NewJob experiment wizard", () => {
   });
 
   it("rejects an invalid custom LLM endpoint before submission", async () => {
+    window.localStorage.setItem("dronedream:model-access:v1", JSON.stringify({
+      provider: "custom",
+      model: "custom-model",
+      baseUrl: "ftp://example.com/v1?key=bad",
+    }));
+    window.sessionStorage.setItem("dronedream:model-access-key:v1", "custom-key");
     const createSpy = vi
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "unused" } as Job);
@@ -807,19 +821,6 @@ describe("NewJob experiment wizard", () => {
     openStep(/Constraints & budget/i);
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
       target: { value: "gpt" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /Configure model access/i }));
-    fireEvent.change(screen.getByLabelText(/Model provider/i), {
-      target: { value: "custom" },
-    });
-    fireEvent.change(screen.getByLabelText(/Model API key/i), {
-      target: { value: "custom-key" },
-    });
-    fireEvent.change(screen.getByLabelText(/Model name/i), {
-      target: { value: "custom-model" },
-    });
-    fireEvent.change(screen.getByLabelText(/Compatible API Base URL/i), {
-      target: { value: "ftp://example.com/v1?key=bad" },
     });
     expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
     expect(activeStepIndex()).toBe(3);
@@ -918,7 +919,7 @@ describe("NewJob experiment wizard", () => {
 
     expect(await screen.findByText(/experiment could not be created.*NETWORK_ERROR/i)).toBeVisible();
     expect(createSpy.mock.calls[0][0].display_name).toBe("keep-me");
-    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("keep-me");
+    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("keep-me");
     expect(navigateMock).not.toHaveBeenCalled();
   });
 });

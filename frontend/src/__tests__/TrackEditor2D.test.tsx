@@ -20,7 +20,7 @@ function EditorHarness() {
         points={points}
         defaultAltitude={3}
         onChange={setPoints}
-        dataPanelFooter={<button type="button">JSON import / export</button>}
+        dataPanelAction={<button type="button">JSON import / export</button>}
       />
       <output data-testid="track-state">{JSON.stringify(points)}</output>
     </I18nProvider>
@@ -77,12 +77,12 @@ describe("TrackEditor2D", () => {
     const workspace = screen.getByTestId("track-editor-workspace");
     const visualPane = screen.getByTestId("track-editor-visual-pane");
     const dataPane = screen.getByTestId("track-waypoint-table-scroll");
-    const dataFooter = screen.getByTestId("track-editor-data-footer");
+    const dataAction = screen.getByTestId("track-editor-data-action");
 
     expect(workspace).toContainElement(visualPane);
     expect(workspace).toContainElement(dataPane);
-    expect(workspace).toContainElement(dataFooter);
-    expect(dataFooter).toHaveTextContent("JSON import / export");
+    expect(workspace).toContainElement(dataAction);
+    expect(dataAction).toHaveTextContent("JSON import / export");
   });
 
   it("cycles through XY, XZ, YZ and interactive 3D views and edits Z by dragging", () => {
@@ -142,6 +142,26 @@ describe("TrackEditor2D", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Previous view" }));
     expect(screen.getByRole("group", { name: "YZ view flight track editor" })).toBeVisible();
+  });
+
+  it("adds grid columns for a long 3D track instead of stretching fixed cells", () => {
+    const longTrack: TrackPoint[] = Array.from({ length: 17 }, (_value, index) => ({
+      x: index * 2,
+      y: index % 4 === 0 ? 3 : index % 4 === 2 ? -3 : 0,
+      z: 2 + (index % 3) * 2,
+    }));
+    render(
+      <I18nProvider>
+        <TrackEditor2D points={longTrack} defaultAltitude={3} onChange={() => undefined} />
+      </I18nProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Previous view" }));
+
+    const canvas = screen.getByRole("group", { name: "3D view flight track editor" });
+    const xGridLines = canvas.querySelectorAll('[data-grid-axis="x"]');
+    const yGridLines = canvas.querySelectorAll('[data-grid-axis="y"]');
+    expect(xGridLines.length).toBeGreaterThan(yGridLines.length);
+    expect(xGridLines.length).toBeGreaterThan(6);
   });
 
   it("clamps planar dragging to the visible plot using stable drag-start bounds", () => {

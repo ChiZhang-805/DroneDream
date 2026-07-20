@@ -178,8 +178,24 @@ interface TauriCore {
   invoke(command: string, args?: Record<string, unknown>): Promise<unknown>;
 }
 
+export interface DesktopCloseRequestedEvent {
+  preventDefault(): void;
+}
+
+export interface DesktopWindowHandle {
+  onCloseRequested(
+    handler: (event: DesktopCloseRequestedEvent) => void | Promise<void>,
+  ): Promise<() => void>;
+  destroy(): Promise<void>;
+}
+
+interface TauriWindowApi {
+  getCurrentWindow(): DesktopWindowHandle;
+}
+
 interface TauriGlobal {
   core?: TauriCore;
+  window?: TauriWindowApi;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -252,6 +268,22 @@ function getTauriCore(): TauriCore | null {
   if (typeof window === "undefined") return null;
   const core = window.__TAURI__?.core;
   return core && typeof core.invoke === "function" ? core : null;
+}
+
+export function getDesktopWindowHandle(): DesktopWindowHandle | null {
+  if (typeof window === "undefined") return null;
+  const windowApi = window.__TAURI__?.window;
+  if (!windowApi || typeof windowApi.getCurrentWindow !== "function") return null;
+  try {
+    const handle = windowApi.getCurrentWindow();
+    return handle &&
+      typeof handle.onCloseRequested === "function" &&
+      typeof handle.destroy === "function"
+      ? handle
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export class DesktopRuntimeUnavailableError extends Error {
