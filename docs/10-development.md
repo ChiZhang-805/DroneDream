@@ -30,17 +30,18 @@ npm ci
 
 ```bash
 # terminal 1
-cd backend
-.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+./scripts/dev-backend.sh
 
 # terminal 2
-cd worker
-.venv/bin/python -m drone_dream_worker.main
+./scripts/dev-worker.sh
 
 # terminal 3
-cd frontend
-npm run dev -- --host 0.0.0.0 --port 5173
+./scripts/dev-frontend.sh
 ```
+
+Launch all three commands from the repository root. The backend and worker
+helpers load the same root `.env` and pin the fallback SQLite URL to the same
+database file.
 
 ## Quality gates
 
@@ -54,18 +55,18 @@ Use existing scripts (recommended):
 Equivalent manual commands:
 
 ```bash
-ruff check backend
-mypy backend/app
-pytest backend
+backend/.venv/bin/python -m ruff check backend
+backend/.venv/bin/python -m mypy backend/app
+backend/.venv/bin/python -m pytest backend
+worker/.venv/bin/python -m ruff check worker
 cd frontend && npm run typecheck && npm run lint && npm run build && npm test
 ```
 
 ## Current capabilities
 
-- Backend includes SQLite lightweight migration logic for additive columns.
-- Batch APIs and frontend pages are covered by backend/frontend tests.
+- Backend ships an Alembic migration chain for reviewed schema upgrades.
+- Batch compatibility APIs are covered by backend tests; the retired batch pages are not part of the frontend bundle.
 
 ## Limitations / roadmap
 
-- No Alembic migration chain yet.
 - CI bootstrap remains multi-step (no single `make dev` entrypoint yet).

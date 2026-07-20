@@ -1,4 +1,4 @@
-# Runpod Gazebo Visualization (PR5)
+# Runpod Gazebo Visualization
 
 ## 1) Default mode (recommended)
 
@@ -87,14 +87,15 @@ Then restart frontend (and backend/worker when needed) so env changes take effec
 Open JobDetail/TrialDetail to view the iframe panel.
 
 > noVNC/Xvfb only gives you a virtual desktop. To see Gazebo in that desktop,
-> the Gazebo GUI client must also run. PR5 adds wrapper-side auto-launch for
+> the Gazebo GUI client must also run. The wrapper supports auto-launching
 > `gz sim -g` when GUI mode is explicitly enabled.
 
 If Gazebo still appears stuck in the top-left or clipped, check:
 
 - `command -v wmctrl`
 - `command -v xdpyinfo`
-- `/workspace/logs/window-manager.log`
+- `$LOG_DIR/window-manager.log` (default:
+  `<repo>/artifacts/vnc-logs/window-manager.log`)
 - per-trial `gui_stdout.log` / `gui_stderr.log`
 - `launch_config.json` (`gui_command`, `PX4_GAZEBO_GUI_WINDOW_MODE`)
 
@@ -119,7 +120,7 @@ If Gazebo shows `x500_0` but no track marker, inspect:
 - `track_marker_stderr.log`
 - `launch_config.json` (`track_marker_enabled` should be `true`)
 
-### 3.5 Manual fallback verification
+### 4.1 Manual fallback verification
 
 If you need to verify GUI attach manually in a terminal:
 
@@ -138,4 +139,4 @@ gz sim -g
 - `LIBGL_ALWAYS_SOFTWARE=1` forces software rendering and can increase CPU usage significantly.
 - Avoid enabling GUI during expensive batch tuning unless visualization is intentionally required.
 - Recommended batch optimization path: keep headless mode on and use trajectory replay artifacts.
-- Multi-worker concurrent visualization is not supported in this PR.
+- Multi-worker concurrent visualization is not supported by the bundled setup.

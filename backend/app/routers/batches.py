@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -14,6 +14,9 @@ from app.response import ok
 from app.services import jobs as job_service
 
 router = APIRouter(tags=["batches"])
+
+_PageQ = Query(1, ge=1)
+_PageSizeQ = Query(100, ge=1, le=200)
 
 
 def _raise(err: job_service.JobServiceError) -> None:
@@ -40,14 +43,23 @@ def create_batch(
 def list_batches(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
+    page: int = _PageQ,
+    page_size: int = _PageSizeQ,
 ) -> dict[str, object]:
     try:
-        items = job_service.list_batches(db, user=user)
+        items, total = job_service.list_batches(
+            db,
+            user=user,
+            page=page,
+            page_size=page_size,
+        )
     except job_service.JobServiceError as err:
         _raise(err)
     payload = schemas.PaginatedBatchJobs(
         items=[job_service.to_batch_schema(item) for item in items],
-        total=len(items),
+        page=page,
+        page_size=page_size,
+        total=total,
     )
     return ok(payload.model_dump(mode="json"))
 

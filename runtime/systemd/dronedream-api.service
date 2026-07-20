@@ -1,0 +1,29 @@
+[Unit]
+Description=DroneDreamRuntime local API
+After=network.target valkey.service dronedream-runtime-init.service
+Requires=valkey.service dronedream-runtime-init.service
+
+[Service]
+Type=simple
+User=dronedream
+Group=dronedream
+EnvironmentFile=/etc/dronedream/runtime.env
+WorkingDirectory=/opt/dronedream/source/backend
+ExecStartPre=/opt/dronedream/venv/bin/alembic -c /opt/dronedream/source/backend/alembic.ini upgrade head
+ExecStart=/opt/dronedream/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=3
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/dronedream /tmp
+
+[Install]
+WantedBy=multi-user.target

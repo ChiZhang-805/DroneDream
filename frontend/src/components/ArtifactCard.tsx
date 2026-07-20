@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { apiClient } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
 import type { Artifact } from "../types/api";
 
 interface ArtifactCardProps {
@@ -33,8 +34,11 @@ async function copyToClipboard(value: string): Promise<boolean> {
 }
 
 export function ArtifactCard({ artifact }: ArtifactCardProps) {
+  const { t } = useI18n();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "failed">("idle");
   const [schemaVersion, setSchemaVersion] = useState<string | null>(null);
+  const feedbackTimer = useRef<number | null>(null);
   const label = artifact.display_name ?? artifact.artifact_type;
   const fileName = basename(artifact.storage_path);
   const isPdf =
@@ -48,8 +52,26 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
     } catch {
       setCopyState("failed");
     }
-    window.setTimeout(() => setCopyState("idle"), 1500);
+    if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = window.setTimeout(() => {
+      setCopyState("idle");
+      feedbackTimer.current = null;
+    }, 1500);
   };
+
+  const handleDownload = async () => {
+    setDownloadState("downloading");
+    try {
+      await apiClient.downloadArtifact(artifact.id, artifact.display_name ?? fileName);
+      setDownloadState("idle");
+    } catch {
+      setDownloadState("failed");
+    }
+  };
+
+  useEffect(() => () => {
+    if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,17 +103,18 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
           className="btn btn-ghost artifact-copy-btn"
           onClick={handleCopy}
         >
-          Copy path
+          {t("artifact.copyPath")}
         </button>
         {isPdf ? (
           <button
             type="button"
             className="btn"
-            onClick={() =>
-              void apiClient.downloadArtifact(artifact.id, artifact.display_name ?? fileName)
-            }
+            onClick={() => void handleDownload()}
+            disabled={downloadState === "downloading"}
           >
-            Download PDF
+            {downloadState === "downloading"
+              ? t("artifact.downloading")
+              : t("artifact.downloadPdf")}
           </button>
         ) : null}
       </header>
@@ -106,10 +129,19 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
 
       <div className="artifact-meta">
         {artifact.mime_type ? <span>{artifact.mime_type}</span> : null}
-        {artifact.file_size_bytes !== null ? <span>{artifact.file_size_bytes} bytes</span> : null}
-        {schemaVersion ? <span>schema: {schemaVersion}</span> : null}
-        {copyState === "copied" ? <span className="artifact-copy-ok">Copied</span> : null}
-        {copyState === "failed" ? <span className="artifact-copy-fail">Copy unavailable</span> : null}
+        {artifact.file_size_bytes !== null ? (
+          <span>{t("artifact.bytes", { count: artifact.file_size_bytes })}</span>
+        ) : null}
+        {schemaVersion ? <span>{t("artifact.schema", { version: schemaVersion })}</span> : null}
+        {copyState === "copied" ? (
+          <span className="artifact-copy-ok" role="status">{t("artifact.copied")}</span>
+        ) : null}
+        {copyState === "failed" ? (
+          <span className="artifact-copy-fail" role="alert">{t("artifact.copyUnavailable")}</span>
+        ) : null}
+        {downloadState === "failed" ? (
+          <span className="artifact-copy-fail" role="alert">{t("artifact.downloadFailed")}</span>
+        ) : null}
       </div>
     </article>
   );

@@ -12,16 +12,65 @@ DroneDream is a PX4/Gazebo-oriented web platform for automatic drone parameter t
 
 ---
 
+# Windows Closed Beta
+
+Download the newest `desktop-v*` Windows closed beta and its matching
+`.sha256` file from [GitHub Releases](https://github.com/ChiZhang-805/DroneDream/releases).
+A fresh interactive installer defaults to **Install all**, shows the Runtime
+download/storage plan, and then prepares WSL2, uses a suitable fixed NTFS disk
+such as `E:`, and downloads the manifest-signed
+[DroneDreamRuntime](https://github.com/ChiZhang-805/DroneDream/releases/tag/runtime-v0.1.0-beta.1),
+importing it as an isolated `DroneDreamRuntime` distribution without a second
+in-app install click. It does not move, convert, terminate, or unregister an
+existing Ubuntu distribution.
+
+The beta targets x86-64 Windows 10 build 19041+ or Windows 11, a
+16-GB-class computer with hardware virtualization, and at least 52 GiB of free
+space on the selected NTFS disk. The installer is not yet Authenticode-signed,
+so Windows SmartScreen may show a warning; verify the published SHA-256 file
+before installing.
+
+## Code signing policy
+
+DroneDream publishes Windows artifacts only from its traceable GitHub Actions
+release workflow. See the [Code signing policy](CODE_SIGNING_POLICY.md) for
+release roles, signing order, key protection, artifact restrictions, and the
+boundary between Authenticode and the independent Tauri updater signature.
+Data storage, optional network services, and deletion behavior are documented
+in the [Privacy policy](PRIVACY.md); security reports follow
+[SECURITY.md](SECURITY.md).
+
+---
+
 # Core Capabilities
 
 - `real_cli` integration with PX4/Gazebo SITL.
-- Heuristic and GPT-based parameter proposal strategies.
+- User-selectable, versioned PX4 parameter domains with safe-bound validation and
+  write/readback evidence.
+- Seven accuracy-first experimental engines: constrained MOBO,
+  multi-fidelity MOBO, TuRBO, SAASBO, surrogate-assisted CMA-ES,
+  BIPOP-CMA-ES, and an adaptive optimizer portfolio. Keyless heuristic,
+  generic CMA-ES, and provider-neutral LLM paths remain available for
+  compatibility and comparison.
+- Multi-objective robust scoring, constraints, fair seed matrices, holdout validation,
+  Pareto recommendations, and generation history.
+- Five-step experiment builder with 3D waypoint editing and fully separated Chinese/English UI.
+- PostgreSQL/S3/OIDC-ready multi-user deployment foundation.
 - noVNC/Gazebo GUI visualization and replay.
 - Artifact download and report generation.
 
 ---
 
 # Complete DroneDream Runpod Setup Guide
+
+> This section is a single-operator development deployment. Do not expose an
+> `AUTH_MODE=disabled` API to untrusted users. A public/multi-user deployment
+> must use OIDC (or temporary demo tokens), PostgreSQL, S3-compatible storage,
+> worker heartbeats, TLS, and per-user quotas as described in `docs/11-operations.md`.
+> The bundled runner can prove nominal execution and static box/cylinder
+> obstacle injection through Gazebo EntityFactory. Wind/gust, sensor/GPS,
+> battery, payload, actuator-delay, and other requested physical effects fail
+> closed until a launcher applies them and returns validated evidence.
 
 ## 0. Pod Configuration
 
@@ -165,8 +214,9 @@ cd /workspace/DroneDream/frontend
 which node
 node -v
 npm -v
-rm -rf node_modules package-lock.json
-npm install
+# Keep the committed lockfile: `npm ci` installs the reviewed dependency graph
+# exactly and removes a stale node_modules directory automatically.
+npm ci
 npm run build
 ```
 
@@ -233,7 +283,7 @@ ARTIFACT_ROOT=/workspace/DroneDream/.artifacts
 
 # --- PX4/Gazebo runner ---
 PX4_GAZEBO_DRY_RUN=false
-PX4_GAZEBO_LAUNCH_COMMAND="/workspace/PX4-Autopilot/.venv/bin/python /workspace/DroneDream/scripts/simulators/local_px4_launch_wrapper.py --run-dir {run_dir} --input {trial_input} --params {params_json} --track {track_json} --telemetry {telemetry_json} --stdout-log {stdout_log} --stderr-log {stderr_log} --vehicle {vehicle} --world {world} --headless {headless}"
+PX4_GAZEBO_LAUNCH_COMMAND="/workspace/PX4-Autopilot/.venv/bin/python /workspace/DroneDream/scripts/simulators/local_px4_launch_wrapper.py --run-dir {run_dir} --input {trial_input} --params {params_json} --px4-params {px4_params_json} --track {track_json} --telemetry {telemetry_json} --stdout-log {stdout_log} --stderr-log {stderr_log} --vehicle {vehicle} --world {world} --headless {headless}"
 PX4_GAZEBO_WORKDIR=/workspace/DroneDream
 PX4_GAZEBO_TIMEOUT_SECONDS=900
 PX4_GAZEBO_HEADLESS=false
@@ -241,17 +291,21 @@ PX4_GAZEBO_KEEP_RAW_LOGS=true
 PX4_GAZEBO_PASS_RMSE=0.75
 PX4_GAZEBO_PASS_MAX_ERROR=2.0
 PX4_GAZEBO_MIN_TRACK_COVERAGE=0.9
-PX4_GAZEBO_VEHICLE=x500
-PX4_GAZEBO_WORLD=default
+# Leave blank to honor each job's model/world selection.
+PX4_GAZEBO_VEHICLE=
+PX4_GAZEBO_WORLD=
 PX4_GAZEBO_EXTRA_ARGS=
 PX4_GAZEBO_TELEMETRY_FORMAT=json
 PX4_GAZEBO_ALLOW_CSV_TELEMETRY=false
+PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS=false
 
 # --- local PX4 wrapper ---
 PX4_AUTOPILOT_DIR=/workspace/PX4-Autopilot
 PX4_SETUP_COMMANDS="source /workspace/PX4-Autopilot/.venv/bin/activate"
 PX4_LAUNCH_COMMAND_TEMPLATE=
-PX4_MAKE_TARGET=gz_x500
+# Leave blank to use each job's vehicle_profile.simulator_model.
+PX4_MAKE_TARGET=
+PX4_FORCE_MAKE_TARGET=false
 PX4_RUN_SECONDS=90
 PX4_READY_TIMEOUT_SECONDS=30
 PX4_SITE_DRY_RUN=false
@@ -271,6 +325,9 @@ PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS=30
 PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS=120
 PX4_OFFBOARD_LAND_AFTER=true
 PX4_OFFBOARD_DRY_RUN=false
+PX4_PARAMETER_TRANSPORT=environment
+PX4_PARAMETER_CONNECTION=udp://:14540
+PX4_PARAMETER_ENFORCE_SAFE_BOUNDS=true
 
 # --- noVNC / Gazebo GUI ---
 DISPLAY=:99
@@ -388,9 +445,11 @@ python3 -m json.tool "$TMP/trial_result.json"
 Expected:
 
 ```json
-"success": true,
-"metrics": {
-  "rmse": ...
+{
+  "success": true,
+  "metrics": {
+    "rmse": 0.42
+  }
 }
 ```
 
@@ -505,6 +564,7 @@ npm run dev -- --host 0.0.0.0 --port 5173
 ```text
 Simulator Backend: real_cli
 Optimizer Strategy: heuristic
+Scenario matrix: click "Use bundled nominal-only matrix"
 Track: circle
 Altitude: 3
 Wind: 0/0/0/0
@@ -516,28 +576,23 @@ Target RMSE: 0.75
 ```text
 Simulator Backend: real_cli
 Optimizer Strategy: gpt
-Max Iterations: 20
-Trials per Candidate: 3
+Scenario matrix: click "Use bundled nominal-only matrix"
+Max Iterations: 2
+Trials per Candidate: 1
 Target RMSE: 0.75
 Min Pass Rate: 0.8
 OpenAI Model: gpt-4.1
 ```
 
-## 13. ECE498 Final Project
+## 13. ECE 498 BH course tribute
 
-The pipeline includes:
-
-- baseline with no tool
-- tool-augmented pipeline
-- self-refinement with tools
-
-Run these on the ECE498 page:
-
-```text
-Run Baseline (No Tool)
-Run Tool-Augmented (CMA-ES)
-Run Tool + Refinement (CMA-ES Loop)
-```
+The in-app **ECE 498 BH** page is a one-screen, bilingual, interactive course
+introduction and student tribute to Professor Bin Hu. Its learning path connects
+reasoning baselines, tool use, structured workflows, verification, feedback,
+the final project, and DroneDream's PX4/Gazebo harness. It is informational,
+not an experiment runner or an official UIUC course website. See the
+[course-page guide](docs/Manuals/dronedream_ece498_user_manual.md) for the
+content and accessibility contract.
 
 ---
 

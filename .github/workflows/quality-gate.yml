@@ -1,0 +1,326 @@
+name: Quality gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend / Python 3.11
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install backend quality dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --disable-pip-version-check \
+            --editable ".[dev]" \
+            "ruff==0.15.21" "mypy==2.2.0" "pytest==9.1.1"
+          python -m pip install --disable-pip-version-check \
+            --editable "../worker[dev]"
+
+      - name: Validate repository-owned text, JSON, and Markdown links
+        run: python scripts/check-repository.py
+
+      - name: Lint, type-check, and test backend
+        working-directory: backend
+        run: |
+          python -m ruff check app tests alembic scripts ../worker \
+            ../scripts/check-repository.py ../scripts/simulators
+          python -m ruff check app ../worker/drone_dream_worker \
+            ../scripts/simulators --select S
+          python -m ruff format --check ../scripts/check-repository.py \
+            ../scripts/simulators
+          python -m mypy app
+          python -m mypy ../worker/drone_dream_worker
+          python -m compileall -q app tests alembic scripts ../worker \
+            ../scripts/check-repository.py ../scripts/simulators
+          python -m pytest
+
+  frontend:
+    name: Frontend / Node.js 22
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Lint, type-check, test, and build frontend
+        env:
+          CI: "true"
+        run: |
+          npm --prefix frontend audit --audit-level=high
+          npm --prefix desktop audit --audit-level=high
+          npm --prefix frontend run lint
+          npm --prefix frontend run typecheck
+          npm --prefix frontend run test -- --testTimeout 15000
+          npm --prefix frontend run build
+          npm --prefix frontend run site:build
+
+      - name: Install Chromium for the public-site visual contract
+        run: npx --prefix frontend playwright install --with-deps chromium
+
+      - name: Enforce bilingual copy rhythm and responsive layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix frontend run site:preview -- --host 127.0.0.1 --port 4174 >"$RUNNER_TEMP/dronedream-site-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:4174/site.html >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$preview_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/dronedream-site-preview.log"
+              exit 1
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              cat "$RUNNER_TEMP/dronedream-site-preview.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 1440 1000 0.80 "$RUNNER_TEMP/site-audit-1440.json"
+          node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 2048 1280 0.80 "$RUNNER_TEMP/site-audit-2048.json"
+          node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 390 844 0.80 "$RUNNER_TEMP/site-audit-mobile.json" layout-only
+
+  runtime-contract:
+    name: Runtime / Static contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: runtime/locks/release-tools-requirements.lock
+
+      - name: Install Runtime contract dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            --requirement runtime/locks/release-tools-requirements.lock \
+            "ruff==0.15.21" "pip-audit==2.10.1"
+
+      - name: Audit locked Python dependencies
+        run: |
+          python -m pip_audit \
+            --requirement deploy/requirements.backend.lock \
+            --disable-pip --strict
+          python -m pip_audit \
+            --requirement runtime/locks/python-requirements.lock \
+            --no-deps --disable-pip --strict
+
+      - name: Validate Runtime Python and manifests
+        run: |
+          python -m ruff check runtime/tools runtime/tests runtime/scripts scripts/simulators
+          python -m ruff check runtime/tools runtime/scripts scripts/simulators --select S
+          python -m ruff format --check runtime/tools runtime/tests runtime/scripts \
+            scripts/simulators
+          python -m compileall -q runtime/tools runtime/tests runtime/scripts scripts/simulators
+          python runtime/tools/runtime_manifest.py validate-config \
+            --pins runtime/pins.env \
+            --python-lock runtime/locks/python-requirements.lock
+          python -m unittest discover -s runtime/tests -v
+
+      - name: Validate every Runtime shell script
+        shell: bash
+        run: |
+          mapfile -d '' scripts < <(find runtime scripts -type f -name '*.sh' -print0)
+          if (( ${#scripts[@]} == 0 )); then
+            echo "No Runtime shell scripts were found" >&2
+            exit 1
+          fi
+          for script in "${scripts[@]}"; do
+            echo "Checking ${script}"
+            bash -n "${script}"
+          done
+
+  desktop-rust:
+    name: Desktop / Rust 1.97.0
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # action snapshot, 2026-07-10
+        with:
+          toolchain: 1.97.0
+          components: rustfmt, clippy
+
+      - name: Cache Cargo dependencies and build output
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/bin/cargo-audit.exe
+            desktop/src-tauri/target
+          key: ${{ runner.os }}-rust-1.97.0-audit-0.22.2-${{ hashFiles('desktop/src-tauri/Cargo.lock') }}
+
+      - name: Audit desktop Rust dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (-not (Get-Command cargo-audit -ErrorAction SilentlyContinue)) {
+            cargo install cargo-audit --version 0.22.2 --locked
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          cargo audit --file desktop/src-tauri/Cargo.lock
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Format, lint, and test desktop Rust
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          cargo fmt --all --manifest-path desktop/src-tauri/Cargo.toml -- --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo clippy --locked --manifest-path desktop/src-tauri/Cargo.toml `
+            --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked --manifest-path desktop/src-tauri/Cargo.toml `
+            --all-targets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify installer ownership and uninstall contracts
+        shell: pwsh
+        run: ./desktop/scripts/verify-nsis-template.ps1
+
+  deployment-images:
+    name: Deployment / Hardened images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Validate deployment scripts
+        run: |
+          grep -qxF '**/target' .dockerignore
+          grep -qxF '**/.env*' .dockerignore
+          grep -qxF '**/.ssh' .dockerignore
+          find website/scripts -type f -name '*.sh' -print0 \
+            | xargs -0 -n1 bash -n
+          node --check website/scripts/capture-site.mjs
+
+      - name: Verify production configuration fails closed without secrets
+        run: |
+          if env \
+            -u POSTGRES_PASSWORD \
+            -u MINIO_ROOT_PASSWORD \
+            -u VITE_DEMO_AUTH_TOKEN \
+            -u DEMO_AUTH_TOKENS \
+            -u APP_SECRET_KEY \
+            docker compose --env-file .env.example config --quiet \
+            >/dev/null 2>&1; then
+            echo '.env.example unexpectedly produced a deployable configuration' >&2
+            exit 1
+          fi
+          cat >"$RUNNER_TEMP/dronedream-ci.env" <<'EOF'
+          POSTGRES_PASSWORD=ci-postgres-secret
+          MINIO_ROOT_PASSWORD=ci-minio-secret
+          VITE_DEMO_AUTH_TOKEN=ci-demo-token
+          DEMO_AUTH_TOKENS=ci@example.test:ci-demo-token
+          APP_SECRET_KEY=I3L8I_Z1uoHGe1OZZqGnqZFw4fNrWQ1Jp2LTdZ5wXSk=
+          SIMULATOR_BACKEND=
+          PX4_GAZEBO_EVAL_ALTITUDE_FRACTION=0.42
+          EOF
+          docker compose --env-file "$RUNNER_TEMP/dronedream-ci.env" \
+            config --format json >"$RUNNER_TEMP/dronedream-compose.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          config_path = Path(os.environ["RUNNER_TEMP"]) / "dronedream-compose.json"
+          worker_env = json.loads(config_path.read_text(encoding="utf-8"))["services"]["worker"]["environment"]
+          assert worker_env["SIMULATOR_BACKEND"] == "", worker_env["SIMULATOR_BACKEND"]
+          assert worker_env["PX4_GAZEBO_EVAL_ALTITUDE_FRACTION"] == "0.42"
+          forbidden = {
+              "PX4_PARAMETER_CONTEXT_JSON",
+              "PX4_PARAMETER_PX4_VERSION",
+              "PX4_PARAMETER_REQUEST_PATH",
+          }
+          assert forbidden.isdisjoint(worker_env)
+          assert not any(name.startswith("PX4_TRIAL_") for name in worker_env)
+          PY
+
+      - name: Build and inspect API and worker images
+        run: |
+          docker build --file deploy/Dockerfile.backend --target api \
+            --tag dronedream-api:quality-gate .
+          docker build --file deploy/Dockerfile.backend --target worker \
+            --tag dronedream-worker:quality-gate .
+          docker run --rm --entrypoint sh dronedream-api:quality-gate -c \
+            'test "$(id -u)" = 10001 && python -c "import app.main"'
+          docker run --rm --entrypoint sh dronedream-worker:quality-gate -c \
+            'test "$(id -u)" = 10001 && python -c "import drone_dream_worker.main"'
+
+      - name: Build and validate frontend image
+        run: |
+          docker build --file deploy/Dockerfile.frontend \
+            --build-arg VITE_DEMO_AUTH_TOKEN=quality-gate-only \
+            --tag dronedream-frontend:quality-gate .
+          docker run --rm --add-host api:127.0.0.1 --entrypoint nginx \
+            dronedream-frontend:quality-gate -t
+          docker run --rm --entrypoint nginx \
+            --tmpfs /www/wwwlogs \
+            --volume "$PWD/website/nginx/baota/dronedream-public.conf:/etc/nginx/conf.d/default.conf:ro" \
+            dronedream-frontend:quality-gate -t
+          docker run --rm --entrypoint nginx \
+            --tmpfs /www/wwwlogs \
+            --volume "$PWD/website/nginx/baota/dronedream-staging.conf:/etc/nginx/conf.d/default.conf:ro" \
+            dronedream-frontend:quality-gate -t

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/runtime-release.v1.json",
+  "title": "DroneDreamRuntime downloadable release manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runtime", "source", "artifact", "smoke", "requirements"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "buildId", "version", "architecture", "wslVersion"],
+      "properties": {
+        "id": {"const": "DroneDreamRuntime"},
+        "buildId": {"type": "string", "format": "uuid"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "architecture": {"const": "x86_64"},
+        "wslVersion": {"const": 2}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gitCommit", "px4Commit", "gazeboVersion", "buildTimestamp"],
+      "properties": {
+        "gitCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "px4Commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "gazeboVersion": {"type": "string", "minLength": 1, "maxLength": 128},
+        "buildTimestamp": {"type": "string", "format": "date-time"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "mediaType", "compression", "sizeBytes", "sha256", "parts"],
+      "properties": {
+        "filename": {"type": "string"},
+        "mediaType": {"const": "application/vnd.dronedream.wsl-rootfs+tar"},
+        "compression": {"const": "none"},
+        "sizeBytes": {"type": "integer", "minimum": 1, "maximum": 12884901888},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["index", "filename", "sizeBytes", "sha256", "url"],
+            "properties": {
+              "index": {"type": "integer", "minimum": 0},
+              "filename": {"type": "string"},
+              "sizeBytes": {"type": "integer", "minimum": 1, "exclusiveMaximum": 2147483648},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "url": {"type": "string", "format": "uri", "pattern": "^https://"}
+            }
+          }
+        }
+      }
+    },
+    "smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "reportFilename", "reportSha256", "reportUrl", "completedAt"],
+      "properties": {
+        "passed": {"const": true},
+        "reportFilename": {"type": "string"},
+        "reportSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "reportUrl": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "completedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumFreeBytes", "targetPathHint"],
+      "properties": {
+        "minimumFreeBytes": {"type": "integer", "minimum": 55834574848},
+        "targetPathHint": {"const": "X:\\DroneDream"}
+      }
+    }
+  }
+}

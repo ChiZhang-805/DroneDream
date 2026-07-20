@@ -22,7 +22,6 @@ BASELINE_PARAMETERS: dict[str, float] = {
     "accel_limit": 4.0,
     "disturbance_rejection": 0.5,
 }
-
 # Safe ranges the optimizer must not escape. Anything it proposes is clamped
 # into ``[lo, hi]`` before being persisted.
 PARAMETER_SAFE_RANGES: dict[str, tuple[float, float]] = {
@@ -131,8 +130,3 @@ SCORE_WEIGHTS: dict[str, float] = {
     "instability": 1.0,
     "failed_trial": 1.5,
 }
-
-# If a candidate has *fewer* completed trials than this fraction of its
-# dispatched trials, it's considered too unreliable to win — the aggregator
-# will mark it eligible=False and skip it during best-candidate selection.
-MIN_COMPLETED_TRIAL_RATIO: float = 0.5

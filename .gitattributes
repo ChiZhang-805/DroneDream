@@ -1,0 +1,25 @@
+* text=auto
+
+*.py text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.rs text eol=lf
+*.nsh text eol=lf
+*.sh text eol=lf
+
+/runtime/** text eol=lf
+/scripts/**/*.sh text eol=lf
+/.github/workflows/*.yml text eol=lf
+/desktop/scripts/*.ps1 text eol=lf
+/desktop/src-tauri/nsis/*.nsi text eol=lf
+/desktop/src-tauri/nsis/*.nsh text eol=lf

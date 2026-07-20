@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Iterator
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
+
+from app.parameters import CATALOG_VERSION
 
 
 class FakeOpenAIClient:
@@ -82,6 +85,26 @@ def _create_gpt_job(ctx: dict[str, object], *, with_secret: bool = True) -> str:
         return job.id
 
 
+def test_expired_job_secret_is_wiped_before_llm_use(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        secret = job.secrets[0]
+        secret.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.commit()
+
+        assert ctx["proposer"]._load_api_key(db, job) is None
+        assert secret.encrypted_api_key == ""
+        assert secret.deleted_at is not None
+        assert any(
+            event.event_type == "job_secrets_purged"
+            and event.payload_json == {"reason": "secret_expired", "count": 1}
+            for event in job.events
+        )
+
+
 def test_proposer_records_events_and_clamps_output(llm_ctx):
     ctx = llm_ctx
     job_id = _create_gpt_job(ctx)
@@ -99,18 +122,6 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
                         "vel_limit": 5.0,
                         "accel_limit": 4.0,
                         "disturbance_rejection": 0.5,
-                    },
-                },
-                {
-                    "label": "conservative",
-                    "rationale": "Smaller gains",
-                    "parameters": {
-                        "kp_xy": 0.9,
-                        "kd_xy": 0.25,
-                        "ki_xy": 0.05,
-                        "vel_limit": 4.0,
-                        "accel_limit": 3.0,
-                        "disturbance_rejection": 0.6,
                     },
                 },
             ]
@@ -167,6 +178,15 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
         db.commit()
         assert result.error is None
         assert len(result.proposals) == 1
+        assert result.raw_response == {
+            "proposals": [
+                {
+                    "label": "aggressive",
+                    "rationale": "Increase kp to tighten tracking",
+                    "parameters": result.proposals[0].parameters,
+                }
+            ]
+        }
         first = result.proposals[0]
         assert first.parameters["kp_xy"] == 2.5
         assert first.parameters["kd_xy"] == 0.05
@@ -182,7 +202,12 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
         assert "llm_proposal_completed" in events
         payload = json.loads(fake.calls[0]["user"])
         assert len(payload["previous_candidates"]) >= 1
-        assert any("trials" in candidate for candidate in payload["previous_candidates"])
+        assert any(
+            "scenario_feedback" in candidate
+            for candidate in payload["previous_candidates"]
+        )
+        assert "log_excerpt" not in fake.calls[0]["user"]
+        assert "failure_reason" not in fake.calls[0]["user"]
 
 
 def test_proposer_rejects_invalid_response(llm_ctx):
@@ -196,6 +221,67 @@ def test_proposer_rejects_invalid_response(llm_ctx):
         db.commit()
         assert result.error == "invalid_response"
         assert result.proposals == []
+
+
+def test_proposer_uses_selected_px4_domain_and_provider_metadata(llm_ctx):
+    ctx = llm_ctx
+    schemas = ctx["schemas"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                optimizer_strategy="gpt",
+                llm=schemas.LLMProviderConfig(
+                    provider="deepseek",
+                    api_key="provider-key",
+                    model="control-tuner-model",
+                    base_url="https://llm.example.test/v1",
+                ),
+                parameter_catalog_version="px4-v1.16",
+                vehicle_profile=schemas.VehicleProfileConfig(px4_version="v1.16"),
+                parameter_space=[
+                    schemas.ParameterSelection(
+                        name="MPC_XY_P",
+                        baseline=0.95,
+                        minimum=0.6,
+                        maximum=1.3,
+                        step=0.1,
+                    ),
+                    schemas.ParameterSelection(
+                        name="MPC_TILTMAX_AIR",
+                        baseline=45,
+                        minimum=25,
+                        maximum=60,
+                        step=1,
+                        value_type="integer",
+                    ),
+                ],
+            ),
+        )
+        fake = FakeOpenAIClient(
+            {
+                "proposals": [
+                    {
+                        "label": "px4 candidate",
+                        "rationale": "balance tracking and tilt authority",
+                        "parameters": {"MPC_XY_P": 1.023, "MPC_TILTMAX_AIR": 52.6},
+                    }
+                ]
+            }
+        )
+        criteria = ctx["acceptance"].criteria_for_job(job)
+        result = ctx["proposer"].propose_candidates(db, job, criteria, client=fake)
+        assert result.error is None
+        assert result.model == "control-tuner-model"
+        assert result.proposals[0].parameters == {
+            "MPC_XY_P": 1.0,
+            "MPC_TILTMAX_AIR": 53.0,
+        }
+        prompt = json.loads(fake.calls[0]["user"])
+        assert set(prompt["parameter_domains"]) == {"MPC_XY_P", "MPC_TILTMAX_AIR"}
+        assert prompt["parameter_catalog_version"] == CATALOG_VERSION
+        assert job.llm_provider == "deepseek"
+        assert job.llm_base_url == "https://llm.example.test/v1"
 
 
 def test_proposer_handles_client_exception(llm_ctx):
@@ -249,6 +335,104 @@ def test_proposer_rejects_nan_or_extra_keys(llm_ctx):
         assert result.error == "invalid_response"
 
 
+def test_proposer_rejects_boolean_parameters(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+    proposal = {
+        "label": "invalid boolean",
+        "rationale": "booleans are not controller gains",
+        "parameters": {
+            "kp_xy": True,
+            "kd_xy": 0.2,
+            "ki_xy": 0.05,
+            "vel_limit": 5.0,
+            "accel_limit": 4.0,
+            "disturbance_rejection": 0.5,
+        },
+    }
+    fake = FakeOpenAIClient({"proposals": [proposal]})
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        result = ctx["proposer"].propose_candidates(
+            db,
+            job,
+            ctx["acceptance"].criteria_for_job(job),
+            client=fake,
+        )
+
+    assert result.error == "invalid_response"
+    assert result.proposals == []
+
+
+def test_proposer_rejects_surplus_proposals(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+    proposal = {
+        "label": "valid but duplicated",
+        "rationale": "the response violates maxItems",
+        "parameters": {
+            "kp_xy": 1.0,
+            "kd_xy": 0.2,
+            "ki_xy": 0.05,
+            "vel_limit": 5.0,
+            "accel_limit": 4.0,
+            "disturbance_rejection": 0.5,
+        },
+    }
+    fake = FakeOpenAIClient({"proposals": [proposal, proposal]})
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        result = ctx["proposer"].propose_candidates(
+            db,
+            job,
+            ctx["acceptance"].criteria_for_job(job),
+            client=fake,
+        )
+
+    assert result.error == "invalid_response"
+    assert result.proposals == []
+
+
+@pytest.mark.parametrize(
+    "extra_payload",
+    [
+        {"provider_debug": {"api_key": "must-not-persist"}},
+        {"provider_debug": {"overflow": 1e999}},
+    ],
+)
+def test_proposer_rejects_unbounded_or_nonfinite_provider_payload(
+    llm_ctx, extra_payload
+):
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+    response = {
+        "proposals": [
+            {
+                "label": "valid-looking",
+                "rationale": "but the root payload violates the strict contract",
+                "parameters": {
+                    "kp_xy": 1.1,
+                    "kd_xy": 0.2,
+                    "ki_xy": 0.05,
+                    "vel_limit": 5.0,
+                    "accel_limit": 4.0,
+                    "disturbance_rejection": 0.5,
+                },
+            }
+        ],
+        **extra_payload,
+    }
+    fake = FakeOpenAIClient(response)
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        result = ctx["proposer"].propose_candidates(
+            db, job, ctx["acceptance"].criteria_for_job(job), client=fake
+        )
+
+    assert result.error == "invalid_response"
+    assert result.proposals == []
+
+
 def test_create_job_rejects_gpt_without_api_key(llm_ctx):
     ctx = llm_ctx
     schemas = ctx["schemas"]
@@ -264,10 +448,10 @@ def test_create_job_rejects_gpt_without_api_key(llm_ctx):
         assert exc.value.code == "INVALID_INPUT"
 
 
-def test_job_create_request_defaults_are_gpt_and_20(llm_ctx):
+def test_job_create_request_defaults_are_keyless_heuristic_and_20(llm_ctx):
     schemas = llm_ctx["schemas"]
     req = schemas.JobCreateRequest()
-    assert req.optimizer_strategy == "gpt"
+    assert req.optimizer_strategy == "heuristic"
     assert req.max_iterations == 20
 
 

@@ -38,4 +38,9 @@ pnpm-debug.log*
 
 # Build artifacts / data
 artifacts/
+/.artifacts/
 tmp/
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/
+/frontend/site-dist/
+/runtime/out/

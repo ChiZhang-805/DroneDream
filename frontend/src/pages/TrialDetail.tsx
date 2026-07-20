@@ -15,8 +15,10 @@ import {
 } from "../components/TrajectoryReplay";
 import { GazeboLivePanel } from "../components/GazeboLivePanel";
 import { selectReplayArtifactsForTrial } from "../components/trajectoryReplayUtils";
+import { useI18n } from "../i18n/I18nProvider";
 
 export function TrialDetail() {
+  const { t } = useI18n();
   const { trialId } = useParams<{ trialId: string }>();
   const safeId = trialId ?? "";
 
@@ -35,19 +37,19 @@ export function TrialDetail() {
     retry: false,
   });
 
-  if (trialQuery.isLoading) return <Loading label="Loading trial…" />;
+  if (trialQuery.isLoading) return <Loading label={t("trial.loading")} />;
   if (trialQuery.isError || !trialQuery.data) {
     return (
       <ErrorState
-        title="Trial not found"
+        title={t("trial.notFound")}
         description={
           trialQuery.error instanceof ApiClientError
             ? trialQuery.error.message
-            : "We couldn't find that trial."
+            : t("trial.notFoundBody")
         }
         action={
           <Link to="/" className="btn">
-            Back to Dashboard
+            {t("trial.backDashboard")}
           </Link>
         }
       />
@@ -82,14 +84,15 @@ export function TrialDetail() {
 }
 
 function TrialHeader({ trial }: { trial: Trial }) {
+  const { t } = useI18n();
   return (
     <header className="page-header">
       <div>
         <h1>
-          Trial <code>{trial.id}</code>
+          {t("trial.title")} <code>{trial.id}</code>
         </h1>
         <p className="page-header-subtitle">
-          Part of job{" "}
+          {t("trial.partOfJob")}{" "}
           <Link to={`/jobs/${trial.job_id}`}>
             <code>{trial.job_id}</code>
           </Link>
@@ -105,45 +108,46 @@ function TrialHeader({ trial }: { trial: Trial }) {
 }
 
 function TrialMetadata({ trial }: { trial: Trial }) {
+  const { t } = useI18n();
   return (
-    <SectionCard title="Trial metadata">
+    <SectionCard title={t("trial.metadata")}>
       <ul className="kv-list">
         <li>
-          <span className="kv-key">Candidate ID</span>
+          <span className="kv-key">{t("trial.candidateId")}</span>
           <span className="kv-value">
             <code>{trial.candidate_id}</code>
           </span>
         </li>
         <li>
-          <span className="kv-key">Seed</span>
+          <span className="kv-key">{t("trial.seed")}</span>
           <span className="kv-value">{trial.seed}</span>
         </li>
         <li>
-          <span className="kv-key">Scenario type</span>
+          <span className="kv-key">{t("trial.scenarioType")}</span>
           <span className="kv-value">{trial.scenario_type}</span>
         </li>
         <li>
-          <span className="kv-key">Attempt count</span>
+          <span className="kv-key">{t("trial.attemptCount")}</span>
           <span className="kv-value">{trial.attempt_count}</span>
         </li>
         <li>
-          <span className="kv-key">Worker</span>
+          <span className="kv-key">{t("trial.worker")}</span>
           <span className="kv-value">{trial.worker_id ?? "—"}</span>
         </li>
         <li>
-          <span className="kv-key">Simulator backend</span>
+          <span className="kv-key">{t("trial.simulatorBackend")}</span>
           <span className="kv-value">{trial.simulator_backend ?? "—"}</span>
         </li>
         <li>
-          <span className="kv-key">Queued at</span>
+          <span className="kv-key">{t("trial.queuedAt")}</span>
           <span className="kv-value">{formatDateTime(trial.queued_at)}</span>
         </li>
         <li>
-          <span className="kv-key">Started at</span>
+          <span className="kv-key">{t("trial.startedAt")}</span>
           <span className="kv-value">{formatDateTime(trial.started_at)}</span>
         </li>
         <li>
-          <span className="kv-key">Finished at</span>
+          <span className="kv-key">{t("trial.finishedAt")}</span>
           <span className="kv-value">{formatDateTime(trial.finished_at)}</span>
         </li>
       </ul>
@@ -152,37 +156,37 @@ function TrialMetadata({ trial }: { trial: Trial }) {
 }
 
 function TrialMetricsSection({ trial }: { trial: Trial }) {
+  const { t } = useI18n();
   if (!trial.metrics) {
     return (
-      <SectionCard title="Metrics">
+      <SectionCard title={t("trial.metrics")}>
         <Alert tone="warning">
-          Metrics are not available for this trial
-          {trial.status === "FAILED" ? " because it failed." : "."}
+          {trial.status === "FAILED" ? t("trial.metricsFailed") : t("trial.metricsUnavailable")}
         </Alert>
       </SectionCard>
     );
   }
   const m = trial.metrics;
   return (
-    <SectionCard title="Metrics">
+    <SectionCard title={t("trial.metrics")}>
       <div className="metric-grid">
-        <MetricCard label="Score" value={formatNumber(m.score)} />
-        <MetricCard label="RMSE" value={`${formatNumber(m.rmse)} m`} />
-        <MetricCard label="Max error" value={`${formatNumber(m.max_error)} m`} />
-        <MetricCard label="Overshoot" value={m.overshoot_count} />
+        <MetricCard label={t("trial.score")} value={formatNumber(m.score)} />
+        <MetricCard label={t("trial.rmse")} value={`${formatNumber(m.rmse)} m`} />
+        <MetricCard label={t("trial.maxError")} value={`${formatNumber(m.max_error)} m`} />
+        <MetricCard label={t("trial.overshoot")} value={m.overshoot_count} />
         <MetricCard
-          label="Completion time"
+          label={t("trial.completionTime")}
           value={`${formatNumber(m.completion_time)} s`}
         />
-        <MetricCard label="Final error" value={`${formatNumber(m.final_error)} m`} />
+        <MetricCard label={t("trial.finalError")} value={`${formatNumber(m.final_error)} m`} />
         <MetricCard
-          label="Pass"
-          value={m.pass_flag ? "yes" : "no"}
+          label={t("trial.pass")}
+          value={m.pass_flag ? t("common.yes") : t("common.no")}
           tone={m.pass_flag ? "positive" : "negative"}
         />
         <MetricCard
-          label="Instability"
-          value={m.instability_flag ? "yes" : "no"}
+          label={t("trial.instability")}
+          value={m.instability_flag ? t("common.yes") : t("common.no")}
           tone={m.instability_flag ? "negative" : "muted"}
         />
       </div>
@@ -199,6 +203,7 @@ function TrialArtifactsSection({
   artifacts: Artifact[];
   isLoading: boolean;
 }) {
+  const { t } = useI18n();
   // Phase 8 polish: the job artifacts endpoint returns both job-scoped and
   // trial-scoped artifacts with ``owner_type`` preserved. For real_cli jobs
   // the worker persists trajectory_plot / telemetry_json / worker_log under
@@ -212,26 +217,23 @@ function TrialArtifactsSection({
   const jobArtifacts = artifacts.filter((a) => a.owner_type === "job");
   return (
     <ArtifactsPanel
-      title="Artifacts"
-      description={
-        `Artifacts for this trial (scenario ${trial.scenario_type}, seed ${trial.seed})` +
-        ` and for its parent job.`
-      }
+      title={t("artifacts.title")}
+      description={t("trial.artifactsDescription", { scenario: trial.scenario_type, seed: trial.seed })}
       isLoading={isLoading}
-      emptyDescription="Artifacts become available after the parent job completes."
+      emptyDescription={t("trial.artifactsEmpty")}
       sections={[
         {
-          heading: `Trial artifacts (${trialArtifacts.length})`,
+          heading: t("trial.trialArtifacts", { count: trialArtifacts.length }),
           artifacts: trialArtifacts,
           emptyNote:
             trial.simulator_backend === "mock"
-              ? "The mock simulator does not produce per-trial artifact files."
-              : "No trial-level artifacts were recorded for this trial.",
+              ? t("trial.mockArtifactsEmpty")
+              : t("trial.trialArtifactsEmpty"),
         },
         {
-          heading: `Job artifacts (${jobArtifacts.length})`,
+          heading: t("trial.jobArtifacts", { count: jobArtifacts.length }),
           artifacts: jobArtifacts,
-          emptyNote: "The job has not produced shared artifacts yet.",
+          emptyNote: t("trial.jobArtifactsEmpty"),
         },
       ]}
     />
@@ -239,11 +241,12 @@ function TrialArtifactsSection({
 }
 
 function FailureDetails({ trial }: { trial: Trial }) {
+  const { t } = useI18n();
   if (trial.status !== "FAILED") return null;
   return (
-    <SectionCard title="Failure details">
-      <Alert tone="danger" title={trial.failure_code ?? "Trial failed"}>
-        {trial.failure_reason ?? "No failure reason reported."}
+    <SectionCard title={t("trial.failureDetails")}>
+      <Alert tone="danger" title={trial.failure_code ?? t("trial.failed")}>
+        {trial.failure_reason ?? t("trial.noFailureReason")}
       </Alert>
       {trial.log_excerpt ? (
         <pre className="log-panel">{trial.log_excerpt}</pre>

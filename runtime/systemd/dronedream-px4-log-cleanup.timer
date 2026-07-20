@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically enforce DroneDream PX4 ULog retention limits
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Persistent=true
+Unit=dronedream-px4-log-cleanup.service
+
+[Install]
+WantedBy=timers.target

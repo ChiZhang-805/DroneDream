@@ -7,7 +7,7 @@ import io
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ router = APIRouter(tags=["jobs"])
 
 _PageQ = Query(1, ge=1)
 _PageSizeQ = Query(20, ge=1, le=200)
+_TrialPageSizeQ = Query(200, ge=1, le=500)
 _StatusQ: schemas.JobStatus | None = Query(None)
 
 
@@ -185,7 +186,13 @@ def rerun_job(
     req: schemas.JobRerunRequest | None = None,
 ) -> dict[str, object]:
     try:
-        job = job_service.rerun_job(db, job_id, user=user, openai=(req.openai if req else None))
+        job = job_service.rerun_job(
+            db,
+            job_id,
+            user=user,
+            openai=(req.openai if req else None),
+            llm=(req.llm if req else None),
+        )
     except job_service.JobServiceError as err:
         _raise(err)
     return ok(_job_payload_with_alias(job_service.to_job_schema(job)))
@@ -222,13 +229,41 @@ def list_job_trials(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
+    response: Response,
+    page: int = _PageQ,
+    page_size: int = _TrialPageSizeQ,
 ) -> dict[str, object]:
+    try:
+        trials, total = job_service.list_job_trials(
+            db,
+            job_id,
+            user=user,
+            page=page,
+            page_size=page_size,
+        )
+    except job_service.JobServiceError as err:
+        _raise(err)
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Page"] = str(page)
+    response.headers["X-Page-Size"] = str(page_size)
+    summaries = [job_service.to_trial_summary(t) for t in trials]
+    return ok([s.model_dump(mode="json") for s in summaries])
+
+
+@router.get("/jobs/{job_id}/candidates")
+def list_job_candidates(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Return every generation plus constraint-aware Pareto recommendations."""
+
     try:
         job = job_service.get_job(db, job_id, user=user)
     except job_service.JobServiceError as err:
         _raise(err)
-    summaries = [job_service.to_trial_summary(t) for t in job.trials]
-    return ok([s.model_dump(mode="json") for s in summaries])
+    history = job_service.optimization_history(job)
+    return ok(history.model_dump(mode="json"))
 
 
 @router.get("/jobs/{job_id}/report")

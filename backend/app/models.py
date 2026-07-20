@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     Float,
@@ -20,6 +21,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,10 +38,23 @@ def _now() -> datetime:
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint(
+            "identity_provider",
+            "external_subject",
+            name="uq_users_identity_provider_subject",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("usr"))
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    identity_provider: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+    external_subject: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
@@ -100,6 +115,18 @@ class Job(Base):
     )
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Versioned, extensible experiment definition.  The legacy flat columns
+    # above remain populated for backwards-compatible filtering and clients.
+    vehicle_profile_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    parameter_catalog_version: Mapped[str] = mapped_column(
+        String(128), nullable=False, default="builtin-v1"
+    )
+    parameter_space_json: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    objective_config_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    scenario_suite_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
     # State.
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="CREATED", index=True)
     current_phase: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -124,6 +151,8 @@ class Job(Base):
     current_generation: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     optimization_outcome: Mapped[str | None] = mapped_column(String(64), nullable=True)
     openai_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    llm_provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    llm_base_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
     # Relational pointers.
     best_candidate_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -179,6 +208,9 @@ class CandidateParameterSet(Base):
     aggregated_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     aggregated_metric_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     proposal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    optimizer_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
     parent_candidate_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     llm_response_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     trial_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -302,7 +334,10 @@ class Artifact(Base):
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
     mime_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Artifact logs and telemetry can legitimately exceed PostgreSQL's
+    # 32-bit INTEGER ceiling. SQLite already stores 64-bit integers, while
+    # BigInteger keeps the production schema portable and lossless.
+    file_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
@@ -346,6 +381,7 @@ class JobSecret(Base):
 
 __all__ = [
     "Artifact",
+    "BatchJob",
     "CandidateParameterSet",
     "Job",
     "JobEvent",

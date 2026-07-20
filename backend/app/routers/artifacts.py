@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app import models
@@ -22,6 +23,25 @@ router = APIRouter(tags=["artifacts"])
 def _is_under_allowed_root(path: Path, allowed_roots: list[Path]) -> bool:
     resolved = path.resolve()
     return any(resolved.is_relative_to(root) for root in allowed_roots)
+
+
+def _safe_download_name(display_name: str | None, storage_path: str) -> str:
+    """Return a header-safe leaf name for worker-supplied artifact metadata."""
+
+    raw = (display_name or Path(storage_path).name or "artifact").strip()
+    cleaned = "".join(
+        "_" if ord(char) < 32 or char in {"/", "\\"} else char for char in raw
+    ).strip(". ")
+    return (cleaned or "artifact")[:255]
+
+
+def _attachment_header(filename: str) -> str:
+    try:
+        filename.encode("ascii")
+    except UnicodeEncodeError:
+        return f"attachment; filename*=UTF-8''{quote(filename)}"
+    escaped = filename.replace("\\", "_").replace('"', "_")
+    return f'attachment; filename="{escaped}"'
 
 
 @router.get("/artifacts/{artifact_id}/download")
@@ -68,6 +88,13 @@ def download_artifact(
                 status_code=404,
                 detail={"code": "ARTIFACT_NOT_FOUND", "message": "Artifact not found."},
             )
+    else:
+        # Polymorphic owner rows are written by workers. Unknown owner types
+        # must fail closed instead of skipping tenant authorization entirely.
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "ARTIFACT_NOT_FOUND", "message": "Artifact not found."},
+        )
 
     if artifact.storage_path.startswith("s3://"):
         try:
@@ -80,6 +107,14 @@ def download_artifact(
                         "message": "Artifact file does not exist.",
                     },
                 )
+            presign = getattr(storage, "presign_download", None)
+            if callable(presign):
+                signed_url = presign(
+                    artifact.storage_path,
+                    expires_seconds=get_settings().artifact_presign_expiry_seconds,
+                )
+                if signed_url:
+                    return RedirectResponse(url=signed_url, status_code=307)
             content = storage.read_bytes(artifact.storage_path)
         except S3StorageConfigError as exc:
             raise HTTPException(
@@ -87,11 +122,11 @@ def download_artifact(
                 detail={"code": "CONFIGURATION_ERROR", "message": str(exc)},
             ) from exc
 
-        filename = artifact.display_name or Path(artifact.storage_path).name
+        filename = _safe_download_name(artifact.display_name, artifact.storage_path)
         return Response(
             content=content,
             media_type=artifact.mime_type or "application/octet-stream",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
+            headers={"Content-Disposition": _attachment_header(filename)},
         )
 
     raw_path = Path(artifact.storage_path)
@@ -122,5 +157,5 @@ def download_artifact(
     return FileResponse(
         path=path,
         media_type=artifact.mime_type or "application/octet-stream",
-        filename=artifact.display_name or path.name,
+        filename=_safe_download_name(artifact.display_name, artifact.storage_path),
     )

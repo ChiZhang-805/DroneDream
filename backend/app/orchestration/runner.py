@@ -18,6 +18,7 @@ blocked waiting for a worker transaction.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import signal
 import socket
@@ -28,6 +29,8 @@ from app.db import SessionLocal
 from app.orchestration.aggregation import finalize_ready_jobs
 from app.orchestration.job_manager import start_queued_jobs
 from app.orchestration.trial_executor import claim_and_run_one_pending_trial
+from app.orchestration.worker_presence import WorkerPresenceHeartbeat
+from app.services.jobs import purge_expired_job_secrets
 
 logger = logging.getLogger("drone_dream.orchestration.runner")
 
@@ -56,6 +59,13 @@ def tick(worker_id: str) -> dict[str, object]:
     without sleeping. Returns a small summary dict.
     """
 
+    if not isinstance(worker_id, str) or not worker_id.strip():
+        raise ValueError("worker_id must be a non-empty string")
+    worker_id = worker_id.strip()
+
+    with SessionLocal() as db:
+        expired_secrets = purge_expired_job_secrets(db)
+
     with SessionLocal() as db:
         started = start_queued_jobs(db)
 
@@ -65,7 +75,12 @@ def tick(worker_id: str) -> dict[str, object]:
     with SessionLocal() as db:
         finalized = finalize_ready_jobs(db)
 
-    return {"started": started, "trial_id": trial_id, "finalized": finalized}
+    return {
+        "started": started,
+        "trial_id": trial_id,
+        "finalized": finalized,
+        "expired_secrets": expired_secrets,
+    }
 
 
 def run_forever(
@@ -79,9 +94,31 @@ def run_forever(
     Returns the intended process exit code.
     """
 
-    wid = worker_id or _default_worker_id()
+    if (
+        isinstance(poll_interval_seconds, bool)
+        or not isinstance(poll_interval_seconds, int | float)
+        or not math.isfinite(float(poll_interval_seconds))
+        or poll_interval_seconds < 0
+    ):
+        raise ValueError("poll_interval_seconds must be finite and >= 0")
+    if max_iterations is not None and (
+        isinstance(max_iterations, bool)
+        or not isinstance(max_iterations, int)
+        or max_iterations < 0
+    ):
+        raise ValueError("max_iterations must be a non-negative integer")
+    if max_iterations == 0:
+        return 0
+
+    if worker_id is not None and (
+        not isinstance(worker_id, str) or not worker_id.strip()
+    ):
+        raise ValueError("worker_id must be a non-empty string when provided")
+    wid = worker_id.strip() if worker_id is not None else _default_worker_id()
     _install_signal_handlers()
     logger.info("worker %s starting (poll_interval=%.2fs)", wid, poll_interval_seconds)
+    presence = WorkerPresenceHeartbeat(wid)
+    presence.start()
 
     iterations = 0
     try:
@@ -97,7 +134,8 @@ def run_forever(
             if not did_work:
                 time.sleep(poll_interval_seconds)
     except WorkerStopped:
-        pass
+        logger.info("worker %s received a stop request", wid)
     finally:
+        presence.stop()
         logger.info("worker %s stopped after %d ticks", wid, iterations)
     return 0

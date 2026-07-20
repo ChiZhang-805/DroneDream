@@ -7,13 +7,6 @@ export interface TrackGeometryConfig {
   lemniscate_scale_m: number;
 }
 
-export const DEFAULT_TRACK_GEOMETRY: TrackGeometryConfig = {
-  circle_radius_m: 5.0,
-  u_turn_straight_length_m: 10.0,
-  u_turn_turn_radius_m: 3.0,
-  lemniscate_scale_m: 4.0,
-};
-
 export function generateReferenceTrack(
   trackType: Exclude<TrackType, "custom">,
   startX: number,

@@ -16,3 +16,15 @@ class ArtifactStorage(Protocol):
 
     def delete(self, storage_uri: str) -> None:
         """Delete an artifact payload from storage."""
+
+    def presign_download(
+        self, storage_uri: str, *, expires_seconds: int | None = None
+    ) -> str | None:
+        """Return a temporary download URL when the backend supports it.
+
+        Local storage intentionally returns ``None`` so existing API streaming
+        remains the compatibility path.
+        """
+
+    def check_health(self) -> None:
+        """Raise when the backing store is not currently usable."""

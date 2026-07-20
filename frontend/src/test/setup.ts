@@ -4,4 +4,7 @@ import { cleanup } from "@testing-library/react";
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
+  delete window.__TAURI__;
+  document.documentElement.removeAttribute("lang");
 });

@@ -4,7 +4,7 @@
 
 DroneDream is a three-process system:
 
-- **Frontend (`frontend/`)**: React + TypeScript UI for creating jobs/batches, viewing progress, comparing completed jobs, and browsing artifacts/reports.
+- **Frontend (`frontend/`)**: React + TypeScript UI for creating optimization experiments, viewing progress, comparing completed jobs, and browsing artifacts/reports. The retired batch UI is intentionally not exposed.
 - **Backend (`backend/`)**: FastAPI + SQLAlchemy API, persistence layer, report/artifact metadata APIs, auth envelope, and request validation.
 - **Worker (`worker/`)**: async polling runner that claims queued jobs and executes trial loops via simulator + optimizer adapters.
 
@@ -15,7 +15,7 @@ DroneDream is a three-process system:
 3. Worker claims queued jobs and executes orchestration in `backend/app/orchestration/`.
 4. Simulator adapter returns trial telemetry.
 5. Aggregation + acceptance logic picks best candidate and writes report/artifact metadata.
-6. API surfaces job/batch/trial/report state to frontend.
+6. API surfaces job/trial/report state to the current frontend. Batch endpoints remain a compatibility and automation API.
 
 ## Backend layering
 
@@ -31,7 +31,8 @@ DroneDream is a three-process system:
 - `Job` is the execution unit.
 - `BatchJob` groups multiple `Job` rows via `jobs.batch_id`.
 - Batch status is computed from child job statuses (aggregated, not independently orchestrated).
-- SQLite lightweight migration path is implemented in `backend/app/db.py` for additive columns used by newer versions.
+- SQLite remains convenient for local development; deployed databases use the
+  reviewed Alembic migration chain under `backend/alembic/`.
 
 ## Current capabilities
 
@@ -39,11 +40,13 @@ DroneDream is a three-process system:
 - Trial detail/list and report/artifact APIs.
 - Batch create/list/detail/list-jobs/cancel.
 - Batch creation validates all child jobs up front; invalid child rejects whole request.
-- Optimizer strategies: `heuristic`, `gpt`, `cma_es`.
+- Optimizer strategies: `none`, `heuristic`, `gpt`, `cma_es`, plus the seven
+  experimental engines documented in `09-optimizer-guide.md`.
 - Simulator backends: `mock`, `real_cli`.
 
 ## Limitations / roadmap
 
-- Batch creation UI is currently JSON-array based (no visual sweep builder yet).
+- Batch endpoints remain available for compatibility and external automation, but the desktop navigation does not expose a batch-creation page.
 - Batch analytics are basic counts/progress, not full statistical dashboards.
-- No Alembic migration chain yet; SQLite lightweight migration is additive only.
+- Real PX4/Gazebo execution still requires a site runtime, and verified
+  disturbance injection remains site-specific.

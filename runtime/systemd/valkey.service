@@ -1,0 +1,28 @@
+[Unit]
+Description=DroneDreamRuntime local Valkey
+After=network.target dronedream-runtime-init.service
+Requires=dronedream-runtime-init.service
+
+[Service]
+Type=notify
+User=valkey
+Group=valkey
+ExecStart=/usr/local/bin/valkey-server /etc/valkey/valkey.conf
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=on-failure
+RestartSec=2
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/valkey
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

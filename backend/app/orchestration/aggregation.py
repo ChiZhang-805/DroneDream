@@ -7,10 +7,9 @@ Once every trial for a job is terminal, this module:
    candidate), rolls up the candidate's completed trials into
    ``aggregated_metric_json`` / ``aggregated_score``, and persists trial
    counts. See :func:`_aggregate_candidate`.
-3. Selects the best candidate by lowest ``aggregated_score`` among
-   "eligible" candidates (candidates with enough completed trials — see
-   :data:`constants.MIN_COMPLETED_TRIAL_RATIO`). Baseline is always eligible
-   if it has any completed trials so we can always produce a report.
+3. Selects the best candidate by lowest ``aggregated_score`` among candidates
+   that completed the entire configured full-fidelity scenario matrix, passed
+   every required holdout, and satisfied all persisted hard constraints.
 4. Ranks every candidate (``rank_in_job``, 1-indexed) and marks ``is_best``
    on the winner.
 5. Writes the ``JobReport`` using the baseline's aggregate as the baseline
@@ -25,13 +24,21 @@ The scoring formula is deterministic and documented in
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+import math
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.orm import Session
 
-from app import models
+from app import models, schemas
+from app.config import get_settings
+from app.db import SessionLocal
+from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
+from app.optimization.robust import CandidateEvaluation
+from app.optimization.robust import evaluate_candidate as evaluate_objectives
+from app.optimization.scenarios import scenario_matrix
 from app.orchestration import constants, report_generator
 from app.orchestration.acceptance import (
     AcceptanceCriteria,
@@ -44,13 +51,256 @@ from app.orchestration.events import record_event
 logger = logging.getLogger("drone_dream.orchestration.aggregation")
 
 _TERMINAL_TRIAL = {"COMPLETED", "FAILED", "CANCELLED"}
+_ITERATIVE_OPTIMIZERS = {
+    "gpt",
+    "cma_es",
+    *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+}
+
+
+def _candidate_fidelity(candidate: object) -> float:
+    """Read optimizer fidelity defensively for legacy rows and test doubles."""
+
+    metadata = getattr(candidate, "optimizer_metadata_json", None)
+    if not isinstance(metadata, dict):
+        return 1.0
+    raw = metadata.get("requested_fidelity", metadata.get("fidelity", 1.0))
+    if isinstance(raw, bool) or not isinstance(raw, str | int | float):
+        return 1.0
+    try:
+        fidelity = float(raw)
+    except (TypeError, ValueError):
+        return 1.0
+    return fidelity if math.isfinite(fidelity) and 0.0 < fidelity <= 1.0 else 0.0
+
+
+def _configured_scenario_contract(
+    candidate: object,
+) -> tuple[Counter[tuple[str, bool]], bool] | None:
+    """Return the expected case/holdout multiplicities when the job is available.
+
+    The public recommendation gate is also used with lightweight test doubles and
+    legacy detached rows.  In those cases there is no trustworthy job-side suite
+    to compare, so the older aggregate/trial checks remain the compatibility
+    boundary.  A present but invalid persisted suite is never considered safe.
+    """
+
+    try:
+        job = getattr(candidate, "job", None)
+        raw_suite = getattr(job, "scenario_suite_json", None)
+    except Exception:  # pragma: no cover - detached ORM state is not publishable
+        return Counter(), False
+    if raw_suite is None:
+        return None
+    if not isinstance(raw_suite, dict):
+        return Counter(), False
+    try:
+        runs = scenario_matrix(schemas.ScenarioSuiteConfig(**raw_suite))
+    except (TypeError, ValueError):
+        return Counter(), False
+    expected = Counter((run.case_id, run.holdout) for run in runs)
+    return expected, any(run.holdout for run in runs)
+
+
+def _uses_experimental_optimizer(candidate: object) -> bool:
+    try:
+        job_strategy = str(getattr(getattr(candidate, "job", None), "optimizer_strategy", ""))
+    except Exception:  # pragma: no cover - fail closed for detached ORM state
+        return True
+    metadata = getattr(candidate, "optimizer_metadata_json", None)
+    child_strategy = ""
+    if isinstance(metadata, dict):
+        child_strategy = str(metadata.get("child_strategy") or metadata.get("strategy") or "")
+    return (
+        job_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES
+        or child_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES
+    )
+
+
+def _safe_candidate_count(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
+    """Return whether a candidate is safe to expose as a parameter recommendation.
+
+    Optimizer observations may remain useful after a partial or reduced-cost
+    evaluation, but a public recommendation has a stricter contract: nominal
+    full fidelity, a completely successful dispatched matrix, a finite score,
+    no known hard-constraint failure, exact coverage of the configured scenario
+    matrix, and a passed holdout whenever the suite requires one. Legacy
+    aggregates did not persist ``feasible``; absence remains compatible for
+    legacy optimizers, while experimental optimizers require an explicit result.
+    """
+
+    if not candidate.is_baseline and _candidate_fidelity(candidate) < 1.0 - 1e-9:
+        return False
+    trial_count = _safe_candidate_count(candidate.trial_count)
+    completed_trial_count = _safe_candidate_count(candidate.completed_trial_count)
+    failed_trial_count = _safe_candidate_count(candidate.failed_trial_count)
+    if (
+        trial_count is None
+        or completed_trial_count is None
+        or failed_trial_count is None
+        or trial_count <= 0
+        or completed_trial_count != trial_count
+        or failed_trial_count != 0
+    ):
+        return False
+    score = candidate.aggregated_score
+    if (
+        isinstance(score, bool)
+        or not isinstance(score, int | float)
+        or not math.isfinite(float(score))
+    ):
+        return False
+    aggregate = candidate.aggregated_metric_json
+    if not isinstance(aggregate, dict):
+        return False
+    aggregate_feasible = aggregate.get("feasible")
+    if _uses_experimental_optimizer(candidate) and aggregate_feasible is not True:
+        return False
+    if aggregate_feasible is not None and aggregate_feasible is not True:
+        return False
+
+    try:
+        has_trial_relationship = hasattr(candidate, "trials")
+        trials = list(getattr(candidate, "trials", ()) or ())
+    except Exception:  # pragma: no cover - detached ORM state is not publishable
+        return False
+    if has_trial_relationship and (
+        len(trials) != trial_count or any(not _trial_has_usable_metric(trial) for trial in trials)
+    ):
+        return False
+
+    configured_contract = _configured_scenario_contract(candidate)
+    configured_holdout = False
+    if configured_contract is not None:
+        expected_cases, configured_holdout = configured_contract
+        actual_cases: Counter[tuple[str, bool]] = Counter()
+        unique_runs: set[tuple[str, int]] = set()
+        for trial in trials:
+            config = getattr(trial, "scenario_config_json", None)
+            if not isinstance(config, dict):
+                return False
+            case_id = config.get("scenario_case_id")
+            seed = getattr(trial, "seed", None)
+            holdout_value = config.get("holdout", False)
+            if (
+                not isinstance(case_id, str)
+                or isinstance(seed, bool)
+                or not isinstance(seed, int)
+                or not isinstance(holdout_value, bool)
+            ):
+                return False
+            trial_holdout = holdout_value
+            actual_cases[(case_id, trial_holdout)] += 1
+            unique_runs.add((case_id, seed))
+        if not expected_cases or actual_cases != expected_cases or len(unique_runs) != trial_count:
+            return False
+
+    def _trial_is_holdout(trial: object) -> bool:
+        config = getattr(trial, "scenario_config_json", None)
+        return isinstance(config, dict) and config.get("holdout") is True
+
+    expects_holdout = (
+        configured_holdout
+        or isinstance(aggregate.get("holdout"), dict)
+        or any(_trial_is_holdout(trial) for trial in trials)
+    )
+    if expects_holdout:
+        holdout_result = aggregate.get("holdout")
+        if not (
+            isinstance(holdout_result, dict)
+            and holdout_result.get("validation_status") == "passed"
+            and holdout_result.get("feasible") is True
+        ):
+            return False
+    return True
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _job_is_cancelled(job_id: str) -> bool:
+    """Read a cancellation fence without discarding this session's changes."""
+
+    with SessionLocal() as fence_db:
+        return (
+            fence_db.scalar(select(models.Job.status).where(models.Job.id == job_id)) == "CANCELLED"
+        )
+
+
 # --- Scoring ---------------------------------------------------------------
+
+
+def _finite_metric_number(value: object, *, nonnegative: bool = True) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    numeric = float(value)
+    if not math.isfinite(numeric) or (nonnegative and numeric < 0.0):
+        return None
+    return numeric
+
+
+def _metric_is_usable(metric: models.TrialMetric | None) -> bool:
+    if metric is None:
+        return False
+    overshoot = metric.overshoot_count
+    return (
+        _finite_metric_number(metric.rmse) is not None
+        and _finite_metric_number(metric.max_error) is not None
+        and _finite_metric_number(metric.completion_time) is not None
+        and _finite_metric_number(metric.score, nonnegative=False) is not None
+        and _finite_metric_number(metric.final_error) is not None
+        and isinstance(overshoot, int)
+        and not isinstance(overshoot, bool)
+        and overshoot >= 0
+        and all(
+            isinstance(flag, bool)
+            for flag in (
+                metric.crash_flag,
+                metric.timeout_flag,
+                metric.pass_flag,
+                metric.instability_flag,
+            )
+        )
+    )
+
+
+def _required_metric_number(value: object, *, field_name: str) -> float:
+    numeric = _finite_metric_number(
+        value,
+        nonnegative=field_name != "score",
+    )
+    if numeric is None:
+        raise ValueError(f"trial metric {field_name} is missing or invalid")
+    return numeric
+
+
+def _required_overshoot_count(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError("trial metric overshoot_count is missing or invalid")
+    return value
+
+
+def _trial_has_usable_metric(trial: models.Trial) -> bool:
+    return getattr(trial, "status", None) == "COMPLETED" and _metric_is_usable(
+        getattr(trial, "metric", None)
+    )
+
+
+def _trial_passed_with_usable_metric(trial: models.Trial) -> bool:
+    metric = getattr(trial, "metric", None)
+    return (
+        getattr(trial, "status", None) == "COMPLETED"
+        and _metric_is_usable(metric)
+        and metric is not None
+        and metric.pass_flag
+    )
 
 
 def _score_candidate(metrics: list[models.TrialMetric], trial_count: int, failed: int) -> float:
@@ -77,9 +327,22 @@ def _score_candidate(metrics: list[models.TrialMetric], trial_count: int, failed
     n = max(1, len(metrics))
     denom = max(1, trial_count)
 
-    mean_rmse = sum(m.rmse or 0.0 for m in metrics) / n
-    mean_max_error = sum(m.max_error or 0.0 for m in metrics) / n
-    mean_completion = sum(m.completion_time or 0.0 for m in metrics) / n
+    if not metrics or any(not _metric_is_usable(metric) for metric in metrics):
+        raise ValueError("candidate score requires at least one complete valid metric")
+    mean_rmse = (
+        sum(_required_metric_number(metric.rmse, field_name="rmse") for metric in metrics) / n
+    )
+    mean_max_error = (
+        sum(_required_metric_number(metric.max_error, field_name="max_error") for metric in metrics)
+        / n
+    )
+    mean_completion = (
+        sum(
+            _required_metric_number(metric.completion_time, field_name="completion_time")
+            for metric in metrics
+        )
+        / n
+    )
     crash_rate = sum(1 for m in metrics if m.crash_flag) / denom
     timeout_rate = sum(1 for m in metrics if m.timeout_flag) / denom
     instability_rate = sum(1 for m in metrics if m.instability_flag) / denom
@@ -100,6 +363,9 @@ def _score_candidate(metrics: list[models.TrialMetric], trial_count: int, failed
 def _aggregate_candidate(
     candidate: models.CandidateParameterSet,
     trials: list[models.Trial],
+    *,
+    objective_config: schemas.ObjectiveConfig | None = None,
+    scenario_suite: schemas.ScenarioSuiteConfig | None = None,
 ) -> dict[str, Any] | None:
     """Roll up this candidate's trial metrics, update counts + aggregated_score.
 
@@ -108,12 +374,12 @@ def _aggregate_candidate(
     ineligible to win.
     """
 
-    completed_trials = [t for t in trials if t.status == "COMPLETED" and t.metric is not None]
+    completed_trials = [trial for trial in trials if _trial_has_usable_metric(trial)]
     metrics = [t.metric for t in completed_trials if t.metric is not None]
 
     candidate.trial_count = len(trials)
     candidate.completed_trial_count = len(completed_trials)
-    candidate.failed_trial_count = sum(1 for t in trials if t.status == "FAILED")
+    candidate.failed_trial_count = len(trials) - len(completed_trials)
     passing_trial_count = sum(1 for m in metrics if m.pass_flag)
 
     if not metrics:
@@ -124,19 +390,154 @@ def _aggregate_candidate(
     def _avg(values: list[float]) -> float:
         return round(sum(values) / len(values), 4)
 
-    rmse = _avg([m.rmse or 0.0 for m in metrics])
-    max_error = _avg([m.max_error or 0.0 for m in metrics])
-    overshoot = int(round(sum(m.overshoot_count or 0 for m in metrics) / len(metrics)))
-    completion_time = _avg([m.completion_time or 0.0 for m in metrics])
-    trial_score_mean = _avg([m.score or 0.0 for m in metrics])
+    cases_by_id = {
+        case.id: case
+        for case in (scenario_suite.cases if scenario_suite is not None else [])
+        if case.enabled
+    }
+    cases_by_type: dict[str, schemas.ScenarioCaseConfig] = {}
+    for case in cases_by_id.values():
+        cases_by_type.setdefault(case.scenario_type, case)
+
+    def _resolved_case(
+        trial: models.Trial,
+    ) -> tuple[str, schemas.ScenarioCaseConfig | None]:
+        scenario_config = trial.scenario_config_json or {}
+        raw_case_id = scenario_config.get("scenario_case_id")
+        if raw_case_id is not None:
+            case_id = str(raw_case_id)
+            case = cases_by_id.get(case_id)
+            if case is not None:
+                return f"id:{case_id}", case
+            fallback_case = cases_by_type.get(trial.scenario_type)
+            if fallback_case is not None:
+                return f"id:{fallback_case.id}", fallback_case
+            return f"id:{case_id}", None
+        case = cases_by_type.get(trial.scenario_type)
+        if case is not None:
+            return f"id:{case.id}", case
+        return f"type:{trial.scenario_type}", None
+
+    def _rate_summary(rows: list[models.Trial]) -> dict[str, Any]:
+        """Calculate case-weighted execution and pass rates.
+
+        Seeds are first reduced within their scenario case. Each case then
+        contributes exactly its configured ``weight``, independent of how
+        many seeds it contains. Failed seeds remain in the per-case
+        denominator, so a partially executed case cannot look healthier just
+        because only successful rows produced metrics.
+        """
+
+        grouped: dict[str, tuple[schemas.ScenarioCaseConfig | None, list[models.Trial]]] = {}
+        for trial in rows:
+            group_key, case = _resolved_case(trial)
+            if group_key not in grouped:
+                grouped[group_key] = (case, [])
+            grouped[group_key][1].append(trial)
+
+        completed_count = sum(1 for trial in rows if _trial_has_usable_metric(trial))
+        failed_count = len(rows) - completed_count
+        passing_count = sum(1 for trial in rows if _trial_passed_with_usable_metric(trial))
+        if not grouped:
+            return {
+                "trial_count": 0,
+                "completed_trial_count": 0,
+                "failed_trial_count": 0,
+                "passing_trial_count": 0,
+                "completion_rate": 0.0,
+                "failure_rate": 0.0,
+                "pass_rate": 0.0,
+                "scenario_case_count": 0,
+                "scenario_weight_total": 0.0,
+                "scenario_cases": [],
+            }
+
+        weight_total = sum(
+            float(case.weight) if case is not None else 1.0 for case, _case_rows in grouped.values()
+        )
+        weighted_completion = 0.0
+        weighted_failure = 0.0
+        weighted_pass = 0.0
+        case_summaries: list[dict[str, Any]] = []
+        for group_key, (case, case_rows) in grouped.items():
+            weight = float(case.weight) if case is not None else 1.0
+            denominator = len(case_rows)
+            case_completed = sum(1 for trial in case_rows if _trial_has_usable_metric(trial))
+            case_failed = denominator - case_completed
+            case_passing = sum(1 for trial in case_rows if _trial_passed_with_usable_metric(trial))
+            weighted_completion += weight * case_completed / denominator
+            weighted_failure += weight * case_failed / denominator
+            weighted_pass += weight * case_passing / denominator
+            case_summaries.append(
+                {
+                    "scenario_case_id": (
+                        case.id if case is not None else group_key.split(":", 1)[-1]
+                    ),
+                    "scenario_type": (
+                        case.scenario_type if case is not None else case_rows[0].scenario_type
+                    ),
+                    "weight": weight,
+                    "trial_count": denominator,
+                    "completed_trial_count": case_completed,
+                    "failed_trial_count": case_failed,
+                    "passing_trial_count": case_passing,
+                    "completion_rate": round(case_completed / denominator, 8),
+                    "failure_rate": round(case_failed / denominator, 8),
+                    "pass_rate": round(case_passing / denominator, 8),
+                }
+            )
+
+        return {
+            "trial_count": len(rows),
+            "completed_trial_count": completed_count,
+            "failed_trial_count": failed_count,
+            "passing_trial_count": passing_count,
+            "completion_rate": round(weighted_completion / weight_total, 8),
+            "failure_rate": round(weighted_failure / weight_total, 8),
+            "pass_rate": round(weighted_pass / weight_total, 8),
+            "scenario_case_count": len(grouped),
+            "scenario_weight_total": round(weight_total, 8),
+            "scenario_cases": case_summaries,
+        }
+
+    rmse = _avg([_required_metric_number(metric.rmse, field_name="rmse") for metric in metrics])
+    max_error_values = [
+        _required_metric_number(metric.max_error, field_name="max_error") for metric in metrics
+    ]
+    max_error = _avg(max_error_values)
+    max_error_worst = round(max(max_error_values), 4)
+    overshoot = int(
+        round(
+            sum(_required_overshoot_count(metric.overshoot_count) for metric in metrics)
+            / len(metrics)
+        )
+    )
+    completion_time = _avg(
+        [
+            _required_metric_number(
+                metric.completion_time,
+                field_name="completion_time",
+            )
+            for metric in metrics
+        ]
+    )
+    trial_score_mean = _avg(
+        [_required_metric_number(metric.score, field_name="score") for metric in metrics]
+    )
 
     aggregated_score = _score_candidate(
         metrics, trial_count=len(trials), failed=candidate.failed_trial_count
     )
+    overall_rates = _rate_summary(trials)
 
     agg: dict[str, Any] = {
         "rmse": rmse,
+        # ``max_error`` remains the historical mean for report/API
+        # compatibility. Acceptance and safety checks use the explicit worst
+        # field so a single large excursion is never averaged away.
         "max_error": max_error,
+        "max_error_mean": max_error,
+        "max_error_worst": max_error_worst,
         "overshoot_count": overshoot,
         "completion_time": completion_time,
         "score": trial_score_mean,
@@ -144,12 +545,255 @@ def _aggregate_candidate(
         "trial_count": len(trials),
         "completed_trial_count": len(completed_trials),
         "failed_trial_count": candidate.failed_trial_count,
-        # Phase 8 polish: the "pass rate" that drives the acceptance check is
-        # the fraction of dispatched trials whose per-trial pass_flag is true,
-        # NOT the execution-completion ratio. Persisting it here keeps
-        # acceptance.evaluate_candidate and the UI in sync.
+        "invalid_metric_count": sum(
+            1
+            for trial in trials
+            if trial.status == "COMPLETED" and not _metric_is_usable(trial.metric)
+        ),
+        "cancelled_trial_count": sum(1 for trial in trials if trial.status == "CANCELLED"),
+        # Counts remain available for compatibility; the rates below first
+        # reduce seeds within each case and then apply scenario weights.
         "passing_trial_count": passing_trial_count,
+        "completion_rate": overall_rates["completion_rate"],
+        "failure_rate": overall_rates["failure_rate"],
+        "failed_trial_rate": overall_rates["failure_rate"],
+        "pass_rate": overall_rates["pass_rate"],
+        "rate_aggregation": "scenario_case_weighted_v1",
+        "scenario_case_rates": overall_rates["scenario_cases"],
     }
+    if objective_config is not None:
+
+        def _evaluate_rows(
+            rows: list[models.Trial],
+        ) -> tuple[CandidateEvaluation, dict[str, Any]] | None:
+            completed_rows = [trial for trial in rows if _trial_has_usable_metric(trial)]
+            if not completed_rows:
+                return None
+            rate_summary = _rate_summary(rows)
+            samples: list[dict[str, float]] = []
+            sample_weights: list[float] = []
+            resolved_cases = [_resolved_case(trial) for trial in completed_rows]
+            dispatched_per_case = Counter(_resolved_case(trial)[0] for trial in rows)
+            for trial, (group_key, case) in zip(completed_rows, resolved_cases, strict=True):
+                metric = trial.metric
+                if metric is None:
+                    raise RuntimeError(
+                        "aggregation invariant violated: usable trial lost its metric"
+                    )
+                sample: dict[str, float] = {
+                    "rmse": _required_metric_number(metric.rmse, field_name="rmse"),
+                    "max_error": _required_metric_number(
+                        metric.max_error,
+                        field_name="max_error",
+                    ),
+                    "overshoot_count": float(_required_overshoot_count(metric.overshoot_count)),
+                    "completion_time": _required_metric_number(
+                        metric.completion_time,
+                        field_name="completion_time",
+                    ),
+                    "crash_flag": float(metric.crash_flag),
+                    "timeout_flag": float(metric.timeout_flag),
+                    "score": _required_metric_number(metric.score, field_name="score"),
+                    "final_error": _required_metric_number(
+                        metric.final_error,
+                        field_name="final_error",
+                    ),
+                    "pass_flag": float(metric.pass_flag),
+                    "instability_flag": float(metric.instability_flag),
+                    "completion_rate": float(rate_summary["completion_rate"]),
+                    "failed_trial_rate": float(rate_summary["failure_rate"]),
+                    "failure_rate": float(rate_summary["failure_rate"]),
+                    "pass_rate": float(rate_summary["pass_rate"]),
+                }
+                raw_metrics = metric.raw_metric_json
+                if not isinstance(raw_metrics, dict):
+                    raw_metrics = {}
+                for key, raw_value in raw_metrics.items():
+                    if (
+                        key not in sample
+                        and isinstance(raw_value, (bool, int, float))
+                        and math.isfinite(float(raw_value))
+                    ):
+                        sample[key] = float(raw_value)
+                samples.append(sample)
+                # A case weight is shared by every dispatched seed, including
+                # seeds that failed before producing metrics. This prevents a
+                # lone surviving seed from inheriting an incomplete case's
+                # entire configured weight.
+                sample_weights.append(
+                    (float(case.weight) if case is not None else 1.0)
+                    / dispatched_per_case[group_key]
+                )
+            return (
+                evaluate_objectives(
+                    samples,
+                    objective_config,
+                    sample_weights=sample_weights,
+                ),
+                rate_summary,
+            )
+
+        training_trials = [
+            trial for trial in trials if not bool((trial.scenario_config_json or {}).get("holdout"))
+        ]
+        try:
+            training_result = _evaluate_rows(training_trials)
+        except ValueError as exc:
+            agg["objective_evaluation_error"] = str(exc)
+            candidate.aggregated_metric_json = agg
+            candidate.aggregated_score = None
+            return agg
+        if training_result is None:
+            agg["objective_evaluation_error"] = "no completed training scenario metrics"
+            candidate.aggregated_metric_json = agg
+            candidate.aggregated_score = None
+            return agg
+        evaluation, training_rates = training_result
+        training_completed = [trial for trial in training_trials if _trial_has_usable_metric(trial)]
+        training_metrics = [
+            trial.metric for trial in training_completed if trial.metric is not None
+        ]
+        training_passing = sum(1 for metric in training_metrics if metric.pass_flag)
+        training_failed = len(training_trials) - len(training_completed)
+        training_max_errors = [
+            _required_metric_number(metric.max_error, field_name="max_error")
+            for metric in training_metrics
+        ]
+        training_max_error_mean = _avg(training_max_errors)
+        training_max_error_worst = round(max(training_max_errors), 4)
+        agg.update(
+            {
+                "rmse": _avg(
+                    [
+                        _required_metric_number(metric.rmse, field_name="rmse")
+                        for metric in training_metrics
+                    ]
+                ),
+                "max_error": training_max_error_mean,
+                "max_error_mean": training_max_error_mean,
+                "max_error_worst": training_max_error_worst,
+                "overshoot_count": int(
+                    round(
+                        sum(
+                            _required_overshoot_count(metric.overshoot_count)
+                            for metric in training_metrics
+                        )
+                        / len(training_metrics)
+                    )
+                ),
+                "completion_time": _avg(
+                    [
+                        _required_metric_number(
+                            metric.completion_time,
+                            field_name="completion_time",
+                        )
+                        for metric in training_metrics
+                    ]
+                ),
+                "score": _avg(
+                    [
+                        _required_metric_number(metric.score, field_name="score")
+                        for metric in training_metrics
+                    ]
+                ),
+                "training_completed_trial_count": len(training_completed),
+                "training_failed_trial_count": training_failed,
+                "training_passing_trial_count": training_passing,
+                "completion_rate": training_rates["completion_rate"],
+                "failure_rate": training_rates["failure_rate"],
+                "failed_trial_rate": training_rates["failure_rate"],
+                "pass_rate": training_rates["pass_rate"],
+                "training_completion_rate": training_rates["completion_rate"],
+                "training_failure_rate": training_rates["failure_rate"],
+                "training_pass_rate": training_rates["pass_rate"],
+                "training_scenario_case_rates": training_rates["scenario_cases"],
+            }
+        )
+        selection_score = evaluation.scalar_loss
+        selection_score += constants.SCORE_WEIGHTS["failed_trial"] * float(
+            training_rates["failure_rate"]
+        )
+        if not evaluation.feasible:
+            selection_score += 1_000_000.0 + 1_000.0 * evaluation.total_violation
+        aggregated_score = round(selection_score, 8)
+        agg.update(
+            {
+                "aggregated_score": aggregated_score,
+                "objective_values": evaluation.objectives,
+                "constraint_values": evaluation.constraint_values,
+                "constraint_violations": evaluation.violations,
+                "feasible": evaluation.feasible,
+                "total_constraint_violation": evaluation.total_violation,
+                "robust_aggregation": objective_config.robust_aggregation,
+                "scalar_loss": evaluation.scalar_loss,
+                "training_trial_count": len(training_trials),
+            }
+        )
+        holdout_trials = [
+            trial for trial in trials if bool((trial.scenario_config_json or {}).get("holdout"))
+        ]
+        if holdout_trials:
+            holdout_rates = _rate_summary(holdout_trials)
+            holdout_payload: dict[str, Any] = {
+                "trial_count": int(holdout_rates["trial_count"]),
+                "completed_trial_count": int(holdout_rates["completed_trial_count"]),
+                "failed_trial_count": int(holdout_rates["failed_trial_count"]),
+                "passing_trial_count": int(holdout_rates["passing_trial_count"]),
+                "completion_rate": float(holdout_rates["completion_rate"]),
+                "failure_rate": float(holdout_rates["failure_rate"]),
+                "failed_trial_rate": float(holdout_rates["failure_rate"]),
+                "pass_rate": float(holdout_rates["pass_rate"]),
+                "scenario_case_count": int(holdout_rates["scenario_case_count"]),
+                "scenario_weight_total": float(holdout_rates["scenario_weight_total"]),
+                "scenario_case_rates": holdout_rates["scenario_cases"],
+            }
+            try:
+                holdout_result = _evaluate_rows(holdout_trials)
+            except ValueError as exc:
+                holdout_payload.update(
+                    {
+                        "evaluation_error": str(exc),
+                        "validation_status": "error",
+                        "feasible": False,
+                    }
+                )
+            else:
+                if holdout_result is None:
+                    holdout_payload.update(
+                        {
+                            "evaluation_error": "no completed holdout metrics",
+                            "validation_status": "failed",
+                            "feasible": False,
+                        }
+                    )
+                else:
+                    holdout_evaluation, _holdout_summary = holdout_result
+                    trial_count = int(holdout_rates["trial_count"])
+                    completed_count = int(holdout_rates["completed_trial_count"])
+                    passing_count = int(holdout_rates["passing_trial_count"])
+                    execution_complete = completed_count == trial_count
+                    all_trials_passed = passing_count == trial_count
+                    validation_feasible = (
+                        holdout_evaluation.feasible and execution_complete and all_trials_passed
+                    )
+                    if not execution_complete:
+                        validation_status = "incomplete"
+                    elif not all_trials_passed or not holdout_evaluation.feasible:
+                        validation_status = "failed"
+                    else:
+                        validation_status = "passed"
+                    holdout_payload.update(
+                        {
+                            "objective_values": holdout_evaluation.objectives,
+                            "constraint_values": holdout_evaluation.constraint_values,
+                            "constraint_violations": holdout_evaluation.violations,
+                            "objective_feasible": holdout_evaluation.feasible,
+                            "feasible": validation_feasible,
+                            "validation_status": validation_status,
+                            "total_constraint_violation": (holdout_evaluation.total_violation),
+                        }
+                    )
+            agg["holdout"] = holdout_payload
     candidate.aggregated_metric_json = agg
     candidate.aggregated_score = aggregated_score
     return agg
@@ -159,22 +803,9 @@ def _aggregate_candidate(
 
 
 def _is_eligible(candidate: models.CandidateParameterSet) -> bool:
-    """A candidate is eligible to win only if it has enough completed trials.
+    """Compatibility wrapper for the public recommendation contract."""
 
-    Baseline is always eligible when it has at least one completed trial so
-    we can produce *some* report; optimizer candidates need at least
-    :data:`constants.MIN_COMPLETED_TRIAL_RATIO` of their dispatched trials
-    completed.
-    """
-
-    if candidate.aggregated_score is None:
-        return False
-    if candidate.is_baseline:
-        return candidate.completed_trial_count > 0
-    if candidate.trial_count <= 0:
-        return False
-    ratio = candidate.completed_trial_count / candidate.trial_count
-    return ratio >= constants.MIN_COMPLETED_TRIAL_RATIO
+    return candidate_is_publishable(candidate)
 
 
 def _rank_and_select_best(
@@ -187,7 +818,10 @@ def _rank_and_select_best(
     optimized column differs from the baseline column).
     """
 
-    scorable = [c for c in candidates if c.aggregated_score is not None]
+    for candidate in candidates:
+        candidate.rank_in_job = None
+        candidate.is_best = False
+    scorable = [candidate for candidate in candidates if candidate_is_publishable(candidate)]
     if not scorable:
         return None
 
@@ -199,23 +833,10 @@ def _rank_and_select_best(
         )
     )
 
-    best: models.CandidateParameterSet | None = None
     for rank, candidate in enumerate(scorable, start=1):
         candidate.rank_in_job = rank
-        candidate.is_best = False
-    # Pick the first eligible candidate in score order. If none are eligible,
-    # we fall back to the baseline if it scored at all.
-    for candidate in scorable:
-        if _is_eligible(candidate):
-            best = candidate
-            break
-    if best is None:
-        for candidate in scorable:
-            if candidate.is_baseline:
-                best = candidate
-                break
-    if best is not None:
-        best.is_best = True
+    best = scorable[0]
+    best.is_best = True
     return best
 
 
@@ -238,7 +859,7 @@ def finalize_job_if_ready(
     iteration/trial budget is exhausted.
     """
 
-    if job.status not in {"RUNNING", "AGGREGATING"}:
+    if job.status not in {"RUNNING", "AGGREGATING", "FINALIZING"}:
         return False
 
     trials = list(job.trials)
@@ -272,11 +893,38 @@ def finalize_job_if_ready(
     for t in trials:
         trials_by_candidate.setdefault(t.candidate_id, []).append(t)
 
-    baseline_agg = _aggregate_candidate(baseline, trials_by_candidate.get(baseline.id, []))
+    objective_config = (
+        schemas.ObjectiveConfig(**job.objective_config_json)
+        if job.objective_config_json is not None
+        else None
+    )
+    scenario_suite = (
+        schemas.ScenarioSuiteConfig(**job.scenario_suite_json)
+        if job.scenario_suite_json is not None
+        else None
+    )
+    baseline_agg = _aggregate_candidate(
+        baseline,
+        trials_by_candidate.get(baseline.id, []),
+        objective_config=objective_config,
+        scenario_suite=scenario_suite,
+    )
     for candidate in candidates:
         if candidate.id == baseline.id:
             continue
-        _aggregate_candidate(candidate, trials_by_candidate.get(candidate.id, []))
+        _aggregate_candidate(
+            candidate,
+            trials_by_candidate.get(candidate.id, []),
+            objective_config=objective_config,
+            scenario_suite=scenario_suite,
+        )
+
+    # Persist aggregation results before any report storage or LLM network I/O.
+    # This releases SQLite's write lock while a provider or filesystem is slow.
+    db.commit()
+    if _job_is_cancelled(job.id):
+        db.rollback()
+        return True
 
     if baseline_agg is None:
         _fail_job(
@@ -294,7 +942,7 @@ def finalize_job_if_ready(
 
     # Iterative optimizer loop (GPT / CMA-ES-style): possibly dispatch another
     # generation instead of finalizing.
-    if job.optimizer_strategy in {"gpt", "cma_es"}:
+    if job.optimizer_strategy in _ITERATIVE_OPTIMIZERS:
         if _try_continue_iterative_optimizer(
             db, job, baseline, candidates, criteria, llm_client=llm_client
         ):
@@ -317,9 +965,11 @@ def finalize_job_if_ready(
         best_agg=best.aggregated_metric_json,
     )
 
-    outcome, terminal_status, terminal_error = _determine_terminal_state(
-        job, best, criteria
-    )
+    if _job_is_cancelled(job.id):
+        db.rollback()
+        return True
+
+    outcome, terminal_status, terminal_error = _determine_terminal_state(job, best, criteria)
     now = _now()
     job.status = terminal_status
     job.current_phase = "completed" if terminal_status == "COMPLETED" else None
@@ -397,11 +1047,9 @@ def _determine_terminal_state(
     if result.passed:
         return "success", "COMPLETED", None
     # No criteria set → treat completion as success by convention.
-    if not any_criterion_set(criteria) and criteria.min_pass_rate <= (
-        result.pass_rate + 1e-9
-    ):
+    if not any_criterion_set(criteria) and criteria.min_pass_rate <= (result.pass_rate + 1e-9):
         return "success", "COMPLETED", None
-    if job.optimizer_strategy in {"gpt", "cma_es"}:
+    if job.optimizer_strategy in _ITERATIVE_OPTIMIZERS:
         # Iterative optimizer exhausted iteration/trial budget without finding
         # a passing candidate — report best-so-far as a completed run.
         if job.current_generation >= job.max_iterations:
@@ -431,21 +1079,24 @@ def _try_continue_iterative_optimizer(
     * Respects ``max_iterations`` and ``max_total_trials``.
     """
 
-    if not any_criterion_set(criteria):
-        return False
-
-    scored = [c for c in candidates if c.aggregated_score is not None]
-    passed = any(evaluate_candidate(c, criteria).passed for c in scored)
-    if passed:
+    scored = [candidate for candidate in candidates if candidate_is_publishable(candidate)]
+    passed = any_criterion_set(criteria) and any(
+        evaluate_candidate(c, criteria).passed for c in scored
+    )
+    needs_verified_optimizer = (
+        job.optimizer_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES
+        and not any(
+            candidate.source_type == "optimizer" and candidate_is_publishable(candidate)
+            for candidate in candidates
+        )
+    )
+    if passed and not needs_verified_optimizer:
         return False
     if job.current_generation >= job.max_iterations:
         return False
-    next_generation_trials = max(1, job.trials_per_candidate)
-    if job.progress_total_trials + next_generation_trials > job.max_total_trials:
-        return False
-
     from app.orchestration.job_manager import (
         dispatch_next_cma_es_generation,
+        dispatch_next_experimental_generation,
         dispatch_next_llm_generation,
     )
     from app.orchestration.llm_parameter_proposer import OpenAIClientLike
@@ -473,11 +1124,28 @@ def _try_continue_iterative_optimizer(
             return False
     elif job.optimizer_strategy == "cma_es":
         cma_dispatch = dispatch_next_cma_es_generation(db, job)
-        if cma_dispatch.status in {"budget_exhausted", "max_iterations_reached"}:
+        if cma_dispatch.status in {
+            "budget_exhausted",
+            "max_iterations_reached",
+            "search_space_exhausted",
+        }:
+            return False
+    elif job.optimizer_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES:
+        experimental_dispatch = dispatch_next_experimental_generation(db, job)
+        if experimental_dispatch.status in {
+            "budget_exhausted",
+            "max_iterations_reached",
+            "search_space_exhausted",
+        }:
             return False
     else:
         return False
 
+    # Re-check the persisted state after an external LLM call. Cancellation is
+    # allowed while FINALIZING and must never be overwritten by the worker.
+    if _job_is_cancelled(job.id):
+        db.rollback()
+        return False
     # Return to RUNNING so the worker keeps draining trials.
     job.status = "RUNNING"
     db.commit()
@@ -494,10 +1162,16 @@ def _finalize_without_usable_candidate(
 ) -> None:
     """Terminal state when no candidate produced a usable aggregate."""
 
+    db.refresh(job)
+    if job.status == "CANCELLED":
+        db.rollback()
+        return
+
     if baseline_agg is not None:
-        # Treat baseline as best-so-far.
-        job.best_candidate_id = baseline.id
-        baseline.is_best = True
+        # Preserve a diagnostic baseline comparison without publishing a
+        # partial/failed baseline as a validated parameter recommendation.
+        job.best_candidate_id = None
+        baseline.is_best = False
         report_generator.generate_and_persist_report(
             db,
             job=job,
@@ -505,6 +1179,9 @@ def _finalize_without_usable_candidate(
             baseline_agg=baseline_agg,
             best_agg=baseline_agg,
         )
+        if _job_is_cancelled(job.id):
+            db.rollback()
+            return
     now = _now()
     job.status = "COMPLETED"
     job.completed_at = now
@@ -539,6 +1216,9 @@ def _fail_job(
     message: str,
     outcome: str | None = None,
 ) -> None:
+    if _job_is_cancelled(job.id):
+        db.rollback()
+        return
     now = _now()
     job.status = "FAILED"
     job.failed_at = now
@@ -567,15 +1247,81 @@ def set_llm_client_override(client: object | None) -> None:
 
 
 def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
-    """Finalize up to ``limit`` jobs that are ready to complete."""
+    """Claim and finalize ready jobs without holding a DB lock over external I/O.
 
-    stmt = (
-        select(models.Job)
-        .where(models.Job.status.in_(["RUNNING", "AGGREGATING"]))
-        .limit(limit)
-    )
+    ``FINALIZING`` plus ``updated_at`` acts as a bounded lease. The claim is
+    committed before report/LLM work; a crashed worker's stale claim becomes
+    reclaimable after ``FINALIZATION_LEASE_SECONDS``.
+    """
+
     finalized: list[str] = []
-    for job in list(db.scalars(stmt)):
-        if finalize_job_if_ready(db, job, llm_client=_llm_client_override):
-            finalized.append(job.id)
+    examined: set[str] = set()
+    for _ in range(max(0, limit)):
+        # Recompute immediately before each atomic claim. A preceding job may
+        # spend minutes in an LLM call, so reusing the function-entry timestamp
+        # could make a later claim stale the instant it is committed.
+        claim_time = _now()
+        stale_before = claim_time - timedelta(seconds=get_settings().finalization_lease_seconds)
+        claimable = or_(
+            models.Job.status.in_(["RUNNING", "AGGREGATING"]),
+            and_(
+                models.Job.status == "FINALIZING",
+                models.Job.updated_at <= stale_before,
+            ),
+        )
+        stmt = select(models.Job).where(claimable)
+        if examined:
+            stmt = stmt.where(models.Job.id.not_in(examined))
+        job = db.scalars(stmt.order_by(models.Job.updated_at.asc()).limit(1)).first()
+        if job is None:
+            break
+        examined.add(job.id)
+        trials = list(job.trials)
+        if not trials or not all(t.status in _TERMINAL_TRIAL for t in trials):
+            continue
+        claimed = db.execute(
+            update(models.Job)
+            .where(
+                models.Job.id == job.id,
+                claimable,
+            )
+            .values(
+                status="FINALIZING",
+                current_phase="aggregating",
+                updated_at=claim_time,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        if claimed.rowcount != 1:  # type: ignore[attr-defined]
+            db.rollback()
+            continue
+        db.expire(job)
+        db.refresh(job)
+        record_event(db, job.id, "aggregation_started", None)
+        db.commit()
+        db.refresh(job)
+        try:
+            if finalize_job_if_ready(db, job, llm_client=_llm_client_override):
+                finalized.append(job.id)
+        except Exception as exc:
+            logger.exception("job %s finalization crashed", job.id)
+            db.rollback()
+            failed_job = db.get(models.Job, job.id)
+            if failed_job is None or failed_job.status == "CANCELLED":
+                continue
+            try:
+                _fail_job(
+                    db,
+                    failed_job,
+                    code="FINALIZATION_FAILED",
+                    message=(
+                        "Finalization failed while producing optimizer output or "
+                        f"artifacts: {str(exc)[:500]}"
+                    ),
+                    outcome="no_usable_candidate",
+                )
+                finalized.append(job.id)
+            except Exception:
+                db.rollback()
+                logger.exception("job %s could not be marked failed", job.id)
     return finalized

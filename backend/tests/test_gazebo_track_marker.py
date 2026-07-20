@@ -62,6 +62,39 @@ def test_load_reference_points_errors(tmp_path: Path):
     with pytest.raises(marker.TrackMarkerError, match="no valid points"):
         marker.load_reference_points(empty)
 
+    too_many = _write_track(
+        tmp_path / "too-many.json",
+        [{"x": index, "y": 0} for index in range(marker.MAX_TRACK_POINTS + 1)],
+    )
+    with pytest.raises(marker.TrackMarkerError, match="cannot exceed"):
+        marker.load_reference_points(too_many)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"world": "bad/world"}, "world"),
+        ({"marker_namespace": "bad' namespace"}, "marker namespace"),
+        ({"marker_id": -1}, "marker id"),
+        ({"line_width": float("nan")}, "line width"),
+        ({"color": "0 0.8 2 1"}, "between 0 and 1"),
+        ({"mode": "future_mode"}, "marker mode"),
+    ],
+)
+def test_build_marker_request_rejects_unsafe_values(kwargs: dict[str, object], message: str):
+    values: dict[str, object] = {
+        "points": [(1.0, 2.0, 0.03)],
+        "world": "default",
+        "color": "0 0.8 1 1",
+        "line_width": 0.08,
+        "marker_namespace": "dronedream_track",
+        "marker_id": 805,
+        "mode": "line_strip",
+    }
+    values.update(kwargs)
+    with pytest.raises(marker.TrackMarkerError, match=message):
+        marker.build_marker_service_request(**values)
+
 
 def test_marker_service_candidates_default_and_override(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("PX4_GAZEBO_MARKER_SERVICE", raising=False)
@@ -69,6 +102,27 @@ def test_marker_service_candidates_default_and_override(monkeypatch: pytest.Monk
 
     monkeypatch.setenv("PX4_GAZEBO_MARKER_SERVICE", "/marker")
     assert marker.marker_service_candidates("default") == ["/marker"]
+
+    monkeypatch.setenv("PX4_GAZEBO_MARKER_SERVICE", "/marker;rm")
+    with pytest.raises(marker.TrackMarkerError, match="safe Gazebo service"):
+        marker.marker_service_candidates("default")
+
+
+def test_run_cmd_turns_timeout_into_structured_failure(monkeypatch: pytest.MonkeyPatch):
+    def _timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(["gz"], timeout=10, stderr="stuck")
+
+    monkeypatch.setattr(marker.subprocess, "run", _timeout)
+    result = marker._run_cmd(["gz", "service", "-l"])
+    assert result.returncode == 124
+    assert "timed out" in result.stderr
+
+
+def test_command_logging_redacts_marker_payload():
+    command = ["gz", "service", "--req", "point { x: 1 }" * 100]
+    summarized = marker._command_for_log(command)
+    assert "point" not in summarized[-1]
+    assert "chars" in summarized[-1]
 
 
 def test_build_marker_command_accepts_world_or_service():
