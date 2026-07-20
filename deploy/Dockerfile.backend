@@ -2,7 +2,10 @@ FROM python:3.12.13-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DATABASE_URL=sqlite:////srv/data/drone_dream.db \
+    ARTIFACT_ROOT=/srv/artifacts \
+    REAL_SIMULATOR_ARTIFACT_ROOT=/srv/artifacts
 
 WORKDIR /srv
 
@@ -20,6 +23,7 @@ RUN python -m pip install --no-cache-dir --no-deps --no-build-isolation \
     && groupadd --gid 10001 dronedream \
     && useradd --uid 10001 --gid dronedream --no-create-home \
         --shell /usr/sbin/nologin dronedream \
+    && install -d -o dronedream -g dronedream -m 0750 /srv/data \
     && install -d -o dronedream -g dronedream -m 0750 /srv/artifacts
 
 USER dronedream:dronedream
