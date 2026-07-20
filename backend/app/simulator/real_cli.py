@@ -255,7 +255,11 @@ class _WindowsKillOnCloseJob:
     def create(cls) -> _WindowsKillOnCloseJob | None:
         if os.name != "nt":
             return None
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        windll_factory = getattr(ctypes, "WinDLL", None)
+        if windll_factory is None:
+            logger.warning("Windows DLL loader is unavailable")
+            return None
+        kernel32 = windll_factory("kernel32", use_last_error=True)
         kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
         kernel32.CreateJobObjectW.restype = ctypes.c_void_p
         kernel32.SetInformationJobObject.argtypes = [

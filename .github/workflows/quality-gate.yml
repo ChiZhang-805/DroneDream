@@ -314,7 +314,8 @@ jobs:
           docker build --file deploy/Dockerfile.frontend \
             --build-arg VITE_DEMO_AUTH_TOKEN=quality-gate-only \
             --tag dronedream-frontend:quality-gate .
-          docker run --rm --entrypoint nginx dronedream-frontend:quality-gate -t
+          docker run --rm --add-host api:127.0.0.1 --entrypoint nginx \
+            dronedream-frontend:quality-gate -t
           docker run --rm --entrypoint nginx \
             --volume "$PWD/website/nginx/baota/dronedream-public.conf:/etc/nginx/conf.d/default.conf:ro" \
             dronedream-frontend:quality-gate -t
