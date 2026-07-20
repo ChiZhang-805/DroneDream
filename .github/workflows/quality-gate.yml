@@ -317,8 +317,10 @@ jobs:
           docker run --rm --add-host api:127.0.0.1 --entrypoint nginx \
             dronedream-frontend:quality-gate -t
           docker run --rm --entrypoint nginx \
+            --tmpfs /www/wwwlogs \
             --volume "$PWD/website/nginx/baota/dronedream-public.conf:/etc/nginx/conf.d/default.conf:ro" \
             dronedream-frontend:quality-gate -t
           docker run --rm --entrypoint nginx \
+            --tmpfs /www/wwwlogs \
             --volume "$PWD/website/nginx/baota/dronedream-staging.conf:/etc/nginx/conf.d/default.conf:ro" \
             dronedream-frontend:quality-gate -t
