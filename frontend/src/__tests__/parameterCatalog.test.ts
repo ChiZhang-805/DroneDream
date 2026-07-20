@@ -37,6 +37,25 @@ describe("parameter catalog compatibility", () => {
               description: { en: "Tune together", "zh-CN": "联动调节" },
             },
           ],
+          control_loop: "horizontal_position_velocity",
+          axes: ["x", "y"],
+          tuning_stage: 40,
+          expertise: "guided",
+          apply_policy: "disarmed",
+          compatibility: {
+            px4_versions: ["v1.16"],
+            vehicle_types: ["multicopter"],
+            airframe_families: ["quadrotor", "hexarotor"],
+          },
+          application_interfaces: ["mavsdk", "px4_startup_env"],
+          recommended_metrics: ["position_rmse_m"],
+          evidence_signals: ["vehicle_local_position"],
+          flight_modes: ["Position"],
+          preconditions: ["Validate estimator health first."],
+          risk_note: { en: "Increase gradually.", "zh-CN": "请逐步增加。" },
+          source_url: "https://docs.px4.io/main/en/advanced_config/parameter_reference.html",
+          bounds_source: "px4_and_dronedream_guardrail",
+          choices: [],
         },
         {
           name: "MC_AIRMODE",
@@ -52,6 +71,10 @@ describe("parameter catalog compatibility", () => {
           label: { en: "Multicopter air-mode", "zh-CN": "多旋翼空中模式" },
           description: { en: "Mixer policy", "zh-CN": "混控策略" },
           dependencies: [],
+          choices: [
+            { value: 0, label: { en: "Disabled", "zh-CN": "关闭" } },
+            { value: 2, label: { en: "Roll/pitch/yaw", "zh-CN": "横滚/俯仰/偏航" } },
+          ],
         },
       ],
     });
@@ -65,17 +88,34 @@ describe("parameter catalog compatibility", () => {
       safe_max: 1.3,
       legacy_key: "kp_xy",
       dependencies: ["MPC_XY_VEL_P_ACC"],
+      control_loop: "horizontal_position_velocity",
+      axes: ["x", "y"],
+      tuning_stage: 40,
+      expertise: "guided",
+      apply_policy: "disarmed",
+      supported_airframes: ["quadrotor", "hexarotor"],
+      application_interfaces: ["mavsdk", "px4_startup_env"],
+      recommended_metrics: ["position_rmse_m"],
+      evidence_signals: ["vehicle_local_position"],
+      flight_modes: ["Position"],
+      preconditions: ["Validate estimator health first."],
+      risk_note: { en: "Increase gradually.", "zh-CN": "请逐步增加。" },
+      bounds_source: "px4_and_dronedream_guardrail",
       localized_label: { en: "Horizontal position P", "zh-CN": "水平位置 P" },
     });
     expect(result.parameters[1]).toMatchObject({
       name: "MC_AIRMODE",
       value_type: "integer",
       step: 1,
+      choices: [
+        { value: 0, label: { en: "Disabled", "zh-CN": "关闭" } },
+        { value: 2, label: { en: "Roll/pitch/yaw", "zh-CN": "横滚/俯仰/偏航" } },
+      ],
     });
   });
 
   it("creates mode presets and emits only checked dimensions", () => {
-    expect(BUILTIN_PARAMETER_CATALOG.parameters).toHaveLength(28);
+    expect(BUILTIN_PARAMETER_CATALOG.parameters).toHaveLength(31);
     expect(
       BUILTIN_PARAMETER_CATALOG.parameters.find((item) => item.name === "MC_AIRMODE"),
     ).toMatchObject({ value_type: "integer", safe_min: 0, safe_max: 2 });
@@ -88,7 +128,23 @@ describe("parameter catalog compatibility", () => {
       "MPC_XY_P",
       "MPC_XY_VEL_MAX",
       "MPC_ACC_HOR",
+      "MPC_ACC_HOR_MAX",
     ]);
     expect(selected[0]).not.toHaveProperty("selected");
+  });
+
+  it("falls back safely when a catalog response contains only malformed rows", () => {
+    const result = normalizeApiCatalog({
+      catalog_version: "broken",
+      source: "runtime",
+      px4_version: "v1.16",
+      supported_px4_versions: ["v1.16"],
+      vehicle_type: "multicopter",
+      parameter_count: 1,
+      parameters: [{ name: "BROKEN" }],
+    } as never);
+
+    expect(result.source).toBe("builtin");
+    expect(result.parameters).toHaveLength(31);
   });
 });

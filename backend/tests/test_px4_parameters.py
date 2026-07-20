@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -16,6 +18,7 @@ from app.simulator.px4_parameters import (
     ParameterReadbackError,
     apply_and_verify_parameters,
     build_px4_parameter_environment,
+    connect_mavsdk_parameter_client,
     verify_environment_parameters,
     verify_environment_parameters_with_mavsdk,
     write_simulated_parameter_evidence,
@@ -41,6 +44,24 @@ class FakeParameterClient:
         self.set_calls.append((name, value, value_type))
 
 
+def test_mavsdk_client_close_is_idempotent_after_stop_failure() -> None:
+    class _Owner:
+        stop_calls = 0
+
+        def _stop_mavsdk_server(self) -> None:
+            self.stop_calls += 1
+            raise RuntimeError("stop failed")
+
+    owner = _Owner()
+    client = px4_parameter_module.MavsdkParameterClient(object(), owner=owner)
+
+    with pytest.raises(RuntimeError, match="stop failed"):
+        client.close()
+    client.close()
+
+    assert owner.stop_calls == 1
+
+
 def _read(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -50,6 +71,12 @@ def test_environment_builder_uses_real_px4_names_and_stable_values() -> None:
     assert result == {
         "PX4_PARAM_MPC_XY_P": "1",
         "PX4_PARAM_MC_ROLLRATE_D": "0.003",
+    }
+
+
+def test_environment_builder_supports_reboot_parameters_at_process_start() -> None:
+    assert build_px4_parameter_environment({"IMU_GYRO_CUTOFF": 40.0}) == {
+        "PX4_PARAM_IMU_GYRO_CUTOFF": "40"
     }
 
 
@@ -84,6 +111,28 @@ def test_mavsdk_style_client_transaction_writes_before_requested_applied(tmp_pat
     assert applied["context"]["trial_id"] == "trial-1"
 
 
+def test_live_transaction_rejects_reboot_parameter_before_contacting_px4(
+    tmp_path: Path,
+) -> None:
+    client = FakeParameterClient({"IMU_GYRO_CUTOFF": 40.0})
+
+    with pytest.raises(ParameterApplicationError, match="Start a fresh SITL process"):
+        asyncio.run(
+            apply_and_verify_parameters(
+                {"IMU_GYRO_CUTOFF": 45.0},
+                client,
+                tmp_path,
+            )
+        )
+
+    assert client.set_calls == []
+    assert _read(tmp_path / REQUESTED_EVIDENCE_NAME)["values"] == {"IMU_GYRO_CUTOFF": 45.0}
+    assert _read(tmp_path / BEFORE_EVIDENCE_NAME)["status"] == "error"
+    applied = _read(tmp_path / APPLIED_EVIDENCE_NAME)
+    assert applied["status"] == "error"
+    assert "reboot-required" in applied["verification"]["error"]
+
+
 def test_readback_mismatch_is_fatal_but_preserves_evidence(tmp_path: Path) -> None:
     client = FakeParameterClient({"MPC_XY_P": 0.95}, corrupt_readback="MPC_XY_P")
 
@@ -100,6 +149,140 @@ def test_readback_mismatch_is_fatal_but_preserves_evidence(tmp_path: Path) -> No
     assert applied["status"] == "mismatch"
     assert applied["verification"]["verified"] is False
     assert "MPC_XY_P" in applied["verification"]["mismatches"]
+    # The fake transport corrupts every post-write readback, so the original
+    # value is restored in storage but cannot honestly be marked as verified.
+    assert applied["verification"]["rollback_succeeded"] is False
+    assert "MPC_XY_P" in applied["verification"]["rollback_errors"]
+    assert client.values["MPC_XY_P"] == 0.95
+
+
+def test_partial_live_parameter_write_rolls_back_previous_values(tmp_path: Path) -> None:
+    class FailingClient(FakeParameterClient):
+        async def set_parameter(self, name: str, value: int | float, value_type: str) -> None:
+            if name == "MPC_XY_VEL_P_ACC" and value == 2.0:
+                raise RuntimeError("transport dropped")
+            await super().set_parameter(name, value, value_type)
+
+    client = FailingClient({"MPC_XY_P": 0.95, "MPC_XY_VEL_P_ACC": 1.8})
+    with pytest.raises(ParameterApplicationError, match="transport dropped"):
+        asyncio.run(
+            apply_and_verify_parameters(
+                {"MPC_XY_P": 1.1, "MPC_XY_VEL_P_ACC": 2.0},
+                client,
+                tmp_path,
+            )
+        )
+    assert client.values == {"MPC_XY_P": 0.95, "MPC_XY_VEL_P_ACC": 1.8}
+    verification = _read(tmp_path / APPLIED_EVIDENCE_NAME)["verification"]
+    assert verification["rollback_attempted"] is True
+    assert verification["rollback_succeeded"] is True
+
+
+def test_mavsdk_connection_timeout_stops_embedded_server(monkeypatch) -> None:
+    class _Core:
+        async def connection_state(self):
+            while True:
+                yield type("State", (), {"is_connected": False})()
+                await asyncio.sleep(1)
+
+    class _System:
+        latest: _System | None = None
+
+        def __init__(self) -> None:
+            self.core = _Core()
+            self.param = object()
+            self.stopped = False
+            _System.latest = self
+
+        async def connect(self, *, system_address: str) -> None:
+            assert system_address == "udp://:14540"
+
+        def _stop_mavsdk_server(self) -> None:
+            self.stopped = True
+
+    mavsdk = ModuleType("mavsdk")
+    mavsdk.System = _System  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "mavsdk", mavsdk)
+
+    with pytest.raises(ParameterApplicationError, match="timed out"):
+        asyncio.run(
+            connect_mavsdk_parameter_client(
+                "udp://:14540",
+                timeout_seconds=0.01,
+            )
+        )
+    assert _System.latest is not None
+    assert _System.latest.stopped is True
+
+
+def test_mavsdk_connection_cancellation_stops_embedded_server_and_propagates(
+    monkeypatch,
+) -> None:
+    class _Core:
+        async def connection_state(self):
+            raise asyncio.CancelledError
+            yield  # pragma: no cover - makes this an async generator.
+
+    class _System:
+        latest: _System | None = None
+
+        def __init__(self) -> None:
+            self.core = _Core()
+            self.param = object()
+            self.stopped = False
+            _System.latest = self
+
+        async def connect(self, *, system_address: str) -> None:
+            assert system_address == "udp://:14540"
+
+        def _stop_mavsdk_server(self) -> None:
+            self.stopped = True
+
+    mavsdk = ModuleType("mavsdk")
+    mavsdk.System = _System  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "mavsdk", mavsdk)
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(
+            connect_mavsdk_parameter_client(
+                "udp://:14540",
+                timeout_seconds=1.0,
+            )
+        )
+    assert _System.latest is not None
+    assert _System.latest.stopped is True
+
+
+def test_mavsdk_connect_failure_stops_embedded_server_and_propagates(monkeypatch) -> None:
+    class _System:
+        latest: _System | None = None
+
+        def __init__(self) -> None:
+            self.core = object()
+            self.param = object()
+            self.stopped = False
+            _System.latest = self
+
+        async def connect(self, *, system_address: str) -> None:
+            assert system_address == "udp://:14540"
+            raise RuntimeError("embedded transport failed")
+
+        def _stop_mavsdk_server(self) -> None:
+            self.stopped = True
+
+    mavsdk = ModuleType("mavsdk")
+    mavsdk.System = _System  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "mavsdk", mavsdk)
+
+    with pytest.raises(RuntimeError, match="embedded transport failed"):
+        asyncio.run(
+            connect_mavsdk_parameter_client(
+                "udp://:14540",
+                timeout_seconds=1.0,
+            )
+        )
+    assert _System.latest is not None
+    assert _System.latest.stopped is True
 
 
 def test_environment_transport_readback_does_not_set_again(tmp_path: Path) -> None:
@@ -116,6 +299,24 @@ def test_environment_transport_readback_does_not_set_again(tmp_path: Path) -> No
     assert result.before == {"MPC_XY_P": "0.95"}
     assert client.set_calls == []
     assert _read(tmp_path / BEFORE_EVIDENCE_NAME)["kind"] == "before_environment_override"
+
+
+def test_reboot_parameter_is_verified_after_startup_environment_injection(
+    tmp_path: Path,
+) -> None:
+    client = FakeParameterClient({"IMU_GYRO_CUTOFF": 45.0})
+    result = asyncio.run(
+        verify_environment_parameters(
+            {"IMU_GYRO_CUTOFF": 45.0},
+            client,
+            tmp_path,
+            previous_environment={"PX4_PARAM_IMU_GYRO_CUTOFF": "40"},
+        )
+    )
+
+    assert result.verified is True
+    assert result.applied == {"IMU_GYRO_CUTOFF": 45.0}
+    assert client.set_calls == []
 
 
 def test_site_dry_run_evidence_is_explicitly_marked_simulated(tmp_path: Path) -> None:

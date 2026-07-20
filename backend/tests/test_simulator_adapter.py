@@ -10,9 +10,11 @@ from __future__ import annotations
 import importlib
 import sys
 from collections.abc import Iterator
+from types import SimpleNamespace
 
 import pytest
 
+import app.simulator.factory as simulator_factory
 from app.simulator import (
     ArtifactMetadata,
     JobConfig,
@@ -78,6 +80,63 @@ def _make_ctx(
     )
 
 
+def _metrics(**overrides: object) -> TrialMetricsPayload:
+    values: dict[str, object] = {
+        "rmse": 0.2,
+        "max_error": 0.4,
+        "overshoot_count": 0,
+        "completion_time": 5.0,
+        "crash_flag": False,
+        "timeout_flag": False,
+        "score": 1.0,
+        "final_error": 0.1,
+        "pass_flag": True,
+        "instability_flag": False,
+        "raw_metric_json": {},
+    }
+    values.update(overrides)
+    return TrialMetricsPayload(**values)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("overrides", "error_type"),
+    [
+        ({"rmse": float("nan")}, ValueError),
+        ({"max_error": float("inf")}, ValueError),
+        ({"completion_time": -0.1}, ValueError),
+        ({"final_error": -0.1}, ValueError),
+        ({"overshoot_count": True}, ValueError),
+        ({"score": True}, TypeError),
+        ({"crash_flag": 1}, TypeError),
+        ({"raw_metric_json": {"nested": float("inf")}}, ValueError),
+    ],
+)
+def test_trial_metrics_reject_invalid_adapter_values(
+    overrides: dict[str, object], error_type: type[Exception]
+) -> None:
+    with pytest.raises(error_type):
+        _metrics(**overrides)
+
+
+def test_trial_result_enforces_success_failure_contract() -> None:
+    failure = TrialFailure(code=FAILURE_SIMULATION, reason="failed")
+    with pytest.raises(ValueError, match="require metrics"):
+        TrialResult(success=True, backend="mock")
+    with pytest.raises(ValueError, match="forbid failure"):
+        TrialResult(success=True, backend="mock", metrics=_metrics(), failure=failure)
+    with pytest.raises(ValueError, match="require failure"):
+        TrialResult(success=False, backend="mock")
+    with pytest.raises(ValueError, match="forbid metrics"):
+        TrialResult(success=False, backend="mock", metrics=_metrics(), failure=failure)
+
+
+def test_artifact_metadata_enforces_database_storage_bounds() -> None:
+    with pytest.raises(ValueError, match="artifact_type"):
+        ArtifactMetadata("x" * 33, "Artifact", "artifact.bin")
+    with pytest.raises(ValueError, match="file_size_bytes"):
+        ArtifactMetadata("log", "Artifact", "artifact.bin", file_size_bytes=2**63)
+
+
 # --- MockSimulatorAdapter --------------------------------------------------
 
 
@@ -91,6 +150,47 @@ def test_mock_adapter_is_deterministic_for_same_inputs():
     assert r1.success and r2.success
     assert r1.metrics is not None and r2.metrics is not None
     assert r1.metrics.as_dict() == r2.metrics.as_dict()
+
+
+def test_mock_adapter_catalog_parameters_have_explicit_synthetic_effect():
+    adapter = MockSimulatorAdapter()
+    low = adapter.run_trial(_make_ctx(parameters={"MPC_XY_P": 0.6}, seed=77))
+    high = adapter.run_trial(_make_ctx(parameters={"MPC_XY_P": 1.3}, seed=77))
+
+    assert low.metrics is not None and high.metrics is not None
+    assert low.metrics.rmse != high.metrics.rmse
+    assert low.metrics.raw_metric_json["mock_landscape_schema"] == (
+        "dronedream.mock.synthetic.v1"
+    )
+    assert low.metrics.raw_metric_json["physical_fidelity"] is False
+    assert low.metrics.raw_metric_json["catalog_parameter_count"] == 1
+    # The score contract is consistent across adapters: lower error => lower score.
+    better, worse = sorted((low.metrics, high.metrics), key=lambda metric: metric.rmse)
+    assert better.score < worse.score
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "turbulence",
+        "gps_dropout",
+        "payload_changed",
+        "battery_degraded",
+        "actuator_delay",
+        "custom",
+    ],
+)
+def test_mock_adapter_models_every_declared_scenario(scenario: str):
+    result = MockSimulatorAdapter().run_trial(_make_ctx(scenario=scenario))
+    assert result.success is True
+    assert result.metrics is not None
+
+
+def test_mock_adapter_rejects_unknown_scenario_instead_of_treating_it_as_nominal():
+    result = MockSimulatorAdapter().run_trial(_make_ctx(scenario="future_unknown"))
+    assert result.success is False
+    assert result.failure is not None
+    assert result.failure.code == FAILURE_SIMULATION
 
 
 def test_mock_adapter_scenario_worsens_rmse():
@@ -268,8 +368,25 @@ def test_factory_defaults_to_mock(monkeypatch):
 
 def test_factory_respects_env_var(monkeypatch):
     monkeypatch.setenv("SIMULATOR_BACKEND", "real_stub")
+    monkeypatch.setattr(
+        simulator_factory,
+        "get_settings",
+        lambda: SimpleNamespace(app_env="test"),
+    )
     adapter = get_simulator_adapter()
     assert isinstance(adapter, RealSimulatorAdapterStub)
+
+
+def test_factory_rejects_test_only_stub_outside_test_environment(monkeypatch):
+    monkeypatch.setenv("SIMULATOR_BACKEND", "real_stub")
+    monkeypatch.setattr(
+        simulator_factory,
+        "get_settings",
+        lambda: SimpleNamespace(app_env="production"),
+    )
+
+    with pytest.raises(UnknownSimulatorBackendError, match="test-only"):
+        get_simulator_adapter()
 
 
 def test_factory_explicit_arg_wins_over_env(monkeypatch):

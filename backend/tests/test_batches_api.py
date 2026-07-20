@@ -47,6 +47,35 @@ def test_invalid_child_job_rolls_back_all(client: TestClient) -> None:
     assert jobs_resp.json()["data"]["total"] == 0
 
 
+def test_list_batches_is_bounded_and_reports_total(client: TestClient) -> None:
+    for index in range(3):
+        response = client.post(
+            "/api/v1/batches",
+            json={
+                "name": f"page-{index}",
+                "jobs": [{**HEURISTIC_JOB_PAYLOAD}],
+            },
+        )
+        assert response.status_code == 200, response.text
+
+    first = client.get("/api/v1/batches?page=1&page_size=2")
+    assert first.status_code == 200, first.text
+    first_data = first.json()["data"]
+    assert first_data["total"] == 3
+    assert first_data["page"] == 1
+    assert first_data["page_size"] == 2
+    assert len(first_data["items"]) == 2
+
+    second = client.get("/api/v1/batches?page=2&page_size=2")
+    assert second.status_code == 200, second.text
+    second_data = second.json()["data"]
+    assert second_data["total"] == 3
+    assert len(second_data["items"]) == 1
+    assert {
+        item["id"] for item in first_data["items"]
+    }.isdisjoint({item["id"] for item in second_data["items"]})
+
+
 def test_batch_detail_aggregates_progress(client: TestClient) -> None:
     payload = {
         "name": "agg",
@@ -105,6 +134,47 @@ def test_cancel_batch_cancels_non_terminal_children(client: TestClient) -> None:
     assert by_id[jobs[1]["id"]]["status"] == "CANCELLED"
 
 
+def test_cancel_batch_purges_all_child_gpt_secrets(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
+    gpt_job = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "optimizer_strategy": "gpt",
+        "max_iterations": 1,
+        "openai": {"api_key": "sk-batch-cancel"},
+    }
+    response = client.post(
+        "/api/v1/batches",
+        json={"name": "gpt-cancel", "jobs": [gpt_job, gpt_job]},
+    )
+    assert response.status_code == 200, response.text
+    batch_id = response.json()["data"]["id"]
+
+    cancelled = client.post(f"/api/v1/batches/{batch_id}/cancel")
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["data"]["status"] == "CANCELLED"
+
+    from sqlalchemy import select
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        batch = db.get(models.BatchJob, batch_id)
+        assert batch is not None
+        assert batch.status == "CANCELLED"
+        child_ids = [job.id for job in batch.jobs]
+        secrets = list(
+            db.scalars(
+                select(models.JobSecret).where(models.JobSecret.job_id.in_(child_ids))
+            )
+        )
+        assert len(secrets) == 2
+        assert all(secret.deleted_at is not None for secret in secrets)
+        assert all(secret.encrypted_api_key == "" for secret in secrets)
+
+
 def test_batch_aggregates_aggregating_child_as_running(client: TestClient) -> None:
     payload = {
         "name": "agg-running",
@@ -128,3 +198,57 @@ def test_batch_aggregates_aggregating_child_as_running(client: TestClient) -> No
     detail = client.get(f"/api/v1/batches/{created['id']}")
     assert detail.status_code == 200
     assert detail.json()["data"]["status"] == "RUNNING"
+
+
+def test_batch_aggregates_finalizing_child_as_running(client: TestClient) -> None:
+    created = client.post(
+        "/api/v1/batches",
+        json={"name": "finalizing", "jobs": [{**HEURISTIC_JOB_PAYLOAD}]},
+    ).json()["data"]
+    jobs = client.get(f"/api/v1/batches/{created['id']}/jobs").json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        child = db.get(models.Job, jobs[0]["id"])
+        assert child is not None
+        child.status = "FINALIZING"
+        db.commit()
+
+    detail = client.get(f"/api/v1/batches/{created['id']}")
+    assert detail.status_code == 200, detail.text
+    payload = detail.json()["data"]
+    assert payload["status"] == "RUNNING"
+    assert payload["progress"]["running_jobs"] == 1
+
+
+def test_cancel_completed_batch_preserves_terminal_state(client: TestClient) -> None:
+    created = client.post(
+        "/api/v1/batches",
+        json={"name": "already-complete", "jobs": [{**HEURISTIC_JOB_PAYLOAD}]},
+    ).json()["data"]
+    jobs = client.get(f"/api/v1/batches/{created['id']}/jobs").json()["data"]
+
+    from datetime import datetime, timezone
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        batch = db.get(models.BatchJob, created["id"])
+        child = db.get(models.Job, jobs[0]["id"])
+        assert batch is not None and child is not None
+        child.status = "COMPLETED"
+        child.completed_at = datetime.now(timezone.utc)
+        batch.status = "COMPLETED"
+        batch.completed_at = child.completed_at
+        db.commit()
+
+    response = client.post(f"/api/v1/batches/{created['id']}/cancel")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "BATCH_ALREADY_TERMINAL"
+    detail = client.get(f"/api/v1/batches/{created['id']}").json()["data"]
+    assert detail["status"] == "COMPLETED"
+    assert detail["cancelled_at"] is None

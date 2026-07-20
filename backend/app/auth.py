@@ -14,6 +14,7 @@ from app.db import get_db
 
 _DEFAULT_USER_EMAIL = "default@drone-dream.local"
 _DEFAULT_USER_NAME = "Default User"
+_LOCAL_IDENTITY_PROVIDER = "urn:dronedream:local"
 
 
 class OIDCConfigurationError(RuntimeError):
@@ -27,17 +28,63 @@ def _extract_bearer_token(authorization: str | None) -> str | None:
     if len(parts) != 2 or parts[0].lower() != "bearer":
         return None
     token = parts[1].strip()
-    return token or None
+    # Bound work performed by JWT parsing/key selection and avoid retaining an
+    # arbitrarily large attacker-controlled header in exception chains.
+    if not token or len(token) > 16_384:
+        return None
+    return token
 
 
 def _get_or_create_user(db: Session, *, email: str, display_name: str | None = None) -> models.User:
-    existing = db.scalars(select(models.User).where(models.User.email == email).limit(1)).first()
+    existing = db.scalars(
+        select(models.User)
+        .where(
+            models.User.identity_provider == _LOCAL_IDENTITY_PROVIDER,
+            models.User.external_subject == email,
+        )
+        .limit(1)
+    ).first()
+    if existing is None:
+        # Compatibility for databases created before local identities had an
+        # explicit provider. Never adopt an OIDC identity merely because its
+        # optional email claim happens to match a demo-token email.
+        existing = db.scalars(
+            select(models.User)
+            .where(
+                models.User.email == email,
+                models.User.identity_provider.is_(None),
+                models.User.external_subject.is_(None),
+            )
+            .limit(1)
+        ).first()
     if existing is not None:
         return existing
 
-    user = models.User(email=email, display_name=display_name or email)
+    user = models.User(
+        email=email,
+        display_name=display_name or email,
+        identity_provider=_LOCAL_IDENTITY_PROVIDER,
+        external_subject=email,
+    )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Concurrent API replicas can provision the same demo/local identity
+        # at the same time. Resolve the unique-constraint winner instead of
+        # binding subsequent requests to different duplicate user rows.
+        db.rollback()
+        winner = db.scalars(
+            select(models.User)
+            .where(
+                models.User.identity_provider == _LOCAL_IDENTITY_PROVIDER,
+                models.User.external_subject == email,
+            )
+            .limit(1)
+        ).first()
+        if winner is None:
+            raise
+        return winner
     db.refresh(user)
     return user
 

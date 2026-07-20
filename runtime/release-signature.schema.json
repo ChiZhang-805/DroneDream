@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/runtime-release-signature.v1.json",
+  "title": "DroneDreamRuntime detached release signature",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "algorithm", "keyId", "manifestSha256", "signature"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "algorithm": {"const": "Ed25519"},
+    "keyId": {"type": "string", "pattern": "^ed25519:[0-9a-f]{64}$"},
+    "manifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "signature": {"type": "string", "contentEncoding": "base64"}
+  }
+}

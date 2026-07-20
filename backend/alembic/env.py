@@ -2,18 +2,21 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
 from alembic import context
 from app import models  # noqa: F401
 from app.config import get_settings
 from app.db import Base
+from sqlalchemy import engine_from_config, pool
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# Alembic stores options in ConfigParser, where a literal percent sign starts
+# interpolation. Escaping here preserves URL-encoded database passwords such
+# as ``p%40ss`` while ``get_main_option``/``engine_from_config`` recover the
+# original URL for SQLAlchemy.
+config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
 target_metadata = Base.metadata
 
 

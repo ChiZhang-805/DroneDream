@@ -1,0 +1,78 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream",
+  "version": "1.0.0",
+  "identifier": "io.dronedream.desktop",
+  "build": {
+    "beforeDevCommand": "npm run frontend:dev",
+    "beforeBuildCommand": "npm run frontend:build",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../../frontend/dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:8000 ws://127.0.0.1:*; frame-src http://127.0.0.1:* http://localhost:*; img-src 'self' asset: http://asset.localhost http://127.0.0.1:8000 data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'",
+      "devCsp": "default-src 'self' http://127.0.0.1:5173; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:*; frame-src http://127.0.0.1:* http://localhost:*; img-src 'self' asset: http://asset.localhost http://127.0.0.1:* data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-eval'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": false,
+    "targets": ["nsis"],
+    "publisher": "DroneDream",
+    "shortDescription": "Local-first PX4 and Gazebo tuning for Windows",
+    "longDescription": "DroneDream installs and verifies an isolated DroneDreamRuntime WSL2 environment, then runs local PX4 and Gazebo tuning workflows without modifying existing Linux distributions.",
+    "resources": {
+      "../../LICENSE": "licenses/DroneDream-LICENSE.txt",
+      "../../runtime/THIRD_PARTY_NOTICES.md": "licenses/THIRD_PARTY_NOTICES.md",
+      "../../runtime/licenses/valkey-COPYING": "licenses/Valkey-COPYING.txt"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "SimpChinese"],
+        "customLanguageFiles": {
+          "English": "nsis/languages/English.nsh",
+          "SimpChinese": "nsis/languages/SimpChinese.nsh"
+        },
+        "displayLanguageSelector": true,
+        "template": "nsis/installer.nsi",
+        "installerHooks": "nsis/webview2-health.nsh"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaW5pIHB1YmxpYyBrZXk6IEJBM0ZEQ0FGNzFDRTJGRjUKUldUMUw4NXhyOXcvdXF3aTFMbFM1TVpNQ3J3T1czMVRXMkduWVA3ajlPSmdCSEtsbTVWeTVFS0cK",
+      "endpoints": [
+        "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

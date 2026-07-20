@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
 import { apiClient, ApiClientError, artifactDownloadUrl } from "../api/client";
+import {
+  ensureOverallDesktopReadiness,
+  resetDesktopReadinessSession,
+} from "../desktop/readiness";
 
 function mockFetchOnce(body: unknown, status = 200) {
   const response = new Response(JSON.stringify(body), {
@@ -10,7 +14,41 @@ function mockFetchOnce(body: unknown, status = 200) {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
 }
 
+const desktopPrerequisites = {
+  platform: "windows",
+  supported: true,
+  windows: {
+    caption: "Windows 11 Pro",
+    version: "10.0.26100",
+    buildNumber: "26100",
+    architecture: "64-bit",
+  },
+  wsl: { executableAvailable: true, distributions: [] },
+  memory: { totalBytes: 16 * 1024 ** 3, availableBytes: 8 * 1024 ** 3 },
+  disks: [],
+  gpus: [],
+  probeErrors: [],
+};
+
+const runtimeComponents = [
+  "wsl-runtime",
+  "host-ownership",
+  "runtime-manifest",
+  "local-backend",
+  "px4",
+  "gazebo",
+].map((id) => ({
+  id,
+  label: id,
+  status: "ready",
+  required: true,
+  version: null,
+  detail: null,
+}));
+
 afterEach(() => {
+  resetDesktopReadinessSession();
+  delete window.__TAURI__;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -42,6 +80,77 @@ describe("apiClient envelope handling", () => {
     expect(job.status).toBe("QUEUED");
   });
 
+  it("preserves provider-neutral LLM credentials when rerunning a job", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { id: "job_rerun_1", status: "QUEUED" },
+          error: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await apiClient.rerunJob("job/source", {
+      llm: {
+        provider: "deepseek",
+        api_key: "secret-token",
+        model: "deepseek-chat",
+        base_url: "https://api.deepseek.com/v1",
+      },
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/jobs/job%2Fsource/rerun",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          llm: {
+            provider: "deepseek",
+            api_key: "secret-token",
+            model: "deepseek-chat",
+            base_url: "https://api.deepseek.com/v1",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("loads runtime capability preflight metadata", async () => {
+    mockFetchOnce({
+      success: true,
+      data: {
+        service_version: "0.1.0",
+        simulators: {
+          configuration_scope: "api_process",
+          authoritative: false,
+          worker_override: null,
+          worker_override_supported: true,
+          items: { mock: { ready: true, status: "available" } },
+        },
+        optimizers: {
+          authoritative: true,
+          items: { heuristic: { ready: true, status: "available" } },
+        },
+        parameter_catalog: {
+          catalog_version: "px4-mc-v3",
+          supported_px4_versions: ["v1.16"],
+        },
+      },
+      error: null,
+    });
+
+    const capabilities = await apiClient.getCapabilities();
+
+    expect(capabilities.simulators.items.mock.ready).toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/capabilities",
+      expect.any(Object),
+    );
+  });
+
   it("throws ApiClientError with the server-provided code on a structured error envelope", async () => {
     mockFetchOnce(
       {
@@ -69,6 +178,23 @@ describe("apiClient envelope handling", () => {
       name: "ApiClientError",
       code: "INVALID_INPUT",
       httpStatus: 422,
+    });
+  });
+
+  it("does not accept a success envelope carried by an HTTP error response", async () => {
+    mockFetchOnce(
+      {
+        success: true,
+        data: { id: "job_should_not_exist", status: "QUEUED" },
+        error: null,
+      },
+      503,
+    );
+
+    await expect(apiClient.getJob("job_x")).rejects.toMatchObject({
+      name: "ApiClientError",
+      code: "HTTP_ERROR",
+      httpStatus: 503,
     });
   });
 
@@ -159,10 +285,14 @@ describe("apiClient envelope handling", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
     const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const anchorClickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
     const mod = await import("../api/client");
     await mod.apiClient.downloadArtifact("art_1", "file.txt");
     expect(createObjectURLSpy).toHaveBeenCalled();
     expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock");
+    expect(anchorClickSpy).toHaveBeenCalledOnce();
     expect(fetchSpy).toHaveBeenCalledWith(
       "http://127.0.0.1:8000/api/v1/artifacts/art_1/download",
       expect.objectContaining({
@@ -187,6 +317,114 @@ describe("apiClient envelope handling", () => {
     );
   });
 
+  it("loads every bounded trial page without returning duplicates", async () => {
+    const firstPage = Array.from({ length: 500 }, (_, index) => ({
+      id: `trial_${index}`,
+    }));
+    const secondPage = [{ id: "trial_500" }];
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ success: true, data: firstPage, error: null }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ success: true, data: secondPage, error: null }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const trials = await apiClient.listJobTrials("job with spaces");
+
+    expect(trials).toHaveLength(501);
+    expect(new Set(trials.map((trial) => trial.id)).size).toBe(501);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      "http://127.0.0.1:8000/api/v1/jobs/job%20with%20spaces/trials?page=1&page_size=500",
+      expect.any(Object),
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:8000/api/v1/jobs/job%20with%20spaces/trials?page=2&page_size=500",
+      expect.any(Object),
+    );
+  });
+
+  it("uses the cached manual environment result before a real run without probing again", async () => {
+    const readyRuntime = {
+      runtimeName: "DroneDreamRuntime",
+      installed: true,
+      running: true,
+      ready: true,
+      version: "2026.07",
+      dataRoot: "E:\\DroneDream",
+      components: runtimeComponents,
+      diagnostics: [] as string[],
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return desktopPrerequisites;
+      if (command === "probe_runtime_status") return readyRuntime;
+      if (command === "start_runtime") return readyRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    await ensureOverallDesktopReadiness({ autoStart: true });
+    invoke.mockClear();
+    mockFetchOnce({ success: true, data: { id: "job_1" }, error: null });
+
+    await expect(apiClient.createJob({} as never)).resolves.toMatchObject({ id: "job_1" });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("blocks a real run without a cached manual check and never probes automatically", async () => {
+    const invoke = vi.fn(async () => undefined);
+    const fetchSpy = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(apiClient.createJob({} as never)).rejects.toMatchObject({
+      code: "DESKTOP_RUNTIME_NOT_READY",
+      httpStatus: 0,
+    });
+    expect(invoke).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not recheck the environment for metadata-only mutations", async () => {
+    const readyRuntime = {
+      runtimeName: "DroneDreamRuntime",
+      installed: true,
+      running: true,
+      ready: true,
+      version: "2026.07",
+      dataRoot: "E:\\DroneDream",
+      components: runtimeComponents,
+      diagnostics: [],
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return desktopPrerequisites;
+      if (command === "probe_runtime_status") return readyRuntime;
+      if (command === "start_runtime") return readyRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    mockFetchOnce({
+      success: true,
+      data: { id: "job_1", display_name: "safe write" },
+      error: null,
+    });
+
+    await apiClient.updateJob("job_1", { display_name: "safe write" });
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it("loads the versioned parameter catalog from the advanced endpoint", async () => {
     mockFetchOnce({
       success: true,
@@ -206,6 +444,18 @@ describe("apiClient envelope handling", () => {
       "http://127.0.0.1:8000/api/v1/parameter-catalog?px4_version=v1.16",
       expect.any(Object),
     );
+  });
+
+  it("normalizes comparison CSV network failures", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+
+    await expect(
+      apiClient.downloadCompareJobsCsv(["job_a", "job_b"]),
+    ).rejects.toMatchObject({
+      name: "ApiClientError",
+      code: "NETWORK_ERROR",
+      httpStatus: 0,
+    });
   });
 
   it("loads constraint-aware candidate and Pareto history for a job", async () => {

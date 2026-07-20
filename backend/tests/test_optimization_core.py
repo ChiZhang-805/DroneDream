@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 from pydantic import ValidationError
 
 from app.optimization.design import halton_design
-from app.optimization.domain import SearchSpace
+from app.optimization.domain import ParameterDomain, SearchSpace
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import aggregate_metric, evaluate_candidate
 from app.optimization.scenarios import holdout_matrix, scenario_matrix, training_matrix
@@ -125,6 +127,41 @@ def test_candidate_evaluation_enforces_worst_case_hard_constraints() -> None:
     assert evaluation.total_violation == 1.0
 
 
+def test_objective_targets_apply_one_sided_aspiration_loss() -> None:
+    config = ObjectiveConfig(
+        objectives=[
+            ObjectiveSpec(
+                metric="rmse",
+                direction="minimize",
+                weight=1.0,
+                normalization=2.0,
+                target=1.0,
+            ),
+            ObjectiveSpec(
+                metric="pass_rate",
+                direction="maximize",
+                weight=1.0,
+                normalization=1.0,
+                target=0.9,
+            ),
+        ]
+    )
+
+    met = evaluate_candidate(
+        [{"rmse": 0.8, "pass_rate": 0.95}],
+        config,
+    )
+    missed = evaluate_candidate(
+        [{"rmse": 1.4, "pass_rate": 0.7}],
+        config,
+    )
+
+    assert met.scalar_loss == 0.0
+    # Equal objective weights: 0.5 * ((1.4 - 1.0) / 2) +
+    # 0.5 * ((0.9 - 0.7) / 1) = 0.2.
+    assert missed.scalar_loss == pytest.approx(0.2)
+
+
 def test_pareto_front_is_constraint_aware_and_recommendations_are_stable() -> None:
     directions = {"rmse": "minimize", "speed": "maximize"}
     points = [
@@ -141,6 +178,17 @@ def test_pareto_front_is_constraint_aware_and_recommendations_are_stable() -> No
     assert recommendations["balanced"].id in {"stable", "fast"}
 
 
+def test_pareto_diagnostics_never_recommend_an_infeasible_parameter_set() -> None:
+    directions = {"rmse": "minimize"}
+    unsafe = [
+        ParetoPoint("less-unsafe", {"rmse": 0.4}, directions, False, 0.1),
+        ParetoPoint("more-unsafe", {"rmse": 0.2}, directions, False, 0.8),
+    ]
+
+    assert [point.id for point in nondominated_front(unsafe)] == ["less-unsafe"]
+    assert representative_points(unsafe) == {}
+
+
 def test_scenario_suite_requires_unique_ids_and_seeds() -> None:
     with pytest.raises(ValidationError, match="seeds must be unique"):
         ScenarioCaseConfig(id="wind", scenario_type="wind_perturbed", seeds=[1, 1])
@@ -151,6 +199,34 @@ def test_scenario_suite_requires_unique_ids_and_seeds() -> None:
                 ScenarioCaseConfig(id="same", seeds=[2]),
             ]
         )
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: ParameterDomain("", 0.5, 0.0, 1.0),
+        lambda: ParameterDomain("x", 0.5, 1.0, 0.0),
+        lambda: ParameterDomain("x", 2.0, 0.0, 1.0),
+        lambda: ParameterDomain("x", 0.5, 0.0, 1.0, step=0.0),
+        lambda: ParameterDomain("x", 0.5, 0.0, 1.0, scale="log"),
+        lambda: ParameterDomain("x", 0.5, 0.0, 1.0, choices=(0.25, 1.5)),
+    ],
+)
+def test_parameter_domain_rejects_invalid_runtime_contracts(
+    factory: Callable[[], ParameterDomain],
+) -> None:
+    with pytest.raises(ValueError):
+        factory()
+
+
+def test_parameter_domain_rejects_nonfinite_and_boolean_proposals() -> None:
+    domain = ParameterDomain("x", 0.5, 0.0, 1.0)
+    with pytest.raises(ValueError):
+        domain.from_unit(float("nan"))
+    with pytest.raises(ValueError):
+        domain.from_unit(True)
+    with pytest.raises(ValueError):
+        domain.project(False)
 
 
 def test_scenario_matrix_is_fixed_across_candidates_and_splits_holdout() -> None:

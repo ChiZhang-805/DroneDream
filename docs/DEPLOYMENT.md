@@ -1,6 +1,6 @@
 # DroneDream deployment guide
 
-This repository ships a production-shaped local stack with five independent
+This repository ships a production-shaped local stack with six independent
 roles:
 
 - `frontend`: static React application behind Nginx;
@@ -15,6 +15,31 @@ not install PX4 or Gazebo. Build a site-specific worker image on top of the
 `worker` target when real simulation is enabled, pinning the required PX4,
 Gazebo, MAVSDK, graphics, and vehicle assets.
 
+Compose forwards the operator-facing `REAL_SIMULATOR_*`, `PX4_*`, Gazebo GUI,
+marker, telemetry, evaluation, and timeout settings from `.env` to that worker.
+Leave `SIMULATOR_BACKEND` blank for normal use so each experiment retains its
+own selected backend. Per-trial `PX4_TRIAL_*` paths/evidence and the internal
+`PX4_PARAMETER_*` request context are deliberately **not** accepted from
+Compose; the runner creates them for each isolated trial.
+
+The API/worker image installs third-party Python packages from
+`deploy/requirements.backend.lock` with mandatory hashes, then installs the two
+local projects without dependency resolution or build isolation. After changing
+either production dependency list, regenerate the lock for the actual Linux
+target and review the complete diff:
+
+```powershell
+uv pip compile deploy/requirements.backend.in `
+  --output-file deploy/requirements.backend.lock `
+  --python-version 3.12 `
+  --python-platform x86_64-manylinux_2_36 `
+  --only-binary :all: `
+  --generate-hashes
+```
+
+The quality gate builds both targets, verifies their imports, and proves that
+they run as the fixed unprivileged UID 10001 before a change can ship.
+
 ## Local container stack
 
 Requirements: Docker Engine with Compose v2 and at least 8 GB of available
@@ -22,11 +47,14 @@ memory for the application stack. Real Gazebo simulation needs substantially
 more CPU and memory.
 
 1. Copy `.env.example` to `.env`.
-2. Replace `POSTGRES_PASSWORD`, `MINIO_ROOT_PASSWORD`,
+2. Replace `POSTGRES_PASSWORD`, `MINIO_ROOT_PASSWORD`, `APP_SECRET_KEY`,
    `DEMO_AUTH_TOKENS`, and `VITE_DEMO_AUTH_TOKEN`. The demo token presented by
-   the frontend must match one token in `DEMO_AUTH_TOKENS`.
-3. If GPT optimization is enabled, set a Fernet `APP_SECRET_KEY` shared by API
-   and worker.
+   the frontend must match one token in `DEMO_AUTH_TOKENS`. Compose deliberately
+   refuses to start when any of these required values is missing; there are no
+   deployable fallback passwords or tokens.
+3. Generate `APP_SECRET_KEY` as a Fernet key and share it only with API and
+   worker. Even when GPT optimization is initially disabled, setting it before
+   first deployment avoids introducing an unplanned secret migration later.
 4. Start the stack:
 
    ```powershell
@@ -36,6 +64,10 @@ more CPU and memory.
 
 5. Open `http://localhost:8080`. Inspect readiness at
    `http://localhost:8080/health/ready`.
+
+The MinIO administration console is bound to `127.0.0.1:9001` only. Keep it
+loopback-only; use an authenticated tunnel instead of exposing it publicly when
+administering a remote host.
 
 The API container runs `alembic upgrade head` before Uvicorn. Its Compose
 healthcheck uses `/health/live`, allowing the worker to start without a
@@ -83,9 +115,11 @@ and MinIO before applying a destructive migration.
 - Result persistence is fenced by `(trial_id, lease_owner, attempt_count)`.
   If an expired Trial has been reclaimed, an old simulator process may finish
   but its stale metrics and artifacts are discarded.
-- Job finalization uses a transaction-scoped `FINALIZING` claim. Reports and
-  terminal state are committed together; iterative optimizers instead return
-  the Job to `RUNNING` with their next generation.
+- Job finalization uses a committed, time-bounded `FINALIZING` lease. The
+  database transaction is released before report storage or LLM network I/O;
+  cancellation is fenced before any new generation/terminal commit, and a
+  crashed worker's stale lease can be reclaimed. One job's finalization error
+  is isolated and cannot stop other ready jobs.
 - Artifact object keys are deterministic per Job/Trial/type/name. Retrying
   after an object-upload/database boundary overwrites the same private object
   rather than creating an unbounded duplicate.
@@ -97,19 +131,22 @@ lease. The code clamps an oversized heartbeat interval at runtime.
 ## Scaling for the initial 20-user service
 
 Start with one API replica and one simulation worker on a 16-core/32-GB host.
-Limit the worker to roughly two to four concurrent headless simulations; the
-current worker process executes one Trial at a time, so concurrency is added
-by running more worker replicas:
+The current worker process executes one Trial at a time. For the mock backend,
+additional worker replicas can drain independent trials:
 
 ```powershell
 docker compose up -d --scale worker=3
 ```
 
-PostgreSQL conditional claims make multiple workers safe. Measure CPU, peak
-RSS, simulation wall time, object volume, and failure recovery before choosing
-the worker count. For higher load, keep the control plane small and place
-PX4/Gazebo workers on separate compute nodes with the same database, Valkey,
-and S3-compatible endpoints.
+PostgreSQL conditional claims make database work ownership safe, but the bundled
+PX4/Gazebo wrapper still defaults MAVSDK to UDP 14540 and does not allocate a
+complete per-instance port set. Therefore run at most **one `real_cli` trial per
+host**. Do not use `--scale worker=3` for real simulations on one host until an
+operator supplies a matching PX4/Gazebo/MAVSDK instance-and-port allocator.
+For higher real load, place one worker on each compute node with the same
+database, Valkey, and S3-compatible endpoints. Measure CPU, peak RSS,
+simulation wall time, object volume, and failure recovery before increasing the
+fleet.
 
 ## Production checklist
 
@@ -125,8 +162,11 @@ and S3-compatible endpoints.
   versioning/lifecycle rules, and database/object-store backups.
 - Keep the bucket private. S3 storage exposes short-lived presigned download
   capability; local storage continues to use API streaming for compatibility.
-- Pin and scan all images. The Compose tags are a tested baseline, not an
-  automatic upgrade policy.
+- Local-only installations can use the opt-in, DB-safe capacity policy in
+  [Local Artifact Capacity and Retention](./13-artifact-retention.md). S3/MinIO
+  deployments should keep cleanup disabled and configure bucket lifecycle rules.
+- Keep the image tag-and-digest pairs pinned and scan them before each release.
+  Dependency upgrades are explicit review events, never an automatic policy.
 - Send structured logs and metrics off-host. Alert on `/health/ready`, queue
   age, missing worker heartbeat, expired/reclaimed leases, failed Trials,
   PostgreSQL saturation, and MinIO capacity.

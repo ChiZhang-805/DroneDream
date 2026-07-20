@@ -1,0 +1,732 @@
+name: Desktop installer
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".gitattributes"
+      - ".github/CODEOWNERS"
+      - ".github/workflows/desktop-installer.yml"
+      - "CODE_SIGNING_POLICY.md"
+      - "PRIVACY.md"
+      - "README.md"
+      - "SECURITY.md"
+      - "VERSIONING.md"
+      - "desktop/**"
+      - "frontend/**"
+      - "backend/**"
+      - "docs/14-runtime-release.md"
+      - "LICENSE"
+      - "runtime/release-public-keys.json"
+      - "runtime/tests/fixtures/jcs-release-vector.input.json"
+      - "runtime/tests/fixtures/runtime-release.json"
+      - "runtime/tests/fixtures/runtime-release.json.sig"
+      - "runtime/THIRD_PARTY_NOTICES.md"
+      - "runtime/licenses/valkey-COPYING"
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  windows-nsis:
+    name: Windows x64 NSIS
+    runs-on: windows-2022
+    # Two SignPath requests require explicit release approval. Keep enough
+    # headroom for review without turning a stalled request into an endless job.
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: "4"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Verify release version consistency
+        id: release-version
+        shell: pwsh
+        run: |
+          $releaseTag = if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $env:GITHUB_REF_NAME
+          } else {
+            ""
+          }
+          ./desktop/scripts/verify-desktop-version.ps1 -ReleaseTag $releaseTag
+          $desktopVersion = (
+            Get-Content -LiteralPath "desktop/src-tauri/tauri.conf.json" -Raw |
+              ConvertFrom-Json
+          ).version
+          "version=$desktopVersion" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+          $backendProjectVersionMatch = Select-String `
+            -LiteralPath "backend/pyproject.toml" `
+            -Pattern '^version\s*=\s*"([^"]+)"\s*$' |
+            Select-Object -First 1
+          $backendCodeVersionMatch = Select-String `
+            -LiteralPath "backend/app/__init__.py" `
+            -Pattern '^__version__\s*=\s*"([^"]+)"\s*$' |
+            Select-Object -First 1
+          if (-not $backendProjectVersionMatch -or -not $backendCodeVersionMatch) {
+            throw "Backend package or code version was not found"
+          }
+          $backendProjectVersion = $backendProjectVersionMatch.Matches[0].Groups[1].Value
+          $backendCodeVersion = $backendCodeVersionMatch.Matches[0].Groups[1].Value
+
+          if ($backendProjectVersion -cne $backendCodeVersion) {
+            throw "Backend versions disagree: pyproject=$backendProjectVersion code=$backendCodeVersion"
+          }
+          Write-Host "Backend versions verified: $backendCodeVersion"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Set up Rust 1.97.0
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # action snapshot, 2026-07-10
+        with:
+          toolchain: 1.97.0
+          components: rustfmt, clippy
+
+      - name: Install JavaScript dependencies
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --prefix frontend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm ci --prefix desktop
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install backend test dependencies
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install -e "./backend[dev]" `
+            "ruff==0.15.21" "mypy==2.2.0" "pytest==9.1.1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify open-source release inventory
+        shell: pwsh
+        run: npm --prefix desktop run verify:release-source
+
+      - name: Verify backend
+        shell: pwsh
+        working-directory: backend
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m ruff check app tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m mypy app
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify shared frontend
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm --prefix frontend run typecheck
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix frontend run lint
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # The Windows hosted runner is materially slower than local jsdom.
+          # Keep assertions unchanged while allowing the existing wizard tests
+          # enough time to finish under runner load.
+          npm --prefix frontend run test -- --testTimeout 15000
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify desktop Rust
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          cargo fmt --all --manifest-path desktop/src-tauri/Cargo.toml -- --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo clippy --release --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Release-profile tests reuse most compiled artifacts in the NSIS build.
+          cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify pinned NSIS template
+        shell: pwsh
+        run: ./desktop/scripts/verify-nsis-template.ps1
+
+      - name: Validate SignPath release configuration
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_APPLICATION_POLICY_SLUG: ${{ vars.SIGNPATH_APPLICATION_POLICY_SLUG }}
+          SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG }}
+          SIGNPATH_INSTALLER_POLICY_SLUG: ${{ vars.SIGNPATH_INSTALLER_POLICY_SLUG }}
+          SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG }}
+        run: |
+          $required = @(
+            "SIGNPATH_API_TOKEN",
+            "SIGNPATH_ORGANIZATION_ID",
+            "SIGNPATH_PROJECT_SLUG",
+            "SIGNPATH_APPLICATION_POLICY_SLUG",
+            "SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG",
+            "SIGNPATH_INSTALLER_POLICY_SLUG",
+            "SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG"
+          )
+          $missing = @($required | Where-Object {
+            [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          })
+          if ($missing.Count -gt 0) {
+            throw "Formal releases require accepted SignPath configuration: $($missing -join ', ')"
+          }
+
+      - name: Build DroneDream application or unsigned test installer
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $releaseBuild = $env:GITHUB_REF -like "refs/tags/desktop-v*"
+          $buildExitCode = 1
+          foreach ($attempt in 1..3) {
+            if ($releaseBuild) {
+              # Sign the application before NSIS embeds it. Tauri's separate
+              # bundle command below packages these already signed bytes.
+              npm --prefix desktop run build -- --no-bundle
+            } else {
+              # Pull requests exercise the complete unsigned installer without
+              # obtaining or publishing a release signature.
+              npm --prefix desktop run build -- --config '{"bundle":{"createUpdaterArtifacts":false}}'
+            }
+            $buildExitCode = $LASTEXITCODE
+            if ($buildExitCode -eq 0) { break }
+            if ($attempt -lt 3) {
+              Write-Warning "Desktop build attempt $attempt failed with exit code $buildExitCode; retrying in 10 seconds"
+              Start-Sleep -Seconds 10
+            }
+          }
+          if ($buildExitCode -ne 0) { exit $buildExitCode }
+
+      - name: Upload unsigned application for SignPath
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        id: upload-unsigned-application
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: DroneDream-unsigned-application
+          archive: false
+          if-no-files-found: error
+          retention-days: 1
+          path: desktop/src-tauri/target/release/drone-dream-desktop.exe
+
+      - name: Submit application signing request
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_APPLICATION_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-application.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: desktop/src-tauri/target/release/signpath/application
+          skip-decompress: true
+          parameters: |
+            version: "${{ steps.release-version.outputs.version }}"
+
+      - name: Install and verify signed application
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        run: |
+          $target = "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+          $signed = @(
+            Get-ChildItem `
+              -LiteralPath "desktop/src-tauri/target/release/signpath/application" `
+              -Recurse -Filter "drone-dream-desktop.exe" -File
+          )
+          if ($signed.Count -ne 1) {
+            throw "Expected exactly one signed application from SignPath, found $($signed.Count)."
+          }
+          Copy-Item -LiteralPath $signed[0].FullName -Destination $target -Force
+          $signature = Get-AuthenticodeSignature -LiteralPath $target
+          if ($signature.Status -ne "Valid") {
+            throw "Signed application failed Authenticode verification: $($signature.StatusMessage)"
+          }
+
+      - name: Bundle the signed application as NSIS
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $bundleExitCode = 1
+          foreach ($attempt in 1..3) {
+            npm --prefix desktop run tauri -- bundle --bundles nsis
+            $bundleExitCode = $LASTEXITCODE
+            if ($bundleExitCode -eq 0) { break }
+            if ($attempt -lt 3) {
+              Write-Warning "NSIS bundle attempt $attempt failed with exit code $bundleExitCode; retrying in 10 seconds"
+              Start-Sleep -Seconds 10
+            }
+          }
+          if ($bundleExitCode -ne 0) { exit $bundleExitCode }
+
+      - name: Verify WebView2 installer health gate
+        shell: pwsh
+        run: |
+          ./desktop/scripts/verify-webview2-installer.ps1 `
+            -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
+
+      - name: Verify installer locales and extracted planner
+        shell: pwsh
+        run: |
+          ./desktop/scripts/verify-installer-path-guard.ps1
+          ./desktop/scripts/verify-installer-locales.ps1 `
+            -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
+          ./desktop/scripts/verify-installer-planner.ps1 `
+            -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+
+      - name: Upload unsigned installer for SignPath
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        id: upload-unsigned-installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: DroneDream-unsigned-installer
+          archive: false
+          if-no-files-found: error
+          retention-days: 1
+          path: desktop/src-tauri/target/release/bundle/nsis/DroneDream_${{ steps.release-version.outputs.version }}_x64-setup.exe
+
+      - name: Submit installer signing request
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_INSTALLER_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: desktop/src-tauri/target/release/signpath/installer
+          skip-decompress: true
+          parameters: |
+            version: "${{ steps.release-version.outputs.version }}"
+
+      - name: Install and verify signed installer
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        run: |
+          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $target = Join-Path `
+            $bundleDir `
+            "DroneDream_${{ steps.release-version.outputs.version }}_x64-setup.exe"
+          $signed = @(
+            Get-ChildItem `
+              -LiteralPath "desktop/src-tauri/target/release/signpath/installer" `
+              -Recurse -Filter "DroneDream_*_x64-setup.exe" -File
+          )
+          if ($signed.Count -ne 1) {
+            throw "Expected exactly one signed installer from SignPath, found $($signed.Count)."
+          }
+          if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
+            throw "Unsigned installer target was not found at $target"
+          }
+          Copy-Item -LiteralPath $signed[0].FullName -Destination $target -Force
+          $signature = Get-AuthenticodeSignature -LiteralPath $target
+          if ($signature.Status -ne "Valid") {
+            throw "Signed installer failed Authenticode verification: $($signature.StatusMessage)"
+          }
+
+      - name: Write release inventory and SHA-256 checksum
+        shell: pwsh
+        run: |
+          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $installers = @(Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS installer, found $($installers.Count)"
+          }
+          $installer = $installers[0]
+          $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName
+          $checksumPath = "$($installer.FullName).sha256"
+          "$($hash.Hash.ToLowerInvariant())  $($installer.Name)" |
+            Set-Content -Encoding ascii -LiteralPath $checksumPath
+          npm --prefix desktop run verify:release-source -- `
+            --output "$bundleDir/release-source-inventory.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify publisher signatures and write updater manifest
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $installer = Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File |
+            Select-Object -First 1
+          if (-not $installer) { throw "The signed installer was not produced." }
+          $application = "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+          foreach ($signedFile in @($application, $installer.FullName)) {
+            $authenticode = Get-AuthenticodeSignature -LiteralPath $signedFile
+            if ($authenticode.Status -ne "Valid") {
+              throw "Authenticode verification failed for ${signedFile}: $($authenticode.StatusMessage)"
+            }
+          }
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+            throw "A formal desktop tag requires TAURI_SIGNING_PRIVATE_KEY."
+          }
+          $updaterKeyPath = Join-Path $env:RUNNER_TEMP "dronedream-updater.key"
+          try {
+            [IO.File]::WriteAllText(
+              $updaterKeyPath,
+              $env:TAURI_SIGNING_PRIVATE_KEY,
+              (New-Object Text.UTF8Encoding($false))
+            )
+            $passwordArgument = "--password=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)"
+            node ./desktop/node_modules/@tauri-apps/cli/tauri.js signer sign `
+              --private-key-path $updaterKeyPath `
+              $passwordArgument `
+              $installer.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Tauri updater signing failed." }
+          } finally {
+            Remove-Item -LiteralPath $updaterKeyPath -Force -ErrorAction SilentlyContinue
+          }
+          ./desktop/scripts/write-updater-manifest.ps1 -BundleDirectory $bundleDir
+
+      - name: Verify installer lifecycle and checksum
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          using System.Text;
+
+          public static class DroneDreamSmokeNative
+          {
+              [DllImport("kernel32.dll")]
+              public static extern uint SetErrorMode(uint mode);
+
+              [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+              public static extern int GetClassName(
+                  IntPtr window,
+                  StringBuilder className,
+                  int maximumCount
+              );
+
+              [DllImport("user32.dll", SetLastError = true)]
+              public static extern IntPtr SendMessageTimeout(
+                  IntPtr window,
+                  uint message,
+                  UIntPtr wParam,
+                  IntPtr lParam,
+                  uint flags,
+                  uint timeout,
+                  out UIntPtr result
+              );
+          }
+          '@
+          # Child processes inherit this mode. Loader failures therefore exit
+          # instead of leaving a modal Windows error dialog that looks alive.
+          [void][DroneDreamSmokeNative]::SetErrorMode(0x8003)
+
+          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $installers = @(Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS installer, found $($installers.Count)"
+          }
+          $installer = $installers[0]
+          $checksumPath = "$($installer.FullName).sha256"
+          $checksumLine = (Get-Content -LiteralPath $checksumPath -Raw).Trim()
+          $checksumMatch = [regex]::Match(
+            $checksumLine,
+            '^([0-9a-f]{64})  ([^\\/]+)$',
+            [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+          )
+          if (-not $checksumMatch.Success) {
+            throw "Installer checksum has an invalid format"
+          }
+          if ($checksumMatch.Groups[2].Value -cne $installer.Name) {
+            throw "Installer checksum names a different file"
+          }
+          $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName).Hash
+          if ($checksumMatch.Groups[1].Value -cne $actualHash.ToLowerInvariant()) {
+            throw "Installer checksum verification failed"
+          }
+
+          $runnerTemp = [System.IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\', '/')
+          $installDir = Join-Path $runnerTemp ("DroneDream-Smoke-" + [guid]::NewGuid().ToString("N"))
+          $installDirFull = [System.IO.Path]::GetFullPath($installDir)
+          $runnerTempPrefix = $runnerTemp + [System.IO.Path]::DirectorySeparatorChar
+          if (-not $installDirFull.StartsWith(
+            $runnerTempPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+          )) {
+            throw "Refusing to test outside RUNNER_TEMP: $installDirFull"
+          }
+
+          $appProcess = $null
+          $uninstaller = Join-Path $installDirFull "uninstall.exe"
+          # Ordinary desktop uninstall must preserve app-owned diagnostic state.
+          # The interactive "delete app data" checkbox is the only operation
+          # allowed to remove this bundle-owned directory. Runtime diagnostics
+          # live in the separately marker-owned download cache and are even
+          # further outside the uninstaller's ownership boundary.
+          $appDataRoot = Join-Path $env:LOCALAPPDATA "io.dronedream.desktop"
+          $diagnosticRoot = Join-Path $appDataRoot "diagnostics"
+          $diagnosticSentinel = Join-Path $diagnosticRoot "ci-uninstall-preserve.txt"
+          New-Item -ItemType Directory -Force -Path $diagnosticRoot | Out-Null
+          Set-Content -LiteralPath $diagnosticSentinel -Encoding utf8 -Value "preserve"
+          try {
+            $installProcess = Start-Process -FilePath $installer.FullName `
+              -ArgumentList @("/S", "/D=$installDirFull") -Wait -PassThru
+            if ($installProcess.ExitCode -ne 0) {
+              throw "Silent installer failed with exit code $($installProcess.ExitCode)"
+            }
+
+            $application = Join-Path $installDirFull "drone-dream-desktop.exe"
+            if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
+              throw "Installed application was not found at $application"
+            }
+            if ($env:GITHUB_REF -like "refs/tags/desktop-v*") {
+              $installedSignature = Get-AuthenticodeSignature -LiteralPath $application
+              if ($installedSignature.Status -ne "Valid") {
+                throw "Installed application failed Authenticode verification: $($installedSignature.StatusMessage)"
+              }
+            }
+            if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
+              throw "NSIS uninstaller was not found at $uninstaller"
+            }
+            $licenseRoot = Join-Path $installDirFull "licenses"
+            foreach ($licenseName in @(
+              "DroneDream-LICENSE.txt",
+              "THIRD_PARTY_NOTICES.md",
+              "Valkey-COPYING.txt"
+            )) {
+              $licensePath = Join-Path $licenseRoot $licenseName
+              if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf)) {
+                throw "Installed license material was not found at $licensePath"
+              }
+              if ((Get-Item -LiteralPath $licensePath).Length -le 0) {
+                throw "Installed license material is empty: $licensePath"
+              }
+            }
+
+            $originalPath = $env:PATH
+            try {
+              $env:PATH = @(
+                (Join-Path $env:SystemRoot "System32"),
+                $env:SystemRoot,
+                (Join-Path $env:SystemRoot "System32\Wbem")
+              ) -join ";"
+              $appProcess = Start-Process -FilePath $application `
+                -WorkingDirectory $installDirFull -PassThru
+            }
+            finally {
+              $env:PATH = $originalPath
+            }
+            $launchDeadline = [DateTime]::UtcNow.AddSeconds(20)
+            do {
+              Start-Sleep -Milliseconds 500
+              $appProcess.Refresh()
+              if ($appProcess.HasExited) {
+                throw "Installed application exited during the launch smoke test with code $($appProcess.ExitCode)"
+              }
+            } until (
+              $appProcess.MainWindowTitle -ceq "DroneDream" -or
+              [DateTime]::UtcNow -ge $launchDeadline
+            )
+            if ($appProcess.MainWindowTitle -cne "DroneDream") {
+              throw "Installed application did not open its DroneDream window; observed title: '$($appProcess.MainWindowTitle)'"
+            }
+
+            $windowClass = [System.Text.StringBuilder]::new(256)
+            if ([DroneDreamSmokeNative]::GetClassName(
+              $appProcess.MainWindowHandle,
+              $windowClass,
+              $windowClass.Capacity
+            ) -le 0) {
+              throw "Could not inspect the installed application's main window"
+            }
+            if ($windowClass.ToString() -ceq "#32770") {
+              throw "The installed application opened an error dialog instead of its main window"
+            }
+            $messageResult = [UIntPtr]::Zero
+            $sendResult = [DroneDreamSmokeNative]::SendMessageTimeout(
+              $appProcess.MainWindowHandle,
+              0,
+              [UIntPtr]::Zero,
+              [IntPtr]::Zero,
+              0x0002,
+              2000,
+              [ref]$messageResult
+            )
+            if ($sendResult -eq [IntPtr]::Zero) {
+              throw "The installed application's main window is not responding"
+            }
+            Start-Sleep -Seconds 2
+            $appProcess.Refresh()
+            if ($appProcess.HasExited) {
+              throw "Installed application exited immediately after opening with code $($appProcess.ExitCode)"
+            }
+          }
+          finally {
+            if ($null -ne $appProcess) {
+              if (-not $appProcess.HasExited) {
+                Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+              }
+              if (-not $appProcess.WaitForExit(10000)) {
+                throw "Installed application did not stop before uninstall"
+              }
+            }
+            if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
+              $uninstallProcess = Start-Process -FilePath $uninstaller `
+                -ArgumentList "/S" -Wait -PassThru
+              if ($uninstallProcess.ExitCode -ne 0) {
+                throw "Silent uninstaller failed with exit code $($uninstallProcess.ExitCode)"
+              }
+            }
+          }
+          if (Test-Path -LiteralPath $installDirFull) {
+            throw "Silent uninstaller left the installation directory behind: $installDirFull"
+          }
+          if (-not (Test-Path -LiteralPath $diagnosticSentinel -PathType Leaf)) {
+            throw "Ordinary uninstall erased app diagnostic state without explicit consent"
+          }
+
+          # WebView2 may keep its BrowserMetrics file open briefly after the
+          # Tauri parent exits. Stop only WebView2 children that reference this
+          # app-owned profile, then retry the runner-only cleanup. The lifecycle
+          # assertions above remain strict; an ephemeral metrics-file lock must
+          # not turn a successful install/uninstall validation into a product
+          # failure.
+          $appDataToken = Split-Path -Leaf $appDataRoot
+          @(
+            Get-CimInstance Win32_Process `
+              -Filter "Name = 'msedgewebview2.exe'" `
+              -ErrorAction SilentlyContinue
+          ) |
+            Where-Object {
+              $_.CommandLine -and $_.CommandLine.Contains(
+                $appDataToken,
+                [System.StringComparison]::OrdinalIgnoreCase
+              )
+            } |
+            ForEach-Object {
+              Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+            }
+
+          $cleanupError = $null
+          foreach ($cleanupAttempt in 1..6) {
+            try {
+              if (Test-Path -LiteralPath $appDataRoot) {
+                Remove-Item -LiteralPath $appDataRoot -Recurse -Force -ErrorAction Stop
+              }
+              if (Test-Path -LiteralPath $appDataRoot) {
+                throw "The application data directory still exists"
+              }
+              $cleanupError = $null
+              break
+            }
+            catch {
+              $cleanupError = $_.Exception.Message
+              if ($cleanupAttempt -lt 6) {
+                Start-Sleep -Milliseconds (500 * $cleanupAttempt)
+              }
+            }
+          }
+          if (Test-Path -LiteralPath $appDataRoot) {
+            Write-Warning (
+              "Runner cleanup left a locked WebView2 metrics file after " +
+              "six attempts; lifecycle assertions passed. Last error: $cleanupError"
+            )
+          }
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: DroneDream-Windows-x64
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: |
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sha256
+            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+            desktop/src-tauri/target/release/bundle/nsis/latest.json
+            desktop/src-tauri/target/release/bundle/nsis/release-source-inventory.json
+
+  publish-release:
+    name: Publish signed Windows release
+    if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+    needs: windows-nsis
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified installer
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: DroneDream-Windows-x64
+          path: dist
+
+      - name: Validate release files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version="${GITHUB_REF_NAME#desktop-v}"
+          installer="dist/DroneDream_${version}_x64-setup.exe"
+          checksum="${installer}.sha256"
+          signature="${installer}.sig"
+          test -f "$installer"
+          test -f "$checksum"
+          test -f "$signature"
+          test -f "dist/latest.json"
+          test -f "dist/release-source-inventory.json"
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 5
+          (cd dist && sha256sum --check "$(basename "$checksum")")
+          jq -e --arg version "$version" \
+            '.schemaVersion == 1 and .productName == "DroneDream" and .productVersion == $version and .repositoryLicense == "MIT" and .sourceCommit == env.GITHUB_SHA' \
+            dist/release-source-inventory.json >/dev/null
+          jq -e --arg version "$version" \
+            '.version == $version and .platforms["windows-x86_64"].signature != "" and (.platforms["windows-x86_64"].url | endswith("/DroneDream_" + $version + "_x64-setup.exe"))' \
+            dist/latest.json >/dev/null
+
+      - name: Publish immutable signed GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release already exists and will never be overwritten: $GITHUB_REF_NAME" >&2
+            exit 2
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "DroneDream Desktop ${GITHUB_REF_NAME#desktop-v}" \
+            --notes "DroneDream Windows x64 release: application and NSIS installer Authenticode-signed through SignPath Foundation, authenticated for in-app updates, and published with SHA-256 plus a source/dependency inventory." \
+            --draft
+          gh release upload "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY"
+          gh release edit "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --latest

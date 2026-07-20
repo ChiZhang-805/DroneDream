@@ -10,7 +10,7 @@ interface AlertProps {
 
 export function Alert({ tone = "info", title, children }: AlertProps) {
   return (
-    <div className={`alert alert-${tone}`} role="status">
+    <div className={`alert alert-${tone}`} role={tone === "danger" ? "alert" : "status"}>
       {title ? <div className="alert-title">{title}</div> : null}
       {children ? <div className="alert-body">{children}</div> : null}
     </div>

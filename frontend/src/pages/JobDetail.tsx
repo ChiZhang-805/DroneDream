@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -19,6 +20,11 @@ import { ComparisonChart } from "../components/ComparisonChart";
 import { ArtifactsPanel } from "../components/ArtifactsPanel";
 import { GazeboLivePanel } from "../components/GazeboLivePanel";
 import { OptimizationInsights } from "../components/OptimizationInsights";
+import {
+  optimizerStrategyDescription,
+  optimizerStrategyLabel,
+} from "../features/experiment/optimizerStrategies";
+import { useI18n } from "../i18n/I18nProvider";
 
 // Polling interval for active jobs. The frontend only polls; all state
 // transitions are driven by the backend worker process (Phase 3+). See
@@ -32,9 +38,17 @@ function CandidateCell({
   t: TrialSummary;
   optimizerStrategy: Job["optimizer_strategy"];
 }) {
-  const label = t.candidate_label ?? (t.candidate_is_baseline ? "baseline" : "—");
+  const { t: translate } = useI18n();
+  const displayedStrategy = t.candidate_optimizer_strategy ?? optimizerStrategy;
+  const label = t.candidate_label ?? (t.candidate_is_baseline ? translate("jobDetail.baseline") : "—");
   const isCmaEsOptimizer =
-    t.candidate_source_type === "optimizer" && optimizerStrategy === "cma_es";
+    t.candidate_source_type === "optimizer" && displayedStrategy === "cma_es";
+  const isExperimentalOptimizer = ![
+    "none",
+    "heuristic",
+    "gpt",
+    "cma_es",
+  ].includes(displayedStrategy);
   // Phase 8: "llm_optimizer" rows must render as GPT Gen N, not collapse into
   // "Baseline". Tone classes fall through to "optimizer" for the LLM variant
   // so the existing CSS (orange/heuristic) still applies.
@@ -46,21 +60,27 @@ function CandidateCell({
         ? "llm_optimizer"
         : "baseline";
   const toneClass = tone === "llm_optimizer" ? "optimizer" : tone;
-  const tagText =
-    tone === "baseline"
-      ? "Baseline"
-      : tone === "optimizer" && isCmaEsOptimizer
-        ? `CMA-ES Gen ${t.candidate_generation_index}`
-        : tone === "optimizer"
-        ? `Heuristic #${t.candidate_generation_index}`
-        : `GPT Gen ${t.candidate_generation_index}`;
+  const strategyLabel = optimizerStrategyLabel(displayedStrategy, translate);
+  let tagText = translate("jobDetail.gptGeneration", { count: t.candidate_generation_index });
+  if (tone === "baseline") {
+    tagText = translate("jobDetail.baseline");
+  } else if (tone === "optimizer" && isCmaEsOptimizer) {
+    tagText = translate("jobDetail.cmaGeneration", { count: t.candidate_generation_index });
+  } else if (tone === "optimizer" && !isExperimentalOptimizer) {
+    tagText = translate("jobDetail.heuristicGeneration", { count: t.candidate_generation_index });
+  } else if (tone === "optimizer") {
+    tagText = translate("jobDetail.strategyGeneration", {
+      strategy: strategyLabel,
+      count: t.candidate_generation_index,
+    });
+  }
   return (
     <span className="candidate-cell">
       <span className={`candidate-tag candidate-tag-${toneClass}`}>
         {tagText}
       </span>
       {t.candidate_is_best ? (
-        <span className="candidate-tag candidate-tag-best">Best</span>
+        <span className="candidate-tag candidate-tag-best">{translate("jobDetail.best")}</span>
       ) : null}
       <code className="candidate-id">{label}</code>
     </span>
@@ -74,24 +94,26 @@ function CandidateCell({
 // passed. ``null`` means the trial has no metric yet (queued/running or a
 // hard failure without metrics) and is rendered as "—".
 function PassBadge({ pass_flag }: { pass_flag: boolean | null }) {
+  const { t } = useI18n();
   if (pass_flag === null) return <span className="form-hint">—</span>;
   return (
     <span
       className={`candidate-tag candidate-tag-${pass_flag ? "best" : "baseline"}`}
-      aria-label={pass_flag ? "Trial passed" : "Trial failed"}
+      aria-label={pass_flag ? t("jobDetail.trialPassed") : t("jobDetail.trialFailed")}
     >
-      {pass_flag ? "PASS" : "FAIL"}
+      {pass_flag ? t("jobDetail.pass") : t("jobDetail.fail")}
     </span>
   );
 }
 
 function buildTrialColumns(
   optimizerStrategy: Job["optimizer_strategy"],
+  translate: ReturnType<typeof useI18n>["t"],
 ): Column<TrialSummary>[] {
   return [
   {
     key: "id",
-    header: "Trial ID",
+    header: translate("jobDetail.trialId"),
     render: (t) => (
       <Link to={`/trials/${t.id}`}>
         <code>{t.id}</code>
@@ -100,41 +122,43 @@ function buildTrialColumns(
   },
   {
     key: "candidate",
-    header: "Candidate",
+    header: translate("jobDetail.candidate"),
     render: (t) => <CandidateCell t={t} optimizerStrategy={optimizerStrategy} />,
   },
-  { key: "seed", header: "Seed", render: (t) => t.seed },
-  { key: "scenario_type", header: "Scenario", render: (t) => t.scenario_type },
+  { key: "seed", header: translate("trial.seed"), render: (t) => t.seed },
+  { key: "scenario_type", header: translate("trajectory.scenario"), render: (t) => t.scenario_type },
   {
     key: "status",
-    header: "Status",
+    header: translate("jobCompare.status"),
     render: (t) => <StatusBadge status={t.status} />,
   },
   {
     key: "pass",
-    header: "Pass",
+    header: translate("trial.pass"),
     render: (t) => <PassBadge pass_flag={t.pass_flag} />,
   },
   {
     key: "score",
-    header: "Score",
+    header: translate("trial.score"),
     align: "right",
     render: (t) => (t.score === null ? "—" : formatNumber(t.score)),
   },
   {
     key: "action",
-    header: "Action",
+    header: translate("jobDetail.action"),
     align: "right",
-    render: (t) => <Link to={`/trials/${t.id}`}>View</Link>,
+    render: (t) => <Link to={`/trials/${t.id}`}>{translate("jobDetail.view")}</Link>,
   },
   ];
 }
 
 export function JobDetail() {
+  const { t } = useI18n();
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const safeId = jobId ?? "";
+  const [pdfDownloadError, setPdfDownloadError] = useState(false);
 
   const rerunMutation = useMutation({
     mutationFn: ({
@@ -227,18 +251,18 @@ export function JobDetail() {
   });
 
   if (jobQuery.isLoading) {
-    return <Loading label="Loading job…" />;
+    return <Loading label={t("jobDetail.loading")} />;
   }
   if (jobQuery.isError || !job) {
     return (
       <ErrorState
-        title="Unable to load job"
+        title={t("jobDetail.loadFailed")}
         description={
           jobQuery.error instanceof ApiClientError
             ? jobQuery.error.message
-            : "Job not found."
+            : t("jobDetail.notFound")
         }
-        action={<Link to="/history" className="btn">Back to History</Link>}
+        action={<Link to="/history" className="btn">{t("jobDetail.backHistory")}</Link>}
       />
     );
   }
@@ -259,7 +283,7 @@ export function JobDetail() {
   const handleRerun = () => {
     if (job.optimizer_strategy === "gpt") {
       const freshKey = window.prompt(
-        "Enter a fresh OpenAI API key for this GPT rerun:",
+        t("jobDetail.apiKeyPrompt"),
       );
       if (!freshKey || freshKey.trim() === "") return;
       rerunMutation.mutate({
@@ -287,29 +311,33 @@ export function JobDetail() {
           <button
             type="button"
             className="btn"
-            onClick={() =>
+            onClick={() => {
+              setPdfDownloadError(false);
               void apiClient.downloadArtifact(
                 pdfArtifact.id,
                 pdfArtifact.display_name ?? `${job.id}-report.pdf`,
-              )
-            }
+              ).catch(() => setPdfDownloadError(true));
+            }}
           >
-            Download PDF report
+            {t("jobDetail.downloadPdf")}
           </button>
         </div>
       ) : null}
+      {pdfDownloadError ? (
+        <p className="form-error" role="alert">{t("artifact.downloadFailed")}</p>
+      ) : null}
       {rerunMutation.isError ? (
-        <Alert tone="danger" title="Rerun failed">
+        <Alert tone="danger" title={t("jobDetail.rerunFailed")}>
           {rerunMutation.error instanceof ApiClientError
             ? rerunMutation.error.message
-            : "Could not rerun this job."}
+            : t("jobDetail.rerunFailedBody")}
         </Alert>
       ) : null}
       {cancelMutation.isError ? (
-        <Alert tone="danger" title="Cancel failed">
+        <Alert tone="danger" title={t("jobDetail.cancelFailed")}>
           {cancelMutation.error instanceof ApiClientError
             ? cancelMutation.error.message
-            : "Could not cancel this job."}
+            : t("jobDetail.cancelFailedBody")}
         </Alert>
       ) : null}
       <JobSummaryCard job={job} />
@@ -319,16 +347,19 @@ export function JobDetail() {
       <StatusSpecificTop job={job} report={report} />
 
       <MetricsCards job={job} report={report} />
+      {report?.optimized_metrics.holdout ? (
+        <HoldoutValidationSummary holdout={report.optimized_metrics.holdout} />
+      ) : null}
       <SectionCard
-        title="Best candidate replay"
-        description="Trajectory replay renders on Trial Detail using telemetry/trajectory artifacts."
+        title={t("jobDetail.bestReplay")}
+        description={t("jobDetail.bestReplayDescription")}
       >
         {bestTrial ? (
-          <Link to={`/trials/${bestTrial.id}`}>Open best trial replay</Link>
+          <Link to={`/trials/${bestTrial.id}`}>{t("jobDetail.openBestReplay")}</Link>
         ) : (
           <Empty
-            title="Replay unavailable"
-            description="No best trial is available yet."
+            title={t("trajectory.unavailable")}
+            description={t("jobDetail.noBestTrial")}
           />
         )}
       </SectionCard>
@@ -340,10 +371,10 @@ export function JobDetail() {
           <SectionCard
             title={
               job.status === "FAILED"
-                ? "Best-so-far: Baseline vs Optimized comparison"
-                : "Baseline vs Optimized comparison"
+                ? t("jobDetail.bestSoFarComparison")
+                : t("comparison.ariaLabel")
             }
-            description="Optimized candidate vs. baseline across the core metrics."
+            description={t("jobDetail.comparisonDescription")}
           >
             <ComparisonChart data={report.comparison} />
           </SectionCard>
@@ -351,8 +382,8 @@ export function JobDetail() {
           <BestParametersSection job={job} report={report} />
 
           <SectionCard
-            title="Summary"
-            description="Deterministic local summary — no external LLM call."
+            title={t("jobDetail.summary")}
+            description={t("jobDetail.summaryDescription")}
           >
             <p style={{ margin: 0 }}>{report.summary_text}</p>
           </SectionCard>
@@ -360,28 +391,28 @@ export function JobDetail() {
       ) : null}
 
       {reportEnabled && reportQuery.isError && job.status === "COMPLETED" ? (
-        <Alert tone="danger" title="Report unavailable">
+        <Alert tone="danger" title={t("jobDetail.reportUnavailable")}>
           {reportQuery.error instanceof ApiClientError
             ? reportQuery.error.message
-            : "Could not load the job report."}
+            : t("jobDetail.reportUnavailableBody")}
         </Alert>
       ) : null}
 
       <SectionCard
-        title="Optimization search insights"
-        description="Generation convergence, per-candidate evidence, and a score/pass-rate Pareto-style view derived from completed trials."
+        title={t("jobDetail.insights")}
+        description={t("jobDetail.insightsDescription")}
       >
         {trialsQuery.isLoading ? (
-          <Loading label="Loading optimization evidence…" />
+          <Loading label={t("jobDetail.loadingEvidence")} />
         ) : trialsQuery.isError ? (
           <div className="insight-empty">
-            Search charts are unavailable because trial data could not be loaded.
+            {t("jobDetail.insightsUnavailable")}
           </div>
         ) : (
           <>
             {candidatesQuery.isError ? (
               <p className="form-hint insight-fallback-note">
-                The advanced candidate/Pareto endpoint is unavailable; this view is derived from trial summaries.
+                {t("jobDetail.insightsFallback")}
               </p>
             ) : null}
             <OptimizationInsights
@@ -393,28 +424,28 @@ export function JobDetail() {
       </SectionCard>
 
       <SectionCard
-        title="Trials"
-        description="Per-candidate evaluation runs for this job."
+        title={t("jobDetail.trials")}
+        description={t("jobDetail.trialsDescription")}
       >
         {trialsQuery.isLoading ? (
-          <Loading label="Loading trials…" />
+          <Loading label={t("jobDetail.loadingTrials")} />
         ) : trialsQuery.isError ? (
           <ErrorState
             description={
               trialsQuery.error instanceof ApiClientError
                 ? trialsQuery.error.message
-                : "Failed to load trials."
+                : t("jobDetail.trialsLoadFailed")
             }
           />
         ) : (
           <DataTable
-            columns={buildTrialColumns(job.optimizer_strategy)}
+            columns={buildTrialColumns(job.optimizer_strategy, t)}
             rows={trials}
             rowKey={(t) => t.id}
             emptyState={
               <Empty
-                title="No trials yet"
-                description="Trials will appear here once the worker starts dispatching them."
+                title={t("jobDetail.noTrials")}
+                description={t("jobDetail.noTrialsDescription")}
               />
             }
           />
@@ -423,20 +454,20 @@ export function JobDetail() {
 
       {artifactsEnabled ? (
         <ArtifactsPanel
-          title="Artifacts"
-          description="Job-level artifacts and per-trial artifacts recorded by the backend."
+          title={t("artifacts.title")}
+          description={t("jobDetail.artifactsDescription")}
           isLoading={artifactsQuery.isLoading}
-          emptyDescription="Artifacts will appear once a completed job has generated report or trial outputs."
+          emptyDescription={t("jobDetail.artifactsEmpty")}
           sections={[
             {
-              heading: `Job artifacts (${artifacts.filter((a) => a.owner_type === "job").length})`,
+              heading: t("trial.jobArtifacts", { count: artifacts.filter((a) => a.owner_type === "job").length }),
               artifacts: artifacts.filter((a) => a.owner_type === "job"),
-              emptyNote: "No job-level artifacts yet.",
+              emptyNote: t("jobDetail.noJobArtifacts"),
             },
             {
-              heading: `Trial artifacts (${artifacts.filter((a) => a.owner_type === "trial").length})`,
+              heading: t("trial.trialArtifacts", { count: artifacts.filter((a) => a.owner_type === "trial").length }),
               artifacts: artifacts.filter((a) => a.owner_type === "trial"),
-              emptyNote: "No trial-level artifacts yet.",
+              emptyNote: t("jobDetail.noTrialArtifacts"),
             },
           ]}
         />
@@ -462,21 +493,26 @@ function JobHeader({
   cancelPending: boolean;
   canCancel: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <header className="page-header">
       <div>
         <h1>
-          Job <code>{job.id}</code>
+          {t("jobDetail.job")} <code>{job.id}</code>
         </h1>
         <p className="page-header-subtitle">
-          Created {formatDateTime(job.created_at)} · Updated{" "}
-          {formatDateTime(job.updated_at)}
+          {t("jobDetail.createdUpdated", {
+            created: formatDateTime(job.created_at),
+            updated: formatDateTime(job.updated_at),
+          })}
         </p>
       </div>
       <div className="page-header-actions">
         <StatusBadge status={job.status} />
         {isActiveJobStatus(job.status) ? (
-          <span className="form-hint">Polling every {ACTIVE_POLL_INTERVAL_MS / 1000}s…</span>
+          <span className="form-hint">
+            {t("jobDetail.polling", { seconds: ACTIVE_POLL_INTERVAL_MS / 1000 })}
+          </span>
         ) : null}
         {canCancel ? (
           <button
@@ -485,7 +521,7 @@ function JobHeader({
             onClick={onCancel}
             disabled={cancelPending}
           >
-            {cancelPending ? "Cancelling…" : "Cancel"}
+            {cancelPending ? t("jobDetail.cancelling") : t("jobDetail.cancel")}
           </button>
         ) : null}
         <button
@@ -494,7 +530,7 @@ function JobHeader({
           onClick={onRerun}
           disabled={rerunPending}
         >
-          {rerunPending ? "Rerunning…" : "Rerun"}
+          {rerunPending ? t("jobDetail.rerunning") : t("jobDetail.rerun")}
         </button>
       </div>
     </header>
@@ -502,6 +538,7 @@ function JobHeader({
 }
 
 function JobSummaryCard({ job }: { job: Job }) {
+  const { t } = useI18n();
   const customPreview = (job.reference_track ?? []).slice(0, 5);
   const advanced = job.advanced_scenario_config;
   const obstacleCount = advanced?.obstacles?.length ?? 0;
@@ -509,30 +546,30 @@ function JobSummaryCard({ job }: { job: Job }) {
   const gust = advanced?.wind_gusts;
   const battery = advanced?.battery;
   return (
-    <SectionCard title="Job summary">
+    <SectionCard title={t("jobDetail.jobSummary")}>
       <ul className="kv-list">
         <li>
-          <span className="kv-key">Track type</span>
+          <span className="kv-key">{t("jobDetail.trackType")}</span>
           <span className="kv-value">{job.track_type}</span>
         </li>
         {job.track_type === "custom" ? (
           <li>
-            <span className="kv-key">Custom track</span>
+            <span className="kv-key">{t("jobDetail.customTrack")}</span>
             <span className="kv-value">
-              {(job.reference_track ?? []).length} points
+              {t("jobDetail.trackPoints", { count: (job.reference_track ?? []).length })}
               {customPreview.length > 0
-                ? ` · preview ${JSON.stringify(customPreview)}`
+                ? ` · ${t("jobDetail.preview")} ${JSON.stringify(customPreview)}`
                 : ""}
             </span>
           </li>
         ) : null}
         <li>
-          <span className="kv-key">Objective profile</span>
+          <span className="kv-key">{t("jobDetail.objectiveProfile")}</span>
           <span className="kv-value">{job.objective_profile}</span>
         </li>
         {job.vehicle_profile ? (
           <li>
-            <span className="kv-key">Vehicle / firmware</span>
+            <span className="kv-key">{t("jobDetail.vehicleFirmware")}</span>
             <span className="kv-value">
               {job.vehicle_profile.airframe} · {job.vehicle_profile.simulator_model} · PX4 {job.vehicle_profile.px4_version}
               {job.vehicle_profile.firmware_commit ? ` @ ${job.vehicle_profile.firmware_commit}` : ""}
@@ -541,47 +578,56 @@ function JobSummaryCard({ job }: { job: Job }) {
         ) : null}
         {job.parameter_space && job.parameter_space.length > 0 ? (
           <li>
-            <span className="kv-key">Tunable PX4 parameters</span>
+            <span className="kv-key">{t("jobDetail.tunableParameters")}</span>
             <span className="kv-value">
-              {job.parameter_space.filter((parameter) => parameter.enabled && !parameter.locked).length} dimensions · {job.parameter_space.map((parameter) => parameter.name).join(", ")}
+              {t("jobDetail.dimensions", { count: job.parameter_space.filter((parameter) => parameter.enabled && !parameter.locked).length })} · {job.parameter_space.map((parameter) => parameter.name).join(", ")}
             </span>
           </li>
         ) : null}
         {job.scenario_suite ? (
           <li>
-            <span className="kv-key">Scenario suite</span>
+            <span className="kv-key">{t("jobDetail.scenarioSuite")}</span>
             <span className="kv-value">
-              {job.scenario_suite.cases.filter((scenario) => scenario.enabled && !scenario.holdout).length} search cases · {job.scenario_suite.cases.filter((scenario) => scenario.enabled && scenario.holdout).length} holdout cases · matched randomness {job.scenario_suite.common_random_numbers ? "on" : "off"}
+              {t("jobDetail.scenarioSuiteValue", {
+                search: job.scenario_suite.cases.filter((scenario) => scenario.enabled && !scenario.holdout).length,
+                holdout: job.scenario_suite.cases.filter((scenario) => scenario.enabled && scenario.holdout).length,
+                matched: job.scenario_suite.common_random_numbers ? t("common.yes") : t("common.no"),
+              })}
             </span>
           </li>
         ) : null}
         <li>
-          <span className="kv-key">Altitude</span>
+          <span className="kv-key">{t("jobDetail.altitude")}</span>
           <span className="kv-value">{job.altitude_m} m</span>
         </li>
         <li>
-          <span className="kv-key">Start point</span>
+          <span className="kv-key">{t("jobDetail.startPoint")}</span>
           <span className="kv-value">
             ({job.start_point.x}, {job.start_point.y})
           </span>
         </li>
         <li>
-          <span className="kv-key">Sensor noise</span>
+          <span className="kv-key">{t("jobDetail.sensorNoise")}</span>
           <span className="kv-value">{job.sensor_noise_level}</span>
         </li>
         <li>
-          <span className="kv-key">Wind (N/E/S/W)</span>
+          <span className="kv-key">{t("jobDetail.wind")}</span>
           <span className="kv-value">
             {job.wind.north} / {job.wind.east} / {job.wind.south} /{" "}
             {job.wind.west}
           </span>
         </li>
         <li>
-          <span className="kv-key">Advanced scenario</span>
+          <span className="kv-key">{t("jobDetail.advancedScenario")}</span>
           <span className="kv-value">
             {advanced
-              ? `enabled · gust=${gust?.enabled ? "on" : "off"} · obstacles=${obstacleCount} · dropout=${dropout ?? 0} · battery=${battery?.initial_percent ?? 100}%`
-              : "disabled"}
+              ? t("jobDetail.advancedScenarioValue", {
+                  gust: gust?.enabled ? t("common.yes") : t("common.no"),
+                  obstacles: obstacleCount,
+                  dropout: dropout ?? 0,
+                  battery: battery?.initial_percent ?? 100,
+                })
+              : t("jobDetail.disabled")}
           </span>
         </li>
       </ul>
@@ -590,66 +636,70 @@ function JobSummaryCard({ job }: { job: Job }) {
 }
 
 function ExecutionBackendCard({ job }: { job: Job }) {
+  const { t } = useI18n();
   const ac = job.acceptance_criteria;
   return (
     <SectionCard
-      title="Execution Backend & Auto-Tuning"
-      description="Simulator backend, optimizer strategy, and acceptance criteria for this job."
+      title={t("jobDetail.execution")}
+      description={t("jobDetail.executionDescription")}
     >
       <ul className="kv-list">
         <li>
-          <span className="kv-key">Simulator backend</span>
+          <span className="kv-key">{t("trial.simulatorBackend")}</span>
           <span className="kv-value">
             <code>{job.simulator_backend_requested}</code>
           </span>
         </li>
         <li>
-          <span className="kv-key">Optimizer strategy</span>
+          <span className="kv-key">{t("job.optimizerStrategy")}</span>
           <span className="kv-value">
-            <code>{job.optimizer_strategy}</code>
+            <strong>{optimizerStrategyLabel(job.optimizer_strategy, t)}</strong>
+            <span className="form-hint">
+              {" "}· {optimizerStrategyDescription(job.optimizer_strategy, t)}
+            </span>
             {job.openai_model ? (
-              <span className="form-hint"> · model {job.openai_model}</span>
+              <span className="form-hint"> · {t("jobDetail.model")} {job.openai_model}</span>
             ) : null}
             {job.llm_provider ? (
-              <span className="form-hint"> · provider {job.llm_provider}</span>
+              <span className="form-hint"> · {t("jobDetail.provider")} {job.llm_provider}</span>
             ) : null}
           </span>
         </li>
         <li>
-          <span className="kv-key">Current generation</span>
+          <span className="kv-key">{t("jobDetail.currentGeneration")}</span>
           <span className="kv-value">
-            {job.current_generation} of max {job.max_iterations}
+            {t("jobDetail.generationValue", { current: job.current_generation, max: job.max_iterations })}
           </span>
         </li>
         <li>
-          <span className="kv-key">Trials per candidate</span>
+          <span className="kv-key">{t("jobDetail.trialsPerCandidate")}</span>
           <span className="kv-value">{job.trials_per_candidate}</span>
         </li>
         {job.max_total_trials ? (
           <li>
-            <span className="kv-key">Maximum total trials</span>
+            <span className="kv-key">{t("jobDetail.maximumTrials")}</span>
             <span className="kv-value">{job.max_total_trials}</span>
           </li>
         ) : null}
         <li>
-          <span className="kv-key">Acceptance criteria</span>
+          <span className="kv-key">{t("jobDetail.acceptanceCriteria")}</span>
           <span className="kv-value">
             {ac.target_rmse !== null ? (
               <>RMSE ≤ {formatNumber(ac.target_rmse)} m · </>
             ) : null}
             {ac.target_max_error !== null ? (
-              <>max error ≤ {formatNumber(ac.target_max_error)} m · </>
+              <>{t("jobDetail.maxErrorLower", { value: formatNumber(ac.target_max_error) })} · </>
             ) : null}
             {/* Phase 8 polish: "pass rate" means the per-trial pass_flag rate
                 (fraction of dispatched trials whose pass_flag is true), NOT
                 the execution-completion ratio. The outcome only reports
                 "success" when this rate meets the threshold. */}
-            trial pass rate ≥ {Math.round(ac.min_pass_rate * 100)}%
+            {t("jobDetail.passRateHigher", { value: Math.round(ac.min_pass_rate * 100) })}
           </span>
         </li>
         {job.optimization_outcome ? (
           <li>
-            <span className="kv-key">Outcome</span>
+            <span className="kv-key">{t("jobDetail.outcome")}</span>
             <span className="kv-value">
               <code>{job.optimization_outcome}</code>
             </span>
@@ -661,29 +711,47 @@ function ExecutionBackendCard({ job }: { job: Job }) {
 }
 
 function ProgressSection({ job }: { job: Job }) {
+  const { t } = useI18n();
   const { completed_trials, total_trials, current_phase } = job.progress;
-  const pct =
-    total_trials > 0 ? Math.min(100, (completed_trials / total_trials) * 100) : 0;
+  const pct = total_trials > 0
+    ? Math.max(0, Math.min(100, (completed_trials / total_trials) * 100))
+    : 0;
   const active = isActiveJobStatus(job.status);
   return (
     <SectionCard
-      title="Progress"
+      title={t("jobDetail.progress")}
       description={
         current_phase ? (
           <>
-            Current phase: <code>{current_phase}</code>
+            {t("jobDetail.currentPhase")}: <code>{current_phase}</code>
           </>
         ) : null
       }
     >
-      <div className="progress-bar">
+      <div
+        className="progress-bar"
+        role="progressbar"
+        aria-label={t("jobDetail.progress")}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(pct)}
+        aria-valuetext={t("jobDetail.progressValue", {
+          completed: completed_trials,
+          total: total_trials,
+          percent: pct.toFixed(0),
+        })}
+      >
         <div
           className={`progress-bar-fill${active ? " progress-bar-fill-active" : ""}`}
           style={{ width: `${pct}%` }}
         />
       </div>
       <div className="form-hint">
-        {completed_trials} / {total_trials} trials completed ({pct.toFixed(0)}%)
+        {t("jobDetail.progressValue", {
+          completed: completed_trials,
+          total: total_trials,
+          percent: pct.toFixed(0),
+        })}
       </div>
     </SectionCard>
   );
@@ -696,34 +764,32 @@ function StatusSpecificTop({
   job: Job;
   report: JobReport | undefined;
 }) {
+  const { t } = useI18n();
   if (job.status === "QUEUED") {
     return (
-      <Alert tone="info" title="Job queued">
-        The job is queued and waiting for a worker to pick it up. This page will
-        auto-refresh while the job is active.
+      <Alert tone="info" title={t("jobDetail.queuedTitle")}>
+        {t("jobDetail.queuedBody")}
       </Alert>
     );
   }
   if (job.status === "RUNNING") {
     return (
-      <Alert tone="info" title="Job running">
-        Baseline trials are being dispatched and executed by the worker. This
-        page auto-refreshes while the job is active.
+      <Alert tone="info" title={t("jobDetail.runningTitle")}>
+        {t("jobDetail.runningBody")}
       </Alert>
     );
   }
-  if (job.status === "AGGREGATING") {
+  if (job.status === "AGGREGATING" || job.status === "FINALIZING") {
     return (
-      <Alert tone="info" title="Aggregating results">
-        All trials have finished. The backend will select the best candidate and
-        emit a report.
+      <Alert tone="info" title={t("jobDetail.finalizingTitle")}>
+        {t("jobDetail.finalizingBody")}
       </Alert>
     );
   }
   if (job.status === "CANCELLED") {
     return (
-      <Alert tone="warning" title="Job cancelled">
-        Cancelled {formatDateTime(job.cancelled_at)}. No report was generated.
+      <Alert tone="warning" title={t("jobDetail.cancelledTitle")}>
+        {t("jobDetail.cancelledBody", { time: formatDateTime(job.cancelled_at) })}
       </Alert>
     );
   }
@@ -732,17 +798,17 @@ function StatusSpecificTop({
     const outcome = job.optimization_outcome;
     const hasBestSoFar = Boolean(report);
     const title = hasBestSoFar
-      ? "Job failed — best-so-far results available"
-      : "Job failed";
+      ? t("jobDetail.failedBestTitle")
+      : t("jobDetail.failedTitle");
     const outcomeLabel =
       outcome === "max_iterations_reached"
-        ? "Max iterations reached before any candidate passed the acceptance criteria."
+        ? t("jobDetail.outcomeMaxIterations")
         : outcome === "no_usable_candidate"
-          ? "No candidate produced usable metrics."
+          ? t("jobDetail.outcomeNoCandidate")
           : outcome === "llm_failed"
-            ? "GPT parameter proposer failed; see the job event log."
+            ? t("jobDetail.outcomeLlmFailed")
             : outcome === "simulator_unavailable"
-              ? "Simulator adapter was unavailable."
+              ? t("jobDetail.outcomeSimulatorUnavailable")
               : null;
     return (
       <Alert tone={hasBestSoFar ? "warning" : "danger"} title={title}>
@@ -751,12 +817,12 @@ function StatusSpecificTop({
             <strong>{err.code}</strong>: {err.message}
           </div>
         ) : (
-          <div>Failed with no detailed error reported.</div>
+          <div>{t("jobDetail.noDetailedError")}</div>
         )}
         {outcomeLabel ? <div style={{ marginTop: 4 }}>{outcomeLabel}</div> : null}
         {hasBestSoFar ? (
           <div style={{ marginTop: 4 }}>
-            Best-so-far parameters and baseline-vs-optimized metrics are shown below.
+            {t("jobDetail.bestSoFarBelow")}
           </div>
         ) : null}
       </Alert>
@@ -765,9 +831,8 @@ function StatusSpecificTop({
   if (job.status === "COMPLETED") {
     if (job.optimization_outcome === "success") {
       return (
-        <Alert tone="success" title="Acceptance criteria satisfied">
-          The tuning loop found a candidate that meets the configured acceptance
-          criteria.
+        <Alert tone="success" title={t("jobDetail.acceptanceSatisfied")}>
+          {t("jobDetail.acceptanceSatisfiedBody")}
         </Alert>
       );
     }
@@ -778,18 +843,17 @@ function StatusSpecificTop({
       return (
         <Alert
           tone="warning"
-          title="Search budget exhausted — showing best-so-far parameters"
+          title={t("jobDetail.budgetExhausted")}
         >
-          No candidate fully satisfied acceptance before the search budget was
-          exhausted.
+          {t("jobDetail.budgetExhaustedBody")}
         </Alert>
       );
     }
   }
   if (job.status === "COMPLETED" && !report) {
     return (
-      <Alert tone="info" title="Loading report…">
-        Fetching the final report.
+      <Alert tone="info" title={t("jobDetail.loadingReport")}>
+        {t("jobDetail.loadingReportBody")}
       </Alert>
     );
   }
@@ -803,41 +867,45 @@ function MetricsCards({
   job: Job;
   report: JobReport | undefined;
 }) {
+  const { t } = useI18n();
   if (
     (job.status === "COMPLETED" || job.status === "FAILED") &&
     report
   ) {
     const { baseline_metrics: b, optimized_metrics: o } = report;
     return (
-      <SectionCard title="Headline metrics">
+      <SectionCard title={t("jobDetail.headlineMetrics")}>
         <div className="metric-grid">
           <MetricCard
-            label="RMSE (optimized)"
+            label={t("jobDetail.rmseOptimized")}
             value={`${formatNumber(o.rmse)} m`}
-            sub={`baseline ${formatNumber(b.rmse)} m`}
+            sub={t("jobDetail.baselineMetric", { value: `${formatNumber(b.rmse)} m` })}
             tone="positive"
           />
           <MetricCard
-            label="Max error (optimized)"
-            value={`${formatNumber(o.max_error)} m`}
-            sub={`baseline ${formatNumber(b.max_error)} m`}
+            label={t("jobDetail.worstErrorOptimized")}
+            value={`${formatNumber(o.max_error_worst ?? o.max_error)} m`}
+            sub={t("jobDetail.errorComparison", {
+              baseline: formatNumber(b.max_error_worst ?? b.max_error),
+              mean: formatNumber(o.max_error_mean ?? o.max_error),
+            })}
             tone="positive"
           />
           <MetricCard
-            label="Overshoot (optimized)"
+            label={t("jobDetail.overshootOptimized")}
             value={o.overshoot_count}
-            sub={`baseline ${b.overshoot_count}`}
+            sub={t("jobDetail.baselineMetric", { value: b.overshoot_count })}
             tone="positive"
           />
           <MetricCard
-            label="Completion time"
+            label={t("trial.completionTime")}
             value={`${formatNumber(o.completion_time)} s`}
-            sub={`baseline ${formatNumber(b.completion_time)} s`}
+            sub={t("jobDetail.baselineMetric", { value: `${formatNumber(b.completion_time)} s` })}
           />
           <MetricCard
-            label="Score"
+            label={t("trial.score")}
             value={formatNumber(o.score)}
-            sub={`baseline ${formatNumber(b.score)}`}
+            sub={t("jobDetail.baselineMetric", { value: formatNumber(b.score) })}
             tone="positive"
           />
         </div>
@@ -846,18 +914,42 @@ function MetricsCards({
   }
 
   return (
-    <SectionCard title="Headline metrics">
+    <SectionCard title={t("jobDetail.headlineMetrics")}>
       <Empty
-        title="Metrics not ready"
+        title={t("jobDetail.metricsNotReady")}
         description={
           job.status === "FAILED"
-            ? "Job failed before a report could be generated."
+            ? t("jobDetail.metricsFailed")
             : job.status === "CANCELLED"
-              ? "Job was cancelled before completion."
-              : "Metrics will appear once the job completes."
+              ? t("jobDetail.metricsCancelled")
+              : t("jobDetail.metricsPending")
         }
       />
     </SectionCard>
+  );
+}
+
+function HoldoutValidationSummary({
+  holdout,
+}: {
+  holdout: NonNullable<JobReport["optimized_metrics"]["holdout"]>;
+}) {
+  const { t } = useI18n();
+  const tone = holdout.validation_status === "passed"
+    ? "success"
+    : holdout.validation_status === "incomplete"
+      ? "warning"
+      : "danger";
+  return (
+    <Alert tone={tone} title={t("jobDetail.holdoutTitle", { status: holdout.validation_status })}>
+      {t("jobDetail.holdoutBody", {
+        completed: holdout.completed_trial_count,
+        total: holdout.trial_count,
+        passed: holdout.passing_trial_count,
+        passRate: (holdout.pass_rate * 100).toFixed(1),
+        failureRate: (holdout.failure_rate * 100).toFixed(1),
+      })}
+    </Alert>
   );
 }
 
@@ -868,14 +960,15 @@ function BestParametersSection({
   job: Job;
   report: JobReport;
 }) {
+  const { t } = useI18n();
   const baselineWon = report.best_candidate_id === job.baseline_candidate_id;
   return (
     <SectionCard
-      title="Best parameters"
+      title={t("jobDetail.bestParameters")}
       description={
         baselineWon
-          ? "Baseline outperformed every optimizer candidate — baseline parameters are the recommended result."
-          : "Parameters from the winning optimizer candidate. Baseline shown for comparison."
+          ? t("jobDetail.baselineWinnerDescription")
+          : t("jobDetail.optimizerWinnerDescription")
       }
     >
       <div className="best-parameters-head">
@@ -884,7 +977,7 @@ function BestParametersSection({
             baselineWon ? "candidate-tag-baseline" : "candidate-tag-optimizer"
           }`}
         >
-          {baselineWon ? "Baseline winner" : "Optimizer winner"}
+          {baselineWon ? t("jobDetail.baselineWinner") : t("jobDetail.optimizerWinner")}
         </span>
         <code className="candidate-id">{report.best_candidate_id}</code>
       </div>
@@ -945,6 +1038,7 @@ function formatEventLine(e: JobEventInfo): string {
 }
 
 function DiagnosticsPanel({ job }: { job: Job }) {
+  const { t } = useI18n();
   const events = job.recent_events ?? [];
   // `recent_events` is returned newest-first by the backend. The log panel
   // reads naturally oldest-first, so reverse before formatting.
@@ -953,11 +1047,11 @@ function DiagnosticsPanel({ job }: { job: Job }) {
 
   return (
     <SectionCard
-      title="Diagnostics / logs"
+      title={t("jobDetail.diagnostics")}
       description={
         eventLines.length > 0
-          ? `Last ${events.length} structured job events from the backend.`
-          : "Structured job events derived from the backend job state."
+          ? t("jobDetail.diagnosticsEvents", { count: events.length })
+          : t("jobDetail.diagnosticsFallback")
       }
     >
       <pre className="log-panel">{lines.join("\n")}</pre>

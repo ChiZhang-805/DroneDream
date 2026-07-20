@@ -7,6 +7,7 @@ iterative GPT tuning loop to decide whether to stop or keep proposing.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from app import models
@@ -34,25 +35,53 @@ class AcceptanceResult:
     passed: bool
     reason: str
     pass_rate: float
-    """Fraction of dispatched trials whose per-trial ``pass_flag`` is true.
+    """Scenario-case-weighted fraction of seeds whose ``pass_flag`` is true.
 
-    This is the semantic definition used by the acceptance check: a candidate
-    is accepted only when enough trials *actually passed*, not merely when
-    they executed to completion. ``completion_rate`` captures the execution
-    ratio separately.
+    Each case first uses all dispatched seeds as its denominator, including
+    failed seeds, before case weights are applied. ``completion_rate`` uses
+    the same hierarchy for execution success.
     """
     completion_rate: float
     rmse: float | None
     max_error: float | None
+    """Worst observed trial max-error used by the acceptance threshold."""
 
 
 def _safe_float(value: object) -> float | None:
     try:
-        if value is None:
+        if value is None or isinstance(value, bool):
             return None
-        return float(value)  # type: ignore[arg-type]
+        parsed = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def _safe_rate(value: object) -> float | None:
+    parsed = _safe_float(value)
+    if parsed is None:
+        return None
+    return min(1.0, max(0.0, parsed))
+
+
+def _safe_nonnegative_int(value: object) -> int:
+    parsed = _safe_float(value)
+    if parsed is None or parsed < 0 or not parsed.is_integer():
+        return 0
+    return int(parsed)
+
+
+def _criteria_are_valid(criteria: AcceptanceCriteria) -> bool:
+    minimum_rate = _safe_float(criteria.min_pass_rate)
+    if minimum_rate is None or not 0.0 <= minimum_rate <= 1.0:
+        return False
+    for threshold in (criteria.target_rmse, criteria.target_max_error):
+        if threshold is None:
+            continue
+        parsed = _safe_float(threshold)
+        if parsed is None or parsed < 0:
+            return False
+    return True
 
 
 def evaluate_candidate(
@@ -61,39 +90,78 @@ def evaluate_candidate(
 ) -> AcceptanceResult:
     """Determine whether ``candidate`` satisfies the acceptance criteria.
 
-    Phase 8 polish: ``pass_rate`` is the fraction of *dispatched* trials whose
-    per-trial ``pass_flag`` is true, matching the product intent that
-    "success" means the candidate truly met the user's thresholds. The old
-    execution-completion ratio is exposed as ``completion_rate`` for UI /
-    diagnostics only.
+    ``pass_rate`` and ``completion_rate`` prefer the persisted case-weighted
+    rates. Legacy aggregates without those fields fall back to raw dispatched
+    trial counts.
     """
 
     agg = candidate.aggregated_metric_json or {}
-    trial_count = max(
-        1,
-        int(agg.get("training_trial_count", candidate.trial_count or 0) or 0),
+    trial_count = _safe_nonnegative_int(
+        agg.get("training_trial_count", candidate.trial_count or 0)
     )
-    completed = int(
-        agg.get(
-            "training_completed_trial_count", candidate.completed_trial_count or 0
-        )
-        or 0
+    completed = min(
+        trial_count,
+        _safe_nonnegative_int(
+            agg.get(
+                "training_completed_trial_count",
+                candidate.completed_trial_count or 0,
+            )
+        ),
     )
-    completion_rate = completed / trial_count if trial_count > 0 else 0.0
+    stored_completion_rate = _safe_rate(agg.get("training_completion_rate"))
+    if (
+        stored_completion_rate is None
+        and agg.get("rate_aggregation") == "scenario_case_weighted_v1"
+    ):
+        stored_completion_rate = _safe_rate(agg.get("completion_rate"))
+    completion_rate = (
+        stored_completion_rate
+        if stored_completion_rate is not None
+        else completed / trial_count if trial_count > 0 else 0.0
+    )
 
     rmse = _safe_float(agg.get("rmse"))
-    max_error = _safe_float(agg.get("max_error"))
-    passing = int(
-        agg.get(
-            "training_passing_trial_count", agg.get("passing_trial_count", 0)
-        )
-        or 0
+    # ``max_error`` historically contains the completed-trial mean. New
+    # aggregates retain it for compatibility while acceptance uses the worst
+    # observed trial excursion.
+    max_error = _safe_float(agg.get("max_error_worst", agg.get("max_error")))
+    passing = min(
+        trial_count,
+        _safe_nonnegative_int(
+            agg.get(
+                "training_passing_trial_count",
+                agg.get("passing_trial_count", 0),
+            )
+        ),
     )
-    pass_rate = passing / trial_count if trial_count > 0 else 0.0
+    stored_pass_rate = _safe_rate(agg.get("training_pass_rate"))
+    if (
+        stored_pass_rate is None
+        and agg.get("rate_aggregation") == "scenario_case_weighted_v1"
+    ):
+        stored_pass_rate = _safe_rate(agg.get("pass_rate"))
+    pass_rate = (
+        stored_pass_rate
+        if stored_pass_rate is not None
+        else passing / trial_count if trial_count > 0 else 0.0
+    )
 
-    if candidate.aggregated_metric_json is None:
+    if not _criteria_are_valid(criteria):
+        return AcceptanceResult(
+            False, "invalid_criteria", pass_rate, completion_rate, rmse, max_error
+        )
+    if candidate.aggregated_metric_json is None or trial_count == 0:
         return AcceptanceResult(
             False, "no_metrics", pass_rate, completion_rate, rmse, max_error
+        )
+    if completed == 0:
+        return AcceptanceResult(
+            False,
+            "no_completed_trials",
+            pass_rate,
+            completion_rate,
+            rmse,
+            max_error,
         )
     if pass_rate < criteria.min_pass_rate:
         return AcceptanceResult(
@@ -120,7 +188,11 @@ def evaluate_candidate(
 def any_criterion_set(criteria: AcceptanceCriteria) -> bool:
     """Return ``True`` if at least one numeric threshold is configured."""
 
-    return criteria.target_rmse is not None or criteria.target_max_error is not None
+    return (
+        criteria.target_rmse is not None
+        or criteria.target_max_error is not None
+        or criteria.min_pass_rate > 0
+    )
 
 
 __all__ = [

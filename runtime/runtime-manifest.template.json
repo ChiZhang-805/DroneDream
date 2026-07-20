@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "version": null,
+  "runtimeId": null,
+  "target": {
+    "os": "ubuntu",
+    "version": null,
+    "codename": null,
+    "arch": "amd64",
+    "format": "wsl2-rootfs-tar"
+  },
+  "source": {"droneDreamCommit": null},
+  "components": {"backend": null, "px4": null, "gazebo": null},
+  "componentDetails": {},
+  "locks": {},
+  "smokeTests": {"px4Sitl": false, "gazebo": false, "parameterReadback": false},
+  "smokeReport": null,
+  "artifact": null
+}

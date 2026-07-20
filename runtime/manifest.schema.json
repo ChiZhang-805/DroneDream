@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/runtime-manifest.v1.json",
+  "title": "DroneDreamRuntime manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "version",
+    "runtimeId",
+    "target",
+    "source",
+    "components",
+    "componentDetails",
+    "locks",
+    "smokeTests",
+    "smokeReport",
+    "artifact"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "runtimeId": {"type": "string", "format": "uuid"},
+    "target": {
+      "type": "object",
+      "required": ["os", "version", "codename", "arch", "format"],
+      "additionalProperties": false,
+      "properties": {
+        "os": {"const": "ubuntu"},
+        "version": {"type": "string"},
+        "codename": {"type": "string"},
+        "arch": {"const": "amd64"},
+        "format": {"const": "wsl2-rootfs-tar"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["droneDreamCommit"],
+      "additionalProperties": false,
+      "properties": {
+        "droneDreamCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "components": {
+      "type": "object",
+      "required": ["backend", "px4", "gazebo"],
+      "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "componentDetails": {"type": "object"},
+    "locks": {"type": "object"},
+    "smokeTests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["px4Sitl", "gazebo", "parameterReadback"],
+      "properties": {
+        "px4Sitl": {"type": "boolean"},
+        "gazebo": {"type": "boolean"},
+        "parameterReadback": {"type": "boolean"}
+      }
+    },
+    "smokeReport": {"type": ["object", "null"]},
+    "artifact": {"type": ["object", "null"]}
+  }
+}

@@ -17,6 +17,13 @@ from pathlib import Path
 import pytest
 
 
+def _clear_settings_cache() -> None:
+    """Clear the currently loaded config module, not a stale pre-reload alias."""
+
+    config_module = importlib.import_module("app.config")
+    config_module.get_settings.cache_clear()
+
+
 @pytest.fixture()
 def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     """Reload the backend against an isolated SQLite DB."""
@@ -206,6 +213,7 @@ def test_score_comparison_point_is_lower_is_better(ctx):
         {
             "rmse": 1.0,
             "max_error": 1.0,
+            "max_error_worst": 2.0,
             "overshoot_count": 1,
             "completion_time": 10.0,
             "score": 5.0,
@@ -213,6 +221,7 @@ def test_score_comparison_point_is_lower_is_better(ctx):
         {
             "rmse": 0.8,
             "max_error": 0.9,
+            "max_error_worst": 1.5,
             "overshoot_count": 0,
             "completion_time": 9.0,
             "score": 4.0,
@@ -220,6 +229,10 @@ def test_score_comparison_point_is_lower_is_better(ctx):
     )
     score_point = next(p for p in points if p["metric"] == "score")
     assert score_point["lower_is_better"] is True
+    worst_point = next(p for p in points if p["metric"] == "max_error_worst")
+    assert worst_point["label"] == "Worst max error"
+    assert worst_point["baseline"] == 2.0
+    assert worst_point["optimized"] == 1.5
 
 
 # --- Artifacts ------------------------------------------------------------
@@ -321,6 +334,7 @@ def test_real_cli_job_artifacts_are_real_files_and_idempotent(ctx, tmp_path, mon
     models = ctx["models"]
     db_module = ctx["db_module"]
     monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
 
     with db_module.SessionLocal() as db:
         job = models.Job(
@@ -401,6 +415,7 @@ def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
     models = ctx["models"]
     db_module = ctx["db_module"]
     monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
 
     with db_module.SessionLocal() as db:
         job = models.Job(
@@ -479,6 +494,14 @@ def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
             .all()
         )
         assert len(rows) == 1
+
+
+def test_pdf_renderer_uses_unicode_cid_font_for_chinese_text() -> None:
+    from app.services.pdf_report import _build_pdf
+
+    pdf = _build_pdf(["蝶 梦 水 云 乡"])
+    assert b"/Encoding /UniGB-UCS2-H" in pdf
+    assert "蝶 梦 水 云 乡".encode("utf-16-be").hex().upper().encode("ascii") in pdf
 
 
 def test_generate_job_pdf_report_creates_expected_file(ctx, tmp_path):
@@ -678,12 +701,15 @@ def test_generate_job_pdf_report_paginates_and_includes_all_candidates_trials(ct
         assert path.exists()
         assert path.name == f"{job.id} report.pdf"
         assert body.startswith(b"%PDF")
-        assert b"cand_large_000" in body
-        assert b"cand_large_020" in body
-        assert b"tri_large_000" in body
-        assert b"tri_large_063" in body
-        assert b"Page 1 /" in body
-        assert b"Page 2 /" in body
+        def pdf_text(value: str) -> bytes:
+            return value.encode("utf-16-be").hex().upper().encode("ascii")
+
+        assert pdf_text("cand_large_000") in body
+        assert pdf_text("cand_large_020") in body
+        assert pdf_text("tri_large_000") in body
+        assert pdf_text("tri_large_063") in body
+        assert pdf_text("Page 1 /") in body
+        assert pdf_text("Page 2 /") in body
 
 
 def test_generate_job_pdf_report_excludes_secret_values(ctx, tmp_path):
@@ -790,6 +816,9 @@ def test_repro_manifest_generated_for_mock_job(ctx):
         assert "track_type" in payload["job"]
         assert "acceptance_criteria" in payload["job"]
         assert "candidate_summaries" in payload["optimizer"]
+        candidate_summary = payload["optimizer"]["candidate_summaries"][0]
+        assert "parameters" in candidate_summary
+        assert "aggregated_feedback" in candidate_summary
 
 
 def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
@@ -797,6 +826,7 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
     models = ctx["models"]
     db_module = ctx["db_module"]
     monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
 
     with db_module.SessionLocal() as db:
         job = models.Job(
@@ -807,6 +837,34 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
             status="COMPLETED",
             simulator_backend_requested="real_cli",
             openai_model="gpt-4.1-mini",
+            baseline_parameter_json={"kp_xy": 1.0},
+            vehicle_profile_json={
+                "px4_version": "v1.16",
+                "vehicle_type": "multicopter",
+                "airframe": "quad_x",
+                "simulator_model": "gz_x500",
+                "world": "baylands",
+                "headless": True,
+                "simulation_speed_factor": 2.0,
+                "instance_id": 3,
+            },
+            parameter_catalog_version="dronedream.px4.multicopter.2026-07-r2",
+            parameter_space_json=[
+                {
+                    "name": "MPC_XY_P",
+                    "enabled": True,
+                    "locked": False,
+                    "baseline": 0.95,
+                    "minimum": 0.6,
+                    "maximum": 1.3,
+                }
+            ],
+            objective_config_json={
+                "objectives": [{"metric": "rmse", "direction": "minimize"}]
+            },
+            scenario_suite_json={
+                "cases": [{"scenario_type": "wind", "seeds": [101]}]
+            },
             advanced_scenario_config_json={
                 "wind_gusts": {"enabled": True},
                 "service_token": "should-not-appear",
@@ -834,6 +892,7 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
                 job_id=job.id,
                 candidate_id=candidate.id,
                 scenario_type="nominal",
+                scenario_config_json={"wind_scale": 1.25},
                 seed=101,
                 status="COMPLETED",
             )
@@ -853,6 +912,16 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
         assert not artifact.storage_path.startswith("mock://")
         payload = json.loads(Path(artifact.storage_path).read_text(encoding="utf-8"))
         assert payload["simulator"]["real_simulator_artifact_root"] == str(tmp_path)
+        assert payload["manifest_schema_version"] == "dronedream.repro.v2"
+        config = payload["job"]["job_config"]
+        assert config["vehicle_profile_json"]["simulation_speed_factor"] == 2.0
+        assert config["vehicle_profile_json"]["instance_id"] == 3
+        assert config["parameter_catalog_version"].endswith("2026-07-r2")
+        assert config["parameter_space_json"][0]["name"] == "MPC_XY_P"
+        assert config["objective_config_json"]["objectives"][0]["metric"] == "rmse"
+        assert config["scenario_suite_json"]["cases"][0]["seeds"] == [101]
+        assert payload["trials"][0]["scenario_config_json"] == {"wind_scale": 1.25}
+        assert payload["simulator"]["effective_vehicle_profile"]["world"] == "baylands"
 
 
 def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
@@ -864,6 +933,7 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
     monkeypatch.setenv("APP_SECRET_KEY", "top-secret")
     monkeypatch.setenv("SERVICE_TOKEN", "tok-secret")
     monkeypatch.setenv("DB_PASSWORD", "db-secret")
+    _clear_settings_cache()
 
     with db_module.SessionLocal() as db:
         job = models.Job(
@@ -929,7 +999,7 @@ def test_build_job_report_lines_includes_new_sections(ctx):
             simulator_backend_requested="real_cli",
             target_rmse=0.8,
             target_max_error=1.0,
-            min_pass_rate=0.9,
+            min_pass_rate=0.0,
         )
         db.add(job)
         db.flush()
@@ -938,7 +1008,12 @@ def test_build_job_report_lines_includes_new_sections(ctx):
             source_type="baseline",
             label="baseline",
             parameter_json={"kp_xy": 1.0, "openai_api_key": "never-print"},
-            aggregated_metric_json={"rmse": 1.0, "max_error": 1.2, "completion_time": 10.0},
+            aggregated_metric_json={
+                "rmse": 1.0,
+                "max_error": 1.2,
+                "max_error_worst": 2.0,
+                "completion_time": 10.0,
+            },
             is_baseline=True,
         )
         best = models.CandidateParameterSet(
@@ -946,8 +1021,23 @@ def test_build_job_report_lines_includes_new_sections(ctx):
             source_type="optimizer",
             label="best-cand",
             parameter_json={"kp_xy": 1.2},
-            aggregated_metric_json={"rmse": 0.7, "max_error": 0.9, "completion_time": 9.0},
+            aggregated_metric_json={
+                "rmse": 0.7,
+                "max_error": 0.9,
+                "max_error_worst": 4.0,
+                "completion_time": 9.0,
+                "holdout": {
+                    "validation_status": "incomplete",
+                    "feasible": False,
+                    "completed_trial_count": 1,
+                    "trial_count": 2,
+                    "pass_rate": 0.5,
+                    "failure_rate": 0.5,
+                },
+            },
             is_best=True,
+            trial_count=1,
+            completed_trial_count=1,
         )
         db.add_all([baseline, best])
         db.flush()
@@ -995,6 +1085,9 @@ def test_build_job_report_lines_includes_new_sections(ctx):
         assert "Artifact index" in text
         assert "Failure appendix" in text
         assert "Reproducibility manifest artifact available" in text
+        assert "evaluator=max_error_above_target" in text
+        assert "worst_max_error=4.000" in text
+        assert "Holdout validation: status=incomplete" in text
         assert "never-print" not in text
 
 

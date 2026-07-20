@@ -69,6 +69,11 @@ _PRIMES = (
     293,
 )
 
+# Public capability used by optimizers that can fall back to seeded random
+# designs in very high-dimensional PX4 catalogs.  Keeping the boundary here
+# prevents callers from duplicating (and drifting from) the prime table size.
+MAX_HALTON_DIMENSIONS = len(_PRIMES)
+
 
 def _radical_inverse(index: int, base: int) -> float:
     result = 0.0
@@ -95,8 +100,10 @@ def halton_design(
     if start_index < 1:
         raise ValueError("start_index must be >= 1")
     dimensions = len(search_space.tunable)
-    if dimensions > len(_PRIMES):
-        raise ValueError(f"Halton design supports at most {len(_PRIMES)} dimensions")
+    if dimensions > MAX_HALTON_DIMENSIONS:
+        raise ValueError(
+            f"Halton design supports at most {MAX_HALTON_DIMENSIONS} dimensions"
+        )
     if count == 0:
         return []
 
@@ -117,10 +124,19 @@ def halton_design(
     attempts = 0
     while len(candidates) < count and attempts < max_attempts:
         vector = [_radical_inverse(index, _PRIMES[dim]) for dim in range(dimensions)]
-        append_unique(search_space.from_unit_vector(vector))
+        candidate: dict[str, float] | None
+        try:
+            candidate = search_space.from_unit_vector(vector)
+        except ValueError:
+            # Coupled catalog constraints can make only part of the
+            # rectangular unit cube feasible. Deterministically skip invalid
+            # points and continue the low-discrepancy sequence.
+            candidate = None
+        if candidate is not None:
+            append_unique(candidate)
         index += 1
         attempts += 1
     return candidates
 
 
-__all__ = ["halton_design"]
+__all__ = ["MAX_HALTON_DIMENSIONS", "halton_design"]

@@ -1,20 +1,16 @@
 # 05-api-reference.md
 
-> **Note on this revision.** The previously committed copy of this file had
-> every Chinese sentence truncated mid-character, rendering most prose
-> unreadable. The structure, enum lists, endpoint paths, error codes, and
-> sample payloads have been preserved verbatim where they were intact; the
-> explanatory text has been restored in English to match the implementation
-> currently shipping on `main`. The normative contract (endpoints, envelope,
-> enums, validation rules) has not changed.
+> This is a human-readable guide to the public contract. The live
+> `/api/v1/openapi.json` document and strict Pydantic schemas are authoritative
+> for the complete field-level contract.
 
 ## 1. Document info
 
 - **Document Title**: DroneDream API Specification
 - **Version**: v1.1
 - **API Namespace**: `/api/v1`
-- **Audience**: Devin, frontend engineers, backend engineers, QA.
-- **Purpose**: Define the DroneDream MVP API contract — request/response
+- **Audience**: API consumers, frontend engineers, backend engineers, QA.
+- **Purpose**: Summarize the DroneDream API contract — request/response
   shape, status codes, error codes, and deployment boundary.
 
 ---
@@ -42,13 +38,15 @@
 
 ### 3.1 Enums (locked)
 
-- **Job status**: `CREATED | QUEUED | RUNNING | AGGREGATING | COMPLETED | FAILED | CANCELLED`
+- **Job status**: `CREATED | QUEUED | RUNNING | AGGREGATING | FINALIZING | COMPLETED | FAILED | CANCELLED`
 - **Trial status**: `PENDING | RUNNING | COMPLETED | FAILED | CANCELLED`
 - **Report status**: `PENDING | READY | FAILED`
-- **Track type**: `circle | u_turn | lemniscate`
+- **Track type**: `circle | u_turn | lemniscate | custom`
 - **Sensor noise**: `low | medium | high`
 - **Objective profile**: `stable | fast | smooth | robust | custom`
-- **Scenario type** (trial-level): `nominal | noise_perturbed | wind_perturbed | combined_perturbed`
+- **Scenario type** (trial-level): `nominal | noise_perturbed |
+  wind_perturbed | combined_perturbed | turbulence | gps_dropout |
+  payload_changed | battery_degraded | actuator_delay | custom`
 
 ---
 
@@ -112,7 +110,7 @@ status codes are advisory — clients should branch on `error.code`.
 | `JOB_ALREADY_CANCELLED` | 409 | Cancel was called on a job already in `CANCELLED`. |
 | `JOB_FAILED` | 409 | Report was requested for a job in the terminal `FAILED` state. `error.details.failure_code` gives the job-level cause (see §5.2). |
 | `JOB_CANCELLED` | 409 | Report was requested for a job in the terminal `CANCELLED` state. |
-| `REPORT_NOT_READY` | 409 | Report was requested while the job is still `CREATED / QUEUED / RUNNING / AGGREGATING`. |
+| `REPORT_NOT_READY` | 409 | Report was requested while the job is still `CREATED / QUEUED / RUNNING / AGGREGATING / FINALIZING`. |
 | `INTERNAL_ERROR` | 500 | Unhandled server error. Always includes a request-scoped message; `details` may be `null`. |
 
 ### 5.2 Job-level failure codes
@@ -133,7 +131,7 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 
 | Code | Meaning |
 |---|---|
-| `ADAPTER_UNAVAILABLE` | The configured `SimulatorAdapter` cannot be used (e.g. `SIMULATOR_BACKEND=real_stub`). |
+| `ADAPTER_UNAVAILABLE` | The requested simulator adapter is unavailable, disabled for the current environment, or missing its executable command. The internal `real_stub` adapter is test-only and is rejected outside `APP_ENV=test`. |
 | `SIMULATION_FAILED` | The adapter raised an error during execution. |
 | `WORKER_TIMEOUT` | The trial exceeded its per-trial budget. |
 
@@ -148,13 +146,31 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 | `GET` | `/api/v1/jobs/{job_id}` | Job detail including progress and latest error. |
 | `POST` | `/api/v1/jobs/{job_id}/rerun` | Clone config as a new `QUEUED` job. |
 | `POST` | `/api/v1/jobs/{job_id}/cancel` | Cancel a non-terminal job. |
+| `PATCH` | `/api/v1/jobs/{job_id}` | Update mutable job metadata. |
+| `DELETE` | `/api/v1/jobs/{job_id}` | Delete an eligible owned job. |
 | `GET` | `/api/v1/jobs/{job_id}/trials` | Per-job trial summaries. |
 | `GET` | `/api/v1/jobs/{job_id}/candidates` | Candidate history, feasibility, Pareto front, and recommendations. |
+| `POST` | `/api/v1/jobs/compare` | Compare owned experiments as JSON. |
+| `GET` | `/api/v1/jobs/compare.csv` | Download an owned experiment comparison as CSV. |
 | `GET` | `/api/v1/trials/{trial_id}` | Trial detail (metrics, failure reason, artifacts). |
 | `GET` | `/api/v1/jobs/{job_id}/report` | Job report (requires job in `COMPLETED`). |
 | `GET` | `/api/v1/jobs/{job_id}/artifacts` | Artifact metadata list. |
+| `GET` | `/api/v1/artifacts/{artifact_id}/download` | Authorized local/S3 artifact download. |
+| `POST/GET` | `/api/v1/batches` | Create or list batches. |
+| `GET` | `/api/v1/batches/{batch_id}` | Batch detail. |
+| `GET` | `/api/v1/batches/{batch_id}/jobs` | Jobs in a batch. |
+| `POST` | `/api/v1/batches/{batch_id}/cancel` | Cancel active jobs in a batch. |
+| `GET/POST` | `/api/v1/parameter-catalog/*` | Catalog discovery, presets, and selection validation. |
+| `GET` | `/api/v1/capabilities` | Advisory runtime/optimizer capability discovery. |
 
-`GET /health` lives **outside** `/api/v1` and is intentionally public.
+`GET /health`, `/health/live`, and `/health/ready` live **outside** `/api/v1`.
+
+List endpoints are bounded. `GET /api/v1/batches` accepts `page` (default 1)
+and `page_size` (default 100, maximum 200), and returns `items`, `page`,
+`page_size`, and `total`. `GET /api/v1/jobs/{job_id}/trials` keeps its array
+response for compatibility, accepts `page` (default 1) and `page_size`
+(default 200, maximum 500), and reports `X-Total-Count`, `X-Page`, and
+`X-Page-Size` response headers. Those headers are CORS-exposed.
 
 ---
 
@@ -162,7 +178,7 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 
 ### 7.1 `POST /api/v1/jobs`
 
-Request body (Phase 7 baseline — all Phase 8 fields below are optional):
+Minimal compatibility request (advanced experiment fields below are optional):
 
 ```json
 {
@@ -193,7 +209,10 @@ the full advanced experiment contract):
 ```
 
 - `simulator_backend`: `"mock"` (default) or `"real_cli"`.
-- `optimizer_strategy`: `"heuristic"` (default), `"none"`, `"cma_es"`, or `"gpt"`.
+- `optimizer_strategy`: `"heuristic"` (API default), `"none"`, `"cma_es"`,
+  `"gpt"`, or one of the seven experimental strategies:
+  `"constrained_mobo"`, `"multi_fidelity_mobo"`, `"turbo"`, `"saasbo"`,
+  `"surrogate_cma_es"`, `"bipop_cma_es"`, and `"optimizer_portfolio"`.
 - New clients should send provider credentials in `llm`; legacy `openai` remains accepted.
 - An API key is required **only** when `optimizer_strategy == "gpt"`;
   the server stores it encrypted (Fernet via `APP_SECRET_KEY`) and never
@@ -210,7 +229,8 @@ The job response echoes these fields (with every API key redacted):
 
 Validation errors:
 
-- `optimizer_strategy == "gpt"` without `openai.api_key` →
+- `optimizer_strategy == "gpt"` without `llm.api_key` (legacy
+  `openai.api_key` is also accepted) →
   `INVALID_INPUT`.
 - `optimizer_strategy == "gpt"` without server-side `APP_SECRET_KEY` →
   `INVALID_INPUT` (`details.reason = "server_secret_key_not_configured"`).
@@ -347,9 +367,18 @@ job-level failure code (see §5.2). For jobs still in flight, returns
 
 ### 9.2 `GET /api/v1/jobs/{job_id}/artifacts`
 
-Returns the metadata-only artifact list for a job. Each row has
-`artifact_type`, `display_name`, `storage_path` (a `mock://` URI in the
-MVP), `mime_type`, and timestamps. No bytes are served in the MVP.
+Returns the artifact metadata list for a job. Each row includes
+`artifact_type`, `display_name`, `storage_path`, `mime_type`, file size, and
+timestamps. Storage paths may identify mock, managed local, or S3-compatible
+objects.
+
+### 9.3 `GET /api/v1/artifacts/{artifact_id}/download`
+
+Downloads an owned managed-local artifact, or returns a short-lived redirect
+for an owned S3-compatible object when presigning is available. Mock artifacts
+are metadata-only and return `ARTIFACT_NOT_DOWNLOADABLE`. Missing objects,
+paths outside the configured artifact roots, and cross-user artifacts fail
+closed.
 
 ---
 
@@ -358,14 +387,15 @@ MVP), `mime_type`, and timestamps. No bytes are served in the MVP.
 Rejected by both Pydantic on the backend and by the New Job form on the
 frontend before submission:
 
-- `track_type` must be one of `circle | u_turn | lemniscate`.
+- `track_type` must be one of `circle | u_turn | lemniscate | custom`; custom
+  tracks require at least two finite reference points.
 - `altitude_m` must be in `[1.0, 20.0]`.
 - Every `wind.*` component must be in `[-10.0, 10.0]`.
 - `sensor_noise_level` must be one of `low | medium | high`.
 - `objective_profile` must be one of `stable | fast | smooth | robust | custom`.
 - Missing required fields are rejected with `INVALID_INPUT`.
-- Unknown fields on the request are ignored (Pydantic default), but new
-  fields must be documented here before clients rely on them.
+- Unknown request fields are rejected by the strict Pydantic models; clients
+  must not rely on undocumented fields.
 
 ---
 
@@ -394,13 +424,13 @@ These are internal to the worker process and not exposed over HTTP.
 - **Dashboard / History**: refresh on user action (pull-to-refresh / manual
   reload); no background polling.
 - **Job Detail**: polls `GET /api/v1/jobs/{id}` every 4 s while the job is
-  in `QUEUED / RUNNING / AGGREGATING`; stops once the job reaches a terminal
+  in `QUEUED / RUNNING / AGGREGATING / FINALIZING`; stops once the job reaches a terminal
   state.
 - **Trial Detail**: polls while the trial is `PENDING / RUNNING`.
 
 ---
 
-## 13. Constraints for Devin
+## 13. Implementation constraints
 
 - Do not expose orchestration / optimizer steps as public API endpoints.
 - Do not return different response shapes from the same endpoint depending

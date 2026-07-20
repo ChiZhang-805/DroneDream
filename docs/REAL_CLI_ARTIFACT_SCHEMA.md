@@ -11,6 +11,14 @@ and must atomically publish an output object with this shape:
 
 ```json
 {
+  "schema_version": "dronedream.trial_result.v2",
+  "execution_identity": {
+    "trial_id": "trial-uuid",
+    "job_id": "job-uuid",
+    "candidate_id": "candidate-uuid",
+    "seed": 42,
+    "attempt_count": 1
+  },
   "success": true,
   "backend": "px4_gazebo",
   "metrics": {
@@ -34,6 +42,23 @@ A failed run sets `success=false`, omits `metrics`, and supplies
 `failure: {"code": "...", "reason": "..."}`. `log_excerpt` is optional in
 both cases.
 
+`success` and all metric flags are strict JSON booleans, not strings or
+integers. Metric numbers must be finite; error/time metrics are non-negative,
+and `overshoot_count` is a non-negative integer. A successful result is
+accepted only when the command exits with code `0`. `trial_result.json` is
+limited to 10 MiB.
+
+`raw_metric_json` must remain a JSON object containing only finite JSON values;
+it is limited to 20 nested levels and 10,000 total nodes. This includes numbers
+inside nested arrays/objects (`1e999` is rejected even though some decoders turn
+it into infinity).
+
+The worker writes `dronedream.trial_input.v2` with the same
+`execution_identity`. New runners must echo that object exactly. Identity-free
+v1 output remains readable for old custom launchers, but any identity field
+that is present is validated. Retries use an attempt-specific directory so a
+late or stale process cannot overwrite the current attempt.
+
 ## Artifact metadata
 
 Each `artifacts[]` item contains:
@@ -53,6 +78,20 @@ Known JSON artifacts are validated before persistence:
 - `worker_log`: UTF-8 text;
 - `px4_parameter_evidence_json`: one of the parameter transaction records
   described below.
+- `scenario_config_json`, `controller_parameters_json`,
+  `px4_parameters_input_json`, and `simulator_launch_config_json`: the complete
+  input/launch evidence needed to reproduce an environment.
+- `scenario_effect_request_json` and `scenario_effect_evidence_json`: the
+  normalized physical-effect request and the launcher's validated application
+  evidence. Static box/cylinder obstacles have a bundled Gazebo EntityFactory
+  path; other requested effects require a site Runtime extension and fail
+  closed without evidence.
+- `simulator_runtime_manifest_json`: attempt identity plus requested/observed
+  firmware, scenario-effect support, simulator profile, and timeout evidence.
+
+Known telemetry/reference JSON artifacts are read through a 16 MiB validation
+fence. An oversized or malformed known artifact is dropped instead of being
+loaded without bound into worker memory; its Trial metrics may remain valid.
 
 ## PX4 parameter evidence
 
@@ -75,3 +114,14 @@ The adapter rejects traversal and files outside configured roots. Production
 workers upload accepted files under deterministic
 `jobs/<job>/trials/<trial>/...` object keys. API downloads re-check the owning
 Job's user before returning bytes or a temporary object-store URL.
+
+The external command receives a least-privilege environment, not the worker's
+complete `os.environ`. OS/Python and explicitly named PX4/Gazebo/ROS runtime
+variables are retained; database URLs, S3/cloud/OIDC/LLM credentials, and every
+variable whose name contains `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, or
+`CREDENTIAL` are removed before trial context is injected.
+
+Timeout and cancellation terminate the complete simulator process tree. When
+`REAL_SIMULATOR_KEEP_RUN_DIRS=false`, successful transient run directories are
+removed only after the Trial executor has durably copied/uploaded every
+artifact; failed runs are retained for diagnosis.

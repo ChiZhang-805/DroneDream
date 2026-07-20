@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   extractPoints,
+  getCombinedBounds,
+  to2DViewBoxCoordinates,
   to3DProjectedCoordinates,
 } from "../components/trajectoryReplayMath";
 
@@ -60,5 +62,35 @@ describe("trajectoryReplayMath", () => {
 
     expect(projected.linePoints).not.toContain("NaN");
     expect(projected.linePoints).not.toContain("Infinity");
+  });
+
+  it("uses shared bounds so actual and reference points remain aligned", () => {
+    const actual = [
+      { t: 0, x: 0, y: 0, z: 0 },
+      { t: 1, x: 1, y: 1, z: 1 },
+    ];
+    const reference = [
+      { t: 0, x: 1, y: 1, z: 1 },
+      { t: 1, x: 10, y: 10, z: 10 },
+    ];
+    const bounds = getCombinedBounds([actual, reference]);
+
+    expect(bounds).not.toBeNull();
+    const actual2d = to2DViewBoxCoordinates(actual, bounds ?? undefined);
+    const reference2d = to2DViewBoxCoordinates(reference, bounds ?? undefined);
+    expect(actual2d.markerX(1)).toBeCloseTo(reference2d.markerX(0));
+    expect(actual2d.markerY(1)).toBeCloseTo(reference2d.markerY(0));
+
+    const actual3d = to3DProjectedCoordinates(actual, bounds ?? undefined);
+    const reference3d = to3DProjectedCoordinates(reference, bounds ?? undefined);
+    expect(actual3d.markerX(1)).toBeCloseTo(reference3d.markerX(0));
+    expect(actual3d.markerY(1)).toBeCloseTo(reference3d.markerY(0));
+  });
+
+  it("returns a safe empty projection for an empty track", () => {
+    const projected = to2DViewBoxCoordinates([]);
+    expect(projected.linePoints).toBe("");
+    expect(projected.markerX(0)).toBe(50);
+    expect(projected.markerY(0)).toBe(50);
   });
 });

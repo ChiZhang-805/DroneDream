@@ -8,27 +8,35 @@ process — never inside a request handler.
 
 from __future__ import annotations
 
+import logging
 import math
-from datetime import datetime, timezone
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
+from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import CandidateEvaluation, evaluate_candidate
+from app.orchestration.aggregation import candidate_is_publishable
 from app.orchestration.events import record_event
 from app.parameters import (
+    classify_airframe,
     get_parameter,
     normalize_px4_version,
+    normalize_vehicle_type,
+    resolve_catalog_version,
     validate_parameter_values,
     validate_search_selections,
 )
 from app.storage import get_artifact_storage
+
+logger = logging.getLogger(__name__)
 
 
 class JobServiceError(Exception):
@@ -84,42 +92,109 @@ def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
 
 
 def _validate_parameter_space(req: schemas.JobCreateRequest) -> None:
-    if not req.parameter_space:
-        return
     try:
         px4_version = normalize_px4_version(req.vehicle_profile.px4_version)
     except ValueError as exc:
         raise JobServiceError("UNSUPPORTED_PX4_VERSION", str(exc), http_status=422) from exc
+    try:
+        canonical_catalog_version = resolve_catalog_version(
+            req.parameter_catalog_version,
+            px4_version=px4_version,
+        )
+    except ValueError as exc:
+        raise JobServiceError(
+            "UNSUPPORTED_PARAMETER_CATALOG",
+            str(exc),
+            http_status=422,
+        ) from exc
+    # Aliases are accepted only at the input boundary. Persisting the resolved
+    # immutable id keeps reports, reruns, LLM prompts, and repro manifests from
+    # claiming an alias while validation used a different installed revision.
+    req.parameter_catalog_version = canonical_catalog_version
+    try:
+        vehicle_type = normalize_vehicle_type(req.vehicle_profile.vehicle_type)
+    except ValueError as exc:
+        raise JobServiceError("UNSUPPORTED_VEHICLE_TYPE", str(exc), http_status=422) from exc
+    try:
+        classify_airframe(req.vehicle_profile.airframe)
+    except ValueError as exc:
+        raise JobServiceError("UNSUPPORTED_AIRFRAME", str(exc), http_status=422) from exc
+    if not req.parameter_space:
+        return
 
     active = [selection for selection in req.parameter_space if selection.enabled]
     tunable = [selection for selection in active if not selection.locked]
-    result = validate_search_selections(
-        (
-            {
-                "name": selection.name,
-                "search_min": selection.minimum,
-                "search_max": selection.maximum,
-                "initial_value": selection.baseline,
-            }
-            for selection in tunable
-        ),
-        px4_version=px4_version,
-        enforce_safe_bounds=True,
-    )
-    if not result.valid:
-        messages = "; ".join(issue.message for issue in result.errors)
-        raise JobServiceError("INVALID_PARAMETER_SPACE", messages, http_status=422)
+    active_names = {selection.name for selection in active}
+    for selection in active:
+        definition = get_parameter(
+            selection.name,
+            px4_version=px4_version,
+            vehicle_type=vehicle_type,
+            airframe=req.vehicle_profile.airframe,
+        )
+        if definition is None:
+            continue
+        missing_hard_dependencies = sorted(
+            dependency.parameter
+            for dependency in definition.dependencies
+            if dependency.kind != "recommended_with"
+            and dependency.parameter not in active_names
+        )
+        if missing_hard_dependencies:
+            raise JobServiceError(
+                "INVALID_PARAMETER_SPACE",
+                (
+                    f"{selection.name} requires coupled parameter(s) "
+                    f"{', '.join(missing_hard_dependencies)} to be enabled or locked "
+                    "in the same job"
+                ),
+                http_status=422,
+            )
+    if tunable:
+        result = validate_search_selections(
+            (
+                {
+                    "name": selection.name,
+                    "search_min": selection.minimum,
+                    "search_max": selection.maximum,
+                    "initial_value": selection.baseline,
+                    "step": selection.step,
+                    "scale": selection.scale,
+                    "choices": selection.choices,
+                }
+                for selection in tunable
+            ),
+            px4_version=px4_version,
+            catalog_version=req.parameter_catalog_version,
+            vehicle_type=vehicle_type,
+            airframe=req.vehicle_profile.airframe,
+            enforce_safe_bounds=True,
+        )
+        if not result.valid:
+            messages = "; ".join(issue.message for issue in result.errors)
+            raise JobServiceError("INVALID_PARAMETER_SPACE", messages, http_status=422)
     try:
         validate_parameter_values(
             {selection.name: selection.baseline for selection in active},
             px4_version=px4_version,
+            catalog_version=req.parameter_catalog_version,
+            vehicle_type=vehicle_type,
+            airframe=req.vehicle_profile.airframe,
             enforce_safe_bounds=True,
         )
     except ValueError as exc:
         raise JobServiceError("INVALID_PARAMETER_SPACE", str(exc), http_status=422) from exc
 
-    for selection in active:
-        definition = get_parameter(selection.name, px4_version=px4_version)
+    # Disabled/locked entries are still part of the persisted contract. Resolve
+    # and normalize every name now so a later enable/unlock cannot revive an
+    # arbitrary or version-incompatible parameter without revalidation.
+    for selection in req.parameter_space:
+        definition = get_parameter(
+            selection.name,
+            px4_version=px4_version,
+            vehicle_type=vehicle_type,
+            airframe=req.vehicle_profile.airframe,
+        )
         if definition is None:
             raise JobServiceError(
                 "INVALID_PARAMETER_SPACE",
@@ -129,6 +204,38 @@ def _validate_parameter_space(req: schemas.JobCreateRequest) -> None:
         selection.value_type = (
             "integer" if definition.value_type == "int" else "float"
         )
+        if definition.choices:
+            allowed_choices = {float(choice.value) for choice in definition.choices}
+            if selection.choices is not None and not set(selection.choices).issubset(
+                allowed_choices
+            ):
+                raise JobServiceError(
+                    "INVALID_PARAMETER_SPACE",
+                    f"{selection.name} choices contain values not defined by the catalog",
+                    http_status=422,
+                )
+            if selection.choices is None:
+                applicable_choices = sorted(
+                    value
+                    for value in allowed_choices
+                    if selection.minimum <= value <= selection.maximum
+                )
+                if not applicable_choices:
+                    raise JobServiceError(
+                        "INVALID_PARAMETER_SPACE",
+                        f"{selection.name} bounds contain no catalog choice",
+                        http_status=422,
+                    )
+                selection.choices = applicable_choices
+            if selection.enabled and not selection.locked and len(selection.choices) < 2:
+                raise JobServiceError(
+                    "INVALID_PARAMETER_SPACE",
+                    (
+                        f"{selection.name} has fewer than two reachable catalog choices; "
+                        "widen its bounds or set locked=true"
+                    ),
+                    http_status=422,
+                )
         catalog_step = float(definition.step)
         if selection.step is None:
             selection.step = catalog_step
@@ -158,10 +265,15 @@ def _create_job_from_config(
     persist_scenario_suite: bool | None = None,
 ) -> models.Job:
     now = _now()
+    experimental_optimizer = req.optimizer_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES
     if persist_objective_config is None:
-        persist_objective_config = "objective_config" in req.model_fields_set
+        persist_objective_config = (
+            "objective_config" in req.model_fields_set or experimental_optimizer
+        )
     if persist_scenario_suite is None:
-        persist_scenario_suite = "scenario_suite" in req.model_fields_set
+        persist_scenario_suite = (
+            "scenario_suite" in req.model_fields_set or experimental_optimizer
+        )
     llm_provider = req.llm.provider if req.llm is not None else (
         "openai" if req.openai is not None else None
     )
@@ -235,6 +347,9 @@ def _create_job_from_config(
     db.add(job)
     db.flush()
     if llm_api_key:
+        secret_expires_at = now + timedelta(
+            seconds=get_settings().job_secret_ttl_seconds
+        )
         db.add(
             models.JobSecret(
                 job_id=job.id,
@@ -242,6 +357,7 @@ def _create_job_from_config(
                 # Actual provider identity is retained on Job metadata.
                 provider="openai",
                 encrypted_api_key=job_secrets.encrypt_secret(llm_api_key),
+                expires_at=secret_expires_at,
             )
         )
     db.add(
@@ -336,6 +452,43 @@ def purge_job_secrets(db: Session, job: models.Job, *, reason: str = "job_termin
     return deleted
 
 
+def purge_expired_job_secrets(
+    db: Session, *, now: datetime | None = None
+) -> int:
+    """Wipe expired credentials even when jobs remain queued without a worker.
+
+    ``expires_at`` was introduced after the first secret-store revision.  Old
+    rows without it are treated as expired once ``created_at + configured TTL``
+    has elapsed, so upgrades cannot leave legacy ciphertext indefinitely.
+    """
+
+    current = now or _now()
+    legacy_cutoff = current - timedelta(
+        seconds=get_settings().job_secret_ttl_seconds
+    )
+    expired = list(
+        db.scalars(
+            select(models.JobSecret).where(
+                models.JobSecret.deleted_at.is_(None),
+                models.JobSecret.encrypted_api_key != "",
+                or_(
+                    models.JobSecret.expires_at <= current,
+                    (
+                        models.JobSecret.expires_at.is_(None)
+                        & (models.JobSecret.created_at <= legacy_cutoff)
+                    ),
+                ),
+            )
+        )
+    )
+    for secret in expired:
+        secret.deleted_at = current
+        secret.encrypted_api_key = ""
+    if expired:
+        db.commit()
+    return len(expired)
+
+
 def list_jobs(
     db: Session,
     *,
@@ -393,6 +546,12 @@ def rerun_job(
 ) -> models.Job:
     resolved_user = _resolve_user(db, user)
     source = get_job(db, job_id, user=resolved_user)
+    rerun_suffix = " (rerun)"
+    rerun_display_name = (
+        f"{source.display_name[: 255 - len(rerun_suffix)]}{rerun_suffix}"
+        if source.display_name
+        else None
+    )
     strategy: schemas.OptimizerStrategy = source.optimizer_strategy  # type: ignore[assignment]
     rerun_openai: schemas.OpenAIConfig | None = None
     rerun_llm: schemas.LLMProviderConfig | None = None
@@ -457,7 +616,7 @@ def rerun_job(
             min_pass_rate=source.min_pass_rate,
         ),
         openai=rerun_openai,
-        display_name=(f"{source.display_name} (rerun)" if source.display_name else None),
+        display_name=rerun_display_name,
         baseline_parameters=(
             schemas.BaselineParameters(**source.baseline_parameter_json)
             if source.baseline_parameter_json
@@ -493,6 +652,7 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
         "QUEUED": 0,
         "RUNNING": 0,
         "AGGREGATING": 0,
+        "FINALIZING": 0,
         "COMPLETED": 0,
         "FAILED": 0,
         "CANCELLED": 0,
@@ -509,7 +669,11 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
             status = "CANCELLED"
         else:
             status = "COMPLETED"
-    elif by_status["RUNNING"] > 0 or by_status["AGGREGATING"] > 0:
+    elif (
+        by_status["RUNNING"] > 0
+        or by_status["AGGREGATING"] > 0
+        or by_status["FINALIZING"] > 0
+    ):
         status = "RUNNING"
     elif by_status["QUEUED"] > 0:
         status = "QUEUED"
@@ -521,7 +685,11 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
             completed_jobs=by_status["COMPLETED"],
             failed_jobs=by_status["FAILED"],
             cancelled_jobs=by_status["CANCELLED"],
-            running_jobs=by_status["RUNNING"],
+            running_jobs=(
+                by_status["RUNNING"]
+                + by_status["AGGREGATING"]
+                + by_status["FINALIZING"]
+            ),
             queued_jobs=by_status["QUEUED"],
             created_jobs=by_status["CREATED"],
             terminal_jobs=terminal_jobs,
@@ -579,26 +747,78 @@ def create_batch(
     return batch
 
 
-def list_batches(db: Session, *, user: models.User | None = None) -> list[models.BatchJob]:
+def list_batches(
+    db: Session,
+    *,
+    user: models.User | None = None,
+    page: int,
+    page_size: int,
+) -> tuple[list[models.BatchJob], int]:
     resolved_user = _resolve_user(db, user)
-    return list(
+    owner_filter = models.BatchJob.user_id == resolved_user.id
+    if get_settings().auth_mode == "disabled":
+        owner_filter = or_(owner_filter, models.BatchJob.user_id.is_(None))
+    total = int(
+        db.scalar(
+            select(func.count()).select_from(models.BatchJob).where(owner_filter)
+        )
+        or 0
+    )
+    items = list(
         db.scalars(
             select(models.BatchJob)
-            .where(
-                or_(
-                    models.BatchJob.user_id == resolved_user.id,
-                    models.BatchJob.user_id.is_(None),
-                )
-            )
-            .order_by(models.BatchJob.created_at.desc())
+            .where(owner_filter)
+            .order_by(models.BatchJob.created_at.desc(), models.BatchJob.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
         )
     )
+    return items, total
+
+
+def list_job_trials(
+    db: Session,
+    job_id: str,
+    *,
+    user: models.User | None = None,
+    page: int,
+    page_size: int,
+) -> tuple[list[models.Trial], int]:
+    """Return one deterministic, bounded page without loading all job trials."""
+
+    get_job(db, job_id, user=user)
+    trial_filter = models.Trial.job_id == job_id
+    total = int(
+        db.scalar(select(func.count()).select_from(models.Trial).where(trial_filter))
+        or 0
+    )
+    items = list(
+        db.scalars(
+            select(models.Trial)
+            .options(
+                selectinload(models.Trial.metric),
+                selectinload(models.Trial.candidate),
+            )
+            .where(trial_filter)
+            .order_by(models.Trial.created_at.asc(), models.Trial.id.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    )
+    return items, total
 
 
 def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
     batch = db.get(models.BatchJob, batch_id)
     resolved_user = _resolve_user(db, user)
-    if batch is None or (batch.user_id is not None and batch.user_id != resolved_user.id):
+    auth_disabled_owned_null = (
+        get_settings().auth_mode == "disabled"
+        and batch is not None
+        and batch.user_id is None
+    )
+    if batch is None or (
+        batch.user_id != resolved_user.id and not auth_disabled_owned_null
+    ):
         raise JobServiceError(
             "BATCH_NOT_FOUND",
             f"Batch {batch_id} was not found.",
@@ -609,10 +829,22 @@ def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) ->
 
 def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
     batch = get_batch(db, batch_id, user=user)
+    if batch.jobs and all(
+        child.status in schemas.JOB_TERMINAL_STATUSES for child in batch.jobs
+    ):
+        _, terminal_status = _aggregate_batch_progress(batch.jobs)
+        raise JobServiceError(
+            "BATCH_ALREADY_TERMINAL",
+            f"Batch {batch.id} is already in terminal state {terminal_status}.",
+            http_status=409,
+        )
     now = _now()
     terminal_trials = {"COMPLETED", "FAILED", "CANCELLED"}
     for child in batch.jobs:
         if child.status in schemas.JOB_TERMINAL_STATUSES:
+            # Sweep stale credentials too: an older worker/version may have
+            # terminalized this child without performing the invariant cleanup.
+            purge_job_secrets(db, child, reason="batch_cancel_terminal_sweep")
             continue
         child.status = "CANCELLED"
         child.cancelled_at = now
@@ -631,6 +863,8 @@ def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None)
                 payload_json={"by": "batch"},
             )
         )
+        purge_job_secrets(db, child, reason="batch_cancelled")
+    batch.status = "CANCELLED"
     batch.cancelled_at = now
     db.commit()
     db.refresh(batch)
@@ -683,6 +917,7 @@ def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
         trial.finished_at = now
         trial.lease_owner = None
         trial.lease_expires_at = None
+    purge_job_secrets(db, job, reason="job_cancelled")
     db.add(models.JobEvent(job_id=job.id, event_type="job_cancelled", payload_json=None))
     db.commit()
     db.refresh(job)
@@ -723,22 +958,25 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
                     continue
                 raw_path = Path(storage_path)
                 if ".." in raw_path.parts:
-                    raise JobServiceError(
-                        "ARTIFACT_PATH_FORBIDDEN",
-                        "Artifact path is outside allowed roots.",
-                        http_status=403,
+                    logger.warning(
+                        "skipping out-of-root artifact during job deletion; artifact_id=%s",
+                        artifact.id,
                     )
+                    continue
                 if not storage.exists(storage_path):
                     continue
                 storage.delete(storage_path)
             except JobServiceError:
                 raise
-            except ValueError as exc:
-                raise JobServiceError(
-                    "ARTIFACT_PATH_FORBIDDEN",
-                    f"Artifact path is outside allowed roots. artifact_id={artifact.id}",
-                    http_status=403,
-                ) from exc
+            except ValueError:
+                # A stale or corrupted DB row must never make us touch a path
+                # outside configured storage roots, nor hold the job hostage.
+                # Drop the metadata with the job while leaving that path alone.
+                logger.warning(
+                    "skipping forbidden artifact path during job deletion; artifact_id=%s",
+                    artifact.id,
+                )
+                continue
             except Exception as exc:
                 raise JobServiceError(
                     "ARTIFACT_DELETE_FAILED",
@@ -869,12 +1107,27 @@ def to_job_schema(job: models.Job) -> schemas.Job:
 def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
     candidate = trial.candidate
     source_type: schemas.CandidateSourceType | None = None
+    candidate_optimizer_strategy: schemas.OptimizerStrategy | None = None
     if candidate is not None and candidate.source_type in {
         "baseline",
         "optimizer",
         "llm_optimizer",
     }:
         source_type = candidate.source_type  # type: ignore[assignment]
+    if candidate is not None and isinstance(candidate.optimizer_metadata_json, dict):
+        raw_strategy = candidate.optimizer_metadata_json.get(
+            "child_strategy",
+            candidate.optimizer_metadata_json.get("strategy"),
+        )
+        supported_strategies = {
+            "none",
+            "heuristic",
+            "gpt",
+            "cma_es",
+            *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+        }
+        if isinstance(raw_strategy, str) and raw_strategy in supported_strategies:
+            candidate_optimizer_strategy = raw_strategy  # type: ignore[assignment]
     return schemas.TrialSummary(
         id=trial.id,
         candidate_id=trial.candidate_id,
@@ -885,6 +1138,7 @@ def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
         pass_flag=(trial.metric.pass_flag if trial.metric is not None else None),
         candidate_label=candidate.label if candidate is not None else None,
         candidate_source_type=source_type,
+        candidate_optimizer_strategy=candidate_optimizer_strategy,
         candidate_is_baseline=bool(candidate.is_baseline) if candidate is not None else False,
         candidate_is_best=bool(candidate.is_best) if candidate is not None else False,
         candidate_generation_index=(
@@ -909,14 +1163,10 @@ def to_trial_schema(trial: models.Trial) -> schemas.Trial:
             pass_flag=m.pass_flag,
             instability_flag=m.instability_flag,
         )
+    summary = to_trial_summary(trial)
     return schemas.Trial(
-        id=trial.id,
+        **summary.model_dump(),
         job_id=trial.job_id,
-        candidate_id=trial.candidate_id,
-        seed=trial.seed,
-        scenario_type=trial.scenario_type,  # type: ignore[arg-type]
-        status=trial.status,  # type: ignore[arg-type]
-        score=m.score if m is not None else None,
         attempt_count=trial.attempt_count,
         worker_id=trial.worker_id,
         simulator_backend=trial.simulator_backend,
@@ -1026,7 +1276,11 @@ def _metric_sample(metric: models.TrialMetric) -> dict[str, float]:
         "instability_flag": float(metric.instability_flag),
     }
     for key, raw_value in (metric.raw_metric_json or {}).items():
-        if isinstance(raw_value, (bool, int, float)):
+        if (
+            key not in values
+            and isinstance(raw_value, (bool, int, float))
+            and math.isfinite(float(raw_value))
+        ):
             values[key] = float(raw_value)
     return values
 
@@ -1036,6 +1290,72 @@ def _candidate_evaluation(
     objective_config: schemas.ObjectiveConfig,
     scenario_suite: schemas.ScenarioSuiteConfig,
 ) -> CandidateEvaluation | None:
+    aggregate = candidate.aggregated_metric_json
+    if isinstance(aggregate, dict) and "objective_values" in aggregate:
+        raw_objectives = aggregate.get("objective_values")
+        objective_names = {objective.metric for objective in objective_config.objectives}
+
+        def _finite_mapping(raw: object) -> dict[str, float] | None:
+            if not isinstance(raw, dict):
+                return None
+            result: dict[str, float] = {}
+            for raw_key, raw_value in raw.items():
+                if (
+                    not isinstance(raw_key, str)
+                    or isinstance(raw_value, bool)
+                    or not isinstance(raw_value, int | float)
+                    or not math.isfinite(float(raw_value))
+                ):
+                    return None
+                result[raw_key] = float(raw_value)
+            return result
+
+        persisted_objectives = _finite_mapping(raw_objectives)
+        persisted_constraint_values = _finite_mapping(
+            aggregate.get("constraint_values", {})
+        )
+        persisted_violations = _finite_mapping(
+            aggregate.get("constraint_violations", {})
+        )
+        scalar_loss = aggregate.get("scalar_loss")
+        total_violation = aggregate.get("total_constraint_violation", 0.0)
+        feasible = aggregate.get("feasible")
+        raw_sample_count = aggregate.get(
+            "training_completed_trial_count",
+            candidate.completed_trial_count,
+        )
+        if (
+            persisted_objectives is None
+            or not objective_names.issubset(persisted_objectives)
+            or persisted_constraint_values is None
+            or persisted_violations is None
+            or not isinstance(feasible, bool)
+            or isinstance(scalar_loss, bool)
+            or not isinstance(scalar_loss, int | float)
+            or not math.isfinite(float(scalar_loss))
+            or isinstance(total_violation, bool)
+            or not isinstance(total_violation, int | float)
+            or not math.isfinite(float(total_violation))
+            or isinstance(raw_sample_count, bool)
+            or not isinstance(raw_sample_count, int | float)
+            or not math.isfinite(float(raw_sample_count))
+            or int(raw_sample_count) != float(raw_sample_count)
+            or int(raw_sample_count) < 0
+        ):
+            return None
+        return CandidateEvaluation(
+            objectives={
+                objective.metric: persisted_objectives[objective.metric]
+                for objective in objective_config.objectives
+            },
+            constraint_values=persisted_constraint_values,
+            violations=persisted_violations,
+            feasible=feasible,
+            total_violation=float(total_violation),
+            scalar_loss=float(scalar_loss),
+            sample_count=int(raw_sample_count),
+        )
+
     samples: list[dict[str, float]] = []
     weights: list[float] = []
     training_trials = [
@@ -1048,29 +1368,83 @@ def _candidate_evaluation(
     for case in scenario_suite.cases:
         if case.enabled:
             cases_by_type.setdefault(case.scenario_type, case)
+
+    def _resolved_case(
+        trial: models.Trial,
+    ) -> tuple[str, schemas.ScenarioCaseConfig | None]:
+        scenario_config = trial.scenario_config_json or {}
+        raw_case_id = scenario_config.get("scenario_case_id")
+        if raw_case_id is not None:
+            case_id = str(raw_case_id)
+            scenario_case = cases_by_id.get(case_id)
+            if scenario_case is not None:
+                return f"id:{case_id}", scenario_case
+            fallback_case = cases_by_type.get(trial.scenario_type)
+            if fallback_case is not None:
+                return f"id:{fallback_case.id}", fallback_case
+            return f"id:{case_id}", None
+        scenario_case = cases_by_type.get(trial.scenario_type)
+        if scenario_case is not None:
+            return f"id:{scenario_case.id}", scenario_case
+        return f"type:{trial.scenario_type}", None
+
+    dispatched_per_case = Counter(
+        _resolved_case(trial)[0] for trial in training_trials
+    )
+    grouped_trials: dict[
+        str, tuple[schemas.ScenarioCaseConfig | None, list[models.Trial]]
+    ] = {}
+    for trial in training_trials:
+        group_key, scenario_case = _resolved_case(trial)
+        if group_key not in grouped_trials:
+            grouped_trials[group_key] = (scenario_case, [])
+        grouped_trials[group_key][1].append(trial)
     for trial in candidate.trials:
         if trial.status != "COMPLETED" or trial.metric is None:
             continue
         if bool((trial.scenario_config_json or {}).get("holdout")):
             continue
         samples.append(_metric_sample(trial.metric))
-        scenario_config: dict[str, Any] = trial.scenario_config_json or {}
-        case_id = scenario_config.get("scenario_case_id") or scenario_config.get("_case_id")
-        scenario_case = cases_by_id.get(str(case_id)) if case_id is not None else None
-        if scenario_case is None:
-            scenario_case = cases_by_type.get(trial.scenario_type)
-        weights.append(scenario_case.weight if scenario_case is not None else 1.0)
+        group_key, scenario_case = _resolved_case(trial)
+        weights.append(
+            (float(scenario_case.weight) if scenario_case is not None else 1.0)
+            / dispatched_per_case[group_key]
+        )
     if not samples:
         return None
-    pass_rate = sum(sample.get("pass_flag", 0.0) for sample in samples) / max(
-        1, len(training_trials)
+    weight_total = sum(
+        float(scenario_case.weight) if scenario_case is not None else 1.0
+        for scenario_case, _case_trials in grouped_trials.values()
     )
-    failed_rate = sum(1 for trial in training_trials if trial.status == "FAILED") / max(
-        1, len(training_trials)
-    )
+    weighted_completion = 0.0
+    weighted_failure = 0.0
+    weighted_pass = 0.0
+    for scenario_case, case_trials in grouped_trials.values():
+        case_weight = (
+            float(scenario_case.weight) if scenario_case is not None else 1.0
+        )
+        denominator = len(case_trials)
+        weighted_completion += case_weight * sum(
+            trial.status == "COMPLETED" and trial.metric is not None
+            for trial in case_trials
+        ) / denominator
+        weighted_failure += case_weight * sum(
+            trial.status == "FAILED" for trial in case_trials
+        ) / denominator
+        weighted_pass += case_weight * sum(
+            trial.status == "COMPLETED"
+            and trial.metric is not None
+            and trial.metric.pass_flag
+            for trial in case_trials
+        ) / denominator
+    completion_rate = weighted_completion / weight_total
+    failed_rate = weighted_failure / weight_total
+    pass_rate = weighted_pass / weight_total
     for sample in samples:
+        sample["completion_rate"] = completion_rate
         sample["pass_rate"] = pass_rate
         sample["failed_trial_rate"] = failed_rate
+        sample["failure_rate"] = failed_rate
     try:
         return evaluate_candidate(samples, objective_config, sample_weights=weights)
     except ValueError:
@@ -1094,7 +1468,7 @@ def optimization_history(job: models.Job) -> schemas.OptimizationHistory:
     )
     for candidate in ordered_candidates:
         evaluation = _candidate_evaluation(candidate, objective_config, scenario_suite)
-        if evaluation is not None:
+        if evaluation is not None and candidate_is_publishable(candidate):
             pareto_points.append(
                 ParetoPoint(
                     id=candidate.id,
@@ -1112,6 +1486,11 @@ def optimization_history(job: models.Job) -> schemas.OptimizationHistory:
                 label=candidate.label,
                 parameters=dict(candidate.parameter_json or {}),
                 proposal_reason=candidate.proposal_reason,
+                optimizer_metadata=(
+                    dict(candidate.optimizer_metadata_json)
+                    if candidate.optimizer_metadata_json is not None
+                    else None
+                ),
                 parent_candidate_id=candidate.parent_candidate_id,
                 aggregated_score=candidate.aggregated_score,
                 aggregated_metrics=(

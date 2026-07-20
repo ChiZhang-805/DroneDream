@@ -1,0 +1,49 @@
+[package]
+name = "drone-dream-desktop"
+version = "1.0.0"
+description = "Local-first desktop shell for DroneDream"
+authors = ["DroneDream contributors"]
+edition = "2021"
+
+[lib]
+name = "drone_dream_desktop_lib"
+# The first desktop release targets Windows only. Mobile-oriented cdylib/staticlib
+# outputs make LLVM-MinGW export every dependency symbol and can exceed PE limits.
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+ed25519-dalek = "2"
+hex = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+semver = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_jcs = "0.1"
+sha2 = "0.10"
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-process = "2.3.1"
+uuid = { version = "1", features = ["v4"] }
+wait-timeout = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+webview2-com-sys = "0.38.2"
+windows-core = "0.61"
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Globalization",
+  "Win32_Security",
+  "Win32_Security_Cryptography",
+  "Win32_Storage_FileSystem",
+  "Win32_System_JobObjects",
+  "Win32_System_Com",
+  "Win32_System_Memory",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }

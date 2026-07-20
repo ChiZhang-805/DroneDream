@@ -1,0 +1,75 @@
+name: Runtime contract
+
+on:
+  pull_request:
+    paths:
+      - "runtime/**"
+      - ".github/workflows/runtime-contract.yml"
+      - ".github/workflows/runtime-release.yml"
+      - "desktop/src-tauri/src/runtime.rs"
+      - "backend/app/routers/health.py"
+      - "backend/pyproject.toml"
+      - "worker/pyproject.toml"
+      - "scripts/simulators/**"
+  push:
+    paths:
+      - "runtime/**"
+      - ".github/workflows/runtime-contract.yml"
+      - ".github/workflows/runtime-release.yml"
+      - "desktop/src-tauri/src/runtime.rs"
+      - "backend/app/routers/health.py"
+      - "backend/pyproject.toml"
+      - "worker/pyproject.toml"
+      - "scripts/simulators/**"
+
+permissions:
+  contents: read
+
+jobs:
+  static-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Validate pinned inputs and Python code
+        run: |
+          python -m pip install --disable-pip-version-check \
+            --requirement runtime/locks/release-tools-requirements.lock \
+            "ruff==0.15.21"
+          python -m ruff check runtime/tools runtime/tests runtime/scripts scripts/simulators
+          python -m ruff check runtime/tools runtime/scripts scripts/simulators --select S
+          python -m ruff format --check runtime/tools runtime/tests runtime/scripts \
+            scripts/simulators
+          python runtime/tools/runtime_manifest.py validate-config \
+            --pins runtime/pins.env \
+            --python-lock runtime/locks/python-requirements.lock
+          python -m compileall -q runtime/tools runtime/tests runtime/scripts scripts/simulators
+          python -m unittest discover -s runtime/tests -v
+      - name: Validate shell syntax
+        run: |
+          mapfile -d '' scripts < <(find runtime scripts/simulators -type f -name '*.sh' -print0)
+          if (( ${#scripts[@]} == 0 )); then
+            echo "No Runtime or simulator shell scripts were found" >&2
+            exit 1
+          fi
+          for script in "${scripts[@]}"; do
+            echo "Checking ${script}"
+            bash -n "${script}"
+          done
+      - name: Prove untested manifests cannot be released
+        run: |
+          python runtime/tools/runtime_manifest.py generate \
+            --pins runtime/pins.env \
+            --python-lock runtime/locks/python-requirements.lock \
+            --source-commit "$(git rev-parse HEAD)" \
+            --output /tmp/runtime-manifest.json
+          if python runtime/tools/runtime_manifest.py validate \
+            --manifest /tmp/runtime-manifest.json --require-smoke-passed; then
+            echo "un-smoked manifest was incorrectly accepted" >&2
+            exit 1
+          fi

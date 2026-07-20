@@ -45,6 +45,14 @@ missing() {
   fi
 }
 
+# ---- Repository-owned source and documentation ----
+if command -v python3 >/dev/null 2>&1; then
+  section "Repository: encoding, JSON, and Markdown links"
+  run_or_skip "repository hygiene" python3 scripts/check-repository.py
+else
+  missing "repository hygiene" "install Python 3"
+fi
+
 # ---- Backend ----
 if [[ -x backend/.venv/bin/python ]]; then
   section "Backend: ruff"
@@ -68,13 +76,13 @@ fi
 # ---- Frontend ----
 if [[ -d frontend/node_modules ]]; then
   section "Frontend: typecheck"
-  (cd frontend && run_or_skip "typecheck" npm run -s typecheck)
+  run_or_skip "typecheck" npm --prefix frontend run -s typecheck
   section "Frontend: lint"
-  (cd frontend && run_or_skip "lint" npm run -s lint)
+  run_or_skip "lint" npm --prefix frontend run -s lint
   section "Frontend: build"
-  (cd frontend && run_or_skip "build" npm run -s build)
+  run_or_skip "build" npm --prefix frontend run -s build
   section "Frontend: test"
-  (cd frontend && run_or_skip "test" npm run -s test)
+  run_or_skip "test" npm --prefix frontend run -s test
 else
   missing "frontend" "run 'cd frontend && npm install'"
 fi

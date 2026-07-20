@@ -1,0 +1,11 @@
+# Release trust boundary
+/.github/CODEOWNERS @ChiZhang-805
+/.github/workflows/desktop-installer.yml @ChiZhang-805
+/.signpath/ @ChiZhang-805
+/CODE_SIGNING_POLICY.md @ChiZhang-805
+/PRIVACY.md @ChiZhang-805
+/SECURITY.md @ChiZhang-805
+/VERSIONING.md @ChiZhang-805
+/desktop/scripts/ @ChiZhang-805
+/desktop/src-tauri/ @ChiZhang-805
+/website/scripts/ @ChiZhang-805

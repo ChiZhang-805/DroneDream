@@ -1,0 +1,22 @@
+[Unit]
+Description=Initialize per-installation DroneDreamRuntime state
+Before=valkey.service dronedream-api.service dronedream-worker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/dronedream/runtime-init.sh
+RemainAfterExit=yes
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+ReadWritePaths=/etc/dronedream /var/lib/dronedream /var/lib/valkey
+
+[Install]
+WantedBy=multi-user.target

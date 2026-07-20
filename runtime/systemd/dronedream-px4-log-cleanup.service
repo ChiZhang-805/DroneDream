@@ -1,0 +1,24 @@
+[Unit]
+Description=Safely enforce DroneDream PX4 ULog retention limits
+After=dronedream-runtime-init.service
+Requires=dronedream-runtime-init.service
+
+[Service]
+Type=oneshot
+User=dronedream
+Group=dronedream
+ExecStart=/opt/dronedream/venv/bin/python /usr/lib/dronedream/px4-log-cleanup.py
+WorkingDirectory=/opt/dronedream/source
+Nice=10
+IOSchedulingClass=idle
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+ReadWritePaths=/opt/PX4-Autopilot/build/px4_sitl_default/rootfs/log

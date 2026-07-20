@@ -1,12 +1,12 @@
-// Type definitions aligned with docs/04_API_SPEC.md and docs/05_DATA_MODEL.md.
-// These shapes are the source of truth for Phase 1 mock data and are intended
-// to match the real /api/v1 contract introduced in later phases.
+// Type definitions for the live /api/v1 contract. Backend schemas and the
+// generated runtime evidence must remain compatible with these wire shapes.
 
 export type JobStatus =
   | "CREATED"
   | "QUEUED"
   | "RUNNING"
   | "AGGREGATING"
+  | "FINALIZING"
   | "COMPLETED"
   | "FAILED"
   | "CANCELLED";
@@ -23,6 +23,7 @@ export const JOB_STATUSES: readonly JobStatus[] = [
   "QUEUED",
   "RUNNING",
   "AGGREGATING",
+  "FINALIZING",
   "COMPLETED",
   "FAILED",
   "CANCELLED",
@@ -163,9 +164,9 @@ export interface JobEventInfo {
   created_at: string;
 }
 
-// Phase 6: mock artifact metadata returned by
-// `GET /api/v1/jobs/{job_id}/artifacts`. No underlying files exist in the
-// MVP — `storage_path` uses a `mock://` URI scheme.
+// Artifact metadata returned by `GET /api/v1/jobs/{job_id}/artifacts`.
+// Runtime-backed artifacts can be downloaded through the artifact endpoint;
+// deterministic mock simulations may still expose metadata-only `mock://` rows.
 export interface Artifact {
   id: string;
   owner_type: string;
@@ -212,6 +213,7 @@ export interface JobUpdateRequest {
 
 export interface JobRerunRequest {
   openai?: OpenAIConfig | null;
+  llm?: LLMProviderConfig | null;
 }
 export interface DeleteJobResponse {
   id: string;
@@ -286,12 +288,39 @@ export type CandidateSourceType = "baseline" | "optimizer" | "llm_optimizer";
 export type SimulatorBackend = "mock" | "real_cli";
 export const SIMULATOR_BACKENDS: readonly SimulatorBackend[] = ["mock", "real_cli"];
 
-export type OptimizerStrategy = "none" | "heuristic" | "gpt" | "cma_es";
-export const OPTIMIZER_STRATEGIES: readonly OptimizerStrategy[] = [
+export type OptimizerStrategy =
+  | "none"
+  | "heuristic"
+  | "gpt"
+  | "cma_es"
+  | "constrained_mobo"
+  | "multi_fidelity_mobo"
+  | "turbo"
+  | "saasbo"
+  | "surrogate_cma_es"
+  | "bipop_cma_es"
+  | "optimizer_portfolio";
+
+export const EXPERIMENTAL_OPTIMIZER_STRATEGIES = [
+  "constrained_mobo",
+  "multi_fidelity_mobo",
+  "turbo",
+  "saasbo",
+  "surrogate_cma_es",
+  "bipop_cma_es",
+  "optimizer_portfolio",
+] as const satisfies readonly OptimizerStrategy[];
+
+export const LEGACY_OPTIMIZER_STRATEGIES = [
   "none",
   "heuristic",
   "gpt",
   "cma_es",
+] as const satisfies readonly OptimizerStrategy[];
+
+export const OPTIMIZER_STRATEGIES: readonly OptimizerStrategy[] = [
+  ...EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+  ...LEGACY_OPTIMIZER_STRATEGIES,
 ];
 
 export type OptimizationOutcome =
@@ -327,6 +356,9 @@ export interface VehicleProfileConfig {
   airframe: string;
   simulator_model: string;
   world: string;
+  headless: boolean;
+  simulation_speed_factor: number;
+  instance_id: number;
 }
 
 export type ParameterValueType = "float" | "integer" | "boolean" | "enum";
@@ -394,6 +426,24 @@ export interface ScenarioSuiteConfig {
 export type TuningMode = "basic" | "advanced" | "expert";
 export type ParameterRisk = "low" | "medium" | "high";
 export type ParameterScale = "linear" | "log";
+export type ParameterExpertise = "guided" | "advanced" | "expert";
+export type ParameterApplyPolicy = "live" | "disarmed" | "reboot";
+
+export interface LocalizedParameterText {
+  en: string;
+  "zh-CN": string;
+}
+
+export interface ParameterChoiceDefinition {
+  value: number;
+  label: LocalizedParameterText;
+}
+
+export interface ParameterCompatibilityDefinition {
+  px4_versions: string[];
+  vehicle_types: string[];
+  airframe_families: string[];
+}
 
 export interface PX4ParameterDefinition {
   name: string;
@@ -415,6 +465,21 @@ export interface PX4ParameterDefinition {
   requires_reboot: boolean;
   dependencies: string[];
   supported_airframes: string[];
+  control_loop?: string;
+  axes?: string[];
+  tuning_stage?: number;
+  expertise?: ParameterExpertise;
+  apply_policy?: ParameterApplyPolicy;
+  compatibility?: ParameterCompatibilityDefinition;
+  application_interfaces?: string[];
+  recommended_metrics?: string[];
+  evidence_signals?: string[];
+  flight_modes?: string[];
+  preconditions?: string[];
+  risk_note?: LocalizedParameterText | null;
+  source_url?: string | null;
+  bounds_source?: "px4" | "px4_and_dronedream_guardrail";
+  choices?: ParameterChoiceDefinition[];
   legacy_key?: keyof BaselineParameters | null;
 }
 
@@ -443,6 +508,21 @@ export interface ParameterCatalogApiItem {
     parameter: string;
     description: { en: string; "zh-CN": string };
   }>;
+  control_loop?: string;
+  axes?: string[];
+  tuning_stage?: number;
+  expertise?: ParameterExpertise;
+  apply_policy?: ParameterApplyPolicy;
+  compatibility?: ParameterCompatibilityDefinition;
+  application_interfaces?: string[];
+  recommended_metrics?: string[];
+  evidence_signals?: string[];
+  flight_modes?: string[];
+  preconditions?: string[];
+  risk_note?: LocalizedParameterText | null;
+  source_url?: string | null;
+  bounds_source?: "px4" | "px4_and_dronedream_guardrail";
+  choices?: ParameterChoiceDefinition[];
 }
 
 export interface ParameterCatalogApiResponse {
@@ -453,6 +533,62 @@ export interface ParameterCatalogApiResponse {
   vehicle_type: string;
   parameter_count: number;
   parameters: ParameterCatalogApiItem[];
+}
+
+export interface BackendCapabilityItem {
+  ready: boolean;
+  status: string;
+  reason?: string | null;
+  selectable?: boolean;
+  configured?: boolean;
+  requires_external_runtime?: boolean;
+  requires_user_api_key?: boolean;
+  result_protocol?: string;
+  custom_base_url_allowlist_configured?: boolean;
+  max_concurrency_per_host_without_instance_allocator?: number;
+  instance_allocation?: string;
+  physical_fidelity?: boolean;
+  purpose?: string;
+  catalog_parameter_effects?: string;
+  supported_scenarios?: string[];
+  bundled_runner_advanced_effects?: string[];
+  scenario_effect_contract?: {
+    schema_version: string;
+    physically_applied: string[];
+    obstacles?: {
+      status: string;
+      mechanism: string;
+      requires: string[];
+      evidence: string;
+    };
+    requires_runtime_extension: string[];
+  };
+  unverified_effect_passthrough_opt_in?: boolean;
+  experimental?: boolean;
+  selection_profile?: string;
+}
+
+export interface BackendCapabilitiesResponse {
+  service_version: string;
+  simulators: {
+    configuration_scope: "api_process" | string;
+    authoritative: boolean;
+    worker_override: string | null;
+    worker_override_supported: boolean;
+    items: Record<string, BackendCapabilityItem>;
+  };
+  optimizers: {
+    configuration_scope?: "api_process" | string;
+    authoritative: boolean;
+    selection_profile?: string;
+    recommended_strategy?: OptimizerStrategy;
+    experimental_strategy_ids?: OptimizerStrategy[];
+    items: Record<string, BackendCapabilityItem>;
+  };
+  parameter_catalog: {
+    catalog_version: string;
+    supported_px4_versions: string[];
+  };
 }
 
 export interface StudyParameterSelection {
@@ -514,6 +650,7 @@ export interface TrialSummary {
   // baseline from optimizer rows and highlight the best candidate.
   candidate_label: string | null;
   candidate_source_type: CandidateSourceType | null;
+  candidate_optimizer_strategy?: OptimizerStrategy | null;
   candidate_is_baseline: boolean;
   candidate_is_best: boolean;
   candidate_generation_index: number;
@@ -536,9 +673,28 @@ export interface Trial extends TrialSummary {
 export interface AggregatedMetrics {
   rmse: number;
   max_error: number;
+  max_error_mean?: number | null;
+  max_error_worst?: number | null;
   overshoot_count: number;
   completion_time: number;
   score: number;
+  completion_rate?: number | null;
+  failure_rate?: number | null;
+  pass_rate?: number | null;
+  holdout?: HoldoutValidationMetrics | null;
+}
+
+export interface HoldoutValidationMetrics {
+  validation_status: "passed" | "failed" | "incomplete" | "error";
+  feasible: boolean;
+  objective_feasible: boolean | null;
+  trial_count: number;
+  completed_trial_count: number;
+  failed_trial_count: number;
+  passing_trial_count: number;
+  completion_rate: number;
+  failure_rate: number;
+  pass_rate: number;
 }
 
 export interface ComparisonPoint {
@@ -574,6 +730,7 @@ export interface Candidate {
   label: string | null;
   parameters: Record<string, unknown>;
   proposal_reason: string | null;
+  optimizer_metadata?: Record<string, unknown> | null;
   parent_candidate_id: string | null;
   aggregated_score: number | null;
   aggregated_metrics: Record<string, unknown> | null;
@@ -635,6 +792,8 @@ export interface BatchJob {
 
 export interface PaginatedBatchJobs {
   items: BatchJob[];
+  page: number;
+  page_size: number;
   total: number;
 }
 
@@ -680,10 +839,3 @@ export interface ApiError {
 export type ApiEnvelope<T> =
   | { success: true; data: T; error: null }
   | { success: false; data: null; error: ApiError };
-
-export const JOB_ACTIVE_STATUSES: readonly JobStatus[] = [
-  "CREATED",
-  "QUEUED",
-  "RUNNING",
-  "AGGREGATING",
-];

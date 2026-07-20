@@ -12,12 +12,24 @@ import sys
 import time
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from sqlalchemy.orm import Session
 
-from app.simulator import MockSimulatorAdapter, TrialContext, TrialResult
+from app.simulator import (
+    ArtifactMetadata,
+    MockSimulatorAdapter,
+    RealCliSimulatorAdapter,
+    TrialContext,
+    TrialFailure,
+    TrialResult,
+)
+
+_EXAMPLE_SIM = (
+    Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "example_real_simulator.py"
+)
 
 
 @pytest.fixture()
@@ -113,7 +125,7 @@ def test_start_queued_jobs_creates_baseline_and_trials(orchestration_ctx):
         assert job is not None
         assert job.status == "RUNNING"
         assert job.started_at is not None
-        assert job.current_phase == "baseline"
+        assert job.current_phase == "trial_execution"
         assert job.baseline_candidate_id is not None
         # Phase 5: baseline (4 scenarios) + 3 optimizer candidates × 3 scenarios.
         assert job.progress_total_trials == 4 + 3 * 3
@@ -156,9 +168,7 @@ def test_start_queued_jobs_creates_baseline_and_trials(orchestration_ctx):
         # candidates — the spec requires trials to vary seed and scenario.
         for c in optimizer_candidates:
             seeds = {t.seed for t in optimizer_trials if t.candidate_id == c.id}
-            assert len(seeds) == len(
-                [t for t in optimizer_trials if t.candidate_id == c.id]
-            )
+            assert len(seeds) == len([t for t in optimizer_trials if t.candidate_id == c.id])
 
         events = {e.event_type for e in job.events}
         assert "job_started" in events
@@ -166,6 +176,74 @@ def test_start_queued_jobs_creates_baseline_and_trials(orchestration_ctx):
         assert "optimizer_started" in events
         assert "optimizer_candidate_created" in events
         assert "trial_dispatched" in events
+
+
+def test_invalid_queued_job_is_quarantined_without_blocking_following_job(
+    orchestration_ctx,
+):
+    ctx = orchestration_ctx
+    invalid_job_id = _create_queued_job(ctx)
+    valid_job_id = _create_queued_job(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        invalid_job = db.get(ctx["models"].Job, invalid_job_id)
+        assert invalid_job is not None
+        invalid_job.baseline_parameter_json = {"kp_xy": True}
+        db.commit()
+
+    with ctx["db_module"].SessionLocal() as db:
+        started = ctx["job_manager"].start_queued_jobs(db)
+
+    assert started == [valid_job_id]
+    with ctx["db_module"].SessionLocal() as db:
+        invalid_job = db.get(ctx["models"].Job, invalid_job_id)
+        valid_job = db.get(ctx["models"].Job, valid_job_id)
+        assert invalid_job is not None and valid_job is not None
+        assert invalid_job.status == "FAILED"
+        assert invalid_job.latest_error_code == "JOB_INITIALIZATION_FAILED"
+        assert valid_job.status == "RUNNING"
+
+
+@pytest.mark.parametrize("limit", [0, -1, True, 101])
+def test_start_queued_jobs_rejects_invalid_limits(orchestration_ctx, limit: object):
+    with (
+        orchestration_ctx["db_module"].SessionLocal() as db,
+        pytest.raises(ValueError, match="limit"),
+    ):
+        orchestration_ctx["job_manager"].start_queued_jobs(
+            db,
+            limit=limit,  # type: ignore[arg-type]
+        )
+
+
+def test_budget_limited_legacy_heuristic_still_dispatches_one_candidate(
+    orchestration_ctx,
+):
+    ctx = orchestration_ctx
+    schemas = ctx["schemas"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                simulator_backend="mock",
+                optimizer_strategy="heuristic",
+                # Legacy scheduling uses four baseline and three optimizer
+                # trials. Eight is accepted by the request-level conservative
+                # budget check and leaves room for exactly one candidate.
+                max_total_trials=8,
+            ),
+        )
+        job_id = job.id
+
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert len(job.candidates) == 2
+        assert len([candidate for candidate in job.candidates if not candidate.is_baseline]) == 1
+        assert job.progress_total_trials == 7
+        assert job.progress_total_trials <= job.max_total_trials
 
 
 def test_explicit_scenario_suite_uses_common_random_numbers_for_every_candidate(
@@ -178,7 +256,8 @@ def test_explicit_scenario_suite_uses_common_random_numbers_for_every_candidate(
             db,
             schemas.JobCreateRequest(
                 optimizer_strategy="heuristic",
-                parameter_catalog_version="test-catalog",
+                max_iterations=3,
+                parameter_catalog_version="builtin-v1",
                 parameter_space=[
                     schemas.ParameterSelection(
                         name="MPC_XY_P",
@@ -212,6 +291,20 @@ def test_explicit_scenario_suite_uses_common_random_numbers_for_every_candidate(
         job = db.get(ctx["models"].Job, job_id)
         assert len(job.candidates) == 4
         assert job.progress_total_trials == 4 * 3
+        baseline = next(candidate for candidate in job.candidates if candidate.is_baseline)
+        invariant_keys = {
+            "kp_xy",
+            "kd_xy",
+            "ki_xy",
+            "vel_limit",
+            "accel_limit",
+            "disturbance_rejection",
+        }
+        assert all(
+            {key: candidate.parameter_json[key] for key in invariant_keys}
+            == {key: baseline.parameter_json[key] for key in invariant_keys}
+            for candidate in job.candidates
+        )
         scenario_keys_by_candidate = {
             candidate.id: {
                 (
@@ -236,18 +329,85 @@ def test_explicit_scenario_suite_uses_common_random_numbers_for_every_candidate(
         )
 
 
+def test_selected_parameter_heuristic_honors_iteration_limit(orchestration_ctx):
+    ctx = orchestration_ctx
+    schemas = ctx["schemas"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                optimizer_strategy="heuristic",
+                max_iterations=5,
+                max_total_trials=20,
+                parameter_catalog_version="builtin-v1",
+                parameter_space=[
+                    schemas.ParameterSelection(
+                        name="MPC_XY_P",
+                        baseline=0.95,
+                        minimum=0.6,
+                        maximum=1.3,
+                        step=0.1,
+                    )
+                ],
+                scenario_suite=schemas.ScenarioSuiteConfig(
+                    cases=[
+                        schemas.ScenarioCaseConfig(
+                            id="nominal", scenario_type="nominal", seeds=[11]
+                        )
+                    ]
+                ),
+            ),
+        )
+        job_id = job.id
+
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert len(job.candidates) == 6
+        assert job.current_generation == 5
+        assert job.progress_total_trials == 6
+        optimizer_event = next(
+            event for event in job.events if event.event_type == "optimizer_started"
+        )
+        assert optimizer_event.payload_json["requested_candidate_count"] == 5
+        assert optimizer_event.payload_json["budget_limited"] is False
+        assert optimizer_event.payload_json["design_limited"] is False
+
+
+def test_non_common_random_number_seed_offsets_stay_portable(orchestration_ctx):
+    ctx = orchestration_ctx
+    job = ctx["models"].Job(
+        scenario_suite_json={
+            "common_random_numbers": False,
+            "cases": [
+                {
+                    "id": "nominal",
+                    "scenario_type": "nominal",
+                    "seeds": [2_147_483_647],
+                }
+            ],
+        }
+    )
+
+    runs = ctx["job_manager"]._configured_scenario_runs(job, generation_index=100)
+
+    assert runs is not None
+    assert len(runs) == 1
+    assert 0 <= runs[0].seed <= 2_147_483_647
+    assert runs[0].seed != 2_147_483_647
+
+
 def test_holdout_results_never_influence_candidate_selection(orchestration_ctx):
     """A validation scenario may be reported, but cannot steer optimization."""
 
     ctx = orchestration_ctx
     schemas = ctx["schemas"]
     objective = schemas.ObjectiveConfig(
-        objectives=[
-            schemas.ObjectiveSpec(metric="rmse", direction="minimize", weight=1.0)
-        ],
-        constraints=[
-            schemas.ConstraintSpec(metric="pass_rate", operator="gte", threshold=0.5)
-        ],
+        objectives=[schemas.ObjectiveSpec(metric="rmse", direction="minimize", weight=1.0)],
+        constraints=[schemas.ConstraintSpec(metric="pass_rate", operator="gte", threshold=0.5)],
     )
     suite = schemas.ScenarioSuiteConfig(
         cases=[
@@ -455,9 +615,7 @@ def test_unexpired_lease_blocks_second_worker(orchestration_ctx):
     assert claimed is None
 
 
-def test_long_trial_renews_lease_while_simulator_runs(
-    orchestration_ctx, monkeypatch
-):
+def test_long_trial_renews_lease_while_simulator_runs(orchestration_ctx, monkeypatch):
     ctx = orchestration_ctx
     trial_id = _seed_single_pending_trial(ctx)
     monkeypatch.setenv("WORKER_LEASE_SECONDS", "1")
@@ -500,6 +658,45 @@ def test_long_trial_renews_lease_while_simulator_runs(
         get_settings.cache_clear()
 
 
+def test_process_control_exception_from_cleanup_stops_lease_heartbeat(
+    orchestration_ctx, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    heartbeat_state = SimpleNamespace(started=False, stopped=False)
+
+    class FakeHeartbeat:
+        def __init__(self, *_args, **_kwargs) -> None:
+            self.lost = SimpleNamespace(is_set=lambda: False)
+
+        def start(self) -> None:
+            heartbeat_state.started = True
+
+        def stop(self) -> None:
+            heartbeat_state.stopped = True
+
+    class InterruptingCleanupAdapter(MockSimulatorAdapter):
+        def cleanup(self, _trial_ctx: TrialContext) -> None:
+            raise SystemExit(23)
+
+    monkeypatch.setattr(ctx["trial_executor"], "_TrialLeaseHeartbeat", FakeHeartbeat)
+
+    with ctx["db_module"].SessionLocal() as db, pytest.raises(SystemExit, match="23"):
+        ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-interrupted-cleanup",
+            adapter=InterruptingCleanupAdapter(),
+        )
+
+    assert heartbeat_state.started is True
+    assert heartbeat_state.stopped is True
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "RUNNING"
+        assert trial.failure_code is None
+
+
 def test_reclaimed_attempt_fences_stale_result_persistence(orchestration_ctx):
     ctx = orchestration_ctx
     trial_id = _seed_single_pending_trial(ctx)
@@ -531,6 +728,227 @@ def test_reclaimed_attempt_fences_stale_result_persistence(orchestration_ctx):
         assert trial.metric is None
 
 
+def test_real_cli_artifacts_are_persisted_before_transient_run_cleanup(
+    orchestration_ctx, monkeypatch, tmp_path
+):
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    run_root = tmp_path / "transient-runs"
+    durable_root = tmp_path / "durable-artifacts"
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{_EXAMPLE_SIM}"')
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(run_root))
+    monkeypatch.setenv("REAL_SIMULATOR_KEEP_RUN_DIRS", "false")
+    monkeypatch.setenv("ARTIFACT_ROOT", str(durable_root))
+
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        with ctx["db_module"].SessionLocal() as db:
+            claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-real-cli",
+                adapter=RealCliSimulatorAdapter(),
+            )
+        assert claimed == trial_id
+
+        with ctx["db_module"].SessionLocal() as db:
+            models = ctx["models"]
+            trial = db.get(models.Trial, trial_id)
+            assert trial is not None
+            assert trial.status == "COMPLETED"
+            artifacts = (
+                db.query(models.Artifact)
+                .filter(
+                    models.Artifact.owner_type == "trial",
+                    models.Artifact.owner_id == trial_id,
+                )
+                .all()
+            )
+            assert artifacts
+            for artifact in artifacts:
+                stored = Path(artifact.storage_path)
+                assert stored.is_file()
+                assert stored.resolve().is_relative_to(durable_root.resolve())
+
+        transient_dir = run_root / "jobs" / trial.job_id / "trials" / trial_id
+        assert not transient_dir.exists()
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("simulation_success", [True, False])
+def test_artifact_copy_failure_is_terminal_and_retains_transient_run(
+    orchestration_ctx,
+    monkeypatch,
+    tmp_path,
+    simulation_success: bool,
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    source = tmp_path / "transient" / "telemetry.json"
+    source.parent.mkdir()
+    source.write_text('{"samples": []}', encoding="utf-8")
+    durable_root = tmp_path / "durable"
+    monkeypatch.setenv("ARTIFACT_ROOT", str(durable_root))
+
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+
+    class ArtifactAdapter(MockSimulatorAdapter):
+        backend_name = "artifact-failure-test"
+
+        def __init__(self) -> None:
+            self.finalized_with: TrialResult | None | object = object()
+
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            if simulation_success:
+                result = super().run_trial(trial_ctx)
+            else:
+                result = TrialResult(
+                    success=False,
+                    backend=self.backend_name,
+                    failure=TrialFailure(
+                        code="SIMULATION_FAILED",
+                        reason="fixture simulation failure",
+                    ),
+                )
+            result.artifacts = [
+                ArtifactMetadata(
+                    artifact_type="telemetry_json",
+                    display_name="Telemetry.json",
+                    storage_path=str(source),
+                    mime_type="application/json",
+                )
+            ]
+            return result
+
+        def finalize_trial(self, trial_ctx: TrialContext, result: TrialResult | None) -> None:
+            self.finalized_with = result
+
+    def fail_after_creating_temporary(_source: Path, destination: Path) -> None:
+        Path(destination).write_text("partial", encoding="utf-8")
+        raise OSError("injected artifact copy failure")
+
+    adapter = ArtifactAdapter()
+    monkeypatch.setattr(
+        ctx["trial_executor"].shutil,
+        "copy2",
+        fail_after_creating_temporary,
+    )
+    try:
+        with ctx["db_module"].SessionLocal() as db:
+            claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-storage-failure",
+                adapter=adapter,
+            )
+        assert claimed == trial_id
+        with ctx["db_module"].SessionLocal() as db:
+            models = ctx["models"]
+            trial = db.get(models.Trial, trial_id)
+            assert trial is not None
+            assert trial.status == "FAILED"
+            assert trial.failure_code == "ARTIFACT_PERSISTENCE_FAILED"
+            assert trial.lease_owner is None
+            assert trial.lease_expires_at is None
+            assert trial.metric is None
+        assert source.is_file(), "transient diagnostic input must be retained"
+        assert adapter.finalized_with is None
+        assert not list(durable_root.rglob("*.tmp"))
+    finally:
+        get_settings.cache_clear()
+
+
+def test_invalid_px4_candidate_is_rejected_before_simulator_start(
+    orchestration_ctx,
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        trial.job.parameter_space_json = [{"name": "MPC_XY_P"}]
+        trial.job.vehicle_profile_json = {
+            "px4_version": "main",
+            "vehicle_type": "multicopter",
+            "airframe": "x500",
+        }
+        trial.candidate.parameter_json = {"MPC_XY_P": 99.0}
+        db.commit()
+
+    class NeverStartedAdapter(MockSimulatorAdapter):
+        backend_name = "must-not-start"
+
+        def __init__(self) -> None:
+            self.prepared = False
+            self.ran = False
+
+        def prepare(self, trial_ctx: TrialContext) -> None:
+            self.prepared = True
+
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            self.ran = True
+            return super().run_trial(trial_ctx)
+
+    adapter = NeverStartedAdapter()
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-parameter-fence",
+            adapter=adapter,
+        )
+    assert claimed == trial_id
+    assert adapter.prepared is False
+    assert adapter.ran is False
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "FAILED"
+        assert trial.failure_code == "INVALID_CANDIDATE_PARAMETERS"
+        assert "OUTSIDE_SAFE_BOUNDS" in (trial.failure_reason or "")
+        assert trial.metric is None
+
+
+def test_disabled_parameter_is_not_required_but_enabled_locked_parameter_is(
+    orchestration_ctx,
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        trial.job.parameter_space_json = [
+            {"name": "MPC_XY_P", "enabled": True, "locked": True},
+            {"name": "MPC_Z_P", "enabled": False, "locked": False},
+        ]
+        trial.job.vehicle_profile_json = {
+            "px4_version": "main",
+            "vehicle_type": "multicopter",
+            "airframe": "x500",
+        }
+        trial.candidate.parameter_json = {"MPC_XY_P": 0.95}
+        db.commit()
+
+    adapter = MockSimulatorAdapter()
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-enabled-filter",
+            adapter=adapter,
+        )
+    assert claimed == trial_id
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "COMPLETED"
+        assert trial.failure_code is None
+        assert trial.metric is not None
+
+
 def test_cancel_job_clears_trial_lease(orchestration_ctx):
     ctx = orchestration_ctx
     trial_id = _seed_single_pending_trial(ctx)
@@ -554,6 +972,54 @@ def test_cancel_job_clears_trial_lease(orchestration_ctx):
 
 
 # --- Aggregation / full loop -----------------------------------------------
+
+
+def test_finalization_failure_isolated_to_one_ready_job(orchestration_ctx, monkeypatch) -> None:
+    ctx = orchestration_ctx
+    failing_job_id = _create_queued_job(ctx)
+    healthy_job_id = _create_queued_job(ctx)
+
+    with ctx["db_module"].SessionLocal() as db:
+        assert set(ctx["job_manager"].start_queued_jobs(db)) == {
+            failing_job_id,
+            healthy_job_id,
+        }
+
+    while True:
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db, "worker-finalization-isolation"
+            )
+        if trial_id is None:
+            break
+
+    original_generate = ctx["aggregation"].report_generator.generate_and_persist_report
+
+    def fail_one_report(db, *, job, **kwargs):
+        if job.id == failing_job_id:
+            raise OSError("simulated report storage outage")
+        return original_generate(db, job=job, **kwargs)
+
+    monkeypatch.setattr(
+        ctx["aggregation"].report_generator,
+        "generate_and_persist_report",
+        fail_one_report,
+    )
+
+    with ctx["db_module"].SessionLocal() as db:
+        finalized = ctx["aggregation"].finalize_ready_jobs(db)
+    assert set(finalized) == {failing_job_id, healthy_job_id}
+
+    with ctx["db_module"].SessionLocal() as db:
+        failing = db.get(ctx["models"].Job, failing_job_id)
+        healthy = db.get(ctx["models"].Job, healthy_job_id)
+        assert failing is not None
+        assert healthy is not None
+        assert failing.status == "FAILED"
+        assert failing.latest_error_code == "FINALIZATION_FAILED"
+        assert "report storage outage" in (failing.latest_error_message or "")
+        assert healthy.status == "COMPLETED"
+        assert healthy.report is not None
 
 
 def test_runner_drives_job_to_completed(orchestration_ctx):
@@ -682,6 +1148,8 @@ def test_api_report_endpoint_returns_ready_after_worker_runs(
         assert rep_data["report_status"] == "READY"
         assert rep_data["best_candidate_id"] == body["best_candidate_id"]
         assert len(rep_data["comparison"]) == 5
+        assert isinstance(rep_data["optimized_metrics"]["max_error_worst"], float)
+        assert any(point["metric"] == "max_error_worst" for point in rep_data["comparison"])
         assert set(rep_data["best_parameters"].keys()) >= {"kp_xy", "kd_xy"}
 
 
@@ -707,9 +1175,7 @@ def test_cancelled_queued_job_is_not_started(orchestration_ctx):
 # --- Phase 7 acceptance coverage ------------------------------------------
 
 
-def test_real_stub_backend_marks_job_failed_with_readable_error(
-    orchestration_ctx, monkeypatch
-):
+def test_real_stub_backend_marks_job_failed_with_readable_error(orchestration_ctx, monkeypatch):
     """Phase 7 acceptance: the failed-flow demo must surface a user-readable
     failure summary on the job. Driving the worker with ``SIMULATOR_BACKEND=
     real_stub`` fails every trial with ``ADAPTER_UNAVAILABLE`` and the job
@@ -773,9 +1239,7 @@ def test_terminal_job_rejects_further_cancellation(orchestration_ctx):
     assert excinfo.value.http_status == 409
 
 
-def test_report_for_failed_job_returns_structured_failure(
-    orchestration_ctx, monkeypatch
-):
+def test_report_for_failed_job_returns_structured_failure(orchestration_ctx, monkeypatch):
     """Phase 7 acceptance: when a job fails, ``GET /jobs/{id}/report`` must
     return a structured error with ``code=JOB_FAILED`` (not 200, not 500).
     """

@@ -7,7 +7,7 @@ import io
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,7 @@ router = APIRouter(tags=["jobs"])
 
 _PageQ = Query(1, ge=1)
 _PageSizeQ = Query(20, ge=1, le=200)
+_TrialPageSizeQ = Query(200, ge=1, le=500)
 _StatusQ: schemas.JobStatus | None = Query(None)
 
 
@@ -228,12 +229,24 @@ def list_job_trials(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
+    response: Response,
+    page: int = _PageQ,
+    page_size: int = _TrialPageSizeQ,
 ) -> dict[str, object]:
     try:
-        job = job_service.get_job(db, job_id, user=user)
+        trials, total = job_service.list_job_trials(
+            db,
+            job_id,
+            user=user,
+            page=page,
+            page_size=page_size,
+        )
     except job_service.JobServiceError as err:
         _raise(err)
-    summaries = [job_service.to_trial_summary(t) for t in job.trials]
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Page"] = str(page)
+    response.headers["X-Page-Size"] = str(page_size)
+    summaries = [job_service.to_trial_summary(t) for t in trials]
     return ok([s.model_dump(mode="json") for s in summaries])
 
 

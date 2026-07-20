@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import threading
 from datetime import datetime, timezone
 from typing import Any
@@ -40,9 +41,25 @@ def _client() -> Any:
     )
 
 
+def _validated_worker_id(worker_id: object) -> str:
+    if not isinstance(worker_id, str):
+        raise ValueError("worker_id must be a string")
+    normalized = worker_id.strip()
+    if (
+        not normalized
+        or len(normalized) > 128
+        or any(ord(character) < 32 for character in normalized)
+    ):
+        raise ValueError(
+            "worker_id must be 1-128 visible characters"
+        )
+    return normalized
+
+
 def publish_worker_heartbeat(worker_id: str) -> bool:
     """Publish one expiring worker-presence signal without crashing work."""
 
+    worker_id = _validated_worker_id(worker_id)
     settings = _settings()
     if not settings.redis_url:
         return False
@@ -86,8 +103,37 @@ def worker_presence_health() -> dict[str, object]:
         if not raw:
             return {"ok": False, "status": "missing", "detail": "no live worker signal"}
         payload = json.loads(raw)
-        observed_epoch = float(payload["observed_at_epoch"])
-        age = max(0.0, _now().timestamp() - observed_epoch)
+        if not isinstance(payload, dict):
+            return {
+                "ok": False,
+                "status": "invalid",
+                "detail": "worker signal must be a JSON object",
+            }
+        raw_epoch = payload.get("observed_at_epoch")
+        raw_worker_id = payload.get("worker_id")
+        if isinstance(raw_epoch, bool) or not isinstance(raw_epoch, int | float):
+            return {
+                "ok": False,
+                "status": "invalid",
+                "detail": "worker signal observation time must be numeric",
+            }
+        observed_epoch = float(raw_epoch)
+        try:
+            worker_id = _validated_worker_id(raw_worker_id)
+        except ValueError:
+            return {
+                "ok": False,
+                "status": "invalid",
+                "detail": "worker signal has an invalid worker id",
+            }
+        now_epoch = _now().timestamp()
+        if not math.isfinite(observed_epoch) or observed_epoch > now_epoch + 5.0:
+            return {
+                "ok": False,
+                "status": "invalid",
+                "detail": "worker signal has an invalid observation time",
+            }
+        age = max(0.0, now_epoch - observed_epoch)
         if age > settings.worker_presence_ttl_seconds:
             return {
                 "ok": False,
@@ -97,7 +143,7 @@ def worker_presence_health() -> dict[str, object]:
         return {
             "ok": True,
             "status": "available",
-            "worker_id": str(payload.get("worker_id", "unknown")),
+            "worker_id": worker_id,
             "age_seconds": round(age, 3),
         }
     except Exception as exc:
@@ -108,7 +154,7 @@ class WorkerPresenceHeartbeat:
     """Background signal that remains live while a long trial is executing."""
 
     def __init__(self, worker_id: str) -> None:
-        self._worker_id = worker_id
+        self._worker_id = _validated_worker_id(worker_id)
         self._stop = threading.Event()
         self._thread = threading.Thread(
             target=self._run,

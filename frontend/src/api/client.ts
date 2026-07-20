@@ -1,10 +1,12 @@
-// Real HTTP client for the DroneDream /api/v1 backend. Pages and components
-// use this module instead of the Phase 1 mock client. The call surface matches
-// the mock client deliberately so swapping was a one-line import change.
+// HTTP client for the DroneDream /api/v1 backend. It owns envelope parsing,
+// desktop-runtime liveness checks, and the typed call surface used by pages.
 
+import { isDesktopRuntime } from "../desktop/bridge";
+import { getDesktopReadinessSession } from "../desktop/readiness";
 import type {
   ApiEnvelope,
   Artifact,
+  BackendCapabilitiesResponse,
   BatchCreateRequest,
   BatchJob,
   Job,
@@ -81,7 +83,18 @@ async function triggerBrowserDownload(
 async function request<T>(
   path: string,
   init?: RequestInit,
+  requireRuntimeLiveness = false,
 ): Promise<T> {
+  if (isDesktopRuntime() && requireRuntimeLiveness) {
+    const readiness = getDesktopReadinessSession()?.snapshot;
+    if (!readiness?.ready) {
+      throw new ApiClientError(
+        "DESKTOP_RUNTIME_NOT_READY",
+        "The local DroneDream runtime has not been approved for this session. Open Settings and click Check environment before starting an experiment.",
+      );
+    }
+  }
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
@@ -116,12 +129,15 @@ async function request<T>(
     );
   }
 
-  if (envelope && envelope.success === true) {
+  // The HTTP status remains authoritative. A proxy, stale service worker, or
+  // malformed backend must not turn a 4xx/5xx response into a successful
+  // mutation merely by returning a body with `success: true`.
+  if (response.ok && envelope && envelope.success === true) {
     return envelope.data;
   }
   const error = envelope?.error;
   throw new ApiClientError(
-    error?.code ?? "INTERNAL_ERROR",
+    error?.code ?? (response.ok ? "INTERNAL_ERROR" : "HTTP_ERROR"),
     error?.message ?? `Request failed with HTTP ${response.status}`,
     error?.details ?? null,
     response.status,
@@ -139,6 +155,10 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async getCapabilities(): Promise<BackendCapabilitiesResponse> {
+    return request<BackendCapabilitiesResponse>("/capabilities");
+  },
+
   async getParameterCatalog(px4Version: string): Promise<ParameterCatalogApiResponse> {
     const qs = buildQuery({ px4_version: px4Version });
     return request<ParameterCatalogApiResponse>(`/parameter-catalog${qs}`);
@@ -148,7 +168,7 @@ export const apiClient = {
     return request<Job>("/jobs", {
       method: "POST",
       body: JSON.stringify(req),
-    });
+    }, true);
   },
 
   async listJobs(params?: {
@@ -181,9 +201,36 @@ export const apiClient = {
   },
 
   async listJobTrials(jobId: string): Promise<TrialSummary[]> {
-    return request<TrialSummary[]>(
-      `/jobs/${encodeURIComponent(jobId)}/trials`,
-    );
+    // Keep the historical "all trials" client contract while the API reads
+    // bounded pages. A job is capped at 10,000 trials by JobCreateRequest, so
+    // this is at most twenty deterministic requests instead of one unbounded
+    // database load.
+    const pageSize = 500;
+    const maxPages = 20;
+    const items: TrialSummary[] = [];
+    const seen = new Set<string>();
+    for (let page = 1; page <= maxPages; page += 1) {
+      const qs = buildQuery({ page, page_size: pageSize });
+      const pageItems = await request<TrialSummary[]>(
+        `/jobs/${encodeURIComponent(jobId)}/trials${qs}`,
+      );
+      let added = 0;
+      for (const item of pageItems) {
+        if (!seen.has(item.id)) {
+          seen.add(item.id);
+          items.push(item);
+          added += 1;
+        }
+      }
+      if (pageItems.length < pageSize) return items;
+      if (added === 0) {
+        throw new ApiClientError(
+          "INVALID_PAGINATION",
+          "The trial endpoint returned a repeated page.",
+        );
+      }
+    }
+    return items;
   },
 
   async listJobCandidates(jobId: string): Promise<OptimizationHistory> {
@@ -296,7 +343,7 @@ export const apiClient = {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/rerun`, {
       method: "POST",
       body: JSON.stringify(req ?? {}),
-    });
+    }, true);
   },
 
   async compareJobs(jobIds: string[]): Promise<JobCompareResponse> {
@@ -312,9 +359,21 @@ export const apiClient = {
   },
 
   async downloadCompareJobsCsv(jobIds: string[]): Promise<void> {
-    const response = await fetch(this.compareJobsCsvUrl(jobIds), {
-      headers: { ...authHeaders() },
-    });
+    let response: Response;
+    try {
+      response = await fetch(this.compareJobsCsvUrl(jobIds), {
+        headers: { ...authHeaders() },
+      });
+    } catch (networkError) {
+      throw new ApiClientError(
+        "NETWORK_ERROR",
+        networkError instanceof Error
+          ? networkError.message
+          : "Failed to download comparison CSV.",
+        null,
+        0,
+      );
+    }
     if (!response.ok) {
       throw new ApiClientError(
         "COMPARE_CSV_DOWNLOAD_FAILED",
@@ -333,11 +392,18 @@ export const apiClient = {
     return request<BatchJob>("/batches", {
       method: "POST",
       body: JSON.stringify(req),
-    });
+    }, true);
   },
 
-  async listBatches(): Promise<PaginatedBatchJobs> {
-    return request<PaginatedBatchJobs>("/batches");
+  async listBatches(params?: {
+    page?: number;
+    page_size?: number;
+  }): Promise<PaginatedBatchJobs> {
+    const qs = buildQuery({
+      page: params?.page,
+      page_size: params?.page_size,
+    });
+    return request<PaginatedBatchJobs>(`/batches${qs}`);
   },
 
   async getBatch(batchId: string): Promise<BatchJob> {

@@ -1,35 +1,56 @@
 # DroneDream Frontend
 
-React + TypeScript + Vite app for the DroneDream MVP. Renders real data
-from the FastAPI backend for all required pages — Dashboard, New Job,
-Job Detail, Trial Detail, History / Reports — using TanStack Query for
-server-state caching and polling.
+React, TypeScript, and Vite provide three related surfaces from one source
+tree: the browser application, the Tauri desktop UI, and the public product
+website. TanStack Query owns server state; local drafts and desktop readiness
+are kept behind dedicated adapters rather than mixed into API models.
 
-## What lives here
+## Application routes
 
-- `src/pages/` — route-level components:
-  - `Dashboard` — summary cards + recent jobs table.
-  - `NewJob` — validated form (track type, start point, altitude, wind,
-    sensor noise, objective profile) that creates a job and navigates to
-    its detail page.
-  - `JobDetail` — polls `GET /api/v1/jobs/{id}` every 4 s while the job
-    is active; renders progress, trials table, comparison chart, best
-    parameters, summary text, and structured failure details.
-  - `TrialDetail` — metadata, metrics, failure reason, artifacts.
-  - `History` — full jobs list with links back into detail.
-- `src/components/` — shared UI kit: `StatusBadge`, `MetricCard`,
-  `SectionCard`, `DataTable`, `Alert`, `States` (`Loading`, `Empty`,
-  `ErrorState`).
-- `src/api/` — typed `apiClient` over the `/api/v1` surface; unwraps the
-  standard success envelope and throws `ApiClientError` for structured
-  error envelopes.
-- `src/types/` — TypeScript types mirroring the backend schemas.
+- `/` — runtime-aware overview and recent experiments.
+- `/jobs/new` — the gated five-step **Optimization Experiment** wizard:
+  Flight Task, Parameters, Scenarios, Constraints & Budget, and Review & Run.
+- `/jobs/:id` — live experiment progress, candidates, metrics, reports, replay,
+  and artifacts.
+- `/trials/:id` — one trial's execution evidence and artifacts.
+- `/history` and `/compare` — history, reports, and experiment comparison.
+- `/desktop/setup` — desktop-only prerequisite, Runtime install/repair, and
+  readiness flow.
+- `/ece498` — one-screen bilingual ECE 498 BH course introduction and tribute.
+
+The retired batch pages redirect to the overview. Batch HTTP endpoints remain
+available only as an API compatibility surface; the desktop product creates and
+runs one optimization experiment at a time.
+
+Browser builds use history routing. The packaged desktop uses hash routing so
+navigation continues to work from bundled files. On first launch the desktop
+readiness layer starts the managed Runtime once, reuses the result for later
+route changes, and exposes an explicit full re-check from Settings.
+
+## Source layout
+
+- `src/pages/` — route-level product pages.
+- `src/features/experiment/` — wizard capabilities, draft persistence,
+  parameter catalog, trial planning, and optimizer labels.
+- `src/components/` — shared UI, trajectory replay/editor, Gazebo view, and the
+  3D drone launch scene.
+- `src/desktop/` — typed Tauri bridge, prerequisites, readiness, and access
+  gating.
+- `src/site/` and `site.html` — independent public download/marketing website.
+- `src/i18n/` — full-page English/Simplified Chinese copy. Mixed-language
+  controls are treated as defects.
+- `src/api/` and `src/types/` — strict API envelope client and schema mirrors.
+
+The 3D scene uses adaptive frame-rate and internal-resolution control. It keeps
+the visual design while pausing when out of view and lowering render cost on
+slower devices. Reduced-motion preferences disable nonessential animation.
 
 ## Local setup
 
 ```bash
-npm install
-npm run dev        # http://localhost:5173
+npm ci
+npm run dev          # application: http://localhost:5173
+npm run site:dev     # public site (see package.json for the selected port)
 ```
 
 ## Quality checks
@@ -38,12 +59,13 @@ npm run dev        # http://localhost:5173
 npm run typecheck
 npm run lint
 npm run build
-npm test            # Vitest + React Testing Library regression suite
-npm run test:watch  # Vitest watcher for local TDD
+npm run site:build
+npm test
+npm run test:watch
 ```
 
-The regression suite under [`src/__tests__/`](./src/__tests__/) covers
-the `NewJob` form defaults, client-side validation (altitude range, wind
-range, non-numeric inputs), failure-preserves-input behavior, and the
-`apiClient`'s success/error envelope unwrap. These tests run headlessly
-under JSDOM; they do not require a real browser.
+The Vitest/React Testing Library suite covers the wizard and draft contract,
+desktop/runtime access, bilingual copy, API envelopes, route redirects,
+trajectory editing/replay, 3D performance control, job/trial/history views, and
+the public site. JSDOM tests do not replace clean-browser, clean-Windows, or
+real PX4/Gazebo acceptance tests.

@@ -5,7 +5,7 @@ export interface ReplayPoint {
   z: number;
 }
 
-interface ProjectionBounds {
+export interface ProjectionBounds {
   minX: number;
   maxX: number;
   minY: number;
@@ -86,14 +86,23 @@ function getProjectionBounds(points: ReplayPoint[]): ProjectionBounds {
 
 function mapToViewBox(
   projected: Array<{ x: number; y: number }>,
+  bounds?: { minX: number; maxX: number; minY: number; maxY: number },
 ): ViewBoxProjection {
+  if (projected.length === 0) {
+    return {
+      linePoints: "",
+      markerX: () => VIEWBOX_SIZE / 2,
+      markerY: () => VIEWBOX_SIZE / 2,
+    };
+  }
+
   const xs = projected.map((point) => point.x);
   const ys = projected.map((point) => point.y);
 
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
+  const minX = bounds?.minX ?? Math.min(...xs);
+  const maxX = bounds?.maxX ?? Math.max(...xs);
+  const minY = bounds?.minY ?? Math.min(...ys);
+  const maxY = bounds?.maxY ?? Math.max(...ys);
 
   const width = maxX - minX || 1;
   const height = maxY - minY || 1;
@@ -111,25 +120,59 @@ function mapToViewBox(
   };
 }
 
-export function to2DViewBoxCoordinates(points: ReplayPoint[]): ViewBoxProjection {
-  return mapToViewBox(points.map((point) => ({ x: point.x, y: point.y })));
+export function to2DViewBoxCoordinates(
+  points: ReplayPoint[],
+  bounds?: ProjectionBounds,
+): ViewBoxProjection {
+  return mapToViewBox(
+    points.map((point) => ({ x: point.x, y: point.y })),
+    bounds
+      ? {
+          minX: bounds.minX,
+          maxX: bounds.maxX,
+          minY: bounds.minY,
+          maxY: bounds.maxY,
+        }
+      : undefined,
+  );
 }
 
 export function to3DProjectedCoordinates(
   points: ReplayPoint[],
   bounds?: ProjectionBounds,
 ): ViewBoxProjection {
-  void bounds;
   const projected = points.map((point) => ({
     x: point.x - point.y * 0.5,
     y: -point.z + (point.x + point.y) * 0.25,
   }));
 
-  return mapToViewBox(projected);
-}
+  let projectedBounds:
+    | { minX: number; maxX: number; minY: number; maxY: number }
+    | undefined;
+  if (bounds) {
+    // Project every corner of the shared XYZ bounding box. The isometric
+    // projection is linear, so its extrema are guaranteed to occur at one of
+    // these corners. This keeps actual and reference tracks on one scale.
+    const corners = [bounds.minX, bounds.maxX].flatMap((x) =>
+      [bounds.minY, bounds.maxY].flatMap((y) =>
+        [bounds.minZ, bounds.maxZ].map((z) => ({
+          x: x - y * 0.5,
+          y: -z + (x + y) * 0.25,
+        })),
+      ),
+    );
+    const xs = corners.map((point) => point.x);
+    const ys = corners.map((point) => point.y);
+    projectedBounds = {
+      minX: Math.min(...xs),
+      maxX: Math.max(...xs),
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys),
+    };
+  }
 
-// Backward-compatible alias for existing imports/tests.
-export const to3DViewBoxCoordinates = to3DProjectedCoordinates;
+  return mapToViewBox(projected, projectedBounds);
+}
 
 export function getCombinedBounds(tracks: ReplayPoint[][]): ProjectionBounds | null {
   const allPoints = tracks.flat();

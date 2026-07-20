@@ -9,11 +9,11 @@ engineering stack, local commands, and phase plan.
 |-----------|------------------------------------------------------------------------|---------------------------------------------------------------------------|
 | Frontend  | React 18 + TypeScript + Vite + React Router + TanStack Query           | Fast dev loop, strong typing, idiomatic routing and server-state caching. |
 | Backend   | Python 3.11 + FastAPI + Pydantic v2 + SQLAlchemy 2                     | Async-friendly API, typed request/response models, ORM ready for Postgres.|
-| Database  | SQLite (local MVP), structured for Postgres later                      | Zero-config for MVP; switch via `DATABASE_URL`.                           |
-| Worker    | Plain Python process polling a DB-backed queue                         | Simple, avoids Redis/Celery in MVP; replaceable later.                    |
+| Database  | SQLite for local development; PostgreSQL + Alembic for deployment      | Zero-config local loop with a reviewed production migration path.         |
+| Worker    | Python process claiming DB-backed work with renewable leases           | Keeps orchestration separate from the API; Valkey supplies presence/readiness signals. |
 | Charts    | Recharts                                                               | Simple React chart primitives, good DX.                                   |
 | Tests     | `pytest` (backend), Vitest + React Testing Library + `tsc --noEmit` + ESLint (frontend), `ruff` (backend + worker), `mypy` (backend) | Focused, fast feedback; each layer has its own gate. |
-| CI        | GitHub Actions (`.github/workflows/ci.yml`)                            | Runs backend ruff/mypy/pytest, worker ruff, and frontend typecheck/lint/build/test on every PR and push to `main`. |
+| CI        | GitHub Actions under `.github/workflows/`                              | Verifies the Windows installer and signed runtime contracts/releases; local aggregate gates live under `scripts/`. |
 
 ## Monorepo layout
 
@@ -43,7 +43,7 @@ DroneDream/
 ```bash
 # Frontend
 cd frontend
-npm install
+npm ci
 npm run dev         # Vite dev server
 npm run build       # type-check + bundle
 npm run lint        # ESLint
@@ -88,9 +88,9 @@ probes and future dashboards can share parsing logic.
 
 ## Enums (locked contract)
 
-- **Job status:** `CREATED | QUEUED | RUNNING | AGGREGATING | COMPLETED | FAILED | CANCELLED`
+- **Job status:** `CREATED | QUEUED | RUNNING | AGGREGATING | FINALIZING | COMPLETED | FAILED | CANCELLED`
 - **Trial status:** `PENDING | RUNNING | COMPLETED | FAILED | CANCELLED`
-- **Track type:** `circle | u_turn | lemniscate`
+- **Track type:** `circle | u_turn | lemniscate | custom`
 - **Sensor noise:** `low | medium | high`
 - **Objective profile:** `stable | fast | smooth | robust | custom`
 
@@ -100,15 +100,18 @@ TypeScript unions in [`frontend/src/types/`](../frontend/src/types). Do
 not rename them casually — downstream tests, docs, and the UI assume the
 exact spelling above.
 
-## Phase history (historical — all phases complete)
+## Historical implementation milestones
 
-The MVP followed the canonical execution plan in
-[`docs/archive/execution-plan.md`](./archive/execution-plan.md) (§3.2). The ordering —
-frontend skeleton first, then real backend, then async worker framework, then
-simulator adapter, then optimization loop — was the product's "close the loop
-first, replace mocks later" strategy and is preserved here so future
-maintainers can locate when each behavior landed. **All phases below are
-complete; current state lives in the sections above this one.**
+The MVP followed the historical phase ordering preserved below: frontend
+skeleton first, then real backend, then async worker framework, then simulator
+adapter, then optimization loop. This was the product's "close the loop first,
+replace mocks later" strategy. The former archive was intentionally removed
+from the trimmed documentation tree, so this section is now the surviving phase
+summary. The code-level milestones below were completed, but they are not a
+claim that clean-machine Windows delivery, every advanced Gazebo effect, or
+real-flight acceptance is complete. Current implementation and
+environment-dependent gates live in the product documents linked from
+`docs/README.md`.
 
 - **Phase 0 — Repo Bootstrap.**
   Monorepo skeleton, runnable frontend/backend/worker, docs, env template,
@@ -135,7 +138,7 @@ complete; current state lives in the sections above this one.**
 - **Phase 3 — Async Job / Queue / Worker Framework.**
   `POST /api/v1/jobs` returns immediately with `{job_id, status: QUEUED}`
   (constraint #3); job manager drives
-  `CREATED → QUEUED → RUNNING → AGGREGATING → COMPLETED` from the backend,
+  `CREATED → QUEUED → RUNNING → AGGREGATING → FINALIZING → COMPLETED` from the backend,
   never from the frontend (constraints #4, #7). Worker consumes trial rows
   only (constraint #8), updates status, and writes back mock metrics.
   Baseline candidate is auto-created per job. Minimum closed loop: user
@@ -165,31 +168,23 @@ complete; current state lives in the sections above this one.**
   info, rerun creates a new job and preserves the original, invalid input is
   rejected on both frontend and backend, terminal jobs are not cancellable
   again, charts render from persisted metrics (no mock fallback).
-  Shipped [`docs/archive/acceptance-report.md`](./acceptance-report.md).
+  Acceptance behavior was captured in the automated backend and frontend
+  regression suites.
 - **Post-Phase-7 hardening.**
   Documentation drift corrected, `POST /api/v1/jobs` response contract
   clarified (full `Job` object plus a backward-compatible `job_id` alias),
   GitHub Actions CI wired up, and a minimal Vitest + React Testing Library
   regression suite added on the frontend.
 
-The API contract is preserved across all phases (constraint #10). Real
-PX4/Gazebo integration remains out of scope for the MVP (constraint #1).
-Optional LLM result-summary text, if added later, is limited to explanation
-only — it must not generate flight control commands or bypass the optimizer
-/ simulator boundaries (constraint #9).
+The API contract was preserved across these historical phases. Real
+PX4/Gazebo and external LLM integration were outside the original MVP; both
+now exist behind explicit adapters and safety boundaries described by the
+current product documents.
 
-## Current limitations (by design)
+## Current status and boundaries
 
-- No real PX4/Gazebo — a `RealSimulatorAdapterStub` always returns
-  `ADAPTER_UNAVAILABLE` when `SIMULATOR_BACKEND=real_stub`.
-- No auth layer — every request runs as the default seeded user.
-- No PDF export; the report is rendered from the JSON payload.
-- No advanced track editor — `track_type` is a flat enum.
-- Artifact rows are metadata-only with `mock://` storage paths; no bytes
-  are written or served.
-- SQLite only. Models are structured for Postgres but no migration is
-  wired up.
-- Single worker process. Trial claim is only safe for one worker; a
-  leased-claim upgrade would be needed for horizontal scaling.
-- No external LLM calls. Summary text is produced locally from the
-  structured aggregates.
+This file retains the original implementation history and should not duplicate
+fast-moving release claims. See `12-phase-status.md` for implemented versus
+environment-dependent acceptance work, `DEPLOYMENT.md` for the PostgreSQL,
+authentication, storage, and worker topology, and `14-runtime-release.md` for
+the signed Windows runtime delivery boundary.

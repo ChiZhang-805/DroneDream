@@ -5,6 +5,7 @@ import { SectionCard } from "./SectionCard";
 import { Alert } from "./Alert";
 import { Loading, Empty } from "./States";
 import type { ReplayArtifacts } from "./trajectoryReplayUtils";
+import { useI18n } from "../i18n/I18nProvider";
 import {
   extractPoints,
   extractReferencePoints,
@@ -29,21 +30,23 @@ const SPEEDS = [0.5, 1, 2, 4] as const;
 
 type ReplayViewMode = "2d" | "3d";
 
-function statusTextForError(error: unknown): string {
+function statusTextForError(error: unknown, fallback: string): string {
   if (error instanceof ApiClientError) {
     return `${error.message} (${error.code})`;
   }
   if (error instanceof Error) return error.message;
-  return "Unable to load trajectory JSON artifact.";
+  return fallback;
 }
 
 export function TrajectoryReplay({
-  title = "Trajectory replay",
+  title,
   artifacts,
   meta,
 }: TrajectoryReplayProps) {
+  const { t } = useI18n();
   const [actualPoints, setActualPoints] = useState<ReplayPoint[] | null>(null);
   const [referencePoints, setReferencePoints] = useState<ReplayPoint[]>([]);
+  const [referenceUnavailable, setReferenceUnavailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState<number>(1);
@@ -62,6 +65,7 @@ export function TrajectoryReplay({
       setViewMode("2d");
       setActualPoints(null);
       setReferencePoints([]);
+      setReferenceUnavailable(false);
 
       if (!primaryArtifact) {
         setActualPoints([]);
@@ -79,17 +83,30 @@ export function TrajectoryReplay({
           }
         }
 
-        if (artifacts.reference) {
-          const referencePayload = await apiClient.fetchArtifactJson<unknown>(
-            artifacts.reference.id,
-          );
-          if (!cancelled) {
-            setReferencePoints(extractPoints(referencePayload));
+        if (artifacts.reference && !cancelled) {
+          try {
+            const referencePayload = await apiClient.fetchArtifactJson<unknown>(
+              artifacts.reference.id,
+            );
+            if (!cancelled) {
+              const externalReference = extractPoints(referencePayload);
+              if (externalReference.length > 0) {
+                setReferencePoints(externalReference);
+              } else {
+                setReferenceUnavailable(true);
+              }
+            }
+          } catch {
+            // A reference artifact is optional. Keep the independently loaded
+            // actual trajectory usable when only the overlay is unavailable.
+            if (!cancelled) {
+              setReferenceUnavailable(true);
+            }
           }
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(statusTextForError(loadError));
+          setError(statusTextForError(loadError, t("trajectory.errorFallback")));
           setActualPoints([]);
         }
       }
@@ -100,7 +117,7 @@ export function TrajectoryReplay({
     return () => {
       cancelled = true;
     };
-  }, [artifacts.reference, primaryArtifact]);
+  }, [artifacts.reference, primaryArtifact, t]);
 
   useEffect(() => {
     if (!isPlaying || !actualPoints || actualPoints.length <= 1) {
@@ -108,7 +125,7 @@ export function TrajectoryReplay({
     }
     const timer = window.setInterval(() => {
       setPosition((prev) => {
-        const next = prev + Math.max(1, Math.round(speed));
+        const next = prev + 1;
         if (next >= actualPoints.length - 1) {
           setIsPlaying(false);
           return actualPoints.length - 1;
@@ -130,7 +147,8 @@ export function TrajectoryReplay({
       viewMode === "3d"
         ? (points: ReplayPoint[]) =>
             to3DProjectedCoordinates(points, bounds ?? undefined)
-        : (points: ReplayPoint[]) => to2DViewBoxCoordinates(points);
+        : (points: ReplayPoint[]) =>
+            to2DViewBoxCoordinates(points, bounds ?? undefined);
 
     const actual = project(actualPoints);
     const reference = referencePoints.length > 0 ? project(referencePoints) : null;
@@ -141,41 +159,51 @@ export function TrajectoryReplay({
 
   return (
     <SectionCard
-      title={title}
+      title={title ?? t("trajectory.title")}
       description={
         primaryLabel
-          ? `Source: ${primaryLabel}${artifacts.reference ? " (+ reference track)" : ""}`
-          : "Render trajectory/telemetry JSON artifacts in-browser."
+          ? t(
+              artifacts.reference
+                ? "trajectory.sourceWithReference"
+                : "trajectory.source",
+              { source: primaryLabel },
+            )
+          : t("trajectory.description")
       }
     >
       {!primaryArtifact ? (
         <Empty
-          title="Replay unavailable"
-          description="No trajectory.json or telemetry.json artifact was found for this trial."
+          title={t("trajectory.unavailable")}
+          description={t("trajectory.unavailableDescription")}
         />
       ) : actualPoints === null ? (
-        <Loading label="Loading trajectory replay…" />
+        <Loading label={t("trajectory.loading")} />
       ) : error ? (
-        <Alert tone="danger" title="Replay failed">
+        <Alert tone="danger" title={t("trajectory.failed")}>
           {error}
         </Alert>
       ) : !viewModel ? (
         <Empty
-          title="Replay data missing"
-          description="The selected artifact did not contain valid samples[] / points[] data."
+          title={t("trajectory.dataMissing")}
+          description={t("trajectory.dataMissingDescription")}
         />
       ) : (
         <div className="stack-sm" data-testid="trajectory-replay">
+          {referenceUnavailable ? (
+            <Alert tone="warning" title={t("trajectory.referenceUnavailable")}>
+              {t("trajectory.referenceUnavailableDescription")}
+            </Alert>
+          ) : null}
           <div className="trajectory-controls">
             <label className="trajectory-speed">
-              View
+              {t("trajectory.view")}
               <select
-                aria-label="Replay view mode"
+                aria-label={t("trajectory.viewModeLabel")}
                 value={viewMode}
                 onChange={(event) => setViewMode(event.target.value as ReplayViewMode)}
               >
-                <option value="2d">2D</option>
-                <option value="3d">3D</option>
+                <option value="2d">{t("trajectory.view2d")}</option>
+                <option value="3d">{t("trajectory.view3d")}</option>
               </select>
             </label>
           </div>
@@ -186,7 +214,9 @@ export function TrajectoryReplay({
               viewBox="0 0 100 100"
               role="img"
               data-testid={`trajectory-replay-svg-${viewMode}`}
-              aria-label={viewMode === "3d" ? "Trajectory replay 3D" : "Trajectory replay 2D"}
+              aria-label={t(
+                viewMode === "3d" ? "trajectory.canvas3d" : "trajectory.canvas2d",
+              )}
             >
               <rect x="0" y="0" width="100" height="100" fill="rgba(255,255,255,0.02)" />
               {viewModel.reference ? (
@@ -220,7 +250,7 @@ export function TrajectoryReplay({
               onClick={() => setIsPlaying((p) => !p)}
               disabled={actualPoints.length <= 1}
             >
-              {isPlaying ? "Pause" : "Play"}
+              {t(isPlaying ? "trajectory.pause" : "trajectory.play")}
             </button>
             <button
               type="button"
@@ -230,11 +260,12 @@ export function TrajectoryReplay({
                 setIsPlaying(false);
               }}
             >
-              Reset
+              {t("trajectory.reset")}
             </button>
             <label className="trajectory-speed">
-              Speed
+              {t("trajectory.speed")}
               <select
+                aria-label={t("trajectory.speedLabel")}
                 value={String(speed)}
                 onChange={(e) => setSpeed(Number(e.target.value))}
               >
@@ -249,6 +280,7 @@ export function TrajectoryReplay({
 
           <input
             type="range"
+            aria-label={t("trajectory.timeline")}
             min={0}
             max={Math.max(0, actualPoints.length - 1)}
             value={position}
@@ -272,11 +304,11 @@ export function TrajectoryReplay({
               </span>
             </li>
             <li>
-              <span className="kv-key">Scenario</span>
+              <span className="kv-key">{t("trajectory.scenario")}</span>
               <span className="kv-value">{meta.scenario ?? "—"}</span>
             </li>
             <li>
-              <span className="kv-key">Candidate</span>
+              <span className="kv-key">{t("trajectory.candidate")}</span>
               <span className="kv-value">
                 {meta.candidate_id ? <code>{meta.candidate_id}</code> : "—"}
               </span>

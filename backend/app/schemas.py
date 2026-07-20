@@ -8,6 +8,7 @@ validation; unknown fields are rejected (``extra="forbid"``) per the API spec.
 from __future__ import annotations
 
 import math
+import re
 from datetime import datetime
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
@@ -24,6 +25,7 @@ JobStatus = Literal[
     "QUEUED",
     "RUNNING",
     "AGGREGATING",
+    "FINALIZING",
     "COMPLETED",
     "FAILED",
     "CANCELLED",
@@ -43,7 +45,19 @@ ScenarioType = Literal[
 ]
 ReportStatus = Literal["PENDING", "READY", "FAILED"]
 SimulatorBackend = Literal["mock", "real_cli"]
-OptimizerStrategy = Literal["none", "heuristic", "gpt", "cma_es"]
+OptimizerStrategy = Literal[
+    "none",
+    "heuristic",
+    "gpt",
+    "cma_es",
+    "constrained_mobo",
+    "multi_fidelity_mobo",
+    "turbo",
+    "saasbo",
+    "surrogate_cma_es",
+    "bipop_cma_es",
+    "optimizer_portfolio",
+]
 ParameterScale = Literal["linear", "log"]
 ParameterValueType = Literal["float", "integer", "boolean", "enum"]
 ObjectiveDirection = Literal["minimize", "maximize"]
@@ -68,7 +82,7 @@ BatchStatus = Literal[
 
 JOB_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 JOB_CANCELLABLE_STATUSES: frozenset[str] = frozenset(
-    {"CREATED", "QUEUED", "RUNNING", "AGGREGATING"}
+    {"CREATED", "QUEUED", "RUNNING", "AGGREGATING", "FINALIZING"}
 )
 BATCH_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
@@ -77,7 +91,12 @@ BATCH_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CAN
 
 
 class _Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        allow_inf_nan=False,
+        str_strip_whitespace=True,
+        strict=True,
+    )
 
 
 class StartPoint(_Strict):
@@ -138,6 +157,16 @@ class OpenAIConfig(_Strict):
     api_key: str = Field(min_length=1, max_length=512)
     model: str | None = Field(default=None, max_length=128)
 
+    @model_validator(mode="after")
+    def _normalize_legacy_openai(self) -> OpenAIConfig:
+        # Keep the legacy request shape as strict as LLMProviderConfig. In
+        # particular, whitespace-only keys must never be encrypted and queued.
+        if not self.api_key:
+            raise ValueError("openai api_key cannot be blank")
+        if self.model is not None:
+            self.model = self.model or None
+        return self
+
 
 class LLMProviderConfig(_Strict):
     """Provider-neutral configuration for an OpenAI-compatible optimizer.
@@ -184,6 +213,28 @@ class VehicleProfileConfig(_Strict):
     airframe: str = Field(default="x500", min_length=1, max_length=128)
     simulator_model: str = Field(default="gz_x500", min_length=1, max_length=128)
     world: str = Field(default="default", min_length=1, max_length=128)
+    headless: bool = True
+    simulation_speed_factor: Annotated[float, Field(ge=0.1, le=100.0)] = 1.0
+    instance_id: Annotated[int, Field(ge=0, le=255)] = 0
+
+    @model_validator(mode="after")
+    def _validate_identity(self) -> VehicleProfileConfig:
+        if self.firmware_commit == "":
+            self.firmware_commit = None
+        if self.firmware_commit is not None and not re.fullmatch(
+            r"[0-9a-fA-F]{7,40}", self.firmware_commit
+        ):
+            raise ValueError("firmware_commit must be a 7-40 character Git SHA")
+        identity_values = (
+            self.px4_version,
+            self.vehicle_type,
+            self.airframe,
+            self.simulator_model,
+            self.world,
+        )
+        if any(any(ord(char) < 32 for char in value) for value in identity_values):
+            raise ValueError("vehicle profile fields cannot contain control characters")
+        return self
 
 
 class ParameterSelection(_Strict):
@@ -211,12 +262,19 @@ class ParameterSelection(_Strict):
             raise ValueError("parameter bounds and values must be finite")
         if self.minimum > self.maximum:
             raise ValueError("parameter minimum must be <= maximum")
+        if self.enabled and not self.locked and self.minimum == self.maximum:
+            raise ValueError(
+                "enabled unlocked parameter requires a non-zero search range; "
+                "set locked=true for a fixed value"
+            )
         if not self.minimum <= self.baseline <= self.maximum:
             raise ValueError("parameter baseline must be inside [minimum, maximum]")
         if self.scale == "log" and self.minimum <= 0:
             raise ValueError("log-scaled parameter minimum must be > 0")
         if self.value_type in {"integer", "boolean", "enum"}:
             discrete_values = [self.baseline, self.minimum, self.maximum]
+            if self.step is not None:
+                discrete_values.append(self.step)
             if self.choices:
                 discrete_values.extend(self.choices)
             if any(not value.is_integer() for value in discrete_values):
@@ -235,6 +293,10 @@ class ParameterSelection(_Strict):
                 raise ValueError("parameter baseline must be one of choices")
             if any(value < self.minimum or value > self.maximum for value in self.choices):
                 raise ValueError("parameter choices must be inside [minimum, maximum]")
+            if self.enabled and not self.locked and len(unique_choices) < 2:
+                raise ValueError(
+                    "enabled unlocked parameter choices require at least two values"
+                )
         return self
 
 
@@ -281,7 +343,9 @@ class ObjectiveConfig(_Strict):
 class ScenarioCaseConfig(_Strict):
     id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
     scenario_type: ScenarioType = "nominal"
-    seeds: list[int] = Field(default_factory=lambda: [101], min_length=1, max_length=100)
+    seeds: list[Annotated[int, Field(ge=0, le=2_147_483_647)]] = Field(
+        default_factory=lambda: [101], min_length=1, max_length=100
+    )
     weight: Annotated[float, Field(gt=0.0, le=1000.0)] = 1.0
     enabled: bool = True
     holdout: bool = False
@@ -291,7 +355,41 @@ class ScenarioCaseConfig(_Strict):
     def _validate_seeds(self) -> ScenarioCaseConfig:
         if len(set(self.seeds)) != len(self.seeds):
             raise ValueError("scenario seeds must be unique")
+        _validate_scenario_json(self.config)
         return self
+
+
+def _validate_scenario_json(value: object) -> None:
+    """Reject non-JSON/non-finite values hidden inside arbitrary case config."""
+
+    nodes = 0
+
+    def visit(item: object, *, path: str, depth: int) -> None:
+        nonlocal nodes
+        nodes += 1
+        if nodes > 10_000:
+            raise ValueError("scenario config exceeds 10000 JSON values")
+        if depth > 32:
+            raise ValueError("scenario config nesting exceeds 32 levels")
+        if item is None or isinstance(item, (str, bool, int)):
+            return
+        if isinstance(item, float):
+            if not math.isfinite(item):
+                raise ValueError(f"{path} must contain only finite numbers")
+            return
+        if isinstance(item, list):
+            for index, child in enumerate(item):
+                visit(child, path=f"{path}[{index}]", depth=depth + 1)
+            return
+        if isinstance(item, dict):
+            for key, child in item.items():
+                if not isinstance(key, str):
+                    raise ValueError(f"{path} object keys must be strings")
+                visit(child, path=f"{path}.{key}", depth=depth + 1)
+            return
+        raise ValueError(f"{path} contains unsupported value type {type(item).__name__}")
+
+    visit(value, path="scenario config", depth=0)
 
 
 def _default_scenario_cases() -> list[ScenarioCaseConfig]:
@@ -354,10 +452,13 @@ class ObstacleConfig(_Strict):
                 raise ValueError("cylinder obstacle requires radius")
             if self.height is None:
                 raise ValueError("cylinder obstacle requires height")
-        if self.type == "box" and (
-            self.size_x is None or self.size_y is None or self.size_z is None
-        ):
-            raise ValueError("box obstacle requires size_x/size_y/size_z")
+            if any(value is not None for value in (self.size_x, self.size_y, self.size_z)):
+                raise ValueError("cylinder obstacle cannot contain box size fields")
+        if self.type == "box":
+            if self.size_x is None or self.size_y is None or self.size_z is None:
+                raise ValueError("box obstacle requires size_x/size_y/size_z")
+            if self.radius is not None or self.height is not None:
+                raise ValueError("box obstacle cannot contain cylinder radius/height")
         return self
 
 
@@ -376,7 +477,7 @@ class BatteryConfig(_Strict):
 
 class AdvancedScenarioConfig(_Strict):
     wind_gusts: WindGustsConfig = Field(default_factory=WindGustsConfig)
-    obstacles: list[ObstacleConfig] = Field(default_factory=list)
+    obstacles: list[ObstacleConfig] = Field(default_factory=list, max_length=512)
     sensor_degradation: SensorDegradationConfig = Field(default_factory=SensorDegradationConfig)
     battery: BatteryConfig = Field(default_factory=BatteryConfig)
 
@@ -393,7 +494,7 @@ class JobCreateRequest(_Strict):
     wind: WindVector = Field(default_factory=WindVector)
     sensor_noise_level: SensorNoiseLevel = "medium"
     objective_profile: ObjectiveProfile = "robust"
-    reference_track: list[TrackPoint] | None = None
+    reference_track: list[TrackPoint] | None = Field(default=None, max_length=10_000)
     advanced_scenario_config: AdvancedScenarioConfig | None = None
     display_name: str | None = Field(default=None, max_length=255)
     baseline_parameters: BaselineParameters = Field(default_factory=BaselineParameters)
@@ -417,6 +518,12 @@ class JobCreateRequest(_Strict):
 
     @model_validator(mode="after")
     def _validate_custom_reference_track(self) -> JobCreateRequest:
+        if self.display_name == "":
+            self.display_name = None
+        if self.display_name is not None and any(
+            ord(char) < 32 for char in self.display_name
+        ):
+            raise ValueError("display_name cannot contain control characters")
         points = self.reference_track or []
         if self.track_type == "custom" and len(points) < 2:
             raise ValueError(
@@ -431,7 +538,28 @@ class JobCreateRequest(_Strict):
         if len(set(parameter_names)) != len(parameter_names):
             raise ValueError("parameter_space names must be unique")
         enabled = [item for item in self.parameter_space if item.enabled and not item.locked]
-        if self.parameter_space and not enabled:
+        experimental_optimizers = {
+            "constrained_mobo",
+            "multi_fidelity_mobo",
+            "turbo",
+            "saasbo",
+            "surrogate_cma_es",
+            "bipop_cma_es",
+            "optimizer_portfolio",
+        }
+        if (
+            self.simulator_backend == "real_cli"
+            and self.optimizer_strategy in experimental_optimizers
+            and not self.parameter_space
+        ):
+            raise ValueError(
+                "experimental real_cli optimization requires an explicit PX4 parameter_space"
+            )
+        if (
+            self.optimizer_strategy != "none"
+            and self.parameter_space
+            and not enabled
+        ):
             raise ValueError("parameter_space requires at least one enabled, unlocked parameter")
         if self.openai is not None and self.llm is not None:
             raise ValueError("provide either openai or llm, not both")
@@ -544,6 +672,8 @@ class BatchJob(BaseModel):
 
 class PaginatedBatchJobs(BaseModel):
     items: list[BatchJob]
+    page: int
+    page_size: int
     total: int
 
 
@@ -570,6 +700,7 @@ class Candidate(BaseModel):
     label: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
     proposal_reason: str | None = None
+    optimizer_metadata: dict[str, Any] | None = None
     parent_candidate_id: str | None = None
     aggregated_score: float | None = None
     aggregated_metrics: dict[str, Any] | None = None
@@ -609,6 +740,7 @@ class TrialSummary(BaseModel):
     # needing a second API call.
     candidate_label: str | None = None
     candidate_source_type: CandidateSourceType | None = None
+    candidate_optimizer_strategy: OptimizerStrategy | None = None
     candidate_is_baseline: bool = False
     candidate_is_best: bool = False
     candidate_generation_index: int = 0
@@ -628,12 +760,31 @@ class Trial(TrialSummary):
     finished_at: datetime | None = None
 
 
+class HoldoutValidationMetrics(BaseModel):
+    validation_status: Literal["passed", "failed", "incomplete", "error"]
+    feasible: bool
+    objective_feasible: bool | None = None
+    trial_count: int
+    completed_trial_count: int
+    failed_trial_count: int
+    passing_trial_count: int
+    completion_rate: float
+    failure_rate: float
+    pass_rate: float
+
+
 class AggregatedMetrics(BaseModel):
     rmse: float
     max_error: float
+    max_error_mean: float | None = None
+    max_error_worst: float | None = None
     overshoot_count: int
     completion_time: float
     score: float
+    completion_rate: float | None = None
+    failure_rate: float | None = None
+    pass_rate: float | None = None
+    holdout: HoldoutValidationMetrics | None = None
 
 
 class ComparisonPoint(BaseModel):
@@ -702,7 +853,16 @@ class JobUpdateRequest(_Strict):
         return self
 
 class JobsCompareRequest(_Strict):
-    job_ids: list[str] = Field(min_length=2, max_length=10)
+    job_ids: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(
+        min_length=2,
+        max_length=10,
+    )
+
+    @model_validator(mode="after")
+    def _validate_unique_jobs(self) -> JobsCompareRequest:
+        if len(set(self.job_ids)) != len(self.job_ids):
+            raise ValueError("job_ids must be unique")
+        return self
 
 
 class JobCompareItem(BaseModel):
@@ -732,6 +892,7 @@ class JobsCompareResponse(BaseModel):
 __all__ = [
     "AcceptanceCriteria",
     "AggregatedMetrics",
+    "HoldoutValidationMetrics",
     "Artifact",
     "BaselineParameters",
     "ComparisonPoint",

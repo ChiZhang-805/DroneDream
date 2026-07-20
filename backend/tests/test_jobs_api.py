@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -47,6 +48,32 @@ def test_create_job_returns_queued(client: TestClient) -> None:
     assert job["source_job_id"] is None
 
 
+def test_baseline_only_job_accepts_locked_catalog_parameters(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/jobs",
+        json={
+            **VALID_JOB_PAYLOAD,
+            "optimizer_strategy": "none",
+            "simulator_backend": "mock",
+            "parameter_space": [
+                {
+                    "name": "MPC_XY_P",
+                    "baseline": 0.95,
+                    "minimum": 0.95,
+                    "maximum": 0.95,
+                    "enabled": True,
+                    "locked": True,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    job = response.json()["data"]
+    assert job["optimizer_strategy"] == "none"
+    assert job["parameter_space"][0]["locked"] is True
+
+
 def test_create_job_exposes_job_id_alias(client: TestClient) -> None:
     """The create response must include ``job_id`` (alias of ``id``)."""
 
@@ -57,6 +84,138 @@ def test_create_job_exposes_job_id_alias(client: TestClient) -> None:
     assert "job_id" in job
     assert job["id"] == job["job_id"]
     assert job["status"] == "QUEUED"
+
+
+def test_cancelling_gpt_job_purges_encrypted_api_key(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
+    created = client.post(
+        "/api/v1/jobs",
+        json={
+            **VALID_JOB_PAYLOAD,
+            "optimizer_strategy": "gpt",
+            "simulator_backend": "mock",
+            "max_iterations": 1,
+            "openai": {"api_key": "sk-cancel-me"},
+        },
+    )
+    assert created.status_code == 200, created.text
+    job_id = created.json()["data"]["id"]
+
+    cancelled = client.post(f"/api/v1/jobs/{job_id}/cancel")
+    assert cancelled.status_code == 200, cancelled.text
+
+    from sqlalchemy import select
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        secret = db.scalars(
+            select(models.JobSecret).where(models.JobSecret.job_id == job_id)
+        ).one()
+        assert secret.deleted_at is not None
+        assert secret.encrypted_api_key == ""
+        events = {
+            event.event_type
+            for event in db.scalars(
+                select(models.JobEvent).where(models.JobEvent.job_id == job_id)
+            )
+        }
+        assert "job_secrets_purged" in events
+
+
+def test_gpt_job_secret_has_bounded_lifetime(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
+    monkeypatch.setenv("JOB_SECRET_TTL_SECONDS", "900")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    before = datetime.now(timezone.utc)
+    created = client.post(
+        "/api/v1/jobs",
+        json={
+            **VALID_JOB_PAYLOAD,
+            "optimizer_strategy": "gpt",
+            "simulator_backend": "mock",
+            "openai": {"api_key": "sk-expiring"},
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    from sqlalchemy import select
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        secret = db.scalars(
+            select(models.JobSecret).where(
+                models.JobSecret.job_id == created.json()["data"]["id"]
+            )
+        ).one()
+        assert secret.expires_at is not None
+        expires_at = secret.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        assert 895 <= (expires_at - before).total_seconds() <= 905
+
+
+def test_gpt_job_rejects_blank_server_secret(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "   ")
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
+
+    response = client.post(
+        "/api/v1/jobs",
+        json={
+            **VALID_JOB_PAYLOAD,
+            "optimizer_strategy": "gpt",
+            "simulator_backend": "mock",
+            "openai": {"api_key": "sk-will-not-be-stored"},
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "CONFIGURATION_ERROR"
+
+
+def test_housekeeping_wipes_expired_secret_without_worker(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
+    created = client.post(
+        "/api/v1/jobs",
+        json={
+            **VALID_JOB_PAYLOAD,
+            "optimizer_strategy": "gpt",
+            "simulator_backend": "mock",
+            "openai": {"api_key": "sk-stuck-in-queue"},
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from app import models
+    from app.db import SessionLocal
+    from app.services.jobs import purge_expired_job_secrets
+
+    with SessionLocal() as db:
+        secret = db.scalars(
+            select(models.JobSecret).where(
+                models.JobSecret.job_id == created.json()["data"]["id"]
+            )
+        ).one()
+        secret.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.commit()
+
+        assert purge_expired_job_secrets(db) == 1
+        db.refresh(secret)
+        assert secret.deleted_at is not None
+        assert secret.encrypted_api_key == ""
 
 
 def test_list_and_detail_do_not_add_job_id_alias(client: TestClient) -> None:
@@ -273,6 +432,51 @@ def test_list_trials_for_job_is_empty(client: TestClient) -> None:
     assert resp.json() == {"success": True, "data": [], "error": None}
 
 
+def test_list_trials_keeps_array_contract_and_exposes_page_metadata(
+    client: TestClient,
+) -> None:
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        candidate = models.CandidateParameterSet(
+            job_id=job["id"],
+            parameter_json={},
+            label="pagination candidate",
+        )
+        db.add(candidate)
+        db.flush()
+        db.add_all(
+            [
+                models.Trial(
+                    job_id=job["id"],
+                    candidate_id=candidate.id,
+                    seed=seed,
+                    status="PENDING",
+                )
+                for seed in range(3)
+            ]
+        )
+        db.commit()
+
+    first = client.get(f"/api/v1/jobs/{job['id']}/trials?page=1&page_size=2")
+    assert first.status_code == 200, first.text
+    assert isinstance(first.json()["data"], list)
+    assert len(first.json()["data"]) == 2
+    assert first.headers["X-Total-Count"] == "3"
+    assert first.headers["X-Page"] == "1"
+    assert first.headers["X-Page-Size"] == "2"
+
+    second = client.get(f"/api/v1/jobs/{job['id']}/trials?page=2&page_size=2")
+    assert second.status_code == 200, second.text
+    assert len(second.json()["data"]) == 1
+    assert {
+        item["id"] for item in first.json()["data"]
+    }.isdisjoint({item["id"] for item in second.json()["data"]})
+
+
 def test_trial_not_found(client: TestClient) -> None:
     resp = client.get("/api/v1/trials/tri_missing")
     assert resp.status_code == 404
@@ -300,6 +504,20 @@ def test_rerun_creates_new_job_preserving_original(client: TestClient) -> None:
     again = client.get(f"/api/v1/jobs/{original['id']}").json()["data"]
     assert again["id"] == original["id"]
     assert again["source_job_id"] is None
+
+
+def test_rerun_truncates_max_length_display_name(client: TestClient) -> None:
+    source = client.post(
+        "/api/v1/jobs",
+        json={**HEURISTIC_JOB_PAYLOAD, "display_name": "x" * 255},
+    ).json()["data"]
+
+    response = client.post(f"/api/v1/jobs/{source['id']}/rerun")
+
+    assert response.status_code == 200, response.text
+    display_name = response.json()["data"]["display_name"]
+    assert len(display_name) == 255
+    assert display_name.endswith(" (rerun)")
 
 
 def test_rerun_preserves_custom_reference_track(client: TestClient) -> None:
@@ -411,6 +629,45 @@ def test_rerun_gpt_stays_gpt_with_new_openai_key(
     assert rerun["optimizer_strategy"] == "gpt"
 
 
+def test_rerun_gpt_accepts_provider_neutral_llm_configuration(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "dev-unit-test-key")
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
+    payload = {
+        **VALID_JOB_PAYLOAD,
+        "optimizer_strategy": "gpt",
+        "llm": {
+            "provider": "deepseek",
+            "api_key": "source-provider-key",
+            "model": "deepseek-chat",
+            "base_url": "https://api.deepseek.com/v1",
+        },
+    }
+    original_resp = client.post("/api/v1/jobs", json=payload)
+    assert original_resp.status_code == 200, original_resp.text
+    original = original_resp.json()["data"]
+
+    resp = client.post(
+        f"/api/v1/jobs/{original['id']}/rerun",
+        json={
+            "llm": {
+                "provider": "deepseek",
+                "api_key": "fresh-provider-key",
+                "model": "deepseek-reasoner",
+                "base_url": "https://api.deepseek.com/v1",
+            },
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    rerun = resp.json()["data"]
+    assert rerun["optimizer_strategy"] == "gpt"
+    assert rerun["llm_provider"] == "deepseek"
+    assert rerun["llm_base_url"] == "https://api.deepseek.com/v1"
+    assert rerun["openai_model"] == "deepseek-reasoner"
+
+
 # --- Cancel ----------------------------------------------------------------
 
 
@@ -421,6 +678,33 @@ def test_cancel_queued_job(client: TestClient) -> None:
     cancelled = resp.json()["data"]
     assert cancelled["status"] == "CANCELLED"
     assert cancelled["cancelled_at"] is not None
+
+
+def test_committed_finalizing_job_is_readable_listable_and_cancellable(
+    client: TestClient,
+) -> None:
+    created = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        job = db.get(models.Job, created["id"])
+        assert job is not None
+        job.status = "FINALIZING"
+        job.current_phase = "aggregating"
+        db.commit()
+
+    detail = client.get(f"/api/v1/jobs/{created['id']}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["data"]["status"] == "FINALIZING"
+    listing = client.get("/api/v1/jobs", params={"status": "FINALIZING"})
+    assert listing.status_code == 200, listing.text
+    assert [item["id"] for item in listing.json()["data"]["items"]] == [created["id"]]
+
+    cancelled = client.post(f"/api/v1/jobs/{created['id']}/cancel")
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["data"]["status"] == "CANCELLED"
 
 
 def test_cancel_twice_rejects(client: TestClient) -> None:
@@ -576,6 +860,14 @@ def test_artifacts_includes_trial_scoped_artifacts(client: TestClient) -> None:
 
     with db_module.SessionLocal() as db:
         # Seed a trial row bound to this job.
+        db.add(
+            models.CandidateParameterSet(
+                id="cand_seed",
+                job_id=job_id,
+                parameter_json={},
+            )
+        )
+        db.flush()
         trial = models.Trial(
             job_id=job_id,
             candidate_id="cand_seed",
@@ -722,6 +1014,34 @@ def test_delete_job_ignores_missing_artifact_file(client: TestClient, tmp_path: 
 
     resp = client.delete(f"/api/v1/jobs/{job['id']}")
     assert resp.status_code == 200, resp.text
+
+
+def test_delete_job_never_deletes_artifact_outside_allowed_roots(
+    client: TestClient, tmp_path: Path
+) -> None:
+    from app import models
+    from app.db import SessionLocal
+
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    outside_path = tmp_path / "outside-artifact.bin"
+    outside_path.write_bytes(b"must remain")
+    with SessionLocal() as db:
+        stored_job = db.get(models.Job, job["id"])
+        assert stored_job is not None
+        stored_job.status = "COMPLETED"
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=stored_job.id,
+                artifact_type="log",
+                storage_path=str(outside_path),
+            )
+        )
+        db.commit()
+
+    response = client.delete(f"/api/v1/jobs/{job['id']}")
+    assert response.status_code == 200, response.text
+    assert outside_path.read_bytes() == b"must remain"
     with SessionLocal() as db:
         assert db.get(models.Job, job['id']) is None
         assert db.query(models.Artifact).filter(models.Artifact.owner_id == job['id']).count() == 0

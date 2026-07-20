@@ -183,7 +183,15 @@ def evaluate_candidate(
     for objective in config.objectives:
         value = _objective_value(samples, objective, config, sample_weights)
         objectives[objective.metric] = value
-        oriented = value if objective.direction == "minimize" else -value
+        if objective.target is None:
+            oriented = value if objective.direction == "minimize" else -value
+        elif objective.direction == "minimize":
+            # An aspiration target is a one-sided loss: values at or below a
+            # minimize target have met this objective and should not be
+            # rewarded indefinitely at the expense of other objectives.
+            oriented = max(0.0, value - objective.target)
+        else:
+            oriented = max(0.0, objective.target - value)
         scalar_loss += (
             objective.weight / total_objective_weight
         ) * oriented / objective.normalization

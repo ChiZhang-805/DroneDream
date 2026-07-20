@@ -166,9 +166,44 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         /Search budget exhausted — showing best-so-far parameters/i,
       ),
     ).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Progress" })).toHaveAttribute(
+      "aria-valuenow",
+      "100",
+    );
     await waitFor(() =>
       expect(apiClient.getJobReport).toHaveBeenCalledWith(job.id),
     );
+  });
+
+  it("surfaces worst-case max error and incomplete holdout evidence", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    const report = makeReport();
+    report.baseline_metrics.max_error_worst = 3.5;
+    report.optimized_metrics.max_error_mean = 1.5;
+    report.optimized_metrics.max_error_worst = 4.2;
+    report.optimized_metrics.holdout = {
+      validation_status: "incomplete",
+      feasible: false,
+      objective_feasible: true,
+      trial_count: 4,
+      completed_trial_count: 3,
+      failed_trial_count: 1,
+      passing_trial_count: 2,
+      completion_rate: 0.75,
+      failure_rate: 0.25,
+      pass_rate: 0.5,
+    };
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(report);
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByText("4.20 m")).toBeInTheDocument();
+    expect(screen.getByText(/Holdout validation: incomplete/i)).toBeInTheDocument();
+    expect(screen.getByText(/3\/4 trials completed/)).toBeInTheDocument();
+    expect(screen.getByText(/failure rate 25.0%/)).toBeInTheDocument();
   });
 
   it("labels llm_optimizer rows as 'GPT Gen N' and heuristic as 'Heuristic #N'", async () => {
@@ -244,6 +279,44 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     renderWithJob(job.id);
 
     expect(await screen.findByText(/CMA-ES Gen 2/)).toBeInTheDocument();
+  });
+
+  it("renders the portfolio with a localized name and accuracy-first description", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "optimizer_portfolio",
+    });
+    const trials: TrialSummary[] = [
+      {
+        id: "tri_portfolio_1",
+        candidate_id: "cand_portfolio_1",
+        seed: 31,
+        scenario_type: "nominal",
+        status: "COMPLETED",
+        score: 0.6,
+        pass_flag: true,
+        candidate_label: "optimizer_portfolio_gen_2",
+        candidate_source_type: "optimizer",
+        candidate_optimizer_strategy: "turbo",
+        candidate_is_baseline: false,
+        candidate_is_best: false,
+        candidate_generation_index: 2,
+      },
+    ];
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue(trials);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(
+      await screen.findByText(/TuRBO-inspired trust-region BO · Gen 2/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Splits budget across six engines and favors verified gains/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("optimizer_portfolio")).toBeNull();
   });
 
   it("renders a PASS/FAIL badge per completed trial based on pass_flag", async () => {

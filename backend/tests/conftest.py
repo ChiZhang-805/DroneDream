@@ -39,6 +39,13 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
     else:
         importlib.import_module("app.models")
 
+    # Authentication captures both get_db and get_settings at import time.
+    # Reload it after the database module so fixture order cannot leave a
+    # TestClient bound to an earlier test's engine or cached Settings function.
+    import app.auth as auth_module
+
+    importlib.reload(auth_module)
+
     # Reload services so they import the freshly reloaded models/db.
     import app.services.jobs as jobs_service_module
 

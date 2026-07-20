@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -14,6 +15,12 @@ from pathlib import Path
 
 CLOSE_DISTANCE_THRESHOLD_M = 2.0
 DEFAULT_MARKER_TIMEOUT_MS = 3000
+MAX_TRACK_BYTES = 16 * 1024 * 1024
+MAX_TRACK_POINTS = 10_000
+MAX_HOLD_SECONDS = 3600.0
+GZ_COMMAND_TIMEOUT_SECONDS = 10.0
+_GAZEBO_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+_GAZEBO_SERVICE_RE = re.compile(r"^/[A-Za-z0-9_./-]+$")
 
 
 class TrackMarkerError(RuntimeError):
@@ -36,18 +43,28 @@ def _extract_track_container(payload: object) -> list[object]:
             value = payload.get(key)
             if isinstance(value, list):
                 return value
-    raise TrackMarkerError("reference track JSON must be a list or contain points/samples/reference_track list")
+    raise TrackMarkerError(
+        "reference track JSON must be a list or contain points/samples/reference_track list"
+    )
 
 
 def load_reference_points(path: Path) -> list[dict[str, float]]:
-    if not path.exists():
+    if not path.is_file():
         raise TrackMarkerError(f"track file does not exist: {path}")
     try:
+        if path.stat().st_size > MAX_TRACK_BYTES:
+            raise TrackMarkerError(f"track file exceeds {MAX_TRACK_BYTES} bytes")
         payload = json.loads(path.read_text(encoding="utf-8"))
+    except TrackMarkerError:
+        raise
+    except (OSError, UnicodeDecodeError) as exc:
+        raise TrackMarkerError(f"cannot read track file: {exc}") from exc
     except json.JSONDecodeError as exc:
         raise TrackMarkerError(f"malformed track JSON: {exc}") from exc
 
     raw_points = _extract_track_container(payload)
+    if len(raw_points) > MAX_TRACK_POINTS:
+        raise TrackMarkerError(f"track cannot exceed {MAX_TRACK_POINTS} points")
     normalized: list[dict[str, float]] = []
     for idx, item in enumerate(raw_points):
         if not isinstance(item, dict):
@@ -69,11 +86,16 @@ def load_reference_points(path: Path) -> list[dict[str, float]]:
     return normalized
 
 
-def project_points_to_ground(points: list[dict[str, float]], z_offset: float) -> list[tuple[float, float, float]]:
+def project_points_to_ground(
+    points: list[dict[str, float]], z_offset: float
+) -> list[tuple[float, float, float]]:
     return [(float(p["x"]), float(p["y"]), float(z_offset)) for p in points]
 
 
-def maybe_close_track(points: list[tuple[float, float, float]], threshold_m: float = CLOSE_DISTANCE_THRESHOLD_M) -> list[tuple[float, float, float]]:
+def maybe_close_track(
+    points: list[tuple[float, float, float]],
+    threshold_m: float = CLOSE_DISTANCE_THRESHOLD_M,
+) -> list[tuple[float, float, float]]:
     if len(points) < 3:
         return points
     start = points[0]
@@ -94,12 +116,32 @@ def _parse_color(color: str) -> tuple[float, float, float, float]:
         raise TrackMarkerError("--color must contain numeric floats") from None
     if not all(math.isfinite(v) for v in values):
         raise TrackMarkerError("--color contains non-finite values")
+    if not all(0.0 <= v <= 1.0 for v in values):
+        raise TrackMarkerError("--color components must be between 0 and 1")
     return values
 
 
 def _line_type_token(mode: str) -> int:
     # gz.msgs.Marker enum: LINE_STRIP=4, POINTS=8
-    return 4 if mode == "line_strip" else 8
+    if mode == "line_strip":
+        return 4
+    if mode == "points":
+        return 8
+    raise TrackMarkerError("marker mode must be line_strip or points")
+
+
+def _validate_gazebo_name(value: str, *, label: str) -> str:
+    if not value or _GAZEBO_NAME_RE.fullmatch(value) is None:
+        raise TrackMarkerError(
+            f"{label} must contain only letters, digits, underscore, dot, or hyphen"
+        )
+    return value
+
+
+def _validate_service(value: str) -> str:
+    if _GAZEBO_SERVICE_RE.fullmatch(value) is None or "//" in value or ".." in value:
+        raise TrackMarkerError("marker service must be an absolute safe Gazebo service path")
+    return value
 
 
 def _marker_points_text(points: list[tuple[float, float, float]]) -> str:
@@ -116,6 +158,17 @@ def build_marker_service_request(
     marker_id: int,
     mode: str,
 ) -> str:
+    _validate_gazebo_name(world, label="world")
+    _validate_gazebo_name(marker_namespace, label="marker namespace")
+    if isinstance(marker_id, bool) or not 0 <= marker_id <= 2_147_483_647:
+        raise TrackMarkerError("marker id must be an integer between 0 and 2147483647")
+    if not math.isfinite(line_width) or not 0.0 < line_width <= 100.0:
+        raise TrackMarkerError("line width must be finite and between 0 and 100")
+    if not points or len(points) > MAX_TRACK_POINTS + 1:
+        raise TrackMarkerError(f"marker must contain between 1 and {MAX_TRACK_POINTS + 1} points")
+    for x, y, z in points:
+        if not all(math.isfinite(value) for value in (x, y, z)):
+            raise TrackMarkerError("marker points must contain only finite coordinates")
     r, g, b, a = _parse_color(color)
     line_type = _line_type_token(mode)
     points_text = _marker_points_text(points)
@@ -149,7 +202,8 @@ def marker_service_candidates(world: str) -> list[str]:
 
     override = os.environ.get("PX4_GAZEBO_MARKER_SERVICE", "").strip()
     if override:
-        return [override]
+        return [_validate_service(override)]
+    _validate_gazebo_name(world, label="world")
     return _dedupe([f"/world/{world}/marker", "/marker"])
 
 
@@ -160,7 +214,11 @@ def build_marker_command(
     service: str | None = None,
     timeout_ms: int = DEFAULT_MARKER_TIMEOUT_MS,
 ) -> list[str]:
-    marker_service = service or f"/world/{world or 'default'}/marker"
+    if isinstance(timeout_ms, bool) or not 1 <= timeout_ms <= 60_000:
+        raise TrackMarkerError("marker timeout must be between 1 and 60000 milliseconds")
+    selected_world = world or "default"
+    _validate_gazebo_name(selected_world, label="world")
+    marker_service = _validate_service(service or f"/world/{selected_world}/marker")
     return [
         "gz",
         "service",
@@ -178,7 +236,40 @@ def build_marker_command(
 
 
 def _run_cmd(argv: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(argv, text=True, capture_output=True, check=False)  # noqa: S603
+    try:
+        return subprocess.run(  # noqa: S603
+            argv,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=GZ_COMMAND_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = (
+            exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else exc.stdout
+        )
+        stderr = (
+            exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else exc.stderr
+        )
+        detail = (stderr or "").strip()
+        timeout_message = f"Gazebo command timed out after {GZ_COMMAND_TIMEOUT_SECONDS:g}s"
+        return subprocess.CompletedProcess(
+            argv,
+            124,
+            stdout=stdout or "",
+            stderr=f"{detail}\n{timeout_message}".strip(),
+        )
+
+
+def _command_for_log(argv: list[str]) -> list[str]:
+    """Return a useful command summary without duplicating a large marker payload."""
+
+    summarized = list(argv)
+    if "--req" in summarized:
+        request_index = summarized.index("--req") + 1
+        if request_index < len(summarized):
+            summarized[request_index] = f"<marker request: {len(summarized[request_index])} chars>"
+    return summarized
 
 
 def _marker_backend_available() -> bool:
@@ -188,9 +279,16 @@ def _marker_backend_available() -> bool:
 def _list_gz_services(log_path: Path | None) -> set[str] | None:
     result = _run_cmd(["gz", "service", "-l"])
     if result.returncode != 0:
-        _append_log(log_path, "[gazebo_track_marker] unable to list Gazebo services; trying marker endpoints directly")
+        _append_log(
+            log_path,
+            "[gazebo_track_marker] unable to list Gazebo services; "
+            "trying marker endpoints directly",
+        )
         if result.stderr:
-            _append_log(log_path, f"[gazebo_track_marker] service-list stderr={result.stderr.strip()}")
+            _append_log(
+                log_path,
+                f"[gazebo_track_marker] service-list stderr={result.stderr.strip()}",
+            )
         return None
     services = {line.strip() for line in result.stdout.splitlines() if line.strip()}
     marker_services = sorted(service for service in services if "marker" in service)
@@ -202,7 +300,12 @@ def _service_result_looks_successful(result: subprocess.CompletedProcess[str]) -
     if result.returncode != 0:
         return False
     payload = f"{result.stdout}\n{result.stderr}".lower()
-    false_tokens = ("data: false", "data:false", "boolean { data: false", "boolean{data:false")
+    false_tokens = (
+        "data: false",
+        "data:false",
+        "boolean { data: false",
+        "boolean{data:false",
+    )
     return not any(token in payload for token in false_tokens)
 
 
@@ -219,6 +322,11 @@ def draw_track_marker(
     hold_seconds: float,
     log_path: Path | None,
 ) -> int:
+    _validate_gazebo_name(world, label="world")
+    if not math.isfinite(z_offset):
+        raise TrackMarkerError("z offset must be finite")
+    if not math.isfinite(hold_seconds) or not 0.0 <= hold_seconds <= MAX_HOLD_SECONDS:
+        raise TrackMarkerError(f"hold seconds must be between 0 and {MAX_HOLD_SECONDS:g}")
     points = load_reference_points(track_path)
     projected = project_points_to_ground(points, z_offset)
     if mode == "line_strip":
@@ -248,13 +356,16 @@ def draw_track_marker(
 
     for service in candidates:
         if services is not None and service not in services:
-            _append_log(log_path, f"[gazebo_track_marker] skipping unavailable marker service: {service}")
+            _append_log(
+                log_path,
+                f"[gazebo_track_marker] skipping unavailable marker service: {service}",
+            )
             last_error = f"marker service not listed: {service}"
             continue
 
         cmd = build_marker_command(service=service, request=request)
         _append_log(log_path, f"[gazebo_track_marker] marker_service={service}")
-        _append_log(log_path, f"[gazebo_track_marker] command={cmd}")
+        _append_log(log_path, f"[gazebo_track_marker] command={_command_for_log(cmd)}")
         result = _run_cmd(cmd)
         if result.stdout:
             _append_log(log_path, f"[gazebo_track_marker] stdout={result.stdout.strip()}")
@@ -298,7 +409,7 @@ def main() -> int:
             marker_namespace=args.marker_namespace,
             marker_id=args.marker_id,
             mode=args.mode,
-            hold_seconds=max(0.0, args.hold_seconds),
+            hold_seconds=args.hold_seconds,
             log_path=args.log,
         )
     except TrackMarkerError as exc:

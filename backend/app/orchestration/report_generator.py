@@ -26,9 +26,10 @@ from sqlalchemy.orm import Session
 from app import models
 from app.config import get_settings
 from app.orchestration.events import record_event
-from app.orchestration.repro_manifest import build_repro_manifest
+from app.orchestration.repro_manifest import build_repro_manifest, sanitize_payload
 from app.services.pdf_report import generate_job_pdf_report
 from app.storage import get_artifact_storage
+from app.storage.registration import guard_artifact_registration
 
 logger = logging.getLogger("drone_dream.orchestration.report_generator")
 
@@ -41,20 +42,32 @@ def _comparison_points(
     """Build the baseline-vs-optimized comparison list used by the frontend."""
 
     def _point(
-        key: str, label: str, unit: str | None, *, lower_is_better: bool
+        key: str,
+        label: str,
+        unit: str | None,
+        *,
+        lower_is_better: bool,
+        source_key: str | None = None,
     ) -> dict[str, Any]:
+        value_key = source_key or key
         return {
             "metric": key,
             "label": label,
-            "baseline": baseline_agg[key],
-            "optimized": best_agg[key],
+            "baseline": baseline_agg.get(value_key),
+            "optimized": best_agg.get(value_key),
             "lower_is_better": lower_is_better,
             "unit": unit,
         }
 
     return [
         _point("rmse", "RMSE", "m", lower_is_better=True),
-        _point("max_error", "Max error", "m", lower_is_better=True),
+        _point(
+            "max_error_worst",
+            "Worst max error",
+            "m",
+            lower_is_better=True,
+            source_key="max_error_worst",
+        ),
         _point("overshoot_count", "Overshoot", None, lower_is_better=True),
         _point("completion_time", "Completion time", "s", lower_is_better=True),
         _point("score", "Score", None, lower_is_better=True),
@@ -64,13 +77,19 @@ def _comparison_points(
 def _report_metrics(agg: dict[str, Any]) -> dict[str, Any]:
     """Narrow an aggregate dict to the :class:`AggregatedMetrics` schema shape."""
 
-    return {
+    result: dict[str, Any] = {
         "rmse": agg["rmse"],
         "max_error": agg["max_error"],
+        "max_error_mean": agg.get("max_error_mean", agg["max_error"]),
+        "max_error_worst": agg.get("max_error_worst", agg["max_error"]),
         "overshoot_count": agg["overshoot_count"],
         "completion_time": agg["completion_time"],
         "score": agg["score"],
     }
+    for key in ("completion_rate", "failure_rate", "pass_rate", "holdout"):
+        if key in agg:
+            result[key] = agg[key]
+    return result
 
 
 # --- Summary text ----------------------------------------------------------
@@ -195,7 +214,9 @@ def generate_summary_text(
     best_pass = _pass_rate(best_trials)
 
     notes: list[str] = []
-    if best_failed > 0 and best_trials:
+    if not best_trials:
+        notes.append("no best-candidate trial rows were available")
+    elif best_failed > 0:
         notes.append(
             f"{best_failed} of {len(best_trials)} best-candidate trials failed"
         )
@@ -316,17 +337,18 @@ def ensure_mock_job_artifacts(db: Session, job: models.Job) -> list[models.Artif
     same job does not create duplicate rows.
     """
 
+    guard_artifact_registration(db, owner_type="job", owner_id=job.id)
     existing = db.scalars(
         select(models.Artifact)
         .where(models.Artifact.owner_type == "job")
         .where(models.Artifact.owner_id == job.id)
     ).all()
-    existing_keys = {(a.artifact_type, a.storage_path) for a in existing}
+    existing_types = {artifact.artifact_type for artifact in existing}
 
     created: list[models.Artifact] = []
     for template in _JOB_ARTIFACT_TEMPLATES:
         storage_path = template["storage_path"].format(job_id=job.id)
-        if (template["artifact_type"], storage_path) in existing_keys:
+        if template["artifact_type"] in existing_types:
             continue
         artifact = models.Artifact(
             owner_type="job",
@@ -357,7 +379,7 @@ def _default_artifact_root() -> Path:
 
 def _write_json(path: Path, payload: Any) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(payload, indent=2, sort_keys=True)
+    text = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False)
     path.write_text(text + "\n", encoding="utf-8")
     return len((text + "\n").encode("utf-8"))
 
@@ -383,6 +405,7 @@ def ensure_real_job_artifacts(
 ) -> list[models.Artifact]:
     """Ensure real backend jobs expose concrete job-level artifact files + rows."""
 
+    guard_artifact_registration(db, owner_type="job", owner_id=job.id)
     artifact_dir = _real_artifact_root() / "jobs" / job.id / "job_artifacts"
     custom_track_count, custom_track_preview = _custom_track_summary(job)
     report_payload = {
@@ -390,7 +413,7 @@ def ensure_real_job_artifacts(
         "best_candidate_id": best.id,
         "summary_text": report_body["summary_text"],
         "custom_track_point_count": custom_track_count,
-        "custom_track_preview": custom_track_preview,
+        "custom_track_preview": sanitize_payload(custom_track_preview),
         "baseline_metrics": report_body["baseline_metric_json"],
         "optimized_metrics": report_body["optimized_metric_json"],
         "comparison": report_body["comparison_metric_json"],
@@ -405,12 +428,12 @@ def ensure_real_job_artifacts(
             "source_type": c.source_type,
             "generation_index": c.generation_index,
             "aggregated_score": c.aggregated_score,
-            "aggregated_metrics": c.aggregated_metric_json,
+            "aggregated_metrics": sanitize_payload(c.aggregated_metric_json),
             "trial_count": c.trial_count,
             "completed_trial_count": c.completed_trial_count,
             "failed_trial_count": c.failed_trial_count,
             "rank_in_job": c.rank_in_job,
-            "parameter_json": dict(c.parameter_json or {}),
+            "parameter_json": sanitize_payload(dict(c.parameter_json or {})),
         }
         for c in job.candidates
     ]
@@ -474,7 +497,7 @@ def ensure_real_job_artifacts(
     event_lines = [
         (
             f"{e.created_at.isoformat()} {e.event_type} "
-            f"{json.dumps(e.payload_json or {}, sort_keys=True)}"
+            f"{json.dumps(sanitize_payload(e.payload_json or {}), sort_keys=True, allow_nan=False)}"
         )
         for e in sorted(job.events, key=lambda item: item.created_at)
     ]
@@ -527,7 +550,7 @@ def ensure_real_job_artifacts(
         .where(models.Artifact.owner_type == "job")
         .where(models.Artifact.owner_id == job.id)
     ).all()
-    existing_keys = {(a.artifact_type, a.storage_path) for a in existing}
+    existing_by_type = {artifact.artifact_type: artifact for artifact in existing}
 
     created: list[models.Artifact] = []
     storage = get_artifact_storage()
@@ -539,19 +562,21 @@ def ensure_real_job_artifacts(
         )
         storage_key = f"jobs/{job.id}/job_artifacts/{path.name}"
         storage_path = storage.put_file(path, storage_key, mime_type)
-        if (artifact_type, storage_path) in existing_keys:
-            continue
-        artifact = models.Artifact(
-            owner_type="job",
-            owner_id=job.id,
-            artifact_type=artifact_type,
-            display_name=display_name,
-            storage_path=storage_path,
-            mime_type=mime_type,
-            file_size_bytes=size,
-        )
-        db.add(artifact)
-        created.append(artifact)
+        artifact = existing_by_type.get(artifact_type)
+        if artifact is None:
+            artifact = models.Artifact(
+                owner_type="job",
+                owner_id=job.id,
+                artifact_type=artifact_type,
+                storage_path=storage_path,
+            )
+            db.add(artifact)
+            created.append(artifact)
+            existing_by_type[artifact_type] = artifact
+        artifact.display_name = display_name
+        artifact.storage_path = storage_path
+        artifact.mime_type = mime_type
+        artifact.file_size_bytes = size
     return created
 
 
@@ -603,6 +628,7 @@ def ensure_repro_manifest_artifact(
     job: models.Job,
     best: models.CandidateParameterSet,
 ) -> models.Artifact:
+    guard_artifact_registration(db, owner_type="job", owner_id=job.id)
     root = (
         _real_artifact_root()
         if job.simulator_backend_requested == "real_cli"
@@ -652,6 +678,7 @@ def _upsert_pdf_artifact(
 
 
 def ensure_job_pdf_artifact(db: Session, *, job: models.Job) -> models.Artifact:
+    guard_artifact_registration(db, owner_type="job", owner_id=job.id)
     root = (
         _real_artifact_root()
         if job.simulator_backend_requested == "real_cli"

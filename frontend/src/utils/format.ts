@@ -17,7 +17,8 @@ export function isActiveJobStatus(status: JobStatus): boolean {
     status === "CREATED" ||
     status === "QUEUED" ||
     status === "RUNNING" ||
-    status === "AGGREGATING"
+    status === "AGGREGATING" ||
+    status === "FINALIZING"
   );
 }
 

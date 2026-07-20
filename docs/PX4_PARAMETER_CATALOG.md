@@ -2,11 +2,11 @@
 
 DroneDream exposes a curated multicopter parameter catalog at
 `GET /api/v1/parameter-catalog`. The current revision is
-`dronedream.px4.multicopter.2026-07-r1` and supports the PX4 version selectors
+`dronedream.px4.multicopter.2026-07-r2` and supports the PX4 version selectors
 `v1.16`, `v1.17`, and `main`.
 
 The catalog is intentionally narrower than the complete PX4 parameter set. It
-contains 25 real PX4 names that can be applied to SITL without translating from
+contains 45 real PX4 names that can be applied to SITL without translating from
 DroneDream's legacy `kp_xy`-style Offboard settings:
 
 | Group | Parameters |
@@ -14,8 +14,10 @@ DroneDream's legacy `kp_xy`-style Offboard settings:
 | XY position/velocity | `MPC_XY_P`, `MPC_XY_VEL_P_ACC`, `MPC_XY_VEL_I_ACC`, `MPC_XY_VEL_D_ACC` |
 | Z position/velocity | `MPC_Z_P`, `MPC_Z_VEL_P_ACC`, `MPC_Z_VEL_I_ACC`, `MPC_Z_VEL_D_ACC` |
 | Attitude | `MC_ROLL_P`, `MC_PITCH_P`, `MC_YAW_P` |
-| Angular rate | `MC_ROLLRATE_P`, `MC_ROLLRATE_I`, `MC_ROLLRATE_D`, `MC_PITCHRATE_P`, `MC_PITCHRATE_I`, `MC_PITCHRATE_D`, `MC_YAWRATE_P`, `MC_YAWRATE_I` |
-| Motion limits | `MPC_XY_VEL_MAX`, `MPC_Z_VEL_MAX_UP`, `MPC_Z_VEL_MAX_DN`, `MPC_ACC_HOR`, `MPC_ACC_HOR_MAX`, `MPC_JERK_AUTO` |
+| Angular rate | 18 rate P/I/D, K, feed-forward, and maximum-rate entries for roll, pitch, and yaw |
+| Motion limits | `MPC_XY_VEL_MAX`, `MPC_Z_VEL_MAX_UP`, `MPC_Z_VEL_MAX_DN`, `MPC_ACC_HOR`, `MPC_ACC_HOR_MAX`, `MPC_JERK_AUTO`, `MPC_TILTMAX_AIR`, `MPC_TILTMAX_LND` |
+| Thrust and authority | `MPC_THR_MIN`, `MPC_THR_HOVER`, `MPC_THR_MAX`, `MPC_THR_XY_MARG`, `THR_MDL_FAC`, `MC_AIRMODE` |
+| Filters | `IMU_GYRO_CUTOFF`, `IMU_DGYRO_CUTOFF` |
 
 Every entry includes type, unit, upstream/guardrail hard bounds, narrower
 DroneDream safe bounds, search step, group, risk, reboot flag, dependencies,
@@ -31,7 +33,9 @@ The values are based on the
 PX4's declared bounds are used where they are finite. DroneDream supplies a
 finite guardrail for parameters where upstream does not declare a finite
 maximum. The revision is pinned so later PX4 changes can be introduced as a new
-catalog rather than silently changing an existing experiment.
+catalog rather than silently changing an existing experiment. The immediately
+preceding `r1` ID and explicit `builtin-v1`/`px4-*` aliases resolve to `r2` for
+persisted compatibility; unknown identifiers are rejected.
 
 ## API
 
@@ -89,7 +93,7 @@ two namespaces remain separate: a real PX4 gain never masquerades as an
 Offboard trajectory setting.
 
 By default the runner enforces safe bounds. An operator may set
-`PX4_ENFORCE_SAFE_PARAMETER_BOUNDS=false` for an expert experiment that has
+`PX4_PARAMETER_ENFORCE_SAFE_BOUNDS=false` for an expert experiment that has
 already passed hard-bound validation.
 
 ## Application transports

@@ -11,8 +11,23 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
 from app import models
+from app.orchestration.acceptance import criteria_for_job, evaluate_candidate
 
-_SECRET_TOKENS = ("secret", "api_key", "token", "password", "key")
+_SECRET_TOKENS = (
+    "secret",
+    "api_key",
+    "token",
+    "password",
+    "key",
+    "credential",
+    "authorization",
+    "bearer",
+    "cookie",
+)
+
+
+def _worst_max_error(aggregate: dict[str, Any]) -> Any:
+    return aggregate.get("max_error_worst", aggregate.get("max_error"))
 
 
 def _fmt_dt(value: datetime | None) -> str:
@@ -130,15 +145,22 @@ def _paginate_lines(wrapped_lines: list[str], lines_per_page: int = 52) -> list[
     ]
 
 
-def _escape_pdf_text(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+def _pdf_text_operand(text: str) -> bytes:
+    """Encode Unicode for the predefined Adobe GB1 CID font.
+
+    Literal PDF strings plus Helvetica only render Latin text. DroneDream job
+    names, errors, and summaries are routinely Chinese, so use UTF-16BE hex
+    strings with the standard ``UniGB-UCS2-H`` CMap instead of emitting broken
+    UTF-8 bytes into a Helvetica content stream.
+    """
+
+    return f"<{text.encode('utf-16-be').hex().upper()}> Tj".encode("ascii")
 
 
 def _build_page_stream(page_lines: list[str], page_number: int, page_count: int) -> bytes:
     stream_lines = [b"BT", b"/F1 10 Tf", b"50 800 Td", b"14 TL"]
     for line in page_lines:
-        escaped = _escape_pdf_text(line)
-        stream_lines.append(f"({escaped}) Tj".encode())
+        stream_lines.append(_pdf_text_operand(line))
         stream_lines.append(b"T*")
     stream_lines.extend(
         [
@@ -146,7 +168,7 @@ def _build_page_stream(page_lines: list[str], page_number: int, page_count: int)
             b"BT",
             b"/F1 9 Tf",
             b"260 30 Td",
-            f"(Page {page_number} / {page_count}) Tj".encode(),
+            _pdf_text_operand(f"Page {page_number} / {page_count}"),
             b"ET",
         ]
     )
@@ -168,9 +190,16 @@ def _build_pdf(lines: list[str]) -> bytes:
 
     objects: list[bytes] = []
     objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
-    page_kids = " ".join(f"{5 + i * 2} 0 R" for i in range(page_count))
+    page_kids = " ".join(f"{6 + i * 2} 0 R" for i in range(page_count))
     objects.append(f"<< /Type /Pages /Kids [{page_kids}] /Count {page_count} >>".encode())
-    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    objects.append(
+        b"<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light "
+        b"/Encoding /UniGB-UCS2-H /DescendantFonts [4 0 R] >>"
+    )
+    objects.append(
+        b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light "
+        b"/CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 4 >> >>"
+    )
 
     for idx, page_lines in enumerate(pages):
         stream_obj = _build_page_stream(
@@ -183,7 +212,7 @@ def _build_pdf(lines: list[str]) -> bytes:
             "<< /Type /Page /Parent 2 0 R "
             "/MediaBox [0 0 595 842] "
             "/Resources << /Font << /F1 3 0 R >> >> "
-            f"/Contents {4 + idx * 2} 0 R >>"
+            f"/Contents {5 + idx * 2} 0 R >>"
         ).encode()
         objects.append(page_obj)
 
@@ -248,8 +277,8 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         f"{_pct_change(baseline_agg.get('rmse'), best_agg.get('rmse'))}"
     )
     add(
-        "- Baseline vs best max_error change: "
-        f"{_pct_change(baseline_agg.get('max_error'), best_agg.get('max_error'))}"
+        "- Baseline vs best worst max_error change: "
+        f"{_pct_change(_worst_max_error(baseline_agg), _worst_max_error(best_agg))}"
     )
     add(
         "- Baseline vs best completion_time change: "
@@ -310,49 +339,32 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- target_rmse: {_fmt_num(job.target_rmse, digits=3)}")
     add(f"- target_max_error: {_fmt_num(job.target_max_error, digits=3)}")
     add(f"- min_pass_rate: {_fmt_num(job.min_pass_rate, digits=3)}")
-    pass_count = 0
-    completed_count = 0
-    for trial in best.trials if best is not None else []:
-        if trial.status != "COMPLETED" or trial.metric is None:
-            continue
-        completed_count += 1
-        if trial.metric.pass_flag:
-            pass_count += 1
-    pass_rate = (pass_count / completed_count) if completed_count else None
-    reasons: list[str] = []
-    if isinstance(job.target_rmse, (int, float)):
-        rmse_value = best_agg.get("rmse")
-        if not isinstance(rmse_value, (int, float)) or rmse_value > job.target_rmse:
-            reasons.append(
-                "rmse="
-                f"{_fmt_num(rmse_value, digits=3)} > "
-                f"target={_fmt_num(job.target_rmse, digits=3)}"
-            )
-    if isinstance(job.target_max_error, (int, float)):
-        max_error_value = best_agg.get("max_error")
-        if (
-            not isinstance(max_error_value, (int, float))
-            or max_error_value > job.target_max_error
-        ):
-            reasons.append(
-                "max_error="
-                f"{_fmt_num(max_error_value, digits=3)} > "
-                f"target={_fmt_num(job.target_max_error, digits=3)}"
-            )
-    if isinstance(job.min_pass_rate, (int, float)) and (
-        pass_rate is None or pass_rate < job.min_pass_rate
-    ):
-        reasons.append(
-            f"pass_rate={_fmt_num(pass_rate, digits=3)} < "
-            f"min={_fmt_num(job.min_pass_rate, digits=3)}"
+    acceptance = (
+        evaluate_candidate(best, criteria_for_job(job)) if best is not None else None
+    )
+    add(
+        "- Best candidate meets acceptance: "
+        f"{'yes' if acceptance is not None and acceptance.passed else 'no'}"
+    )
+    if acceptance is not None:
+        add(
+            "  - evaluator="
+            f"{acceptance.reason}, pass_rate={_fmt_num(acceptance.pass_rate, digits=3)}, "
+            f"completion_rate={_fmt_num(acceptance.completion_rate, digits=3)}, "
+            f"rmse={_fmt_num(acceptance.rmse, digits=3)}, "
+            f"worst_max_error={_fmt_num(acceptance.max_error, digits=3)}"
         )
-    add(f"- Best candidate meets acceptance: {'yes' if not reasons else 'no'}")
-    if reasons:
-        add("- Rejection reasons:")
-        for reason in reasons:
-            add(f"  - {reason}")
-    else:
-        add("- Rejection reasons: —")
+    holdout = best_agg.get("holdout")
+    if isinstance(holdout, dict):
+        add(
+            "- Holdout validation: "
+            f"status={holdout.get('validation_status', 'unknown')}, "
+            f"feasible={_fmt_num(holdout.get('feasible'))}, "
+            f"completed={holdout.get('completed_trial_count', 0)}/"
+            f"{holdout.get('trial_count', 0)}, "
+            f"pass_rate={_fmt_num(holdout.get('pass_rate'), digits=3)}, "
+            f"failure_rate={_fmt_num(holdout.get('failure_rate'), digits=3)}"
+        )
 
     add("")
     add("5) Baseline metrics")
@@ -368,9 +380,12 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     else:
         add("- Baseline parameters: —")
     add(f"- Aggregated RMSE: {_fmt_num(baseline_agg.get('rmse'), digits=3)} m")
-    add(f"- Aggregated max_error: {_fmt_num(baseline_agg.get('max_error'), digits=3)} m")
+    add(f"- Mean max_error: {_fmt_num(baseline_agg.get('max_error'), digits=3)} m")
+    add(f"- Worst max_error: {_fmt_num(_worst_max_error(baseline_agg), digits=3)} m")
     add(f"- Completion time: {_fmt_num(baseline_agg.get('completion_time'), digits=2)} s")
-    score = baseline_agg.get("aggregated_score") or baseline_agg.get("score")
+    score = baseline_agg.get("aggregated_score")
+    if score is None:
+        score = baseline_agg.get("score")
     add(f"- Score: {_fmt_num(score, digits=4)}")
     done = baseline_agg.get("completed_trial_count", 0)
     total = baseline_agg.get("trial_count", 0)
@@ -401,11 +416,14 @@ def build_job_report_lines(job: models.Job) -> list[str]:
             "disturbance_rejection": params.get("disturbance_rejection"),
         }
         add(f"  params {_truncate(json.dumps(focus_params, ensure_ascii=False), limit=220)}")
+        aggregate_score = agg.get("aggregated_score")
+        if aggregate_score is None:
+            aggregate_score = candidate.aggregated_score
         metrics_text = (
             f"  metrics rmse={_fmt_num(agg.get('rmse'), digits=3)} "
-            f"max_error={_fmt_num(agg.get('max_error'), digits=3)} "
+            f"worst_max_error={_fmt_num(_worst_max_error(agg), digits=3)} "
             f"completion={_fmt_num(agg.get('completion_time'), digits=2)}s "
-            f"score={_fmt_num(agg.get('aggregated_score') or candidate.aggregated_score, digits=4)}"
+            f"score={_fmt_num(aggregate_score, digits=4)}"
         )
         add(metrics_text)
         rationale = _truncate(candidate.proposal_reason, limit=200)
@@ -445,7 +463,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- best generation index: {best.generation_index if best else '—'}")
     metric_summary = (
         f"- best aggregated metrics: rmse={_fmt_num(best_agg.get('rmse'), digits=3)} m, "
-        f"max_error={_fmt_num(best_agg.get('max_error'), digits=3)} m, "
+        f"worst_max_error={_fmt_num(_worst_max_error(best_agg), digits=3)} m, "
         f"completion={_fmt_num(best_agg.get('completion_time'), digits=2)} s, "
         f"score={_fmt_num(best_agg.get('aggregated_score'), digits=4)}"
     )
@@ -462,7 +480,8 @@ def build_job_report_lines(job: models.Job) -> list[str]:
             add(
                 "- "
                 f"{artifact.artifact_type} | {artifact.display_name or '—'} | "
-                f"{artifact.mime_type or '—'} | size={artifact.file_size_bytes or '—'}"
+                f"{artifact.mime_type or '—'} | "
+                f"size={artifact.file_size_bytes if artifact.file_size_bytes is not None else '—'}"
             )
     else:
         add("- Job-level artifacts: —")
