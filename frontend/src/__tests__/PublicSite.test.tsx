@@ -74,6 +74,9 @@ describe("DroneDream public website", () => {
       "href",
       "https://github.com/ChiZhang-805/DroneDream/blob/main/PRIVACY.md",
     );
+    expect(screen.getByText(
+      /Free code signing provided by SignPath\.io, certificate by SignPath Foundation\./i,
+    )).toBeVisible();
     expectContentLinksToUseIcons(container);
 
     const downloads = screen.getAllByRole("link", { name: /Download/i });
@@ -170,13 +173,25 @@ describe("DroneDream public website", () => {
     expect(fallbackRelease).toMatchObject({
       version: "1.0.0",
       fileName: "DroneDream_1.0.0_x64-setup.exe",
-      sha256: "af3d227610b5c2ad80b793512592f2c45e3792601bd8841ecdad236367723a1d",
-      sizeBytes: 5_752_402,
-      publishedAt: "2026-07-20",
+      sha256: "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+      sizeBytes: 5_526_509,
+      publishedAt: "2026-07-21",
     });
     expect(isWebsiteRelease(fallbackRelease)).toBe(true);
     expect(isWebsiteRelease({ ...fallbackRelease, sha256: "unsafe" })).toBe(false);
     expect(isWebsiteRelease({ ...fallbackRelease, downloadUrl: "javascript:alert(1)" })).toBe(false);
+    expect(isWebsiteRelease({
+      ...fallbackRelease,
+      downloadUrl: fallbackRelease.downloadUrl.replace("https://", "http://"),
+    })).toBe(false);
+    expect(isWebsiteRelease({
+      ...fallbackRelease,
+      downloadUrl: fallbackRelease.downloadUrl.replace("ChiZhang-805/DroneDream", "other/project"),
+    })).toBe(false);
+    expect(isWebsiteRelease({
+      ...fallbackRelease,
+      downloadUrl: `${fallbackRelease.downloadUrl}?unexpected=1`,
+    })).toBe(false);
     expect(isWebsiteRelease({ ...fallbackRelease, version: "0.3.12" })).toBe(false);
     expect(isWebsiteRelease({ ...fallbackRelease, publishedAt: "2026-99-99" })).toBe(false);
     expect(compareReleaseVersions("0.3.18", "0.3.18")).toBe(0);
@@ -197,6 +212,30 @@ describe("DroneDream public website", () => {
       sha256: "a".repeat(64),
       sizeBytes: 5_400_000,
       publishedAt: "2026-07-16",
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => nextRelease,
+    }));
+
+    renderSite();
+
+    await waitFor(() => expect(
+      screen.getAllByRole("link", { name: /Download/i })
+        .some((link) => link.getAttribute("href") === nextRelease.downloadUrl),
+    ).toBe(true));
+  });
+
+  it("uses a valid GitHub Release manifest for every global download link", async () => {
+    const nextRelease = {
+      ...fallbackRelease,
+      version: "1.0.1",
+      fileName: "DroneDream_1.0.1_x64-setup.exe",
+      downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-v1.0.1/DroneDream_1.0.1_x64-setup.exe",
+      checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-v1.0.1/DroneDream_1.0.1_x64-setup.exe.sha256",
+      sha256: "b".repeat(64),
+      sizeBytes: 5_500_000,
+      publishedAt: "2026-07-22",
     };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: true,

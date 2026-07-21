@@ -5,6 +5,30 @@ the independent DroneDream product and download website. The React and Three.js
 source lives in `frontend/src/site`; the generated release is
 `frontend/site-dist`.
 
+## Public website topology
+
+- `https://getdronedream.com/` and `https://www.getdronedream.com/` are the
+  global website, built from `main` and deployed by GitHub Pages.
+- `https://cn.getdronedream.com/` is reserved for the Alibaba Cloud mirror.
+  It must not be made public until the domain and deployment satisfy the
+  applicable mainland-China filing and HTTPS requirements.
+
+The Pages build reads `website/pages-release.json` and links directly to the
+exact versioned GitHub Release asset. It does not duplicate the installer in
+the Pages artifact. This keeps the global download, checksum, CI artifact, and
+future SignPath-signed release traceable to the same bytes.
+
+Build the Pages artifact locally with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-pages-site.ps1
+```
+
+The script produces `index.html`, `404.html`, `CNAME`, `.nojekyll`, and
+`downloads/latest.json` under `frontend/site-dist`. Update
+`website/pages-release.json` only after a new installer version is explicitly
+approved and its public GitHub Release asset has been verified.
+
 ## Build and review a release
 
 Build the versioned Windows installer first, then run from the repository root:
