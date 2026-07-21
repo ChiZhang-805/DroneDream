@@ -13,11 +13,11 @@ declare const __DRONEDREAM_RELEASE__: WebsiteRelease;
 const developmentFallbackRelease: WebsiteRelease = {
   version: "1.0.0",
   fileName: "DroneDream_1.0.0_x64-setup.exe",
-  downloadUrl: "/downloads/DroneDream_1.0.0_x64-setup.exe",
-  checksumUrl: "/downloads/DroneDream_1.0.0_x64-setup.exe.sha256",
-  sha256: "af3d227610b5c2ad80b793512592f2c45e3792601bd8841ecdad236367723a1d",
-  sizeBytes: 5_752_402,
-  publishedAt: "2026-07-20",
+  downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+  checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe.sha256",
+  sha256: "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+  sizeBytes: 5_526_509,
+  publishedAt: "2026-07-21",
 };
 
 export const fallbackRelease: WebsiteRelease =
@@ -34,6 +34,34 @@ function isIsoCalendarDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function isAllowedArtifactUrl(value: string, expectedArtifactName: string) {
+  if (value === `/downloads/${expectedArtifactName}`) return true;
+
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol !== "https:" ||
+      url.hostname !== "github.com" ||
+      url.port ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) return false;
+
+    const pathPrefix = "/ChiZhang-805/DroneDream/releases/download/";
+    if (!url.pathname.startsWith(pathPrefix)) return false;
+    const remainder = url.pathname.slice(pathPrefix.length);
+    const separatorIndex = remainder.indexOf("/");
+    if (separatorIndex <= 0) return false;
+    const tag = remainder.slice(0, separatorIndex);
+    const artifactName = remainder.slice(separatorIndex + 1);
+    return /^[A-Za-z0-9._-]+$/u.test(tag) && artifactName === expectedArtifactName;
+  } catch {
+    return false;
+  }
 }
 
 export function isWebsiteRelease(value: unknown): value is WebsiteRelease {
@@ -54,10 +82,11 @@ export function isWebsiteRelease(value: unknown): value is WebsiteRelease {
     isIsoCalendarDate(release.publishedAt);
   if (!hasValidShape) return false;
 
-  const expectedFileName = `DroneDream_${release.version}_x64-setup.exe`;
-  return release.fileName === expectedFileName &&
-    release.downloadUrl === `/downloads/${expectedFileName}` &&
-    release.checksumUrl === `/downloads/${expectedFileName}.sha256`;
+  const validatedRelease = release as WebsiteRelease;
+  const expectedFileName = `DroneDream_${validatedRelease.version}_x64-setup.exe`;
+  return validatedRelease.fileName === expectedFileName &&
+    isAllowedArtifactUrl(validatedRelease.downloadUrl, expectedFileName) &&
+    isAllowedArtifactUrl(validatedRelease.checksumUrl, `${expectedFileName}.sha256`);
 }
 
 export function compareReleaseVersions(left: string, right: string) {

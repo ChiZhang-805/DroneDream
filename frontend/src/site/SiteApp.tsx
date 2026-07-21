@@ -176,7 +176,7 @@ const content = {
     released: "Released",
     previewNote:
       "Unsigned preview · Windows SmartScreen confirmation may be required.",
-    footerLine: "Local-first autonomous control-parameter tuning for PX4 and Gazebo.",
+    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Free code signing provided by SignPath.io, certificate by SignPath Foundation.",
     codeSigningPolicy: "Code signing policy",
     privacyPolicy: "Privacy policy",
   },
@@ -337,7 +337,7 @@ const content = {
     platformValue: "Windows x64",
     released: "发布日期",
     previewNote: "未签名预览版 · Windows SmartScreen 可能要求确认。",
-    footerLine: "面向 PX4 与 Gazebo 的本地优先无人机控制参数自动调优平台。",
+    footerLine: "本地优先的 PX4/Gazebo 控制参数调优平台；代码签名由 SignPath.io 免费提供，证书由 SignPath Foundation 颁发。",
     codeSigningPolicy: "代码签名政策",
     privacyPolicy: "隐私政策",
   },
