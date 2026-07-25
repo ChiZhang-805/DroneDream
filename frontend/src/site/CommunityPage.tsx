@@ -19,13 +19,18 @@ import {
   type FormEvent,
   type KeyboardEvent,
   useCallback,
+  useDeferredValue,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 
 import type { DroneDreamAccount } from "../features/auth/AuthContext";
 import { supabaseClient } from "../features/auth/supabaseClient";
+import {
+  COMMUNITY_IMAGE_MAX_FILES,
+  CommunityImageError,
+  optimizeCommunityImage,
+} from "./communityMedia";
 
 type SiteLocale = "en" | "zh-CN";
 
@@ -44,27 +49,26 @@ interface CommunityTopic {
   tags: string[];
   image_urls: string[];
   created_at: string;
+  comment_count: number;
+  like_count: number;
+  liked_by_viewer: boolean;
 }
 
 interface CommunityComment {
   id: string;
   topic_id: string;
   parent_id: string | null;
+  parent_author_name: string | null;
   author_id: string;
   author_name: string;
   body: string;
   created_at: string;
+  like_count: number;
+  liked_by_viewer: boolean;
 }
 
-interface TopicLike {
-  topic_id: string;
-  user_id: string;
-}
-
-interface CommentLike {
-  comment_id: string;
-  user_id: string;
-}
+const TOPIC_PAGE_SIZE = 24;
+const COMMENT_PAGE_SIZE = 100;
 
 const tagOptions = {
   en: [
@@ -109,7 +113,12 @@ const communityContent = {
     tagsLabel: "Tags",
     customTag: "Add a custom tag",
     mediaLabel: "Images",
-    mediaHint: "JPEG, PNG, WebP, or GIF · up to 8 MiB each",
+    mediaHint: "JPEG, PNG, or WebP · up to 4 images, optimized below 1 MiB each",
+    mediaUnsupported: "Use a JPEG, PNG, or WebP image.",
+    mediaSourceTooLarge: "Each source image must be 12 MiB or smaller.",
+    mediaDecodeFailed: "One of the selected images could not be processed.",
+    mediaOutputTooLarge: "One image could not be reduced below the upload limit.",
+    preparingMedia: "Optimizing images…",
     publish: "Publish topic",
     publishing: "Publishing…",
     cancel: "Cancel",
@@ -123,6 +132,8 @@ const communityContent = {
     clearReply: "Cancel reply",
     sendComment: "Post comment",
     likes: "likes",
+    loadMore: "Load more topics",
+    loadMoreComments: "Load more comments",
     noComments: "No comments yet. Add the first evidence-based response.",
     signInAction: "Sign in to join the discussion",
     removeImage: "Remove image",
@@ -156,7 +167,12 @@ const communityContent = {
     tagsLabel: "标签",
     customTag: "添加自定义标签",
     mediaLabel: "图片",
-    mediaHint: "支持 JPEG、PNG、WebP 或 GIF；每张不超过 8 MiB",
+    mediaHint: "支持 JPEG、PNG 或 WebP；最多 4 张，自动优化至每张 1 MiB 以下",
+    mediaUnsupported: "请选择 JPEG、PNG 或 WebP 图片。",
+    mediaSourceTooLarge: "每张原始图片不得超过 12 MiB。",
+    mediaDecodeFailed: "其中一张图片无法处理，请更换后重试。",
+    mediaOutputTooLarge: "其中一张图片无法压缩到上传限制以内。",
+    preparingMedia: "正在优化图片……",
     publish: "发表话题",
     publishing: "正在发表……",
     cancel: "取消",
@@ -170,6 +186,8 @@ const communityContent = {
     clearReply: "取消回复",
     sendComment: "发表评论",
     likes: "次点赞",
+    loadMore: "加载更多话题",
+    loadMoreComments: "加载更多评论",
     noComments: "还没有评论；你可以补充第一条基于证据的回复。",
     signInAction: "登录后参与讨论",
     removeImage: "移除图片",
@@ -184,11 +202,6 @@ function dateLabel(locale: SiteLocale, value: string) {
   }).format(new Date(value));
 }
 
-function fileExtension(file: File) {
-  const extension = file.name.split(".").pop()?.toLowerCase();
-  return extension && /^[a-z0-9]+$/u.test(extension) ? extension : "jpg";
-}
-
 export function CommunityPage({
   locale,
   account,
@@ -199,11 +212,14 @@ export function CommunityPage({
   const allTopicsView = new URLSearchParams(window.location.search).get("view") === "all";
   const [topics, setTopics] = useState<CommunityTopic[]>([]);
   const [comments, setComments] = useState<CommunityComment[]>([]);
-  const [topicLikes, setTopicLikes] = useState<TopicLike[]>([]);
-  const [commentLikes, setCommentLikes] = useState<CommentLike[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMoreTopics, setLoadingMoreTopics] = useState(false);
+  const [hasMoreTopics, setHasMoreTopics] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<CommunityTopic | null>(null);
@@ -212,70 +228,86 @@ export function CommunityPage({
   const [tags, setTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [preparingMedia, setPreparingMedia] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
 
-  const loadCommunity = useCallback(async () => {
+  const loadTopics = useCallback(async (offset = 0, append = false) => {
     if (!supabaseClient) {
       setLoading(false);
       setError(copy.unavailable);
       return;
     }
-    setLoading(true);
+    if (append) setLoadingMoreTopics(true);
+    else setLoading(true);
     setError(null);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
-      const [topicsResult, commentsResult, topicLikesResult, commentLikesResult] =
-        await Promise.all([
-          supabaseClient
-            .from("community_topics")
-            .select("id, author_id, author_name, title, body, tags, image_urls, created_at")
-            .order("created_at", { ascending: false })
-            .limit(100)
-            .abortSignal(controller.signal),
-          supabaseClient
-            .from("community_comments")
-            .select("id, topic_id, parent_id, author_id, author_name, body, created_at")
-            .order("created_at", { ascending: true })
-            .limit(500)
-            .abortSignal(controller.signal),
-          supabaseClient
-            .from("community_topic_likes")
-            .select("topic_id, user_id")
-            .limit(2000)
-            .abortSignal(controller.signal),
-          supabaseClient
-            .from("community_comment_likes")
-            .select("comment_id, user_id")
-            .limit(4000)
-            .abortSignal(controller.signal),
-        ]);
-      const requestError =
-        topicsResult.error ??
-        commentsResult.error ??
-        topicLikesResult.error ??
-        commentLikesResult.error;
-      if (requestError) {
-        setError(copy.unavailable);
-        return;
-      }
-      setTopics((topicsResult.data ?? []) as CommunityTopic[]);
-      setComments((commentsResult.data ?? []) as CommunityComment[]);
-      setTopicLikes((topicLikesResult.data ?? []) as TopicLike[]);
-      setCommentLikes((commentLikesResult.data ?? []) as CommentLike[]);
+      const { data, error: requestError } = await supabaseClient
+        .rpc("community_list_topics", {
+          p_search: deferredQuery.trim() || null,
+          p_tag: activeTag,
+          p_offset: offset,
+          p_limit: TOPIC_PAGE_SIZE + 1,
+        })
+        .abortSignal(controller.signal);
+      if (requestError) throw requestError;
+      const page = ((data ?? []) as CommunityTopic[]).map((topic) => ({
+        ...topic,
+        comment_count: Number(topic.comment_count),
+        like_count: Number(topic.like_count),
+      }));
+      const boundedPage = page.slice(0, TOPIC_PAGE_SIZE);
+      setHasMoreTopics(page.length > TOPIC_PAGE_SIZE);
+      setTopics((current) => append ? [...current, ...boundedPage] : boundedPage);
     } catch {
       setError(copy.unavailable);
     } finally {
       window.clearTimeout(timeout);
-      setLoading(false);
+      if (append) setLoadingMoreTopics(false);
+      else setLoading(false);
     }
-  }, [copy.unavailable]);
+  }, [activeTag, copy.unavailable, deferredQuery]);
 
   useEffect(() => {
-    void loadCommunity();
-  }, [loadCommunity]);
+    void loadTopics();
+  }, [loadTopics]);
+
+  const loadComments = useCallback(async (
+    topicId: string,
+    offset = 0,
+    append = false,
+  ) => {
+    if (!supabaseClient) return;
+    setCommentsLoading(true);
+    setError(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
+    try {
+      const { data, error: requestError } = await supabaseClient
+        .rpc("community_list_comments", {
+          p_topic_id: topicId,
+          p_offset: offset,
+          p_limit: COMMENT_PAGE_SIZE + 1,
+        })
+        .abortSignal(controller.signal);
+      if (requestError) throw requestError;
+      const page = ((data ?? []) as CommunityComment[]).map((comment) => ({
+        ...comment,
+        like_count: Number(comment.like_count),
+      }));
+      const boundedPage = page.slice(0, COMMENT_PAGE_SIZE);
+      setHasMoreComments(page.length > COMMENT_PAGE_SIZE);
+      setComments((current) => append ? [...current, ...boundedPage] : boundedPage);
+    } catch {
+      setError(copy.unavailable);
+    } finally {
+      window.clearTimeout(timeout);
+      setCommentsLoading(false);
+    }
+  }, [copy.unavailable]);
 
   useEffect(() => {
     if (!composerOpen && !selectedTopic) return;
@@ -286,20 +318,14 @@ export function CommunityPage({
     };
   }, [composerOpen, selectedTopic]);
 
-  const filteredTopics = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase(locale);
-    return topics.filter((topic) => {
-      const matchesTag = !activeTag || topic.tags.includes(activeTag);
-      const haystack = `${topic.title} ${topic.body} ${topic.tags.join(" ")}`
-        .toLocaleLowerCase(locale);
-      return matchesTag && (!normalized || haystack.includes(normalized));
-    });
-  }, [activeTag, locale, query, topics]);
+  const visibleTopics = allTopicsView ? topics : topics.slice(0, 3);
 
-  const visibleTopics = allTopicsView ? filteredTopics : filteredTopics.slice(0, 3);
-  const selectedComments = selectedTopic
-    ? comments.filter((comment) => comment.topic_id === selectedTopic.id)
-    : [];
+  const openTopic = (topic: CommunityTopic) => {
+    setSelectedTopic(topic);
+    setComments([]);
+    setHasMoreComments(false);
+    void loadComments(topic.id);
+  };
 
   const startTopic = () => {
     if (!account) {
@@ -315,6 +341,32 @@ export function CommunityPage({
     const value = customTag.trim().replace(/^#/u, "").slice(0, 24);
     if (value && !tags.includes(value) && tags.length < 5) setTags([...tags, value]);
     setCustomTag("");
+  };
+
+  const selectImages = async (selected: File[]) => {
+    setPreparingMedia(true);
+    setError(null);
+    try {
+      const optimized: File[] = [];
+      for (const file of selected.slice(0, COMMUNITY_IMAGE_MAX_FILES)) {
+        optimized.push(await optimizeCommunityImage(file));
+      }
+      setFiles(optimized);
+    } catch (mediaError) {
+      if (mediaError instanceof CommunityImageError) {
+        const message = {
+          "unsupported-type": copy.mediaUnsupported,
+          "source-too-large": copy.mediaSourceTooLarge,
+          "decode-failed": copy.mediaDecodeFailed,
+          "output-too-large": copy.mediaOutputTooLarge,
+        }[mediaError.code];
+        setError(message);
+      } else {
+        setError(copy.mediaDecodeFailed);
+      }
+    } finally {
+      setPreparingMedia(false);
+    }
   };
 
   const removeUploadedImages = async (paths: string[]) => {
@@ -335,10 +387,14 @@ export function CommunityPage({
     const paths: string[] = [];
     try {
       for (const [index, file] of files.entries()) {
-        const path = `${account.id}/${crypto.randomUUID()}-${index}.${fileExtension(file)}`;
+        const path = `${account.id}/${crypto.randomUUID()}-${index}.webp`;
         const { error: uploadError } = await supabaseClient.storage
           .from("community-media")
-          .upload(path, file, { cacheControl: "3600", upsert: false });
+          .upload(path, file, {
+            cacheControl: "31536000",
+            contentType: "image/webp",
+            upsert: false,
+          });
         if (uploadError) throw uploadError;
         paths.push(path);
         const { data } = supabaseClient.storage.from("community-media").getPublicUrl(path);
@@ -374,7 +430,7 @@ export function CommunityPage({
       setTags([]);
       setFiles([]);
       setComposerOpen(false);
-      await loadCommunity();
+      await loadTopics();
     } catch (requestError) {
       await removeUploadedImages(uploadedPaths);
       setError(requestError instanceof Error ? requestError.message : copy.unavailable);
@@ -388,9 +444,10 @@ export function CommunityPage({
       onRequireAccount();
       return;
     }
-    const liked = topicLikes.some(
-      (like) => like.topic_id === topicId && like.user_id === account.id,
-    );
+    const topic = topics.find((candidate) => candidate.id === topicId)
+      ?? (selectedTopic?.id === topicId ? selectedTopic : null);
+    if (!topic) return;
+    const liked = topic.liked_by_viewer;
     const { error: requestError } = liked
       ? await supabaseClient
         .from("community_topic_likes")
@@ -404,7 +461,16 @@ export function CommunityPage({
       setError(requestError.message);
       return;
     }
-    await loadCommunity();
+    const updateTopic = (candidate: CommunityTopic): CommunityTopic =>
+      candidate.id === topicId
+        ? {
+            ...candidate,
+            liked_by_viewer: !liked,
+            like_count: Math.max(0, candidate.like_count + (liked ? -1 : 1)),
+          }
+        : candidate;
+    setTopics((current) => current.map(updateTopic));
+    setSelectedTopic((current) => current ? updateTopic(current) : current);
   };
 
   const toggleCommentLike = async (commentId: string) => {
@@ -412,9 +478,9 @@ export function CommunityPage({
       onRequireAccount();
       return;
     }
-    const liked = commentLikes.some(
-      (like) => like.comment_id === commentId && like.user_id === account.id,
-    );
+    const comment = comments.find((candidate) => candidate.id === commentId);
+    if (!comment) return;
+    const liked = comment.liked_by_viewer;
     const { error: requestError } = liked
       ? await supabaseClient
         .from("community_comment_likes")
@@ -428,7 +494,17 @@ export function CommunityPage({
       setError(requestError.message);
       return;
     }
-    await loadCommunity();
+    setComments((current) =>
+      current.map((candidate) =>
+        candidate.id === commentId
+          ? {
+              ...candidate,
+              liked_by_viewer: !liked,
+              like_count: Math.max(0, candidate.like_count + (liked ? -1 : 1)),
+            }
+          : candidate
+      )
+    );
   };
 
   const publishComment = async (event: FormEvent<HTMLFormElement>) => {
@@ -447,13 +523,14 @@ export function CommunityPage({
     }
     setCommentBody("");
     setReplyTo(null);
-    await loadCommunity();
+    const updateTopic = (topic: CommunityTopic): CommunityTopic =>
+      topic.id === selectedTopic.id
+        ? { ...topic, comment_count: topic.comment_count + 1 }
+        : topic;
+    setTopics((current) => current.map(updateTopic));
+    setSelectedTopic((current) => current ? updateTopic(current) : current);
+    await loadComments(selectedTopic.id);
   };
-
-  const topicLikeCount = (topicId: string) =>
-    topicLikes.filter((like) => like.topic_id === topicId).length;
-  const commentLikeCount = (commentId: string) =>
-    commentLikes.filter((like) => like.comment_id === commentId).length;
 
   return (
     <div className={`site-portal community-page${allTopicsView ? " is-all-topics" : ""}`}>
@@ -511,7 +588,9 @@ export function CommunityPage({
           ))}
         </div>
 
-        {visibleTopics.length === 0 ? (
+        {loading ? <p role="status">{copy.loading}</p> : null}
+
+        {!loading && visibleTopics.length === 0 ? (
           <div className={`community-starter${error ? " is-error" : ""}`}>
             <header>
               <h3>{copy.starterTitle}</h3>
@@ -530,25 +609,22 @@ export function CommunityPage({
 
         <div className="community-topic-grid">
           {visibleTopics.map((topic, index) => {
-            const commentCount = comments.filter(
-              (comment) => comment.topic_id === topic.id,
-            ).length;
-            const liked = Boolean(
-              account &&
-                topicLikes.some(
-                  (like) => like.topic_id === topic.id && like.user_id === account.id,
-                ),
-            );
+            const liked = Boolean(account && topic.liked_by_viewer);
             return (
               <article key={topic.id}>
                 <button
                   type="button"
                   className={`community-topic-cover is-tone-${(index % 4) + 1}`}
-                  onClick={() => setSelectedTopic(topic)}
+                  onClick={() => openTopic(topic)}
                   aria-label={`${copy.open}: ${topic.title}`}
                 >
                   {topic.image_urls[0] ? (
-                    <img src={topic.image_urls[0]} alt="" />
+                    <img
+                      src={topic.image_urls[0]}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : (
                     <>
                       <Camera aria-hidden="true" />
@@ -579,13 +655,13 @@ export function CommunityPage({
                       onClick={() => void toggleTopicLike(topic.id)}
                     >
                       <Heart aria-hidden="true" />
-                      {topicLikeCount(topic.id)}
+                      {topic.like_count}
                     </button>
-                    <button type="button" onClick={() => setSelectedTopic(topic)}>
+                    <button type="button" onClick={() => openTopic(topic)}>
                       <MessageCircle aria-hidden="true" />
-                      {commentCount}
+                      {topic.comment_count}
                     </button>
-                    <button type="button" onClick={() => setSelectedTopic(topic)}>
+                    <button type="button" onClick={() => openTopic(topic)}>
                       {copy.open}
                       <ArrowUpRight aria-hidden="true" />
                     </button>
@@ -596,7 +672,18 @@ export function CommunityPage({
           })}
         </div>
 
-        {!loading && !error ? (
+        {!loading && !error && allTopicsView && hasMoreTopics ? (
+          <button
+            type="button"
+            className="community-more"
+            disabled={loadingMoreTopics}
+            onClick={() => void loadTopics(topics.length, true)}
+          >
+            {copy.loadMore}
+            <ChevronRight aria-hidden="true" />
+          </button>
+        ) : null}
+        {!loading && !error && (!allTopicsView || !hasMoreTopics) ? (
           <a
             className="community-more"
             href={allTopicsView ? "/community/" : "/community/?view=all"}
@@ -677,14 +764,17 @@ export function CommunityPage({
               <legend><ImagePlus aria-hidden="true" />{copy.mediaLabel}</legend>
               <label className="community-file-picker">
                 <Upload aria-hidden="true" />
-                <span>{copy.mediaHint}</span>
+                <span>{preparingMedia ? copy.preparingMedia : copy.mediaHint}</span>
                 <input
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept="image/jpeg,image/png,image/webp"
                   multiple
-                  onChange={(event) =>
-                    setFiles(Array.from(event.target.files ?? []).slice(0, 4))
-                  }
+                  disabled={preparingMedia || publishing}
+                  onChange={(event) => {
+                    const selected = Array.from(event.target.files ?? []);
+                    event.target.value = "";
+                    void selectImages(selected);
+                  }}
                 />
               </label>
               {files.length ? (
@@ -711,7 +801,12 @@ export function CommunityPage({
               </button>
               <button
                 type="submit"
-                disabled={publishing || !title.trim() || !body.trim()}
+                disabled={
+                  publishing ||
+                  preparingMedia ||
+                  !title.trim() ||
+                  !body.trim()
+                }
               >
                 <Send aria-hidden="true" />
                 {publishing ? copy.publishing : copy.publish}
@@ -739,7 +834,15 @@ export function CommunityPage({
             </button>
             <div className="community-topic-dialog-visual">
               {selectedTopic.image_urls.length ? (
-                selectedTopic.image_urls.map((url) => <img key={url} src={url} alt="" />)
+                selectedTopic.image_urls.map((url) => (
+                  <img
+                    key={url}
+                    src={url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ))
               ) : (
                 <div>
                   <MessageCircle aria-hidden="true" />
@@ -766,45 +869,33 @@ export function CommunityPage({
                 <button
                   type="button"
                   className={
-                    account &&
-                    topicLikes.some(
-                      (like) =>
-                        like.topic_id === selectedTopic.id &&
-                        like.user_id === account.id,
-                    )
-                      ? "is-liked"
-                      : ""
+                    account && selectedTopic.liked_by_viewer ? "is-liked" : ""
                   }
                   onClick={() => void toggleTopicLike(selectedTopic.id)}
                 >
                   <Heart aria-hidden="true" />
-                  {topicLikeCount(selectedTopic.id)} {copy.likes}
+                  {selectedTopic.like_count} {copy.likes}
                 </button>
               </header>
               <div className="community-comment-list">
                 <h3>{copy.comments}</h3>
-                {selectedComments.length === 0 ? (
+                {commentsLoading && comments.length === 0 ? (
+                  <p role="status">{copy.loading}</p>
+                ) : null}
+                {!commentsLoading && comments.length === 0 ? (
                   <p className="community-no-comments">{copy.noComments}</p>
                 ) : null}
-                {selectedComments.map((comment) => {
-                  const parent = comment.parent_id
-                    ? selectedComments.find((candidate) => candidate.id === comment.parent_id)
-                    : null;
-                  const liked = Boolean(
-                    account &&
-                      commentLikes.some(
-                        (like) =>
-                          like.comment_id === comment.id &&
-                          like.user_id === account.id,
-                      ),
-                  );
+                {comments.map((comment) => {
+                  const liked = Boolean(account && comment.liked_by_viewer);
                   return (
                     <article key={comment.id} className={comment.parent_id ? "is-reply" : ""}>
                       <header>
                         <strong>{comment.author_name}</strong>
                         <time>{dateLabel(locale, comment.created_at)}</time>
                       </header>
-                      {parent ? <small>@{parent.author_name}</small> : null}
+                      {comment.parent_author_name
+                        ? <small>@{comment.parent_author_name}</small>
+                        : null}
                       <p>{comment.body}</p>
                       <footer>
                         <button
@@ -812,7 +903,7 @@ export function CommunityPage({
                           className={liked ? "is-liked" : ""}
                           onClick={() => void toggleCommentLike(comment.id)}
                         >
-                          <Heart aria-hidden="true" />{commentLikeCount(comment.id)}
+                          <Heart aria-hidden="true" />{comment.like_count}
                         </button>
                         <button
                           type="button"
@@ -827,6 +918,19 @@ export function CommunityPage({
                     </article>
                   );
                 })}
+                {hasMoreComments ? (
+                  <button
+                    type="button"
+                    className="community-more"
+                    disabled={commentsLoading}
+                    onClick={() =>
+                      void loadComments(selectedTopic.id, comments.length, true)
+                    }
+                  >
+                    {copy.loadMoreComments}
+                    <ChevronRight aria-hidden="true" />
+                  </button>
+                ) : null}
               </div>
               {account ? (
                 <form

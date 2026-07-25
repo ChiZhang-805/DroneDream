@@ -638,6 +638,12 @@ code {
   font-size: 0.85rem;
 }
 
+.account-email-form .auth-captcha {
+  min-height: 65px;
+  display: flex;
+  justify-content: center;
+}
+
 @media (max-width: 520px) {
   .account-avatar-actions,
   .account-camera-panel > div,

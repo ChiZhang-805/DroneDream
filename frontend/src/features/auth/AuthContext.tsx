@@ -33,8 +33,15 @@ interface AuthContextValue {
   account: DroneDreamAccount | null;
   googleEnabled: boolean;
   appleEnabled: boolean;
-  signInWithPassword: (email: string, password: string) => Promise<void>;
-  sendRegistrationCode: (email: string) => Promise<void>;
+  signInWithPassword: (
+    email: string,
+    password: string,
+    captchaToken?: string,
+  ) => Promise<void>;
+  sendRegistrationCode: (
+    email: string,
+    captchaToken?: string,
+  ) => Promise<void>;
   verifyRegistrationCode: (
     email: string,
     token: string,
@@ -180,18 +187,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithPassword = useCallback(async (
     email: string,
     password: string,
+    captchaToken?: string,
   ) => {
     const { error } = await requireClient().auth.signInWithPassword({
       email: email.trim(),
       password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
     });
     if (error) throw error;
   }, []);
 
-  const sendRegistrationCode = useCallback(async (email: string) => {
+  const sendRegistrationCode = useCallback(async (
+    email: string,
+    captchaToken?: string,
+  ) => {
     const { error } = await requireClient().auth.signInWithOtp({
       email: email.trim(),
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        ...(captchaToken ? { captchaToken } : {}),
+      },
     });
     if (error) throw error;
   }, []);

@@ -44,3 +44,8 @@ export const googleAuthEnabled =
   import.meta.env.VITE_AUTH_GOOGLE_ENABLED === "true";
 export const appleAuthEnabled =
   import.meta.env.VITE_AUTH_APPLE_ENABLED === "true";
+
+export const turnstileSiteKey = (
+  import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
+)?.trim() ?? "";
+export const captchaProtectionConfigured = Boolean(turnstileSiteKey);

@@ -54,6 +54,7 @@ Frontend build variables:
 ```dotenv
 VITE_SUPABASE_URL=https://PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+VITE_TURNSTILE_SITE_KEY=public_site_key
 VITE_AUTH_GOOGLE_ENABLED=false
 VITE_AUTH_APPLE_ENABLED=false
 ```
@@ -83,15 +84,19 @@ password, or any signing key in frontend variables or the repository.
    public release, connect a dedicated sender domain and custom SMTP provider
    such as Resend, Postmark, Amazon SES, or another provider chosen by the
    operator.
-4. Add the production website URL and allowed redirect URLs.
-5. Copy only the project URL and publishable key into the frontend build
-   secrets. Configure the backend OIDC values above in server secrets.
-6. Confirm the project uses an asymmetric signing key compatible with the
+4. Create a Cloudflare Turnstile widget for the production domains, copy its
+   public site key into the frontend build variables, deploy that build, and
+   only then enable CAPTCHA in Supabase Auth with the private secret key.
+5. Add the production website URL and allowed redirect URLs.
+6. Copy only the project URL, publishable key, and Turnstile public site key
+   into the frontend build variables. Configure the backend OIDC values above
+   in server secrets.
+7. Confirm the project uses an asymmetric signing key compatible with the
    JWKS verifier, then run the cross-user isolation acceptance tests.
-7. If Google login is wanted, create a Google OAuth web client, register the
+8. If Google login is wanted, create a Google OAuth web client, register the
    Supabase callback URL, add its client ID and secret in Supabase, then set
    `VITE_AUTH_GOOGLE_ENABLED=true` for the browser build.
-8. Defer Apple login until an Apple Developer account, Services ID, verified
+9. Defer Apple login until an Apple Developer account, Services ID, verified
    domain, redirect URL, and secret-rotation owner are ready.
 
 No mailbox password is needed. The operator configures the SMTP provider

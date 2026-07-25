@@ -33,8 +33,13 @@ import {
 import type { DesktopRuntimeAccess } from "./desktop/access";
 import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
 import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
+import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
+import {
+  captchaProtectionConfigured,
+  turnstileSiteKey,
+} from "./features/auth/supabaseClient";
 import { useModelAccess } from "./features/settings/ModelAccessContext";
 import {
   modelProviderLabel,
@@ -483,6 +488,7 @@ const ACCOUNT_COPY = {
     passwordTooShort: "Password must contain at least 8 characters.",
     passwordMismatch: "The two passwords do not match.",
     codeRequired: "Send and enter the verification code before creating the account.",
+    completeCaptcha: "Complete the security check before continuing.",
     google: "Continue with Google",
     apple: "Continue with Apple",
     username: "Username",
@@ -529,6 +535,7 @@ const ACCOUNT_COPY = {
     passwordTooShort: "密码至少需要 8 个字符。",
     passwordMismatch: "两次输入的密码不一致。",
     codeRequired: "请先发送并填写邮箱验证码，再创建账号。",
+    completeCaptcha: "请先完成安全验证，再继续。",
     google: "使用 Google 登录",
     apple: "使用 Apple 登录",
     username: "用户名",
@@ -635,6 +642,8 @@ function AccountDialog({
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaCycle, setCaptchaCycle] = useState(0);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
@@ -930,7 +939,28 @@ function AccountDialog({
             onSubmit={(event) => {
               event.preventDefault();
               if (authMode === "sign-in") {
-                void run(() => auth.signInWithPassword(email, password));
+                if (captchaProtectionConfigured && !captchaToken) {
+                  setError(copy.completeCaptcha);
+                  return;
+                }
+                void run(async () => {
+                  try {
+                    if (captchaToken) {
+                      await auth.signInWithPassword(
+                        email,
+                        password,
+                        captchaToken,
+                      );
+                    } else {
+                      await auth.signInWithPassword(email, password);
+                    }
+                  } finally {
+                    if (captchaProtectionConfigured) {
+                      setCaptchaToken(null);
+                      setCaptchaCycle((current) => current + 1);
+                    }
+                  }
+                });
                 return;
               }
               if (!registrationPasswordIsValid()) return;
@@ -1011,11 +1041,29 @@ function AccountDialog({
                       type="button"
                       className="btn account-send-code"
                       disabled={pending || !email.trim()}
-                      onClick={() => {
-                        if (!registrationPasswordIsValid()) return;
-                        void run(async () => {
-                          await auth.sendRegistrationCode(email);
-                          setCodeSent(true);
+                    onClick={() => {
+                      if (!registrationPasswordIsValid()) return;
+                      if (captchaProtectionConfigured && !captchaToken) {
+                        setError(copy.completeCaptcha);
+                        return;
+                      }
+                      void run(async () => {
+                          try {
+                            if (captchaToken) {
+                              await auth.sendRegistrationCode(
+                                email,
+                                captchaToken,
+                              );
+                            } else {
+                              await auth.sendRegistrationCode(email);
+                            }
+                            setCodeSent(true);
+                          } finally {
+                            if (captchaProtectionConfigured) {
+                              setCaptchaToken(null);
+                              setCaptchaCycle((current) => current + 1);
+                            }
+                          }
                         });
                       }}
                     >
@@ -1024,6 +1072,13 @@ function AccountDialog({
                   </div>
                 </div>
               </>
+            ) : null}
+            {captchaProtectionConfigured ? (
+              <AuthCaptcha
+                key={captchaCycle}
+                siteKey={turnstileSiteKey}
+                onTokenChange={setCaptchaToken}
+              />
             ) : null}
             <button type="submit" className="btn btn-primary" disabled={pending}>
               <MailCheck aria-hidden="true" strokeWidth={1.8} />
@@ -1040,6 +1095,8 @@ function AccountDialog({
               );
               setCode("");
               setCodeSent(false);
+              setCaptchaToken(null);
+              setCaptchaCycle((current) => current + 1);
               setPassword("");
               setPasswordConfirmation("");
               setError(null);

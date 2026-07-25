@@ -1714,11 +1714,16 @@ html[lang="zh-CN"] .site-hero h1 {
   gap: .35rem;
   align-self: flex-end;
   margin-top: .75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #8438a5;
+  cursor: pointer;
   font-size: .78rem;
   font-weight: 740;
   text-decoration: none;
 }
+.community-more:disabled { cursor: wait; opacity: .58; }
 .community-more svg { width: 16px; }
 
 .community-modal-backdrop {
@@ -2111,6 +2116,12 @@ html[lang="zh-CN"] .site-hero h1 {
   color: #ffd2df;
   background: rgba(255, 72, 127, 0.09);
   font-size: 0.86rem;
+}
+
+.site-auth-form .auth-captcha {
+  min-height: 65px;
+  display: flex;
+  justify-content: center;
 }
 
 .site-auth-account {
@@ -2588,7 +2599,11 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-manual-dialog-body article { grid-template-columns: 1fr; gap: .7rem; }
   .site-footer .site-shell { grid-template-columns: 1fr auto; }
   .site-footer p { grid-column: 1 / -1; }
-  .site-footer-policy-links { grid-column: 1 / -1; }
+  .site-footer-policy-links {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    row-gap: .7rem;
+  }
   .site-portal { padding-top: 66px; }
   .portal-title-desktop { display: none; }
   .portal-title-mobile { display: inline; }

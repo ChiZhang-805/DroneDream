@@ -2,7 +2,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import appIcon from "../../../desktop/src-tauri/icons/128x128.png";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
+import { AuthCaptcha } from "../features/auth/AuthCaptcha";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
+import {
+  captchaProtectionConfigured,
+  turnstileSiteKey,
+} from "../features/auth/supabaseClient";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
@@ -19,6 +24,7 @@ import {
 const GITHUB_URL = "https://github.com/ChiZhang-805/DroneDream";
 const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`;
 const PRIVACY_POLICY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
+const COMMUNITY_GUIDELINES_URL = `${GITHUB_URL}/blob/main/COMMUNITY_GUIDELINES.md`;
 
 const content = {
   en: {
@@ -57,6 +63,7 @@ const content = {
     passwordTooShort: "Password must contain at least 8 characters.",
     passwordMismatch: "The two passwords do not match.",
     codeRequired: "Send and enter the verification code before creating the account.",
+    completeCaptcha: "Complete the security check before continuing.",
     registerNow: "New to DroneDream? Register now",
     backToSignIn: "Already registered? Sign in",
     openConsole: "Open console",
@@ -206,6 +213,7 @@ const content = {
     footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is published while code signing is being prepared.",
     codeSigningPolicy: "Code signing policy",
     privacyPolicy: "Privacy policy",
+    communityGuidelines: "Community guidelines",
   },
   "zh-CN": {
     skip: "跳到主要内容",
@@ -243,6 +251,7 @@ const content = {
     passwordTooShort: "密码至少需要 8 个字符。",
     passwordMismatch: "两次输入的密码不一致。",
     codeRequired: "请先发送并填写邮箱验证码，再创建账号。",
+    completeCaptcha: "请先完成安全验证，再继续。",
     registerNow: "还没有账号？立即注册",
     backToSignIn: "已经注册？返回登录",
     openConsole: "进入控制台",
@@ -391,6 +400,7 @@ const content = {
     footerLine: "本地优先的 PX4/Gazebo 控制参数调优平台；1.0.0 正式版已经发布，代码签名正在按公开流程准备。",
     codeSigningPolicy: "代码签名政策",
     privacyPolicy: "隐私政策",
+    communityGuidelines: "社区规范",
   },
 } as const;
 
@@ -750,6 +760,8 @@ export function SiteApp() {
   const [authCodeSent, setAuthCodeSent] = useState(false);
   const [authPassword, setAuthPassword] = useState("");
   const [authPasswordConfirmation, setAuthPasswordConfirmation] = useState("");
+  const [authCaptchaToken, setAuthCaptchaToken] = useState<string | null>(null);
+  const [authCaptchaCycle, setAuthCaptchaCycle] = useState(0);
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const reducedMotion = usePrefersReducedMotion();
@@ -955,6 +967,8 @@ export function SiteApp() {
     setAuthCodeSent(false);
     setAuthPassword("");
     setAuthPasswordConfirmation("");
+    setAuthCaptchaToken(null);
+    setAuthCaptchaCycle((current) => current + 1);
     setAuthError(null);
     setMenuOpen(false);
     setAuthOpen(true);
@@ -975,7 +989,18 @@ export function SiteApp() {
     setAuthError(null);
     try {
       if (authMode === "sign-in") {
-        await auth.signInWithPassword(authEmail, authPassword);
+        if (captchaProtectionConfigured && !authCaptchaToken) {
+          throw new Error(copy.completeCaptcha);
+        }
+        if (authCaptchaToken) {
+          await auth.signInWithPassword(
+            authEmail,
+            authPassword,
+            authCaptchaToken,
+          );
+        } else {
+          await auth.signInWithPassword(authEmail, authPassword);
+        }
       } else {
         if (authPassword.length < 8) {
           throw new Error(copy.passwordTooShort);
@@ -998,6 +1023,10 @@ export function SiteApp() {
       );
     } finally {
       setAuthPending(false);
+      if (authMode === "sign-in" && captchaProtectionConfigured) {
+        setAuthCaptchaToken(null);
+        setAuthCaptchaCycle((current) => current + 1);
+      }
     }
   };
 
@@ -1012,9 +1041,17 @@ export function SiteApp() {
       setAuthError(copy.passwordMismatch);
       return;
     }
+    if (captchaProtectionConfigured && !authCaptchaToken) {
+      setAuthError(copy.completeCaptcha);
+      return;
+    }
     setAuthPending(true);
     try {
-      await auth.sendRegistrationCode(authEmail);
+      if (authCaptchaToken) {
+        await auth.sendRegistrationCode(authEmail, authCaptchaToken);
+      } else {
+        await auth.sendRegistrationCode(authEmail);
+      }
       setAuthCodeSent(true);
     } catch (reason) {
       setAuthError(
@@ -1022,6 +1059,10 @@ export function SiteApp() {
       );
     } finally {
       setAuthPending(false);
+      if (captchaProtectionConfigured) {
+        setAuthCaptchaToken(null);
+        setAuthCaptchaCycle((current) => current + 1);
+      }
     }
   };
 
@@ -1472,6 +1513,13 @@ export function SiteApp() {
                       </div>
                     </>
                   ) : null}
+                  {captchaProtectionConfigured ? (
+                    <AuthCaptcha
+                      key={authCaptchaCycle}
+                      siteKey={turnstileSiteKey}
+                      onTokenChange={setAuthCaptchaToken}
+                    />
+                  ) : null}
                   <button type="submit" disabled={authPending || auth.loading}>
                     {authMode === "register"
                       ? copy.createAccount
@@ -1490,6 +1538,8 @@ export function SiteApp() {
                     setAuthCodeSent(false);
                     setAuthPassword("");
                     setAuthPasswordConfirmation("");
+                    setAuthCaptchaToken(null);
+                    setAuthCaptchaCycle((current) => current + 1);
                     setAuthError(null);
                   }}
                 >
@@ -1516,6 +1566,10 @@ export function SiteApp() {
             <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
               <DocumentIcon />
               {copy.privacyPolicy}
+            </a>
+            <a href={COMMUNITY_GUIDELINES_URL} target="_blank" rel="noreferrer">
+              <FeatureIcon name="report" />
+              {copy.communityGuidelines}
             </a>
           </nav>
           <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>

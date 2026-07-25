@@ -90,7 +90,9 @@ function AccountProbe() {
       </button>
       <button
         type="button"
-        onClick={() => void auth.sendRegistrationCode("new@example.com")}
+        onClick={() =>
+          void auth.sendRegistrationCode("new@example.com", "captcha-register")
+        }
       >
         Send registration code
       </button>
@@ -179,7 +181,10 @@ describe("AuthContext account profile", () => {
     await waitFor(() => {
       expect(authMock.signInWithOtp).toHaveBeenCalledWith({
         email: "new@example.com",
-        options: { shouldCreateUser: true },
+        options: {
+          shouldCreateUser: true,
+          captchaToken: "captcha-register",
+        },
       });
     });
 
