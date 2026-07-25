@@ -5,8 +5,10 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $frontendRoot = Join-Path $repositoryRoot "frontend"
 $releaseConfigPath = Join-Path $repositoryRoot "website\pages-release.json"
 $tauriConfigPath = Join-Path $repositoryRoot "desktop\src-tauri\tauri.conf.json"
+$codeSigningPolicyPath = Join-Path $repositoryRoot "CODE_SIGNING_POLICY.md"
 $release = Get-Content -LiteralPath $releaseConfigPath -Raw | ConvertFrom-Json
 $tauriConfig = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
+$codeSigningPolicy = Get-Content -LiteralPath $codeSigningPolicyPath -Raw
 
 $version = [string]$release.version
 $fileName = [string]$release.fileName
@@ -22,6 +24,14 @@ if ($fileName -ne $expectedFileName) { throw "Pages release file name must be $e
 if ($releaseTag -notmatch '^[A-Za-z0-9._-]+$') { throw "Invalid GitHub release tag: $releaseTag" }
 if ($sha256 -notmatch '^[a-f0-9]{64}$') { throw "Invalid SHA-256 in $releaseConfigPath" }
 if ($sizeBytes -le 0) { throw "Pages release size must be positive." }
+foreach ($attribution in @(
+    "SignPath.io",
+    "SignPath Foundation"
+)) {
+    if ($codeSigningPolicy.IndexOf($attribution, [StringComparison]::Ordinal) -lt 0) {
+        throw "The code signing policy is missing required attribution: $attribution"
+    }
+}
 $parsedDate = [DateTime]::MinValue
 if (-not [DateTime]::TryParseExact(
     $publishedAt,
@@ -77,8 +87,8 @@ foreach ($marker in @(
     $fileName,
     $sha256,
     $publishedAt,
-    "SignPath.io",
-    "SignPath Foundation"
+    "CODE_SIGNING_POLICY.md",
+    "PRIVACY.md"
 )) {
     if ($builtJavaScript.IndexOf([string]$marker, [StringComparison]::Ordinal) -lt 0) {
         throw "The Pages build did not embed required marker: $marker"
