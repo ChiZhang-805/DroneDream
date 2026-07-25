@@ -84,6 +84,11 @@ jobs:
       - name: Lint, type-check, test, and build frontend
         env:
           CI: "true"
+          # The quality gate exercises the public-site build and visual layout
+          # without contacting production authentication services. Production
+          # deployments still provide their real public Supabase values.
+          VITE_SUPABASE_URL: "https://ci.invalid"
+          VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_ci_quality_gate_only"
         run: |
           npm --prefix frontend run audit:dependencies
           npm --prefix desktop audit --audit-level=high
