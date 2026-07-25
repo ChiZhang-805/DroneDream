@@ -48,7 +48,7 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
     for case in cases:
         snapshot = compile_routing_eval_snapshot(case)
         system, user = build_decision_messages(snapshot)
-        assert snapshot.schema_version == "2.1"
+        assert snapshot.schema_version == "2.2"
         assert case.case_id not in system
         assert case.case_id not in user
         assert case.rationale not in system
@@ -56,7 +56,7 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
         assert "acceptable_tools" not in user
         assert '"case_id"' not in user
         assert '"registry_version":"2.0"' in user
-        assert '"schema_version":"2.1"' in user
+        assert '"schema_version":"2.2"' in user
 
 
 def test_routing_eval_grades_complete_predictions_by_category() -> None:
@@ -129,3 +129,11 @@ def test_routing_eval_compiler_preserves_decision_signals() -> None:
     assert reflection.decision_memory[0].tool_id == "turbo"
     assert reflection.decision_memory[0].status == "search_space_exhausted"
     assert reflection.decision_memory[0].dispatched_candidates == 0
+
+    no_feasible = compile_routing_eval_snapshot(
+        cases["constraint_pressure_no_feasible_points"]
+    )
+    assert no_feasible.search.best_score == pytest.approx(1.0)
+    assert no_feasible.search.relative_improvement_from_baseline == pytest.approx(0.0)
+    assert no_feasible.search.feasibility_observed_candidate_count == 16
+    assert no_feasible.search.feasible_candidate_rate == pytest.approx(0.0)

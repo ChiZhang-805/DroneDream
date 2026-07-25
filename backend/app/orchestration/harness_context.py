@@ -34,7 +34,7 @@ HarnessSourceType = Literal["baseline", "optimizer", "llm_optimizer", "unknown"]
 HarnessObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom", "unknown"]
 HarnessTrackType = Literal["circle", "u_turn", "lemniscate", "custom", "unknown"]
 
-HARNESS_EVIDENCE_SCHEMA_VERSION = "2.1"
+HARNESS_EVIDENCE_SCHEMA_VERSION = "2.2"
 HARNESS_TOOL_REGISTRY_VERSION = "2.0"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
@@ -63,10 +63,18 @@ _ALLOWED_METRICS = (
     "max_error",
     "max_error_worst",
     "completion_time",
+    "completion_rate",
+    "failure_rate",
     "pass_rate",
+    "training_completion_rate",
+    "training_failure_rate",
+    "training_pass_rate",
     "aggregated_score",
+    "scalar_loss",
     "feasible",
     "total_constraint_violation",
+    "invalid_metric_count",
+    "cancelled_trial_count",
 )
 _ALLOWED_EXECUTION_STATUSES = frozenset(
     {
@@ -261,13 +269,18 @@ class HarnessSearchSummary(_ClosedModel):
     scored_candidate_count: int = Field(ge=0)
     completed_candidate_count: int = Field(ge=0)
     incomplete_candidate_count: int = Field(ge=0)
+    completed_candidate_rate: float = Field(ge=0.0, le=1.0)
+    feasibility_observed_candidate_count: int = Field(ge=0)
     feasible_candidate_count: int = Field(ge=0)
+    feasible_candidate_rate: float | None = Field(default=None, ge=0.0, le=1.0)
     total_trial_count: int = Field(ge=0)
     failed_trial_count: int = Field(ge=0)
     observed_failure_rate: float = Field(ge=0.0, le=1.0)
     baseline_score: float | None = None
     best_score: float | None = None
     relative_improvement_from_baseline: float | None = None
+    score_gap_to_runner_up: float | None = Field(default=None, ge=0.0)
+    relative_score_gap_to_runner_up: float | None = Field(default=None, ge=0.0)
     trailing_stagnant_generations: int = Field(ge=0)
     best_score_by_generation: tuple[HarnessGenerationBest, ...] = Field(
         default=(),
@@ -322,7 +335,7 @@ class HarnessJobEvidence(_ClosedModel):
 
 
 class HarnessEvidenceSnapshot(_ClosedModel):
-    schema_version: Literal["2.1"] = "2.1"
+    schema_version: Literal["2.2"] = "2.2"
     job: HarnessJobEvidence
     budget: HarnessBudgetEvidence
     scenarios: HarnessScenarioEvidence
@@ -473,13 +486,16 @@ def _candidate_complete(candidate: models.CandidateParameterSet) -> bool:
     return trial_count > 0 and completed + failed == trial_count
 
 
-def _candidate_feasible(candidate: models.CandidateParameterSet) -> bool:
+def _candidate_feasibility(
+    candidate: models.CandidateParameterSet,
+) -> bool | None:
     aggregate = (
         candidate.aggregated_metric_json
         if isinstance(candidate.aggregated_metric_json, dict)
         else {}
     )
-    return aggregate.get("feasible") is True
+    value = aggregate.get("feasible")
+    return value if isinstance(value, bool) else None
 
 
 def _search_summary(
@@ -491,11 +507,24 @@ def _search_summary(
         if score is not None:
             scored.append((candidate, score))
     baseline_scores = [score for candidate, score in scored if candidate.is_baseline]
-    best_score = min((score for _, score in scored), default=None)
+    ordered_scores = sorted(score for _, score in scored)
+    best_score = ordered_scores[0] if ordered_scores else None
     baseline_score = min(baseline_scores, default=None)
     relative_improvement: float | None = None
     if baseline_score is not None and best_score is not None and abs(baseline_score) > 1e-12:
         relative_improvement = (baseline_score - best_score) / abs(baseline_score)
+    score_gap = (
+        ordered_scores[1] - ordered_scores[0]
+        if len(ordered_scores) >= 2
+        else None
+    )
+    relative_score_gap = (
+        score_gap / abs(best_score)
+        if score_gap is not None
+        and best_score is not None
+        and abs(best_score) > 1e-12
+        else None
+    )
 
     generation_scores: dict[int, list[float]] = defaultdict(list)
     for candidate, score in scored:
@@ -524,17 +553,29 @@ def _search_summary(
 
     total_trials = sum(max(0, int(candidate.trial_count or 0)) for candidate in candidates)
     failed_trials = sum(max(0, int(candidate.failed_trial_count or 0)) for candidate in candidates)
+    completed_candidates = sum(
+        1 for candidate in candidates if _candidate_complete(candidate)
+    )
+    feasibility_observations = [
+        value
+        for candidate in candidates
+        if (value := _candidate_feasibility(candidate)) is not None
+    ]
+    feasible_candidates = sum(1 for value in feasibility_observations if value)
     return HarnessSearchSummary(
         candidate_count=len(candidates),
         scored_candidate_count=len(scored),
-        completed_candidate_count=sum(
-            1 for candidate in candidates if _candidate_complete(candidate)
+        completed_candidate_count=completed_candidates,
+        incomplete_candidate_count=len(candidates) - completed_candidates,
+        completed_candidate_rate=(
+            completed_candidates / len(candidates) if candidates else 0.0
         ),
-        incomplete_candidate_count=sum(
-            1 for candidate in candidates if not _candidate_complete(candidate)
-        ),
-        feasible_candidate_count=sum(
-            1 for candidate in candidates if _candidate_feasible(candidate)
+        feasibility_observed_candidate_count=len(feasibility_observations),
+        feasible_candidate_count=feasible_candidates,
+        feasible_candidate_rate=(
+            feasible_candidates / len(feasibility_observations)
+            if feasibility_observations
+            else None
         ),
         total_trial_count=total_trials,
         failed_trial_count=failed_trials,
@@ -542,6 +583,8 @@ def _search_summary(
         baseline_score=baseline_score,
         best_score=best_score,
         relative_improvement_from_baseline=relative_improvement,
+        score_gap_to_runner_up=score_gap,
+        relative_score_gap_to_runner_up=relative_score_gap,
         trailing_stagnant_generations=trailing_stagnation,
         best_score_by_generation=best_by_generation,
     )
@@ -589,7 +632,7 @@ def _tool_history(
                     1 for candidate in owned if _candidate_complete(candidate)
                 ),
                 feasible_candidate_count=sum(
-                    1 for candidate in owned if _candidate_feasible(candidate)
+                    1 for candidate in owned if _candidate_feasibility(candidate) is True
                 ),
                 total_trial_count=sum(
                     max(0, int(candidate.trial_count or 0)) for candidate in owned

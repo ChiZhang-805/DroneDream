@@ -183,12 +183,16 @@ def compile_routing_eval_snapshot(
     """Compile a diagnostic stimulus into the production evidence contract."""
 
     stimulus = case.stimulus
+    observed_best_score = min(
+        stimulus.baseline_score,
+        stimulus.best_score,
+    )
     max_total_trials = (
         stimulus.current_generation * stimulus.trials_per_candidate + stimulus.remaining_trials
     )
     used_trials = max_total_trials - stimulus.remaining_trials
     relative_improvement = (
-        (stimulus.baseline_score - stimulus.best_score) / abs(stimulus.baseline_score)
+        (stimulus.baseline_score - observed_best_score) / abs(stimulus.baseline_score)
         if abs(stimulus.baseline_score) > 1e-12
         else None
     )
@@ -242,6 +246,15 @@ def compile_routing_eval_snapshot(
         )
         for item in stimulus.tool_history
     )
+    ordered_scores = sorted(
+        (stimulus.baseline_score, stimulus.best_score)
+    )
+    score_gap = ordered_scores[1] - ordered_scores[0]
+    relative_score_gap = (
+        score_gap / abs(ordered_scores[0])
+        if abs(ordered_scores[0]) > 1e-12
+        else None
+    )
     return HarnessEvidenceSnapshot(
         job=HarnessJobEvidence(
             objective_profile="robust",
@@ -277,7 +290,15 @@ def compile_routing_eval_snapshot(
             scored_candidate_count=stimulus.scored_candidate_count,
             completed_candidate_count=stimulus.scored_candidate_count,
             incomplete_candidate_count=0,
+            completed_candidate_rate=1.0,
+            feasibility_observed_candidate_count=(
+                stimulus.scored_candidate_count
+            ),
             feasible_candidate_count=stimulus.feasible_candidate_count,
+            feasible_candidate_rate=(
+                stimulus.feasible_candidate_count
+                / stimulus.scored_candidate_count
+            ),
             total_trial_count=(stimulus.scored_candidate_count * stimulus.trials_per_candidate),
             failed_trial_count=round(
                 stimulus.observed_failure_rate
@@ -286,8 +307,10 @@ def compile_routing_eval_snapshot(
             ),
             observed_failure_rate=stimulus.observed_failure_rate,
             baseline_score=stimulus.baseline_score,
-            best_score=stimulus.best_score,
+            best_score=observed_best_score,
             relative_improvement_from_baseline=relative_improvement,
+            score_gap_to_runner_up=score_gap,
+            relative_score_gap_to_runner_up=relative_score_gap,
             trailing_stagnant_generations=(stimulus.trailing_stagnant_generations),
             best_score_by_generation=tuple(generation_best),
         ),

@@ -115,6 +115,10 @@ Long Jobs retain full-history stagnation computation while exposing only the fir
 and latest 31 generation-best points, preventing unbounded prompt growth. Tests
 verify byte-for-byte prompt invariance under untrusted-field mutations and keep a
 synthetic 1,001-Candidate history below the minimum configured 32 KiB prompt limit.
+The router sees trusted training completion/failure/pass rates, feasibility
+coverage, invalid/cancelled Trial counts, scalar loss, and best-to-runner-up score
+gaps. Holdout status and values remain sealed from every adaptive decision so the
+validation set cannot become another training signal.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic

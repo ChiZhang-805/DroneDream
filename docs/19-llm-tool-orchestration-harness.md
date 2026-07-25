@@ -8075,6 +8075,12 @@ The implemented evidence-v2 compiler:
   scenario IDs, seeds, arbitrary case configuration, or sealed-test material;
 - computes completed/incomplete/feasible Candidate counts, measured failure rate,
   baseline-relative improvement, per-generation best score, and trailing stagnation;
+- exposes only trusted training-side completion/failure/pass rates, scalar loss,
+  invalid/cancelled Trial counts, feasibility observation coverage, completed
+  Candidate rate, and best-to-runner-up score gaps;
+- never exposes holdout status, feasibility, objective/constraint values, error
+  text, or validation metrics to the adaptive router, preserving the validation
+  firewall across generations;
 - computes stagnation over the full history but bounds the provider-visible trend to
   the first generation plus the latest 31 generations, keeping context size constant
   for long-running Jobs;
@@ -8089,7 +8095,7 @@ The implemented evidence-v2 compiler:
 - rejects mappings, strings, labels, free-form diagnostics, proposal rationale,
   errors, Candidate IDs, parameter values, arbitrary JSON, and mixed numeric/text
   metric arrays at the prompt boundary;
-- uses `evidence_schema_version=2.1` and `tool_registry_version=2.0` in capability
+- uses `evidence_schema_version=2.2` and `tool_registry_version=2.0` in capability
   discovery and decision/tool-execution events; and
 - presents a richer static tool manifest with explicit search roles, applicability
   signals, and declared constraint, multi-objective, and multi-fidelity support.
@@ -8124,7 +8130,7 @@ The execution-memory query deliberately avoids loading the mutable SQLAlchemy
 hiding decision events written later in the turn.
 
 For provider calls, `harness_decision_started` now persists the complete bounded,
-provider-safe Evidence 2.1 snapshot and static Tool Manifest 2.0 alongside their
+provider-safe Evidence 2.2 snapshot and static Tool Manifest 2.0 alongside their
 SHA-256 values, the production prompt SHA-256, Prompt Template 1.0, and Decision
 Trace 1.0 versions. `verify_harness_decision_trace()` validates the closed evidence
 schema, rebuilds the exact production messages from the persisted snapshot and
@@ -8158,7 +8164,7 @@ cd backend
 24 cases; 8 categories; 8 registered tools
 uniform-random expectation: 5.625/24 (23.4375%)
 best constant tool: optimizer_portfolio, 14/24 (58.3333%)
-current provider-call traces: Evidence 2.1, Tool Manifest 2.0,
+current provider-call traces: Evidence 2.2, Tool Manifest 2.0,
 Prompt Template 1.0, Decision Trace 1.0
 ```
 
