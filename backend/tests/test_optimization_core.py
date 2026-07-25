@@ -214,7 +214,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "1.2"
+    assert first.compiler_version == "1.3"
     assert (
         first.selection_policy.optimizer_objective_representation_policy
         == "one_representation_per_tool_call"
@@ -224,6 +224,22 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         == "joint_objective_vector_else_scalar_loss"
     )
     assert first.selection_policy.scalar_optimizer_policy == "scalar_loss_only"
+    assert (
+        first.final_promotion_policy.projection_schema
+        == "dronedream.acceptance-projection/v1"
+    )
+    assert (
+        first.final_promotion_policy.rmse_estimator
+        == "within_case_mean_then_fixed_suite_mean"
+    )
+    assert (
+        first.final_promotion_policy.max_error_estimator
+        == "worst_usable_seed"
+    )
+    assert (
+        first.final_promotion_policy.pass_rate_estimator
+        == "case_weighted_dispatched_seed_rate"
+    )
 
     changed = compile_outcome_contract(
         objective_config,

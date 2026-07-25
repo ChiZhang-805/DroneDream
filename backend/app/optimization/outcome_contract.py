@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from app import schemas
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "1.2"
+OUTCOME_CONTRACT_COMPILER_VERSION = "1.3"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
@@ -151,6 +151,16 @@ class OutcomeSelectionPolicy(_FrozenModel):
 
 
 class OutcomePromotionPolicy(_FrozenModel):
+    projection_schema: Literal["dronedream.acceptance-projection/v1"] = (
+        "dronedream.acceptance-projection/v1"
+    )
+    rmse_estimator: Literal["within_case_mean_then_fixed_suite_mean"] = (
+        "within_case_mean_then_fixed_suite_mean"
+    )
+    max_error_estimator: Literal["worst_usable_seed"] = "worst_usable_seed"
+    pass_rate_estimator: Literal["case_weighted_dispatched_seed_rate"] = (
+        "case_weighted_dispatched_seed_rate"
+    )
     require_complete_training_matrix: Literal[True] = True
     require_hard_feasible: Literal[True] = True
     require_complete_holdout_matrix_when_configured: Literal[True] = True
@@ -162,7 +172,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["1.2"] = "1.2"
+    compiler_version: Literal["1.3"] = "1.3"
     contract_id: str
     metric_registry_sha256: str
     objective_config_sha256: str

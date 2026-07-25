@@ -182,6 +182,13 @@ shrinking that scenario's objective weight. A dispatched case with no usable
 metric produces no scalar objective, while constraints continue to inspect the
 worst usable seed rather than a potentially safer case aggregate.
 
+Outcome Contract compiler 1.3 freezes final-promotion projection semantics.
+Acceptance RMSE is an unrounded within-case mean followed by the fixed
+case-weighted mean, maximum error is the unrounded worst usable seed, and pass
+rate uses every dispatched seed in each case denominator before case weights.
+The evaluator consumes these versioned decision fields rather than rounded
+display values.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

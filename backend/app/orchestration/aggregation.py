@@ -402,9 +402,6 @@ def _aggregate_candidate(
         candidate.aggregated_score = None
         return None
 
-    def _avg(values: list[float]) -> float:
-        return round(sum(values) / len(values), 4)
-
     cases_by_id = {
         case.id: case
         for case in (scenario_suite.cases if scenario_suite is not None else [])
@@ -507,37 +504,103 @@ def _aggregate_candidate(
             "completed_trial_count": completed_count,
             "failed_trial_count": failed_count,
             "passing_trial_count": passing_count,
-            "completion_rate": round(weighted_completion / weight_total, 8),
-            "failure_rate": round(weighted_failure / weight_total, 8),
-            "pass_rate": round(weighted_pass / weight_total, 8),
+            "completion_rate": weighted_completion / weight_total,
+            "failure_rate": weighted_failure / weight_total,
+            "pass_rate": weighted_pass / weight_total,
             "scenario_case_count": len(grouped),
             "scenario_weight_total": round(weight_total, 8),
             "scenario_cases": case_summaries,
         }
 
-    rmse = _avg([_required_metric_number(metric.rmse, field_name="rmse") for metric in metrics])
+    def _case_weighted_metric_mean(
+        rows: list[models.Trial],
+        *,
+        field_name: str,
+    ) -> float | None:
+        grouped: dict[
+            str,
+            tuple[schemas.ScenarioCaseConfig | None, list[models.Trial]],
+        ] = {}
+        for trial in rows:
+            group_key, case = _resolved_case(trial)
+            if group_key not in grouped:
+                grouped[group_key] = (case, [])
+            grouped[group_key][1].append(trial)
+        weighted_sum = 0.0
+        weight_total = 0.0
+        for case, case_rows in grouped.values():
+            usable_metrics = [
+                trial.metric
+                for trial in case_rows
+                if _trial_has_usable_metric(trial) and trial.metric is not None
+            ]
+            if not usable_metrics:
+                return None
+            if field_name == "overshoot_count":
+                values = [
+                    float(_required_overshoot_count(metric.overshoot_count))
+                    for metric in usable_metrics
+                ]
+            else:
+                values = [
+                    _required_metric_number(
+                        getattr(metric, field_name),
+                        field_name=field_name,
+                    )
+                    for metric in usable_metrics
+                ]
+            weight = float(case.weight) if case is not None else 1.0
+            weighted_sum += weight * sum(values) / len(values)
+            weight_total += weight
+        if weight_total <= 0.0:
+            return None
+        return weighted_sum / weight_total
+
+    rmse_decision = _case_weighted_metric_mean(
+        trials,
+        field_name="rmse",
+    )
+    rmse = round(rmse_decision, 4) if rmse_decision is not None else None
     max_error_values = [
         _required_metric_number(metric.max_error, field_name="max_error") for metric in metrics
     ]
-    max_error = _avg(max_error_values)
-    max_error_worst = round(max(max_error_values), 4)
-    overshoot = int(
-        round(
-            sum(_required_overshoot_count(metric.overshoot_count) for metric in metrics)
-            / len(metrics)
-        )
+    max_error_decision = _case_weighted_metric_mean(
+        trials,
+        field_name="max_error",
     )
-    completion_time = _avg(
-        [
-            _required_metric_number(
-                metric.completion_time,
-                field_name="completion_time",
-            )
-            for metric in metrics
-        ]
+    max_error = (
+        round(max_error_decision, 4)
+        if max_error_decision is not None
+        else None
     )
-    trial_score_mean = _avg(
-        [_required_metric_number(metric.score, field_name="score") for metric in metrics]
+    max_error_worst_decision = max(max_error_values)
+    max_error_worst = round(max_error_worst_decision, 4)
+    overshoot_decision = _case_weighted_metric_mean(
+        trials,
+        field_name="overshoot_count",
+    )
+    overshoot = (
+        int(round(overshoot_decision))
+        if overshoot_decision is not None
+        else None
+    )
+    completion_time_decision = _case_weighted_metric_mean(
+        trials,
+        field_name="completion_time",
+    )
+    completion_time = (
+        round(completion_time_decision, 4)
+        if completion_time_decision is not None
+        else None
+    )
+    trial_score_decision = _case_weighted_metric_mean(
+        trials,
+        field_name="score",
+    )
+    trial_score_mean = (
+        round(trial_score_decision, 4)
+        if trial_score_decision is not None
+        else None
     )
 
     aggregated_score = _score_candidate(
@@ -729,42 +792,74 @@ def _aggregate_candidate(
             _required_metric_number(metric.max_error, field_name="max_error")
             for metric in training_metrics
         ]
-        training_max_error_mean = _avg(training_max_errors)
-        training_max_error_worst = round(max(training_max_errors), 4)
+        training_rmse_decision = _case_weighted_metric_mean(
+            training_trials,
+            field_name="rmse",
+        )
+        training_max_error_decision = _case_weighted_metric_mean(
+            training_trials,
+            field_name="max_error",
+        )
+        training_overshoot_decision = _case_weighted_metric_mean(
+            training_trials,
+            field_name="overshoot_count",
+        )
+        training_completion_time_decision = _case_weighted_metric_mean(
+            training_trials,
+            field_name="completion_time",
+        )
+        training_score_decision = _case_weighted_metric_mean(
+            training_trials,
+            field_name="score",
+        )
+        if any(
+            value is None
+            for value in (
+                training_rmse_decision,
+                training_max_error_decision,
+                training_overshoot_decision,
+                training_completion_time_decision,
+                training_score_decision,
+            )
+        ):
+            raise RuntimeError(
+                "aggregation invariant violated: evaluated case lost compatibility metrics"
+            )
+        assert training_rmse_decision is not None
+        assert training_max_error_decision is not None
+        assert training_overshoot_decision is not None
+        assert training_completion_time_decision is not None
+        assert training_score_decision is not None
+        training_max_error_worst_decision = max(training_max_errors)
         agg.update(
             {
-                "rmse": _avg(
-                    [
-                        _required_metric_number(metric.rmse, field_name="rmse")
-                        for metric in training_metrics
-                    ]
+                "rmse": round(float(training_rmse_decision), 4),
+                "max_error": round(
+                    float(training_max_error_decision),
+                    4,
                 ),
-                "max_error": training_max_error_mean,
-                "max_error_mean": training_max_error_mean,
-                "max_error_worst": training_max_error_worst,
+                "max_error_mean": round(
+                    float(training_max_error_decision),
+                    4,
+                ),
+                "max_error_worst": round(
+                    training_max_error_worst_decision,
+                    4,
+                ),
                 "overshoot_count": int(
-                    round(
-                        sum(
-                            _required_overshoot_count(metric.overshoot_count)
-                            for metric in training_metrics
-                        )
-                        / len(training_metrics)
-                    )
+                    round(float(training_overshoot_decision))
                 ),
-                "completion_time": _avg(
-                    [
-                        _required_metric_number(
-                            metric.completion_time,
-                            field_name="completion_time",
-                        )
-                        for metric in training_metrics
-                    ]
+                "completion_time": round(
+                    float(training_completion_time_decision),
+                    4,
                 ),
-                "score": _avg(
-                    [
-                        _required_metric_number(metric.score, field_name="score")
-                        for metric in training_metrics
-                    ]
+                "score": round(float(training_score_decision), 4),
+                "acceptance_projection_schema": "dronedream.acceptance-projection/v1",
+                "acceptance_rmse": float(training_rmse_decision),
+                "acceptance_max_error": training_max_error_worst_decision,
+                "acceptance_pass_rate": float(training_rates["pass_rate"]),
+                "acceptance_completion_rate": float(
+                    training_rates["completion_rate"]
                 ),
                 "training_completed_trial_count": len(training_completed),
                 "training_failed_trial_count": training_failed,

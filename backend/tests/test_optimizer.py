@@ -561,6 +561,8 @@ def test_scenario_case_weight_is_independent_of_seed_count() -> None:
     # case-a contributes its seed mean (1.0), case-b contributes 3.0; equal
     # case weights therefore aggregate to 2.0 rather than 5/3.
     assert result["objective_values"]["rmse"] == pytest.approx(2.0)
+    assert result["rmse"] == pytest.approx(2.0)
+    assert result["acceptance_rmse"] == pytest.approx(2.0)
 
 
 def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> None:
@@ -633,6 +635,8 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
     # are applied. The failed seed affects reliability, but cannot silently
     # shrink case-a's objective-distribution weight.
     assert result["objective_values"]["rmse"] == pytest.approx(3.0)
+    assert result["rmse"] == pytest.approx(3.0)
+    assert result["acceptance_rmse"] == pytest.approx(3.0)
     assert (
         result["objective_estimator"]
         == "within_case_mean_then_fixed_suite_mean_v1"
@@ -817,6 +821,7 @@ def test_cvar_is_estimated_within_case_before_fixed_suite_weights() -> None:
     # The upper-tail value is 10 for case-a and 4 for case-b; fixed equal
     # case weights then produce 7. A flat CVaR over all seeds would return 10.
     assert result["objective_values"]["rmse"] == pytest.approx(7.0)
+    assert result["acceptance_rmse"] == pytest.approx(3.5)
     assert (
         result["objective_estimator"]
         == "within_case_cvar_then_fixed_suite_mean_v1"
@@ -1237,6 +1242,41 @@ def test_acceptance_never_treats_invalid_metrics_as_passing(unsafe: object) -> N
     )
 
     assert result.passed is False
+
+
+def test_acceptance_uses_unrounded_versioned_projection_fields() -> None:
+    candidate = _FakeCandidate(
+        candidate_id="exact-acceptance-projection",
+        score=0.1,
+        generation_index=1,
+    )
+    assert candidate.aggregated_metric_json is not None
+    candidate.aggregated_metric_json.update(
+        {
+            "rmse": 0.1234,
+            "max_error_worst": 0.5,
+            "pass_rate": 1.0,
+            "acceptance_projection_schema": "dronedream.acceptance-projection/v1",
+            "acceptance_rmse": 0.123456,
+            "acceptance_max_error": 0.500006,
+            "acceptance_pass_rate": 1.0,
+            "acceptance_completion_rate": 1.0,
+        }
+    )
+
+    result = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=0.12345,
+            target_max_error=0.50001,
+            min_pass_rate=1.0,
+        ),
+    )
+
+    assert result.passed is False
+    assert result.reason == "rmse_above_target"
+    assert result.rmse == pytest.approx(0.123456)
+    assert result.max_error == pytest.approx(0.500006)
 
 
 @pytest.mark.parametrize("unsafe_count", (float("nan"), float("inf"), True, -1))

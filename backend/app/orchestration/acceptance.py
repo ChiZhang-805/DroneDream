@@ -108,7 +108,12 @@ def evaluate_candidate(
             )
         ),
     )
-    stored_completion_rate = _safe_rate(agg.get("training_completion_rate"))
+    stored_completion_rate = _safe_rate(
+        agg.get(
+            "acceptance_completion_rate",
+            agg.get("training_completion_rate"),
+        )
+    )
     if (
         stored_completion_rate is None
         and agg.get("rate_aggregation") == "scenario_case_weighted_v1"
@@ -120,11 +125,16 @@ def evaluate_candidate(
         else completed / trial_count if trial_count > 0 else 0.0
     )
 
-    rmse = _safe_float(agg.get("rmse"))
+    rmse = _safe_float(agg.get("acceptance_rmse", agg.get("rmse")))
     # ``max_error`` historically contains the completed-trial mean. New
     # aggregates retain it for compatibility while acceptance uses the worst
     # observed trial excursion.
-    max_error = _safe_float(agg.get("max_error_worst", agg.get("max_error")))
+    max_error = _safe_float(
+        agg.get(
+            "acceptance_max_error",
+            agg.get("max_error_worst", agg.get("max_error")),
+        )
+    )
     passing = min(
         trial_count,
         _safe_nonnegative_int(
@@ -134,7 +144,12 @@ def evaluate_candidate(
             )
         ),
     )
-    stored_pass_rate = _safe_rate(agg.get("training_pass_rate"))
+    stored_pass_rate = _safe_rate(
+        agg.get(
+            "acceptance_pass_rate",
+            agg.get("training_pass_rate"),
+        )
+    )
     if (
         stored_pass_rate is None
         and agg.get("rate_aggregation") == "scenario_case_weighted_v1"
