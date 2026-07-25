@@ -52,3 +52,14 @@ selection or configuration value alone is not proof of a simulated effect.
   Windows executable. The `1.0.0` release candidate must not be presented as a
   trusted-publisher release until the exact NSIS bytes pass Authenticode
   verification.
+
+## Audited dependency exception
+
+The frontend is a browser-only Vite single-page application built with
+`createBrowserRouter`. It does not install or enable React Router's RSC or
+server-runtime packages. The dependency gate therefore records
+`GHSA-qwww-vcr4-c8h2` as non-applicable while this architecture remains true:
+that advisory concerns React Server Components action handling. The audit
+script pins the reviewed React Router version, refuses the exception if an RSC
+package is added, and continues to fail on every other high or critical npm
+advisory.

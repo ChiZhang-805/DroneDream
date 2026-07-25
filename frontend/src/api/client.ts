@@ -122,7 +122,7 @@ async function request<T>(
     );
   }
 
-  let envelope: ApiEnvelope<T> | null = null;
+  let envelope: ApiEnvelope<T>;
   try {
     envelope = (await response.json()) as ApiEnvelope<T>;
   } catch {
@@ -137,7 +137,7 @@ async function request<T>(
   // The HTTP status remains authoritative. A proxy, stale service worker, or
   // malformed backend must not turn a 4xx/5xx response into a successful
   // mutation merely by returning a body with `success: true`.
-  if (response.ok && envelope && envelope.success === true) {
+  if (response.ok && envelope.success === true) {
     return envelope.data;
   }
   const error = envelope?.error;

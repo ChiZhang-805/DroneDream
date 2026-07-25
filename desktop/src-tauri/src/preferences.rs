@@ -40,12 +40,12 @@ if ($null -eq $value) { '1033' } else { [string]$value }
             .creation_flags(CREATE_NO_WINDOW)
             .output();
 
-        return output
+        output
             .ok()
             .filter(|result| result.status.success())
             .and_then(|result| String::from_utf8(result.stdout).ok())
             .map(|value| locale_from_installer_language(&value).to_string())
-            .unwrap_or_else(|| ENGLISH_LOCALE.to_string());
+            .unwrap_or_else(|| ENGLISH_LOCALE.to_string())
     }
 
     #[cfg(not(target_os = "windows"))]
