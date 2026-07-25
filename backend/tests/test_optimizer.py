@@ -442,8 +442,11 @@ def test_multiobjective_aggregation_uses_robust_score_and_hard_constraints() -> 
     assert result["objective_values"] == {"rmse": 2.0}
     assert result["feasible"] is False
     assert result["constraint_violations"]
+    assert result["hard_constraint_violation"] == pytest.approx(1.0)
+    assert result["preference_loss"] == pytest.approx(2.0)
+    assert result["selection_key"]["hard_feasible"] is False
     assert candidate.aggregated_score is not None
-    assert candidate.aggregated_score > 1_000_000
+    assert candidate.aggregated_score == pytest.approx(2.0)
 
 
 def test_raw_adapter_metrics_cannot_override_canonical_safety_metrics() -> None:

@@ -16,6 +16,9 @@ class CandidateEvaluation:
     violations: dict[str, float]
     feasible: bool
     total_violation: float
+    hard_constraint_violation: float
+    preference_loss: float
+    soft_constraint_penalty: float
     scalar_loss: float
     sample_count: int
 
@@ -41,14 +44,10 @@ def _validated_weights(count: int, weights: Sequence[float] | None) -> list[floa
 
 
 def _weighted_mean(values: Sequence[float], weights: Sequence[float]) -> float:
-    return sum(value * weight for value, weight in zip(values, weights, strict=True)) / sum(
-        weights
-    )
+    return sum(value * weight for value, weight in zip(values, weights, strict=True)) / sum(weights)
 
 
-def _weighted_quantile(
-    values: Sequence[float], weights: Sequence[float], quantile: float
-) -> float:
+def _weighted_quantile(values: Sequence[float], weights: Sequence[float], quantile: float) -> float:
     ordered = sorted(zip(values, weights, strict=True), key=lambda item: item[0])
     threshold = max(0.0, min(1.0, quantile)) * sum(weights)
     cumulative = 0.0
@@ -66,9 +65,7 @@ def _weighted_tail_mean(
     fraction: float,
     highest: bool,
 ) -> float:
-    ordered = sorted(
-        zip(values, weights, strict=True), key=lambda item: item[0], reverse=highest
-    )
+    ordered = sorted(zip(values, weights, strict=True), key=lambda item: item[0], reverse=highest)
     target_weight = fraction * sum(weights)
     remaining = target_weight
     weighted_sum = 0.0
@@ -120,9 +117,7 @@ def aggregate_metric(
     raise ValueError(f"unsupported robust aggregation mode: {mode}")
 
 
-def _constraint_observed(
-    values: Sequence[float], constraint: ConstraintSpec
-) -> float:
+def _constraint_observed(values: Sequence[float], constraint: ConstraintSpec) -> float:
     samples = _validated_values(values)
     if constraint.operator in {"lt", "lte"}:
         return max(samples)
@@ -178,7 +173,7 @@ def evaluate_candidate(
         raise ValueError("candidate evaluation requires at least one metric sample")
     _validated_weights(len(samples), sample_weights)
     objectives: dict[str, float] = {}
-    scalar_loss = 0.0
+    preference_loss = 0.0
     total_objective_weight = sum(objective.weight for objective in config.objectives)
     for objective in config.objectives:
         value = _objective_value(samples, objective, config, sample_weights)
@@ -192,14 +187,16 @@ def evaluate_candidate(
             oriented = max(0.0, value - objective.target)
         else:
             oriented = max(0.0, objective.target - value)
-        scalar_loss += (
-            objective.weight / total_objective_weight
-        ) * oriented / objective.normalization
+        preference_loss += (
+            (objective.weight / total_objective_weight) * oriented / objective.normalization
+        )
 
     constraint_values: dict[str, float] = {}
     violations: dict[str, float] = {}
     hard_violation = False
     total_violation = 0.0
+    hard_constraint_violation = 0.0
+    soft_constraint_penalty = 0.0
     for constraint in config.constraints:
         try:
             values = [sample[constraint.metric] for sample in samples]
@@ -212,8 +209,13 @@ def evaluate_candidate(
             key = f"{constraint.metric}:{constraint.operator}:{constraint.threshold:g}"
             violations[key] = violation
             total_violation += violation
-            hard_violation = hard_violation or constraint.hard
-            scalar_loss += constraint.penalty * violation
+            if constraint.hard:
+                hard_violation = True
+                hard_constraint_violation += violation
+            else:
+                soft_constraint_penalty += constraint.penalty * violation
+
+    scalar_loss = preference_loss + soft_constraint_penalty
 
     return CandidateEvaluation(
         objectives=objectives,
@@ -221,6 +223,9 @@ def evaluate_candidate(
         violations=violations,
         feasible=not hard_violation,
         total_violation=total_violation,
+        hard_constraint_violation=hard_constraint_violation,
+        preference_loss=preference_loss,
+        soft_constraint_penalty=soft_constraint_penalty,
         scalar_loss=scalar_loss,
         sample_count=len(samples),
     )

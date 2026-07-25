@@ -14,7 +14,8 @@ from pathlib import Path
 from typing import Any
 
 from app import models
-from app.orchestration.constants import BASELINE_PARAMETERS, PARAMETER_SAFE_RANGES
+from app.optimization.outcome_contract import compile_job_outcome_contract
+from app.orchestration.constants import BASELINE_PARAMETERS, PARAMETER_SAFE_RANGES, SCORE_WEIGHTS
 
 _SAFE_ENV_ALLOWLIST: tuple[str, ...] = (
     "PX4_GAZEBO_WORLD",
@@ -197,6 +198,10 @@ def _trial_summaries(job: models.Job) -> list[dict[str, Any]]:
 
 def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet) -> dict[str, Any]:
     git = _git_info()
+    outcome_contract = compile_job_outcome_contract(
+        job,
+        failed_trial_weight=SCORE_WEIGHTS["failed_trial"],
+    )
     real_command = os.environ.get("REAL_SIMULATOR_COMMAND")
     px4_dir = os.environ.get("PX4_AUTOPILOT_DIR")
     acceptance_criteria = {
@@ -263,6 +268,7 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
             "acceptance_criteria": acceptance_criteria,
         },
         "optimizer": {
+            "optimization_outcome_contract": outcome_contract.model_dump(mode="json"),
             "parameter_safe_ranges": {
                 key: {"min": lo, "max": hi} for key, (lo, hi) in PARAMETER_SAFE_RANGES.items()
             },

@@ -1277,10 +1277,12 @@ as a hierarchical structure with distinct sources of variation:
 [NIST two-level nested design](https://www.itl.nist.gov/div898/handbook/mpc/section5/mpc5321.htm).
 Flattening all rows first changes the question being answered.
 
-#### 8.10.1 Current objective-pipeline audit
+#### 8.10.1 Baseline objective-pipeline audit
 
-The current advanced path is deterministic and tested, but its semantics are not yet
-strong enough to be the evidence boundary of an autonomous Harness:
+The following table captured the advanced path before Outcome Contract V1 and
+Selection Key 1.0. The hard-feasibility/scalar-loss rows are now addressed by the
+implemented status in Section 30.2; the remaining rows continue to define the
+next contract revisions:
 
 | Current behavior | Why it is insufficient |
 | --- | --- |
@@ -1290,7 +1292,7 @@ strong enough to be the evidence boundary of an autonomous Harness:
 | result constraints always use the worst completed sample | this ignores configured scenario weights and cannot express a universal safety assertion, a chance constraint, a case-level threshold, and an aspiration target as different policies |
 | completed seed rows are flattened and receive `case_weight / dispatched_seed_count` | a missing seed contributes no metric mass, and the remaining weights are renormalized by the aggregator; the result is a conditional-on-observed-metrics estimand mixed with a separate failure penalty |
 | `failed_trial` is added as a weighted rate penalty | the coefficient is not derived from the objective unit or a declared composite outcome, so changing it changes the optimization problem |
-| hard infeasibility adds `1_000_000 + 1_000 × total_violation` | a large constant is not a proof of feasibility-first ordering; objective magnitudes, negative maximize losses, or future metrics can violate the intended precedence |
+| the prior path added `1_000_000 + 1_000 × total_violation` for hard infeasibility | replaced by Selection Key 1.0; this row remains as the regression that the new contract must never reintroduce |
 | violation is divided by `max(1, abs(threshold))` | thresholds below one use absolute units while larger thresholds use relative units; a zero threshold silently selects a scale of one |
 | `constraint_values` is keyed only by metric name | multiple lower/upper/equality contracts for one metric can overwrite observed values even though violation keys differ |
 | `target` creates a one-sided hinge and zero loss after the aspiration is met | this is valid only if satisficing is intended; otherwise distinct Pareto-superior candidates become tied with no declared secondary rule |
@@ -8095,7 +8097,7 @@ The implemented evidence-v2 compiler:
 - rejects mappings, strings, labels, free-form diagnostics, proposal rationale,
   errors, Candidate IDs, parameter values, arbitrary JSON, and mixed numeric/text
   metric arrays at the prompt boundary;
-- uses `evidence_schema_version=2.2` and `tool_registry_version=2.0` in capability
+- uses `evidence_schema_version=2.3` and `tool_registry_version=2.0` in capability
   discovery and decision/tool-execution events; and
 - presents a richer static tool manifest with explicit search roles, applicability
   signals, and declared constraint, multi-objective, and multi-fidelity support.
@@ -8140,7 +8142,7 @@ The execution-memory query deliberately avoids loading the mutable SQLAlchemy
 hiding decision events written later in the turn.
 
 For provider calls, `harness_decision_started` now persists the complete bounded,
-provider-safe Evidence 2.2 snapshot and static Tool Manifest 2.0 alongside their
+provider-safe Evidence 2.3 snapshot and static Tool Manifest 2.0 alongside their
 SHA-256 values, the production prompt SHA-256, Prompt Template 1.0, and Decision
 Trace 1.0 versions. `verify_harness_decision_trace()` validates the closed evidence
 schema, rebuilds the exact production messages from the persisted snapshot and
@@ -8178,27 +8180,47 @@ still proposes numeric parameters and therefore retains more model authority. Th
 closed-tool Harness plus deterministic optimizer adapters remains the preferred
 architecture for continued moat development.
 
+Outcome Contract V1 is now implemented as the first executable slice of Section
+8.10. Job creation and rerun compile a content-addressed
+`dronedream.optimization-outcome/v1` artifact that binds objective, constraint,
+scenario/seed/weight, failure, acceptance, holdout, metric-registry, and selection
+semantics. It is persisted in the Job event stream, advanced Candidate aggregates
+carry its ID, and the reproducibility manifest carries the full contract.
+The narrow legacy adapter labels `legacy_scenario_aliases_v1` and hashes the
+original persisted suite before mapping recognized historical aliases, so report
+export compatibility cannot silently rewrite old experimental intent.
+Before Candidate ranking, final aggregation recompiles the contract and refuses
+to proceed when its ID differs from the recorded creation event, turning
+post-dispatch configuration drift into an explicit terminal failure.
+Selection Key 1.0 replaces the `1_000_000 + 1_000 × violation` ranking shortcut
+with a shared lexicographic order: evidence completeness, hard feasibility, hard
+violation, training failure rate, objective-plus-soft-constraint loss, and a
+stable tiebreak. `scalar_loss` excludes hard-constraint penalties, preventing the
+experimental feasibility model from counting the same hard failure twice; CMA
+centering consumes the same selection key. The compatibility score remains for
+existing API/report consumers but is no longer the authority for hard feasibility.
+
 Current focused validation:
 
 ```text
-backend/.venv/Scripts/python.exe -m pytest \
-  backend/tests/test_harness_routing_evaluation.py \
-  backend/tests/test_phase8_llm_proposer.py \
-  backend/tests/test_phase8_iterative_loop.py \
-  backend/tests/test_capabilities.py -q
-
-44 passed
-
 cd backend
+.venv/Scripts/python.exe -m pytest -q
+
+775 passed
+
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 
 24 cases; 8 categories; 8 registered tools
 uniform-random expectation: 5.625/24 (23.4375%)
 best constant tool: optimizer_portfolio, 14/24 (58.3333%)
-current provider-call traces: Evidence 2.2, Tool Manifest 2.0,
+current provider-call traces: Evidence 2.3, Tool Manifest 2.0,
 Prompt Template 1.0, Decision Trace 1.0
 strict offline predictions: Prediction Artifact 1.0 bound to the printed
 corpus_sha256 and prompt_suite_sha256
+current corpus_sha256:
+4968b0a9639d59474c00402dcd261a241377bdb57a6273554f4d6ad0d1172625
+current prompt_suite_sha256:
+38ef54d3a42700bb447fd3708588b008f3340e9170f5e16aa17ef79bf84962e5
 ```
 
 ## 31. Reference index

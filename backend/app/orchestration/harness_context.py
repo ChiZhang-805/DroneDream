@@ -34,7 +34,7 @@ HarnessSourceType = Literal["baseline", "optimizer", "llm_optimizer", "unknown"]
 HarnessObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom", "unknown"]
 HarnessTrackType = Literal["circle", "u_turn", "lemniscate", "custom", "unknown"]
 
-HARNESS_EVIDENCE_SCHEMA_VERSION = "2.2"
+HARNESS_EVIDENCE_SCHEMA_VERSION = "2.3"
 HARNESS_TOOL_REGISTRY_VERSION = "2.0"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
@@ -57,7 +57,7 @@ _ALLOWED_SCENARIO_TYPES = frozenset(
         "custom",
     }
 )
-_ALLOWED_ROBUST_AGGREGATIONS = frozenset({"mean", "worst_case", "cvar", "percentile"})
+_ALLOWED_ROBUST_AGGREGATIONS = frozenset({"mean", "worst", "cvar", "percentile"})
 _ALLOWED_METRICS = (
     "rmse",
     "max_error",
@@ -335,7 +335,7 @@ class HarnessJobEvidence(_ClosedModel):
 
 
 class HarnessEvidenceSnapshot(_ClosedModel):
-    schema_version: Literal["2.2"] = "2.2"
+    schema_version: Literal["2.3"] = "2.3"
     job: HarnessJobEvidence
     budget: HarnessBudgetEvidence
     scenarios: HarnessScenarioEvidence
@@ -507,22 +507,21 @@ def _search_summary(
         if score is not None:
             scored.append((candidate, score))
     baseline_scores = [score for candidate, score in scored if candidate.is_baseline]
-    ordered_scores = sorted(score for _, score in scored)
+    feasible_or_unknown_scores = [
+        score for candidate, score in scored if _candidate_feasibility(candidate) is not False
+    ]
+    ordered_scores = sorted(
+        feasible_or_unknown_scores if feasible_or_unknown_scores else [score for _, score in scored]
+    )
     best_score = ordered_scores[0] if ordered_scores else None
     baseline_score = min(baseline_scores, default=None)
     relative_improvement: float | None = None
     if baseline_score is not None and best_score is not None and abs(baseline_score) > 1e-12:
         relative_improvement = (baseline_score - best_score) / abs(baseline_score)
-    score_gap = (
-        ordered_scores[1] - ordered_scores[0]
-        if len(ordered_scores) >= 2
-        else None
-    )
+    score_gap = ordered_scores[1] - ordered_scores[0] if len(ordered_scores) >= 2 else None
     relative_score_gap = (
         score_gap / abs(best_score)
-        if score_gap is not None
-        and best_score is not None
-        and abs(best_score) > 1e-12
+        if score_gap is not None and best_score is not None and abs(best_score) > 1e-12
         else None
     )
 
@@ -553,9 +552,7 @@ def _search_summary(
 
     total_trials = sum(max(0, int(candidate.trial_count or 0)) for candidate in candidates)
     failed_trials = sum(max(0, int(candidate.failed_trial_count or 0)) for candidate in candidates)
-    completed_candidates = sum(
-        1 for candidate in candidates if _candidate_complete(candidate)
-    )
+    completed_candidates = sum(1 for candidate in candidates if _candidate_complete(candidate))
     feasibility_observations = [
         value
         for candidate in candidates
@@ -567,9 +564,7 @@ def _search_summary(
         scored_candidate_count=len(scored),
         completed_candidate_count=completed_candidates,
         incomplete_candidate_count=len(candidates) - completed_candidates,
-        completed_candidate_rate=(
-            completed_candidates / len(candidates) if candidates else 0.0
-        ),
+        completed_candidate_rate=(completed_candidates / len(candidates) if candidates else 0.0),
         feasibility_observed_candidate_count=len(feasibility_observations),
         feasible_candidate_count=feasible_candidates,
         feasible_candidate_rate=(
@@ -619,11 +614,18 @@ def _tool_history(
         owned = grouped.get(tool_id)
         if not owned:
             continue
-        scores = [
+        all_scores = [
             score
             for candidate in owned
             if (score := _finite(candidate.aggregated_score)) is not None
         ]
+        feasible_or_unknown_scores = [
+            score
+            for candidate in owned
+            if (score := _finite(candidate.aggregated_score)) is not None
+            and _candidate_feasibility(candidate) is not False
+        ]
+        scores = feasible_or_unknown_scores or all_scores
         result.append(
             HarnessToolHistory(
                 tool_id=tool_id,
@@ -823,8 +825,7 @@ def build_harness_evidence(
     scenarios = _scenario_evidence(job)
     full_trials_per_candidate = max(
         1,
-        scenarios.training_replicate_count
-        + scenarios.validation_replicate_count,
+        scenarios.training_replicate_count + scenarios.validation_replicate_count,
     )
     remaining_trials = max(0, max_total_trials - used_trials)
     compact_candidates = _select_candidates(candidates)
@@ -861,9 +862,7 @@ def build_harness_evidence(
             max_total_trials=max_total_trials,
             remaining_trials=remaining_trials,
             full_trials_per_candidate=full_trials_per_candidate,
-            remaining_full_candidate_capacity=(
-                remaining_trials // full_trials_per_candidate
-            ),
+            remaining_full_candidate_capacity=(remaining_trials // full_trials_per_candidate),
         ),
         scenarios=scenarios,
         search=_search_summary(candidates),

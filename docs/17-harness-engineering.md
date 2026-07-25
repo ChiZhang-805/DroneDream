@@ -137,6 +137,32 @@ inputs, while holdout types/IDs/seeds/configuration/results, Candidate labels/ID
 arbitrary metric keys, and unknown failure strings are removed. This path still has
 more authority than the closed-tool Harness and is not the preferred control plane.
 
+## Versioned outcome and selection semantics
+
+Every new or rerun Job now compiles
+`dronedream.optimization-outcome/v1` before dispatch. The content-addressed
+contract binds the objective/constraint configuration, enabled training and
+holdout scenario identities, seed rows, case weights, acceptance thresholds,
+metric sources/units, missing-metric treatment, failure treatment, and final
+promotion rules. The same contract is persisted as a Job event, copied into the
+reproducibility manifest, and referenced by every advanced Candidate aggregate.
+Recognized pre-contract scenario aliases are normalized only for legacy export,
+while the contract retains the original persisted-suite hash and records the
+named compatibility transformation.
+Final aggregation recompiles the contract and fails closed with
+`OUTCOME_CONTRACT_DRIFT` if a recorded new-Job contract no longer matches the
+persisted Job configuration.
+
+Candidate selection uses Selection Key 1.0 with explicit lexicographic
+precedence: complete evidence, hard feasibility, hard-constraint violation,
+training failure rate, preference plus soft-constraint loss, then a stable
+tiebreak. Hard constraints are no longer folded into `scalar_loss` and are no
+longer represented by a `1,000,000` magic penalty. Soft constraints remain a
+declared loss term; failed Trials remain a separately weighted rate. Traditional
+CMA centering, public ranking, experimental optimizer observations, and reports
+therefore consume compatible meanings instead of silently double-counting hard
+feasibility.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

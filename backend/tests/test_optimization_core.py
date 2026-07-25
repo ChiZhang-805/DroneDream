@@ -1,16 +1,25 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
 
 from app.optimization.design import halton_design
 from app.optimization.domain import ParameterDomain, SearchSpace
+from app.optimization.outcome_contract import (
+    OUTCOME_CONTRACT_SCHEMA,
+    build_selection_key,
+    compile_job_outcome_contract,
+    compile_outcome_contract,
+    selection_order_key,
+)
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import aggregate_metric, evaluate_candidate
 from app.optimization.scenarios import holdout_matrix, scenario_matrix, training_matrix
 from app.schemas import (
+    AcceptanceCriteria,
     ConstraintSpec,
     ObjectiveConfig,
     ObjectiveSpec,
@@ -22,9 +31,7 @@ from app.schemas import (
 
 def _parameter_space() -> list[ParameterSelection]:
     return [
-        ParameterSelection(
-            name="MPC_XY_P", baseline=0.95, minimum=0.2, maximum=2.0, step=0.05
-        ),
+        ParameterSelection(name="MPC_XY_P", baseline=0.95, minimum=0.2, maximum=2.0, step=0.05),
         ParameterSelection(
             name="MPC_TILTMAX_AIR",
             baseline=45,
@@ -48,9 +55,7 @@ def test_parameter_domain_validation_rejects_unsafe_bounds() -> None:
     with pytest.raises(ValidationError, match="inside"):
         ParameterSelection(name="MPC_XY_P", baseline=2.5, minimum=0.2, maximum=2.0)
     with pytest.raises(ValidationError, match="log-scaled"):
-        ParameterSelection(
-            name="MPC_XY_P", baseline=1.0, minimum=0.0, maximum=2.0, scale="log"
-        )
+        ParameterSelection(name="MPC_XY_P", baseline=1.0, minimum=0.0, maximum=2.0, scale="log")
     with pytest.raises(ValidationError, match="requires choices"):
         ParameterSelection(
             name="MC_AIRMODE",
@@ -63,9 +68,7 @@ def test_parameter_domain_validation_rejects_unsafe_bounds() -> None:
 
 def test_search_space_projects_discrete_and_stepped_values() -> None:
     space = SearchSpace.from_schema(_parameter_space())
-    projected = space.project(
-        {"MPC_XY_P": 1.024, "MPC_TILTMAX_AIR": 54.6, "MC_AIRMODE": 1.8}
-    )
+    projected = space.project({"MPC_XY_P": 1.024, "MPC_TILTMAX_AIR": 54.6, "MC_AIRMODE": 1.8})
     assert projected == {
         "MPC_XY_P": 1.0,
         "MPC_TILTMAX_AIR": 55.0,
@@ -89,14 +92,10 @@ def test_halton_design_is_deterministic_bounded_and_includes_baseline() -> None:
 
 def test_robust_aggregations_follow_worst_objective_direction() -> None:
     values = [1.0, 2.0, 10.0]
-    assert aggregate_metric(values, direction="minimize", mode="mean") == pytest.approx(
-        13 / 3
-    )
+    assert aggregate_metric(values, direction="minimize", mode="mean") == pytest.approx(13 / 3)
     assert aggregate_metric(values, direction="minimize", mode="worst") == 10.0
     assert aggregate_metric(values, direction="maximize", mode="worst") == 1.0
-    assert aggregate_metric(
-        values, direction="minimize", mode="cvar", cvar_alpha=0.2
-    ) == 10.0
+    assert aggregate_metric(values, direction="minimize", mode="cvar", cvar_alpha=0.2) == 10.0
 
 
 def test_candidate_evaluation_enforces_worst_case_hard_constraints() -> None:
@@ -110,9 +109,7 @@ def test_candidate_evaluation_enforces_worst_case_hard_constraints() -> None:
                 normalization=10.0,
             ),
         ],
-        constraints=[
-            ConstraintSpec(metric="crash_flag", operator="lte", threshold=0, hard=True)
-        ],
+        constraints=[ConstraintSpec(metric="crash_flag", operator="lte", threshold=0, hard=True)],
         robust_aggregation="mean",
     )
     evaluation = evaluate_candidate(
@@ -125,6 +122,174 @@ def test_candidate_evaluation_enforces_worst_case_hard_constraints() -> None:
     assert evaluation.objectives["rmse"] == 1.0
     assert evaluation.feasible is False
     assert evaluation.total_violation == 1.0
+    assert evaluation.hard_constraint_violation == 1.0
+    assert evaluation.preference_loss == pytest.approx(0.57)
+    assert evaluation.scalar_loss == pytest.approx(0.57)
+
+
+def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> None:
+    objective_config = ObjectiveConfig(
+        objectives=[
+            ObjectiveSpec(
+                metric="rmse",
+                direction="minimize",
+                weight=2.0,
+                normalization=0.5,
+            )
+        ],
+        constraints=[
+            ConstraintSpec(
+                metric="crash_flag",
+                operator="lte",
+                threshold=0,
+                hard=True,
+                penalty=100,
+            )
+        ],
+        robust_aggregation="cvar",
+        cvar_alpha=0.25,
+    )
+    suite = ScenarioSuiteConfig(
+        cases=[
+            ScenarioCaseConfig(id="train", seeds=[1, 2], weight=2),
+            ScenarioCaseConfig(
+                id="sealed",
+                scenario_type="wind_perturbed",
+                seeds=[91],
+                holdout=True,
+                config={"wind_mps": 8},
+            ),
+        ]
+    )
+    acceptance = AcceptanceCriteria(
+        target_rmse=0.8,
+        min_pass_rate=0.9,
+    )
+
+    first = compile_outcome_contract(
+        objective_config,
+        suite,
+        acceptance,
+        failed_trial_weight=1.5,
+    )
+    second = compile_outcome_contract(
+        objective_config,
+        suite,
+        acceptance,
+        failed_trial_weight=1.5,
+    )
+
+    assert first == second
+    assert first.schema_id == OUTCOME_CONTRACT_SCHEMA
+    assert first.contract_id.startswith("sha256:")
+    assert len(first.contract_id) == 71
+    assert first.objectives[0].metric.registry_id == "dronedream.metric.rmse.v1"
+    assert first.objectives[0].weight_decimal == "2"
+    assert first.objectives[0].estimator_scope == "flat_completed_seed_rows"
+    assert first.objectives[0].sample_weight_policy == (
+        "case_weight_divided_by_dispatched_seed_count"
+    )
+    assert first.scenario_population.cases[1].holdout is True
+    assert first.scenario_population.cases[1].config_sha256
+    assert first.domain_failure_policy.hard_constraint_penalty_in_scalar_loss is False
+    assert first.selection_policy.precedence[:3] == (
+        "evidence_complete",
+        "hard_feasible",
+        "hard_constraint_violation",
+    )
+
+    changed = compile_outcome_contract(
+        objective_config,
+        suite.model_copy(
+            update={
+                "cases": [
+                    suite.cases[0],
+                    suite.cases[1].model_copy(update={"seeds": [92]}),
+                ]
+            }
+        ),
+        acceptance,
+        failed_trial_weight=1.5,
+    )
+    assert changed.contract_id != first.contract_id
+
+    with pytest.raises(ValueError, match="failed_trial_weight"):
+        compile_outcome_contract(
+            objective_config,
+            suite,
+            acceptance,
+            failed_trial_weight=float("nan"),
+        )
+
+
+def test_outcome_contract_preserves_and_labels_supported_legacy_scenario_shape() -> None:
+    legacy_suite = {
+        "cases": [
+            {
+                "scenario_type": "wind",
+                "seeds": [101],
+            }
+        ]
+    }
+    job = SimpleNamespace(
+        objective_config_json=None,
+        scenario_suite_json=legacy_suite,
+        target_rmse=None,
+        target_max_error=None,
+        min_pass_rate=0.8,
+    )
+
+    contract = compile_job_outcome_contract(
+        job,
+        failed_trial_weight=1.5,
+    )
+
+    assert contract.compatibility_normalization == (
+        "legacy_scenario_aliases_v1",
+    )
+    assert contract.scenario_population.cases[0].case_id == (
+        "legacy-1-wind_perturbed"
+    )
+    assert contract.scenario_population.cases[0].scenario_type == (
+        "wind_perturbed"
+    )
+
+
+def test_selection_key_is_lexicographic_not_magic_penalty_based() -> None:
+    feasible = {
+        "selection_key": build_selection_key(
+            evidence_complete=True,
+            hard_feasible=True,
+            hard_constraint_violation=0,
+            training_failure_rate=0,
+            decision_loss=5000,
+        )
+    }
+    infeasible = {
+        "selection_key": build_selection_key(
+            evidence_complete=True,
+            hard_feasible=False,
+            hard_constraint_violation=0.001,
+            training_failure_rate=0,
+            decision_loss=0,
+        )
+    }
+
+    assert selection_order_key(feasible, 5000) < selection_order_key(
+        infeasible,
+        0,
+    )
+
+    maximize_reward = {
+        "selection_key": build_selection_key(
+            evidence_complete=True,
+            hard_feasible=True,
+            hard_constraint_violation=0,
+            training_failure_rate=0,
+            decision_loss=-1,
+        )
+    }
+    assert selection_order_key(maximize_reward, -1)[-1] == -1
 
 
 def test_objective_targets_apply_one_sided_aspiration_loss() -> None:
@@ -249,9 +414,7 @@ def test_scenario_matrix_is_fixed_across_candidates_and_splits_holdout() -> None
         ("train", 3),
         ("train", 5),
     ]
-    assert [(run.case_id, run.seed) for run in holdout_matrix(suite)] == [
-        ("validation", 11)
-    ]
+    assert [(run.case_id, run.seed) for run in holdout_matrix(suite)] == [("validation", 11)]
     assert first[-1].persistence_config() == {
         "wind_mps": 9,
         "scenario_case_id": "validation",

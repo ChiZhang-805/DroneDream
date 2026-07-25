@@ -16,6 +16,7 @@ from typing import Any
 
 from app import models, schemas
 from app.optimization.domain import SearchSpace
+from app.optimization.outcome_contract import selection_order_key
 from app.orchestration.optimizer import CandidateProposal
 from app.orchestration.parameter_constraints import validator_for_job
 
@@ -76,7 +77,10 @@ def _best_scored_center(
         return None
     scored.sort(
         key=lambda c: (
-            c.aggregated_score if c.aggregated_score is not None else float("inf"),
+            *selection_order_key(
+                c.aggregated_metric_json,
+                c.aggregated_score,
+            ),
             c.generation_index,
             c.id,
         )
@@ -303,7 +307,10 @@ def _propose_selected_parameter_generation(
     ]
     scored_history.sort(
         key=lambda item: (
-            (item[0].aggregated_score if item[0].aggregated_score is not None else float("inf")),
+            *selection_order_key(
+                item[0].aggregated_metric_json,
+                item[0].aggregated_score,
+            ),
             item[0].generation_index,
             item[0].id,
         )

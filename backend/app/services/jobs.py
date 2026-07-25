@@ -22,8 +22,10 @@ from app import secrets as job_secrets
 from app.config import get_settings
 from app.llm_provider_policy import llm_base_url_is_allowed
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
+from app.optimization.outcome_contract import compile_outcome_contract
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import CandidateEvaluation, evaluate_candidate
+from app.orchestration import constants
 from app.orchestration.aggregation import candidate_is_publishable
 from app.orchestration.events import record_event
 from app.parameters import (
@@ -378,6 +380,18 @@ def _create_job_from_config(
                 ],
             },
         )
+    )
+    outcome_contract = compile_outcome_contract(
+        req.objective_config,
+        req.scenario_suite,
+        req.acceptance_criteria,
+        failed_trial_weight=constants.SCORE_WEIGHTS["failed_trial"],
+    )
+    record_event(
+        db,
+        job.id,
+        "optimization_outcome_contract_compiled",
+        outcome_contract.model_dump(mode="json"),
     )
     db.add(
         models.JobEvent(
@@ -1318,6 +1332,12 @@ def _candidate_evaluation(
         scalar_loss = aggregate.get("scalar_loss")
         total_violation = aggregate.get("total_constraint_violation", 0.0)
         feasible = aggregate.get("feasible")
+        hard_constraint_violation = aggregate.get(
+            "hard_constraint_violation",
+            0.0 if feasible is True else total_violation,
+        )
+        preference_loss = aggregate.get("preference_loss", scalar_loss)
+        soft_constraint_penalty = aggregate.get("soft_constraint_penalty", 0.0)
         raw_sample_count = aggregate.get(
             "training_completed_trial_count",
             candidate.completed_trial_count,
@@ -1334,6 +1354,15 @@ def _candidate_evaluation(
             or isinstance(total_violation, bool)
             or not isinstance(total_violation, int | float)
             or not math.isfinite(float(total_violation))
+            or isinstance(hard_constraint_violation, bool)
+            or not isinstance(hard_constraint_violation, int | float)
+            or not math.isfinite(float(hard_constraint_violation))
+            or isinstance(preference_loss, bool)
+            or not isinstance(preference_loss, int | float)
+            or not math.isfinite(float(preference_loss))
+            or isinstance(soft_constraint_penalty, bool)
+            or not isinstance(soft_constraint_penalty, int | float)
+            or not math.isfinite(float(soft_constraint_penalty))
             or isinstance(raw_sample_count, bool)
             or not isinstance(raw_sample_count, int | float)
             or not math.isfinite(float(raw_sample_count))
@@ -1350,6 +1379,9 @@ def _candidate_evaluation(
             violations=persisted_violations,
             feasible=feasible,
             total_violation=float(total_violation),
+            hard_constraint_violation=float(hard_constraint_violation),
+            preference_loss=float(preference_loss),
+            soft_constraint_penalty=float(soft_constraint_penalty),
             scalar_loss=float(scalar_loss),
             sample_count=int(raw_sample_count),
         )

@@ -23,7 +23,7 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert data["features"]["llm_tool_harness"] == {
         "available": True,
         "decision_schema_version": "1.0",
-        "evidence_schema_version": "2.2",
+        "evidence_schema_version": "2.3",
         "tool_registry_version": "2.0",
         "prompt_template_version": "1.0",
         "trace_schema_version": "1.0",
@@ -165,7 +165,6 @@ def test_capabilities_surfaces_invalid_worker_override(client, monkeypatch) -> N
     assert simulators["items"]["real_cli"]["status"] == "invalid_override"
     assert simulators["items"]["mock"]["ready"] is False
     assert simulators["items"]["real_cli"]["ready"] is False
-
 
 def test_capabilities_rejects_internal_real_stub_override(client, monkeypatch) -> None:
     monkeypatch.setenv("SIMULATOR_BACKEND", "real_stub")

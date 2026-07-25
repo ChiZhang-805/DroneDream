@@ -638,7 +638,6 @@ def test_create_job_rejects_gpt_without_api_key(llm_ctx):
             jobs_service.create_job(db, req)
         assert exc.value.code == "INVALID_INPUT"
 
-
 def test_job_create_request_defaults_are_keyless_heuristic_and_20(llm_ctx):
     schemas = llm_ctx["schemas"]
     req = schemas.JobCreateRequest()
@@ -862,7 +861,7 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
     assert decision.tool_id == "bipop_cma_es"
     provider_payload = json.loads(fake.calls[0]["user"])
     evidence = provider_payload["evidence"]
-    assert evidence["schema_version"] == "2.2"
+    assert evidence["schema_version"] == "2.3"
     assert evidence["budget"] == {
         "current_generation": 3,
         "max_iterations": 6,
@@ -929,7 +928,7 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
     ]
     assert provider_payload["tool_manifest"]["registry_version"] == "2.0"
     assert len(provider_payload["tool_manifest"]["tools"]) == 8
-    assert started_event.payload_json["evidence_schema_version"] == "2.2"
+    assert started_event.payload_json["evidence_schema_version"] == "2.3"
     assert started_event.payload_json["tool_registry_version"] == "2.0"
     assert started_event.payload_json["prompt_template_version"] == "1.0"
     assert started_event.payload_json["trace_schema_version"] == "1.0"

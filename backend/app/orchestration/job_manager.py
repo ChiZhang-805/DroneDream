@@ -38,6 +38,10 @@ from app.orchestration.optimizer import (
     generate_candidates,
     generate_selected_parameter_candidates,
 )
+from app.orchestration.outcome_contract_guard import (
+    OutcomeContractDriftError,
+    check_job_outcome_contract,
+)
 from app.orchestration.parameter_constraints import validator_for_job
 from app.simulator.base import (
     FAILURE_ADAPTER_UNAVAILABLE,
@@ -833,6 +837,11 @@ def _claim_and_initialize_job(db: Session, job: models.Job) -> bool:
 
     if job.status != "QUEUED":
         return False
+    if not check_job_outcome_contract(db, job).valid:
+        raise OutcomeContractDriftError(
+            "the persisted optimization outcome contract no longer matches "
+            "the queued Job configuration"
+        )
 
     now = _now()
     claimed = db.execute(
@@ -1401,7 +1410,13 @@ def dispatch_next_harness_generation(
     return result
 
 
-def _fail_job_initialization(db: Session, job_id: str, exc: ValueError) -> None:
+def _fail_job_initialization(
+    db: Session,
+    job_id: str,
+    exc: ValueError,
+    *,
+    code: str = "JOB_INITIALIZATION_FAILED",
+) -> None:
     """Terminally quarantine one invalid persisted job without blocking the queue."""
 
     db.rollback()
@@ -1412,9 +1427,11 @@ def _fail_job_initialization(db: Session, job_id: str, exc: ValueError) -> None:
     job.status = "FAILED"
     job.current_phase = "failed"
     job.completed_at = now
-    job.latest_error_code = "JOB_INITIALIZATION_FAILED"
+    job.latest_error_code = code
     job.latest_error_message = (
-        "The saved job configuration is invalid and could not be initialized."
+        "The saved optimization outcome contract changed after Job creation."
+        if code == "OUTCOME_CONTRACT_DRIFT"
+        else "The saved job configuration is invalid and could not be initialized."
     )
     purged = 0
     for stored_secret in job.secrets:
@@ -1427,7 +1444,7 @@ def _fail_job_initialization(db: Session, job_id: str, exc: ValueError) -> None:
         job.id,
         "job_failed",
         {
-            "code": "JOB_INITIALIZATION_FAILED",
+            "code": code,
             "error_type": type(exc).__name__,
             "secrets_purged": purged,
         },
@@ -1459,6 +1476,14 @@ def start_queued_jobs(db: Session, *, limit: int = 10) -> list[str]:
                 started.append(job_id)
             else:
                 db.rollback()
+        except OutcomeContractDriftError as exc:
+            logger.error("job %s outcome contract drifted before dispatch", job_id)
+            _fail_job_initialization(
+                db,
+                job_id,
+                exc,
+                code="OUTCOME_CONTRACT_DRIFT",
+            )
         except ValueError as exc:
             logger.exception("job %s failed initialization validation", job_id)
             _fail_job_initialization(db, job_id, exc)

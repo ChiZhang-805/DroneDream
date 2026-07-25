@@ -7,9 +7,10 @@ Once every trial for a job is terminal, this module:
    candidate), rolls up the candidate's completed trials into
    ``aggregated_metric_json`` / ``aggregated_score``, and persists trial
    counts. See :func:`_aggregate_candidate`.
-3. Selects the best candidate by lowest ``aggregated_score`` among candidates
-   that completed the entire configured full-fidelity scenario matrix, passed
-   every required holdout, and satisfied all persisted hard constraints.
+3. Selects the best candidate with the shared lexicographic Selection Key 1.0
+   among candidates that completed the entire configured full-fidelity
+   scenario matrix, passed every required holdout, and satisfied all persisted
+   hard constraints.
 4. Ranks every candidate (``rank_in_job``, 1-indexed) and marks ``is_best``
    on the winner.
 5. Writes the ``JobReport`` using the baseline's aggregate as the baseline
@@ -17,8 +18,9 @@ Once every trial for a job is terminal, this module:
 6. Sets the job ``COMPLETED`` (or ``FAILED`` only when no candidate produced
    a usable aggregate).
 
-The scoring formula is deterministic and documented in
-:func:`_score_candidate`. Lower is better.
+The compatibility score remains deterministic and lower-is-better, while hard
+feasibility and failure precedence are represented explicitly rather than by a
+magic numeric penalty.
 """
 
 from __future__ import annotations
@@ -36,6 +38,11 @@ from app import models, schemas
 from app.config import get_settings
 from app.db import SessionLocal
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
+from app.optimization.outcome_contract import (
+    OptimizationOutcomeContractV1,
+    build_selection_key,
+    selection_order_key,
+)
 from app.optimization.robust import CandidateEvaluation
 from app.optimization.robust import evaluate_candidate as evaluate_objectives
 from app.optimization.scenarios import scenario_matrix
@@ -47,6 +54,7 @@ from app.orchestration.acceptance import (
     evaluate_candidate,
 )
 from app.orchestration.events import record_event
+from app.orchestration.outcome_contract_guard import check_job_outcome_contract
 
 logger = logging.getLogger("drone_dream.orchestration.aggregation")
 
@@ -367,6 +375,7 @@ def _aggregate_candidate(
     *,
     objective_config: schemas.ObjectiveConfig | None = None,
     scenario_suite: schemas.ScenarioSuiteConfig | None = None,
+    outcome_contract: OptimizationOutcomeContractV1 | None = None,
 ) -> dict[str, Any] | None:
     """Roll up this candidate's trial metrics, update counts + aggregated_score.
 
@@ -710,13 +719,20 @@ def _aggregate_candidate(
                 "training_scenario_case_rates": training_rates["scenario_cases"],
             }
         )
-        selection_score = evaluation.scalar_loss
-        selection_score += constants.SCORE_WEIGHTS["failed_trial"] * float(
-            training_rates["failure_rate"]
+        training_failure_rate = float(training_rates["failure_rate"])
+        selection_score = (
+            evaluation.scalar_loss + constants.SCORE_WEIGHTS["failed_trial"] * training_failure_rate
         )
-        if not evaluation.feasible:
-            selection_score += 1_000_000.0 + 1_000.0 * evaluation.total_violation
         aggregated_score = round(selection_score, 8)
+        selection_key = build_selection_key(
+            evidence_complete=(
+                len(training_completed) == len(training_trials) and training_failed == 0
+            ),
+            hard_feasible=evaluation.feasible,
+            hard_constraint_violation=evaluation.hard_constraint_violation,
+            training_failure_rate=training_failure_rate,
+            decision_loss=evaluation.scalar_loss,
+        )
         agg.update(
             {
                 "aggregated_score": aggregated_score,
@@ -725,11 +741,18 @@ def _aggregate_candidate(
                 "constraint_violations": evaluation.violations,
                 "feasible": evaluation.feasible,
                 "total_constraint_violation": evaluation.total_violation,
+                "hard_constraint_violation": (evaluation.hard_constraint_violation),
                 "robust_aggregation": objective_config.robust_aggregation,
+                "preference_loss": evaluation.preference_loss,
+                "soft_constraint_penalty": evaluation.soft_constraint_penalty,
                 "scalar_loss": evaluation.scalar_loss,
+                "selection_key": selection_key,
                 "training_trial_count": len(training_trials),
             }
         )
+        if outcome_contract is not None:
+            agg["outcome_contract_schema"] = outcome_contract.schema_id
+            agg["outcome_contract_id"] = outcome_contract.contract_id
         holdout_trials = [
             trial for trial in trials if bool((trial.scenario_config_json or {}).get("holdout"))
         ]
@@ -792,6 +815,12 @@ def _aggregate_candidate(
                             "feasible": validation_feasible,
                             "validation_status": validation_status,
                             "total_constraint_violation": (holdout_evaluation.total_violation),
+                            "hard_constraint_violation": (
+                                holdout_evaluation.hard_constraint_violation
+                            ),
+                            "preference_loss": holdout_evaluation.preference_loss,
+                            "soft_constraint_penalty": (holdout_evaluation.soft_constraint_penalty),
+                            "scalar_loss": holdout_evaluation.scalar_loss,
                         }
                     )
             agg["holdout"] = holdout_payload
@@ -828,9 +857,13 @@ def _rank_and_select_best(
 
     scorable.sort(
         key=lambda c: (
-            c.aggregated_score if c.aggregated_score is not None else float("inf"),
+            *selection_order_key(
+                c.aggregated_metric_json,
+                c.aggregated_score,
+            ),
             0 if not c.is_baseline else 1,
             c.generation_index,
+            c.id,
         )
     )
 
@@ -904,11 +937,25 @@ def finalize_job_if_ready(
         if job.scenario_suite_json is not None
         else None
     )
+    outcome_contract_check = check_job_outcome_contract(db, job)
+    outcome_contract = outcome_contract_check.contract
+    if not outcome_contract_check.valid:
+        _fail_job(
+            db,
+            job,
+            code="OUTCOME_CONTRACT_DRIFT",
+            message=(
+                "The persisted optimization outcome contract no longer "
+                "matches the Job configuration; refusing to rank candidates."
+            ),
+        )
+        return True
     baseline_agg = _aggregate_candidate(
         baseline,
         trials_by_candidate.get(baseline.id, []),
         objective_config=objective_config,
         scenario_suite=scenario_suite,
+        outcome_contract=outcome_contract,
     )
     for candidate in candidates:
         if candidate.id == baseline.id:
@@ -918,6 +965,7 @@ def finalize_job_if_ready(
             trials_by_candidate.get(candidate.id, []),
             objective_config=objective_config,
             scenario_suite=scenario_suite,
+            outcome_contract=outcome_contract,
         )
 
     # Persist aggregation results before any report storage or LLM network I/O.
@@ -1084,15 +1132,12 @@ def _try_continue_iterative_optimizer(
     passed = any_criterion_set(criteria) and any(
         evaluate_candidate(c, criteria).passed for c in scored
     )
-    needs_verified_optimizer = (
-        job.optimizer_strategy in {
-            "llm_harness",
-            *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
-        }
-        and not any(
-            candidate.source_type == "optimizer" and candidate_is_publishable(candidate)
-            for candidate in candidates
-        )
+    needs_verified_optimizer = job.optimizer_strategy in {
+        "llm_harness",
+        *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+    } and not any(
+        candidate.source_type == "optimizer" and candidate_is_publishable(candidate)
+        for candidate in candidates
     )
     if passed and not needs_verified_optimizer:
         return False

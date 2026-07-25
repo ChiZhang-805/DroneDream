@@ -178,6 +178,34 @@ def test_start_queued_jobs_creates_baseline_and_trials(orchestration_ctx):
         assert "trial_dispatched" in events
 
 
+def test_outcome_contract_drift_is_rejected_before_candidate_dispatch(
+    orchestration_ctx,
+):
+    ctx = orchestration_ctx
+    job_id = _create_queued_job(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        job.min_pass_rate = 0.7
+        db.commit()
+
+    with ctx["db_module"].SessionLocal() as db:
+        started = ctx["job_manager"].start_queued_jobs(db)
+
+    assert started == []
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.status == "FAILED"
+        assert job.latest_error_code == "OUTCOME_CONTRACT_DRIFT"
+        assert list(job.candidates) == []
+        assert list(job.trials) == []
+        failure = next(
+            event for event in job.events if event.event_type == "job_failed"
+        )
+        assert failure.payload_json["code"] == "OUTCOME_CONTRACT_DRIFT"
+
+
 def test_invalid_queued_job_is_quarantined_without_blocking_following_job(
     orchestration_ctx,
 ):

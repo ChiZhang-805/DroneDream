@@ -105,6 +105,20 @@ def test_advanced_experiment_round_trips_and_reruns(client: TestClient) -> None:
     detail = client.get(f"/api/v1/jobs/{created['id']}").json()["data"]
     assert detail["parameter_space"] == created["parameter_space"]
     assert detail["scenario_suite"] == created["scenario_suite"]
+    contract_event = next(
+        event
+        for event in detail["recent_events"]
+        if event["event_type"] == "optimization_outcome_contract_compiled"
+    )
+    contract = contract_event["payload"]
+    assert contract["schema_id"] == "dronedream.optimization-outcome/v1"
+    assert contract["contract_id"].startswith("sha256:")
+    assert contract["domain_failure_policy"] == {
+        "failed_trial_treatment": "separate_rate_penalty",
+        "failed_trial_weight_decimal": "1.5",
+        "hard_constraint_penalty_in_scalar_loss": False,
+        "soft_constraint_penalty_in_scalar_loss": True,
+    }
 
     history_response = client.get(f"/api/v1/jobs/{created['id']}/candidates")
     assert history_response.status_code == 200, history_response.text
@@ -123,6 +137,13 @@ def test_advanced_experiment_round_trips_and_reruns(client: TestClient) -> None:
     assert rerun["objective_config"] == created["objective_config"]
     assert rerun["scenario_suite"] == created["scenario_suite"]
     assert rerun["vehicle_profile"] == created["vehicle_profile"]
+    rerun_detail = client.get(f"/api/v1/jobs/{rerun['id']}").json()["data"]
+    rerun_contract = next(
+        event["payload"]
+        for event in rerun_detail["recent_events"]
+        if event["event_type"] == "optimization_outcome_contract_compiled"
+    )
+    assert rerun_contract["contract_id"] == contract["contract_id"]
 
 
 def test_legacy_job_receives_safe_advanced_defaults(client: TestClient) -> None:
