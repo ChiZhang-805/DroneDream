@@ -3,6 +3,8 @@
 
 import { isDesktopRuntime } from "../desktop/bridge";
 import { getDesktopReadinessSession } from "../desktop/readiness";
+import { getAuthAccessToken } from "../features/auth/authTokenStore";
+import { publicDemoConsole } from "../features/demo/publicDemo";
 import type {
   ApiEnvelope,
   Artifact,
@@ -13,6 +15,8 @@ import type {
   JobCompareResponse,
   JobCreateRequest,
   DeleteJobResponse,
+  ExperimentAssistantTurnRequest,
+  ExperimentAssistantTurnResponse,
   JobUpdateRequest,
   JobRerunRequest,
   JobReport,
@@ -53,10 +57,11 @@ const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
 
 function authHeaders(): Record<string, string> {
-  if (!DEMO_AUTH_TOKEN) {
+  const accessToken = getAuthAccessToken() ?? DEMO_AUTH_TOKEN;
+  if (!accessToken) {
     return {};
   }
-  return { Authorization: `Bearer ${DEMO_AUTH_TOKEN}` };
+  return { Authorization: `Bearer ${accessToken}` };
 }
 
 export function artifactDownloadUrl(artifactId: string): string {
@@ -155,6 +160,15 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async compileExperimentAssistantTurn(
+    req: ExperimentAssistantTurnRequest,
+  ): Promise<ExperimentAssistantTurnResponse> {
+    return request<ExperimentAssistantTurnResponse>("/experiment-assistant/turn", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  },
+
   async getCapabilities(): Promise<BackendCapabilitiesResponse> {
     return request<BackendCapabilitiesResponse>("/capabilities");
   },
@@ -176,6 +190,14 @@ export const apiClient = {
     page_size?: number;
     status?: JobStatus;
   }): Promise<PaginatedJobs> {
+    if (publicDemoConsole) {
+      return {
+        items: [],
+        page: params?.page ?? 1,
+        page_size: params?.page_size ?? 20,
+        total: 0,
+      };
+    }
     const qs = buildQuery({
       page: params?.page,
       page_size: params?.page_size,

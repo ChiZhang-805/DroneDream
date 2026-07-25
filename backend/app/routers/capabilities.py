@@ -167,6 +167,18 @@ def read_capabilities() -> dict[str, object]:
     return ok(
         {
             "service_version": __version__,
+            "features": {
+                "experiment_assistant": {
+                    "available": True,
+                    "schema_version": "1.0",
+                    "draft_only": True,
+                },
+                "llm_tool_harness": {
+                    "available": True,
+                    "decision_schema_version": "1.0",
+                    "tool_registry": "closed",
+                },
+            },
             "simulators": _simulator_capabilities(),
             "optimizers": {
                 "configuration_scope": "api_process",
@@ -192,6 +204,29 @@ def read_capabilities() -> dict[str, object]:
                             None
                             if gpt_ready
                             else "The API secret store is not configured for GPT jobs."
+                        ),
+                        "custom_base_url_allowlist_configured": bool(
+                            settings.llm_allowed_base_urls.strip()
+                        ),
+                    },
+                    "llm_harness": {
+                        "ready": gpt_ready,
+                        "status": (
+                            "experimental"
+                            if gpt_ready
+                            else "server_secret_not_configured"
+                        ),
+                        "experimental": True,
+                        "requires_user_api_key": True,
+                        "tool_registry": "closed",
+                        "fallback_strategy": "optimizer_portfolio",
+                        "reason": (
+                            None
+                            if gpt_ready
+                            else (
+                                "The API secret store is not configured for "
+                                "model-guided Harness jobs."
+                            )
                         ),
                         "custom_base_url_allowlist_configured": bool(
                             settings.llm_allowed_base_urls.strip()

@@ -1,8 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { RefObject } from "react";
+import type { ChangeEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import {
+  Apple,
+  BotMessageSquare,
+  Camera,
+  CircleUserRound,
+  Drone,
+  GraduationCap,
+  History,
+  ImagePlus,
+  LayoutDashboard,
+  LogIn,
+  MailCheck,
+  MoreHorizontal,
+  Settings,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 
 import { apiClient } from "./api/client";
+import {
+  ArchivedExperimentManager,
+  ExperimentWorkspaceSidebar,
+} from "./components/ExperimentWorkspaceSidebar";
 import { getDesktopWindowHandle, isDesktopRuntime } from "./desktop/bridge";
 import type { DesktopWindowHandle, RuntimeComponentState } from "./desktop/bridge";
 import {
@@ -11,13 +32,17 @@ import {
 } from "./desktop/access";
 import type { DesktopRuntimeAccess } from "./desktop/access";
 import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
-import { useAppUpdater } from "./desktop/updater";
 import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
+import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
 import { useModelAccess } from "./features/settings/ModelAccessContext";
-import type { ModelProvider } from "./features/settings/ModelAccessContext";
+import {
+  modelProviderLabel,
+  type ModelProvider,
+} from "./features/settings/ModelAccessContext";
 import { ModelAccessProvider } from "./features/settings/ModelAccessProvider";
 import {
-  clearExperimentDraft,
+  clearAllExperimentDrafts,
   hasExperimentDraft,
 } from "./features/experiment/draftStorage";
 import { useI18n } from "./i18n/I18nProvider";
@@ -31,10 +56,23 @@ const NAV_ITEMS: {
   end?: boolean;
   desktopTo?: string;
   requiresRuntime?: boolean;
+  icon: LucideIcon;
 }[] = [
-  { to: "/", desktopTo: "/dashboard", labelKey: "app.dashboard", end: true },
-  { to: "/history", labelKey: "app.history" },
-  { to: "/ece498", label: "ECE498BH" },
+  {
+    to: "/assistant",
+    labelKey: "app.conversation",
+    end: true,
+    requiresRuntime: true,
+    icon: BotMessageSquare,
+  },
+  {
+    to: "/dashboard",
+    labelKey: "app.dashboard",
+    end: true,
+    icon: LayoutDashboard,
+  },
+  { to: "/history", labelKey: "app.history", icon: History },
+  { to: "/ece498", label: "ECE498BH", icon: GraduationCap },
 ];
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
@@ -75,11 +113,13 @@ async function countActiveJobsBeforeExit(): Promise<number> {
 
 export function AppShell() {
   return (
-    <DesktopRuntimeAccessProvider>
-      <ModelAccessProvider>
-        <AppShellContent />
-      </ModelAccessProvider>
-    </DesktopRuntimeAccessProvider>
+    <AuthProvider>
+      <DesktopRuntimeAccessProvider>
+        <ModelAccessProvider>
+          <AppShellContent />
+        </ModelAccessProvider>
+      </DesktopRuntimeAccessProvider>
+    </AuthProvider>
   );
 }
 
@@ -92,24 +132,6 @@ function LanguageRegionIcon({ region }: { region: "west" | "east" }) {
         <circle className="launcher-language-region" cx={region === "west" ? "8" : "16"} cy="10" r="1.65" />
       </svg>
     </span>
-  );
-}
-
-function UpdateDownloadIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3.75v10.5m0 0 4-4m-4 4-4-4" />
-      <path d="M5.25 15.75v2.5a2 2 0 0 0 2 2h9.5a2 2 0 0 0 2-2v-2.5" />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="3.15" />
-      <path d="M19.45 13.25a7.9 7.9 0 0 0 0-2.5l2-1.55-2-3.46-2.48 1a8.4 8.4 0 0 0-2.17-1.25L14.45 2h-4.9L9.2 5.49a8.4 8.4 0 0 0-2.17 1.25l-2.48-1-2 3.46 2 1.55a7.9 7.9 0 0 0 0 2.5l-2 1.55 2 3.46 2.48-1a8.4 8.4 0 0 0 2.17 1.25L9.55 22h4.9l.35-3.49a8.4 8.4 0 0 0 2.17-1.25l2.48 1 2-3.46-2-1.55Z" />
-    </svg>
   );
 }
 
@@ -146,7 +168,16 @@ function SettingsDialog({
   onClose: () => void;
 }) {
   const { locale, setLocale, t } = useI18n();
-  const { settings: modelAccess, selectProvider, updateSettings } = useModelAccess();
+  const {
+    settings: modelAccess,
+    profiles: modelProfiles,
+    activeProfileId,
+    selectProfile,
+    addProfile,
+    removeActiveProfile,
+    selectProvider,
+    updateSettings,
+  } = useModelAccess();
   const level = runtimeHealthLevel(access);
   const snapshot = access.snapshot;
   const details: string[] = [];
@@ -249,6 +280,39 @@ function SettingsDialog({
             {t(modelAccess.apiKey ? "settings.model.configured" : "settings.model.notConfigured")}
           </span>
         </div>
+        <div className="settings-model-profile-row">
+          <label htmlFor="settings_model_profile">
+            <span>{t("settings.model.profile")}</span>
+            <select
+              id="settings_model_profile"
+              value={activeProfileId}
+              onChange={(event) => selectProfile(event.target.value)}
+            >
+              {modelProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {modelProviderLabel(profile.provider)} ·{" "}
+                  {profile.model || t("wizard.field.backendDefault")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="btn"
+            onClick={addProfile}
+            disabled={modelProfiles.length >= 12}
+          >
+            {t("settings.model.addProfile")}
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={removeActiveProfile}
+            disabled={modelProfiles.length <= 1}
+          >
+            {t("settings.model.removeProfile")}
+          </button>
+        </div>
         <div className="settings-model-grid">
           <label htmlFor="settings_model_provider">
             <span>{t("wizard.field.llmProvider")}</span>
@@ -268,6 +332,7 @@ function SettingsDialog({
             <input
               id="settings_model_name"
               value={modelAccess.model}
+              maxLength={128}
               onChange={(event) => updateSettings({ model: event.target.value })}
               placeholder={t("wizard.field.backendDefault")}
             />
@@ -279,6 +344,7 @@ function SettingsDialog({
               type="password"
               autoComplete="off"
               value={modelAccess.apiKey}
+              maxLength={512}
               onChange={(event) => updateSettings({ apiKey: event.target.value })}
               placeholder={t("settings.model.apiKeyPlaceholder")}
             />
@@ -289,6 +355,7 @@ function SettingsDialog({
               id="settings_model_base_url"
               type="url"
               value={modelAccess.baseUrl}
+              maxLength={2048}
               onChange={(event) => updateSettings({ baseUrl: event.target.value })}
               placeholder="https://…/v1"
             />
@@ -390,16 +457,657 @@ function ExitGuardDialog({
   );
 }
 
+const ACCOUNT_COPY = {
+  en: {
+    title: "DroneDream account",
+    signInTitle: "Sign in to DroneDream",
+    registerTitle: "Create account",
+    localTitle: "Local workspace",
+    localBody:
+      "This build keeps experiments on this computer. Connect the cloud account configuration to enable isolated email accounts, secure storage, and cross-device data sync.",
+    email: "Email address",
+    emailPlaceholder: "you@example.com",
+    password: "Password",
+    passwordPlaceholder: "At least 8 characters",
+    confirmPassword: "Confirm password",
+    confirmPasswordPlaceholder: "Enter the password again",
+    sendCode: "Send code",
+    resendCode: "Resend code",
+    signIn: "Sign in",
+    register: "Register",
+    createAccount: "Create account",
+    registerNow: "New to DroneDream? Register now",
+    backToSignIn: "Already registered? Sign in",
+    code: "Verification code",
+    codePlaceholder: "Six-digit code",
+    passwordTooShort: "Password must contain at least 8 characters.",
+    passwordMismatch: "The two passwords do not match.",
+    codeRequired: "Send and enter the verification code before creating the account.",
+    google: "Continue with Google",
+    apple: "Continue with Apple",
+    username: "Username",
+    usernamePlaceholder: "Choose a username",
+    saveUsername: "Save username",
+    profilePhoto: "Profile photo",
+    choosePhoto: "Choose from computer",
+    useCamera: "Use camera",
+    takePhoto: "Take photo",
+    cancelCamera: "Cancel camera",
+    invalidPhoto: "Choose a JPEG, PNG, or WebP image.",
+    photoTooLarge: "Choose an image smaller than 8 MB.",
+    cameraUnavailable: "The camera is unavailable or permission was not granted.",
+    cameraNotReady: "Wait for the camera preview before taking the photo.",
+    signOut: "Sign out",
+    close: "Close account",
+    account: "Account",
+    localUser: "Local user",
+    localWorkspace: "Local workspace",
+    cloudWorkspace: "Cloud workspace",
+  },
+  "zh-CN": {
+    title: "DroneDream 账号",
+    signInTitle: "登录 DroneDream",
+    registerTitle: "创建账号",
+    localTitle: "本地工作区",
+    localBody:
+      "当前构建将实验保存在这台电脑。完成云账号配置后，即可启用相互隔离的邮箱账号、跨设备数据与完整的安全存储能力。",
+    email: "邮箱地址",
+    emailPlaceholder: "you@example.com",
+    password: "密码",
+    passwordPlaceholder: "至少 8 个字符",
+    confirmPassword: "确认密码",
+    confirmPasswordPlaceholder: "再次输入密码",
+    sendCode: "发送验证码",
+    resendCode: "重新发送",
+    signIn: "登录",
+    register: "注册",
+    createAccount: "创建账号",
+    registerNow: "还没有账号？立即注册",
+    backToSignIn: "已经注册？返回登录",
+    code: "邮箱验证码",
+    codePlaceholder: "六位验证码",
+    passwordTooShort: "密码至少需要 8 个字符。",
+    passwordMismatch: "两次输入的密码不一致。",
+    codeRequired: "请先发送并填写邮箱验证码，再创建账号。",
+    google: "使用 Google 登录",
+    apple: "使用 Apple 登录",
+    username: "用户名",
+    usernamePlaceholder: "输入用户名",
+    saveUsername: "保存用户名",
+    profilePhoto: "头像",
+    choosePhoto: "从电脑选择",
+    useCamera: "使用摄像头",
+    takePhoto: "拍摄头像",
+    cancelCamera: "关闭摄像头",
+    invalidPhoto: "请选择 JPEG、PNG 或 WebP 图片。",
+    photoTooLarge: "请选择小于 8 MB 的图片。",
+    cameraUnavailable: "摄像头不可用，或未获得摄像头权限。",
+    cameraNotReady: "请等待摄像头画面出现后再拍摄。",
+    signOut: "退出登录",
+    close: "关闭账号窗口",
+    account: "账号",
+    localUser: "本地用户",
+    localWorkspace: "本地工作区",
+    cloudWorkspace: "云端工作区",
+  },
+} as const;
+
+const MAX_AVATAR_FILE_BYTES = 8_000_000;
+const AVATAR_PIXEL_SIZE = 320;
+
+function renderSquareAvatar(
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+): string {
+  if (sourceWidth < 1 || sourceHeight < 1) {
+    throw new Error("The profile photo is empty.");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = AVATAR_PIXEL_SIZE;
+  canvas.height = AVATAR_PIXEL_SIZE;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("The profile photo could not be processed.");
+  }
+  const cropSize = Math.min(sourceWidth, sourceHeight);
+  const sourceX = (sourceWidth - cropSize) / 2;
+  const sourceY = (sourceHeight - cropSize) / 2;
+  context.drawImage(
+    source,
+    sourceX,
+    sourceY,
+    cropSize,
+    cropSize,
+    0,
+    0,
+    AVATAR_PIXEL_SIZE,
+    AVATAR_PIXEL_SIZE,
+  );
+  const result = canvas.toDataURL("image/jpeg", 0.86);
+  if (!result.startsWith("data:image/jpeg;base64,")) {
+    throw new Error("The profile photo could not be processed.");
+  }
+  return result;
+}
+
+async function avatarFromFile(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    return renderSquareAvatar(bitmap, bitmap.width, bitmap.height);
+  } finally {
+    bitmap.close();
+  }
+}
+
+function AccountAvatar({
+  account,
+  className,
+}: {
+  account: ReturnType<typeof useAuth>["account"];
+  className: string;
+}) {
+  return (
+    <span className={className} aria-hidden="true">
+      {account?.avatarUrl ? (
+        <img src={account.avatarUrl} alt="" />
+      ) : account ? (
+        account.displayName.slice(0, 1).toUpperCase()
+      ) : (
+        <CircleUserRound strokeWidth={1.75} />
+      )}
+    </span>
+  );
+}
+
+function AccountDialog({
+  closeRef,
+  required,
+  onClose,
+}: {
+  closeRef: RefObject<HTMLButtonElement>;
+  required: boolean;
+  onClose: () => void;
+}) {
+  const { locale } = useI18n();
+  const copy = ACCOUNT_COPY[locale];
+  const auth = useAuth();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [password, setPassword] = useState("");
+  const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
+  const [displayName, setDisplayName] = useState(
+    auth.account?.displayName ?? "",
+  );
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    setDisplayName(auth.account?.displayName ?? "");
+  }, [auth.account?.displayName]);
+
+  const stopCamera = useCallback(() => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    setCameraStream(null);
+    setCameraReady(false);
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const video = cameraVideoRef.current;
+    if (!video || !cameraStream) return;
+    video.srcObject = cameraStream;
+    try {
+      const playback = video.play();
+      void playback?.catch(() => undefined);
+    } catch {
+      // Some embedded webviews begin playback from the autoplay attributes
+      // without exposing a usable play() promise.
+    }
+  }, [cameraStream]);
+
+  const run = async (action: () => Promise<void>) => {
+    setPending(true);
+    setError(null);
+    try {
+      await action();
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Account request failed.",
+      );
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const chooseAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError(copy.invalidPhoto);
+      return;
+    }
+    if (file.size > MAX_AVATAR_FILE_BYTES) {
+      setError(copy.photoTooLarge);
+      return;
+    }
+    await run(async () => {
+      const avatar = await avatarFromFile(file);
+      await auth.updateAvatar(avatar);
+    });
+  };
+
+  const startCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError(copy.cameraUnavailable);
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      stopCamera();
+      cameraStreamRef.current = stream;
+      setCameraStream(stream);
+    } catch {
+      setError(copy.cameraUnavailable);
+    } finally {
+      if (mountedRef.current) setPending(false);
+    }
+  };
+
+  const captureAvatar = async () => {
+    const video = cameraVideoRef.current;
+    if (!video || !cameraReady || video.videoWidth < 1 || video.videoHeight < 1) {
+      setError(copy.cameraNotReady);
+      return;
+    }
+    await run(async () => {
+      const avatar = renderSquareAvatar(
+        video,
+        video.videoWidth,
+        video.videoHeight,
+      );
+      await auth.updateAvatar(avatar);
+      stopCamera();
+    });
+  };
+
+  const registrationPasswordIsValid = () => {
+    if (password.length < 8) {
+      setError(copy.passwordTooShort);
+      return false;
+    }
+    if (password !== passwordConfirmation) {
+      setError(copy.passwordMismatch);
+      return false;
+    }
+    return true;
+  };
+
+  return (
+    <section
+      className="account-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="account-dialog-title"
+    >
+      <header>
+        <div className="account-dialog-title">
+          <CircleUserRound aria-hidden="true" strokeWidth={1.75} />
+          <h2 id="account-dialog-title">
+            {!auth.configured
+              ? copy.localTitle
+              : auth.account
+                ? copy.title
+                : authMode === "register"
+                  ? copy.registerTitle
+                  : copy.signInTitle}
+          </h2>
+        </div>
+        {!required ? (
+          <button
+            ref={closeRef}
+            type="button"
+            className="account-dialog-close"
+            aria-label={copy.close}
+            onClick={onClose}
+          >
+            <X aria-hidden="true" strokeWidth={1.9} />
+          </button>
+        ) : null}
+      </header>
+
+      {!auth.configured ? (
+        <p className="account-dialog-copy">{copy.localBody}</p>
+      ) : auth.account ? (
+        <div className="account-profile-wrap">
+          <div className="account-profile">
+            <AccountAvatar
+              account={auth.account}
+              className="account-avatar"
+            />
+            <div>
+              <strong>{auth.account.displayName}</strong>
+              <span>{auth.account.email}</span>
+            </div>
+          </div>
+          <section className="account-avatar-editor">
+            <strong>{copy.profilePhoto}</strong>
+            <div className="account-avatar-actions">
+              <input
+                ref={avatarInputRef}
+                className="account-avatar-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => void chooseAvatar(event)}
+              />
+              <button
+                type="button"
+                className="btn"
+                disabled={pending}
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                <ImagePlus aria-hidden="true" strokeWidth={1.8} />
+                {copy.choosePhoto}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={pending || Boolean(cameraStream)}
+                onClick={() => void startCamera()}
+              >
+                <Camera aria-hidden="true" strokeWidth={1.8} />
+                {copy.useCamera}
+              </button>
+            </div>
+          </section>
+          {cameraStream ? (
+            <section className="account-camera-panel">
+              <video
+                ref={cameraVideoRef}
+                autoPlay
+                muted
+                playsInline
+                onCanPlay={() => setCameraReady(true)}
+              />
+              <div>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={pending || !cameraReady}
+                  onClick={() => void captureAvatar()}
+                >
+                  <Camera aria-hidden="true" strokeWidth={1.8} />
+                  {copy.takePhoto}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={pending}
+                  onClick={stopCamera}
+                >
+                  {copy.cancelCamera}
+                </button>
+              </div>
+            </section>
+          ) : null}
+          <form
+            className="account-username-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run(() => auth.updateDisplayName(displayName));
+            }}
+          >
+            <label htmlFor="account-username">{copy.username}</label>
+            <div>
+              <input
+                id="account-username"
+                type="text"
+                required
+                maxLength={48}
+                autoComplete="nickname"
+                value={displayName}
+                placeholder={copy.usernamePlaceholder}
+                disabled={pending}
+                onChange={(event) => setDisplayName(event.target.value)}
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={
+                  pending ||
+                  !displayName.trim() ||
+                  displayName.trim() === auth.account.displayName
+                }
+              >
+                {copy.saveUsername}
+              </button>
+            </div>
+          </form>
+          <button
+            type="button"
+            className="btn account-sign-out"
+            disabled={pending}
+            onClick={() => void run(auth.signOut)}
+          >
+            {copy.signOut}
+          </button>
+        </div>
+      ) : (
+        <>
+          <form
+            className="account-email-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (authMode === "sign-in") {
+                void run(() => auth.signInWithPassword(email, password));
+                return;
+              }
+              if (!registrationPasswordIsValid()) return;
+              if (!codeSent || !code.trim()) {
+                setError(copy.codeRequired);
+                return;
+              }
+              void run(() =>
+                auth.verifyRegistrationCode(email, code, password)
+              );
+            }}
+          >
+            <label>
+              <span>{copy.email}</span>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                placeholder={copy.emailPlaceholder}
+                disabled={pending || (authMode === "register" && codeSent)}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>{copy.password}</span>
+              <input
+                type="password"
+                required
+                minLength={8}
+                autoComplete={
+                  authMode === "register" ? "new-password" : "current-password"
+                }
+                value={password}
+                placeholder={copy.passwordPlaceholder}
+                disabled={pending}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            {authMode === "register" ? (
+              <>
+                <label>
+                  <span>{copy.confirmPassword}</span>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={passwordConfirmation}
+                    placeholder={copy.confirmPasswordPlaceholder}
+                    disabled={pending}
+                    onChange={(event) =>
+                      setPasswordConfirmation(event.target.value)
+                    }
+                  />
+                </label>
+                <div className="account-code-field">
+                  <label htmlFor="account-registration-code">
+                    <span>{copy.code}</span>
+                  </label>
+                  <div className="account-code-row">
+                    <input
+                      id="account-registration-code"
+                      type="text"
+                      required
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      minLength={6}
+                      maxLength={12}
+                      value={code}
+                      placeholder={copy.codePlaceholder}
+                      disabled={pending}
+                      onChange={(event) =>
+                        setCode(event.target.value.replace(/\s/g, ""))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="btn account-send-code"
+                      disabled={pending || !email.trim()}
+                      onClick={() => {
+                        if (!registrationPasswordIsValid()) return;
+                        void run(async () => {
+                          await auth.sendRegistrationCode(email);
+                          setCodeSent(true);
+                        });
+                      }}
+                    >
+                      {codeSent ? copy.resendCode : copy.sendCode}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+            <button type="submit" className="btn btn-primary" disabled={pending}>
+              <MailCheck aria-hidden="true" strokeWidth={1.8} />
+              {authMode === "register" ? copy.createAccount : copy.signIn}
+            </button>
+          </form>
+          <button
+            type="button"
+            className="account-auth-mode"
+            disabled={pending}
+            onClick={() => {
+              setAuthMode((current) =>
+                current === "sign-in" ? "register" : "sign-in",
+              );
+              setCode("");
+              setCodeSent(false);
+              setPassword("");
+              setPasswordConfirmation("");
+              setError(null);
+            }}
+          >
+            {authMode === "sign-in"
+              ? copy.registerNow
+              : copy.backToSignIn}
+          </button>
+          {auth.googleEnabled || auth.appleEnabled ? (
+            <div className="account-social-actions">
+              {auth.googleEnabled ? (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={pending}
+                  onClick={() =>
+                    void run(() => auth.signInWithProvider("google"))
+                  }
+                >
+                  <LogIn aria-hidden="true" strokeWidth={1.8} />
+                  {copy.google}
+                </button>
+              ) : null}
+              {auth.appleEnabled ? (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={pending}
+                  onClick={() =>
+                    void run(() => auth.signInWithProvider("apple"))
+                  }
+                >
+                  <Apple aria-hidden="true" strokeWidth={1.8} />
+                  {copy.apple}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </>
+      )}
+      <ArchivedExperimentManager
+        ownerId={auth.account?.id ?? "local"}
+        locale={locale}
+      />
+      {error ? (
+        <p className="account-dialog-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 function AppShellContent() {
   const location = useLocation();
   const desktopRuntime = isDesktopRuntime();
   const runtimeAccess = useDesktopRuntimeAccess();
-  const appUpdater = useAppUpdater();
-  const { t } = useI18n();
+  const auth = useAuth();
+  const { locale, t } = useI18n();
+  const accountCopy = ACCOUNT_COPY[locale];
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [exitPrompt, setExitPrompt] = useState<ExitPromptState | null>(null);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const accountCloseRef = useRef<HTMLButtonElement>(null);
   const desktopWindowRef = useRef<DesktopWindowHandle | null>(null);
   const currentPathRef = useRef(location.pathname);
   const exitPromptRef = useRef<ExitPromptState | null>(null);
@@ -417,27 +1125,34 @@ function AppShellContent() {
     : runtimeAccess.status === "starting"
       ? t("runtimeGate.navStarting")
       : t("runtimeGate.navLocked");
-  const updateAvailable = appUpdater.status === "available";
-  const updateBusy = appUpdater.status === "checking" ||
-    appUpdater.status === "downloading" ||
-    appUpdater.status === "installing";
-  const updateTitle = appUpdater.status === "available"
-    ? t("updater.available", { version: appUpdater.availableVersion ?? "" })
-    : appUpdater.status === "checking"
-      ? t("updater.checking")
-      : appUpdater.status === "downloading"
-        ? t("updater.downloading", { progress: appUpdater.progress ?? 0 })
-        : appUpdater.status === "installing"
-          ? t("updater.installing")
-          : appUpdater.status === "error"
-            ? t("updater.error")
-            : t("updater.current");
+  const accountRequired =
+    import.meta.env.MODE !== "test"
+    && auth.configured
+    && !auth.loading
+    && !auth.account;
+  const accountDialogOpen = accountOpen || accountRequired;
 
   const closeSettings = useCallback(() => {
     setLauncherSettingsOpen(false);
     // The trigger is inert while the modal is open. Restore focus on the next
     // frame, after the dialog effect has removed inert from the app shell.
     requestAnimationFrame(() => launcherSettingsButtonRef.current?.focus());
+  }, []);
+
+  const closeAccount = useCallback(() => {
+    if (accountRequired) return;
+    setAccountOpen(false);
+    requestAnimationFrame(() => accountButtonRef.current?.focus());
+  }, [accountRequired]);
+
+  useEffect(() => {
+    const openAccountDialog = () => {
+      setLauncherSettingsOpen(false);
+      setAccountOpen(true);
+    };
+    window.addEventListener(OPEN_ACCOUNT_DIALOG_EVENT, openAccountDialog);
+    return () =>
+      window.removeEventListener(OPEN_ACCOUNT_DIALOG_EVENT, openAccountDialog);
   }, []);
 
   const returnFromExitPrompt = useCallback(() => {
@@ -448,7 +1163,7 @@ function AppShellContent() {
   const confirmExit = useCallback(() => {
     const desktopWindow = desktopWindowRef.current;
     if (!desktopWindow) return;
-    clearExperimentDraft();
+    clearAllExperimentDrafts();
     exitApprovedRef.current = true;
     exitPromptRef.current = null;
     setExitPrompt(null);
@@ -499,7 +1214,7 @@ function AppShellContent() {
           setExitPrompt(state);
         }
       } else {
-        clearExperimentDraft();
+        clearAllExperimentDrafts();
         exitApprovedRef.current = true;
         try {
           await desktopWindow.destroy();
@@ -583,12 +1298,87 @@ function AppShellContent() {
     };
   }, [closeSettings, launcherSettingsOpen]);
 
+  useEffect(() => {
+    if (!accountDialogOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const inertTargets = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        ".launcher-chrome, .launcher-main, .app-sidebar, .app-header, .app-main, .app-footer, .skip-link",
+      ),
+    );
+    const previousInertStates = inertTargets.map((target) => target.inert);
+    document.body.style.overflow = "hidden";
+    inertTargets.forEach((target) => {
+      target.inert = true;
+    });
+    const focusFrame = requestAnimationFrame(() => {
+      const dialog = document.querySelector<HTMLElement>(".account-dialog");
+      const firstInput = dialog?.querySelector<HTMLElement>(
+        "input:not(:disabled), button:not(:disabled)",
+      );
+      (accountCloseRef.current ?? firstInput)?.focus();
+    });
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !accountRequired) {
+        closeAccount();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = document.querySelector<HTMLElement>(".account-dialog");
+      if (!dialog) return;
+      const focusable = [
+        ...dialog.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), '
+            + 'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((element) => !element.hasAttribute("hidden"));
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      inertTargets.forEach((target, index) => {
+        target.inert = previousInertStates[index] ?? false;
+      });
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleDialogKeyDown);
+    };
+  }, [accountDialogOpen, accountRequired, closeAccount]);
+
   const exitGuard = exitPrompt ? (
     <ExitGuardDialog
       state={exitPrompt}
       onReturn={returnFromExitPrompt}
       onConfirmExit={confirmExit}
     />
+  ) : null;
+  const accountDialog = accountDialogOpen ? (
+    <div
+      className="account-dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target !== event.currentTarget || accountRequired) return;
+        closeAccount();
+      }}
+    >
+      <AccountDialog
+        closeRef={accountCloseRef}
+        required={accountRequired}
+        onClose={closeAccount}
+      />
+    </div>
   ) : null;
 
   if (launcherMode) {
@@ -621,6 +1411,26 @@ function AppShellContent() {
                   : t("runtimeGate.requiredShort")}
             </span>
             <button
+              ref={accountButtonRef}
+              type="button"
+              className="launcher-account-button"
+              aria-label={accountCopy.account}
+              aria-haspopup="dialog"
+              aria-expanded={accountDialogOpen}
+              onClick={() => {
+                setLauncherSettingsOpen(false);
+                setAccountOpen(true);
+              }}
+            >
+              <AccountAvatar
+                account={auth.account}
+                className="launcher-account-avatar"
+              />
+              <span>
+                {auth.account?.displayName ?? accountCopy.signIn}
+              </span>
+            </button>
+            <button
               ref={launcherSettingsButtonRef}
               type="button"
               className="launcher-settings-button"
@@ -629,7 +1439,7 @@ function AppShellContent() {
               aria-expanded={launcherSettingsOpen}
               onClick={() => setLauncherSettingsOpen(true)}
             >
-              <SettingsIcon />
+              <Settings aria-hidden="true" strokeWidth={1.85} />
             </button>
           </div>
         </header>
@@ -649,6 +1459,7 @@ function AppShellContent() {
             />
           </div>
         ) : null}
+        {accountDialog}
         {exitGuard}
         <main id="main-content" className="launcher-main" tabIndex={-1}>
           <Outlet />
@@ -670,8 +1481,10 @@ function AppShellContent() {
         {t("app.skipToContent")}
       </a>
       <aside className="app-sidebar">
-        <Link to="/" className="app-title">
-          <span className="app-title-mark" aria-hidden="true">◆</span>
+        <Link to="/assistant" className="app-title">
+          <span className="app-title-mark" aria-hidden="true">
+            <Drone strokeWidth={1.8} />
+          </span>
           <span>DroneDream</span>
         </Link>
         <nav className="app-nav" aria-label={t("app.primaryNav")}>
@@ -679,6 +1492,7 @@ function AppShellContent() {
             {runtimeNavDescription}
           </span>
           {NAV_ITEMS.map((item) => {
+            const ItemIcon = item.icon;
             const destination = desktopRuntime && item.desktopTo
               ? item.desktopTo
               : item.to;
@@ -701,7 +1515,10 @@ function AppShellContent() {
                   return classes.length > 0 ? classes.join(" ") : undefined;
                 }}
               >
-                <span>{item.labelKey ? t(item.labelKey) : item.label}</span>
+                <span className="app-nav-entry">
+                  <ItemIcon aria-hidden="true" strokeWidth={1.75} />
+                  <span>{item.labelKey ? t(item.labelKey) : item.label}</span>
+                </span>
                 {runtimeLocked ? (
                   <span className="nav-runtime-badge" aria-hidden="true">
                     {runtimeIsBusy
@@ -715,25 +1532,39 @@ function AppShellContent() {
             );
           })}
         </nav>
+        <ExperimentWorkspaceSidebar
+          ownerId={auth.account?.id ?? "local"}
+          locale={locale}
+        />
         <div className="app-sidebar-footer">
-          <div className={`app-version-pill${updateAvailable ? " is-update-available" : ""}`}>
-            <span>{t("app.previewVersion")}</span>
-            {appUpdater.desktopRuntime ? (
-              <button
-                type="button"
-                className="app-update-button"
-                aria-label={updateTitle}
-                title={updateTitle}
-                disabled={updateBusy}
-                onClick={() => {
-                  if (updateAvailable) void appUpdater.installAvailableUpdate();
-                  else void appUpdater.checkForUpdates();
-                }}
-              >
-                <UpdateDownloadIcon />
-              </button>
-            ) : null}
-          </div>
+          <button
+            ref={accountButtonRef}
+            type="button"
+            className="app-account-button"
+            aria-label={accountCopy.account}
+            aria-haspopup="dialog"
+            aria-expanded={accountDialogOpen}
+            onClick={() => {
+              setLauncherSettingsOpen(false);
+              setAccountOpen(true);
+            }}
+          >
+            <AccountAvatar
+              account={auth.account}
+              className="app-account-avatar"
+            />
+            <span className="app-account-copy">
+              <strong>
+                {auth.account?.displayName ?? accountCopy.localUser}
+              </strong>
+              <small>
+                {auth.account
+                  ? accountCopy.cloudWorkspace
+                  : accountCopy.localWorkspace}
+              </small>
+            </span>
+            <MoreHorizontal aria-hidden="true" strokeWidth={1.8} />
+          </button>
         </div>
       </aside>
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
@@ -749,7 +1580,7 @@ function AppShellContent() {
               aria-expanded={launcherSettingsOpen}
               onClick={() => setLauncherSettingsOpen(true)}
             >
-              <SettingsIcon />
+              <Settings aria-hidden="true" strokeWidth={1.85} />
             </button>
           </div>
         </header>
@@ -769,6 +1600,7 @@ function AppShellContent() {
             />
           </div>
         ) : null}
+        {accountDialog}
         {exitGuard}
         <main id="main-content" className={`app-main${experimentWizardMode ? " app-main-wizard" : ""}`} tabIndex={-1}>
           <Outlet />

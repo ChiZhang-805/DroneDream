@@ -29,6 +29,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
 import { formatDateTime } from "../utils/format";
 import { openAppSettings } from "../appSettings";
+import { fetchAllHistoryJobs } from "../features/history/fetchAllHistoryJobs";
 
 type Translator = ReturnType<typeof useI18n>["t"];
 
@@ -51,6 +52,7 @@ const OPTIMIZER_LABELS: Record<OptimizerStrategy, TranslationKey> = {
   none: "optimizer.none.label",
   heuristic: "optimizer.heuristic.label",
   gpt: "optimizer.gpt.label",
+  llm_harness: "optimizer.llmHarness.label",
   cma_es: "optimizer.cmaEs.label",
   constrained_mobo: "optimizer.constrainedMobo.label",
   multi_fidelity_mobo: "optimizer.multiFidelityMobo.label",
@@ -190,11 +192,11 @@ export function History() {
 
   const query = useQuery({
     queryKey: ["jobs", "history"],
-    queryFn: () => apiClient.listJobs({ page: 1, page_size: 100 }),
+    queryFn: fetchAllHistoryJobs,
     enabled: runtimeAccess.canUseRuntime,
   });
 
-  const allJobs = useMemo(() => query.data?.items ?? [], [query.data]);
+  const allJobs = useMemo(() => query.data ?? [], [query.data]);
   const filtered = useMemo(() => {
     const normalizedQuery = queryFilter.trim().toLocaleLowerCase();
     return allJobs.filter(

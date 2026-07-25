@@ -44,6 +44,17 @@ const PRESENTATION: Record<OptimizerStrategy, OptimizerStrategyPresentation> = {
       "wizard.strategyFlow.simulateAndLearn",
     ],
   },
+  llm_harness: {
+    label: "optimizer.llmHarness.label",
+    description: "optimizer.llmHarness.description",
+    cardDetail: "optimizer.llmHarness.cardDetail",
+    flow: [
+      "wizard.strategyFlow.summarizeEvidence",
+      "wizard.strategyFlow.selectOptimizerTool",
+      "wizard.strategyFlow.executeBoundedTool",
+      "wizard.strategyFlow.simulateAndLearn",
+    ],
+  },
   cma_es: {
     label: "optimizer.cmaEs.label",
     description: "optimizer.cmaEs.description",

@@ -225,7 +225,8 @@ npm run build
 The script below generates a Runpod-compatible `.env`. By default:
 
 - `SIMULATOR_BACKEND=real_cli`
-- `optimizer_strategy=gpt` is selected in the UI/job configuration
+- `optimizer_strategy=llm_harness` can be selected for bounded model-to-tool
+  orchestration (`gpt` remains the legacy direct-proposal comparison mode)
 - `real_cli` points to `px4_gazebo_runner.py`
 - noVNC/Gazebo GUI is enabled by default
 - Real PX4/Gazebo mode is enabled by default: `PX4_GAZEBO_DRY_RUN=false`

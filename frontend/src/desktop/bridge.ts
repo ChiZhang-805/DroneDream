@@ -323,6 +323,15 @@ export function isDesktopRuntime(): boolean {
   return getTauriCore() !== null;
 }
 
+export type InstallerLocale = "en" | "zh-CN";
+
+export function getInstallerLocale(): Promise<InstallerLocale> {
+  return invokeDesktop("get_installer_locale", (value) => {
+    if (value === "en" || value === "zh-CN") return value;
+    throw new Error("installer locale must be en or zh-CN");
+  });
+}
+
 export function probeSystemPrerequisites(): Promise<SystemPrerequisiteReport> {
   return invokeDesktop("probe_system_prerequisites", parsePrerequisiteReport);
 }

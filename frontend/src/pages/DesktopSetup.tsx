@@ -31,6 +31,8 @@ import type {
 } from "../desktop/bridge";
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
+import { useOptionalAuth } from "../features/auth/AuthContext";
+import { OPEN_ACCOUNT_DIALOG_EVENT } from "../features/auth/events";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
   clearRuntimeAutoStartFailure,
@@ -276,6 +278,7 @@ function runtimeHealthFailureCopy(code: string | undefined): LauncherFailureCopy
 
 export function DesktopSetup() {
   const { t } = useI18n();
+  const auth = useOptionalAuth();
   const [searchParams] = useSearchParams();
   const runtimeAccess = useDesktopRuntimeAccess();
   const { refresh: refreshRuntimeAccess } = runtimeAccess;
@@ -330,8 +333,10 @@ export function DesktopSetup() {
     state.prerequisitesFresh &&
     state.runtimeFresh &&
     isOverallDesktopReady(state.prerequisites, state.runtime);
+  const accountReady = !auth?.configured || Boolean(auth.account);
   const workspaceReady =
     localRuntimeReady &&
+    accountReady &&
     !state.loading &&
     !installerHandoffState.checking &&
     (!runtimeAccess.desktopRuntime ||
@@ -1173,9 +1178,20 @@ export function DesktopSetup() {
           onCancel={() => void cancelInstall()}
         />
 
-        {workspaceReady ? (
+        {localRuntimeReady && !accountReady ? (
           <div className="launcher-ready-actions">
-            <Link to="/dashboard" className="btn btn-primary launcher-primary-action">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() =>
+                window.dispatchEvent(new Event(OPEN_ACCOUNT_DIALOG_EVENT))}
+            >
+              {t("launcher.signIn")}
+            </button>
+          </div>
+        ) : workspaceReady ? (
+          <div className="launcher-ready-actions">
+            <Link to="/assistant" className="btn btn-primary launcher-primary-action">
               {t("launcher.openWorkspace")}
             </Link>
           </div>
@@ -2774,7 +2790,7 @@ function RuntimeInstallControls({
             </span>
           </>
         ) : phase === "completed" ? (
-          <Link to={launcherMode ? "/dashboard" : "/jobs/new"} className="btn btn-primary">
+          <Link to={launcherMode ? "/assistant" : "/jobs/new"} className="btn btn-primary">
             {launcherMode ? t("launcher.openWorkspace") : t("desktop.continue")}
           </Link>
         ) : phase !== "failed" || canRetry ? (

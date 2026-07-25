@@ -1,4 +1,5 @@
 mod installer_handoff;
+mod preferences;
 mod prerequisites;
 #[cfg(target_os = "windows")]
 mod process;
@@ -50,6 +51,7 @@ pub fn run() {
         .manage(runtime_keepalive::RuntimeKeepalive::default())
         .invoke_handler(tauri::generate_handler![
             prerequisites::probe_system_prerequisites,
+            preferences::get_installer_locale,
             installer_handoff::get_installer_runtime_intent,
             installer_handoff::auto_start_installer_runtime,
             installer_handoff::discard_installer_runtime_intent,

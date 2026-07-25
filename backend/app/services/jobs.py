@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session, selectinload
 from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
+from app.llm_provider_policy import llm_base_url_is_allowed
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import CandidateEvaluation, evaluate_candidate
@@ -54,13 +55,13 @@ def _now() -> datetime:
 
 
 def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
-    if req.optimizer_strategy != "gpt":
+    if req.optimizer_strategy not in {"gpt", "llm_harness"}:
         return
     provider_config = req.llm or req.openai
     if provider_config is None or not provider_config.api_key:
         raise JobServiceError(
             "INVALID_INPUT",
-            "llm.api_key (or legacy openai.api_key) is required when optimizer_strategy=gpt.",
+            "llm.api_key (or legacy openai.api_key) is required for model-guided optimization.",
             http_status=422,
         )
     if not job_secrets.is_configured():
@@ -68,27 +69,23 @@ def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
             "CONFIGURATION_ERROR",
             (
                 "Server-side secret key is not configured. Set APP_SECRET_KEY "
-                "or DRONEDREAM_SECRET_KEY before submitting a GPT-tuned job."
+                "or DRONEDREAM_SECRET_KEY before submitting a model-guided job."
             ),
             http_status=500,
         )
-    if req.llm is not None and req.llm.base_url:
-        settings = get_settings()
-        allowed = {
-            item.strip().rstrip("/")
-            for item in settings.llm_allowed_base_urls.split(",")
-            if item.strip()
-        }
-        is_production = settings.app_env.strip().lower() in {"prod", "production"}
-        if (is_production or allowed) and req.llm.base_url not in allowed:
-            raise JobServiceError(
-                "LLM_BASE_URL_NOT_ALLOWED",
-                (
-                    "The requested llm.base_url is not in LLM_ALLOWED_BASE_URLS. "
-                    "An explicit production allowlist is required to prevent SSRF."
-                ),
-                http_status=422,
-            )
+    if (
+        req.llm is not None
+        and req.llm.base_url
+        and not llm_base_url_is_allowed(req.llm.base_url)
+    ):
+        raise JobServiceError(
+            "LLM_BASE_URL_NOT_ALLOWED",
+            (
+                "The requested llm.base_url is not in LLM_ALLOWED_BASE_URLS. "
+                "An explicit production allowlist is required to prevent SSRF."
+            ),
+            http_status=422,
+        )
 
 
 def _validate_parameter_space(req: schemas.JobCreateRequest) -> None:
@@ -555,12 +552,13 @@ def rerun_job(
     strategy: schemas.OptimizerStrategy = source.optimizer_strategy  # type: ignore[assignment]
     rerun_openai: schemas.OpenAIConfig | None = None
     rerun_llm: schemas.LLMProviderConfig | None = None
-    if strategy == "gpt":
+    if strategy in {"gpt", "llm_harness"}:
         provider_config = llm or openai
         if provider_config is None or not provider_config.api_key:
             raise JobServiceError(
                 "INVALID_INPUT",
-                "llm.api_key (or legacy openai.api_key) is required when rerunning a gpt job.",
+                "llm.api_key (or legacy openai.api_key) is required when rerunning "
+                "a model-guided job.",
                 http_status=422,
             )
         if llm is not None or source.llm_provider not in {None, "openai"}:

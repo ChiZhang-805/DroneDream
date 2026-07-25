@@ -115,6 +115,7 @@ describe("desktop launcher chrome", () => {
       .toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "简体中文" }).querySelector("svg"))
       .toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Model profile")).toHaveValue("default");
 
     fireEvent.change(within(dialog).getByLabelText("Model provider"), {
       target: { value: "qwen" },
@@ -128,11 +129,21 @@ describe("desktop launcher chrome", () => {
     });
     await waitFor(() => {
       expect(window.sessionStorage.getItem("dronedream:model-access-key:v1"))
-        .toBe("session-only-key");
+        .toBeNull();
       expect(window.localStorage.getItem("dronedream:model-access:v1"))
         .toContain("qwen-plus");
       expect(window.localStorage.getItem("dronedream:model-access:v1"))
         .not.toContain("session-only-key");
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add profile" }));
+    expect(within(dialog).getByLabelText("Model profile")).not.toHaveValue("default");
+    expect(within(dialog).getByLabelText("Model provider")).toHaveValue("custom");
+    fireEvent.change(within(dialog).getByLabelText("Model API key"), {
+      target: { value: "second-memory-only-key" },
+    });
+    await waitFor(() => {
+      expect(window.localStorage.getItem("dronedream:model-access:v1"))
+        .not.toContain("second-memory-only-key");
     });
 
     fireEvent.click(within(dialog).getByRole("button", { name: "简体中文" }));

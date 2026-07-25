@@ -15,6 +15,16 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
 
     assert response.status_code == 200
     data = response.json()["data"]
+    assert data["features"]["experiment_assistant"] == {
+        "available": True,
+        "schema_version": "1.0",
+        "draft_only": True,
+    }
+    assert data["features"]["llm_tool_harness"] == {
+        "available": True,
+        "decision_schema_version": "1.0",
+        "tool_registry": "closed",
+    }
     assert data["simulators"]["authoritative"] is False
     assert data["optimizers"]["authoritative"] is False
     assert data["optimizers"]["configuration_scope"] == "api_process"
@@ -67,6 +77,18 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     ]
     assert real_cli["unverified_effect_passthrough_opt_in"] is True
     assert data["optimizers"]["items"]["gpt"]["ready"] is False
+    assert data["optimizers"]["items"]["llm_harness"] == {
+        "ready": False,
+        "status": "server_secret_not_configured",
+        "experimental": True,
+        "requires_user_api_key": True,
+        "tool_registry": "closed",
+        "fallback_strategy": "optimizer_portfolio",
+        "reason": (
+            "The API secret store is not configured for model-guided Harness jobs."
+        ),
+        "custom_base_url_allowlist_configured": False,
+    }
     serialized = response.text
     assert "REAL_SIMULATOR_COMMAND is not configured" in serialized
     assert "APP_SECRET_KEY" not in serialized
@@ -104,6 +126,9 @@ def test_capabilities_honors_global_override_and_configuration(
     assert data["simulators"]["items"]["mock"]["status"] == "overridden"
     assert data["simulators"]["items"]["real_cli"]["ready"] is True
     assert data["optimizers"]["items"]["gpt"]["ready"] is True
+    assert data["optimizers"]["items"]["llm_harness"]["ready"] is True
+    assert data["optimizers"]["items"]["llm_harness"]["status"] == "experimental"
+    assert data["optimizers"]["items"]["llm_harness"]["reason"] is None
     assert "python runner.py" not in response.text
     assert "test-secret-material" not in response.text
 

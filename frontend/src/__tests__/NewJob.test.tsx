@@ -11,6 +11,7 @@ import {
 } from "../features/experiment/draftStorage";
 import type { BackendCapabilitiesResponse, Job } from "../types/api";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
+import type { ModelAccessSettings } from "../features/settings/ModelAccessContext";
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -22,11 +23,13 @@ vi.mock("react-router-dom", async () => {
 interface RenderPageOptions {
   confirmName?: boolean;
   experimentName?: string;
+  modelSettings?: Partial<ModelAccessSettings>;
 }
 
 function renderPage({
   confirmName = true,
   experimentName,
+  modelSettings,
 }: RenderPageOptions = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -34,7 +37,7 @@ function renderPage({
   const result = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <ModelAccessProvider>
+        <ModelAccessProvider initialSettings={modelSettings}>
           <NewJob />
         </ModelAccessProvider>
       </MemoryRouter>
@@ -132,6 +135,7 @@ describe("NewJob experiment wizard", () => {
     expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("wind-study");
 
     first.unmount();
+    window.sessionStorage.removeItem(EXPERIMENT_DRAFT_KEY);
     renderPage({ confirmName: false });
     fireEvent.click(screen.getByRole("button", { name: /^Cancel$/i }));
     expect(navigateMock).toHaveBeenCalledWith(-1);
@@ -177,6 +181,9 @@ describe("NewJob experiment wizard", () => {
       screen.getByRole("option", {
         name: "Accuracy-first optimizer portfolio (Recommended)",
       }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "LLM tool orchestration harness" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("option", { name: "Failure-aware constrained MOBO" }),
@@ -268,7 +275,7 @@ describe("NewJob experiment wizard", () => {
     });
 
     first.unmount();
-    renderPage();
+    renderPage({ confirmName: false });
     const restoredProgress = screen.getByRole("navigation", {
       name: /Experiment setup progress/i,
     });
@@ -618,8 +625,10 @@ describe("NewJob experiment wizard", () => {
   });
 
   it("autosaves and restores a session draft without persisting an LLM secret", async () => {
-    window.sessionStorage.setItem("dronedream:model-access-key:v1", "sk-never-store-this");
-    const first = renderPage({ experimentName: "draft-study" });
+    const first = renderPage({
+      experimentName: "draft-study",
+      modelSettings: { apiKey: "sk-never-store-this" },
+    });
     openStep(/Constraints & budget/i);
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
       target: { value: "gpt" },
@@ -633,8 +642,7 @@ describe("NewJob experiment wizard", () => {
     });
 
     first.unmount();
-    window.sessionStorage.removeItem("dronedream:model-access-key:v1");
-    renderPage();
+    renderPage({ confirmName: false });
     expect(screen.queryByLabelText(/Experiment Name/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /Configure model access/i })).toBeNull();
     expect(screen.queryByLabelText(/Model API key/i)).toBeNull();
@@ -654,7 +662,7 @@ describe("NewJob experiment wizard", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Next$/i }));
 
     first.unmount();
-    renderPage();
+    renderPage({ confirmName: false });
     fireEvent.click(screen.getByRole("button", { name: /^Back$/i }));
     expect(screen.getByLabelText(/Environment presets/i)).toHaveValue("stress");
   });
@@ -686,7 +694,7 @@ describe("NewJob experiment wizard", () => {
       }),
     );
 
-    renderPage();
+    renderPage({ confirmName: false });
     expect(activeStepIndex()).toBe(0);
     expect(screen.getByLabelText(/Tuning experience level/i)).toHaveValue("basic");
     expect(screen.getByLabelText(/Search seeds/i)).toHaveValue("101, 202, 303");
@@ -710,7 +718,7 @@ describe("NewJob experiment wizard", () => {
       }),
     );
 
-    renderPage();
+    renderPage({ confirmName: false });
 
     expect(activeStepIndex()).toBe(0);
     expect(screen.getByLabelText(/Optimizer Strategy/i)).toHaveValue("heuristic");
@@ -780,25 +788,29 @@ describe("NewJob experiment wizard", () => {
     expect(navigateMock).toHaveBeenCalledWith("/jobs/job_created", { replace: false });
   }, 10_000);
 
-  it("supports an OpenAI-compatible Qwen optimizer only when the user opts into GPT", async () => {
+  it("submits an OpenAI-compatible Qwen model for the bounded LLM harness", async () => {
     window.localStorage.setItem("dronedream:model-access:v1", JSON.stringify({
       provider: "qwen",
       model: "qwen-plus",
       baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     }));
-    window.sessionStorage.setItem("dronedream:model-access-key:v1", "dashscope-key");
     const createSpy = vi
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "job_llm" } as Job);
-    renderPage();
+    renderPage({
+      modelSettings: {
+        apiKey: "dashscope-key",
+      },
+    });
     openStep(/Constraints & budget/i);
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
-      target: { value: "gpt" },
+      target: { value: "llm_harness" },
     });
     expect(screen.queryByRole("button", { name: /Configure model access/i })).toBeNull();
     expect(screen.getByText(/Qwen · qwen-plus/i)).toBeVisible();
     createExperiment();
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
+    expect(createSpy.mock.calls[0][0].optimizer_strategy).toBe("llm_harness");
     expect(createSpy.mock.calls[0][0].llm).toEqual({
       provider: "qwen",
       api_key: "dashscope-key",
@@ -813,11 +825,14 @@ describe("NewJob experiment wizard", () => {
       model: "custom-model",
       baseUrl: "ftp://example.com/v1?key=bad",
     }));
-    window.sessionStorage.setItem("dronedream:model-access-key:v1", "custom-key");
     const createSpy = vi
       .spyOn(apiClient, "createJob")
       .mockResolvedValue({ id: "unused" } as Job);
-    renderPage();
+    renderPage({
+      modelSettings: {
+        apiKey: "custom-key",
+      },
+    });
     openStep(/Constraints & budget/i);
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
       target: { value: "gpt" },

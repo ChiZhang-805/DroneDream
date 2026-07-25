@@ -32,6 +32,11 @@ function capabilities(
           ready: gptReady,
           status: gptReady ? "available" : "server_secret_not_configured",
         },
+        llm_harness: {
+          ready: gptReady,
+          status: gptReady ? "experimental" : "server_secret_not_configured",
+          reason: gptReady ? null : "Harness model access is not configured",
+        },
       },
     },
     parameter_catalog: {
@@ -54,9 +59,16 @@ describe("runtimeCapabilityErrors", () => {
 
   it("does not block ready or local-only workflows", () => {
     expect(runtimeCapabilityErrors("real_cli", "gpt", capabilities(true, true))).toEqual({});
+    expect(runtimeCapabilityErrors("mock", "llm_harness", capabilities(true, true))).toEqual({});
     expect(runtimeCapabilityErrors("mock", "heuristic", capabilities(false, false))).toEqual({});
     expect(runtimeCapabilityErrors("real_cli", "gpt", null)).toEqual({});
     expect(runtimeCapabilityErrors("real_cli", "heuristic", capabilities(false, true))).toEqual({});
+  });
+
+  it("uses the selected model optimizer capability instead of GPT metadata", () => {
+    expect(runtimeCapabilityErrors("mock", "llm_harness", capabilities(true, false))).toEqual({
+      optimizer_strategy: "Harness model access is not configured",
+    });
   });
 
   it("fails closed when a discovered capability contract omits selected items", () => {

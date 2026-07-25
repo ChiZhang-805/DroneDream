@@ -480,7 +480,7 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
 
     const downloadSpy = vi.spyOn(apiClient, "downloadArtifact").mockResolvedValue();
     const button = await screen.findByRole("button", { name: /download pdf report/i });
-    button.click();
+    fireEvent.click(button);
     expect(downloadSpy).toHaveBeenCalledWith("art_pdf", `${job.id} report.pdf`);
   });
 

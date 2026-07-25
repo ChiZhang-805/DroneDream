@@ -210,11 +210,12 @@ the full advanced experiment contract):
 
 - `simulator_backend`: `"mock"` (default) or `"real_cli"`.
 - `optimizer_strategy`: `"heuristic"` (API default), `"none"`, `"cma_es"`,
-  `"gpt"`, or one of the seven experimental strategies:
+  `"gpt"`, `"llm_harness"`, or one of the seven experimental strategies:
   `"constrained_mobo"`, `"multi_fidelity_mobo"`, `"turbo"`, `"saasbo"`,
   `"surrogate_cma_es"`, `"bipop_cma_es"`, and `"optimizer_portfolio"`.
 - New clients should send provider credentials in `llm`; legacy `openai` remains accepted.
-- An API key is required **only** when `optimizer_strategy == "gpt"`;
+- An API key is required when `optimizer_strategy` is `"gpt"` or
+  `"llm_harness"`;
   the server stores it encrypted (Fernet via `APP_SECRET_KEY`) and never
   returns it in any response.
 - `vehicle_profile`, `parameter_space`, `objective_config`, `scenario_suite`, and
@@ -229,10 +230,10 @@ The job response echoes these fields (with every API key redacted):
 
 Validation errors:
 
-- `optimizer_strategy == "gpt"` without `llm.api_key` (legacy
+- model-guided strategy (`"gpt"` or `"llm_harness"`) without `llm.api_key` (legacy
   `openai.api_key` is also accepted) →
   `INVALID_INPUT`.
-- `optimizer_strategy == "gpt"` without server-side `APP_SECRET_KEY` →
+- model-guided strategy without server-side `APP_SECRET_KEY` →
   `INVALID_INPUT` (`details.reason = "server_secret_key_not_configured"`).
 
 Success response — the full `Job` object with a backward-compatible
@@ -297,8 +298,9 @@ Creates a new job by cloning the source job's configuration. Response
 matches `POST /api/v1/jobs` exactly: the full new `Job` object plus the
 `job_id` alias. The new job's `source_job_id` references the original.
 
-For source jobs with `optimizer_strategy="gpt"`, the rerun request must include a
-fresh provider configuration/key; stored credentials are never reused:
+For source jobs with `optimizer_strategy="gpt"` or `"llm_harness"`, the rerun
+request must include a fresh provider configuration/key; stored credentials are
+never reused:
 
 ```json
 {
@@ -317,6 +319,29 @@ LLM reruns remain LLM-based; the previously stored encrypted job key is not reus
 Transitions a non-terminal job to `CANCELLED`. Rejects terminal jobs with
 `JOB_ALREADY_COMPLETED` / `JOB_ALREADY_CANCELLED` / `JOB_FAILED` as
 appropriate. Returns the updated `Job` object in the success envelope.
+
+### 7.6 `POST /api/v1/experiment-assistant/turn`
+
+Compiles one bounded ordinary-language turn into the shared five-step
+experiment draft. This endpoint is draft-only: it cannot create a Job, start a
+simulator, or write provider credentials to experiment storage.
+
+The request includes the new message, locale, cumulative redacted summary,
+current registered form values, explicitly confirmed field IDs, and at most 64
+currently selected PX4 parameters with finite baseline and search-range
+values. The selected model profile and API key are used for this call only.
+Custom provider endpoints remain subject to the shared provider URL policy.
+
+The response returns the cumulative summary; accepted and rejected field and
+PX4 parameter patches; `explicit | derived | proposed_default` provenance;
+server-recomputed missing/review fields; at most four focused questions; and
+provider, model, and token-usage metadata.
+
+Explicit or derived patches must reference the current message ID. Proposed
+defaults cannot claim a user-message source or overwrite an explicit value.
+Unknown fields, catalog-unknown parameters, non-finite values, invalid enums,
+unsafe ranges, and malformed structured output are rejected. Removing the
+final selected PX4 parameter leaves the draft incomplete.
 
 ---
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -400,7 +400,7 @@ describe("DesktopSetup", () => {
     expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open tuning workspace" })).toHaveAttribute(
       "href",
-      "/dashboard",
+      "/assistant",
     );
     expect(screen.getByRole("progressbar", { name: "Runtime download progress" }))
       .toHaveAttribute("aria-valuenow", "100");
@@ -809,13 +809,17 @@ describe("DesktopSetup", () => {
     expect(screen.getByText("2.0 GiB / 8.0 GiB")).toBeInTheDocument();
     expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
 
-    resolveAutoStart({
-      disposition: "started",
-      mode: "install-all",
-      targetRoot: "E:\\DroneDream",
-      snapshot: activeSnapshot,
-      message: null,
+    await act(async () => {
+      resolveAutoStart({
+        disposition: "started",
+        mode: "install-all",
+        targetRoot: "E:\\DroneDream",
+        snapshot: activeSnapshot,
+        message: null,
+      });
     });
+    await waitFor(() => expect(screen.getByText("2.0 GiB / 8.0 GiB"))
+      .toBeInTheDocument());
   });
 
   it("consumes a blocked confirmed target and falls back to a simple retry", async () => {

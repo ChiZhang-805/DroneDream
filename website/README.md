@@ -7,8 +7,12 @@ source lives in `frontend/src/site`; the generated release is
 
 ## Public website topology
 
-- `https://getdronedream.com/` and `https://www.getdronedream.com/` are the
-  global website, built from `main` and deployed by GitHub Pages.
+- GitHub Pages is the global entry point until the project domain has working
+  DNS. After DNS is verified, set the repository variable
+  `DRONEDREAM_CUSTOM_DOMAIN` to the exact hostname, such as
+  `getdronedream.com`, and the Pages build will emit `CNAME`.
+- `https://getdronedream.com/` and `https://www.getdronedream.com/` remain the
+  intended future global entry points.
 - `https://cn.getdronedream.com/` is reserved for the Alibaba Cloud mirror.
   It must not be made public until the domain and deployment satisfy the
   applicable mainland-China filing and HTTPS requirements.
@@ -24,8 +28,8 @@ Build the Pages artifact locally with:
 powershell -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-pages-site.ps1
 ```
 
-The script produces `index.html`, `404.html`, `CNAME`, `.nojekyll`, and
-`downloads/latest.json` under `frontend/site-dist`. Update
+The script produces `index.html`, `404.html`, `.nojekyll`, an optional `CNAME`,
+and `downloads/latest.json` under `frontend/site-dist`. Update
 `website/pages-release.json` only after a new installer version is explicitly
 approved and its public GitHub Release asset has been verified.
 

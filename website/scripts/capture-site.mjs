@@ -36,6 +36,12 @@ if (!edge) throw new Error("Microsoft Edge was not found.");
 
 const diagnostics = [];
 const isOptionalPreviewManifest = (value) => value.includes("/downloads/latest.json");
+const isBenignStaticAbort = (request) =>
+  request.failure()?.errorText === "net::ERR_ABORTED" &&
+  (
+    request.url().endsWith("/drone-favicon.svg") ||
+    request.url().includes("/assets/128x128-")
+  );
 const browser = await chromium.launch({
   executablePath: edge,
   headless: true,
@@ -46,28 +52,47 @@ try {
   const page = await browser.newPage({ viewport: { width, height } });
   page.on("pageerror", (error) => diagnostics.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error" && !isOptionalPreviewManifest(message.text())) diagnostics.push(message.text());
+    const value = message.text();
+    const browserResourceSummary = value.startsWith("Failed to load resource: the server responded with a status of ");
+    if (message.type() === "error" && !browserResourceSummary && !isOptionalPreviewManifest(value)) diagnostics.push(value);
   });
   page.on("requestfailed", (request) => {
-    if (isOptionalPreviewManifest(request.url())) return;
+    if (isOptionalPreviewManifest(request.url()) || isBenignStaticAbort(request)) return;
     diagnostics.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "request failed"}`);
   });
+  page.on("response", (response) => {
+    if (response.status() < 400 || isOptionalPreviewManifest(response.url())) return;
+    diagnostics.push(`${response.status()} ${response.request().method()} ${response.url()}`);
+  });
 
-  await page.goto(url, { waitUntil: "networkidle", timeout: 60_000 });
-  await page.waitForSelector(selector, { state: "visible", timeout: 60_000 });
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
   if (locale === "en" || locale === "zh-CN") {
     await page.evaluate((nextLocale) => localStorage.setItem("drone-dream:locale", nextLocale), locale);
-    await page.reload({ waitUntil: "networkidle", timeout: 60_000 });
-    await page.waitForSelector(selector, { state: "visible", timeout: 60_000 });
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
   }
-  await page.evaluate(() => document.fonts.ready);
   if (actionBase64) {
+    await page.waitForTimeout(300);
     const action = Buffer.from(actionBase64, "base64").toString("utf8");
-    await page.evaluate(async (code) => {
-      const run = new Function(`return (async () => { ${code} })()`);
-      await run();
-    }, action);
+    if (action.startsWith("playwright:")) {
+      const steps = JSON.parse(action.slice("playwright:".length));
+      for (const step of steps) {
+        if (step.fill) await page.locator(step.fill).fill(step.value ?? "");
+        if (step.click) await page.locator(step.click).click();
+        if (step.hover) await page.locator(step.hover).hover();
+        if (step.wait) await page.waitForTimeout(step.wait);
+      }
+    } else {
+      await page.evaluate(async (code) => {
+        const run = new Function(`return (async () => { ${code} })()`);
+        await run();
+      }, action);
+    }
   }
+  await page.waitForSelector(selector, {
+    state: selector === "#root" ? "attached" : "visible",
+    timeout: 60_000,
+  });
+  await page.evaluate(() => document.fonts.ready);
   await page.locator(selector).scrollIntoViewIfNeeded();
   await page.waitForTimeout(2_000);
   await page.screenshot({ path: output, fullPage: false });

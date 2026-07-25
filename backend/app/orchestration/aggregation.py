@@ -53,6 +53,7 @@ logger = logging.getLogger("drone_dream.orchestration.aggregation")
 _TERMINAL_TRIAL = {"COMPLETED", "FAILED", "CANCELLED"}
 _ITERATIVE_OPTIMIZERS = {
     "gpt",
+    "llm_harness",
     "cma_es",
     *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
 }
@@ -1084,7 +1085,10 @@ def _try_continue_iterative_optimizer(
         evaluate_candidate(c, criteria).passed for c in scored
     )
     needs_verified_optimizer = (
-        job.optimizer_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES
+        job.optimizer_strategy in {
+            "llm_harness",
+            *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+        }
         and not any(
             candidate.source_type == "optimizer" and candidate_is_publishable(candidate)
             for candidate in candidates
@@ -1097,6 +1101,7 @@ def _try_continue_iterative_optimizer(
     from app.orchestration.job_manager import (
         dispatch_next_cma_es_generation,
         dispatch_next_experimental_generation,
+        dispatch_next_harness_generation,
         dispatch_next_llm_generation,
     )
     from app.orchestration.llm_parameter_proposer import OpenAIClientLike
@@ -1120,6 +1125,18 @@ def _try_continue_iterative_optimizer(
             "budget_exhausted",
             "max_iterations_reached",
             "no_usable_proposal",
+        }:
+            return False
+    elif job.optimizer_strategy == "llm_harness":
+        harness_dispatch = dispatch_next_harness_generation(
+            db,
+            job,
+            client=client_cast,
+        )
+        if harness_dispatch.status in {
+            "budget_exhausted",
+            "max_iterations_reached",
+            "search_space_exhausted",
         }:
             return False
     elif job.optimizer_strategy == "cma_es":

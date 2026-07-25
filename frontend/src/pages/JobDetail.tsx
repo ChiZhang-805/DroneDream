@@ -24,6 +24,7 @@ import {
   optimizerStrategyDescription,
   optimizerStrategyLabel,
 } from "../features/experiment/optimizerStrategies";
+import { optimizerUsesModelAccess } from "../types/api";
 import { useI18n } from "../i18n/I18nProvider";
 
 // Polling interval for active jobs. The frontend only polls; all state
@@ -281,7 +282,7 @@ export function JobDetail() {
     job.status === "CANCELLED";
 
   const handleRerun = () => {
-    if (job.optimizer_strategy === "gpt") {
+    if (optimizerUsesModelAccess(job.optimizer_strategy)) {
       const freshKey = window.prompt(
         t("jobDetail.apiKeyPrompt"),
       );

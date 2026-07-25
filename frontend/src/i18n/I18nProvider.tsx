@@ -7,10 +7,12 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { getInstallerLocale, isDesktopRuntime } from "../desktop/bridge";
 
 export type Locale = "en" | "zh-CN";
 
 const enTranslations = {
+    "app.conversation": "Tuning Chat",
     "app.dashboard": "Dashboard",
     "app.newExperiment": "Experiment",
     "app.history": "Run History",
@@ -43,14 +45,17 @@ const enTranslations = {
     "settings.model.title": "Optimization model access",
     "settings.model.configured": "Key ready",
     "settings.model.notConfigured": "Key required",
+    "settings.model.profile": "Model profile",
+    "settings.model.addProfile": "Add profile",
+    "settings.model.removeProfile": "Remove profile",
     "settings.model.apiKeyPlaceholder": "Enter an API key for this app session",
     "settings.model.securityNote": "The provider, model, and base URL are saved on this device. The API key stays only in memory for this app session, is never written to local storage or experiment drafts, and is cleared when DroneDream closes.",
     "exitGuard.title": "Before you close DroneDream",
-    "exitGuard.draft": "This experiment has not been created. Closing now will permanently discard the current five-step draft, and DroneDream will not restore it the next time the app opens.",
+    "exitGuard.draft": "This experiment has not been created. Closing now will permanently discard the current conversation and five-step draft, and DroneDream will not restore them the next time the app opens.",
     "exitGuard.active": "DroneDream found {{count}} active experiment jobs that are running or waiting to run. Closing now may interrupt their simulations and will prevent you from monitoring their progress in this session.",
-    "exitGuard.draftActive": "This five-step experiment is still a draft, and DroneDream found {{count}} other active experiment jobs. Closing now will permanently discard the draft and may interrupt simulations that are running or waiting to run.",
+    "exitGuard.draftActive": "This experiment is still a draft, and DroneDream found {{count}} other active experiment jobs. Closing now will permanently discard its conversation and form values and may interrupt simulations that are running or waiting to run.",
     "exitGuard.activeUnknown": "DroneDream could not verify whether any simulations are still active. Closing now may interrupt running work, so return to the app if you need to confirm experiment status first.",
-    "exitGuard.draftActiveUnknown": "This five-step experiment is still a draft, and DroneDream could not verify whether other simulations are active. Closing now will permanently discard the draft and may interrupt running work.",
+    "exitGuard.draftActiveUnknown": "This experiment is still a draft, and DroneDream could not verify whether other simulations are active. Closing now will permanently discard its conversation and form values and may interrupt running work.",
     "exitGuard.return": "Return to DroneDream",
     "exitGuard.exitDiscard": "Exit and discard draft",
     "exitGuard.exitAnyway": "Exit anyway",
@@ -63,7 +68,7 @@ const enTranslations = {
     "updater.available": "Version {{version}} is available. Click to update.",
     "updater.downloading": "Downloading update… {{progress}}%",
     "updater.installing": "Installing the update and restarting DroneDream…",
-    "updater.error": "The update check failed. Click to retry.",
+    "updater.error": "The update failed. Click to retry.",
     "app.webEnvironment": "Web app",
     "app.desktopEnvironment": "Desktop app",
     "app.skipToContent": "Skip to main content",
@@ -108,6 +113,7 @@ const enTranslations = {
     "launcher.title.preparing": "Preparing your flight environment",
     "launcher.title.ready": "Your flight lab is ready",
     "launcher.openWorkspace": "Open tuning workspace",
+    "launcher.signIn": "Sign in to continue",
     "launcher.tagline": "Let Every Flight Flow Like a Dream",
     "launcher.telemetry.system": "PX4 / SITL",
     "launcher.telemetry.linkActive": "LINK ACTIVE",
@@ -457,7 +463,6 @@ const enTranslations = {
     "wizard.pipeline.accept": "Accept",
     "wizard.pipeline.acceptDetail": "Feasibility + robustness",
     "wizard.pipeline.feedback": "Evidence updates the next proposal",
-    "wizard.strategyCard.kicker": "SELECTED OPTIMIZATION STRATEGY",
     "wizard.strategyCard.flowTitle": "How this strategy uses the trial budget",
     "wizard.strategyCard.flowDetail1": "Establish the starting evidence and the part of the search space this algorithm will examine first.",
     "wizard.strategyCard.flowDetail2": "Turn the remaining budget into bounded candidates without changing the experiment contract.",
@@ -476,6 +481,8 @@ const enTranslations = {
     "wizard.strategyFlow.rankCandidates": "Rank feasible candidates",
     "wizard.strategyFlow.summarizeEvidence": "Summarize prior evidence",
     "wizard.strategyFlow.requestModelProposal": "Request an LLM proposal",
+    "wizard.strategyFlow.selectOptimizerTool": "Select a registered optimizer",
+    "wizard.strategyFlow.executeBoundedTool": "Execute inside hard boundaries",
     "wizard.strategyFlow.validateProposal": "Validate and constrain the proposal",
     "wizard.strategyFlow.simulateAndLearn": "Simulate and return evidence",
     "wizard.strategyFlow.samplePopulation": "Sample a candidate population",
@@ -556,6 +563,7 @@ const enTranslations = {
     "wizard.mockTitle": "Synthetic workflow simulator",
     "wizard.mockText": "Mock mode gives every selected PX4 parameter a deterministic synthetic effect so you can verify the tuning workflow. It is not flight physics, and its winner must not be treated as a PX4/Gazebo or real-aircraft optimum.",
     "wizard.optimizerStrategy": "Optimizer Strategy",
+    "wizard.optimizerHarnessGroup": "LLM tool orchestration",
     "wizard.optimizerExperimentalGroup": "Accuracy-first experimental algorithms",
     "wizard.optimizerLegacyGroup": "Baseline and legacy algorithms",
     "wizard.experimentalOptimizerTitle": "Experimental accuracy-first strategy",
@@ -570,6 +578,9 @@ const enTranslations = {
     "optimizer.gpt.label": "LLM-guided search (legacy)",
     "optimizer.gpt.description": "External model proposes explainable candidates.",
     "optimizer.gpt.cardDetail": "The model receives bounded parameter context and summarized trial evidence, then proposes the next candidate with a rationale. DroneDream still validates every proposal and accepts improvements only after simulation evidence.",
+    "optimizer.llmHarness.label": "LLM tool orchestration harness",
+    "optimizer.llmHarness.description": "The model selects a trusted optimizer from evidence; DroneDream retains execution authority.",
+    "optimizer.llmHarness.cardDetail": "At each generation boundary, the model reads a compact evidence packet and chooses one optimizer from a closed registry. Local validators enforce the tool identifier, parameter space, trial budget, simulation matrix, and acceptance rules; an invalid or unavailable model decision is recorded and falls back to the deterministic optimizer portfolio.",
     "optimizer.cmaEs.label": "CMA-ES-style search (legacy)",
     "optimizer.cmaEs.description": "Legacy dependency-free CMA-ES-style search.",
     "optimizer.cmaEs.cardDetail": "A population is sampled from an evolving distribution. Results from the strongest candidates reshape the covariance and step size so later generations follow productive parameter couplings.",
@@ -1336,6 +1347,7 @@ const enTranslations = {
 export type TranslationKey = keyof typeof enTranslations;
 
 const zhTranslations = {
+    "app.conversation": "调优对话",
     "app.dashboard": "任务总览",
     "app.newExperiment": "调优实验",
     "app.history": "历史报告",
@@ -1368,14 +1380,17 @@ const zhTranslations = {
     "settings.model.title": "优化模型访问配置",
     "settings.model.configured": "密钥已就绪",
     "settings.model.notConfigured": "需要密钥",
+    "settings.model.profile": "模型配置档",
+    "settings.model.addProfile": "添加配置",
+    "settings.model.removeProfile": "删除配置",
     "settings.model.apiKeyPlaceholder": "输入本次软件会话使用的 API 密钥",
     "settings.model.securityNote": "服务商、模型名称和基础地址会保存在本机。API 密钥只在当前软件会话的内存中使用，不会写入本地存储、运行记录或实验草稿，也不会随实验配置导出，并会在 DroneDream 关闭时自动清除，避免凭据在设备上长期留存。",
     "exitGuard.title": "关闭 DroneDream 前",
-    "exitGuard.draft": "当前实验尚未创建。现在关闭将永久丢弃这份五步实验草稿，DroneDream 下次启动时不会恢复其中已经填写的内容。",
+    "exitGuard.draft": "当前实验尚未创建。现在关闭将永久丢弃这段对话和五步表单草稿，DroneDream 下次启动时不会恢复其中已经填写的内容。",
     "exitGuard.active": "DroneDream 检测到 {{count}} 个实验正在运行或等待运行。现在关闭可能中断相关仿真，并使你无法在本次会话中继续查看实验进度。",
-    "exitGuard.draftActive": "当前五步实验仍是草稿，同时还有 {{count}} 个实验正在运行或等待运行。现在关闭将永久丢弃草稿，并可能中断正在进行的仿真。",
+    "exitGuard.draftActive": "当前实验仍是草稿，同时还有 {{count}} 个实验正在运行或等待运行。现在关闭将永久丢弃对话与表单内容，并可能中断正在进行的仿真。",
     "exitGuard.activeUnknown": "DroneDream 无法确认当前是否仍有仿真在运行。现在关闭可能中断尚未结束的工作；如需先确认实验状态，请返回软件查看。",
-    "exitGuard.draftActiveUnknown": "当前五步实验仍是草稿，且 DroneDream 无法确认是否还有其他仿真在运行。现在关闭将永久丢弃草稿，并可能中断尚未结束的工作。",
+    "exitGuard.draftActiveUnknown": "当前实验仍是草稿，且 DroneDream 无法确认是否还有其他仿真在运行。现在关闭将永久丢弃对话与表单内容，并可能中断尚未结束的工作。",
     "exitGuard.return": "返回 DroneDream",
     "exitGuard.exitDiscard": "退出并丢弃草稿",
     "exitGuard.exitAnyway": "仍然退出",
@@ -1388,7 +1403,7 @@ const zhTranslations = {
     "updater.available": "发现新版本 {{version}}，点击即可更新。",
     "updater.downloading": "正在下载更新……{{progress}}%",
     "updater.installing": "正在安装更新并重新启动 DroneDream……",
-    "updater.error": "检查更新失败，点击可重试。",
+    "updater.error": "更新失败，点击可重试。",
     "app.webEnvironment": "网页版",
     "app.desktopEnvironment": "桌面软件",
     "app.skipToContent": "跳到主要内容",
@@ -1424,6 +1439,7 @@ const zhTranslations = {
     "launcher.title.preparing": "正在准备飞行环境",
     "launcher.title.ready": "你的飞行实验室已经就绪",
     "launcher.openWorkspace": "进入调优平台",
+    "launcher.signIn": "登录后继续",
     "launcher.tagline": "蝶 梦 水 云 乡",
     "launcher.telemetry.system": "PX4 / 软件在环",
     "launcher.telemetry.linkActive": "链路已连接",
@@ -1719,7 +1735,6 @@ const zhTranslations = {
     "wizard.pipeline.accept": "证据验收",
     "wizard.pipeline.acceptDetail": "可行性与鲁棒性",
     "wizard.pipeline.feedback": "证据回流并更新下一组候选",
-    "wizard.strategyCard.kicker": "当前选择的优化算法",
     "wizard.strategyCard.flowTitle": "该算法如何使用试验预算",
     "wizard.strategyCard.flowDetail1": "确定起始证据，并明确该算法首先探索参数空间中的哪一部分。",
     "wizard.strategyCard.flowDetail2": "在不改变实验约束的前提下，把剩余预算转化为边界合法的候选参数。",
@@ -1738,6 +1753,8 @@ const zhTranslations = {
     "wizard.strategyFlow.rankCandidates": "排列可行候选",
     "wizard.strategyFlow.summarizeEvidence": "整理已有试验证据",
     "wizard.strategyFlow.requestModelProposal": "请求大模型提出候选",
+    "wizard.strategyFlow.selectOptimizerTool": "从注册表选择优化工具",
+    "wizard.strategyFlow.executeBoundedTool": "在硬边界内执行工具",
     "wizard.strategyFlow.validateProposal": "校验并约束模型候选",
     "wizard.strategyFlow.simulateAndLearn": "仿真并回传新证据",
     "wizard.strategyFlow.samplePopulation": "采样一组候选种群",
@@ -1818,6 +1835,7 @@ const zhTranslations = {
     "wizard.mockTitle": "合成工作流仿真器",
     "wizard.mockText": "Mock 模式会让每个选中的 PX4 参数产生确定性的合成影响，用于验证调优工作流；它不代表真实飞行动力学，得到的优胜参数不能当作 PX4/Gazebo 或真实飞机的最优参数。",
     "wizard.optimizerStrategy": "优化算法",
+    "wizard.optimizerHarnessGroup": "大模型工具编排",
     "wizard.optimizerExperimentalGroup": "精度优先实验算法",
     "wizard.optimizerLegacyGroup": "基线与旧版算法",
     "wizard.experimentalOptimizerTitle": "精度优先实验策略",
@@ -1832,6 +1850,9 @@ const zhTranslations = {
     "optimizer.gpt.label": "大模型引导搜索（旧版）",
     "optimizer.gpt.description": "由外部模型提出可解释的参数候选。",
     "optimizer.gpt.cardDetail": "大模型会读取受约束的参数背景与历次试验证据摘要，给出下一组候选及理由。DroneDream 仍会独立校验每个提案，并只依据仿真证据接受改进。",
+    "optimizer.llmHarness.label": "大模型工具编排 Harness",
+    "optimizer.llmHarness.description": "模型依据证据选择可信优化器，DroneDream 始终掌握执行权。",
+    "optimizer.llmHarness.cardDetail": "每一代开始前，大模型只读取经过压缩的证据包，并从封闭注册表中选择一种优化器。参数空间、仿真矩阵、试验预算与验收规则仍由本地校验器强制执行；模型不可用或返回无效决策时，系统会明确记录原因并回退到确定性的优化器组合，同时保留证据哈希、决策理由与工具执行结果。",
     "optimizer.cmaEs.label": "CMA-ES 风格搜索（旧版）",
     "optimizer.cmaEs.description": "运行旧版无依赖 CMA-ES 风格搜索。",
     "optimizer.cmaEs.cardDetail": "算法从不断变化的概率分布中采样候选种群，并用表现较好的候选更新协方差和搜索步长，使后续迭代能够跟随有效的参数耦合方向。",
@@ -1858,7 +1879,7 @@ const zhTranslations = {
     "optimizer.portfolio.cardDetail": "多种互补优化器在统一试验上限内竞争。DroneDream 会按同一证据标准复验各自提案，并把后续预算逐步倾向能稳定产生可行改进的引擎。",
     "job.optimizerStrategy": "优化算法",
     "wizard.gptPreflightTitle": "需要访问外部模型服务",
-    "wizard.gptPreflightText": "后端必须能够访问所选模型服务。API 密钥只随本次创建请求发送，绝不会从本机草稿中恢复。",
+    "wizard.gptPreflightText": "后端需要访问所选模型；API 密钥仅随本次创建请求发送，不写入任何本机草稿。",
     "wizard.preflightReadyTitle": "配置预检已通过",
     "wizard.preflightReadyText": "参数范围、场景矩阵和最低预算均已通过客户端检查；运行环境可用性将单独检查。",
     "wizard.preflightIssuesTitle": "派发前请修复以下步骤",
@@ -2632,11 +2653,40 @@ function initialLocale(): Locale {
     // Language preference storage is optional; the app must still start when
     // browser or WebView policy denies access to localStorage.
   }
-  return window.navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+  return "en";
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
+
+  useEffect(() => {
+    if (!isDesktopRuntime()) return;
+    try {
+      const saved = window.localStorage.getItem("drone-dream:locale");
+      if (saved === "en" || saved === "zh-CN") return;
+    } catch {
+      // The installer preference is still safe to use in memory.
+    }
+
+    let active = true;
+    void getInstallerLocale()
+      .then((installerLocale) => {
+        if (!active) return;
+        try {
+          const saved = window.localStorage.getItem("drone-dream:locale");
+          if (saved === "en" || saved === "zh-CN") return;
+        } catch {
+          // Apply the installer language without persistence.
+        }
+        setLocaleState(installerLocale);
+      })
+      .catch(() => {
+        // English is the safe default if the installer record cannot be read.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);

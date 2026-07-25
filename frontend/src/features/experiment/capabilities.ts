@@ -3,6 +3,7 @@ import type {
   OptimizerStrategy,
   SimulatorBackend,
 } from "../../types/api";
+import { optimizerUsesModelAccess } from "../../types/api";
 
 export interface RuntimeCapabilityErrors {
   simulator_backend?: string;
@@ -31,8 +32,8 @@ export function runtimeCapabilityErrors(
         ?? "The real simulator runtime is not ready";
     }
   }
-  if (optimizerStrategy === "gpt") {
-    const capability = capabilities.optimizers.items.gpt;
+  if (optimizerUsesModelAccess(optimizerStrategy)) {
+    const capability = capabilities.optimizers.items[optimizerStrategy];
     // A negative result from the API process is authoritative because job
     // creation cannot encrypt the supplied credential. A positive result is
     // advisory until a separately deployed worker publishes its own health.

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EXPERIMENT_DRAFT_KEY,
   LEGACY_EXPERIMENT_DRAFT_KEY,
+  V2_EXPERIMENT_DRAFT_KEY,
   loadExperimentDraft,
   saveExperimentDraft,
 } from "../features/experiment/draftStorage";
@@ -31,7 +32,7 @@ const schema: ExperimentDraftSchema<TestForm, TestSelections> = {
   },
 };
 
-function envelope(schemaVersion: 1 | 2, activeStep: number, name: string, secret = "") {
+function envelope(schemaVersion: 1 | 2 | 3, activeStep: number, name: string, secret = "") {
   return JSON.stringify({
     schema_version: schemaVersion,
     saved_at: "2026-07-15T00:00:00.000Z",
@@ -51,20 +52,20 @@ describe("experiment draft storage migration", () => {
     vi.restoreAllMocks();
   });
 
-  it("prefers a valid v2 draft and does not remigrate an existing v1 draft", () => {
+  it("prefers a valid v3 draft and does not remigrate an existing v1 draft", () => {
     window.sessionStorage.setItem(
       LEGACY_EXPERIMENT_DRAFT_KEY,
       envelope(1, 6, "legacy"),
     );
     window.sessionStorage.setItem(
       EXPERIMENT_DRAFT_KEY,
-      envelope(2, 4, "current"),
+      envelope(3, 4, "current"),
     );
 
     const loaded = loadExperimentDraft(schema);
 
     expect(loaded).toMatchObject({
-      schema_version: 2,
+      schema_version: 3,
       active_step: 4,
       completed_steps: [0, 1, 2, 3],
       form: { name: "current", llm_api_key: "" },
@@ -72,7 +73,7 @@ describe("experiment draft storage migration", () => {
     expect(window.sessionStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).not.toBeNull();
   });
 
-  it("migrates a legacy seven-step draft to v2 step zero without restoring its secret", () => {
+  it("migrates a legacy seven-step draft to v3 step zero without restoring its secret", () => {
     window.sessionStorage.setItem(
       LEGACY_EXPERIMENT_DRAFT_KEY,
       envelope(1, 6, "legacy-review", "sk-do-not-restore"),
@@ -81,7 +82,7 @@ describe("experiment draft storage migration", () => {
     const loaded = loadExperimentDraft(schema);
 
     expect(loaded).toMatchObject({
-      schema_version: 2,
+      schema_version: 3,
       active_step: 0,
       completed_steps: [],
       form: { name: "legacy-review", llm_api_key: "" },
@@ -90,7 +91,7 @@ describe("experiment draft storage migration", () => {
     const migratedRaw = window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY);
     expect(migratedRaw).not.toContain("sk-do-not-restore");
     expect(JSON.parse(migratedRaw ?? "null")).toMatchObject({
-      schema_version: 2,
+      schema_version: 3,
       active_step: 0,
       form: { name: "legacy-review", llm_api_key: "" },
     });
@@ -98,7 +99,7 @@ describe("experiment draft storage migration", () => {
     expect(loadExperimentDraft(schema)).toEqual(loaded);
   });
 
-  it("keeps the v1 draft when the migrated v2 draft cannot be written", () => {
+  it("keeps the v1 draft when the migrated v3 draft cannot be written", () => {
     window.sessionStorage.setItem(
       LEGACY_EXPERIMENT_DRAFT_KEY,
       envelope(1, 5, "legacy-budget", "sk-still-not-restored"),
@@ -115,7 +116,7 @@ describe("experiment draft storage migration", () => {
     const loaded = loadExperimentDraft(schema);
 
     expect(loaded).toMatchObject({
-      schema_version: 2,
+      schema_version: 3,
       active_step: 0,
       form: { name: "legacy-budget", llm_api_key: "" },
     });
@@ -129,7 +130,7 @@ describe("experiment draft storage migration", () => {
       envelope(1, 4, "legacy-track"),
     );
     window.sessionStorage.setItem(
-      EXPERIMENT_DRAFT_KEY,
+      V2_EXPERIMENT_DRAFT_KEY,
       envelope(2, 5, "invalid-current"),
     );
 
@@ -137,7 +138,7 @@ describe("experiment draft storage migration", () => {
     expect(window.sessionStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).not.toBeNull();
   });
 
-  it("saves only a redacted v2 draft and removes a stale v1 draft afterward", () => {
+  it("saves only a redacted v3 draft and removes stale prior drafts afterward", () => {
     window.sessionStorage.setItem(
       LEGACY_EXPERIMENT_DRAFT_KEY,
       envelope(1, 2, "legacy-parameters"),
@@ -153,7 +154,7 @@ describe("experiment draft storage migration", () => {
     const savedRaw = window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY);
     expect(savedRaw).not.toContain("sk-never-write");
     expect(JSON.parse(savedRaw ?? "null")).toMatchObject({
-      schema_version: 2,
+      schema_version: 3,
       active_step: 3,
       completed_steps: [0, 2],
       form: { name: "new-budget", llm_api_key: "" },

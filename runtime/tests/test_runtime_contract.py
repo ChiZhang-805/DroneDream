@@ -424,6 +424,15 @@ class SystemdContractTests(unittest.TestCase):
             "ReadWritePaths=/etc/dronedream /var/lib/dronedream /var/lib/valkey",
             init,
         )
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn(
+            "install -d -m 0750 -o root -g dronedream /etc/dronedream",
+            dockerfile,
+        )
+        self.assertGreater(
+            dockerfile.index("ARG DRONEDREAM_SOURCE_COMMIT"),
+            dockerfile.index("COPY . /opt/dronedream/source"),
+        )
 
     def test_runtime_diagnostic_tools_are_packaged_and_verified(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")

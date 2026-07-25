@@ -48,6 +48,8 @@ try {
     $env:DRONEDREAM_RELEASE_JSON = $metadata | ConvertTo-Json -Compress
     & $npmCommand --prefix $frontendRoot run site:build
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $npmCommand --prefix $frontendRoot run console:build
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 } finally {
     if ($null -eq $previousReleaseJson) {
         Remove-Item Env:\DRONEDREAM_RELEASE_JSON -ErrorAction SilentlyContinue
@@ -61,6 +63,10 @@ $assetDirectory = Join-Path $outputDirectory "assets"
 $siteHtml = Join-Path $outputDirectory "site.html"
 if (-not (Test-Path -LiteralPath $siteHtml -PathType Leaf)) {
     throw "The site build completed without producing $siteHtml"
+}
+$consoleHtml = Join-Path $outputDirectory "console\index.html"
+if (-not (Test-Path -LiteralPath $consoleHtml -PathType Leaf)) {
+    throw "The console build completed without producing $consoleHtml"
 }
 
 $builtJavaScript = @(
@@ -91,13 +97,30 @@ $metadataJson = $metadata | ConvertTo-Json
     "$metadataJson$([Environment]::NewLine)",
     $utf8WithoutBom
 )
-[IO.File]::WriteAllText(
-    (Join-Path $outputDirectory "CNAME"),
-    "getdronedream.com$([Environment]::NewLine)",
-    $utf8WithoutBom
-)
+$cnamePath = Join-Path $outputDirectory "CNAME"
+$customDomain = ([string]$env:DRONEDREAM_CUSTOM_DOMAIN).Trim().TrimEnd(".")
+if ([string]::IsNullOrWhiteSpace($customDomain)) {
+    Remove-Item -LiteralPath $cnamePath -Force -ErrorAction SilentlyContinue
+} else {
+    if (
+        $customDomain.Length -gt 253 -or
+        $customDomain -notmatch '^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$'
+    ) {
+        throw "DRONEDREAM_CUSTOM_DOMAIN is not a valid DNS hostname."
+    }
+    [IO.File]::WriteAllText(
+        $cnamePath,
+        "$customDomain$([Environment]::NewLine)",
+        $utf8WithoutBom
+    )
+}
 [IO.File]::WriteAllText((Join-Path $outputDirectory ".nojekyll"), "", $utf8WithoutBom)
 
 Write-Host "GitHub Pages site built at $outputDirectory"
 Write-Host "Release asset: $($metadata.downloadUrl)"
 Write-Host "SHA-256: $sha256"
+if ([string]::IsNullOrWhiteSpace($customDomain)) {
+    Write-Host "Custom domain: disabled (GitHub Pages URL remains canonical)"
+} else {
+    Write-Host "Custom domain: $customDomain"
+}

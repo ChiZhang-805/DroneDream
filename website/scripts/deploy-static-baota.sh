@@ -161,7 +161,7 @@ require_security_headers() {
     '^x-content-type-options:[[:space:]]*nosniff' \
     '^referrer-policy:[[:space:]]*strict-origin-when-cross-origin' \
     '^x-frame-options:[[:space:]]*deny' \
-    '^permissions-policy:.*camera=\(\).*microphone=\(\).*geolocation=\(\)' \
+    '^permissions-policy:.*camera=\(self\).*microphone=\(self\).*geolocation=\(\)' \
     "^content-security-policy:.*frame-ancestors[[:space:]]+'none'"; do
     # Do not pipe into `grep -q` while `pipefail` is active: once grep finds a
     # match it may close the pipe early, making printf report SIGPIPE and the
@@ -323,6 +323,10 @@ systemctl reload nginx
 staging_page=$(
   curl_until_contains '<title>DroneDream' -fsS --max-time 10 http://127.0.0.1:18080/
 )
+staging_console=$(
+  curl_until_contains '<title>DroneDream' -fsS --max-time 10 \
+    http://127.0.0.1:18080/console/
+)
 staging_metadata=$(
   curl_until_contains "\"version\":  \"$version\"" -fsS --max-time 10 \
     http://127.0.0.1:18080/downloads/latest.json
@@ -345,6 +349,10 @@ systemctl reload nginx
 public_page=$(
   curl_until_contains '<title>DroneDream' -fsS --max-time 10 \
     -H "Host: $public_host" http://127.0.0.1/
+)
+public_console=$(
+  curl_until_contains '<title>DroneDream' -fsS --max-time 10 \
+    -H "Host: $public_host" http://127.0.0.1/console/
 )
 public_metadata=$(
   curl_until_contains "\"version\":  \"$version\"" -fsS --max-time 10 \

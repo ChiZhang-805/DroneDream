@@ -26,6 +26,7 @@ describe("I18nProvider", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    delete window.__TAURI__;
   });
 
   it("switches the core product language and persists the choice", () => {
@@ -62,6 +63,41 @@ describe("I18nProvider", () => {
     );
 
     expect(screen.getByText("New Tuning Experiment")).toBeInTheDocument();
+  });
+
+  it("defaults to English in the browser even when the operating system uses Chinese", () => {
+    window.localStorage.clear();
+    vi.spyOn(window.navigator, "language", "get").mockReturnValue("zh-CN");
+
+    render(
+      <I18nProvider>
+        <LanguageProbe />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText("New Tuning Experiment")).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("en");
+  });
+
+  it("uses Chinese only when a fresh desktop install recorded Chinese", async () => {
+    window.localStorage.clear();
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "get_installer_locale") return "zh-CN";
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    render(
+      <I18nProvider>
+        <LanguageProbe />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText("新建调优实验")).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("zh-CN");
   });
 
   it("keeps the selected in-memory locale when persistence fails", () => {

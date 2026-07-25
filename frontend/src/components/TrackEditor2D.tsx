@@ -494,7 +494,6 @@ export function TrackEditor2D({
             onClick={addPoint}
             aria-label={t("track.add")}
             title={t("track.add")}
-            data-tooltip={t("track.add")}
           >
             <Icon name="add" />
           </button>
@@ -505,7 +504,6 @@ export function TrackEditor2D({
             disabled={history.current.length === 0}
             aria-label={t("track.undo")}
             title={t("track.undo")}
-            data-tooltip={t("track.undo")}
           >
             <Icon name="undo" />
           </button>
@@ -517,7 +515,6 @@ export function TrackEditor2D({
             disabled={points.length === 0 || confirmingClear}
             aria-label={t("track.clearAll")}
             title={t("track.clearAll")}
-            data-tooltip={t("track.clearAll")}
           >
             <Icon name="trash" />
           </button>
@@ -543,7 +540,6 @@ export function TrackEditor2D({
               onClick={clearPoints}
               aria-label={t("track.confirmClear")}
               title={t("track.confirmClear")}
-              data-tooltip={t("track.confirmClear")}
             >
               <Icon name="confirm" />
             </button>
@@ -553,7 +549,6 @@ export function TrackEditor2D({
               onClick={cancelClear}
               aria-label={t("track.cancelClear")}
               title={t("track.cancelClear")}
-              data-tooltip={t("track.cancelClear")}
             >
               <Icon name="cancel" />
             </button>
@@ -569,7 +564,6 @@ export function TrackEditor2D({
             onClick={() => changeView(-1)}
             aria-label={t("track.previousView")}
             title={t("track.previousView")}
-            data-tooltip={t("track.previousView")}
           >
             <Icon name="left" />
           </button>
@@ -580,7 +574,6 @@ export function TrackEditor2D({
             onClick={() => changeView(1)}
             aria-label={t("track.nextView")}
             title={t("track.nextView")}
-            data-tooltip={t("track.nextView")}
           >
             <Icon name="right" />
           </button>
@@ -762,7 +755,6 @@ export function TrackEditor2D({
                     }}
                     aria-label={t("track.removeWaypoint", { index: index + 1 })}
                     title={t("track.removeWaypoint", { index: index + 1 })}
-                    data-tooltip={t("track.removeWaypoint", { index: index + 1 })}
                   >
                     <Icon name="trash" />
                   </button>
