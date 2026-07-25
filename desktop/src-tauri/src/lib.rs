@@ -61,7 +61,8 @@ pub fn run() {
             runtime_installer::get_runtime_install_progress,
             runtime_installer::cancel_runtime_install,
             runtime_installer::start_runtime,
-            runtime_installer::repair_runtime
+            runtime_installer::repair_runtime,
+            runtime_keepalive::stop_runtime_for_exit
         ])
         .run(tauri::generate_context!())
         .expect("error while running DroneDream desktop");

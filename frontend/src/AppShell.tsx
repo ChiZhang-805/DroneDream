@@ -30,7 +30,11 @@ import {
   ArchivedExperimentManager,
   ExperimentWorkspaceSidebar,
 } from "./components/ExperimentWorkspaceSidebar";
-import { getDesktopWindowHandle, isDesktopRuntime } from "./desktop/bridge";
+import {
+  getDesktopWindowHandle,
+  isDesktopRuntime,
+  stopRuntimeForExit,
+} from "./desktop/bridge";
 import type { DesktopWindowHandle, RuntimeComponentState } from "./desktop/bridge";
 import {
   DesktopRuntimeAccessProvider,
@@ -106,6 +110,7 @@ const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
 ];
 const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
 const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
+const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
 
 interface ExitPromptState {
   hasDraft: boolean;
@@ -153,6 +158,21 @@ async function stopKnownActiveJobsBeforeExit(jobIds: string[]): Promise<void> {
       Promise.allSettled(jobIds.map((jobId) => apiClient.cancelJob(jobId))).then(
         () => undefined,
       ),
+      timeout,
+    ]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}
+
+async function stopDesktopRuntimeBeforeExit(): Promise<void> {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timeoutId = window.setTimeout(resolve, RUNTIME_EXIT_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([
+      stopRuntimeForExit().catch(() => undefined),
       timeout,
     ]);
   } finally {
@@ -1360,6 +1380,7 @@ function AppShellContent() {
     exitApprovedRef.current = true;
     const activeJobIds = exitPromptRef.current?.activeJobIds ?? [];
     await stopKnownActiveJobsBeforeExit(activeJobIds);
+    await stopDesktopRuntimeBeforeExit();
     try {
       await desktopWindow.destroy();
     } catch {
@@ -1422,6 +1443,7 @@ function AppShellContent() {
         }
       } else {
         exitApprovedRef.current = true;
+        await stopDesktopRuntimeBeforeExit();
         try {
           await desktopWindow.destroy();
         } catch {

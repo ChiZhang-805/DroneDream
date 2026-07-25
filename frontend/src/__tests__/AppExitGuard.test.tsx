@@ -24,7 +24,8 @@ let invokeDesktop: (
 
 function installDesktopWindow(): void {
   destroyWindow = vi.fn(async () => undefined);
-  invokeDesktop = vi.fn(async () => {
+  invokeDesktop = vi.fn(async (command: string) => {
+    if (command === "stop_runtime_for_exit") return null;
     throw new Error("No automatic probe expected.");
   });
   const desktopWindow: DesktopWindowHandle = {
@@ -125,7 +126,7 @@ describe("desktop close protection", () => {
     expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toContain(
       "must-not-persist",
     );
-    expect(invokeDesktop).not.toHaveBeenCalled();
+    expect(invokeDesktop).toHaveBeenCalledWith("stop_runtime_for_exit", undefined);
   });
 
   it("warns about active experiment jobs without running an environment probe", async () => {
@@ -142,7 +143,7 @@ describe("desktop close protection", () => {
     expect(invokeDesktop).not.toHaveBeenCalled();
   });
 
-  it("best-effort cancels known active jobs before destroying the window", async () => {
+  it("cancels known jobs and stops the dedicated runtime before destroying the window", async () => {
     const activeJob = { id: "job-running" } as Job;
     vi.mocked(apiClient.listJobs).mockImplementation(async (params) => (
       params?.status === "RUNNING"
@@ -168,16 +169,31 @@ describe("desktop close protection", () => {
     await waitFor(() => expect(cancelJob).toHaveBeenCalledWith("job-running"));
     await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
     expect(cancelJob).toHaveBeenCalledTimes(1);
-    expect(invokeDesktop).not.toHaveBeenCalled();
+    expect(invokeDesktop).toHaveBeenCalledWith("stop_runtime_for_exit", undefined);
+    expect(cancelJob.mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(invokeDesktop).mock.invocationCallOrder[0]);
+    expect(vi.mocked(invokeDesktop).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(destroyWindow).mock.invocationCallOrder[0]);
   });
 
-  it("closes immediately when there is no draft and no active work", async () => {
+  it("stops the dedicated runtime and closes without prompting when no work is active", async () => {
     renderShell("/dashboard");
 
     await requestWindowClose();
 
     await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("dialog", { name: "Before you close DroneDream" })).toBeNull();
-    expect(invokeDesktop).not.toHaveBeenCalled();
+    expect(invokeDesktop).toHaveBeenCalledWith("stop_runtime_for_exit", undefined);
+  });
+
+  it("still closes when the bounded runtime stop command reports an error", async () => {
+    vi.mocked(invokeDesktop).mockRejectedValueOnce(
+      new Error("Runtime termination timed out."),
+    );
+    renderShell("/dashboard");
+
+    await requestWindowClose();
+
+    await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
   });
 });

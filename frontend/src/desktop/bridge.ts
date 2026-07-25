@@ -407,6 +407,14 @@ export function repairRuntime(): Promise<RuntimeStatusReport> {
   return invokeDesktop("repair_runtime", parseRuntimeStatus);
 }
 
+export function stopRuntimeForExit(): Promise<void> {
+  return invokeDesktop("stop_runtime_for_exit", (value) => {
+    if (value !== null) {
+      throw new Error("stop_runtime_for_exit must return null");
+    }
+  });
+}
+
 function parsePrerequisiteReport(value: unknown): SystemPrerequisiteReport {
   const record = expectRecord(value, "report");
   return {

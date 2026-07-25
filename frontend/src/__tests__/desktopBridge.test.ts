@@ -15,6 +15,7 @@ import {
   repairRuntime,
   startRuntime,
   startRuntimeInstall,
+  stopRuntimeForExit,
 } from "../desktop/bridge";
 
 const prerequisiteReport = {
@@ -152,6 +153,19 @@ describe("desktop bridge", () => {
       "get_runtime_install_plan",
       { targetRoot: "E:\\DroneDream" },
     );
+  });
+
+  it("accepts only the native unit response for runtime exit termination", async () => {
+    const invoke = vi.fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ stopped: true });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(stopRuntimeForExit()).resolves.toBeUndefined();
+    await expect(stopRuntimeForExit()).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "stop_runtime_for_exit",
+    });
   });
 
   it("rejects malformed native responses at the trust boundary", async () => {

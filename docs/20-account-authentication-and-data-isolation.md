@@ -48,6 +48,10 @@ The frontend has a Supabase account layer for public desktop builds:
   before the startup gate can reach 100%;
 - unfinished experiment drafts are redacted and mirrored into persistent local
   storage so a normal app exit or restart can restore them;
+- an explicit desktop exit asks the backend to cancel known active jobs, then
+  terminates only the dedicated `DroneDreamRuntime` WSL distribution with a
+  bounded command before destroying the window; it never issues a global WSL
+  shutdown or targets the user's other distributions;
 - signing out or changing accounts clears the unfinished experiment draft to
   prevent cross-account disclosure;
 - the desktop refresh-token session uses `sessionStorage` until an
