@@ -43,7 +43,10 @@ export function useAppUpdater() {
     setState((current) => ({ ...current, status: "checking", error: null, progress: null }));
     try {
       await updateRef.current?.close();
-      const update = await check({ timeout: 15_000 });
+      const update = await check({
+        timeout: 15_000,
+        allowDowngrades: false,
+      });
       updateRef.current = update;
       if (!update) {
         setState(CURRENT_STATE);

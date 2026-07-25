@@ -27,6 +27,7 @@ from app.routers import experiment_assistant as experiment_assistant_router
 from app.routers import health
 from app.routers import jobs as jobs_router
 from app.routers import parameter_catalog as parameter_catalog_router
+from app.routers import session as session_router
 from app.routers import trials as trials_router
 from app.services.jobs import purge_expired_job_secrets
 from app.storage.cleanup import cleanup_local_artifacts
@@ -139,6 +140,7 @@ def create_app() -> FastAPI:
     api_v1.include_router(parameter_catalog_router.router)
     api_v1.include_router(capabilities_router.router)
     api_v1.include_router(experiment_assistant_router.router)
+    api_v1.include_router(session_router.router)
 
     _register_exception_handlers(api_v1)
     app.mount("/api/v1", api_v1)

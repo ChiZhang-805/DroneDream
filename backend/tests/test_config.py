@@ -83,6 +83,11 @@ def test_production_rejects_disabled_auth() -> None:
         Settings(app_env="production", auth_mode="disabled")
 
 
+def test_desktop_rejects_disabled_auth() -> None:
+    with pytest.raises(ValidationError, match="AUTH_MODE=disabled is forbidden"):
+        Settings(app_env="desktop", auth_mode="disabled")
+
+
 def test_production_demo_auth_requires_at_least_one_token() -> None:
     with pytest.raises(ValidationError, match="DEMO_AUTH_TOKENS"):
         Settings(app_env="production", auth_mode="demo_token", demo_auth_tokens="")

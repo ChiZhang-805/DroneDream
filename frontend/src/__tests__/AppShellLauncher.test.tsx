@@ -1,6 +1,31 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../features/auth/AuthContext", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../features/auth/AuthContext")>();
+  const unavailable = async () => undefined;
+  return {
+    ...original,
+    AuthProvider: ({ children }: { children: ReactNode }) => children,
+    useAuth: () => ({
+      configured: false,
+      loading: false,
+      account: null,
+      googleEnabled: false,
+      appleEnabled: false,
+      signInWithPassword: unavailable,
+      sendRegistrationCode: unavailable,
+      verifyRegistrationCode: unavailable,
+      signInWithProvider: unavailable,
+      updateDisplayName: unavailable,
+      updateAvatar: unavailable,
+      signOut: unavailable,
+    }),
+  };
+});
 
 import { AppShell } from "../AppShell";
 import { I18nProvider } from "../i18n/I18nProvider";

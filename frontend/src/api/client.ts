@@ -2,12 +2,17 @@
 // desktop-runtime liveness checks, and the typed call surface used by pages.
 
 import { isDesktopRuntime } from "../desktop/bridge";
-import { getDesktopReadinessSession } from "../desktop/readiness";
+import {
+  ensureDesktopRuntimeLiveness,
+  getDesktopReadinessSession,
+} from "../desktop/readiness";
+import { getDesktopStartupGateSession } from "../desktop/startupGate";
 import { getAuthAccessToken } from "../features/auth/authTokenStore";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import type {
   ApiEnvelope,
   Artifact,
+  AuthenticatedSessionResponse,
   BackendCapabilitiesResponse,
   BatchCreateRequest,
   BatchJob,
@@ -98,6 +103,30 @@ async function request<T>(
         "The local DroneDream runtime has not been approved for this session. Open Settings and click Check environment before starting an experiment.",
       );
     }
+    const startupGate = getDesktopStartupGateSession();
+    if (startupGate.status !== "ready") {
+      throw new ApiClientError(
+        "DESKTOP_STARTUP_GATE_NOT_READY",
+        "The startup checks have not approved this account and runtime session.",
+      );
+    }
+    try {
+      const live = await ensureDesktopRuntimeLiveness({ autoStart: true });
+      if (!live.ready) {
+        throw new ApiClientError(
+          "DESKTOP_RUNTIME_NOT_READY",
+          "The local DroneDream runtime stopped responding before the experiment started.",
+        );
+      }
+    } catch (error) {
+      if (error instanceof ApiClientError) throw error;
+      throw new ApiClientError(
+        "DESKTOP_RUNTIME_NOT_READY",
+        error instanceof Error
+          ? error.message
+          : "The local DroneDream runtime could not be verified.",
+      );
+    }
   }
 
   let response: Response;
@@ -160,6 +189,10 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async verifyAuthenticatedSession(): Promise<AuthenticatedSessionResponse> {
+    return request<AuthenticatedSessionResponse>("/session");
+  },
+
   async compileExperimentAssistantTurn(
     req: ExperimentAssistantTurnRequest,
   ): Promise<ExperimentAssistantTurnResponse> {

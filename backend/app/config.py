@@ -129,7 +129,11 @@ class Settings(BaseSettings):
     def validate_production_safety(self) -> Settings:
         """Reject the development-only anonymous identity in production."""
 
-        is_production = self.app_env.strip().lower() in {"prod", "production"}
+        protected_environment = self.app_env.strip().lower() in {
+            "desktop",
+            "prod",
+            "production",
+        }
         if self.worker_lease_heartbeat_seconds >= self.worker_lease_seconds:
             raise ValueError(
                 "WORKER_LEASE_HEARTBEAT_SECONDS must be less than WORKER_LEASE_SECONDS"
@@ -188,7 +192,7 @@ class Settings(BaseSettings):
                     f"CORS_ORIGINS contains an invalid origin (scheme/host/port only): {origin!r}"
                 )
             if (
-                is_production
+                protected_environment
                 and parsed_origin.scheme == "http"
                 and parsed_origin.hostname not in {"localhost", "127.0.0.1", "::1"}
                 and not parsed_origin.hostname.endswith(".localhost")
@@ -209,7 +213,7 @@ class Settings(BaseSettings):
                     or any(ord(char) < 32 for char in email + token)
                 ):
                     raise ValueError("DEMO_AUTH_TOKENS contains an invalid email:token entry")
-                if is_production and (
+                if protected_environment and (
                     len(token.encode("utf-8")) < 32
                     or len(set(token)) < 8
                     or _is_obvious_placeholder(token)
@@ -249,8 +253,10 @@ class Settings(BaseSettings):
                 or parsed_jwks.fragment
             ):
                 raise ValueError("OIDC_JWKS_URL must be an absolute HTTP(S) URL")
-            if is_production and parsed_jwks.scheme != "https":
-                raise ValueError("OIDC_JWKS_URL must use HTTPS in production")
+            if protected_environment and parsed_jwks.scheme != "https":
+                raise ValueError(
+                    "OIDC_JWKS_URL must use HTTPS in desktop and production environments"
+                )
             allowed_algorithms = {"RS256", "RS384", "RS512", "ES256", "ES384", "EdDSA"}
             if not self.oidc_algorithm_list or not set(self.oidc_algorithm_list).issubset(
                 allowed_algorithms
@@ -259,16 +265,16 @@ class Settings(BaseSettings):
                     "OIDC_ALGORITHMS must contain only asymmetric algorithms: "
                     + ", ".join(sorted(allowed_algorithms))
                 )
-        if is_production:
+        if protected_environment:
             if self.auth_mode == "disabled":
                 raise ValueError(
-                    "AUTH_MODE=disabled is forbidden when APP_ENV=production; "
+                    "AUTH_MODE=disabled is forbidden when APP_ENV is desktop or production; "
                     "configure an authenticated mode before starting the service"
                 )
             if self.auth_mode == "demo_token" and not self.demo_auth_token_map:
                 raise ValueError(
                     "DEMO_AUTH_TOKENS must contain at least one email:token pair "
-                    "when AUTH_MODE=demo_token in production"
+                    "when AUTH_MODE=demo_token in desktop or production"
                 )
         return self
 

@@ -4,6 +4,54 @@ import { StrictMode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const optionalAuthState = vi.hoisted(() => ({
+  current: null as null | {
+    configured: boolean;
+    loading: boolean;
+    account: {
+      id: string;
+      email: string | null;
+      displayName: string;
+      avatarUrl: string | null;
+    } | null;
+  },
+}));
+const updaterState = vi.hoisted(() => ({
+  current: {
+    status: "current" as
+      | "checking"
+      | "current"
+      | "available"
+      | "downloading"
+      | "installing"
+      | "error",
+    availableVersion: null as string | null,
+    progress: null as number | null,
+    error: null as string | null,
+    desktopRuntime: true,
+    checkForUpdates: vi.fn(async () => undefined),
+    installAvailableUpdate: vi.fn(async () => undefined),
+  },
+}));
+
+vi.mock("../features/auth/AuthContext", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../features/auth/AuthContext")>();
+  return {
+    ...original,
+    useOptionalAuth: () => optionalAuthState.current,
+  };
+});
+
+vi.mock("../desktop/updaterContext", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../desktop/updaterContext")>();
+  return {
+    ...original,
+    useAppUpdaterState: () => updaterState.current,
+  };
+});
+
 import type {
   InstallerRuntimeAutoStartResult,
   InstallerRuntimeDiscardResult,
@@ -13,9 +61,11 @@ import type {
   RuntimeStatusReport,
   SystemPrerequisiteReport,
 } from "../desktop/bridge";
+import { apiClient } from "../api/client";
 import { formatBytes } from "../desktop/format";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { DesktopSetup } from "../pages/DesktopSetup";
+import { resetDesktopReadinessSession } from "../desktop/readiness";
 
 const prerequisites: SystemPrerequisiteReport = {
   platform: "windows",
@@ -368,6 +418,18 @@ function renderPage(
 }
 
 afterEach(() => {
+  optionalAuthState.current = null;
+  resetDesktopReadinessSession();
+  updaterState.current = {
+    status: "current",
+    availableVersion: null,
+    progress: null,
+    error: null,
+    desktopRuntime: true,
+    checkForUpdates: vi.fn(async () => undefined),
+    installAvailableUpdate: vi.fn(async () => undefined),
+  };
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
 });
 
@@ -402,10 +464,163 @@ describe("DesktopSetup", () => {
       "href",
       "/assistant",
     );
-    expect(screen.getByRole("progressbar", { name: "Runtime download progress" }))
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
+  });
+
+  it("holds startup at 99 percent while a configured account is still loading", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: true,
+      account: null,
+    };
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") return runtime;
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    renderPage();
+
+    expect(await screen.findByText("DroneDreamRuntime · Installed · Running"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "99");
+    expect(screen.queryByRole("button", { name: "Sign in to continue" }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("holds startup at 99 percent until the configured account signs in", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") return runtime;
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    renderPage();
+
+    expect(await screen.findByText("Sign in to finish")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "99");
+    expect(screen.getByRole("button", { name: "Sign in to continue" }))
+      .toBeEnabled();
+    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("reaches 100 percent only after the local backend accepts the signed-in account", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: {
+        id: "user-accepted",
+        email: "pilot@example.com",
+        displayName: "Pilot",
+        avatarUrl: null,
+      },
+    };
+    const verifySession = vi
+      .spyOn(apiClient, "verifyAuthenticatedSession")
+      .mockResolvedValue({ status: "ready", user_id: "user-accepted" });
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") return runtime;
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    renderPage();
+
+    expect(await screen.findByRole("link", { name: "Open tuning workspace" }))
+      .toHaveAttribute("href", "/assistant");
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "100");
+    expect(verifySession).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the workspace locked when the backend identity differs from the signed-in account", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: {
+        id: "user-expected",
+        email: "pilot@example.com",
+        displayName: "Pilot",
+        avatarUrl: null,
+      },
+    };
+    vi.spyOn(apiClient, "verifyAuthenticatedSession").mockResolvedValue({
+      status: "ready",
+      user_id: "user-other",
+    });
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") return runtime;
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    renderPage();
+
+    expect(await screen.findByText(/different account identity/i)).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "99");
+  });
+
+  it("blocks entry and offers the signed updater when a newer application is available", async () => {
+    const installAvailableUpdate = vi.fn(async () => undefined);
+    updaterState.current = {
+      ...updaterState.current,
+      status: "available",
+      availableVersion: "1.0.1",
+      installAvailableUpdate,
+    };
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") return runtime;
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    renderPage();
+
+    const update = await screen.findByRole("button", {
+      name: "Version 1.0.1 is available. Click to update.",
+    });
+    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "99");
+    await userEvent.click(update);
+    expect(installAvailableUpdate).toHaveBeenCalledTimes(1);
   });
 
   it("keeps checking through a transient system-probe timeout instead of showing an error", async () => {
@@ -431,7 +646,7 @@ describe("DesktopSetup", () => {
     expect(screen.getByText("Checking system")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "Runtime download progress" }))
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "99");
 
     expect(await screen.findByRole("link", { name: "Open tuning workspace" }, {
@@ -570,7 +785,7 @@ describe("DesktopSetup", () => {
       .toHaveClass("sr-only");
     expect(screen.getByText("Preparing download")).toBeInTheDocument();
     expect(screen.getByText("Preparing installation")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "Runtime download progress" }))
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "0");
     expect(screen.getByRole("button", { name: "Pause installation" })).toBeEnabled();
     expect(page.container.querySelector(".launcher-stage-strip")).not.toBeInTheDocument();

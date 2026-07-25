@@ -5,6 +5,10 @@ import {
   ensureOverallDesktopReadiness,
   resetDesktopReadinessSession,
 } from "../desktop/readiness";
+import {
+  approveDesktopStartupGateWithoutCloudAuth,
+  resetDesktopStartupGateSession,
+} from "../desktop/startupGate";
 import { setAuthAccessToken } from "../features/auth/authTokenStore";
 
 function mockFetchOnce(body: unknown, status = 200) {
@@ -50,6 +54,7 @@ const runtimeComponents = [
 afterEach(() => {
   setAuthAccessToken(null);
   resetDesktopReadinessSession();
+  resetDesktopStartupGateSession();
   delete window.__TAURI__;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -382,7 +387,7 @@ describe("apiClient envelope handling", () => {
     );
   });
 
-  it("uses the cached manual environment result before a real run without probing again", async () => {
+  it("uses the approved startup gate and performs one lightweight runtime probe before a real run", async () => {
     const readyRuntime = {
       runtimeName: "DroneDreamRuntime",
       installed: true,
@@ -401,12 +406,14 @@ describe("apiClient envelope handling", () => {
     });
     window.__TAURI__ = { core: { invoke } };
     await ensureOverallDesktopReadiness({ autoStart: true });
+    approveDesktopStartupGateWithoutCloudAuth();
     invoke.mockClear();
     mockFetchOnce({ success: true, data: { id: "job_1" }, error: null });
 
     await expect(apiClient.createJob({} as never)).resolves.toMatchObject({ id: "job_1" });
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith("probe_runtime_status", undefined);
   });
 
   it("blocks a real run without a cached manual check and never probes automatically", async () => {

@@ -83,6 +83,13 @@ if (([regex]::Matches($upstream, [regex]::Escape($uninstallQuiesceAnchor))).Coun
     throw "DroneDream inherited-uninstaller quiesce anchor is missing or duplicated"
 }
 $upstream = $upstream.Replace($uninstallQuiesceAnchor, "")
+$downgradeAnchor = "  !ifmacrodef DRONEDREAM_BLOCK_DOWNGRADE`n" +
+    "    !insertmacro DRONEDREAM_BLOCK_DOWNGRADE `$R0`n" +
+    "  !endif`n"
+if (([regex]::Matches($upstream, [regex]::Escape($downgradeAnchor))).Count -ne 1) {
+    throw "DroneDream fail-closed downgrade anchor is missing or duplicated"
+}
+$upstream = $upstream.Replace($downgradeAnchor, "")
 $languageAnchor = "; DroneDream custom strings must be expanded only after every MUI language is`n" +
     "; registered. Expanding them from the early hook include maps both locales to`n" +
     "; English and lets the Chinese text overwrite the English text.`n" +
@@ -116,6 +123,9 @@ foreach ($required in @(
     'StrCpy $DroneDreamInstallerLanguage "$LANGUAGE"',
     'StrCpy $LANGUAGE $DroneDreamInstallerLanguage',
     'dronedream-runtime-probe.exe',
+    '!macro DRONEDREAM_BLOCK_DOWNGRADE',
+    'DD_DowngradeBlocked',
+    'SetErrorLevel 74',
     'ClearErrors',
     'launch-failed',
     'result-incomplete',

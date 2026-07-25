@@ -136,6 +136,7 @@ describe("NewJob experiment wizard", () => {
 
     first.unmount();
     window.sessionStorage.removeItem(EXPERIMENT_DRAFT_KEY);
+    window.localStorage.removeItem(EXPERIMENT_DRAFT_KEY);
     renderPage({ confirmName: false });
     fireEvent.click(screen.getByRole("button", { name: /^Cancel$/i }));
     expect(navigateMock).toHaveBeenCalledWith(-1);

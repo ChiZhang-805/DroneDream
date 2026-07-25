@@ -185,6 +185,31 @@ class RuntimeManifestContractTests(unittest.TestCase):
         ):
             self.assertIn(fragment, desktop)
 
+    def test_packaged_desktop_runtime_requires_supabase_oidc(self) -> None:
+        values = {}
+        for raw_line in (RUNTIME / "config" / "runtime.env.default").read_text(
+            encoding="utf-8"
+        ).splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            key, separator, value = line.partition("=")
+            self.assertEqual(separator, "=", raw_line)
+            values[key] = value
+
+        self.assertEqual(values["APP_ENV"], "desktop")
+        self.assertEqual(values["AUTH_MODE"], "oidc_jwt")
+        self.assertEqual(values["OIDC_AUDIENCE"], "authenticated")
+        self.assertEqual(values["OIDC_ALGORITHMS"], "ES256")
+        self.assertRegex(
+            values["OIDC_ISSUER"],
+            r"^https://[a-z0-9]+\.supabase\.co/auth/v1$",
+        )
+        self.assertEqual(
+            values["OIDC_JWKS_URL"],
+            values["OIDC_ISSUER"] + "/.well-known/jwks.json",
+        )
+
 
 class ThirdPartyNoticeContractTests(unittest.TestCase):
     def test_notice_is_included_in_the_exported_rootfs_source_tree(self) -> None:

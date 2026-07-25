@@ -22,6 +22,8 @@ worker uses to dispatch and finalize jobs.
     compatibility filters, guided presets, and server-side search-space validation.
   - `capabilities` — advisory worker/simulator/optimizer readiness used by the
     experiment wizard before dispatch (job creation remains authoritative).
+  - `session` — authenticated identity probe used by the packaged desktop
+    startup gate before it can report 100% ready.
 - `app/schemas.py` — Pydantic v2 request/response models + enum literals.
 - `app/models.py` — SQLAlchemy ORM models including `User`, `BatchJob`, `Job`,
   `JobSecret`, `CandidateParameterSet`, `Trial`, `TrialMetric`, `JobReport`,
@@ -133,7 +135,7 @@ python3 -m venv .venv
     whenever `DRONEDREAM_RUNTIME_ID` is configured
 - Authentication:
   - `AUTH_MODE=disabled|demo_token|oidc_jwt` (default `disabled`; production
-    refuses disabled mode)
+    and packaged `APP_ENV=desktop` runtimes refuse disabled mode)
   - `DEMO_AUTH_TOKENS` format:
     `user1@example.com:token1,user2@example.com:token2`
   - OIDC mode requires `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL`, and

@@ -688,6 +688,11 @@ export interface BackendCapabilitiesResponse {
   };
 }
 
+export interface AuthenticatedSessionResponse {
+  status: "ready";
+  user_id: string;
+}
+
 export interface StudyParameterSelection {
   name: string;
   baseline: number;

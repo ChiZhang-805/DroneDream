@@ -11,7 +11,7 @@ import type {
 import { resetDesktopReadinessSession } from "../desktop/readiness";
 import { EXPERIMENT_DRAFT_KEY } from "../features/experiment/draftStorage";
 import { I18nProvider } from "../i18n/I18nProvider";
-import type { PaginatedJobs } from "../types/api";
+import type { Job, PaginatedJobs } from "../types/api";
 
 let closeRequestedHandler:
   | ((event: DesktopCloseRequestedEvent) => void | Promise<void>)
@@ -103,16 +103,28 @@ describe("desktop close protection", () => {
     expect(destroyWindow).not.toHaveBeenCalled();
   });
 
-  it("discards the current-session draft only after explicit exit confirmation", async () => {
-    window.sessionStorage.setItem(EXPERIMENT_DRAFT_KEY, "current-session-draft");
+  it("persists the redacted current-session draft before explicit exit confirmation", async () => {
+    window.sessionStorage.setItem(EXPERIMENT_DRAFT_KEY, JSON.stringify({
+      schema_version: 3,
+      saved_at: "2026-07-26T00:00:00.000Z",
+      active_step: 2,
+      completed_steps: [0, 1],
+      form: { display_name: "Keep me", llm_api_key: "must-not-persist" },
+      selections: {},
+      conversation: null,
+    }));
     renderShell("/dashboard");
 
     await requestWindowClose();
-    fireEvent.click(screen.getByRole("button", { name: "Exit and discard draft" }));
+    expect(screen.getByText(/redacted draft is saved/i)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Exit and keep draft" }));
 
     await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
-    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).toBeNull();
-    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toBeNull();
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("Keep me");
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toContain(
+      "must-not-persist",
+    );
     expect(invokeDesktop).not.toHaveBeenCalled();
   });
 
@@ -127,6 +139,35 @@ describe("desktop close protection", () => {
     expect(screen.getByText(/2 active experiment jobs/i)).toBeVisible();
     expect(screen.getByRole("button", { name: "Exit anyway" })).toBeVisible();
     expect(destroyWindow).not.toHaveBeenCalled();
+    expect(invokeDesktop).not.toHaveBeenCalled();
+  });
+
+  it("best-effort cancels known active jobs before destroying the window", async () => {
+    const activeJob = { id: "job-running" } as Job;
+    vi.mocked(apiClient.listJobs).mockImplementation(async (params) => (
+      params?.status === "RUNNING"
+        ? {
+            items: [activeJob],
+            page: 1,
+            page_size: 100,
+            total: 1,
+          }
+        : emptyJobs()
+    ));
+    const cancelJob = vi.spyOn(apiClient, "cancelJob").mockResolvedValue({
+      ...activeJob,
+      status: "CANCELLED",
+    });
+    renderShell("/dashboard");
+
+    await requestWindowClose();
+    const exitButton = screen.getByRole("button", { name: "Exit anyway" });
+    fireEvent.click(exitButton);
+    fireEvent.click(exitButton);
+
+    await waitFor(() => expect(cancelJob).toHaveBeenCalledWith("job-running"));
+    await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
+    expect(cancelJob).toHaveBeenCalledTimes(1);
     expect(invokeDesktop).not.toHaveBeenCalled();
   });
 

@@ -40,6 +40,11 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: "4"
+      # Pull requests may compile with inert placeholders. Formal desktop tags
+      # are rejected below unless the repository variables contain the real
+      # public Supabase project configuration.
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://ci.invalid' }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_ci_desktop_only' }}
 
     steps:
       - name: Check out source
@@ -82,6 +87,28 @@ jobs:
             throw "Backend versions disagree: pyproject=$backendProjectVersion code=$backendCodeVersion"
           }
           Write-Host "Backend versions verified: $backendCodeVersion"
+
+      - name: Validate desktop account configuration
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        shell: pwsh
+        run: |
+          $url = $env:VITE_SUPABASE_URL.Trim()
+          $publishableKey = $env:VITE_SUPABASE_PUBLISHABLE_KEY.Trim()
+          $parsedUrl = $null
+          if (
+            -not [Uri]::TryCreate($url, [UriKind]::Absolute, [ref]$parsedUrl) -or
+            $parsedUrl.Scheme -cne "https" -or
+            $parsedUrl.Host -eq "ci.invalid"
+          ) {
+            throw "Formal desktop releases require a real HTTPS VITE_SUPABASE_URL repository variable."
+          }
+          if (
+            $publishableKey.Length -lt 20 -or
+            $publishableKey -match '(?i)placeholder|change.?me|desktop_only'
+          ) {
+            throw "Formal desktop releases require a real VITE_SUPABASE_PUBLISHABLE_KEY repository variable."
+          }
+          Write-Host "Desktop account configuration is present for the formal release build."
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0

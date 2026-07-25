@@ -91,6 +91,7 @@ request time, user agent, delivery status, and security events. They may
 process data in countries other than the user's country. Their own terms,
 privacy policies, security measures, and retention practices also apply.
 
+The DroneDream desktop application does not include first-party advertising.
 The website does not currently use first-party advertising or behavioral
 analytics.
 

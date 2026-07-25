@@ -7,6 +7,7 @@ import type {
   SystemPrerequisiteReport,
 } from "./bridge";
 import { probeSystemPrerequisitesWithStartupGrace } from "./prerequisiteProbe";
+import { resetDesktopStartupGateSession } from "./startupGate";
 
 export const MINIMUM_MEMORY_BYTES = 15 * 1024 ** 3;
 
@@ -73,6 +74,7 @@ export function resetDesktopReadinessSession(): void {
   runtimeStartInFlight = null;
   autoStartFailureKey = null;
   runtimeLifetimeClaimed = false;
+  resetDesktopStartupGateSession();
 }
 
 function runtimeIdentityKey(runtime: RuntimeStatusReport): string {

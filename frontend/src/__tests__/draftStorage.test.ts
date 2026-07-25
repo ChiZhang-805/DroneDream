@@ -162,14 +162,18 @@ describe("experiment draft storage migration", () => {
     expect(window.sessionStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).toBeNull();
   });
 
-  it("purges old persistent drafts instead of restoring them in a new app session", () => {
+  it("restores a redacted persistent draft in a new app session", () => {
     window.localStorage.setItem(
       EXPERIMENT_DRAFT_KEY,
-      envelope(2, 3, "stale-from-closed-app"),
+      envelope(3, 3, "saved-from-closed-app", "sk-never-restore"),
     );
 
-    expect(loadExperimentDraft(schema)).toBeNull();
-    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toBeNull();
-    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).toBeNull();
+    expect(loadExperimentDraft(schema)).toMatchObject({
+      schema_version: 3,
+      active_step: 3,
+      form: { name: "saved-from-closed-app", llm_api_key: "" },
+    });
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toBeNull();
+    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toBeNull();
   });
 });

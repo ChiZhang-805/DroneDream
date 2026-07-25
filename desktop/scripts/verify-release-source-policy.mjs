@@ -120,6 +120,18 @@ if (missingRustLicenses.length > 0) {
 }
 
 const tauriConfig = JSON.parse(readText("desktop/src-tauri/tauri.conf.json"));
+const desktopCapability = JSON.parse(
+  readText("desktop/src-tauri/capabilities/default.json"),
+);
+for (const requiredPermission of [
+  "core:window:allow-destroy",
+  "updater:default",
+  "process:allow-restart",
+]) {
+  if (!desktopCapability.permissions?.includes(requiredPermission)) {
+    fail(`desktop capability is missing: ${requiredPermission}`);
+  }
+}
 const inventory = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),

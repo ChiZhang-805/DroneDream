@@ -1,6 +1,15 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { apiClient } from "../api/client";
 import { Alert } from "../components/Alert";
 import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
@@ -41,6 +50,14 @@ import {
   isRuntimeFullyReady,
   MINIMUM_MEMORY_BYTES,
 } from "../desktop/readiness";
+import {
+  approveDesktopStartupGateWithoutCloudAuth,
+  getDesktopStartupGateSession,
+  setDesktopStartupGateState,
+  subscribeDesktopStartupGate,
+  verifyDesktopStartupGate,
+} from "../desktop/startupGate";
+import { useAppUpdaterState } from "../desktop/updaterContext";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
 
@@ -279,6 +296,12 @@ function runtimeHealthFailureCopy(code: string | undefined): LauncherFailureCopy
 export function DesktopSetup() {
   const { t } = useI18n();
   const auth = useOptionalAuth();
+  const updater = useAppUpdaterState();
+  const startupGate = useSyncExternalStore(
+    subscribeDesktopStartupGate,
+    getDesktopStartupGateSession,
+    getDesktopStartupGateSession,
+  );
   const [searchParams] = useSearchParams();
   const runtimeAccess = useDesktopRuntimeAccess();
   const { refresh: refreshRuntimeAccess } = runtimeAccess;
@@ -333,10 +356,25 @@ export function DesktopSetup() {
     state.prerequisitesFresh &&
     state.runtimeFresh &&
     isOverallDesktopReady(state.prerequisites, state.runtime);
-  const accountReady = !auth?.configured || Boolean(auth.account);
+  const accountChecking = Boolean(auth?.configured && auth.loading);
+  const accountRequired = Boolean(
+    auth?.configured && !auth.loading && !auth.account,
+  );
+  const accountReady =
+    !auth?.configured || (!auth.loading && Boolean(auth.account));
+  const startupGateReady =
+    !desktopAvailable || startupGate.status === "ready";
+  const updaterBusy =
+    updater.status === "checking" ||
+    updater.status === "downloading" ||
+    updater.status === "installing";
+  const updaterBlocksWorkspace =
+    updaterBusy || updater.status === "available";
   const workspaceReady =
     localRuntimeReady &&
     accountReady &&
+    startupGateReady &&
+    !updaterBlocksWorkspace &&
     !state.loading &&
     !installerHandoffState.checking &&
     (!runtimeAccess.desktopRuntime ||
@@ -344,6 +382,9 @@ export function DesktopSetup() {
   const workspaceChecking =
     state.loading ||
     installerHandoffState.checking ||
+    accountChecking ||
+    updaterBusy ||
+    startupGate.status === "checking" ||
     runtimeAccess.isChecking ||
     runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
@@ -412,6 +453,78 @@ export function DesktopSetup() {
       componentMounted.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!desktopAvailable) return;
+    if (
+      updater.status === "checking" ||
+      updater.status === "downloading" ||
+      updater.status === "installing"
+    ) {
+      setDesktopStartupGateState("checking", {
+        accountId: auth?.account?.id ?? null,
+      });
+      return;
+    }
+    if (updater.status === "available") {
+      setDesktopStartupGateState("blocked", {
+        accountId: auth?.account?.id ?? null,
+        error: `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
+      });
+      return;
+    }
+    const accessCheckInProgress = runtimeAccess.desktopRuntime && (
+      runtimeAccess.isChecking ||
+      runtimeAccess.status === "checking" ||
+      runtimeAccess.status === "starting"
+    );
+    const accessApproved =
+      !runtimeAccess.desktopRuntime || runtimeAccess.status === "ready";
+    if (
+      !localRuntimeReady ||
+      accessCheckInProgress ||
+      !accessApproved
+    ) {
+      if (accessCheckInProgress) {
+        setDesktopStartupGateState("checking", {
+          accountId: auth?.account?.id ?? null,
+        });
+      }
+      return;
+    }
+    if (!auth?.configured) {
+      if (import.meta.env.DEV || import.meta.env.MODE === "test") {
+        approveDesktopStartupGateWithoutCloudAuth();
+      } else {
+        setDesktopStartupGateState("blocked", {
+          error: "Account authentication is not configured in this desktop build.",
+        });
+      }
+      return;
+    }
+    if (auth.loading) {
+      setDesktopStartupGateState("checking");
+      return;
+    }
+    if (!auth.account) {
+      setDesktopStartupGateState("accountRequired");
+      return;
+    }
+    void verifyDesktopStartupGate(
+      auth.account.id,
+      () => apiClient.verifyAuthenticatedSession(),
+    );
+  }, [
+    auth,
+    desktopAvailable,
+    localRuntimeReady,
+    runtimeAccess.isChecking,
+    runtimeAccess.lastFullCheckAt,
+    runtimeAccess.status,
+    runtimeAccess.desktopRuntime,
+    updater.availableVersion,
+    updater.status,
+  ]);
 
   const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;
@@ -1173,12 +1286,39 @@ export function DesktopSetup() {
           snapshot={installState.snapshot}
           ready={workspaceReady}
           checking={workspaceChecking}
+          gateBlocked={
+            localRuntimeReady &&
+            accountReady &&
+            (startupGate.status === "blocked" ||
+              updater.status === "available")
+          }
+          accountRequired={localRuntimeReady && accountRequired}
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
           onCancel={() => void cancelInstall()}
         />
 
-        {localRuntimeReady && !accountReady ? (
+        {localRuntimeReady &&
+        startupGate.status === "blocked" &&
+        updater.status !== "available" ? (
+          <Alert tone="warning" title={t("launcher.startupBlocked")}>
+            <p>{startupGate.error ?? t("launcher.errorHint")}</p>
+          </Alert>
+        ) : null}
+
+        {updater.status === "available" ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void updater.installAvailableUpdate()}
+            >
+              {t("updater.available", {
+                version: updater.availableVersion ?? "",
+              })}
+            </button>
+          </div>
+        ) : localRuntimeReady && accountRequired ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
@@ -1194,6 +1334,21 @@ export function DesktopSetup() {
             <Link to="/assistant" className="btn btn-primary launcher-primary-action">
               {t("launcher.openWorkspace")}
             </Link>
+          </div>
+        ) : localRuntimeReady && (
+          updaterBusy || startupGate.status === "checking"
+        ) ? null : localRuntimeReady ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => {
+                void updater.checkForUpdates();
+                void refreshRuntimeAccess();
+              }}
+            >
+              {t("launcher.retryChecks")}
+            </button>
           </div>
         ) : (
           <>
@@ -2289,6 +2444,8 @@ function RuntimeLauncherHero({
   snapshot,
   ready,
   checking,
+  gateBlocked,
+  accountRequired,
   automaticStartPending,
   commandBusy,
   onCancel,
@@ -2296,6 +2453,8 @@ function RuntimeLauncherHero({
   snapshot: RuntimeInstallSnapshot | null;
   ready: boolean;
   checking: boolean;
+  gateBlocked: boolean;
+  accountRequired: boolean;
   automaticStartPending: boolean;
   commandBusy: boolean;
   onCancel: () => void;
@@ -2310,7 +2469,11 @@ function RuntimeLauncherHero({
     ? 100
     : measuredPercent !== null
       ? Math.min(measuredPercent, 99)
-      : checking || automaticStartPending || phase === "completed"
+      : checking ||
+          gateBlocked ||
+          accountRequired ||
+          automaticStartPending ||
+          phase === "completed"
         ? 99
         : null;
   const status = ready
@@ -2319,6 +2482,10 @@ function RuntimeLauncherHero({
       ? t("launcher.status.pausing")
       : commandBusy
         ? t("launcher.status.queued")
+      : accountRequired
+        ? t("launcher.status.signIn")
+      : gateBlocked
+        ? t("launcher.status.blocked")
       : phase === "completed"
         ? t("launcher.status.healthChecking")
       : (checking || automaticStartPending) && phase === "idle"
@@ -2337,7 +2504,7 @@ function RuntimeLauncherHero({
         <div
           className={`launcher-progress-track${percent === null && (active || checking) ? " indeterminate" : ""}`}
           role="progressbar"
-          aria-label={t("desktop.downloadProgress")}
+          aria-label={t("launcher.progressLabel")}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent ?? undefined}

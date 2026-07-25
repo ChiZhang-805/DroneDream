@@ -65,6 +65,9 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const { ensureOverallDesktopReadiness } = await import("../desktop/readiness");
     await ensureOverallDesktopReadiness({ autoStart: false });
+    const { approveDesktopStartupGateWithoutCloudAuth } =
+      await import("../desktop/startupGate");
+    approveDesktopStartupGateWithoutCloudAuth();
     const { router } = await import("../router");
 
     expect(router.state.location.pathname).toBe("/desktop/setup");

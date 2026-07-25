@@ -4,17 +4,21 @@
 
 DroneDream uses two explicit operating modes:
 
-- **Local workspace** is the default for the signed Windows application. It
-  uses the local Runtime and local database, does not require an Internet
-  account, and keeps the current experiment draft only for the current app
-  session.
-- **Cloud workspace** is opt-in. It uses Supabase Auth as the identity
-  provider and DroneDream's authenticated API as the data boundary. New users
-  register with an email address, a password, and the verification code sent
-  to that address; returning users sign in with email and password. Google can
-  be enabled for the browser deployment after its OAuth callback is
-  configured. SMS is excluded from the first release because it adds provider
-  cost and abuse controls.
+- **Public signed Windows application** requires a Supabase account. Supabase
+  Auth supplies the access token, while the bundled local Runtime and database
+  remain the experiment execution boundary. The startup screen cannot report
+  100% or expose the tuning-platform entry until the Runtime is ready, the
+  signed update check has completed, and `GET /api/v1/session` accepts the
+  current account identity.
+- **Local development/test workspace** may explicitly omit Supabase and use
+  disabled or demo authentication. This exception is not a shippable desktop
+  configuration and must never be used to make a public build appear ready.
+
+New users register with an email address, a password, and the verification
+code sent to that address; returning users sign in with email and password.
+Google can be enabled for the browser deployment after its OAuth callback is
+configured. SMS is excluded from the first release because it adds provider
+cost and abuse controls.
 
 The product must never display a successful cloud sign-in while continuing to
 query unscoped local or cloud records. Authentication and tenant filtering are
@@ -31,14 +35,21 @@ The backend already has the required ownership model:
 - `AUTH_MODE=oidc_jwt` verifies asymmetric JWT signatures, issuer, audience,
   expiry, and subject through the configured JWKS endpoint.
 
-The frontend now has an optional Supabase account layer:
+The frontend has a Supabase account layer for public desktop builds:
 
-- no Supabase environment variables means an honest local-only workspace;
+- no Supabase environment variables means an honest local-development
+  workspace; a formal signed desktop build must fail before release when those
+  public variables are absent;
 - email verification creates one password-protected account per verified
   email, and the registration form keeps the code field visible from the
   beginning;
 - a Supabase access token is attached to API requests in memory;
-- signing out or changing accounts clears the unfinished experiment draft;
+- the backend identity probe must accept the same immutable account subject
+  before the startup gate can reach 100%;
+- unfinished experiment drafts are redacted and mirrored into persistent local
+  storage so a normal app exit or restart can restore them;
+- signing out or changing accounts clears the unfinished experiment draft to
+  prevent cross-account disclosure;
 - the desktop refresh-token session uses `sessionStorage` until an
   OS-keychain-backed Tauri storage adapter is added;
 - Google and Apple buttons are build flags and stay hidden in the desktop
@@ -62,7 +73,7 @@ VITE_AUTH_APPLE_ENABLED=false
 Backend runtime variables:
 
 ```dotenv
-APP_ENV=production
+APP_ENV=desktop
 AUTH_MODE=oidc_jwt
 OIDC_ISSUER=https://PROJECT_REF.supabase.co/auth/v1
 OIDC_AUDIENCE=authenticated
@@ -89,8 +100,9 @@ password, or any signing key in frontend variables or the repository.
    only then enable CAPTCHA in Supabase Auth with the private secret key.
 5. Add the production website URL and allowed redirect URLs.
 6. Copy only the project URL, publishable key, and Turnstile public site key
-   into the frontend build variables. Configure the backend OIDC values above
-   in server secrets.
+   into the frontend build variables. The packaged local Runtime receives only
+   the public OIDC verifier configuration above; it never receives a Supabase
+   service-role key.
 7. Confirm the project uses an asymmetric signing key compatible with the
    JWKS verifier, then run the cross-user isolation acceptance tests.
 8. If Google login is wanted, create a Google OAuth web client, register the
@@ -110,13 +122,14 @@ Before cloud accounts appear in a public build:
 2. User B cannot discover User A's job through list filters or guessed IDs.
 3. User B receives a not-found or forbidden response for User A's trials,
    artifacts, reports, batches, and downloads.
-4. Signing out clears the unfinished conversation and five-step draft.
+4. A normal close/restart restores the redacted unfinished five-step draft;
+   signing out clears it.
 5. Signing in as another user does not reveal the previous account's jobs,
    model API key, draft, or cached artifact URL.
 6. Expired, wrong-audience, wrong-issuer, unsigned, and symmetric-algorithm
    tokens fail closed.
-7. Local-only mode remains available without pretending that its data is
-   synced to a cloud account.
+7. Local-only development mode remains available without pretending that it is
+   a public signed build or that its data is synced to a cloud account.
 
 ## Storage direction for the initial user count
 

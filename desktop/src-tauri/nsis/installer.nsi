@@ -235,6 +235,9 @@ Function PageReinstall
 
   nsis_tauri_utils::SemverCompare "${VERSION}" $R0
   Pop $R0
+  !ifmacrodef DRONEDREAM_BLOCK_DOWNGRADE
+    !insertmacro DRONEDREAM_BLOCK_DOWNGRADE $R0
+  !endif
   ; Reinstalling the same version
   ${If} $R0 = 0
     StrCpy $R1 "$(alreadyInstalledLong)"

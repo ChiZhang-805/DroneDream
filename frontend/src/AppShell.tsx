@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { ChangeEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
@@ -32,6 +38,17 @@ import {
 } from "./desktop/access";
 import type { DesktopRuntimeAccess } from "./desktop/access";
 import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
+import {
+  approveDesktopStartupGateWithoutCloudAuth,
+  getDesktopStartupGateSession,
+  setDesktopStartupGateState,
+  subscribeDesktopStartupGate,
+  verifyDesktopStartupGate,
+} from "./desktop/startupGate";
+import {
+  AppUpdaterProvider,
+  useAppUpdaterState,
+} from "./desktop/updaterContext";
 import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
@@ -47,8 +64,8 @@ import {
 } from "./features/settings/ModelAccessContext";
 import { ModelAccessProvider } from "./features/settings/ModelAccessProvider";
 import {
-  clearAllExperimentDrafts,
   hasExperimentDraft,
+  persistExperimentDraftsForExit,
 } from "./features/experiment/draftStorage";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
@@ -88,14 +105,20 @@ const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
   "FINALIZING",
 ];
 const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
+const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 
 interface ExitPromptState {
   hasDraft: boolean;
+  draftPreserved: boolean;
   activeJobCount: number;
+  activeJobIds: string[];
   activeJobsUnknown: boolean;
 }
 
-async function countActiveJobsBeforeExit(): Promise<number> {
+async function findActiveJobsBeforeExit(): Promise<{
+  count: number;
+  jobIds: string[];
+}> {
   let timeoutId: number | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
     timeoutId = window.setTimeout(
@@ -106,11 +129,32 @@ async function countActiveJobsBeforeExit(): Promise<number> {
   try {
     const pages = await Promise.race([
       Promise.all(EXIT_GUARD_JOB_STATUSES.map((status) =>
-        apiClient.listJobs({ page: 1, page_size: 1, status })
+        apiClient.listJobs({ page: 1, page_size: 100, status })
       )),
       timeout,
     ]);
-    return pages.reduce((total, page) => total + page.total, 0);
+    return {
+      count: pages.reduce((total, page) => total + page.total, 0),
+      jobIds: [...new Set(pages.flatMap((page) => page.items.map((job) => job.id)))],
+    };
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}
+
+async function stopKnownActiveJobsBeforeExit(jobIds: string[]): Promise<void> {
+  if (jobIds.length === 0) return;
+  let timeoutId: number | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timeoutId = window.setTimeout(resolve, ACTIVE_JOB_CANCEL_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([
+      Promise.allSettled(jobIds.map((jobId) => apiClient.cancelJob(jobId))).then(
+        () => undefined,
+      ),
+      timeout,
+    ]);
   } finally {
     if (timeoutId !== undefined) window.clearTimeout(timeoutId);
   }
@@ -120,9 +164,11 @@ export function AppShell() {
   return (
     <AuthProvider>
       <DesktopRuntimeAccessProvider>
-        <ModelAccessProvider>
-          <AppShellContent />
-        </ModelAccessProvider>
+        <AppUpdaterProvider>
+          <ModelAccessProvider>
+            <AppShellContent />
+          </ModelAccessProvider>
+        </AppUpdaterProvider>
       </DesktopRuntimeAccessProvider>
     </AuthProvider>
   );
@@ -445,6 +491,15 @@ function ExitGuardDialog({
         <p id="app-exit-description">
           {t(paragraphKey, { count: state.activeJobCount })}
         </p>
+        {state.hasDraft ? (
+          <p role={state.draftPreserved ? "status" : "alert"}>
+            {t(
+              state.draftPreserved
+                ? "exitGuard.draftSaved"
+                : "exitGuard.draftSaveFailed",
+            )}
+          </p>
+        ) : null}
         <div className="app-exit-actions">
           <button type="button" className="btn" autoFocus onClick={onReturn}>
             {t("exitGuard.return")}
@@ -454,7 +509,7 @@ function ExitGuardDialog({
             className="btn app-exit-confirm"
             onClick={onConfirmExit}
           >
-            {t(state.hasDraft ? "exitGuard.exitDiscard" : "exitGuard.exitAnyway")}
+            {t(state.hasDraft ? "exitGuard.exitKeep" : "exitGuard.exitAnyway")}
           </button>
         </div>
       </section>
@@ -1156,6 +1211,12 @@ function AppShellContent() {
   const desktopRuntime = isDesktopRuntime();
   const runtimeAccess = useDesktopRuntimeAccess();
   const auth = useAuth();
+  const updater = useAppUpdaterState();
+  const startupGate = useSyncExternalStore(
+    subscribeDesktopStartupGate,
+    getDesktopStartupGateSession,
+    getDesktopStartupGateSession,
+  );
   const { locale, t } = useI18n();
   const accountCopy = ACCOUNT_COPY[locale];
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
@@ -1174,9 +1235,14 @@ function AppShellContent() {
   const experimentWizardMode = location.pathname === "/jobs/new";
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
-  const launcherRuntimeChecking = runtimeAccess.isChecking || runtimeIsBusy;
+  const launcherRuntimeChecking =
+    runtimeAccess.isChecking ||
+    runtimeIsBusy ||
+    startupGate.status === "checking";
   const launcherRuntimeChecked =
-    runtimeAccess.status === "ready" && !runtimeAccess.isChecking;
+    runtimeAccess.status === "ready" &&
+    !runtimeAccess.isChecking &&
+    startupGate.status === "ready";
   const runtimeNavDescription = runtimeAccess.status === "checking"
     ? t("runtimeGate.navChecking")
     : runtimeAccess.status === "starting"
@@ -1188,6 +1254,76 @@ function AppShellContent() {
     && !auth.loading
     && !auth.account;
   const accountDialogOpen = accountOpen || accountRequired;
+
+  useEffect(() => {
+    if (!desktopRuntime) return;
+    if (
+      updater.status === "checking" ||
+      updater.status === "downloading" ||
+      updater.status === "installing"
+    ) {
+      setDesktopStartupGateState("checking", {
+        accountId: auth.account?.id ?? null,
+      });
+      return;
+    }
+    if (updater.status === "available") {
+      setDesktopStartupGateState("blocked", {
+        accountId: auth.account?.id ?? null,
+        error: `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
+      });
+      return;
+    }
+    if (
+      runtimeAccess.isChecking ||
+      runtimeAccess.status === "checking" ||
+      runtimeAccess.status === "starting"
+    ) {
+      setDesktopStartupGateState("checking", {
+        accountId: auth.account?.id ?? null,
+      });
+      return;
+    }
+    if (runtimeAccess.status !== "ready") {
+      setDesktopStartupGateState("blocked", {
+        accountId: auth.account?.id ?? null,
+        error: "The local runtime has not passed its startup checks.",
+      });
+      return;
+    }
+    if (!auth.configured) {
+      if (import.meta.env.DEV || import.meta.env.MODE === "test") {
+        approveDesktopStartupGateWithoutCloudAuth();
+      } else {
+        setDesktopStartupGateState("blocked", {
+          error: "Account authentication is not configured in this desktop build.",
+        });
+      }
+      return;
+    }
+    if (auth.loading) {
+      setDesktopStartupGateState("checking");
+      return;
+    }
+    if (!auth.account) {
+      setDesktopStartupGateState("accountRequired");
+      return;
+    }
+    void verifyDesktopStartupGate(
+      auth.account.id,
+      () => apiClient.verifyAuthenticatedSession(),
+    );
+  }, [
+    auth.account,
+    auth.configured,
+    auth.loading,
+    desktopRuntime,
+    runtimeAccess.isChecking,
+    runtimeAccess.lastFullCheckAt,
+    runtimeAccess.status,
+    updater.availableVersion,
+    updater.status,
+  ]);
 
   const closeSettings = useCallback(() => {
     setLauncherSettingsOpen(false);
@@ -1217,16 +1353,18 @@ function AppShellContent() {
     setExitPrompt(null);
   }, []);
 
-  const confirmExit = useCallback(() => {
+  const confirmExit = useCallback(async () => {
     const desktopWindow = desktopWindowRef.current;
-    if (!desktopWindow) return;
-    clearAllExperimentDrafts();
+    if (!desktopWindow || exitApprovedRef.current) return;
+    persistExperimentDraftsForExit();
     exitApprovedRef.current = true;
-    exitPromptRef.current = null;
-    setExitPrompt(null);
-    void desktopWindow.destroy().catch(() => {
+    const activeJobIds = exitPromptRef.current?.activeJobIds ?? [];
+    await stopKnownActiveJobsBeforeExit(activeJobIds);
+    try {
+      await desktopWindow.destroy();
+    } catch {
       exitApprovedRef.current = false;
-    });
+    }
   }, []);
 
   useEffect(() => {
@@ -1253,17 +1391,29 @@ function AppShellContent() {
 
       const path = currentPathRef.current;
       const hasDraft = path === "/jobs/new" || hasExperimentDraft();
+      const draftPreserved = hasDraft
+        ? persistExperimentDraftsForExit()
+        : true;
       let activeJobCount = 0;
+      let activeJobIds: string[] = [];
       let activeJobsUnknown = false;
       if (path !== "/desktop/setup") {
         try {
-          activeJobCount = await countActiveJobsBeforeExit();
+          const activeJobs = await findActiveJobsBeforeExit();
+          activeJobCount = activeJobs.count;
+          activeJobIds = activeJobs.jobIds;
         } catch {
           activeJobsUnknown = true;
         }
       }
 
-      const state = { hasDraft, activeJobCount, activeJobsUnknown };
+      const state = {
+        hasDraft,
+        draftPreserved,
+        activeJobCount,
+        activeJobIds,
+        activeJobsUnknown,
+      };
       const mustConfirm = hasDraft || activeJobCount > 0 || activeJobsUnknown;
       if (mustConfirm) {
         if (!cancelled) {
@@ -1271,7 +1421,6 @@ function AppShellContent() {
           setExitPrompt(state);
         }
       } else {
-        clearAllExperimentDrafts();
         exitApprovedRef.current = true;
         try {
           await desktopWindow.destroy();

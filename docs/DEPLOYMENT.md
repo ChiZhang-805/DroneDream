@@ -154,8 +154,15 @@ fleet.
   `OIDC_ISSUER`, `OIDC_AUDIENCE`, and the HTTPS `OIDC_JWKS_URL`. The API pins
   asymmetric algorithms, validates issuer/audience/expiry/subject, and keys
   user ownership by `(issuer, subject)` rather than mutable email. Demo tokens
-  remain an interim staging mechanism; production refuses anonymous
-  `AUTH_MODE=disabled`.
+  remain an interim staging mechanism; production and packaged desktop
+  runtimes refuse anonymous `AUTH_MODE=disabled`.
+- A formal desktop artifact must be built with the Supabase project URL and
+  publishable key. The startup gate verifies that account against
+  `GET /api/v1/session`; Runtime readiness alone is not enough to display 100%
+  or expose the tuning-platform entry.
+- Keep the packaged Runtime OIDC issuer, audience, JWKS URL, and asymmetric
+  algorithms synchronized with the public Supabase project. Never package a
+  service-role key, SMTP secret, signing key, or personal credential.
 - Terminate TLS at the load balancer or reverse proxy and restrict Postgres,
   Valkey, MinIO API, and the MinIO console to private networks.
 - Use managed secrets, unique high-entropy credentials, bucket encryption,

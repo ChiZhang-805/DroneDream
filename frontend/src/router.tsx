@@ -8,7 +8,7 @@ import type { RouteObject } from "react-router-dom";
 
 import { AppShell } from "./AppShell";
 import { isDesktopRuntime } from "./desktop/bridge";
-import { getDesktopReadinessSession } from "./desktop/readiness";
+import { getDesktopStartupGateSession } from "./desktop/startupGate";
 import { Dashboard } from "./pages/Dashboard";
 import { NewJobRoute } from "./pages/NewJobRoute";
 import { JobDetail } from "./pages/JobDetail";
@@ -22,7 +22,7 @@ import { ExperimentAssistant } from "./pages/ExperimentAssistant";
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
   const requireDesktopReadiness = (feature: "experiment" | "job") =>
     desktopRuntime
-      ? () => getDesktopReadinessSession()?.snapshot.ready
+      ? () => getDesktopStartupGateSession().status === "ready"
         ? null
         : redirect(`/dashboard?settings=runtime&required=${feature}`)
       : undefined;

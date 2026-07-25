@@ -476,6 +476,14 @@ def test_assistant_honors_explicit_base_url_allowlist_before_provider_call(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("APP_ENV", "desktop")
+    monkeypatch.setenv("AUTH_MODE", "oidc_jwt")
+    monkeypatch.setenv("OIDC_ISSUER", "https://identity.example.test/auth/v1")
+    monkeypatch.setenv("OIDC_AUDIENCE", "authenticated")
+    monkeypatch.setenv(
+        "OIDC_JWKS_URL",
+        "https://identity.example.test/auth/v1/.well-known/jwks.json",
+    )
+    monkeypatch.setenv("OIDC_ALGORITHMS", "ES256")
     monkeypatch.setenv("LLM_ALLOWED_BASE_URLS", "https://approved.example/v1")
     from app.config import get_settings
 
