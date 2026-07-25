@@ -240,6 +240,17 @@ still remains in acceptance/completion denominators, blocks complete evidence,
 and retains its incurred work; infrastructure exclusion never turns a failed
 run into a passing result.
 
+Outcome Contract compiler 2.0 adds
+`dronedream.portfolio-sources/v1` for same-batch proposal attribution. An exact
+parameter/fidelity action proposed by multiple child optimizers retains every
+unique child source and divides reward credit so shares sum to one. Same-tool
+duplicates cannot multiply credit. A lower-fidelity collision or a source
+superseded by a higher-fidelity action remains visible but becomes reward
+ineligible; emergency fallbacks remain ineligible. Portfolio statistics use
+fractional credit rather than awarding one full reward to every source. This
+does not yet replace the need for an append-only routing-opportunity/action
+ledger capable of preserving collisions against historical Candidates.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

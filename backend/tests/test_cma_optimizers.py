@@ -1174,6 +1174,145 @@ def test_portfolio_replaces_a_same_batch_low_fidelity_collision_with_full_fideli
     assert len(shared) == 1
     assert shared[0].metadata["child_strategy"] == "turbo"
     assert shared[0].metadata["requested_fidelity"] == pytest.approx(1.0)
+    sources = {
+        item["child_strategy"]: item
+        for item in shared[0].metadata["portfolio_sources"]
+    }
+    assert sources["multi_fidelity_mobo"]["materialized"] is False
+    assert (
+        sources["multi_fidelity_mobo"]["exclusion_reason"]
+        == "superseded_by_higher_fidelity"
+    )
+    assert sources["turbo"]["materialized"] is True
+    assert shared[0].metadata["portfolio_source_credits"] == [
+        {"child_strategy": "turbo", "share": 1.0}
+    ]
+
+
+def test_portfolio_exact_collision_preserves_equal_cross_tool_credit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    space = _space()
+    shared_parameters = space.from_unit_vector((0.4, 0.4, 0.5, 0.5))
+    monkeypatch.setattr(
+        portfolio_optimizer,
+        "portfolio_allocation",
+        lambda request: {"constrained_mobo": 1, "turbo": 1},
+    )
+
+    def delegate(
+        search_space: SearchSpace,
+        request: OptimizerRequest,
+        strategy: ExperimentalOptimizerStrategy,
+        count: int,
+    ) -> list[ExperimentalProposal]:
+        return [
+            ExperimentalProposal(
+                label=f"same-{strategy}",
+                parameters=shared_parameters,
+                rationale="deliberate exact action collision",
+                metadata={
+                    "strategy": strategy,
+                    "fidelity": 1.0,
+                    "requested_fidelity": 1.0,
+                    "backend": "test",
+                },
+            )
+        ]
+
+    monkeypatch.setattr(portfolio_optimizer, "_delegate", delegate)
+
+    proposals = propose_optimizer_portfolio(
+        space,
+        _request("optimizer_portfolio", generation=1, batch_size=2),
+    )
+    shared = next(
+        item for item in proposals if item.parameters == shared_parameters
+    )
+
+    assert len(proposals) == 2
+    assert {
+        item["child_strategy"]
+        for item in shared.metadata["portfolio_sources"]
+        if item["materialized"]
+    } == {"constrained_mobo", "turbo"}
+    assert shared.metadata["portfolio_source_credits"] == [
+        {"child_strategy": "constrained_mobo", "share": 0.5},
+        {"child_strategy": "turbo", "share": 0.5},
+    ]
+
+    observation = _observation_from_proposal(
+        space,
+        shared,
+        candidate_id="shared-credit",
+        generation=1,
+        loss=0.5,
+    )
+    statistics = {
+        item.strategy: item
+        for item in portfolio_statistics(
+            _request("optimizer_portfolio", (observation,), generation=2)
+        )
+    }
+    assert statistics["constrained_mobo"].full_fidelity_observations == 1
+    assert statistics["turbo"].full_fidelity_observations == 1
+    assert statistics["constrained_mobo"].reward_credit == pytest.approx(0.5)
+    assert statistics["turbo"].reward_credit == pytest.approx(0.5)
+
+
+def test_portfolio_same_child_fidelity_upgrade_keeps_one_materialized_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    space = _space()
+    shared_parameters = space.from_unit_vector((0.4, 0.4, 0.5, 0.5))
+    monkeypatch.setattr(
+        portfolio_optimizer,
+        "portfolio_allocation",
+        lambda request: {"multi_fidelity_mobo": 2},
+    )
+    monkeypatch.setattr(
+        portfolio_optimizer,
+        "_delegate",
+        lambda search_space, request, strategy, count: [
+            ExperimentalProposal(
+                label=f"same-child-{fidelity}",
+                parameters=shared_parameters,
+                rationale="same child fidelity upgrade",
+                metadata={
+                    "strategy": strategy,
+                    "fidelity": fidelity,
+                    "requested_fidelity": fidelity,
+                    "backend": "test",
+                },
+            )
+            for fidelity in (0.25, 1.0)
+        ],
+    )
+
+    proposals = propose_optimizer_portfolio(
+        space,
+        _request("optimizer_portfolio", generation=1, batch_size=2),
+    )
+    upgraded = next(
+        item for item in proposals if item.parameters == shared_parameters
+    )
+
+    assert upgraded.metadata["requested_fidelity"] == pytest.approx(1.0)
+    assert upgraded.metadata["portfolio_sources"] == [
+        {
+            "child_strategy": "multi_fidelity_mobo",
+            "generated_by": "multi_fidelity_mobo",
+            "planned_slot_role": "externally_planned",
+            "effective_fidelity": 1.0,
+            "requested_fidelity": 1.0,
+            "materialized": True,
+            "reward_eligible": True,
+            "exclusion_reason": None,
+        }
+    ]
+    assert upgraded.metadata["portfolio_source_credits"] == [
+        {"child_strategy": "multi_fidelity_mobo", "share": 1.0}
+    ]
 
 
 def test_serial_portfolio_exploits_four_generations_and_periodically_explores() -> None:

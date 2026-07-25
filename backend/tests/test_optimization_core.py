@@ -239,7 +239,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "1.9"
+    assert first.compiler_version == "2.0"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -269,6 +269,18 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert (
         first.selection_policy.candidate_outcome_evidence_policy
         == "content_addressed_search_projection"
+    )
+    assert (
+        first.selection_policy.portfolio_source_schema
+        == "dronedream.portfolio-sources/v1"
+    )
+    assert (
+        first.selection_policy.portfolio_exact_collision_policy
+        == "equal_credit_across_unique_child_strategies"
+    )
+    assert (
+        first.selection_policy.portfolio_material_change_policy
+        == "superseded_source_ineligible_for_reward"
     )
     assert (
         first.final_promotion_policy.projection_schema
