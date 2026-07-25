@@ -15,6 +15,10 @@ from types import SimpleNamespace
 import pytest
 
 from app import models, schemas
+from app.optimization.outcome_contract import build_selection_key
+from app.optimization.outcome_evidence import (
+    compile_candidate_outcome_evidence,
+)
 from app.orchestration import acceptance, aggregation, constants, job_manager
 from app.orchestration.optimizer import (
     generate_candidates,
@@ -1219,6 +1223,77 @@ def test_experimental_candidate_requires_an_explicit_feasibility_result() -> Non
 def test_rank_and_select_best_returns_none_when_nothing_scorable() -> None:
     c = _FakeCandidate(candidate_id="c", score=None, generation_index=1)
     assert aggregation._rank_and_select_best([c]) is None
+
+
+def test_acceptance_prefers_verified_candidate_outcome_evidence() -> None:
+    candidate = _FakeCandidate(
+        candidate_id="verified-acceptance",
+        score=0.1,
+        generation_index=1,
+    )
+    aggregate = {
+        "training_trial_count": 3,
+        "training_completed_trial_count": 3,
+        "training_failed_trial_count": 0,
+        "training_passing_trial_count": 3,
+        "objective_values": {"rmse": 0.1},
+        "constraint_values": {},
+        "constraint_violations": {},
+        "feasible": True,
+        "preference_loss": 0.1,
+        "soft_constraint_penalty": 0.0,
+        "scalar_loss": 0.1,
+        "selection_key": build_selection_key(
+            evidence_complete=True,
+            hard_feasible=True,
+            hard_constraint_violation=0.0,
+            training_failure_rate=0.0,
+            decision_loss=0.1,
+        ),
+        "acceptance_rmse": 0.1,
+        "acceptance_max_error": 0.2,
+        "acceptance_pass_rate": 1.0,
+        "acceptance_completion_rate": 1.0,
+    }
+    evidence = compile_candidate_outcome_evidence(
+        outcome_contract_id="sha256:" + "b" * 64,
+        candidate_id=candidate.id,
+        generation_index=candidate.generation_index,
+        parameter_snapshot={"MPC_XY_P": 0.95},
+        trial_evidence_rows=[{"trial_id": f"trial-{index}"} for index in range(3)],
+        aggregate=aggregate,
+    )
+    candidate.aggregated_metric_json = {
+        **aggregate,
+        "acceptance_rmse": 999.0,
+        "candidate_outcome_evidence": evidence.model_dump(mode="json"),
+    }
+
+    result = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=0.2,
+            target_max_error=0.3,
+            min_pass_rate=1.0,
+        ),
+    )
+
+    assert result.passed is True
+    assert result.rmse == pytest.approx(0.1)
+
+    candidate.aggregated_metric_json["candidate_outcome_evidence"][
+        "scalar_loss"
+    ] = -1.0
+    invalid = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=0.2,
+            target_max_error=0.3,
+            min_pass_rate=1.0,
+        ),
+    )
+    assert invalid.passed is False
+    assert invalid.reason == "invalid_outcome_evidence"
 
 
 @pytest.mark.parametrize("unsafe", (float("nan"), float("inf"), True))

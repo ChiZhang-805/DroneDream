@@ -11,6 +11,10 @@ import math
 from dataclasses import dataclass
 
 from app import models
+from app.optimization.outcome_evidence import (
+    authoritative_outcome_projection,
+    candidate_outcome_evidence_required,
+)
 
 
 @dataclass(frozen=True)
@@ -95,7 +99,9 @@ def evaluate_candidate(
     trial counts.
     """
 
-    agg = candidate.aggregated_metric_json or {}
+    raw_aggregate = candidate.aggregated_metric_json
+    evidence_required = candidate_outcome_evidence_required(raw_aggregate)
+    agg = authoritative_outcome_projection(raw_aggregate)
     trial_count = _safe_nonnegative_int(
         agg.get("training_trial_count", candidate.trial_count or 0)
     )
@@ -164,6 +170,15 @@ def evaluate_candidate(
     if not _criteria_are_valid(criteria):
         return AcceptanceResult(
             False, "invalid_criteria", pass_rate, completion_rate, rmse, max_error
+        )
+    if evidence_required and not agg:
+        return AcceptanceResult(
+            False,
+            "invalid_outcome_evidence",
+            pass_rate,
+            completion_rate,
+            rmse,
+            max_error,
         )
     if candidate.aggregated_metric_json is None or trial_count == 0:
         return AcceptanceResult(

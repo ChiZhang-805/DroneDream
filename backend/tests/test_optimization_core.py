@@ -15,6 +15,11 @@ from app.optimization.outcome_contract import (
     compile_outcome_contract,
     selection_order_key,
 )
+from app.optimization.outcome_evidence import (
+    authoritative_outcome_projection,
+    compile_candidate_outcome_evidence,
+    verify_candidate_outcome_evidence,
+)
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import aggregate_metric, evaluate_candidate
 from app.optimization.scenarios import holdout_matrix, scenario_matrix, training_matrix
@@ -214,7 +219,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "1.6"
+    assert first.compiler_version == "1.7"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -240,6 +245,10 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert (
         first.selection_policy.incomplete_objective_vector_policy
         == "scalar_loss_else_exploration"
+    )
+    assert (
+        first.selection_policy.candidate_outcome_evidence_policy
+        == "content_addressed_search_projection"
     )
     assert (
         first.final_promotion_policy.projection_schema
@@ -280,6 +289,100 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
             acceptance,
             failed_trial_weight=float("nan"),
         )
+
+
+def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> None:
+    aggregate = {
+        "training_trial_count": 2,
+        "training_completed_trial_count": 2,
+        "training_failed_trial_count": 0,
+        "training_passing_trial_count": 2,
+        "objective_values": {"rmse": 0.4},
+        "constraint_values": {"crash_flag:lte:0": 0.0},
+        "constraint_violations": {"crash_flag:lte:0": 0.0},
+        "feasible": True,
+        "preference_loss": 0.4,
+        "soft_constraint_penalty": 0.0,
+        "scalar_loss": 0.4,
+        "selection_key": build_selection_key(
+            evidence_complete=True,
+            hard_feasible=True,
+            hard_constraint_violation=0.0,
+            training_failure_rate=0.0,
+            decision_loss=0.4,
+        ),
+        "acceptance_rmse": 0.4,
+        "acceptance_max_error": 0.8,
+        "acceptance_pass_rate": 1.0,
+        "acceptance_completion_rate": 1.0,
+        "holdout": {
+            "validation_status": "passed",
+            "feasible": True,
+        },
+    }
+    evidence = compile_candidate_outcome_evidence(
+        outcome_contract_id="sha256:" + "a" * 64,
+        candidate_id="candidate-evidence",
+        generation_index=2,
+        parameter_snapshot={"MPC_XY_P": 0.95},
+        trial_evidence_rows=[
+            {"trial_id": "trial-1", "seed": 101, "rmse": 0.3},
+            {"trial_id": "trial-2", "seed": 102, "rmse": 0.5},
+        ],
+        aggregate=aggregate,
+    )
+
+    assert verify_candidate_outcome_evidence(
+        evidence.model_dump(mode="json")
+    ) == evidence
+    wrapped = {
+        **aggregate,
+        "candidate_outcome_evidence": evidence.model_dump(mode="json"),
+    }
+    wrapped["scalar_loss"] = -1_000_000.0
+    projection = authoritative_outcome_projection(wrapped)
+    assert projection["scalar_loss"] == pytest.approx(0.4)
+    assert projection["holdout"]["validation_status"] == "passed"
+    assert selection_order_key(wrapped, -1_000_000.0)[-1] == pytest.approx(0.4)
+
+    holdout_tampered = {
+        **wrapped,
+        "holdout": {
+            "validation_status": "failed",
+            "feasible": False,
+        },
+    }
+    assert authoritative_outcome_projection(holdout_tampered) == {}
+
+    missing_evidence_payload = {
+        **aggregate,
+        "candidate_outcome_evidence": None,
+    }
+    assert authoritative_outcome_projection(missing_evidence_payload) == {}
+    required_but_missing = {
+        **aggregate,
+        "candidate_outcome_evidence_required": True,
+    }
+    assert authoritative_outcome_projection(required_but_missing) == {}
+    assert selection_order_key(required_but_missing, -1_000_000.0)[-1] == float(
+        "inf"
+    )
+
+    tampered_evidence = evidence.model_dump(mode="json")
+    tampered_evidence["scalar_loss"] = -1_000_000.0
+    tampered = {
+        **aggregate,
+        "candidate_outcome_evidence": tampered_evidence,
+    }
+    assert verify_candidate_outcome_evidence(tampered_evidence) is None
+    assert authoritative_outcome_projection(tampered) == {}
+    assert selection_order_key(tampered, -1_000_000.0) == (
+        1,
+        1,
+        float("inf"),
+        float("inf"),
+        float("inf"),
+    )
 
 
 def test_outcome_contract_rejects_unregistered_adapter_raw_metrics() -> None:

@@ -43,6 +43,11 @@ from app.optimization.outcome_contract import (
     build_selection_key,
     selection_order_key,
 )
+from app.optimization.outcome_evidence import (
+    authoritative_outcome_projection,
+    candidate_outcome_evidence_required,
+    compile_candidate_outcome_evidence,
+)
 from app.optimization.robust import (
     CandidateEvaluation,
     aggregate_metric,
@@ -173,6 +178,10 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     aggregate = candidate.aggregated_metric_json
     if not isinstance(aggregate, dict):
         return False
+    authoritative_aggregate = authoritative_outcome_projection(aggregate)
+    if candidate_outcome_evidence_required(aggregate) and not authoritative_aggregate:
+        return False
+    aggregate = authoritative_aggregate
     aggregate_feasible = aggregate.get("feasible")
     if _uses_experimental_optimizer(candidate) and aggregate_feasible is not True:
         return False
@@ -305,6 +314,35 @@ def _trial_has_usable_metric(trial: models.Trial) -> bool:
     return getattr(trial, "status", None) == "COMPLETED" and _metric_is_usable(
         getattr(trial, "metric", None)
     )
+
+
+def _trial_outcome_evidence_row(trial: models.Trial) -> dict[str, Any]:
+    metric = trial.metric
+    metric_payload = (
+        {
+            "rmse": metric.rmse,
+            "max_error": metric.max_error,
+            "overshoot_count": metric.overshoot_count,
+            "completion_time": metric.completion_time,
+            "crash_flag": metric.crash_flag,
+            "timeout_flag": metric.timeout_flag,
+            "score": metric.score,
+            "final_error": metric.final_error,
+            "pass_flag": metric.pass_flag,
+            "instability_flag": metric.instability_flag,
+        }
+        if metric is not None
+        else None
+    )
+    return {
+        "trial_id": trial.id,
+        "status": trial.status,
+        "seed": trial.seed,
+        "scenario_type": trial.scenario_type,
+        "scenario_config": trial.scenario_config_json or {},
+        "failure_code": trial.failure_code,
+        "metric": metric_payload,
+    }
 
 
 def _trial_passed_with_usable_metric(trial: models.Trial) -> bool:
@@ -983,6 +1021,28 @@ def _aggregate_candidate(
                         }
                     )
             agg["holdout"] = holdout_payload
+        if outcome_contract is not None:
+            ordered_training_trials = sorted(
+                training_trials,
+                key=lambda trial: (
+                    trial.scenario_type,
+                    trial.seed,
+                    trial.id,
+                ),
+            )
+            evidence = compile_candidate_outcome_evidence(
+                outcome_contract_id=outcome_contract.contract_id,
+                candidate_id=candidate.id,
+                generation_index=candidate.generation_index,
+                parameter_snapshot=candidate.parameter_json,
+                trial_evidence_rows=[
+                    _trial_outcome_evidence_row(trial)
+                    for trial in ordered_training_trials
+                ],
+                aggregate=agg,
+            )
+            agg["candidate_outcome_evidence_required"] = True
+            agg["candidate_outcome_evidence"] = evidence.model_dump(mode="json")
     candidate.aggregated_metric_json = agg
     candidate.aggregated_score = aggregated_score
     return agg

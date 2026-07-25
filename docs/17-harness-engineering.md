@@ -211,6 +211,16 @@ declared scalar loss (or exploration when no scalar evidence exists) rather
 than silently optimizing a reduced problem. Proposal metadata records the
 preference policy, weights, and scales used.
 
+Outcome Contract compiler 1.7 adds a migration-safe
+`CandidateOutcomeEvidenceV1` compatibility projection. New aggregates bind
+the search-role objectives, constraints, selection key, acceptance fields,
+candidate parameters, holdout projection, and exact Trial evidence snapshot
+to a canonical SHA-256 identifier. Ranking, acceptance, publishability, and
+optimizer learning read the verified projection when present and fail closed
+on schema, hash, or bound-holdout mismatch. The payload is still embedded in
+the legacy aggregate JSON; an append-only relational evidence ledger remains
+a later database migration rather than a capability claimed by this slice.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

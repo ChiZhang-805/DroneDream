@@ -116,6 +116,9 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
 ) -> None:
     ctx = experimental_ctx
     job_id = _create_job(ctx, strategy)
+    from app.optimization.outcome_evidence import (
+        verify_candidate_outcome_evidence,
+    )
 
     assert _drive_to_terminal(ctx, job_id) == "COMPLETED"
 
@@ -189,6 +192,14 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
             if "objective_values" in aggregate:
                 assert history_by_id[candidate.id].objective_values == aggregate[
                     "objective_values"
+                ]
+                evidence = verify_candidate_outcome_evidence(
+                    aggregate.get("candidate_outcome_evidence")
+                )
+                assert evidence is not None
+                assert evidence.candidate_id == candidate.id
+                assert evidence.outcome_contract_id == aggregate[
+                    "outcome_contract_id"
                 ]
 
         if strategy == "multi_fidelity_mobo":

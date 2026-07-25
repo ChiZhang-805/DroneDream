@@ -11,9 +11,13 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from app import schemas
+from app.optimization.outcome_evidence import (
+    authoritative_outcome_projection,
+    candidate_outcome_evidence_required,
+)
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "1.6"
+OUTCOME_CONTRACT_COMPILER_VERSION = "1.7"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
@@ -163,6 +167,9 @@ class OutcomeSelectionPolicy(_FrozenModel):
     incomplete_objective_vector_policy: Literal[
         "scalar_loss_else_exploration"
     ] = "scalar_loss_else_exploration"
+    candidate_outcome_evidence_policy: Literal[
+        "content_addressed_search_projection"
+    ] = "content_addressed_search_projection"
     precedence: tuple[str, ...] = (
         "evidence_complete",
         "hard_feasible",
@@ -198,7 +205,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["1.6"] = "1.6"
+    compiler_version: Literal["1.7"] = "1.7"
     contract_id: str
     metric_admission_policy: Literal["registered_metrics_only"] = (
         "registered_metrics_only"
@@ -578,6 +585,10 @@ def selection_order_key(
 ) -> tuple[int, int, float, float, float]:
     """Return the shared lexicographic order used by numerical and public paths."""
 
+    evidence_required = candidate_outcome_evidence_required(aggregate)
+    aggregate = authoritative_outcome_projection(aggregate)
+    if evidence_required and not aggregate:
+        return (1, 1, float("inf"), float("inf"), float("inf"))
     fallback = (
         float(aggregated_score)
         if isinstance(aggregated_score, int | float)

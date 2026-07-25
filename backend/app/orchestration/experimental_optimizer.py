@@ -21,6 +21,10 @@ from app.optimization.experimental_types import (
 from app.optimization.outcome_contract import (
     OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
 )
+from app.optimization.outcome_evidence import (
+    authoritative_outcome_projection,
+    candidate_outcome_evidence_required,
+)
 from app.orchestration import constants
 from app.orchestration.optimizer import CandidateProposal
 from app.orchestration.parameter_constraints import validator_for_job
@@ -92,11 +96,14 @@ def _objective_directions(job: models.Job) -> dict[str, str]:
 
 
 def _candidate_failure_rate(candidate: models.CandidateParameterSet) -> float:
-    aggregate = (
+    evidence_required = candidate_outcome_evidence_required(
         candidate.aggregated_metric_json
-        if isinstance(candidate.aggregated_metric_json, dict)
-        else {}
     )
+    aggregate = authoritative_outcome_projection(
+        candidate.aggregated_metric_json
+    )
+    if evidence_required and not aggregate:
+        return 1.0
     raw = aggregate.get("training_failure_rate", aggregate.get("failure_rate"))
     if (
         not isinstance(raw, bool)
@@ -190,11 +197,9 @@ def observations_for_job(
             # Historical rows from an older catalog must remain visible to the
             # user, but an invalid point cannot train the current search space.
             continue
-        aggregate = (
-            candidate.aggregated_metric_json
-            if isinstance(candidate.aggregated_metric_json, dict)
-            else {}
-        )
+        raw_aggregate = candidate.aggregated_metric_json
+        evidence_required = candidate_outcome_evidence_required(raw_aggregate)
+        aggregate = authoritative_outcome_projection(raw_aggregate)
         raw_objectives = aggregate.get("objective_values", {})
         objectives = {
             str(name): float(value)
@@ -229,7 +234,7 @@ def observations_for_job(
             if isinstance(raw_scalar_loss, int | float)
             and not isinstance(raw_scalar_loss, bool)
             and math.isfinite(float(raw_scalar_loss))
-            else candidate.aggregated_score
+            else None if evidence_required else candidate.aggregated_score
         )
         if (
             isinstance(loss, bool)
