@@ -43,8 +43,13 @@ from app.optimization.outcome_contract import (
     build_selection_key,
     selection_order_key,
 )
-from app.optimization.robust import CandidateEvaluation
-from app.optimization.robust import evaluate_candidate as evaluate_objectives
+from app.optimization.robust import (
+    CandidateEvaluation,
+    aggregate_metric,
+)
+from app.optimization.robust import (
+    evaluate_candidate as evaluate_objectives,
+)
 from app.optimization.scenarios import scenario_matrix
 from app.orchestration import constants, report_generator
 from app.orchestration.acceptance import (
@@ -572,6 +577,12 @@ def _aggregate_candidate(
         "scenario_case_rates": overall_rates["scenario_cases"],
     }
     if objective_config is not None:
+        within_case_mode = objective_config.robust_aggregation
+        across_case_mode = "worst" if within_case_mode == "worst" else "mean"
+        objective_estimator = (
+            f"within_case_{within_case_mode}_then_fixed_suite_"
+            f"{across_case_mode}_v1"
+        )
 
         def _evaluate_rows(
             rows: list[models.Trial],
@@ -580,11 +591,17 @@ def _aggregate_candidate(
             if not completed_rows:
                 return None
             rate_summary = _rate_summary(rows)
-            samples: list[dict[str, float]] = []
-            sample_weights: list[float] = []
-            resolved_cases = [_resolved_case(trial) for trial in completed_rows]
-            dispatched_per_case = Counter(_resolved_case(trial)[0] for trial in rows)
-            for trial, (group_key, case) in zip(completed_rows, resolved_cases, strict=True):
+            grouped: dict[
+                str,
+                tuple[schemas.ScenarioCaseConfig | None, list[models.Trial]],
+            ] = {}
+            for trial in rows:
+                group_key, case = _resolved_case(trial)
+                if group_key not in grouped:
+                    grouped[group_key] = (case, [])
+                grouped[group_key][1].append(trial)
+
+            def _metric_sample(trial: models.Trial) -> dict[str, float]:
                 metric = trial.metric
                 if metric is None:
                     raise RuntimeError(
@@ -596,14 +613,19 @@ def _aggregate_candidate(
                         metric.max_error,
                         field_name="max_error",
                     ),
-                    "overshoot_count": float(_required_overshoot_count(metric.overshoot_count)),
+                    "overshoot_count": float(
+                        _required_overshoot_count(metric.overshoot_count)
+                    ),
                     "completion_time": _required_metric_number(
                         metric.completion_time,
                         field_name="completion_time",
                     ),
                     "crash_flag": float(metric.crash_flag),
                     "timeout_flag": float(metric.timeout_flag),
-                    "score": _required_metric_number(metric.score, field_name="score"),
+                    "score": _required_metric_number(
+                        metric.score,
+                        field_name="score",
+                    ),
                     "final_error": _required_metric_number(
                         metric.final_error,
                         field_name="final_error",
@@ -621,24 +643,62 @@ def _aggregate_candidate(
                 for key, raw_value in raw_metrics.items():
                     if (
                         key not in sample
-                        and isinstance(raw_value, (bool, int, float))
+                        and isinstance(raw_value, bool | int | float)
                         and math.isfinite(float(raw_value))
                     ):
                         sample[key] = float(raw_value)
-                samples.append(sample)
-                # A case weight is shared by every dispatched seed, including
-                # seeds that failed before producing metrics. This prevents a
-                # lone surviving seed from inheriting an incomplete case's
-                # entire configured weight.
-                sample_weights.append(
-                    (float(case.weight) if case is not None else 1.0)
-                    / dispatched_per_case[group_key]
+                return sample
+
+            case_samples: list[dict[str, float]] = []
+            case_weights: list[float] = []
+            constraint_samples: list[dict[str, float]] = []
+            for group_key, (case, case_rows) in grouped.items():
+                usable_rows = [
+                    trial for trial in case_rows if _trial_has_usable_metric(trial)
+                ]
+                if not usable_rows:
+                    raise ValueError(
+                        "scenario case "
+                        f"{group_key.split(':', 1)[-1]} has no usable metric samples"
+                    )
+                seed_samples = [_metric_sample(trial) for trial in usable_rows]
+                common_metrics = set(seed_samples[0]).intersection(
+                    *(set(sample) for sample in seed_samples[1:])
                 )
+                case_sample = {
+                    metric_name: sum(
+                        sample[metric_name] for sample in seed_samples
+                    )
+                    / len(seed_samples)
+                    for metric_name in sorted(common_metrics)
+                }
+                for objective in objective_config.objectives:
+                    if objective.metric not in common_metrics:
+                        raise ValueError(
+                            f"missing objective metric: {objective.metric}"
+                        )
+                    case_sample[objective.metric] = aggregate_metric(
+                        [
+                            sample[objective.metric]
+                            for sample in seed_samples
+                        ],
+                        direction=objective.direction,
+                        mode=within_case_mode,
+                        cvar_alpha=objective_config.cvar_alpha,
+                        percentile=objective_config.percentile,
+                    )
+                case_samples.append(case_sample)
+                case_weights.append(
+                    float(case.weight) if case is not None else 1.0
+                )
+                constraint_samples.extend(seed_samples)
             return (
                 evaluate_objectives(
-                    samples,
+                    case_samples,
                     objective_config,
-                    sample_weights=sample_weights,
+                    sample_weights=case_weights,
+                    constraint_samples=constraint_samples,
+                    objective_aggregation_mode=across_case_mode,
                 ),
                 rate_summary,
             )
@@ -743,6 +803,8 @@ def _aggregate_candidate(
                 "total_constraint_violation": evaluation.total_violation,
                 "hard_constraint_violation": (evaluation.hard_constraint_violation),
                 "robust_aggregation": objective_config.robust_aggregation,
+                "objective_estimator": objective_estimator,
+                "constraint_estimator": "worst_usable_seed_v1",
                 "preference_loss": evaluation.preference_loss,
                 "soft_constraint_penalty": evaluation.soft_constraint_penalty,
                 "scalar_loss": evaluation.scalar_loss,
@@ -818,6 +880,8 @@ def _aggregate_candidate(
                             "hard_constraint_violation": (
                                 holdout_evaluation.hard_constraint_violation
                             ),
+                            "objective_estimator": objective_estimator,
+                            "constraint_estimator": "worst_usable_seed_v1",
                             "preference_loss": holdout_evaluation.preference_loss,
                             "soft_constraint_penalty": (holdout_evaluation.soft_constraint_penalty),
                             "scalar_loss": holdout_evaluation.scalar_loss,

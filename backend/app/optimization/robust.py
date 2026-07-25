@@ -152,6 +152,7 @@ def _objective_value(
     objective: ObjectiveSpec,
     config: ObjectiveConfig,
     weights: Sequence[float] | None,
+    mode: str,
 ) -> float:
     try:
         values = [sample[objective.metric] for sample in samples]
@@ -160,7 +161,7 @@ def _objective_value(
     return aggregate_metric(
         values,
         direction=objective.direction,
-        mode=config.robust_aggregation,
+        mode=mode,
         weights=weights,
         cvar_alpha=config.cvar_alpha,
         percentile=config.percentile,
@@ -172,17 +173,31 @@ def evaluate_candidate(
     config: ObjectiveConfig,
     *,
     sample_weights: Sequence[float] | None = None,
+    constraint_samples: Sequence[Mapping[str, float]] | None = None,
+    objective_aggregation_mode: str | None = None,
 ) -> CandidateEvaluation:
     """Evaluate a candidate consistently across objectives and scenarios."""
 
     if not samples:
         raise ValueError("candidate evaluation requires at least one metric sample")
     _validated_weights(len(samples), sample_weights)
+    effective_constraint_samples = (
+        samples if constraint_samples is None else constraint_samples
+    )
+    if not effective_constraint_samples:
+        raise ValueError("constraint evaluation requires at least one metric sample")
     objectives: dict[str, float] = {}
     preference_loss = 0.0
     total_objective_weight = sum(objective.weight for objective in config.objectives)
+    aggregation_mode = objective_aggregation_mode or config.robust_aggregation
     for objective in config.objectives:
-        value = _objective_value(samples, objective, config, sample_weights)
+        value = _objective_value(
+            samples,
+            objective,
+            config,
+            sample_weights,
+            aggregation_mode,
+        )
         objectives[objective.metric] = value
         if objective.target is None:
             oriented = value if objective.direction == "minimize" else -value
@@ -205,7 +220,10 @@ def evaluate_candidate(
     soft_constraint_penalty = 0.0
     for constraint in config.constraints:
         try:
-            values = [sample[constraint.metric] for sample in samples]
+            values = [
+                sample[constraint.metric]
+                for sample in effective_constraint_samples
+            ]
         except KeyError as exc:
             raise ValueError(f"missing constraint metric: {constraint.metric}") from exc
         observed = _constraint_observed(values, constraint)

@@ -173,6 +173,15 @@ loss; it never blends both. TuRBO and CMA-family scalar-state optimizers use
 scalar loss only. Proposal metadata records the selected representation so the
 decision can be replayed and audited.
 
+Outcome Contract compiler 1.2 makes the scenario estimand hierarchical. Usable
+replicates first pass through the declared within-case estimator (mean, worst,
+CVaR, or percentile); the resulting case value then receives the case's full
+frozen weight in the declared across-suite estimator. A failed replicate
+therefore affects the separately modeled failure rate without silently
+shrinking that scenario's objective weight. A dispatched case with no usable
+metric produces no scalar objective, while constraints continue to inspect the
+worst usable seed rather than a potentially safer case aggregate.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

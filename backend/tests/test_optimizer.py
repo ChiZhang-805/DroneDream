@@ -629,9 +629,15 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
     assert result["training_failure_rate"] == pytest.approx(0.0625)
     assert result["training_completed_trial_count"] == 4
     assert result["training_failed_trial_count"] == 1
-    # Completed samples retain only their dispatched-seed share of a case's
-    # weight: case-a contributes 3/4 * 1 and case-b contributes 1 * 3.
-    assert result["objective_values"]["rmse"] == pytest.approx(3.2)
+    # Replicates are reduced within each case before the fixed case weights
+    # are applied. The failed seed affects reliability, but cannot silently
+    # shrink case-a's objective-distribution weight.
+    assert result["objective_values"]["rmse"] == pytest.approx(3.0)
+    assert (
+        result["objective_estimator"]
+        == "within_case_mean_then_fixed_suite_mean_v1"
+    )
+    assert result["constraint_estimator"] == "worst_usable_seed_v1"
     assert result["training_scenario_case_rates"] == [
         {
             "scenario_case_id": "case-a",
@@ -660,7 +666,7 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
     ]
     # Failed-seed penalty uses the weighted case failure rate, not raw 1/5.
     assert result["aggregated_score"] == pytest.approx(
-        3.2 + constants.SCORE_WEIGHTS["failed_trial"] * 0.0625
+        3.0 + constants.SCORE_WEIGHTS["failed_trial"] * 0.0625
     )
     acceptance_result = acceptance.evaluate_candidate(
         candidate,
@@ -672,6 +678,205 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
     assert acceptance_result.reason == "pass_rate_too_low"
     assert acceptance_result.pass_rate == pytest.approx(0.1875)
     assert acceptance_result.completion_rate == pytest.approx(0.9375)
+
+
+def test_case_mean_objectives_keep_seed_level_constraint_extremes() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_nested_estimator",
+        job_id="job_nested_estimator",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trials = [
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="case_a_seed_1",
+            case_id="case-a",
+            seed=1,
+            rmse=0.0,
+        ),
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="case_a_seed_2",
+            case_id="case-a",
+            seed=2,
+            rmse=10.0,
+        ),
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="case_b_seed_1",
+            case_id="case-b",
+            seed=3,
+            rmse=0.0,
+            scenario_type="wind_perturbed",
+        ),
+    ]
+
+    result = aggregation._aggregate_candidate(
+        candidate,
+        trials,
+        objective_config=schemas.ObjectiveConfig(
+            objectives=[schemas.ObjectiveSpec(metric="rmse")],
+            constraints=[
+                schemas.ConstraintSpec(
+                    metric="rmse",
+                    operator="lte",
+                    threshold=6.0,
+                    hard=True,
+                )
+            ],
+            robust_aggregation="mean",
+        ),
+        scenario_suite=schemas.ScenarioSuiteConfig(
+            cases=[
+                schemas.ScenarioCaseConfig(
+                    id="case-a",
+                    scenario_type="nominal",
+                    seeds=[1, 2],
+                    weight=1,
+                ),
+                schemas.ScenarioCaseConfig(
+                    id="case-b",
+                    scenario_type="wind_perturbed",
+                    seeds=[3],
+                    weight=1,
+                ),
+            ]
+        ),
+    )
+
+    assert result is not None
+    # case-a mean = 5 and case-b mean = 0, then equal case weights => 2.5.
+    assert result["objective_values"]["rmse"] == pytest.approx(2.5)
+    # Safety constraints retain the worst physical seed rather than seeing
+    # only the safer case mean.
+    assert result["constraint_values"]["rmse:lte:6"] == pytest.approx(10.0)
+    assert result["feasible"] is False
+
+
+def test_cvar_is_estimated_within_case_before_fixed_suite_weights() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_nested_cvar",
+        job_id="job_nested_cvar",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trials = [
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id=f"case_a_{seed}",
+            case_id="case-a",
+            seed=seed,
+            rmse=rmse,
+        )
+        for seed, rmse in ((1, 0.0), (2, 10.0))
+    ]
+    trials.extend(
+        [
+            _aggregation_trial(
+                candidate=candidate,
+                trial_id=f"case_b_{seed}",
+                case_id="case-b",
+                seed=seed,
+                rmse=rmse,
+                scenario_type="wind_perturbed",
+            )
+            for seed, rmse in ((3, 0.0), (4, 4.0))
+        ]
+    )
+
+    result = aggregation._aggregate_candidate(
+        candidate,
+        trials,
+        objective_config=schemas.ObjectiveConfig(
+            objectives=[schemas.ObjectiveSpec(metric="rmse")],
+            robust_aggregation="cvar",
+            cvar_alpha=0.25,
+        ),
+        scenario_suite=schemas.ScenarioSuiteConfig(
+            cases=[
+                schemas.ScenarioCaseConfig(
+                    id="case-a",
+                    scenario_type="nominal",
+                    seeds=[1, 2],
+                    weight=1,
+                ),
+                schemas.ScenarioCaseConfig(
+                    id="case-b",
+                    scenario_type="wind_perturbed",
+                    seeds=[3, 4],
+                    weight=1,
+                ),
+            ]
+        ),
+    )
+
+    assert result is not None
+    # The upper-tail value is 10 for case-a and 4 for case-b; fixed equal
+    # case weights then produce 7. A flat CVaR over all seeds would return 10.
+    assert result["objective_values"]["rmse"] == pytest.approx(7.0)
+    assert (
+        result["objective_estimator"]
+        == "within_case_cvar_then_fixed_suite_mean_v1"
+    )
+
+
+def test_dispatched_case_without_any_usable_metric_has_no_scalar_objective() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_missing_case",
+        job_id="job_missing_case",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trials = [
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="case_a_failed",
+            case_id="case-a",
+            seed=1,
+            status="FAILED",
+        ),
+        _aggregation_trial(
+            candidate=candidate,
+            trial_id="case_b_completed",
+            case_id="case-b",
+            seed=2,
+            rmse=1.0,
+            scenario_type="wind_perturbed",
+        ),
+    ]
+
+    result = aggregation._aggregate_candidate(
+        candidate,
+        trials,
+        objective_config=schemas.ObjectiveConfig(
+            objectives=[schemas.ObjectiveSpec(metric="rmse")],
+        ),
+        scenario_suite=schemas.ScenarioSuiteConfig(
+            cases=[
+                schemas.ScenarioCaseConfig(
+                    id="case-a",
+                    scenario_type="nominal",
+                    seeds=[1],
+                ),
+                schemas.ScenarioCaseConfig(
+                    id="case-b",
+                    scenario_type="wind_perturbed",
+                    seeds=[2],
+                ),
+            ]
+        ),
+    )
+
+    assert result is not None
+    assert result["objective_evaluation_error"] == (
+        "scenario case case-a has no usable metric samples"
+    )
+    assert candidate.aggregated_score is None
+    assert "objective_values" not in result
 
 
 def test_acceptance_uses_worst_trial_max_error_and_keeps_legacy_mean() -> None:

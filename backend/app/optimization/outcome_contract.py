@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from app import schemas
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "1.1"
+OUTCOME_CONTRACT_COMPILER_VERSION = "1.2"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
@@ -74,10 +74,12 @@ class OutcomeObjective(_FrozenModel):
     weight_decimal: str
     normalization_decimal: str
     target_decimal: str | None
-    estimator_scope: Literal["flat_completed_seed_rows"]
+    estimator_scope: Literal["within_case_estimator_then_fixed_suite"]
     robust_estimator: str
+    within_case_estimator: str
+    across_case_estimator: Literal["mean", "worst"]
     sample_weight_policy: Literal[
-        "case_weight_divided_by_dispatched_seed_count"
+        "full_case_weight_after_within_case_estimator"
     ]
     missing_policy: str
 
@@ -105,11 +107,15 @@ class OutcomeScenarioCase(_FrozenModel):
 class OutcomeScenarioPopulation(_FrozenModel):
     case_semantics: Literal["fixed_suite"] = "fixed_suite"
     case_weight_semantics: Literal["decision_priority"] = "decision_priority"
-    replicate_semantics: Literal["fixed_seed_rows_within_case"] = "fixed_seed_rows_within_case"
+    replicate_semantics: Literal[
+        "declared_within_case_estimator_with_failure_rate_separate"
+    ] = (
+        "declared_within_case_estimator_with_failure_rate_separate"
+    )
     common_random_numbers: bool
     cases: tuple[OutcomeScenarioCase, ...]
-    missing_metric_policy: Literal["drop_and_renormalize_observed_weight"] = (
-        "drop_and_renormalize_observed_weight"
+    missing_metric_policy: Literal["fail_dispatched_case_without_usable_metric"] = (
+        "fail_dispatched_case_without_usable_metric"
     )
 
 
@@ -156,7 +162,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["1.1"] = "1.1"
+    compiler_version: Literal["1.2"] = "1.2"
     contract_id: str
     metric_registry_sha256: str
     objective_config_sha256: str
@@ -234,12 +240,18 @@ def compile_outcome_contract(
             weight_decimal=_decimal(item.weight),
             normalization_decimal=_decimal(item.normalization),
             target_decimal=(_decimal(item.target) if item.target is not None else None),
-            estimator_scope="flat_completed_seed_rows",
+            estimator_scope="within_case_estimator_then_fixed_suite",
             robust_estimator=objective_config.robust_aggregation,
-            sample_weight_policy=(
-                "case_weight_divided_by_dispatched_seed_count"
+            within_case_estimator=objective_config.robust_aggregation,
+            across_case_estimator=(
+                "worst"
+                if objective_config.robust_aggregation == "worst"
+                else "mean"
             ),
-            missing_policy="drop_and_renormalize_observed_weight",
+            sample_weight_policy=(
+                "full_case_weight_after_within_case_estimator"
+            ),
+            missing_policy="fail_dispatched_case_without_usable_metric",
         )
         for index, item in enumerate(objective_config.objectives)
     )
@@ -253,7 +265,7 @@ def compile_outcome_contract(
             threshold_decimal=_decimal(item.threshold),
             hard=item.hard,
             penalty_decimal=_decimal(item.penalty),
-            observation_policy="worst_completed_sample",
+            observation_policy="worst_usable_seed_sample",
             violation_scale_policy="max_one_or_absolute_threshold",
         )
         for item in objective_config.constraints

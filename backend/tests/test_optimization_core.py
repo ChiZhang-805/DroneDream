@@ -185,12 +185,25 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert len(first.contract_id) == 71
     assert first.objectives[0].metric.registry_id == "dronedream.metric.rmse.v1"
     assert first.objectives[0].weight_decimal == "2"
-    assert first.objectives[0].estimator_scope == "flat_completed_seed_rows"
+    assert (
+        first.objectives[0].estimator_scope
+        == "within_case_estimator_then_fixed_suite"
+    )
+    assert first.objectives[0].within_case_estimator == "cvar"
+    assert first.objectives[0].across_case_estimator == "mean"
     assert first.objectives[0].sample_weight_policy == (
-        "case_weight_divided_by_dispatched_seed_count"
+        "full_case_weight_after_within_case_estimator"
     )
     assert first.scenario_population.cases[1].holdout is True
     assert first.scenario_population.cases[1].config_sha256
+    assert (
+        first.scenario_population.replicate_semantics
+        == "declared_within_case_estimator_with_failure_rate_separate"
+    )
+    assert (
+        first.scenario_population.missing_metric_policy
+        == "fail_dispatched_case_without_usable_metric"
+    )
     assert first.domain_failure_policy.hard_constraint_penalty_in_scalar_loss is False
     assert (
         first.domain_failure_policy.optimizer_learning_failure_rate_limit_decimal
@@ -201,7 +214,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "1.1"
+    assert first.compiler_version == "1.2"
     assert (
         first.selection_policy.optimizer_objective_representation_policy
         == "one_representation_per_tool_call"
