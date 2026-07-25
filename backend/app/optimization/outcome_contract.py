@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from app import schemas
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "1.3"
+OUTCOME_CONTRACT_COMPILER_VERSION = "1.4"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
@@ -172,8 +172,11 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["1.3"] = "1.3"
+    compiler_version: Literal["1.4"] = "1.4"
     contract_id: str
+    metric_admission_policy: Literal["registered_metrics_only"] = (
+        "registered_metrics_only"
+    )
     metric_registry_sha256: str
     objective_config_sha256: str
     scenario_suite_sha256: str
@@ -211,12 +214,10 @@ def _decimal(value: float | int) -> str:
 def _metric_reference(metric: str) -> OutcomeMetricReference:
     registered = _CANONICAL_METRICS.get(metric)
     if registered is None:
-        return OutcomeMetricReference(
-            metric=metric,
-            registry_id=f"adapter.raw.{metric}.v1",
-            source="adapter_raw_metric",
-            unit="adapter_defined",
-            value_kind="adapter_defined",
+        allowed = ", ".join(sorted(_CANONICAL_METRICS))
+        raise ValueError(
+            f"unregistered optimization metric: {metric}; "
+            f"registered metrics are: {allowed}"
         )
     source, unit, value_kind = registered
     return OutcomeMetricReference(
@@ -241,6 +242,14 @@ def compile_outcome_contract(
 
     if not math.isfinite(failed_trial_weight) or failed_trial_weight < 0:
         raise ValueError("failed_trial_weight must be finite and non-negative")
+
+    # Resolve every metric before constructing any contract payload. Numeric
+    # values in adapter ``raw_metric_json`` are report evidence only until a
+    # reviewed registry entry binds their unit, type, source, and semantics.
+    for objective in objective_config.objectives:
+        _metric_reference(objective.metric)
+    for constraint in objective_config.constraints:
+        _metric_reference(constraint.metric)
 
     objectives = tuple(
         OutcomeObjective(
@@ -302,6 +311,7 @@ def compile_outcome_contract(
     payload = {
         "schema_id": OUTCOME_CONTRACT_SCHEMA,
         "compiler_version": OUTCOME_CONTRACT_COMPILER_VERSION,
+        "metric_admission_policy": "registered_metrics_only",
         "metric_registry_sha256": _sha256(_CANONICAL_METRICS),
         "objective_config_sha256": _sha256(objective_json),
         "scenario_suite_sha256": _sha256(scenario_json),

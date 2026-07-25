@@ -180,3 +180,24 @@ def test_job_create_revalidates_parameter_catalog_server_side(client: TestClient
     response = client.post("/api/v1/jobs", json=payload)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_PARAMETER_SPACE"
+
+
+def test_job_create_rejects_unregistered_raw_optimization_metric(
+    client: TestClient,
+) -> None:
+    payload = _advanced_job_payload()
+    payload["objective_config"] = {
+        "objectives": [
+            {
+                "metric": "custom_energy",
+                "direction": "minimize",
+            }
+        ]
+    }
+
+    response = client.post("/api/v1/jobs", json=payload)
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_OUTCOME_CONTRACT"
+    assert "unregistered optimization metric: custom_energy" in error["message"]

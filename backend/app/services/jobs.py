@@ -263,6 +263,19 @@ def _create_job_from_config(
     persist_objective_config: bool | None = None,
     persist_scenario_suite: bool | None = None,
 ) -> models.Job:
+    try:
+        outcome_contract = compile_outcome_contract(
+            req.objective_config,
+            req.scenario_suite,
+            req.acceptance_criteria,
+            failed_trial_weight=constants.SCORE_WEIGHTS["failed_trial"],
+        )
+    except ValueError as exc:
+        raise JobServiceError(
+            "INVALID_OUTCOME_CONTRACT",
+            str(exc),
+            http_status=422,
+        ) from exc
     now = _now()
     experimental_optimizer = req.optimizer_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES
     if persist_objective_config is None:
@@ -380,12 +393,6 @@ def _create_job_from_config(
                 ],
             },
         )
-    )
-    outcome_contract = compile_outcome_contract(
-        req.objective_config,
-        req.scenario_suite,
-        req.acceptance_criteria,
-        failed_trial_weight=constants.SCORE_WEIGHTS["failed_trial"],
     )
     record_event(
         db,

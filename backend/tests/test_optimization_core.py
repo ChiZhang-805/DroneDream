@@ -214,7 +214,8 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "1.3"
+    assert first.compiler_version == "1.4"
+    assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.selection_policy.optimizer_objective_representation_policy
         == "one_representation_per_tool_call"
@@ -262,6 +263,28 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
             suite,
             acceptance,
             failed_trial_weight=float("nan"),
+        )
+
+
+def test_outcome_contract_rejects_unregistered_adapter_raw_metrics() -> None:
+    with pytest.raises(
+        ValueError,
+        match="unregistered optimization metric: custom_energy",
+    ):
+        compile_outcome_contract(
+            ObjectiveConfig(
+                objectives=[
+                    ObjectiveSpec(
+                        metric="custom_energy",
+                        direction="minimize",
+                    )
+                ]
+            ),
+            ScenarioSuiteConfig(
+                cases=[ScenarioCaseConfig(id="train", seeds=[1])],
+            ),
+            AcceptanceCriteria(),
+            failed_trial_weight=1.5,
         )
 
 

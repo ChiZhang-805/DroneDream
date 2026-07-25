@@ -189,6 +189,12 @@ rate uses every dispatched seed in each case denominator before case weights.
 The evaluator consumes these versioned decision fields rather than rounded
 display values.
 
+Outcome Contract compiler 1.4 admits registered metrics only. Numeric keys in
+adapter `raw_metric_json` remain report evidence until a reviewed registry
+entry binds their source, unit, value kind, and semantics. Job creation,
+reruns, and batch children reject unregistered objective or constraint names
+with `INVALID_OUTCOME_CONTRACT` before a Job row or secret is persisted.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.
