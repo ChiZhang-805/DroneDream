@@ -10,6 +10,10 @@ from fastapi import APIRouter
 from app import __version__
 from app.config import get_settings
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
+from app.orchestration.harness_context import (
+    HARNESS_EVIDENCE_SCHEMA_VERSION,
+    HARNESS_TOOL_REGISTRY_VERSION,
+)
 from app.parameters import CATALOG_VERSION, SUPPORTED_PX4_VERSIONS
 from app.response import ok
 from app.secrets import is_configured as secret_store_is_configured
@@ -176,6 +180,8 @@ def read_capabilities() -> dict[str, object]:
                 "llm_tool_harness": {
                     "available": True,
                     "decision_schema_version": "1.0",
+                    "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+                    "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
                     "tool_registry": "closed",
                 },
             },

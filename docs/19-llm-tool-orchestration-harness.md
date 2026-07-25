@@ -1,9 +1,9 @@
 # LLM Tool-Orchestrated Optimization Harness
 
-Status: approved target design; compatibility execution slice implemented, hardened target gated<br>
+Status: approved target design; compatibility execution slice and evidence-v2 router diagnostics implemented, hardened target gated<br>
 Audience: backend, optimization, simulation, security, evaluation, and course-review stakeholders<br>
 Scope: DroneDream's automated PX4/Gazebo tuning loop<br>
-Last reviewed: 2026-07-24
+Last reviewed: 2026-07-26
 
 ## 1. Executive decision
 
@@ -8055,6 +8055,82 @@ In particular, passing the current optimizer tests confirms current behavior; it
 not validate hierarchical estimands, fixed objective semantics, cross-adapter rank
 consistency, or unified acceptance/selection. Those schemas, tables, gateway,
 compilers, verifiers, and evaluation campaign remain unimplemented.
+
+### 30.2 Evidence-v2 context and routing diagnostics on 2026-07-26
+
+The compatibility Harness now uses a closed, versioned
+`HarnessEvidenceSnapshot` instead of constructing an untyped prompt dictionary in
+the decision module. This is an incremental implementation step toward the target
+control plane, not a claim that the immutable evidence-v3 or decision-ledger design
+is complete.
+
+The implemented evidence-v2 compiler:
+
+- exposes remaining generations and Trials, per-Candidate Trial cost, parameter
+  dimension, objective/constraint counts, and trusted catalog parameter names;
+- summarizes training and validation scenario/replicate counts without sending
+  scenario IDs, seeds, arbitrary case configuration, or sealed-test material;
+- computes completed/incomplete/feasible Candidate counts, measured failure rate,
+  baseline-relative improvement, per-generation best score, and trailing stagnation;
+- computes stagnation over the full history but bounds the provider-visible trend to
+  the first generation plus the latest 31 generations, keeping context size constant
+  for long-running Jobs;
+- preserves bounded optimizer memory through per-tool Candidate, feasibility,
+  failure, best-score, and last-generation statistics derived from trusted metadata;
+- reads at most eight recent `harness_tool_execution_result` rows through a bounded
+  SQL query and exposes only registered tool IDs, closed execution/fallback enums,
+  generation numbers, and dispatched counts, so the next decision can react to
+  zero-dispatch, exhausted-search, budget, and deterministic-fallback outcomes;
+- selects at most twelve provider-visible Candidates while reserving representation
+  for the baseline, strongest historical evidence, and the latest generations;
+- rejects mappings, strings, labels, free-form diagnostics, proposal rationale,
+  errors, Candidate IDs, parameter values, and arbitrary JSON at the prompt boundary;
+- uses `evidence_schema_version=2.0` and `tool_registry_version=2.0` in capability
+  discovery and decision/tool-execution events; and
+- presents a richer static tool manifest with explicit search roles, applicability
+  signals, and declared constraint, multi-objective, and multi-fidelity support.
+
+The Harness dispatcher now performs a deterministic feasibility preflight before
+contacting a provider. If the next generation exceeds `max_iterations`, or the
+remaining Trial budget cannot materialize one complete Candidate under the configured
+scenario matrix, it records `harness_decision_skipped` and returns the terminal
+dispatch status without spending a model request.
+
+`build_decision_messages()` is now a pure production function shared by live routing
+and offline evaluation. The repository includes a 24-case, eight-category
+development corpus covering cold start, local progress, stagnation, constraint
+pressure, high dimension, tight budget, failure recovery, and mixed tool history.
+`backend/scripts/evaluate_harness_router.py` validates that corpus, can emit the exact
+secretless production messages, and grades a complete case-to-tool prediction file.
+Tests prove that case IDs, acceptable answers, grader rationale, scenario IDs,
+scenario configuration, seeds, and injected text do not enter those messages.
+The execution-memory query deliberately avoids loading the mutable SQLAlchemy
+`job.events` relationship, preventing a same-transaction relationship cache from
+hiding decision events written later in the turn.
+
+This corpus is deliberately a development diagnostic, not the confirmatory
+simulator campaign in Section 22. It detects prompt/tool discrimination regressions
+and enables matched model comparisons, but it does not prove that an LLM router beats
+the deterministic portfolio. Provider/model evaluation, blocked simulator campaigns,
+the locked test bank, immutable decision/model/tool ledgers, and evidence-v3 remain
+required before that stronger claim.
+
+Current focused validation:
+
+```text
+backend/.venv/Scripts/python.exe -m pytest \
+  backend/tests/test_harness_routing_evaluation.py \
+  backend/tests/test_phase8_llm_proposer.py \
+  backend/tests/test_phase8_iterative_loop.py \
+  backend/tests/test_capabilities.py -q
+
+43 passed
+
+cd backend
+.venv/Scripts/python.exe scripts/evaluate_harness_router.py
+
+24 cases; 8 categories; 8 registered tools
+```
 
 ## 31. Reference index
 

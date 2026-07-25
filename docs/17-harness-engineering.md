@@ -81,3 +81,30 @@ applied until the dedicated Runtime contains a verified adapter.
   request/evidence, telemetry, logs, metrics, and failure taxonomy per trial.
 - Treat simulation winners as candidates for controlled validation, not proof
   of safety on a real aircraft.
+
+## Bounded model decision context
+
+The optional `llm_harness` mode does not give a model direct simulator or
+parameter authority. At each generation boundary, deterministic code compiles a
+versioned evidence snapshot containing remaining budget, scenario cost, search
+progress, stagnation, feasibility/failure statistics, and bounded per-tool
+history. It also receives a bounded, enum-only memory of recent tool dispatch
+outcomes, allowing a later generation to react when a prior tool exhausted its
+search space or dispatched no candidates. The model may select one identifier
+from the closed optimizer registry; the server validates that identifier and
+remains the only dispatcher. The dispatcher skips the model entirely when no
+generation or Trial budget remains, so an impossible plan cannot consume
+provider quota before deterministic rejection.
+
+Provider-visible evidence never includes user labels, candidate IDs, parameter
+values, scenario IDs or seeds, free-form simulator/model text, credentials, or
+arbitrary JSON. The snapshot keeps the baseline, strongest measured candidates,
+and latest generations so historical quality does not hide recent stagnation.
+Long Jobs retain full-history stagnation computation while exposing only the first
+and latest 31 generation-best points, preventing unbounded prompt growth.
+
+The development routing corpus lives at
+`backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
+cases across eight routing regimes and uses the exact production prompt builder.
+It is a regression tool, not evidence that model routing outperforms the
+deterministic portfolio; that claim still requires the frozen simulator campaign.

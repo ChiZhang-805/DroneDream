@@ -1324,6 +1324,48 @@ def dispatch_next_harness_generation(
     optimizer code without mutating the job's persisted ``llm_harness`` mode.
     """
 
+    generation_index = job.current_generation + 1
+    if generation_index > job.max_iterations:
+        record_event(
+            db,
+            job.id,
+            "harness_decision_skipped",
+            {
+                "reason": "max_iterations_reached",
+                "generation": generation_index,
+                "remaining_trials": max(
+                    0,
+                    job.max_total_trials - job.progress_total_trials,
+                ),
+            },
+        )
+        return AdaptiveDispatchResult(status="max_iterations_reached")
+
+    configured_runs = _configured_scenario_runs(
+        job,
+        generation_index=generation_index,
+    )
+    full_trials_per_candidate = (
+        len(configured_runs) if configured_runs is not None else max(1, job.trials_per_candidate)
+    )
+    remaining_trials = max(
+        0,
+        job.max_total_trials - job.progress_total_trials,
+    )
+    if remaining_trials < full_trials_per_candidate:
+        record_event(
+            db,
+            job.id,
+            "harness_decision_skipped",
+            {
+                "reason": "budget_exhausted",
+                "generation": generation_index,
+                "remaining_trials": remaining_trials,
+                "minimum_dispatch_trials": full_trials_per_candidate,
+            },
+        )
+        return AdaptiveDispatchResult(status="budget_exhausted")
+
     from app.orchestration.decision_harness import (
         as_experimental_strategy,
         select_optimizer_tool,
@@ -1351,6 +1393,8 @@ def dispatch_next_harness_generation(
             "evidence_sha256": decision.evidence_sha256,
             "prompt_sha256": decision.prompt_sha256,
             "fallback_reason": decision.fallback_reason,
+            "evidence_schema_version": decision.evidence_schema_version,
+            "tool_registry_version": decision.tool_registry_version,
         },
     )
     return result
