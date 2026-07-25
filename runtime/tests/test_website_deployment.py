@@ -151,9 +151,7 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         )
         self.assertNotEqual(install_gate, -1)
         rollback = remote_deploy[
-            remote_deploy.index("rollback() {") : remote_deploy.index(
-                "curl_until_contains() {"
-            )
+            remote_deploy.index("rollback() {") : remote_deploy.index("curl_until_contains() {")
         ]
         changed_gate = rollback.index("if [[ $public_config_changed -eq 1 ]]; then")
         remove_vhost = rollback.index('rm -f "$public_vhost"')
