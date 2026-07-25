@@ -65,6 +65,12 @@ jobs:
     name: Frontend / Node.js 22
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      # CI-only placeholders keep production authentication credentials out of
+      # the repository while letting Vite builds and preview audits exercise
+      # the same required configuration contract.
+      VITE_SUPABASE_URL: "https://ci.invalid"
+      VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_ci_quality_gate_only"
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -84,11 +90,6 @@ jobs:
       - name: Lint, type-check, test, and build frontend
         env:
           CI: "true"
-          # The quality gate exercises the public-site build and visual layout
-          # without contacting production authentication services. Production
-          # deployments still provide their real public Supabase values.
-          VITE_SUPABASE_URL: "https://ci.invalid"
-          VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_ci_quality_gate_only"
         run: |
           npm --prefix frontend run audit:dependencies
           npm --prefix desktop audit --audit-level=high
