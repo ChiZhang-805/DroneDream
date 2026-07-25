@@ -72,13 +72,16 @@ installer checksum, security headers, and loopback-only staging vhost before it
 atomically switches `current`. Any failure restores the previous symlink and
 Nginx configuration.
 
-The supported Windows entry point is the PowerShell wrapper. Pass the private
-key **path**, never its contents:
+The supported Windows entry point is the PowerShell wrapper. Targets are
+declared together in `website/deployment-targets.json`, so the SSH destination,
+public host, public root URI, and vhost policy cannot silently drift apart.
+Pass the private key **path**, never its contents.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass `
   -File website/scripts/deploy-static-baota.ps1 `
-  -SshKeyPath "$HOME\.ssh\DroneDream-deploy.pem"
+  -SshKeyPath "$HOME\.ssh\DroneDream-deploy.pem" `
+  -TargetMode Production
 ```
 
 The wrapper builds the website unless `-SkipBuild` is supplied, validates every
@@ -88,18 +91,31 @@ server deployment, removes temporary files, and probes the public page and
 hashed assets. It uses `BatchMode=yes` and `StrictHostKeyChecking=yes`; connect
 once manually and verify the server fingerprint before the first automated run.
 
-Defaults currently target the preview host:
+`Production` is the default and requires:
+
+- `cn.getdronedream.com`;
+- the root `https://cn.getdronedream.com/` URI;
+- an existing BaoTa vhost that names that host and listens on 443 with TLS.
+
+Production deployment preserves that employee-managed TLS vhost instead of
+overwriting its certificate paths. Before activating a release, the server
+script validates the preserved vhost, the trusted certificate, the HTTPS
+content/security headers, and the HTTP-to-HTTPS redirect. The wrapper then
+repeats the checks through public DNS and re-downloads the installer.
+
+Until DNS, filing, and TLS are complete, the explicit preview target remains:
 
 ```powershell
--Remote root@47.93.180.216
--PublicHost 47.93.180.216
--PublicBaseUri http://47.93.180.216/
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File website/scripts/deploy-static-baota.ps1 `
+  -SshKeyPath "$HOME\.ssh\DroneDream-deploy.pem" `
+  -TargetMode Preview
 ```
 
-Update `server_name` in the BaoTa public vhost and override all three together
-when a product domain is ready. The current bare-IP HTTP endpoint is suitable
-for preview testing only. A public production release still requires a domain,
-HTTPS certificate, and the corresponding TLS vhost.
+Preview mode installs the repository-managed HTTP vhost. It declares both
+`cn.getdronedream.com` and `47.93.180.216`, while the direct IPv4 URL remains
+the only supported pre-filing bare-IP public preview. Production mode will fail closed
+until the BaoTa TLS vhost is in place.
 Keep ports 80/443 public, restrict SSH to trusted administrator addresses, and
 never commit or paste a private key or Alibaba Cloud AccessKey.
 

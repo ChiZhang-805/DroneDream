@@ -377,7 +377,7 @@ describe("DesktopSetup", () => {
     expect(
       screen.getByRole("heading", { name: "Open this page in the DroneDream desktop app" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/web version cannot inspect Windows, WSL or local disks/i)).toBeInTheDocument();
+    expect(screen.getByText(/web version cannot inspect Windows, WSL,? or local disks/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
   });
 

@@ -41,7 +41,7 @@ const COPY = {
     archive: "Archive",
     restore: "Restore",
     remove: "Remove",
-    empty: "New experiments will appear here.",
+    empty: "Your experiments and recent runs appear here together.",
     noArchived: "No archived experiments.",
     delete: "Delete permanently",
   },

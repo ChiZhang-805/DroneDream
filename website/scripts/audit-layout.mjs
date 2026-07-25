@@ -90,6 +90,50 @@ try {
         text: element.textContent.trim().replace(/\s+/g, " "),
         lines: lineFragments(element).length,
       }));
+    const isContainedHorizontalOverflow = (element) => {
+      let ancestor = element.parentElement;
+      while (ancestor && ancestor !== scope.parentElement) {
+        const style = getComputedStyle(ancestor);
+        const rect = ancestor.getBoundingClientRect();
+        if (
+          ["auto", "scroll", "hidden", "clip"].includes(style.overflowX) &&
+          rect.left >= -1 &&
+          rect.right <= document.documentElement.clientWidth + 1
+        ) {
+          return true;
+        }
+        ancestor = ancestor.parentElement;
+      }
+      return false;
+    };
+    const horizontalOverflowElements = [...scope.querySelectorAll("*")]
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return (
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          rect.width > 1 &&
+          (rect.left < -1 || rect.right > document.documentElement.clientWidth + 1) &&
+          !isContainedHorizontalOverflow(element)
+        );
+      })
+      .slice(0, 20)
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          element: `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}${
+            element.classList.length > 0
+              ? `.${[...element.classList].join(".")}`
+              : ""
+          }`,
+          text: element.textContent?.trim().replace(/\s+/g, " ").slice(0, 120) ?? "",
+          left: Math.round(rect.left),
+          right: Math.round(rect.right),
+          width: Math.round(rect.width),
+          scrollWidth: element.scrollWidth,
+        };
+      });
 
     return {
       viewport: { width: innerWidth, height: innerHeight },
@@ -100,6 +144,7 @@ try {
         scrollHeight: document.documentElement.scrollHeight,
         horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       },
+      horizontalOverflowElements,
       headings,
       paragraphs,
       paragraphViolations: paragraphs.filter((paragraph) => paragraph.lines > 1 && paragraph.lastLineRatio < 0.8),

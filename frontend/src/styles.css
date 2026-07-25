@@ -4026,17 +4026,23 @@ a {
 }
 
 .desktop-browser-card h2 {
+  color: #ffffff;
   font-size: clamp(1.25rem, 3vw, 1.8rem);
 }
 
 .desktop-browser-card p {
-  max-width: 720px;
-  color: var(--text-dim);
+  max-width: 380px;
+  color: #ddcfe4;
 }
 
 .desktop-browser-hint {
-  color: var(--text-muted) !important;
+  max-width: 720px !important;
+  color: #c6b2ce !important;
   font-size: 0.86rem;
+}
+
+.desktop-browser-card p:lang(zh-CN):not(.desktop-browser-hint) {
+  max-width: 347px;
 }
 
 .desktop-browser-illustration {
@@ -4056,7 +4062,7 @@ a {
 }
 
 .desktop-browser-illustration span:last-child {
-  color: var(--text-muted);
+  color: #cdb9d5;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.78rem;
   letter-spacing: 0.12em;
@@ -4528,6 +4534,10 @@ a {
 @media (max-width: 720px) {
   .desktop-browser-card {
     grid-template-columns: 1fr;
+  }
+
+  .desktop-browser-card p:lang(zh-CN):not(.desktop-browser-hint) {
+    max-width: 274px;
   }
 
   .desktop-browser-illustration {
@@ -7618,6 +7628,7 @@ a {
 
 @media (max-width: 760px) {
   .app-shell:has(.history-page) {
+    align-content: start;
     height: auto;
     min-height: 100dvh;
     overflow: visible;
@@ -7626,11 +7637,21 @@ a {
   .app-shell:has(.history-page) .app-body,
   .app-shell:has(.history-page) .app-main {
     height: auto;
+    min-height: auto;
     overflow: visible;
+  }
+
+  .app-shell:has(.history-page) .app-main,
+  .history-body {
+    flex: 0 0 auto;
   }
 
   .history-page {
     height: auto;
+  }
+
+  .history-header .page-header-subtitle:lang(en) {
+    max-width: 280px;
   }
 
   .history-filter-grid {

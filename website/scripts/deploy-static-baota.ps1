@@ -4,9 +4,16 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$SshKeyPath,
 
-    [string]$Remote = "root@47.93.180.216",
-    [string]$PublicHost = "47.93.180.216",
-    [string]$PublicBaseUri = "http://47.93.180.216/",
+    [ValidateSet("Production", "Preview")]
+    [string]$TargetMode = "Production",
+
+    [string]$Remote = "",
+    [string]$PublicHost = "",
+    [string]$PublicBaseUri = "",
+
+    [ValidateSet("preserve", "install")]
+    [string]$VhostMode = "preserve",
+
     [switch]$SkipBuild
 )
 
@@ -90,6 +97,31 @@ function Get-ResponseHeader {
     return [string]($value -join ", ")
 }
 
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$targetConfigPath = Join-Path $repositoryRoot 'website\deployment-targets.json'
+if (-not (Test-Path -LiteralPath $targetConfigPath -PathType Leaf)) {
+    throw "Deployment target configuration is missing: $targetConfigPath"
+}
+$targets = Get-Content -LiteralPath $targetConfigPath -Raw -Encoding UTF8 |
+    ConvertFrom-Json
+$targetName = $TargetMode.ToLowerInvariant()
+$target = $targets.$targetName
+if ($null -eq $target) {
+    throw "Deployment target configuration does not define $targetName."
+}
+if ([string]::IsNullOrWhiteSpace($Remote)) {
+    $Remote = [string]$target.remote
+}
+if ([string]::IsNullOrWhiteSpace($PublicHost)) {
+    $PublicHost = [string]$target.publicHost
+}
+if ([string]::IsNullOrWhiteSpace($PublicBaseUri)) {
+    $PublicBaseUri = [string]$target.publicBaseUri
+}
+if (-not $PSBoundParameters.ContainsKey("VhostMode")) {
+    $VhostMode = [string]$target.vhostMode
+}
+
 if ($Remote -notmatch '^[A-Za-z_][A-Za-z0-9._-]*@[A-Za-z0-9][A-Za-z0-9.-]*$') {
     throw "Remote must use the safe user@host form without SSH options or paths."
 }
@@ -107,8 +139,29 @@ if (-not $publicUri.IsAbsoluteUri -or
     -not [string]::IsNullOrEmpty($publicUri.Query) -or
     -not [string]::IsNullOrEmpty($publicUri.Fragment) -or
     $publicUri.AbsolutePath -notin @('', '/') -or
+    -not $publicUri.IsDefaultPort -or
     $publicUri.DnsSafeHost -ne $PublicHost) {
-    throw "PublicBaseUri must be the root HTTP(S) URI for PublicHost."
+    throw "PublicBaseUri must be the default-port root HTTP(S) URI for PublicHost."
+}
+$expectedRemote = [string]$target.remote
+$expectedHost = [string]$target.publicHost
+$expectedScheme = ([Uri][string]$target.publicBaseUri).Scheme
+$expectedVhostMode = [string]$target.vhostMode
+if ($Remote -cne $expectedRemote -or
+    $PublicHost -cne $expectedHost -or
+    $publicUri.Scheme -cne $expectedScheme -or
+    $VhostMode -cne $expectedVhostMode) {
+    throw (
+        "$TargetMode deployments require Remote=$expectedRemote, " +
+        "PublicHost=$expectedHost, " +
+        "scheme=$expectedScheme, and VhostMode=$expectedVhostMode."
+    )
+}
+if ($TargetMode -ceq "Production" -and $publicUri.Scheme -cne "https") {
+    throw "Production deployments require HTTPS."
+}
+if ($TargetMode -ceq "Preview" -and $publicUri.Scheme -cne "http") {
+    throw "Preview deployments use the explicit bare-IP HTTP target."
 }
 if (-not (Test-Path -LiteralPath $SshKeyPath -PathType Leaf)) {
     throw "SSH private key file does not exist at the supplied path."
@@ -118,7 +171,6 @@ $resolvedKeyPath = (Resolve-Path -LiteralPath $SshKeyPath).Path
 $sshPath = (Get-Command ssh.exe -ErrorAction Stop).Source
 $scpPath = (Get-Command scp.exe -ErrorAction Stop).Source
 $tarPath = (Get-Command tar.exe -ErrorAction Stop).Source
-$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $siteDirectory = Join-Path $repositoryRoot 'frontend\site-dist'
 $buildScript = Join-Path $PSScriptRoot 'build-release-site.ps1'
 $serverDeployScript = Join-Path $PSScriptRoot 'deploy-static-baota.sh'
@@ -193,10 +245,21 @@ Test-SiteIntegrityManifest -SiteDirectory $siteDirectory -ManifestPath $manifest
 Write-Host "Verified local website release manifest for DroneDream $version."
 
 $publicConfigText = Get-Content -LiteralPath $publicConfig -Raw -Encoding UTF8
-$serverNamePattern = '(?m)^\s*server_name\s+' +
-    [regex]::Escape($PublicHost) + ';\s*$'
-if ($publicConfigText -notmatch $serverNamePattern) {
-    throw "The BaoTa public vhost does not declare server_name $PublicHost."
+$configuredServerNames = @(
+    [regex]::Matches(
+        $publicConfigText,
+        '(?m)^\s*server_name\s+([^;]+);'
+    ) | ForEach-Object {
+        $_.Groups[1].Value -split '\s+'
+    }
+)
+foreach ($requiredServerName in @(
+        [string]$targets.production.publicHost,
+        [string]$targets.preview.publicHost
+    )) {
+    if ($requiredServerName -notin $configuredServerNames) {
+        throw "The BaoTa managed vhost does not declare server_name $requiredServerName."
+    }
 }
 
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) `
@@ -253,7 +316,7 @@ try {
         'set -eu',
         "cd '$remoteDirectory'",
         "printf '%s  %s\n' '$archiveSha256' 'dronedream-site.tar.gz' | sha256sum --check -",
-        "bash ./deploy-static-baota.sh ./dronedream-site.tar.gz '$version' '$installerSha256' ./dronedream-staging.conf ./dronedream-public.conf '$PublicHost'"
+        "bash ./deploy-static-baota.sh ./dronedream-site.tar.gz '$version' '$installerSha256' ./dronedream-staging.conf ./dronedream-public.conf '$PublicHost' '$($publicUri.Scheme)' '$VhostMode'"
     ) -join '; '
     $deployArguments = @()
     $deployArguments += $sshOptions

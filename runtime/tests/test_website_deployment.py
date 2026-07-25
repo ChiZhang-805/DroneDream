@@ -1,6 +1,8 @@
+import json
 import re
 import unittest
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -48,6 +50,45 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
                 )
                 self.assertRegex(config, r'default\s+"no-cache";')
 
+    def test_mainland_targets_separate_production_https_from_ip_preview(self) -> None:
+        targets = json.loads(self.read("website/deployment-targets.json"))
+        production = targets["production"]
+        preview = targets["preview"]
+
+        self.assertEqual(production["remote"], preview["remote"])
+        self.assertEqual(production["publicHost"], "cn.getdronedream.com")
+        self.assertEqual(production["vhostMode"], "preserve")
+        self.assertEqual(preview["publicHost"], "47.93.180.216")
+        self.assertEqual(preview["vhostMode"], "install")
+
+        for name, target, expected_scheme in (
+            ("production", production, "https"),
+            ("preview", preview, "http"),
+        ):
+            with self.subTest(name=name):
+                uri = urlsplit(target["publicBaseUri"])
+                self.assertEqual(uri.scheme, expected_scheme)
+                self.assertEqual(uri.hostname, target["publicHost"])
+                self.assertEqual(uri.path, "/")
+                self.assertFalse(uri.query)
+                self.assertFalse(uri.fragment)
+
+    def test_managed_vhosts_name_canonical_and_preview_hosts(self) -> None:
+        required_names = {
+            "cn.getdronedream.com",
+            "47.93.180.216",
+        }
+        for name in ("dronedream-public.conf", "dronedream-staging.conf"):
+            with self.subTest(name=name):
+                config = self.read(f"website/nginx/baota/{name}")
+                configured_names: set[str] = set()
+                for directive in re.findall(
+                    r"(?m)^\s*server_name\s+([^;]+);",
+                    config,
+                ):
+                    configured_names.update(directive.split())
+                self.assertTrue(required_names.issubset(configured_names))
+
     def test_readme_routes_baota_deployments_through_the_wrapper(self) -> None:
         readme = self.read("website/README.md")
         legacy_script = self.read("website/scripts/deploy-static.sh")
@@ -78,13 +119,45 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("deploy-static-baota.sh", wrapper)
         self.assertIn("dronedream-staging.conf", wrapper)
         self.assertIn("dronedream-public.conf", wrapper)
+        self.assertIn("deployment-targets.json", wrapper)
+        self.assertIn('[string]$TargetMode = "Production"', wrapper)
+        self.assertIn("Production deployments require HTTPS.", wrapper)
+        self.assertIn("Preview deployments use the explicit bare-IP HTTP target.", wrapper)
+        self.assertIn("Remote=$expectedRemote", wrapper)
         self.assertIn("max-age=31536000", wrapper)
         self.assertNotRegex(wrapper, re.compile(r"(?i)private[-_ ]?key\s*=\s*['\"]"))
 
         remote_deploy = self.read("website/scripts/deploy-static-baota.sh")
         self.assertIn("http://127.0.0.1:18080/console/", remote_deploy)
-        self.assertIn("http://127.0.0.1/console/", remote_deploy)
+        self.assertIn('--resolve "$public_host:443:127.0.0.1"', remote_deploy)
+        self.assertIn("validate_preserved_public_vhost", remote_deploy)
+        self.assertIn("preserved vhost does not declare server_name", remote_deploy)
+        self.assertIn("does not listen on 443 with TLS", remote_deploy)
+        self.assertIn("^strict-transport-security:", remote_deploy)
         self.assertIn("camera=\\(self\\)", remote_deploy)
+
+    def test_remote_rollback_never_removes_a_preserved_tls_vhost(self) -> None:
+        remote_deploy = self.read("website/scripts/deploy-static-baota.sh")
+
+        self.assertIn("public_config_changed=0", remote_deploy)
+        self.assertIn("if [[ $public_config_changed -eq 1 ]]; then", remote_deploy)
+        self.assertIn("if [[ $vhost_mode == install ]]; then", remote_deploy)
+        self.assertEqual(remote_deploy.count("public_config_changed=1"), 1)
+        assignment = remote_deploy.index("public_config_changed=1")
+        install_gate = remote_deploy.rfind(
+            "if [[ $vhost_mode == install ]]; then",
+            0,
+            assignment,
+        )
+        self.assertNotEqual(install_gate, -1)
+        rollback = remote_deploy[
+            remote_deploy.index("rollback() {") : remote_deploy.index(
+                "curl_until_contains() {"
+            )
+        ]
+        changed_gate = rollback.index("if [[ $public_config_changed -eq 1 ]]; then")
+        remove_vhost = rollback.index('rm -f "$public_vhost"')
+        self.assertLess(changed_gate, remove_vhost)
 
     def test_pages_custom_domain_is_opt_in_until_dns_is_ready(self) -> None:
         builder = self.read("website/scripts/build-pages-site.ps1")
