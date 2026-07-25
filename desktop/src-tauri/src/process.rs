@@ -414,20 +414,21 @@ mod tests {
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            r#"Start-Sleep -Milliseconds 250; $info = [Diagnostics.ProcessStartInfo]::new(); $info.FileName = 'ping.exe'; $info.Arguments = '-n 30 127.0.0.1'; $info.UseShellExecute = $false; [Diagnostics.Process]::Start($info) | Out-Null"#,
+            r#"Start-Sleep -Milliseconds 250; $info = [Diagnostics.ProcessStartInfo]::new(); $info.FileName = 'ping.exe'; $info.Arguments = '-n 60 127.0.0.1'; $info.UseShellExecute = $false; [Diagnostics.Process]::Start($info) | Out-Null"#,
         ]);
         let started = std::time::Instant::now();
-        // A busy CI host may take several seconds merely to start PowerShell.
-        // The descendant deliberately lives much longer than both this
-        // deadline and the assertion below, so a leaked pipe still fails while
-        // scheduler contention cannot be mistaken for a containment defect.
-        let output = command_output(command, Duration::from_secs(15), "descendant pipe test")
+        // A cold Windows runner may take well over ten seconds merely to start
+        // PowerShell. The descendant deliberately lives much longer than this
+        // deadline, so a leaked pipe still fails without treating runner startup
+        // contention as a process-containment defect.
+        let deadline = Duration::from_secs(25);
+        let output = command_output(command, deadline, "descendant pipe test")
             .expect("the direct parent should exit successfully");
+        let elapsed = started.elapsed();
         assert!(output.status.success());
         assert!(
-            started.elapsed() < Duration::from_secs(10),
-            "the inherited pipe remained open for {:?}",
-            started.elapsed()
+            elapsed < deadline,
+            "the inherited pipe remained open for {elapsed:?}"
         );
     }
 }
