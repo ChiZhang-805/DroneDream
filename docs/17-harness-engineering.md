@@ -221,6 +221,14 @@ on schema, hash, or bound-holdout mismatch. The payload is still embedded in
 the legacy aggregate JSON; an append-only relational evidence ledger remains
 a later database migration rather than a capability claimed by this slice.
 
+Outcome Contract compiler 1.8 makes reduced-fidelity scenario coverage
+case-stratified by contract. A screening matrix must execute at least one
+replicate from every configured training case before allocating additional
+replicates. The effective fidelity advertised to the numerical optimizer is
+the actual executed fraction after this minimum is applied, so a small nominal
+budget cannot silently omit difficult cases or claim less work than it ran.
+Holdout cases remain reserved for full verification.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

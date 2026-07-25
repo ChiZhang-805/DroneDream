@@ -209,6 +209,10 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         first.scenario_population.missing_metric_policy
         == "fail_dispatched_case_without_usable_metric"
     )
+    assert (
+        first.scenario_population.low_fidelity_case_coverage_policy
+        == "every_training_case_before_additional_replicates"
+    )
     assert first.domain_failure_policy.hard_constraint_penalty_in_scalar_loss is False
     assert (
         first.domain_failure_policy.optimizer_learning_failure_rate_limit_decimal
@@ -219,7 +223,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "1.7"
+    assert first.compiler_version == "1.8"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy

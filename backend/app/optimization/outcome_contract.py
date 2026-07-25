@@ -17,7 +17,7 @@ from app.optimization.outcome_evidence import (
 )
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "1.7"
+OUTCOME_CONTRACT_COMPILER_VERSION = "1.8"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
@@ -138,6 +138,9 @@ class OutcomeScenarioPopulation(_FrozenModel):
     missing_metric_policy: Literal["fail_dispatched_case_without_usable_metric"] = (
         "fail_dispatched_case_without_usable_metric"
     )
+    low_fidelity_case_coverage_policy: Literal[
+        "every_training_case_before_additional_replicates"
+    ] = "every_training_case_before_additional_replicates"
 
 
 class OutcomeFailurePolicy(_FrozenModel):
@@ -205,7 +208,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["1.7"] = "1.7"
+    compiler_version: Literal["1.8"] = "1.8"
     contract_id: str
     metric_admission_policy: Literal["registered_metrics_only"] = (
         "registered_metrics_only"

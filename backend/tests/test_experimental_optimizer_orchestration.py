@@ -210,9 +210,13 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
             ]
             assert any(
                 float(candidate.optimizer_metadata_json["requested_fidelity"]) < 1.0
-                and float(candidate.optimizer_metadata_json["effective_fidelity"]) < 1.0
                 for candidate in earlier_candidates
-            ), "multi-fidelity search must exercise a cheaper evaluation before verification"
+            ), "multi-fidelity search must exercise a screening request before verification"
+            assert all(
+                float(candidate.optimizer_metadata_json["effective_fidelity"])
+                >= float(candidate.optimizer_metadata_json["requested_fidelity"])
+                for candidate in earlier_candidates
+            )
             final_candidates = [
                 candidate
                 for candidate in optimizer_candidates
@@ -288,6 +292,73 @@ def test_real_scenario_matrix_controls_iterative_budget_not_legacy_trial_count(
         assert job.progress_total_trials == 2
         assert len(job.trials) == 2
         assert any(not candidate.is_baseline for candidate in job.candidates)
+
+
+def test_reduced_fidelity_covers_every_training_case_before_more_replicates(
+    experimental_ctx: dict[str, Any],
+) -> None:
+    _ = experimental_ctx
+    from app.optimization.scenarios import scenario_matrix
+    from app.orchestration.job_manager import (
+        _effective_fidelity_mapping,
+        _low_fidelity_scenario_runs,
+    )
+    from app.schemas import ScenarioCaseConfig, ScenarioSuiteConfig
+
+    suite = ScenarioSuiteConfig(
+        cases=[
+            ScenarioCaseConfig(
+                id=f"training-{case_index}",
+                scenario_type=(
+                    "nominal"
+                    if case_index == 0
+                    else "wind_perturbed"
+                ),
+                seeds=[
+                    case_index * 10 + seed_index
+                    for seed_index in (1, 2, 3)
+                ],
+            )
+            for case_index in range(4)
+        ]
+        + [
+            ScenarioCaseConfig(
+                id="sealed-holdout",
+                seeds=[901, 902],
+                holdout=True,
+            )
+        ]
+    )
+    runs = scenario_matrix(suite)
+
+    quarter = _low_fidelity_scenario_runs(runs, 0.25)
+    half = _low_fidelity_scenario_runs(runs, 0.5)
+    mapping = dict(
+        _effective_fidelity_mapping(
+            runs,
+            full_trials_per_candidate=999,
+        )
+    )
+
+    assert len(quarter) == 4
+    assert {run.case_id for run in quarter} == {
+        "training-0",
+        "training-1",
+        "training-2",
+        "training-3",
+    }
+    assert all(not run.holdout for run in quarter)
+    assert len(half) == 6
+    assert {run.case_id for run in half} == {
+        "training-0",
+        "training-1",
+        "training-2",
+        "training-3",
+    }
+    assert set(mapping) == {0.25, 0.5, 1.0}
+    assert mapping[0.25] == pytest.approx(4 / 12)
+    assert mapping[0.5] == pytest.approx(6 / 12)
+    assert mapping[1.0] == pytest.approx(1.0)
 
 
 def test_experimental_dispatch_deduplicates_identical_proposals_within_batch(

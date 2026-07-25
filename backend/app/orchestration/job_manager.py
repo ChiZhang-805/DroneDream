@@ -643,10 +643,16 @@ def _low_fidelity_scenario_runs(
     training_runs = [run for run in configured_runs if not run.holdout]
     if not training_runs:
         return []
-    target = max(1, math.ceil(len(training_runs) * fidelity))
     grouped: dict[str, list[ScenarioRun]] = {}
     for run in training_runs:
         grouped.setdefault(run.case_id, []).append(run)
+    # Every configured training case is part of the declared population. A
+    # reduced matrix may remove replicates, but it must not remove a whole
+    # case and silently optimize a different scenario suite.
+    target = min(
+        len(training_runs),
+        max(len(grouped), math.ceil(len(training_runs) * fidelity)),
+    )
     reduced: list[ScenarioRun] = []
     seed_index = 0
     while len(reduced) < target:
@@ -669,15 +675,22 @@ def _effective_fidelity_mapping(
     full_trials_per_candidate: int,
 ) -> tuple[tuple[float, float], ...]:
     if configured_runs is not None:
-        matrix_size = len([run for run in configured_runs if not run.holdout])
+        training_runs = [run for run in configured_runs if not run.holdout]
+        matrix_size = len(training_runs)
+        minimum_coverage = len({run.case_id for run in training_runs})
     else:
         matrix_size = max(1, full_trials_per_candidate)
+        minimum_coverage = 1
     if matrix_size <= 0:
         return ((0.25, 0.25), (0.5, 0.5), (1.0, 1.0))
     return tuple(
         (
             level,
-            min(1.0, max(1, math.ceil(matrix_size * level)) / matrix_size),
+            min(
+                1.0,
+                max(minimum_coverage, math.ceil(matrix_size * level))
+                / matrix_size,
+            ),
         )
         for level in (0.25, 0.5, 1.0)
     )
@@ -725,6 +738,9 @@ def _dispatch_optimizer_trials(
         job, generation_index=candidate.generation_index
     )
     if configured_runs is not None:
+        full_training_count = sum(
+            1 for run in configured_runs if not run.holdout
+        )
         fidelity = _optimizer_fidelity(candidate.optimizer_metadata_json)
         requested_fidelity = _optimizer_requested_fidelity(
             candidate.optimizer_metadata_json
@@ -734,6 +750,12 @@ def _dispatch_optimizer_trials(
                 configured_runs,
                 requested_fidelity,
             )
+            if full_training_count > 0:
+                fidelity = len(configured_runs) / full_training_count
+                metadata = dict(candidate.optimizer_metadata_json or {})
+                metadata["effective_fidelity"] = fidelity
+                metadata["fidelity"] = fidelity
+                candidate.optimizer_metadata_json = metadata
         for run in configured_runs:
             payload = _scenario_payload(
                 job,
