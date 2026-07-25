@@ -214,7 +214,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "1.5"
+    assert first.compiler_version == "1.6"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -229,6 +229,18 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         == "joint_objective_vector_else_scalar_loss"
     )
     assert first.selection_policy.scalar_optimizer_policy == "scalar_loss_only"
+    assert (
+        first.selection_policy.bayesian_objective_scale_policy
+        == "fixed_job_objective_normalization"
+    )
+    assert (
+        first.selection_policy.bayesian_scalarization_policy
+        == "fixed_job_objective_weights"
+    )
+    assert (
+        first.selection_policy.incomplete_objective_vector_policy
+        == "scalar_loss_else_exploration"
+    )
     assert (
         first.final_promotion_policy.projection_schema
         == "dronedream.acceptance-projection/v1"

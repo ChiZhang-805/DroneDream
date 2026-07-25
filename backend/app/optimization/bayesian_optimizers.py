@@ -70,9 +70,12 @@ class _MetricModel:
     best: float
     source_count: int
     training_count: int
+    fixed_scale: float | None = None
 
     @property
     def span(self) -> float:
+        if self.fixed_scale is not None:
+            return self.fixed_scale
         observed_span = self.maximum - self.minimum
         if observed_span > 1e-9:
             return observed_span
@@ -460,6 +463,7 @@ def _fit_metric_model(
         [Sequence[Sequence[float]], Sequence[float], Sequence[float]], _Predictor
     ]
     | None = None,
+    normalization: float | None = None,
 ) -> _MetricModel | None:
     entries: list[_ActiveSetEntry] = []
     for observation in observations:
@@ -521,6 +525,7 @@ def _fit_metric_model(
         best=best,
         source_count=source_count,
         training_count=len(active),
+        fixed_scale=normalization,
     )
 
 
@@ -532,7 +537,9 @@ def _fit_models(
         [Sequence[Sequence[float]], Sequence[float], Sequence[float]], _Predictor
     ]
     | None = None,
+    objective_normalizations: Mapping[str, float] | None = None,
 ) -> tuple[_MetricModel | None, tuple[_MetricModel, ...]]:
+    normalizations = objective_normalizations or {}
     loss_model = _fit_metric_model(
         "__loss__",
         observations,
@@ -548,6 +555,7 @@ def _fit_models(
                 observations,
                 feature_builder=feature_builder,
                 predictor_factory=predictor_factory,
+                normalization=normalizations.get(name),
             )
         )
         is not None
@@ -594,6 +602,36 @@ def _random_scalarizations(count: int, dimension: int, rng: random.Random) -> li
         total = sum(raw)
         weights.append([value / total for value in raw])
     return weights
+
+
+def _objective_scalarizations(
+    models: Sequence[_MetricModel],
+    request: OptimizerRequest,
+    rng: random.Random,
+    *,
+    fallback_count: int,
+) -> tuple[list[list[float]], str]:
+    configured = dict(request.objective_weights)
+    normalizations = dict(request.objective_normalizations)
+    model_names = {model.name for model in models}
+    configured_names = set(configured)
+    if configured_names or normalizations:
+        if (
+            not models
+            or model_names != configured_names
+            or model_names != set(normalizations)
+        ):
+            return [], "blocked_incomplete_job_objective_vector"
+        raw = [configured[model.name] for model in models]
+        total = sum(raw)
+        return (
+            [[value / total for value in raw]],
+            "fixed_configured_objective_weights",
+        )
+    return (
+        _random_scalarizations(fallback_count, len(models), rng),
+        "deterministic_random_fallback_without_job_preferences",
+    )
 
 
 def _joint_scalarized_incumbents(
@@ -1054,7 +1092,11 @@ def _standard_constrained_mobo(
         model_request.observations, search_space, feature_builder=feature_builder
     )
     loss_model, objective_models = _fit_models(
-        model_request.observations, feature_builder=feature_builder
+        model_request.observations,
+        feature_builder=feature_builder,
+        objective_normalizations=dict(
+            model_request.objective_normalizations
+        ),
     )
     informative = _informative_count(model_request.observations)
     if informative < max(4, 2 * len(search_space.tunable)):
@@ -1066,7 +1108,12 @@ def _standard_constrained_mobo(
             backend="native_matern52_ard_gp",
         )
     pool = _candidate_pool(search_space, model_request, rng)
-    scalarizations = _random_scalarizations(24, len(objective_models), rng)
+    scalarizations, scalarization_policy = _objective_scalarizations(
+        objective_models,
+        model_request,
+        rng,
+        fallback_count=24,
+    )
     incumbents = _joint_scalarized_incumbents(
         model_request.observations,
         objective_models,
@@ -1118,7 +1165,17 @@ def _standard_constrained_mobo(
                 ),
                 "acquisition_score": round(scores[_parameter_key(candidate.parameters)], 12),
                 "acquisition_representation": representation,
+                "scalarization_policy": (
+                    scalarization_policy
+                    if representation == "objective_vector"
+                    else "not_used_for_scalar_loss"
+                ),
+                "objective_preference_policy": scalarization_policy,
                 "objective_models": [model.name for model in objective_models],
+                "objective_weights": dict(model_request.objective_weights),
+                "objective_normalizations": {
+                    model.name: model.span for model in objective_models
+                },
                 "uses_scalar_loss": loss_model is not None,
                 "training_observations": len(request.observations),
                 "gp_training_set": _gp_active_set_metadata(
@@ -1173,7 +1230,9 @@ def _multi_fidelity_mobo(
         request.observations, search_space, feature_builder=feature_builder
     )
     loss_model, objective_models = _fit_models(
-        request.observations, feature_builder=feature_builder
+        request.observations,
+        feature_builder=feature_builder,
+        objective_normalizations=dict(request.objective_normalizations),
     )
     informative = _informative_count(request.observations)
     if informative < max(4, len(search_space.tunable) + 2):
@@ -1193,7 +1252,12 @@ def _multi_fidelity_mobo(
 
     base_pool = _candidate_pool(search_space, request, rng, include_observed=True)
     levels = _fidelity_levels(request)
-    scalarizations = _random_scalarizations(24, len(objective_models), rng)
+    scalarizations, scalarization_policy = _objective_scalarizations(
+        objective_models,
+        request,
+        rng,
+        fallback_count=24,
+    )
     incumbents = _joint_scalarized_incumbents(
         request.observations,
         objective_models,
@@ -1293,7 +1357,17 @@ def _multi_fidelity_mobo(
                 },
                 "required_fidelity": request.required_fidelity,
                 "acquisition_representation": representation,
+                "scalarization_policy": (
+                    scalarization_policy
+                    if representation == "objective_vector"
+                    else "not_used_for_scalar_loss"
+                ),
+                "objective_preference_policy": scalarization_policy,
                 "objective_models": [model.name for model in objective_models],
+                "objective_weights": dict(request.objective_weights),
+                "objective_normalizations": {
+                    model.name: model.span for model in objective_models
+                },
                 "uses_scalar_loss": loss_model is not None,
                 "training_observations": len(request.observations),
                 "gp_training_set": _gp_active_set_metadata(
@@ -1507,9 +1581,17 @@ def _saasbo(search_space: SearchSpace, request: OptimizerRequest) -> list[Experi
         model_request.observations,
         feature_builder=feature_builder,
         predictor_factory=factory,
+        objective_normalizations=dict(
+            model_request.objective_normalizations
+        ),
     )
     pool = _candidate_pool(search_space, model_request, rng)
-    scalarizations = _random_scalarizations(24, len(objective_models), rng)
+    scalarizations, scalarization_policy = _objective_scalarizations(
+        objective_models,
+        model_request,
+        rng,
+        fallback_count=24,
+    )
     incumbents = _joint_scalarized_incumbents(
         model_request.observations,
         objective_models,
@@ -1557,7 +1639,17 @@ def _saasbo(search_space: SearchSpace, request: OptimizerRequest) -> list[Experi
                 ),
                 "acquisition_score": round(scores[_parameter_key(candidate.parameters)], 12),
                 "acquisition_representation": representation,
+                "scalarization_policy": (
+                    scalarization_policy
+                    if representation == "objective_vector"
+                    else "not_used_for_scalar_loss"
+                ),
+                "objective_preference_policy": scalarization_policy,
                 "objective_models": [model.name for model in objective_models],
+                "objective_weights": dict(model_request.objective_weights),
+                "objective_normalizations": {
+                    model.name: model.span for model in objective_models
+                },
                 "uses_scalar_loss": loss_model is not None,
                 "training_observations": len(request.observations),
                 "gp_training_set": _gp_active_set_metadata(

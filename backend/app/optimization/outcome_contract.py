@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from app import schemas
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "1.5"
+OUTCOME_CONTRACT_COMPILER_VERSION = "1.6"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
@@ -154,6 +154,15 @@ class OutcomeSelectionPolicy(_FrozenModel):
         "joint_objective_vector_else_scalar_loss"
     ] = "joint_objective_vector_else_scalar_loss"
     scalar_optimizer_policy: Literal["scalar_loss_only"] = "scalar_loss_only"
+    bayesian_objective_scale_policy: Literal[
+        "fixed_job_objective_normalization"
+    ] = "fixed_job_objective_normalization"
+    bayesian_scalarization_policy: Literal[
+        "fixed_job_objective_weights"
+    ] = "fixed_job_objective_weights"
+    incomplete_objective_vector_policy: Literal[
+        "scalar_loss_else_exploration"
+    ] = "scalar_loss_else_exploration"
     precedence: tuple[str, ...] = (
         "evidence_complete",
         "hard_feasible",
@@ -189,7 +198,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["1.5"] = "1.5"
+    compiler_version: Literal["1.6"] = "1.6"
     contract_id: str
     metric_admission_policy: Literal["registered_metrics_only"] = (
         "registered_metrics_only"

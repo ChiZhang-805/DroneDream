@@ -278,6 +278,10 @@ class OptimizerRequest:
     batch_size: int
     random_seed: int
     observations: tuple[OptimizerObservation, ...]
+    # Frozen Job preference inputs. Bayesian vector acquisitions use these
+    # instead of adapting objective scales or weights from observed extrema.
+    objective_weights: tuple[tuple[str, float], ...] = ()
+    objective_normalizations: tuple[tuple[str, float], ...] = ()
     # Pairs are (requested level, effective training-matrix coverage). The
     # orchestration layer derives them from the concrete scenario/seed matrix.
     fidelity_mapping: tuple[tuple[float, float], ...] = ()
@@ -307,6 +311,35 @@ class OptimizerRequest:
         observations = tuple(self.observations)
         if not all(isinstance(item, OptimizerObservation) for item in observations):
             raise ValueError("observations must contain OptimizerObservation values")
+        for field_name, pairs in (
+            ("objective_weights", self.objective_weights),
+            ("objective_normalizations", self.objective_normalizations),
+        ):
+            names = [name for name, _value in pairs]
+            if (
+                any(not isinstance(name, str) or not name for name in names)
+                or len(set(names)) != len(names)
+                or any(
+                    isinstance(value, bool)
+                    or not isinstance(value, int | float)
+                    or not math.isfinite(float(value))
+                    or float(value) <= 0.0
+                    for _name, value in pairs
+                )
+            ):
+                raise ValueError(
+                    f"{field_name} must contain unique metric names and "
+                    "finite positive values"
+                )
+        weight_names = {name for name, _value in self.objective_weights}
+        normalization_names = {
+            name for name, _value in self.objective_normalizations
+        }
+        if weight_names != normalization_names:
+            raise ValueError(
+                "objective_weights and objective_normalizations must declare "
+                "the same metric names"
+            )
         if any(
             isinstance(value, bool) or not isinstance(value, int | float)
             for pair in self.fidelity_mapping
@@ -347,6 +380,22 @@ class OptimizerRequest:
         ):
             raise ValueError("required_fidelity must be finite and inside (0, 1]")
         object.__setattr__(self, "observations", observations)
+        object.__setattr__(
+            self,
+            "objective_weights",
+            tuple(
+                (name, float(value))
+                for name, value in self.objective_weights
+            ),
+        )
+        object.__setattr__(
+            self,
+            "objective_normalizations",
+            tuple(
+                (name, float(value))
+                for name, value in self.objective_normalizations
+            ),
+        )
         object.__setattr__(self, "fidelity_mapping", ordered_mapping)
 
 

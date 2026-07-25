@@ -646,6 +646,64 @@ def test_bayesian_acquisition_never_blends_objective_vector_and_scalar_loss() ->
         assert set(proposal.metadata["gp_training_set"]["metrics"]) == {"__loss__"}
 
 
+def test_bayesian_vector_uses_frozen_job_weights_and_normalizations() -> None:
+    request = replace(
+        _request("constrained_mobo", _grid_observations(), seed=463),
+        objective_weights=(("tracking", 9.0), ("speed", 1.0)),
+        objective_normalizations=(("tracking", 4.0), ("speed", 20.0)),
+    )
+
+    proposals = propose_bayesian_candidates(_space(), request)
+
+    assert proposals
+    for proposal in proposals:
+        assert proposal.metadata["acquisition_representation"] == "objective_vector"
+        assert (
+            proposal.metadata["scalarization_policy"]
+            == "fixed_configured_objective_weights"
+        )
+        assert (
+            proposal.metadata["objective_preference_policy"]
+            == "fixed_configured_objective_weights"
+        )
+        assert proposal.metadata["objective_weights"] == {
+            "tracking": 9.0,
+            "speed": 1.0,
+        }
+        assert proposal.metadata["objective_normalizations"] == {
+            "speed": 20.0,
+            "tracking": 4.0,
+        }
+
+
+def test_incomplete_job_objective_vector_falls_back_to_scalar_loss() -> None:
+    observations = tuple(
+        replace(
+            observation,
+            objectives={"tracking": observation.objectives["tracking"]},
+            objective_directions={"tracking": "minimize"},
+        )
+        for observation in _grid_observations()
+    )
+    request = replace(
+        _request("constrained_mobo", observations, seed=467),
+        objective_weights=(("tracking", 9.0), ("speed", 1.0)),
+        objective_normalizations=(("tracking", 4.0), ("speed", 20.0)),
+    )
+
+    proposals = propose_bayesian_candidates(_space(), request)
+
+    assert proposals
+    for proposal in proposals:
+        assert proposal.metadata["acquisition_representation"] == "scalar_loss"
+        assert (
+            proposal.metadata["objective_preference_policy"]
+            == "blocked_incomplete_job_objective_vector"
+        )
+        assert proposal.metadata["objective_models"] == []
+        assert proposal.metadata["uses_scalar_loss"] is True
+
+
 def test_turbo_uses_declared_scalar_loss_as_its_only_objective_representation() -> None:
     proposals = propose_bayesian_candidates(
         _space(),
@@ -1003,4 +1061,33 @@ def test_request_contract_rejects_invalid_fidelity_mapping(
             random_seed=1,
             observations=(),
             fidelity_mapping=mapping,
+        )
+
+
+@pytest.mark.parametrize(
+    ("weights", "normalizations"),
+    [
+        ((("tracking", 1.0),), ()),
+        ((("tracking", 1.0),), (("speed", 1.0),)),
+        (
+            (("tracking", 1.0), ("tracking", 2.0)),
+            (("tracking", 1.0),),
+        ),
+        ((("tracking", float("nan")),), (("tracking", 1.0),)),
+        ((("tracking", 1.0),), (("tracking", 0.0),)),
+    ],
+)
+def test_request_contract_rejects_invalid_objective_preferences(
+    weights: tuple[tuple[str, float], ...],
+    normalizations: tuple[tuple[str, float], ...],
+) -> None:
+    with pytest.raises(ValueError):
+        OptimizerRequest(
+            strategy="constrained_mobo",
+            generation_index=0,
+            batch_size=1,
+            random_seed=1,
+            observations=(),
+            objective_weights=weights,
+            objective_normalizations=normalizations,
         )

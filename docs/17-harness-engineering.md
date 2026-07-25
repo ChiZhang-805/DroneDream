@@ -202,6 +202,15 @@ registered, and `completion_rate`, `failure_rate`, and `failed_trial_rate`
 cannot be combined as if they were independent reliability objectives or
 constraints.
 
+Outcome Contract compiler 1.6 freezes Bayesian preference inputs at the Job
+boundary. Vector acquisition uses the configured objective weights and
+normalization scales rather than observed extrema or per-call random
+scalarizations. The optimizer request requires weights and scales to name the
+same metrics, and an incomplete observed objective vector falls back to the
+declared scalar loss (or exploration when no scalar evidence exists) rather
+than silently optimizing a reduced problem. Proposal metadata records the
+preference policy, weights, and scales used.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

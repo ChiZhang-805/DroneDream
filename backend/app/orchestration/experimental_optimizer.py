@@ -418,6 +418,9 @@ def propose_experimental_generation(
         candidates=candidates,
     )
     strategy = cast(ExperimentalOptimizerStrategy, strategy_value)
+    objective_config = schemas.ObjectiveConfig(
+        **(job.objective_config_json or {})
+    )
     request = OptimizerRequest(
         strategy=strategy,
         generation_index=generation_index,
@@ -429,6 +432,14 @@ def propose_experimental_generation(
             observations=observations,
         ),
         observations=observations,
+        objective_weights=tuple(
+            (objective.metric, objective.weight)
+            for objective in objective_config.objectives
+        ),
+        objective_normalizations=tuple(
+            (objective.metric, objective.normalization)
+            for objective in objective_config.objectives
+        ),
         fidelity_mapping=fidelity_mapping,
         required_fidelity=required_fidelity,
     )

@@ -512,6 +512,66 @@ def test_pending_candidate_is_visible_but_excluded_from_bayesian_training(
         assert proposals[0].parameters != pending.parameter_json
 
 
+def test_job_objective_preferences_reach_bayesian_vector_acquisition(
+    experimental_ctx: dict[str, Any],
+) -> None:
+    ctx = experimental_ctx
+    job_id = _create_job(ctx, "constrained_mobo")
+    from app.orchestration.experimental_optimizer import (
+        propose_experimental_generation,
+    )
+
+    with ctx["db"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        for index, (parameter, rmse) in enumerate(
+            ((0.6, 0.8), (0.8, 0.5), (1.0, 0.3), (1.2, 0.6)),
+            start=1,
+        ):
+            job.candidates.append(
+                ctx["models"].CandidateParameterSet(
+                    job_id=job.id,
+                    generation_index=index,
+                    source_type="optimizer",
+                    label=f"preference-evidence-{index}",
+                    parameter_json={"MPC_XY_P": parameter},
+                    aggregated_score=rmse,
+                    aggregated_metric_json={
+                        "objective_values": {"rmse": rmse},
+                        "constraint_violations": {},
+                        "scalar_loss": rmse,
+                        "feasible": True,
+                    },
+                    optimizer_metadata_json={
+                        "strategy": "constrained_mobo",
+                        "fidelity": 1.0,
+                    },
+                    trial_count=1,
+                    completed_trial_count=1,
+                    failed_trial_count=0,
+                )
+            )
+        db.flush()
+
+        proposals = propose_experimental_generation(
+            job=job,
+            candidates=list(job.candidates),
+            baseline_parameters={"MPC_XY_P": 0.95},
+            generation_index=5,
+            batch_size=1,
+        )
+
+        assert proposals
+        metadata = proposals[0].metadata
+        assert metadata["acquisition_representation"] == "objective_vector"
+        assert (
+            metadata["scalarization_policy"]
+            == "fixed_configured_objective_weights"
+        )
+        assert metadata["objective_weights"] == {"rmse": 1.0}
+        assert metadata["objective_normalizations"] == {"rmse": 1.0}
+
+
 @pytest.mark.parametrize("strategy", ("surrogate_cma_es", "bipop_cma_es"))
 def test_pending_cma_offspring_reserves_its_cohort_position_without_training(
     experimental_ctx: dict[str, Any], strategy: str
