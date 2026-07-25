@@ -250,7 +250,9 @@ def test_large_history_reports_objective_and_feasibility_active_sets(
     assert training["limit_per_exact_gp"] == 12
     assert "active set" in training["method"]
     assert training["feasibility"] == {"source": 40, "active": 12}
-    assert training["metrics"]["__loss__"] == {"source": 40, "active": 12}
+    assert proposals[0].metadata["acquisition_representation"] == "objective_vector"
+    assert proposals[0].metadata["uses_scalar_loss"] is False
+    assert "__loss__" not in training["metrics"]
     assert training["metrics"]["tracking"] == {"source": 40, "active": 12}
     assert training["metrics"]["speed"] == {"source": 40, "active": 12}
 
@@ -610,6 +612,52 @@ def test_constrained_mobo_honors_objective_direction_when_loss_is_uninformative(
 
     assert min(proposal.parameters["x"] for proposal in maximize) > 0.9
     assert max(proposal.parameters["x"] for proposal in minimize) < 0.1
+
+
+def test_bayesian_acquisition_never_blends_objective_vector_and_scalar_loss() -> None:
+    search_space = _space()
+    vector_history = _grid_observations()
+    vector_proposals = propose_bayesian_candidates(
+        search_space,
+        _request("constrained_mobo", vector_history, seed=419),
+    )
+    scalar_history = tuple(
+        replace(
+            observation,
+            objectives={},
+            objective_directions={},
+        )
+        for observation in vector_history
+    )
+    scalar_proposals = propose_bayesian_candidates(
+        search_space,
+        _request("constrained_mobo", scalar_history, seed=419),
+    )
+
+    for proposal in vector_proposals:
+        assert proposal.metadata["acquisition_representation"] == "objective_vector"
+        assert proposal.metadata["objective_models"] == ["speed", "tracking"]
+        assert proposal.metadata["uses_scalar_loss"] is False
+        assert "__loss__" not in proposal.metadata["gp_training_set"]["metrics"]
+    for proposal in scalar_proposals:
+        assert proposal.metadata["acquisition_representation"] == "scalar_loss"
+        assert proposal.metadata["objective_models"] == []
+        assert proposal.metadata["uses_scalar_loss"] is True
+        assert set(proposal.metadata["gp_training_set"]["metrics"]) == {"__loss__"}
+
+
+def test_turbo_uses_declared_scalar_loss_as_its_only_objective_representation() -> None:
+    proposals = propose_bayesian_candidates(
+        _space(),
+        _request("turbo", _grid_observations(), seed=421),
+    )
+
+    assert proposals
+    for proposal in proposals:
+        assert proposal.metadata["acquisition_representation"] == "scalar_loss"
+        assert proposal.metadata["objective_models"] == []
+        assert proposal.metadata["uses_scalar_loss"] is True
+        assert set(proposal.metadata["gp_training_set"]["metrics"]) == {"__loss__"}
 
 
 def test_non_mf_safety_model_ignores_reduced_fidelity_labels() -> None:

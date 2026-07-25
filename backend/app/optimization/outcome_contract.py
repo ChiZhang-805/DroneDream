@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from app import schemas
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "1.0"
+OUTCOME_CONTRACT_COMPILER_VERSION = "1.1"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
@@ -124,6 +124,13 @@ class OutcomeFailurePolicy(_FrozenModel):
 
 class OutcomeSelectionPolicy(_FrozenModel):
     schema_version: Literal["1.0"] = "1.0"
+    optimizer_objective_representation_policy: Literal[
+        "one_representation_per_tool_call"
+    ] = "one_representation_per_tool_call"
+    bayesian_multiobjective_policy: Literal[
+        "joint_objective_vector_else_scalar_loss"
+    ] = "joint_objective_vector_else_scalar_loss"
+    scalar_optimizer_policy: Literal["scalar_loss_only"] = "scalar_loss_only"
     precedence: tuple[str, ...] = (
         "evidence_complete",
         "hard_feasible",
@@ -149,7 +156,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["1.0"] = "1.0"
+    compiler_version: Literal["1.1"] = "1.1"
     contract_id: str
     metric_registry_sha256: str
     objective_config_sha256: str

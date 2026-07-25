@@ -506,7 +506,9 @@ def test_pending_candidate_is_visible_but_excluded_from_bayesian_training(
         diagnostics = proposals[0].metadata["gp_training_set"]
         assert diagnostics["feasibility"] == {"source": 3, "active": 3}
         assert diagnostics["metrics"]["__loss__"] == {"source": 3, "active": 3}
-        assert diagnostics["metrics"]["rmse"] == {"source": 3, "active": 3}
+        assert "rmse" not in diagnostics["metrics"]
+        assert proposals[0].metadata["acquisition_representation"] == "scalar_loss"
+        assert proposals[0].metadata["uses_scalar_loss"] is True
         assert proposals[0].parameters != pending.parameter_json
 
 

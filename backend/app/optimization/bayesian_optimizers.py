@@ -22,7 +22,7 @@ import math
 import random
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Protocol
+from typing import Literal, Protocol
 
 from app.optimization.design import MAX_HALTON_DIMENSIONS, halton_design
 from app.optimization.domain import SearchSpace
@@ -81,6 +81,13 @@ class _MetricModel:
         # dividing that uncertainty by 1e-9 and letting a flat auxiliary
         # metric overwhelm every informative objective.
         return max(1.0, abs(self.best) * 0.05)
+
+
+_AcquisitionRepresentation = Literal[
+    "objective_vector",
+    "scalar_loss",
+    "exploration_only",
+]
 
 
 @dataclass(frozen=True)
@@ -675,6 +682,74 @@ def _loss_utility(features: Sequence[float], model: _MetricModel | None) -> floa
     return math.log1p(improvement / model.span)
 
 
+def _select_acquisition_representation(
+    loss_model: _MetricModel | None,
+    objective_models: Sequence[_MetricModel],
+    scalarizations: Sequence[Sequence[float]],
+    incumbents: Sequence[float],
+) -> tuple[
+    _AcquisitionRepresentation,
+    _MetricModel | None,
+    tuple[_MetricModel, ...],
+]:
+    """Select exactly one objective representation for one optimizer call.
+
+    A complete joint objective incumbent is required before vector acquisition
+    is meaningful.  Otherwise the declared scalar loss is the only objective
+    authority.  The two representations are never blended because scalar loss
+    is derived from the same objective evidence and would count it twice.
+    """
+
+    objective_tuple = tuple(objective_models)
+    if (
+        objective_tuple
+        and scalarizations
+        and len(incumbents) == len(scalarizations)
+    ):
+        return "objective_vector", None, objective_tuple
+    if loss_model is not None:
+        return "scalar_loss", loss_model, ()
+    return "exploration_only", None, ()
+
+
+def _acquisition_utility(
+    features: Sequence[float],
+    *,
+    representation: _AcquisitionRepresentation,
+    loss_model: _MetricModel | None,
+    objective_models: Sequence[_MetricModel],
+    scalarizations: Sequence[Sequence[float]],
+    incumbents: Sequence[float],
+) -> float:
+    if representation == "objective_vector":
+        return _multiobjective_utility(
+            features,
+            objective_models,
+            scalarizations,
+            incumbents,
+        )
+    if representation == "scalar_loss":
+        return _loss_utility(features, loss_model)
+    return 0.0
+
+
+def _representation_uncertainty(
+    features: Sequence[float],
+    *,
+    loss_model: _MetricModel | None,
+    objective_models: Sequence[_MetricModel],
+) -> float:
+    models = list(objective_models)
+    if loss_model is not None:
+        models.append(loss_model)
+    if not models:
+        return 1.0
+    return sum(
+        model.predictor.predict(features).standard_deviation / model.span
+        for model in models
+    ) / len(models)
+
+
 def _make_candidate(
     search_space: SearchSpace, vector: Sequence[float], *, fidelity: float = 1.0
 ) -> _Candidate | None:
@@ -997,23 +1072,32 @@ def _standard_constrained_mobo(
         objective_models,
         scalarizations,
     )
-    scores: dict[tuple[tuple[str, float], ...], float] = {}
-    probabilities: dict[tuple[tuple[str, float], ...], float] = {}
-    for candidate in pool:
-        probability = feasibility.probability(candidate.vector)
-        objective_utility = _multiobjective_utility(
-            candidate.vector,
+    representation, loss_model, objective_models = (
+        _select_acquisition_representation(
+            loss_model,
             objective_models,
             scalarizations,
             incumbents,
         )
-        loss_utility = _loss_utility(candidate.vector, loss_model)
-        exploration = 0.0
-        if loss_model is not None:
-            exploration = (
-                loss_model.predictor.predict(candidate.vector).standard_deviation / loss_model.span
-            )
-        utility = 0.7 * objective_utility + 0.3 * loss_utility + 0.015 * exploration
+    )
+    scores: dict[tuple[tuple[str, float], ...], float] = {}
+    probabilities: dict[tuple[tuple[str, float], ...], float] = {}
+    for candidate in pool:
+        probability = feasibility.probability(candidate.vector)
+        utility = _acquisition_utility(
+            candidate.vector,
+            representation=representation,
+            loss_model=loss_model,
+            objective_models=objective_models,
+            scalarizations=scalarizations,
+            incumbents=incumbents,
+        )
+        exploration = _representation_uncertainty(
+            candidate.vector,
+            loss_model=loss_model,
+            objective_models=objective_models,
+        )
+        utility += 0.015 * exploration
         key = _parameter_key(candidate.parameters)
         scores[key] = max(1e-15, utility) * probability**1.5
         probabilities[key] = probability
@@ -1033,6 +1117,7 @@ def _standard_constrained_mobo(
                     probabilities[_parameter_key(candidate.parameters)], 8
                 ),
                 "acquisition_score": round(scores[_parameter_key(candidate.parameters)], 12),
+                "acquisition_representation": representation,
                 "objective_models": [model.name for model in objective_models],
                 "uses_scalar_loss": loss_model is not None,
                 "training_observations": len(request.observations),
@@ -1115,6 +1200,14 @@ def _multi_fidelity_mobo(
         scalarizations,
         prefer_full_fidelity=True,
     )
+    representation, loss_model, objective_models = (
+        _select_acquisition_representation(
+            loss_model,
+            objective_models,
+            scalarizations,
+            incumbents,
+        )
+    )
     evaluated_by_parameter: dict[tuple[tuple[str, float], ...], list[OptimizerObservation]] = {}
     for observation in request.observations:
         evaluated_by_parameter.setdefault(_parameter_key(observation.parameters), []).append(
@@ -1123,14 +1216,17 @@ def _multi_fidelity_mobo(
     scored: list[tuple[float, _Candidate, float]] = []
     for base in base_pool:
         target_features = (*base.vector, 1.0)
-        target_objective = _multiobjective_utility(
-            target_features,
-            objective_models,
-            scalarizations,
-            incumbents,
+        target_value = max(
+            1e-12,
+            _acquisition_utility(
+                target_features,
+                representation=representation,
+                loss_model=loss_model,
+                objective_models=objective_models,
+                scalarizations=scalarizations,
+                incumbents=incumbents,
+            ),
         )
-        target_loss = _loss_utility(target_features, loss_model)
-        target_value = max(1e-12, 0.7 * target_objective + 0.3 * target_loss)
         for requested_fidelity in levels:
             effective_fidelity = _effective_fidelity(request, requested_fidelity)
             if any(
@@ -1144,15 +1240,14 @@ def _multi_fidelity_mobo(
                 continue
             features = (*base.vector, effective_fidelity)
             probability = feasibility.probability(features)
-            uncertainties = [
-                model.predictor.predict(features).standard_deviation / model.span
-                for model in objective_models
-            ]
-            if loss_model is not None:
-                uncertainties.append(
-                    loss_model.predictor.predict(features).standard_deviation / loss_model.span
-                )
-            information = max(0.02, sum(uncertainties) / max(1, len(uncertainties)))
+            information = max(
+                0.02,
+                _representation_uncertainty(
+                    features,
+                    loss_model=loss_model,
+                    objective_models=objective_models,
+                ),
+            )
             # A sublinear cost curve reflects that startup overhead is not free,
             # while still rewarding cheap screening evaluations.
             relative_cost = 0.18 + 0.82 * effective_fidelity**1.35
@@ -1197,6 +1292,7 @@ def _multi_fidelity_mobo(
                     str(level): _effective_fidelity(request, level) for level in levels
                 },
                 "required_fidelity": request.required_fidelity,
+                "acquisition_representation": representation,
                 "objective_models": [model.name for model in objective_models],
                 "uses_scalar_loss": loss_model is not None,
                 "training_observations": len(request.observations),
@@ -1272,7 +1368,8 @@ def _turbo(search_space: SearchSpace, request: OptimizerRequest) -> list[Experim
     feasibility = _FeasibilityModel(
         model_request.observations, search_space, feature_builder=feature_builder
     )
-    loss_model, objective_models = _fit_models(
+    loss_model = _fit_metric_model(
+        "__loss__",
         model_request.observations, feature_builder=feature_builder
     )
     valid = [
@@ -1307,32 +1404,18 @@ def _turbo(search_space: SearchSpace, request: OptimizerRequest) -> list[Experim
         center=center,
         radius=radius,
     )
-    scalarizations = _random_scalarizations(12, len(objective_models), rng)
-    incumbents = _joint_scalarized_incumbents(
-        model_request.observations,
-        objective_models,
-        scalarizations,
-    )
     scores: dict[tuple[tuple[str, float], ...], float] = {}
     probabilities: dict[tuple[tuple[str, float], ...], float] = {}
     for candidate in pool:
         probability = feasibility.probability(candidate.vector)
         local_loss = _loss_utility(candidate.vector, loss_model)
-        multiobjective = _multiobjective_utility(
-            candidate.vector,
-            objective_models,
-            scalarizations,
-            incumbents,
-        )
         distance = math.sqrt(
             sum((left - right) ** 2 for left, right in zip(candidate.vector, center, strict=True))
             / max(1, len(center))
         )
         trust_weight = math.exp(-0.5 * (distance / max(0.05, radius)) ** 2)
         key = _parameter_key(candidate.parameters)
-        scores[key] = (
-            max(1e-15, 0.8 * local_loss + 0.2 * multiobjective) * probability**1.5 * trust_weight
-        )
+        scores[key] = max(1e-15, local_loss) * probability**1.5 * trust_weight
         probabilities[key] = probability
     observed = {_parameter_key(item.parameters) for item in model_request.observations}
     selected = _select_diverse(pool, scores, count=request.batch_size, observed=observed)
@@ -1352,9 +1435,12 @@ def _turbo(search_space: SearchSpace, request: OptimizerRequest) -> list[Experim
                     probabilities[_parameter_key(candidate.parameters)], 8
                 ),
                 "acquisition_score": round(scores[_parameter_key(candidate.parameters)], 12),
+                "acquisition_representation": "scalar_loss",
+                "objective_models": [],
+                "uses_scalar_loss": loss_model is not None,
                 "training_observations": len(request.observations),
                 "gp_training_set": _gp_active_set_metadata(
-                    feasibility, loss_model, objective_models
+                    feasibility, loss_model, ()
                 ),
                 "random_seed": request.random_seed,
             },
@@ -1429,16 +1515,26 @@ def _saasbo(search_space: SearchSpace, request: OptimizerRequest) -> list[Experi
         objective_models,
         scalarizations,
     )
+    representation, loss_model, objective_models = (
+        _select_acquisition_representation(
+            loss_model,
+            objective_models,
+            scalarizations,
+            incumbents,
+        )
+    )
     scores: dict[tuple[tuple[str, float], ...], float] = {}
     probabilities: dict[tuple[tuple[str, float], ...], float] = {}
     for candidate in pool:
         probability = feasibility.probability(candidate.vector)
-        utility = 0.65 * _multiobjective_utility(
+        utility = _acquisition_utility(
             candidate.vector,
-            objective_models,
-            scalarizations,
-            incumbents,
-        ) + 0.35 * _loss_utility(candidate.vector, loss_model)
+            representation=representation,
+            loss_model=loss_model,
+            objective_models=objective_models,
+            scalarizations=scalarizations,
+            incumbents=incumbents,
+        )
         key = _parameter_key(candidate.parameters)
         scores[key] = max(1e-15, utility) * probability**1.5
         probabilities[key] = probability
@@ -1460,6 +1556,9 @@ def _saasbo(search_space: SearchSpace, request: OptimizerRequest) -> list[Experi
                     probabilities[_parameter_key(candidate.parameters)], 8
                 ),
                 "acquisition_score": round(scores[_parameter_key(candidate.parameters)], 12),
+                "acquisition_representation": representation,
+                "objective_models": [model.name for model in objective_models],
+                "uses_scalar_loss": loss_model is not None,
                 "training_observations": len(request.observations),
                 "gp_training_set": _gp_active_set_metadata(
                     feasibility, loss_model, objective_models

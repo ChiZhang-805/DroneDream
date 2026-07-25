@@ -201,6 +201,16 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
+    assert first.compiler_version == "1.1"
+    assert (
+        first.selection_policy.optimizer_objective_representation_policy
+        == "one_representation_per_tool_call"
+    )
+    assert (
+        first.selection_policy.bayesian_multiobjective_policy
+        == "joint_objective_vector_else_scalar_loss"
+    )
+    assert first.selection_policy.scalar_optimizer_policy == "scalar_loss_only"
 
     changed = compile_outcome_contract(
         objective_config,

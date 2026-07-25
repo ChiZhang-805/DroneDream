@@ -166,6 +166,13 @@ CMA centering, public ranking, experimental optimizer observations, and reports
 therefore consume compatible meanings instead of silently double-counting hard
 feasibility.
 
+Outcome Contract compiler 1.1 also fixes the objective representation used by
+each numerical call. A Bayesian multi-objective call uses a complete joint
+objective vector when one exists and otherwise falls back to declared scalar
+loss; it never blends both. TuRBO and CMA-family scalar-state optimizers use
+scalar loss only. Proposal metadata records the selected representation so the
+decision can be replayed and audited.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.
