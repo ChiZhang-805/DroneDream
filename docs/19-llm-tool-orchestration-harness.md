@@ -8068,6 +8068,9 @@ The implemented evidence-v2 compiler:
 
 - exposes remaining generations and Trials, per-Candidate Trial cost, parameter
   dimension, objective/constraint counts, and trusted catalog parameter names;
+- derives `full_trials_per_candidate` and `remaining_full_candidate_capacity`
+  through the same validated `ScenarioSuiteConfig` plus `scenario_matrix()` path
+  used by the dispatcher, including enabled training and holdout seed rows;
 - summarizes training and validation scenario/replicate counts without sending
   scenario IDs, seeds, arbitrary case configuration, or sealed-test material;
 - computes completed/incomplete/feasible Candidate counts, measured failure rate,
@@ -8086,7 +8089,7 @@ The implemented evidence-v2 compiler:
 - rejects mappings, strings, labels, free-form diagnostics, proposal rationale,
   errors, Candidate IDs, parameter values, arbitrary JSON, and mixed numeric/text
   metric arrays at the prompt boundary;
-- uses `evidence_schema_version=2.0` and `tool_registry_version=2.0` in capability
+- uses `evidence_schema_version=2.1` and `tool_registry_version=2.0` in capability
   discovery and decision/tool-execution events; and
 - presents a richer static tool manifest with explicit search roles, applicability
   signals, and declared constraint, multi-objective, and multi-fidelity support.
@@ -8103,6 +8106,11 @@ development corpus covering cold start, local progress, stagnation, constraint
 pressure, high dimension, tight budget, failure recovery, and mixed tool history.
 `backend/scripts/evaluate_harness_router.py` validates that corpus, can emit the exact
 secretless production messages, and grades a complete case-to-tool prediction file.
+It also reports every constant-tool baseline and the uniform-random expectation,
+then measures supplied predictions against both without using case categories or
+grader rationale. In corpus v1 the random expectation is 23.4375%, while the best
+constant policy (`optimizer_portfolio`) reaches 58.3333% (14/24); therefore raw
+accuracy alone is not sufficient evidence that a router uses the supplied signals.
 Tests prove that case IDs, acceptable answers, grader rationale, scenario IDs,
 scenario configuration, seeds, and injected text do not enter those messages.
 Byte-invariance tests additionally prove that changing only untrusted display names,
@@ -8137,6 +8145,8 @@ cd backend
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 
 24 cases; 8 categories; 8 registered tools
+uniform-random expectation: 5.625/24 (23.4375%)
+best constant tool: optimizer_portfolio, 14/24 (58.3333%)
 ```
 
 ## 31. Reference index

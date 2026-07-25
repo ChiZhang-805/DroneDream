@@ -717,7 +717,7 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
     assert decision.tool_id == "bipop_cma_es"
     provider_payload = json.loads(fake.calls[0]["user"])
     evidence = provider_payload["evidence"]
-    assert evidence["schema_version"] == "2.0"
+    assert evidence["schema_version"] == "2.1"
     assert evidence["budget"] == {
         "current_generation": 3,
         "max_iterations": 6,
@@ -725,7 +725,8 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
         "used_trials": 12,
         "max_total_trials": 40,
         "remaining_trials": 28,
-        "trials_per_candidate": 2,
+        "full_trials_per_candidate": 3,
+        "remaining_full_candidate_capacity": 9,
     }
     assert evidence["scenarios"] == {
         "training_case_count": 1,
@@ -760,7 +761,7 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
     ]
     assert provider_payload["tool_manifest"]["registry_version"] == "2.0"
     assert len(provider_payload["tool_manifest"]["tools"]) == 8
-    assert started_event.payload_json["evidence_schema_version"] == "2.0"
+    assert started_event.payload_json["evidence_schema_version"] == "2.1"
     assert started_event.payload_json["tool_registry_version"] == "2.0"
 
     serialized = fake.calls[0]["user"]
@@ -795,7 +796,7 @@ def test_harness_prompt_is_invariant_to_untrusted_fields_and_sensitive_to_scores
         job.scenario_suite_json = {
             "cases": [
                 {
-                    "id": "FIRST PRIVATE SCENARIO ID",
+                    "id": "FIRST-PRIVATE-SCENARIO-ID",
                     "scenario_type": "wind_perturbed",
                     "seeds": [101, 102],
                     "enabled": True,
@@ -832,7 +833,7 @@ def test_harness_prompt_is_invariant_to_untrusted_fields_and_sensitive_to_scores
         job.scenario_suite_json = {
             "cases": [
                 {
-                    "id": "SECOND PRIVATE SCENARIO ID",
+                    "id": "SECOND-PRIVATE-SCENARIO-ID",
                     "scenario_type": "wind_perturbed",
                     "seeds": [9001, 9002],
                     "enabled": True,
@@ -881,7 +882,9 @@ def test_harness_prompt_is_invariant_to_untrusted_fields_and_sensitive_to_scores
     serialized = before_messages[1] + after_untrusted_messages[1]
     for forbidden in (
         "FIRST PRIVATE",
+        "FIRST-PRIVATE",
         "SECOND PRIVATE",
+        "SECOND-PRIVATE",
         "999.0",
     ):
         assert forbidden not in serialized

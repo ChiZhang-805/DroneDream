@@ -126,6 +126,33 @@ class HarnessRoutingEvalSummary(_ClosedModel):
     grades: tuple[HarnessRoutingGrade, ...]
 
 
+class HarnessConstantToolBaseline(_ClosedModel):
+    tool_id: HarnessToolId
+    passed_count: int = Field(ge=0)
+    pass_rate: float = Field(ge=0.0, le=1.0)
+
+
+class HarnessRoutingBaselineSummary(_ClosedModel):
+    schema_version: Literal["1.0"] = "1.0"
+    case_count: int = Field(ge=1)
+    tool_count: int = Field(ge=1)
+    uniform_random_expected_passed_count: float = Field(ge=0.0)
+    uniform_random_expected_pass_rate: float = Field(ge=0.0, le=1.0)
+    best_constant_passed_count: int = Field(ge=0)
+    best_constant_pass_rate: float = Field(ge=0.0, le=1.0)
+    best_constant_tools: tuple[HarnessToolId, ...] = Field(min_length=1)
+    constant_tool_results: tuple[HarnessConstantToolBaseline, ...] = Field(min_length=1)
+
+
+class HarnessRoutingEvalReport(_ClosedModel):
+    schema_version: Literal["1.0"] = "1.0"
+    predictions: HarnessRoutingEvalSummary
+    baselines: HarnessRoutingBaselineSummary
+    absolute_lift_over_uniform_random: float
+    absolute_lift_over_best_constant: float
+    beats_best_constant: bool
+
+
 def load_routing_eval_cases(path: Path) -> tuple[HarnessRoutingEvalCase, ...]:
     """Load and strictly validate a JSONL development corpus."""
 
@@ -232,7 +259,10 @@ def compile_routing_eval_snapshot(
             used_trials=used_trials,
             max_total_trials=max_total_trials,
             remaining_trials=stimulus.remaining_trials,
-            trials_per_candidate=stimulus.trials_per_candidate,
+            full_trials_per_candidate=stimulus.trials_per_candidate,
+            remaining_full_candidate_capacity=(
+                stimulus.remaining_trials // stimulus.trials_per_candidate
+            ),
         ),
         scenarios=HarnessScenarioEvidence(
             training_case_count=stimulus.training_case_count,
@@ -318,14 +348,78 @@ def summarize_routing_predictions(
     )
 
 
+def summarize_routing_baselines(
+    cases: tuple[HarnessRoutingEvalCase, ...],
+) -> HarnessRoutingBaselineSummary:
+    """Compute non-adaptive baselines without using case categories or rationales."""
+
+    if not cases:
+        raise ValueError("cannot summarize routing baselines for an empty corpus")
+    tool_ids = tuple(HARNESS_TOOL_DEFINITIONS)
+    constant_result_items: list[HarnessConstantToolBaseline] = []
+    for tool_id in tool_ids:
+        passed = sum(1 for case in cases if tool_id in case.acceptable_tools)
+        constant_result_items.append(
+            HarnessConstantToolBaseline(
+                tool_id=tool_id,
+                passed_count=passed,
+                pass_rate=passed / len(cases),
+            )
+        )
+    constant_results = tuple(constant_result_items)
+    best_passed = max(result.passed_count for result in constant_results)
+    expected_random_passed = sum(
+        len(case.acceptable_tools) / len(tool_ids) for case in cases
+    )
+    return HarnessRoutingBaselineSummary(
+        case_count=len(cases),
+        tool_count=len(tool_ids),
+        uniform_random_expected_passed_count=expected_random_passed,
+        uniform_random_expected_pass_rate=expected_random_passed / len(cases),
+        best_constant_passed_count=best_passed,
+        best_constant_pass_rate=best_passed / len(cases),
+        best_constant_tools=tuple(
+            result.tool_id
+            for result in constant_results
+            if result.passed_count == best_passed
+        ),
+        constant_tool_results=constant_results,
+    )
+
+
+def build_routing_eval_report(
+    cases: tuple[HarnessRoutingEvalCase, ...],
+    predictions: dict[str, HarnessToolId],
+) -> HarnessRoutingEvalReport:
+    """Compare complete predictions against chance and best constant routing."""
+
+    summary = summarize_routing_predictions(cases, predictions)
+    baselines = summarize_routing_baselines(cases)
+    return HarnessRoutingEvalReport(
+        predictions=summary,
+        baselines=baselines,
+        absolute_lift_over_uniform_random=(
+            summary.pass_rate - baselines.uniform_random_expected_pass_rate
+        ),
+        absolute_lift_over_best_constant=(
+            summary.pass_rate - baselines.best_constant_pass_rate
+        ),
+        beats_best_constant=summary.pass_rate > baselines.best_constant_pass_rate,
+    )
+
+
 __all__ = [
     "HARNESS_ROUTING_EVAL_SCHEMA_VERSION",
+    "HarnessRoutingBaselineSummary",
     "HarnessRoutingEvalCase",
+    "HarnessRoutingEvalReport",
     "HarnessRoutingEvalSummary",
     "HarnessRoutingGrade",
     "HarnessRoutingStimulus",
+    "build_routing_eval_report",
     "compile_routing_eval_snapshot",
     "grade_routing_decision",
     "load_routing_eval_cases",
+    "summarize_routing_baselines",
     "summarize_routing_predictions",
 ]

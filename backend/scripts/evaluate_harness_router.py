@@ -10,9 +10,10 @@ from typing import cast
 from app.orchestration.decision_harness import build_decision_messages
 from app.orchestration.harness_context import HARNESS_TOOL_DEFINITIONS, HarnessToolId
 from app.orchestration.harness_evaluation import (
+    build_routing_eval_report,
     compile_routing_eval_snapshot,
     load_routing_eval_cases,
-    summarize_routing_predictions,
+    summarize_routing_baselines,
 )
 
 
@@ -49,6 +50,7 @@ def main() -> int:
         "categories": sorted({case.category for case in cases}),
         "tool_count": len(HARNESS_TOOL_DEFINITIONS),
     }
+    result["baselines"] = summarize_routing_baselines(cases).model_dump(mode="json")
 
     if args.emit_prompts is not None:
         with args.emit_prompts.open("w", encoding="utf-8", newline="\n") as handle:
@@ -77,10 +79,20 @@ def main() -> int:
             if not isinstance(case_id, str) or tool_id not in HARNESS_TOOL_DEFINITIONS:
                 raise ValueError("predictions contain an invalid case or tool ID")
             predictions[case_id] = cast(HarnessToolId, tool_id)
-        result["grade"] = summarize_routing_predictions(
+        report = build_routing_eval_report(
             cases,
             predictions,
-        ).model_dump(mode="json")
+        )
+        result["grade"] = report.predictions.model_dump(mode="json")
+        result["comparison"] = {
+            "absolute_lift_over_uniform_random": (
+                report.absolute_lift_over_uniform_random
+            ),
+            "absolute_lift_over_best_constant": (
+                report.absolute_lift_over_best_constant
+            ),
+            "beats_best_constant": report.beats_best_constant,
+        }
 
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0

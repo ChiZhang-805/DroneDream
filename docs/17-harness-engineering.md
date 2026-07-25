@@ -95,6 +95,9 @@ from the closed optimizer registry; the server validates that identifier and
 remains the only dispatcher. The dispatcher skips the model entirely when no
 generation or Trial budget remains, so an impossible plan cannot consume
 provider quota before deterministic rejection.
+The displayed full-Candidate Trial cost and remaining full-Candidate capacity
+come from the same validated scenario-matrix compiler used by dispatch, including
+enabled training and holdout seed rows rather than the legacy Job default.
 
 Provider-visible evidence never includes user labels, candidate IDs, parameter
 values, scenario IDs or seeds, free-form simulator/model text, credentials, or
@@ -110,5 +113,8 @@ synthetic 1,001-Candidate history below the minimum configured 32 KiB prompt lim
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.
+Its report includes uniform-random and all eight constant-tool baselines; the best
+constant policy currently scores 14/24, so a candidate router must be compared
+against that 58.33% floor rather than against chance alone.
 It is a regression tool, not evidence that model routing outperforms the
 deterministic portfolio; that claim still requires the frozen simulator campaign.

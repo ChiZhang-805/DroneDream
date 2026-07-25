@@ -16,7 +16,8 @@ from typing import Literal, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app import models
+from app import models, schemas
+from app.optimization.scenarios import scenario_matrix
 from app.parameters import get_parameter
 
 HarnessToolId = Literal[
@@ -33,7 +34,7 @@ HarnessSourceType = Literal["baseline", "optimizer", "llm_optimizer", "unknown"]
 HarnessObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom", "unknown"]
 HarnessTrackType = Literal["circle", "u_turn", "lemniscate", "custom", "unknown"]
 
-HARNESS_EVIDENCE_SCHEMA_VERSION = "2.0"
+HARNESS_EVIDENCE_SCHEMA_VERSION = "2.1"
 HARNESS_TOOL_REGISTRY_VERSION = "2.0"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
@@ -237,7 +238,8 @@ class HarnessBudgetEvidence(_ClosedModel):
     used_trials: int = Field(ge=0)
     max_total_trials: int = Field(ge=0)
     remaining_trials: int = Field(ge=0)
-    trials_per_candidate: int = Field(ge=1)
+    full_trials_per_candidate: int = Field(ge=1)
+    remaining_full_candidate_capacity: int = Field(ge=0)
 
 
 class HarnessScenarioEvidence(_ClosedModel):
@@ -320,7 +322,7 @@ class HarnessJobEvidence(_ClosedModel):
 
 
 class HarnessEvidenceSnapshot(_ClosedModel):
-    schema_version: Literal["2.0"] = "2.0"
+    schema_version: Literal["2.1"] = "2.1"
     job: HarnessJobEvidence
     budget: HarnessBudgetEvidence
     scenarios: HarnessScenarioEvidence
@@ -431,8 +433,7 @@ def _registered_parameter_names(job: models.Job) -> tuple[str, ...]:
 
 def _scenario_evidence(job: models.Job) -> HarnessScenarioEvidence:
     raw_suite = job.scenario_suite_json if isinstance(job.scenario_suite_json, dict) else {}
-    raw_cases = raw_suite.get("cases")
-    if not isinstance(raw_cases, list):
+    if not raw_suite:
         return HarnessScenarioEvidence(
             training_case_count=1,
             validation_case_count=0,
@@ -441,34 +442,27 @@ def _scenario_evidence(job: models.Job) -> HarnessScenarioEvidence:
             training_type_counts={},
             common_random_numbers=None,
         )
-    training_cases = 0
-    validation_cases = 0
-    training_replicates = 0
-    validation_replicates = 0
+    suite = schemas.ScenarioSuiteConfig(**raw_suite)
+    runs = scenario_matrix(suite)
     type_counts: dict[str, int] = defaultdict(int)
-    for case in raw_cases[:64]:
-        if not isinstance(case, dict) or case.get("enabled", True) is not True:
+    training_case_count = 0
+    validation_case_count = 0
+    for case in suite.cases:
+        if not case.enabled:
             continue
-        seeds = case.get("seeds")
-        replicate_count = len(seeds[:100]) if isinstance(seeds, list) else 0
-        is_validation = case.get("holdout", False) is True
-        if is_validation:
-            validation_cases += 1
-            validation_replicates += replicate_count
+        if case.holdout:
+            validation_case_count += 1
             continue
-        training_cases += 1
-        training_replicates += replicate_count
-        scenario_type = case.get("scenario_type")
-        if scenario_type in _ALLOWED_SCENARIO_TYPES:
-            type_counts[str(scenario_type)] += 1
-    crn = raw_suite.get("common_random_numbers")
+        training_case_count += 1
+        if case.scenario_type in _ALLOWED_SCENARIO_TYPES:
+            type_counts[str(case.scenario_type)] += 1
     return HarnessScenarioEvidence(
-        training_case_count=training_cases,
-        validation_case_count=validation_cases,
-        training_replicate_count=training_replicates,
-        validation_replicate_count=validation_replicates,
+        training_case_count=training_case_count,
+        validation_case_count=validation_case_count,
+        training_replicate_count=sum(1 for run in runs if not run.holdout),
+        validation_replicate_count=sum(1 for run in runs if run.holdout),
         training_type_counts=dict(sorted(type_counts.items())),
-        common_random_numbers=crn if isinstance(crn, bool) else None,
+        common_random_numbers=suite.common_random_numbers,
     )
 
 
@@ -783,6 +777,13 @@ def build_harness_evidence(
         robust_aggregation = "unknown"
     used_trials = max(0, int(job.progress_total_trials or 0))
     max_total_trials = max(0, int(job.max_total_trials or 0))
+    scenarios = _scenario_evidence(job)
+    full_trials_per_candidate = max(
+        1,
+        scenarios.training_replicate_count
+        + scenarios.validation_replicate_count,
+    )
+    remaining_trials = max(0, max_total_trials - used_trials)
     compact_candidates = _select_candidates(candidates)
     objective_profile = cast(
         HarnessObjectiveProfile,
@@ -815,10 +816,13 @@ def build_harness_evidence(
             ),
             used_trials=used_trials,
             max_total_trials=max_total_trials,
-            remaining_trials=max(0, max_total_trials - used_trials),
-            trials_per_candidate=max(1, int(job.trials_per_candidate or 1)),
+            remaining_trials=remaining_trials,
+            full_trials_per_candidate=full_trials_per_candidate,
+            remaining_full_candidate_capacity=(
+                remaining_trials // full_trials_per_candidate
+            ),
         ),
-        scenarios=_scenario_evidence(job),
+        scenarios=scenarios,
         search=_search_summary(candidates),
         tool_history=_tool_history(candidates),
         decision_memory=_decision_memory(list(execution_events)),
