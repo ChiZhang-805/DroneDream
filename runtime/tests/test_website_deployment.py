@@ -98,6 +98,29 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
             workflow,
         )
 
+    def test_pages_build_verifies_policy_source_and_compiled_policy_links(self) -> None:
+        builder = self.read("website/scripts/build-pages-site.ps1")
+        policy = self.read("CODE_SIGNING_POLICY.md")
+
+        self.assertIn('"SignPath.io"', builder)
+        self.assertIn('"SignPath Foundation"', builder)
+        self.assertIn(
+            "The code signing policy is missing required attribution",
+            builder,
+        )
+        self.assertIn('"CODE_SIGNING_POLICY.md"', builder)
+        self.assertIn('"PRIVACY.md"', builder)
+        self.assertNotRegex(
+            builder,
+            re.compile(
+                r"\$publishedAt,\s*"
+                r'"SignPath\.io",\s*'
+                r'"SignPath Foundation"',
+            ),
+        )
+        self.assertIn("Free code signing provided by [SignPath.io]", policy)
+        self.assertIn("certificate by [SignPath Foundation]", policy)
+
 
 if __name__ == "__main__":
     unittest.main()
