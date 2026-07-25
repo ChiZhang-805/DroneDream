@@ -99,6 +99,12 @@ The displayed full-Candidate Trial cost and remaining full-Candidate capacity
 come from the same validated scenario-matrix compiler used by dispatch, including
 enabled training and holdout seed rows rather than the legacy Job default.
 
+Every provider-call start event stores the bounded safe evidence snapshot and
+static tool manifest with evidence, manifest, and full-prompt SHA-256 values plus
+explicit prompt/trace versions. A pure verifier rebuilds the production messages
+and detects snapshot, manifest, or prompt drift. This is a reproducibility check,
+not a cryptographic signature or an immutable audit ledger.
+
 Provider-visible evidence never includes user labels, candidate IDs, parameter
 values, scenario IDs or seeds, free-form simulator/model text, credentials, or
 arbitrary JSON. Mixed numeric/text metric arrays are rejected as a whole rather

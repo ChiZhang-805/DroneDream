@@ -8123,6 +8123,17 @@ The execution-memory query deliberately avoids loading the mutable SQLAlchemy
 `job.events` relationship, preventing a same-transaction relationship cache from
 hiding decision events written later in the turn.
 
+For provider calls, `harness_decision_started` now persists the complete bounded,
+provider-safe Evidence 2.1 snapshot and static Tool Manifest 2.0 alongside their
+SHA-256 values, the production prompt SHA-256, Prompt Template 1.0, and Decision
+Trace 1.0 versions. `verify_harness_decision_trace()` validates the closed evidence
+schema, rebuilds the exact production messages from the persisted snapshot and
+manifest, and checks all three hashes. Tests demonstrate that a one-field evidence
+mutation invalidates both the evidence and prompt hashes. This supplies
+same-version reproducibility and accidental-corruption detection; it is not a
+signature, append-only log, or proof against an actor who can rewrite the mutable
+event row and every hash.
+
 This corpus is deliberately a development diagnostic, not the confirmatory
 simulator campaign in Section 22. It detects prompt/tool discrimination regressions
 and enables matched model comparisons, but it does not prove that an LLM router beats
@@ -8147,6 +8158,8 @@ cd backend
 24 cases; 8 categories; 8 registered tools
 uniform-random expectation: 5.625/24 (23.4375%)
 best constant tool: optimizer_portfolio, 14/24 (58.3333%)
+current provider-call traces: Evidence 2.1, Tool Manifest 2.0,
+Prompt Template 1.0, Decision Trace 1.0
 ```
 
 ## 31. Reference index

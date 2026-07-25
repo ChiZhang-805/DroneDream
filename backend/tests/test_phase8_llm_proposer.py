@@ -763,8 +763,29 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
     assert len(provider_payload["tool_manifest"]["tools"]) == 8
     assert started_event.payload_json["evidence_schema_version"] == "2.1"
     assert started_event.payload_json["tool_registry_version"] == "2.0"
+    assert started_event.payload_json["prompt_template_version"] == "1.0"
+    assert started_event.payload_json["trace_schema_version"] == "1.0"
+    assert started_event.payload_json["evidence_snapshot"] == evidence
+    assert started_event.payload_json["tool_manifest"] == provider_payload["tool_manifest"]
+    verification = ctx["decision_harness"].verify_harness_decision_trace(
+        started_event.payload_json
+    )
+    assert verification.valid is True
+    assert verification.failures == ()
+    assert verification.evidence_sha256 == decision.evidence_sha256
+    assert verification.prompt_sha256 == decision.prompt_sha256
+    assert len(json.dumps(started_event.payload_json).encode("utf-8")) < 32_768
 
-    serialized = fake.calls[0]["user"]
+    tampered_trace = json.loads(json.dumps(started_event.payload_json))
+    tampered_trace["evidence_snapshot"]["budget"]["remaining_trials"] -= 1
+    tampered = ctx["decision_harness"].verify_harness_decision_trace(
+        tampered_trace
+    )
+    assert tampered.valid is False
+    assert "evidence_sha256_mismatch" in tampered.failures
+    assert "prompt_sha256_mismatch" in tampered.failures
+
+    serialized = fake.calls[0]["user"] + json.dumps(started_event.payload_json)
     for forbidden in (
         "IGNORE DISPLAY NAME",
         "IGNORE-TRAINING-INSTRUCTIONS",
@@ -1045,6 +1066,7 @@ def test_harness_dispatch_routes_tool_without_mutating_job_mode(
     assert result.dispatched_candidates == 2
     assert result_event.payload_json["tool_id"] == "saasbo"
     assert result_event.payload_json["decision_source"] == "model"
+    assert result_event.payload_json["prompt_template_version"] == "1.0"
 
 
 @pytest.mark.parametrize(

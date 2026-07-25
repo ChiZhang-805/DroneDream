@@ -10,6 +10,10 @@ from fastapi import APIRouter
 from app import __version__
 from app.config import get_settings
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
+from app.orchestration.decision_harness import (
+    HARNESS_DECISION_TRACE_SCHEMA_VERSION,
+    HARNESS_PROMPT_TEMPLATE_VERSION,
+)
 from app.orchestration.harness_context import (
     HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_TOOL_REGISTRY_VERSION,
@@ -182,6 +186,8 @@ def read_capabilities() -> dict[str, object]:
                     "decision_schema_version": "1.0",
                     "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
                     "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+                    "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
+                    "trace_schema_version": HARNESS_DECISION_TRACE_SCHEMA_VERSION,
                     "tool_registry": "closed",
                 },
             },

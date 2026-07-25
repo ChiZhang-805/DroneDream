@@ -1395,6 +1395,7 @@ def dispatch_next_harness_generation(
             "fallback_reason": decision.fallback_reason,
             "evidence_schema_version": decision.evidence_schema_version,
             "tool_registry_version": decision.tool_registry_version,
+            "prompt_template_version": decision.prompt_template_version,
         },
     )
     return result

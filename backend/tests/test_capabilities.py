@@ -25,6 +25,8 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
         "decision_schema_version": "1.0",
         "evidence_schema_version": "2.1",
         "tool_registry_version": "2.0",
+        "prompt_template_version": "1.0",
+        "trace_schema_version": "1.0",
         "tool_registry": "closed",
     }
     assert data["simulators"]["authoritative"] is False

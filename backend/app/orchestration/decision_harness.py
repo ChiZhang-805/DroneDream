@@ -46,6 +46,8 @@ HarnessDecisionSource = Literal["model", "deterministic_fallback"]
 _DEFAULT_MODEL = "gpt-4.1"
 _FALLBACK_TOOL: HarnessToolId = "optimizer_portfolio"
 _MAX_RATIONALE_LENGTH = 400
+HARNESS_PROMPT_TEMPLATE_VERSION = "1.0"
+HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.0"
 
 _DECISION_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -85,6 +87,18 @@ class HarnessDecision:
     fallback_reason: str | None = None
     evidence_schema_version: str = HARNESS_EVIDENCE_SCHEMA_VERSION
     tool_registry_version: str = HARNESS_TOOL_REGISTRY_VERSION
+    prompt_template_version: str = HARNESS_PROMPT_TEMPLATE_VERSION
+
+
+@dataclass(frozen=True)
+class HarnessDecisionTraceVerification:
+    """Self-consistency result for one persisted, provider-safe decision trace."""
+
+    valid: bool
+    failures: tuple[str, ...]
+    evidence_sha256: str | None = None
+    tool_manifest_sha256: str | None = None
+    prompt_sha256: str | None = None
 
 
 def _canonical_json(value: object) -> str:
@@ -118,6 +132,8 @@ def _validate_response(raw: object) -> tuple[HarnessToolId, str] | None:
 
 def build_decision_messages(
     evidence_snapshot: HarnessEvidenceSnapshot,
+    *,
+    tool_manifest: dict[str, object] | None = None,
 ) -> tuple[str, str]:
     """Build the exact production model messages from a closed snapshot.
 
@@ -135,7 +151,9 @@ def build_decision_messages(
         "tool IDs. Return only JSON that conforms to the required schema."
     )
     user_payload = {
-        "tool_manifest": provider_tool_manifest(),
+        "tool_manifest": (
+            provider_tool_manifest() if tool_manifest is None else tool_manifest
+        ),
         "evidence": evidence_snapshot.model_dump(mode="json", exclude_none=True),
         "instructions": (
             "Choose one tool for the next bounded generation. Prefer measured "
@@ -145,6 +163,86 @@ def build_decision_messages(
         ),
     }
     return system, _canonical_json(user_payload)
+
+
+def verify_harness_decision_trace(
+    payload: object,
+) -> HarnessDecisionTraceVerification:
+    """Rebuild and verify a current-version decision-start trace.
+
+    This proves internal reproducibility and detects accidental corruption. It
+    is not a signature and does not make the mutable JobEvent table tamper-proof.
+    """
+
+    if not isinstance(payload, dict):
+        return HarnessDecisionTraceVerification(
+            valid=False,
+            failures=("invalid_payload",),
+        )
+    failures: list[str] = []
+    if payload.get("trace_schema_version") != HARNESS_DECISION_TRACE_SCHEMA_VERSION:
+        failures.append("unsupported_trace_schema_version")
+    if payload.get("prompt_template_version") != HARNESS_PROMPT_TEMPLATE_VERSION:
+        failures.append("unsupported_prompt_template_version")
+
+    snapshot: HarnessEvidenceSnapshot | None = None
+    raw_snapshot = payload.get("evidence_snapshot")
+    try:
+        snapshot = HarnessEvidenceSnapshot.model_validate(raw_snapshot)
+    except ValueError:
+        failures.append("invalid_evidence_snapshot")
+    computed_evidence_sha256: str | None = None
+    if snapshot is not None:
+        computed_evidence_sha256 = _sha256_text(
+            _canonical_json(
+                snapshot.model_dump(mode="json", exclude_none=True)
+            )
+        )
+        if payload.get("evidence_schema_version") != snapshot.schema_version:
+            failures.append("evidence_schema_version_mismatch")
+        if payload.get("evidence_sha256") != computed_evidence_sha256:
+            failures.append("evidence_sha256_mismatch")
+
+    raw_manifest = payload.get("tool_manifest")
+    manifest: dict[str, object] | None = (
+        raw_manifest if isinstance(raw_manifest, dict) else None
+    )
+    if manifest is None:
+        failures.append("invalid_tool_manifest")
+    computed_manifest_sha256: str | None = None
+    if manifest is not None:
+        try:
+            computed_manifest_sha256 = _sha256_text(_canonical_json(manifest))
+        except (TypeError, ValueError):
+            failures.append("invalid_tool_manifest")
+            manifest = None
+        else:
+            if payload.get("tool_manifest_sha256") != computed_manifest_sha256:
+                failures.append("tool_manifest_sha256_mismatch")
+            if manifest != provider_tool_manifest():
+                failures.append("tool_manifest_version_mismatch")
+    if payload.get("tool_registry_version") != HARNESS_TOOL_REGISTRY_VERSION:
+        failures.append("tool_registry_version_mismatch")
+    if payload.get("allowed_tools") != list(HARNESS_TOOL_REGISTRY):
+        failures.append("allowed_tools_mismatch")
+
+    computed_prompt_sha256: str | None = None
+    if snapshot is not None and manifest is not None:
+        system, user = build_decision_messages(
+            snapshot,
+            tool_manifest=manifest,
+        )
+        computed_prompt_sha256 = _sha256_text(f"{system}\n{user}")
+        if payload.get("prompt_sha256") != computed_prompt_sha256:
+            failures.append("prompt_sha256_mismatch")
+
+    return HarnessDecisionTraceVerification(
+        valid=not failures,
+        failures=tuple(failures),
+        evidence_sha256=computed_evidence_sha256,
+        tool_manifest_sha256=computed_manifest_sha256,
+        prompt_sha256=computed_prompt_sha256,
+    )
 
 
 def _fallback(
@@ -163,6 +261,7 @@ def _fallback(
         "evidence_sha256": evidence_sha256,
         "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
         "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+        "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
     }
     if prompt_sha256 is not None:
         rejected_payload["prompt_sha256"] = prompt_sha256
@@ -179,6 +278,7 @@ def _fallback(
             "evidence_sha256": evidence_sha256,
             "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
             "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+            "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
         },
     )
     return HarnessDecision(
@@ -194,6 +294,7 @@ def _fallback(
         fallback_reason=reason,
         evidence_schema_version=HARNESS_EVIDENCE_SCHEMA_VERSION,
         tool_registry_version=HARNESS_TOOL_REGISTRY_VERSION,
+        prompt_template_version=HARNESS_PROMPT_TEMPLATE_VERSION,
     )
 
 
@@ -254,7 +355,11 @@ def select_optimizer_tool(
             model=chosen_model,
         )
 
-    system, user = build_decision_messages(evidence_snapshot)
+    tool_manifest = provider_tool_manifest()
+    system, user = build_decision_messages(
+        evidence_snapshot,
+        tool_manifest=tool_manifest,
+    )
     settings = get_settings()
     if len(user.encode("utf-8")) > settings.llm_max_prompt_bytes:
         return _fallback(
@@ -265,6 +370,7 @@ def select_optimizer_tool(
             model=chosen_model,
         )
     prompt_sha256 = _sha256_text(f"{system}\n{user}")
+    tool_manifest_sha256 = _sha256_text(_canonical_json(tool_manifest))
     effective_client = client
     if effective_client is None:
         api_key = load_job_api_key(db, job)
@@ -297,8 +403,13 @@ def select_optimizer_tool(
             "evidence_sha256": evidence_sha256,
             "prompt_sha256": prompt_sha256,
             "allowed_tools": list(HARNESS_TOOL_REGISTRY),
+            "trace_schema_version": HARNESS_DECISION_TRACE_SCHEMA_VERSION,
+            "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
             "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
             "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+            "evidence_snapshot": evidence,
+            "tool_manifest": tool_manifest,
+            "tool_manifest_sha256": tool_manifest_sha256,
         },
     )
     try:
@@ -343,6 +454,7 @@ def select_optimizer_tool(
             "prompt_sha256": prompt_sha256,
             "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
             "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+            "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
         },
     )
     return HarnessDecision(
@@ -354,6 +466,7 @@ def select_optimizer_tool(
         prompt_sha256=prompt_sha256,
         evidence_schema_version=HARNESS_EVIDENCE_SCHEMA_VERSION,
         tool_registry_version=HARNESS_TOOL_REGISTRY_VERSION,
+        prompt_template_version=HARNESS_PROMPT_TEMPLATE_VERSION,
     )
 
 
@@ -372,11 +485,15 @@ def as_experimental_strategy(
 
 
 __all__ = [
+    "HARNESS_DECISION_TRACE_SCHEMA_VERSION",
+    "HARNESS_PROMPT_TEMPLATE_VERSION",
     "HARNESS_TOOL_REGISTRY",
     "HarnessDecision",
+    "HarnessDecisionTraceVerification",
     "HarnessDispatchStrategy",
     "as_experimental_strategy",
     "build_decision_messages",
     "is_experimental_harness_tool",
     "select_optimizer_tool",
+    "verify_harness_decision_trace",
 ]
