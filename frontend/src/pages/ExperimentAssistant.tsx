@@ -52,7 +52,7 @@ const COPY = {
   en: {
     title: "What flight experiment should we build?",
     subtitle:
-      "Describe the flight; DroneDream will turn your intent into a reviewable experiment draft.",
+      "Describe the flight, model, constraints, and trial budget; DroneDream will turn your intent into a reviewable experiment draft.",
     manual: "Create manually",
     moreActions: "More ways to start",
     importFiles: "Import reference files",
@@ -113,7 +113,7 @@ const COPY = {
   "zh-CN": {
     title: "想创建怎样的飞行调优实验？",
     subtitle:
-      "直接说出轨迹、机型、调优目标、控制参数、仿真场景和次数预算。",
+      "直接说出轨迹、机型、调优目标、控制参数、仿真场景和次数预算，先生成可审查草案。",
     manual: "手动创建",
     moreActions: "更多创建方式",
     importFiles: "导入参考文件",

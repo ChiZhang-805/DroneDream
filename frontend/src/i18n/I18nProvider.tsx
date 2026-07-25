@@ -106,7 +106,7 @@ const enTranslations = {
     "desktop.eyebrow": "LOCAL RUNTIME",
     "desktop.title": "Desktop environment setup",
     "desktop.subtitle":
-      "Check this computer, the dedicated DroneDream runtime, and the steps required before local PX4/Gazebo tuning.",
+      "Check this computer, the dedicated DroneDream runtime, and the steps required before local PX4/Gazebo tuning begins.",
     "launcher.title.welcome": "Build your autonomous flight workspace",
     "launcher.title.checking": "Checking your simulation environment",
     "launcher.title.downloading": "Downloading your flight environment",
@@ -170,7 +170,7 @@ const enTranslations = {
     "launcher.retryError": "Try again",
     "desktop.browserTitle": "Open this page in the DroneDream desktop app",
     "desktop.browserBody":
-      "The web version cannot inspect Windows, WSL or local disks. The rest of DroneDream remains available in the browser when it is connected to a managed backend.",
+      "The web version cannot inspect Windows, WSL, or local disks. The rest of DroneDream remains available in the browser when connected to a managed backend, while local execution and device checks stay inside the desktop app.",
     "desktop.browserHint":
       "After installing DroneDream, use Settings in the top-right corner to run this read-only check.",
     "desktop.refresh": "Check again",
@@ -1080,7 +1080,7 @@ const enTranslations = {
     "dashboard.action": "Action",
     "dashboard.view": "View",
     "history.title": "Run history",
-    "history.subtitle": "Review and compare every optimization experiment.",
+    "history.subtitle": "Review, compare, and trace every optimization experiment, its preserved evidence, and the reasoning behind each result.",
     "history.newJob": "+ New experiment",
     "history.filters": "Filters",
     "history.all": "All",
@@ -1491,8 +1491,8 @@ const zhTranslations = {
     "launcher.dismissError": "关闭",
     "launcher.retryError": "重新尝试",
     "desktop.browserTitle": "请在 DroneDream 桌面软件中打开此页面",
-    "desktop.browserBody": "网页版无法读取 Windows、WSL 或本地磁盘信息；连接到托管后端后，DroneDream 的其他网页功能仍可正常使用。",
-    "desktop.browserHint": "安装 DroneDream 后，使用右上角的“设置”即可执行这项只读检查。",
+    "desktop.browserBody": "网页版无法读取 Windows、WSL 或本地磁盘信息。连接托管后端后，仍可创建实验、查看任务和历史报告；本机执行、环境检查和仿真启动必须使用桌面软件，并由用户确认后继续。",
+    "desktop.browserHint": "安装 DroneDream 后，使用右上角的“设置”即可执行这项只读检查，并继续完成环境安装流程。",
     "desktop.refresh": "重新检查",
     "desktop.checking": "正在检查本地环境…",
     "desktop.ready": "已可执行本地调优",

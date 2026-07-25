@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ $# -ne 6 ]]; then
-  echo "usage: $0 ARCHIVE VERSION INSTALLER_SHA256 STAGING_CONF PUBLIC_CONF PUBLIC_HOST" >&2
+if [[ $# -ne 8 ]]; then
+  echo "usage: $0 ARCHIVE VERSION INSTALLER_SHA256 STAGING_CONF PUBLIC_CONF PUBLIC_HOST PUBLIC_SCHEME VHOST_MODE" >&2
   exit 64
 fi
 
@@ -12,6 +12,8 @@ expected_installer_sha=${3,,}
 staging_config=$4
 public_config=$5
 public_host=$6
+public_scheme=$7
+vhost_mode=$8
 
 if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "invalid release version: $version" >&2
@@ -25,12 +27,32 @@ if [[ ! $public_host =~ ^[0-9A-Za-z.-]+$ ]]; then
   echo "invalid public host" >&2
   exit 64
 fi
-for required_file in "$archive" "$staging_config" "$public_config"; do
+if [[ $public_scheme != http && $public_scheme != https ]]; then
+  echo "invalid public scheme: $public_scheme" >&2
+  exit 64
+fi
+if [[ $vhost_mode != install && $vhost_mode != preserve ]]; then
+  echo "invalid vhost mode: $vhost_mode" >&2
+  exit 64
+fi
+if [[ $vhost_mode == install && $public_scheme != http ]]; then
+  echo "the repository-managed vhost is HTTP preview-only" >&2
+  exit 64
+fi
+if [[ $vhost_mode == preserve && $public_scheme != https ]]; then
+  echo "preserved production vhosts must be verified over HTTPS" >&2
+  exit 64
+fi
+for required_file in "$archive" "$staging_config"; do
   if [[ ! -f $required_file ]]; then
     echo "missing deployment input: $required_file" >&2
     exit 66
   fi
 done
+if [[ $vhost_mode == install && ! -f $public_config ]]; then
+  echo "missing deployment input: $public_config" >&2
+  exit 66
+fi
 for command_name in awk curl find flock grep install mv nginx python3 readlink rm \
   sha256sum systemctl tar tr; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -54,6 +76,8 @@ config_backup=""
 installer_name_file=""
 had_public_config=0
 previous_target=""
+public_config_changed=0
+nginx_dump_file=""
 
 # Serialize releases so two operators or CI retries cannot delete or activate
 # each other's candidate directories during the rollback window.
@@ -70,6 +94,9 @@ cleanup_temp_files() {
   fi
   if [[ -n $installer_name_file ]]; then
     rm -f -- "$installer_name_file"
+  fi
+  if [[ -n $nginx_dump_file ]]; then
+    rm -f -- "$nginx_dump_file"
   fi
 }
 trap cleanup_temp_files EXIT
@@ -88,10 +115,61 @@ if [[ -e $staging_vhost ]]; then
   echo "$staging_vhost already exists; remove the stale DroneDream staging vhost first" >&2
   exit 73
 fi
-if [[ -e $public_vhost ]]; then
+if [[ $vhost_mode == preserve && ! -f $public_vhost ]]; then
+  echo "the production BaoTa vhost is missing: $public_vhost" >&2
+  exit 66
+fi
+if [[ $vhost_mode == install && -e $public_vhost ]]; then
   config_backup=$(mktemp /tmp/dronedream-nginx-backup.XXXXXX)
   cp -a "$public_vhost" "$config_backup"
   had_public_config=1
+fi
+
+validate_preserved_public_vhost() {
+  nginx_dump_file=$(mktemp /tmp/dronedream-nginx-dump.XXXXXX)
+  nginx -T >"$nginx_dump_file" 2>&1
+  python3 - "$nginx_dump_file" "$public_host" <<'PY'
+import pathlib
+import re
+import sys
+
+text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+host = sys.argv[2]
+
+server_blocks: list[str] = []
+for match in re.finditer(r"\bserver\s*\{", text):
+    depth = 1
+    index = match.end()
+    while index < len(text) and depth:
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+        index += 1
+    if depth == 0:
+        server_blocks.append(text[match.start():index])
+
+def names(block: str) -> set[str]:
+    found: set[str] = set()
+    for directive in re.findall(r"(?m)^\s*server_name\s+([^;]+);", block):
+        found.update(directive.split())
+    return found
+
+matching = [block for block in server_blocks if host in names(block)]
+if not matching:
+    raise SystemExit(f"preserved vhost does not declare server_name {host}")
+if not any(
+    re.search(r"(?m)^\s*listen\s+(?:[^;\s]+:)?443\b[^;]*\bssl\b[^;]*;", block)
+    for block in matching
+):
+    raise SystemExit(f"preserved vhost for {host} does not listen on 443 with TLS")
+PY
+  rm -f -- "$nginx_dump_file"
+  nginx_dump_file=""
+}
+
+if [[ $vhost_mode == preserve ]]; then
+  validate_preserved_public_vhost
 fi
 
 rollback() {
@@ -106,10 +184,12 @@ rollback() {
   fi
   rm -f -- "$candidate" "$staging_vhost" "$candidate_link" "$next_link"
   rm -rf -- "$upload_dir" "$release_dir"
-  if [[ $had_public_config -eq 1 ]]; then
-    cp -a "$config_backup" "$public_vhost"
-  else
-    rm -f "$public_vhost"
+  if [[ $public_config_changed -eq 1 ]]; then
+    if [[ $had_public_config -eq 1 ]]; then
+      cp -a "$config_backup" "$public_vhost"
+    else
+      rm -f "$public_vhost"
+    fi
   fi
   nginx -t >/dev/null 2>&1 && systemctl reload nginx
   echo "deployment rolled back after an error" >&2
@@ -339,34 +419,54 @@ staging_security_headers=$(
   curl_until_security_headers -fsSI --max-time 10 http://127.0.0.1:18080/
 )
 
-# Publish through the public IPv4 address. The pre-existing WordPress vhost and
-# files remain untouched; removing this one added vhost restores the old route.
+# Publish the candidate. Preview mode installs the repository-managed HTTP
+# vhost. Production mode preserves the employee-managed BaoTa TLS vhost and
+# validates it before this point.
 ln -s "$release_dir" "$next_link"
 mv -Tf "$next_link" "$current"
-install -m 0644 "$public_config" "$public_vhost"
+if [[ $vhost_mode == install ]]; then
+  public_config_changed=1
+  install -m 0644 "$public_config" "$public_vhost"
+fi
 nginx -t
 systemctl reload nginx
+
+public_curl_args=()
+if [[ $public_scheme == https ]]; then
+  public_origin="https://$public_host"
+  public_curl_args=(--resolve "$public_host:443:127.0.0.1")
+else
+  public_origin="http://127.0.0.1"
+  public_curl_args=(-H "Host: $public_host")
+fi
 public_page=$(
   curl_until_contains '<title>DroneDream' -fsS --max-time 10 \
-    -H "Host: $public_host" http://127.0.0.1/
+    "${public_curl_args[@]}" "$public_origin/"
 )
 public_console=$(
   curl_until_contains '<title>DroneDream' -fsS --max-time 10 \
-    -H "Host: $public_host" http://127.0.0.1/console/
+    "${public_curl_args[@]}" "$public_origin/console/"
 )
 public_metadata=$(
   curl_until_contains "\"version\":  \"$version\"" -fsS --max-time 10 \
-    -H "Host: $public_host" \
-    http://127.0.0.1/downloads/latest.json
+    "${public_curl_args[@]}" "$public_origin/downloads/latest.json"
 )
 public_installer_headers=$(
-  curl_until_regex '^content-length:' -fsSI --max-time 10 -H "Host: $public_host" \
-    "http://127.0.0.1/downloads/$installer_name"
+  curl_until_regex '^content-length:' -fsSI --max-time 10 \
+    "${public_curl_args[@]}" "$public_origin/downloads/$installer_name"
 )
 public_security_headers=$(
-  curl_until_security_headers -fsSI --max-time 10 -H "Host: $public_host" \
-    http://127.0.0.1/
+  curl_until_security_headers -fsSI --max-time 10 \
+    "${public_curl_args[@]}" "$public_origin/"
 )
+if [[ $public_scheme == https ]]; then
+  curl_until_regex '^strict-transport-security:' -fsSI --max-time 10 \
+    "${public_curl_args[@]}" "$public_origin/" >/dev/null
+  redirect_headers=$(
+    curl_until_regex '^location:[[:space:]]*https://'"$public_host"'/' \
+      -fsSI --max-time 10 -H "Host: $public_host" http://127.0.0.1/
+  )
+fi
 
 rm -f "$candidate" "$staging_vhost"
 nginx -t

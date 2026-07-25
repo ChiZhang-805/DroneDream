@@ -1,0 +1,14 @@
+{
+  "production": {
+    "remote": "root@47.93.180.216",
+    "publicHost": "cn.getdronedream.com",
+    "publicBaseUri": "https://cn.getdronedream.com/",
+    "vhostMode": "preserve"
+  },
+  "preview": {
+    "remote": "root@47.93.180.216",
+    "publicHost": "47.93.180.216",
+    "publicBaseUri": "http://47.93.180.216/",
+    "vhostMode": "install"
+  }
+}

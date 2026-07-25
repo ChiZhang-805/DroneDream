@@ -902,7 +902,8 @@ html[lang^="zh"] .ece498-stage-copy-section p {
     grid-template-rows: auto auto;
     height: auto;
     min-height: 100%;
-    overflow: visible;
+    overflow-x: clip;
+    overflow-y: visible;
   }
 
   .ece498-course-hero {
@@ -936,6 +937,19 @@ html[lang^="zh"] .ece498-stage-copy-section p {
     display: block;
   }
 
+  .ece498-course-hero {
+    padding-right: 0;
+  }
+
+  .ece498-course-intro h1 {
+    padding-right: 7.2rem;
+  }
+
+  .ece498-course-intro h1 > strong {
+    white-space: normal;
+    text-wrap: balance;
+  }
+
   .ece498-timeline-heading > p {
     margin-top: 0.25rem;
     text-align: left;
@@ -952,6 +966,11 @@ html[lang^="zh"] .ece498-stage-copy-section p {
 
   .ece498-stage-copy-section + .ece498-stage-copy-section {
     border-top: 1px solid rgba(201, 158, 230, 0.13);
+  }
+
+  .ece498-stage-copy-section p,
+  .ece498-story-body p {
+    text-align: left;
   }
 }
 

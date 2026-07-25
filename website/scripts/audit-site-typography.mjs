@@ -161,7 +161,7 @@ const collectLayout = async (page, locale, state) => page.evaluate(({ activeLoca
   }
 
   const criticalSelectors = [
-    ".site-header > .site-shell",
+    ".site-header",
     ".site-hero-copy",
     ".site-section",
     ".site-product-demo",
@@ -219,6 +219,34 @@ const collectLayout = async (page, locale, state) => page.evaluate(({ activeLoca
       }
     }
   });
+
+  const requiredHeaderSelectors = [
+    ".site-header",
+    ".site-brand",
+    ".site-account-button",
+    ".site-language",
+    viewportWidth <= 1050 ? ".site-menu-button" : ".site-header-download",
+  ];
+  for (const selector of requiredHeaderSelectors) {
+    const node = document.querySelector(selector);
+    if (!(node instanceof HTMLElement) || !isVisible(node)) {
+      violations.push(`${selector}: required header control is not visible`);
+      continue;
+    }
+    const rect = node.getBoundingClientRect();
+    if (rect.left < -tolerance || rect.right > viewportWidth + tolerance) {
+      violations.push(
+        `${selector}: required header control is outside the viewport (${round(rect.left)}..${round(rect.right)}px)`,
+      );
+    }
+    const header = document.querySelector(".site-header");
+    if (header instanceof HTMLElement) {
+      const headerRect = header.getBoundingClientRect();
+      if (rect.top < headerRect.top - tolerance || rect.bottom > headerRect.bottom + tolerance) {
+        violations.push(`${selector}: required header control is clipped by the header`);
+      }
+    }
+  }
 
   const copyAndHeadings = Array.from(document.querySelectorAll(
     "[data-copy-block], h1, h2, h3, [role=heading]",
