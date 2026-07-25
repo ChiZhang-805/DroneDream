@@ -8147,6 +8147,21 @@ the deterministic portfolio. Provider/model evaluation, blocked simulator campai
 the locked test bank, immutable decision/model/tool ledgers, and evidence-v3 remain
 required before that stronger claim.
 
+The older direct `gpt` parameter proposer now uses Prompt Schema 2.0 as well. Its
+feedback path already excluded holdout Trial rows; it now also compiles the scenario
+suite so that only training scenario enums, counts, weights, and allowlisted numeric
+Runtime inputs are visible. Holdout cases expose counts only—not types, IDs, seeds,
+weights, configuration, outcomes, or metrics. Vehicle identity is reduced to
+catalog-backed categories, objective/constraint names are restricted to supported
+Trial metrics or stable `custom_*` aliases, and Candidate IDs/labels, arbitrary
+aggregate mappings, unrecognized scenario keys, and unknown failure-code strings
+are excluded. Capabilities report `prompt_schema_version=2.0` for this path.
+
+This hardening does not make the direct proposer equivalent to `llm_harness`: it
+still proposes numeric parameters and therefore retains more model authority. The
+closed-tool Harness plus deterministic optimizer adapters remains the preferred
+architecture for continued moat development.
+
 Current focused validation:
 
 ```text

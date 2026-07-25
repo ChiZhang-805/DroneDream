@@ -30,6 +30,23 @@ from app.orchestration import constants
 from app.orchestration.acceptance import AcceptanceCriteria
 from app.orchestration.events import record_event
 from app.orchestration.parameter_constraints import validator_for_job
+from app.parameters import (
+    SUPPORTED_PX4_VERSIONS,
+    SUPPORTED_TRIAL_METRICS,
+    SUPPORTED_VEHICLE_TYPES,
+    classify_airframe,
+)
+from app.simulator.base import (
+    FAILURE_ADAPTER_UNAVAILABLE,
+    FAILURE_ARTIFACT_PERSISTENCE,
+    FAILURE_CANCELLED,
+    FAILURE_INVALID_PARAMETERS,
+    FAILURE_RESULT_PERSISTENCE,
+    FAILURE_SIM_ERROR,
+    FAILURE_SIMULATION,
+    FAILURE_TIMEOUT,
+    FAILURE_UNSTABLE,
+)
 
 logger = logging.getLogger("drone_dream.orchestration.llm")
 
@@ -40,17 +57,56 @@ _MIN_PROPOSALS = 1
 _MAX_RESPONSE_NODES = 10_000
 _MAX_RESPONSE_DEPTH = 16
 _MAX_PROMPT_CANDIDATES = 8
+LLM_PROPOSER_PROMPT_SCHEMA_VERSION = "2.0"
 _PROMPT_AGGREGATE_KEYS = (
     "rmse",
     "max_error",
+    "max_error_worst",
     "overshoot_count",
     "completion_time",
+    "completion_rate",
+    "failure_rate",
+    "pass_rate",
+    "training_completion_rate",
+    "training_failure_rate",
+    "training_pass_rate",
     "aggregated_score",
-    "objective_values",
-    "constraint_values",
-    "constraint_violations",
+    "scalar_loss",
     "feasible",
-    "total_violation",
+    "total_constraint_violation",
+    "invalid_metric_count",
+    "cancelled_trial_count",
+)
+_SAFE_SCENARIO_CONFIG_KEYS = frozenset(
+    {
+        "wind_mps",
+        "dropout_rate",
+        "mass_payload_kg",
+        "delay_ms",
+        "intensity",
+    }
+)
+_SAFE_FAILURE_CODES = frozenset(
+    {
+        FAILURE_TIMEOUT,
+        FAILURE_SIMULATION,
+        FAILURE_UNSTABLE,
+        FAILURE_SIM_ERROR,
+        FAILURE_ADAPTER_UNAVAILABLE,
+        FAILURE_CANCELLED,
+        FAILURE_ARTIFACT_PERSISTENCE,
+        FAILURE_RESULT_PERSISTENCE,
+        FAILURE_INVALID_PARAMETERS,
+    }
+)
+_SAFE_OBJECTIVE_METRICS = frozenset(
+    {
+        *SUPPORTED_TRIAL_METRICS,
+        "completion_rate",
+        "failed_trial_rate",
+        "failure_rate",
+        "pass_rate",
+    }
 )
 _INVALID_PROMPT_VALUE = object()
 
@@ -400,6 +456,114 @@ def load_job_api_key(db: Session, job: models.Job) -> str | None:
 _load_api_key = load_job_api_key
 
 
+def _compile_vehicle_profile(job: models.Job) -> dict[str, Any]:
+    profile = schemas.VehicleProfileConfig(**(job.vehicle_profile_json or {}))
+    try:
+        airframe_family = classify_airframe(profile.airframe)
+    except ValueError:
+        airframe_family = "custom_multicopter"
+    return {
+        "px4_version": (
+            profile.px4_version
+            if profile.px4_version in SUPPORTED_PX4_VERSIONS
+            else "custom_px4_version"
+        ),
+        "firmware_commit": profile.firmware_commit,
+        "vehicle_type": (
+            profile.vehicle_type
+            if profile.vehicle_type in SUPPORTED_VEHICLE_TYPES
+            else "custom_vehicle_type"
+        ),
+        "airframe_family": airframe_family,
+        "simulator_model_kind": (
+            "gazebo_px4" if profile.simulator_model.startswith("gz_") else "custom"
+        ),
+        "world_kind": "default" if profile.world == "default" else "custom",
+        "headless": profile.headless,
+        "simulation_speed_factor": profile.simulation_speed_factor,
+        "instance_id": profile.instance_id,
+    }
+
+
+def _compile_objective_contract(job: models.Job) -> dict[str, Any]:
+    config = schemas.ObjectiveConfig(**(job.objective_config_json or {}))
+    objectives = [
+        {
+            "metric": (
+                objective.metric
+                if objective.metric in _SAFE_OBJECTIVE_METRICS
+                else f"custom_objective_{index + 1}"
+            ),
+            "direction": objective.direction,
+            "weight": objective.weight,
+            "normalization": objective.normalization,
+            "target": objective.target,
+        }
+        for index, objective in enumerate(config.objectives)
+    ]
+    constraints = [
+        {
+            "metric": (
+                constraint.metric
+                if constraint.metric in _SAFE_OBJECTIVE_METRICS
+                else f"custom_constraint_{index + 1}"
+            ),
+            "operator": constraint.operator,
+            "threshold": constraint.threshold,
+            "hard": constraint.hard,
+            "penalty": constraint.penalty,
+        }
+        for index, constraint in enumerate(config.constraints)
+    ]
+    return {
+        "objectives": objectives,
+        "constraints": constraints,
+        "robust_aggregation": config.robust_aggregation,
+        "cvar_alpha": config.cvar_alpha,
+        "percentile": config.percentile,
+    }
+
+
+def _compile_scenario_contract(
+    job: models.Job,
+    *,
+    compact: bool = False,
+) -> dict[str, Any]:
+    suite = schemas.ScenarioSuiteConfig(**(job.scenario_suite_json or {}))
+    training_cases = [case for case in suite.cases if case.enabled and not case.holdout]
+    holdout_cases = [case for case in suite.cases if case.enabled and case.holdout]
+    training_type_counts: dict[str, int] = {}
+    for case in training_cases:
+        training_type_counts[case.scenario_type] = (
+            training_type_counts.get(case.scenario_type, 0) + 1
+        )
+    payload: dict[str, Any] = {
+        "schema_version": "1.0",
+        "common_random_numbers": suite.common_random_numbers,
+        "training_case_count": len(training_cases),
+        "training_replicate_count": sum(len(case.seeds) for case in training_cases),
+        "training_type_counts": dict(sorted(training_type_counts.items())),
+        "holdout_case_count": len(holdout_cases),
+        "holdout_replicate_count": sum(len(case.seeds) for case in holdout_cases),
+    }
+    if compact:
+        return payload
+    payload["training_cases"] = [
+        {
+            "scenario_type": case.scenario_type,
+            "seed_count": len(case.seeds),
+            "weight": case.weight,
+            "config": {
+                key: numeric
+                for key in sorted(_SAFE_SCENARIO_CONFIG_KEYS)
+                if (numeric := _finite_number(case.config.get(key))) is not None
+            },
+        }
+        for case in training_cases
+    ]
+    return payload
+
+
 def _build_prompt(
     job: models.Job,
     criteria: AcceptanceCriteria,
@@ -544,7 +708,12 @@ def _build_prompt(
                 bucket["completion_time_sum"] += completion_time
             elif trial.failure_code:
                 codes = bucket["failure_codes"]
-                codes[trial.failure_code] = int(codes.get(trial.failure_code, 0)) + 1
+                failure_code = (
+                    trial.failure_code
+                    if trial.failure_code in _SAFE_FAILURE_CODES
+                    else "OTHER"
+                )
+                codes[failure_code] = int(codes.get(failure_code, 0)) + 1
         compact_feedback: list[dict[str, Any]] = []
         for bucket in scenario_feedback.values():
             completed_count = int(bucket.pop("completed_count"))
@@ -568,9 +737,12 @@ def _build_prompt(
             compact_feedback.append(bucket)
         prior.append(
             {
-                "candidate_id": cand.id,
-                "label": cand.label,
                 "generation_index": cand.generation_index,
+                "source_type": (
+                    cand.source_type
+                    if cand.source_type in {"baseline", "optimizer", "llm_optimizer"}
+                    else "unknown"
+                ),
                 "parameters": {
                     key: value
                     for key, value in (cand.parameter_json or {}).items()
@@ -592,6 +764,7 @@ def _build_prompt(
         )
 
     user_payload = {
+        "prompt_schema_version": LLM_PROPOSER_PROMPT_SCHEMA_VERSION,
         "objective_profile": job.objective_profile,
         "simulator_backend": job.simulator_backend_requested,
         "track_type": job.track_type,
@@ -608,12 +781,12 @@ def _build_prompt(
             "target_max_error": criteria.target_max_error,
             "min_pass_rate": criteria.min_pass_rate,
         },
-        "vehicle_profile": _safe_prompt_value(dict(job.vehicle_profile_json or {})),
+        "vehicle_profile": _compile_vehicle_profile(job),
         "parameter_catalog_version": job.parameter_catalog_version,
         "parameter_domains": parameter_domains,
         "baseline_parameters": search_space.baseline(),
-        "objective_config": _safe_prompt_value(dict(job.objective_config_json or {})),
-        "scenario_suite": _safe_prompt_value(dict(job.scenario_suite_json or {})),
+        "objective_config": _compile_objective_contract(job),
+        "scenario_suite": _compile_scenario_contract(job),
         "previous_candidates": prior,
         "current_generation": job.current_generation,
         "max_iterations": job.max_iterations,
@@ -651,27 +824,10 @@ def _build_prompt(
         prior.pop(removable_index)
         encoded = serialize()
     if len(encoded.encode("utf-8")) > settings.llm_max_prompt_bytes:
-        suite = job.scenario_suite_json or {}
-        cases = suite.get("cases", []) if isinstance(suite, dict) else []
-        user_payload["scenario_suite"] = {
-            "common_random_numbers": bool(
-                suite.get("common_random_numbers", True)
-                if isinstance(suite, dict)
-                else True
-            ),
-            "cases": [
-                {
-                    "id": case.get("id"),
-                    "scenario_type": case.get("scenario_type"),
-                    "seed_count": len(case.get("seeds", [])),
-                    "weight": case.get("weight"),
-                    "enabled": case.get("enabled"),
-                    "holdout": case.get("holdout"),
-                }
-                for case in cases
-                if isinstance(case, dict)
-            ],
-        }
+        user_payload["scenario_suite"] = _compile_scenario_contract(
+            job,
+            compact=True,
+        )
         scenario_suite_compacted = True
         encoded = serialize()
     prompt_bytes = len(encoded.encode("utf-8"))
@@ -883,6 +1039,7 @@ def job_secrets_env_model() -> str | None:
 
 
 __all__ = [
+    "LLM_PROPOSER_PROMPT_SCHEMA_VERSION",
     "LlmProposal",
     "LlmProposerResult",
     "OpenAIJsonClient",

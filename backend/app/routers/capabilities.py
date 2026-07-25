@@ -18,6 +18,9 @@ from app.orchestration.harness_context import (
     HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_TOOL_REGISTRY_VERSION,
 )
+from app.orchestration.llm_parameter_proposer import (
+    LLM_PROPOSER_PROMPT_SCHEMA_VERSION,
+)
 from app.parameters import CATALOG_VERSION, SUPPORTED_PX4_VERSIONS
 from app.response import ok
 from app.secrets import is_configured as secret_store_is_configured
@@ -212,6 +215,9 @@ def read_capabilities() -> dict[str, object]:
                             "available" if gpt_ready else "server_secret_not_configured"
                         ),
                         "requires_user_api_key": True,
+                        "prompt_schema_version": (
+                            LLM_PROPOSER_PROMPT_SCHEMA_VERSION
+                        ),
                         "reason": (
                             None
                             if gpt_ready

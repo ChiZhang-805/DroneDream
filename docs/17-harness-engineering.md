@@ -120,6 +120,12 @@ coverage, invalid/cancelled Trial counts, scalar loss, and best-to-runner-up sco
 gaps. Holdout status and values remain sealed from every adaptive decision so the
 validation set cannot become another training signal.
 
+The compatibility `gpt` parameter proposer follows the same validation firewall in
+Prompt Schema 2.0. It receives allowlisted training scenario structure and numeric
+inputs, while holdout types/IDs/seeds/configuration/results, Candidate labels/IDs,
+arbitrary metric keys, and unknown failure strings are removed. This path still has
+more authority than the closed-tool Harness and is not the preferred control plane.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.
