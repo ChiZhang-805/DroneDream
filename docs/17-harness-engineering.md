@@ -195,6 +195,13 @@ entry binds their source, unit, value kind, and semantics. Job creation,
 reruns, and batch children reject unregistered objective or constraint names
 with `INVALID_OUTCOME_CONTRACT` before a Job row or secret is persisted.
 
+Outcome Contract compiler 1.5 records known metric dependencies and rejects
+objective duplication before execution. The adapter-defined composite `score`
+cannot be combined with another objective until its component graph is
+registered, and `completion_rate`, `failure_rate`, and `failed_trial_rate`
+cannot be combined as if they were independent reliability objectives or
+constraints.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from app import schemas
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "1.4"
+OUTCOME_CONTRACT_COMPILER_VERSION = "1.5"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
@@ -38,6 +38,23 @@ _CANONICAL_METRICS: dict[str, tuple[MetricSource, str, str]] = {
     "failed_trial_rate": ("candidate_aggregate", "ratio", "continuous"),
     "failure_rate": ("candidate_aggregate", "ratio", "continuous"),
     "pass_rate": ("candidate_aggregate", "ratio", "continuous"),
+}
+_KNOWN_RELIABILITY_DEPENDENCY_GROUP = frozenset(
+    {
+        "completion_rate",
+        "failed_trial_rate",
+        "failure_rate",
+    }
+)
+_EXCLUSIVE_COMPOSITE_OBJECTIVES = frozenset({"score"})
+_METRIC_REGISTRY = {
+    "metrics": _CANONICAL_METRICS,
+    "known_dependency_groups": [
+        sorted(_KNOWN_RELIABILITY_DEPENDENCY_GROUP),
+    ],
+    "exclusive_composite_objectives": sorted(
+        _EXCLUSIVE_COMPOSITE_OBJECTIVES
+    ),
 }
 _SCENARIO_TYPES = frozenset(
     {
@@ -172,11 +189,14 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["1.4"] = "1.4"
+    compiler_version: Literal["1.5"] = "1.5"
     contract_id: str
     metric_admission_policy: Literal["registered_metrics_only"] = (
         "registered_metrics_only"
     )
+    metric_dependency_policy: Literal[
+        "reject_known_alias_complement_and_composite_overlap"
+    ] = "reject_known_alias_complement_and_composite_overlap"
     metric_registry_sha256: str
     objective_config_sha256: str
     scenario_suite_sha256: str
@@ -229,6 +249,42 @@ def _metric_reference(metric: str) -> OutcomeMetricReference:
     )
 
 
+def _validate_metric_dependencies(
+    objective_config: schemas.ObjectiveConfig,
+) -> None:
+    objective_metrics = {
+        objective.metric for objective in objective_config.objectives
+    }
+    composite_overlap = objective_metrics & _EXCLUSIVE_COMPOSITE_OBJECTIVES
+    if composite_overlap and len(objective_metrics) > 1:
+        composite = sorted(composite_overlap)[0]
+        raise ValueError(
+            f"composite objective metric {composite} cannot be combined "
+            "with another objective until its dependency graph is registered"
+        )
+
+    objective_reliability = sorted(
+        objective_metrics & _KNOWN_RELIABILITY_DEPENDENCY_GROUP
+    )
+    if len(objective_reliability) > 1:
+        raise ValueError(
+            "dependent reliability objective metrics cannot be combined: "
+            + ", ".join(objective_reliability)
+        )
+
+    constraint_metrics = {
+        constraint.metric for constraint in objective_config.constraints
+    }
+    constraint_reliability = sorted(
+        constraint_metrics & _KNOWN_RELIABILITY_DEPENDENCY_GROUP
+    )
+    if len(constraint_reliability) > 1:
+        raise ValueError(
+            "dependent reliability constraint metrics cannot be combined: "
+            + ", ".join(constraint_reliability)
+        )
+
+
 def compile_outcome_contract(
     objective_config: schemas.ObjectiveConfig,
     scenario_suite: schemas.ScenarioSuiteConfig,
@@ -250,6 +306,7 @@ def compile_outcome_contract(
         _metric_reference(objective.metric)
     for constraint in objective_config.constraints:
         _metric_reference(constraint.metric)
+    _validate_metric_dependencies(objective_config)
 
     objectives = tuple(
         OutcomeObjective(
@@ -312,7 +369,10 @@ def compile_outcome_contract(
         "schema_id": OUTCOME_CONTRACT_SCHEMA,
         "compiler_version": OUTCOME_CONTRACT_COMPILER_VERSION,
         "metric_admission_policy": "registered_metrics_only",
-        "metric_registry_sha256": _sha256(_CANONICAL_METRICS),
+        "metric_dependency_policy": (
+            "reject_known_alias_complement_and_composite_overlap"
+        ),
+        "metric_registry_sha256": _sha256(_METRIC_REGISTRY),
         "objective_config_sha256": _sha256(objective_json),
         "scenario_suite_sha256": _sha256(scenario_json),
         "acceptance_criteria_sha256": _sha256(acceptance_json),

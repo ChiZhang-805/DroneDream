@@ -214,8 +214,12 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "1.4"
+    assert first.compiler_version == "1.5"
     assert first.metric_admission_policy == "registered_metrics_only"
+    assert (
+        first.metric_dependency_policy
+        == "reject_known_alias_complement_and_composite_overlap"
+    )
     assert (
         first.selection_policy.optimizer_objective_representation_policy
         == "one_representation_per_tool_call"
@@ -279,6 +283,66 @@ def test_outcome_contract_rejects_unregistered_adapter_raw_metrics() -> None:
                         direction="minimize",
                     )
                 ]
+            ),
+            ScenarioSuiteConfig(
+                cases=[ScenarioCaseConfig(id="train", seeds=[1])],
+            ),
+            AcceptanceCriteria(),
+            failed_trial_weight=1.5,
+        )
+
+
+@pytest.mark.parametrize(
+    "objectives",
+    [
+        [
+            ObjectiveSpec(metric="score"),
+            ObjectiveSpec(metric="rmse"),
+        ],
+        [
+            ObjectiveSpec(metric="completion_rate", direction="maximize"),
+            ObjectiveSpec(metric="failure_rate"),
+        ],
+        [
+            ObjectiveSpec(metric="failed_trial_rate"),
+            ObjectiveSpec(metric="failure_rate"),
+        ],
+    ],
+)
+def test_outcome_contract_rejects_known_objective_dependency_overlap(
+    objectives: list[ObjectiveSpec],
+) -> None:
+    with pytest.raises(ValueError, match="cannot be combined"):
+        compile_outcome_contract(
+            ObjectiveConfig(objectives=objectives),
+            ScenarioSuiteConfig(
+                cases=[ScenarioCaseConfig(id="train", seeds=[1])],
+            ),
+            AcceptanceCriteria(),
+            failed_trial_weight=1.5,
+        )
+
+
+def test_outcome_contract_rejects_redundant_reliability_constraints() -> None:
+    with pytest.raises(
+        ValueError,
+        match="dependent reliability constraint metrics cannot be combined",
+    ):
+        compile_outcome_contract(
+            ObjectiveConfig(
+                objectives=[ObjectiveSpec(metric="rmse")],
+                constraints=[
+                    ConstraintSpec(
+                        metric="completion_rate",
+                        operator="gte",
+                        threshold=0.8,
+                    ),
+                    ConstraintSpec(
+                        metric="failure_rate",
+                        operator="lte",
+                        threshold=0.2,
+                    ),
+                ],
             ),
             ScenarioSuiteConfig(
                 cases=[ScenarioCaseConfig(id="train", seeds=[1])],
