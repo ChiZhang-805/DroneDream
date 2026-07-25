@@ -8149,6 +8149,12 @@ mutation invalidates both the evidence and prompt hashes. This supplies
 same-version reproducibility and accidental-corruption detection; it is not a
 signature, append-only log, or proof against an actor who can rewrite the mutable
 event row and every hash.
+The read-only `scripts.verify_harness_decision_traces` command applies that
+reconstruction to exported raw payloads, JSON arrays, or JSONL event envelopes
+without database or provider access. It ignores unrelated event types in a full
+export, emits bounded identifiers/failure codes/hashes instead of replaying the
+evidence packet into CI logs, and exits nonzero for a missing, invalid, corrupted,
+or current-version-incompatible trace.
 
 This corpus is deliberately a development diagnostic, not the confirmatory
 simulator campaign in Section 22. It detects prompt/tool discrimination regressions

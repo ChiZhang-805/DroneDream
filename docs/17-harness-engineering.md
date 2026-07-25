@@ -104,6 +104,17 @@ static tool manifest with evidence, manifest, and full-prompt SHA-256 values plu
 explicit prompt/trace versions. A pure verifier rebuilds the production messages
 and detects snapshot, manifest, or prompt drift. This is a reproducibility check,
 not a cryptographic signature or an immutable audit ledger.
+Exported decision-start events can be checked without database or provider access:
+
+```powershell
+cd backend
+python -m scripts.verify_harness_decision_traces .\decision-events.jsonl
+```
+
+The verifier accepts a raw payload, a JSON array, or JSONL event export; ignores
+unrelated event envelopes; emits only bounded identifiers, failure codes, and
+computed hashes; and exits nonzero if no decision trace is present or any trace
+fails current-version reconstruction.
 
 Provider-visible evidence never includes user labels, candidate IDs, parameter
 values, scenario IDs or seeds, free-form simulator/model text, credentials, or
