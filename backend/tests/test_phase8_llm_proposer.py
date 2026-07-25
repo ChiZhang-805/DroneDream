@@ -782,6 +782,111 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
     assert '"config"' not in serialized
 
 
+def test_harness_prompt_is_invariant_to_untrusted_fields_and_sensitive_to_scores(
+    llm_ctx,
+):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+
+    with ctx["db_module"].SessionLocal() as db:
+        _seed_harness_evidence(ctx, db, job_id)
+        job = db.get(ctx["models"].Job, job_id)
+        job.display_name = "FIRST PRIVATE DISPLAY NAME"
+        job.scenario_suite_json = {
+            "cases": [
+                {
+                    "id": "FIRST PRIVATE SCENARIO ID",
+                    "scenario_type": "wind_perturbed",
+                    "seeds": [101, 102],
+                    "enabled": True,
+                    "holdout": False,
+                    "config": {"instruction": "FIRST PRIVATE CONFIG"},
+                }
+            ],
+            "common_random_numbers": True,
+        }
+        event = ctx["models"].JobEvent(
+            job_id=job_id,
+            event_type="harness_tool_execution_result",
+            payload_json={
+                "generation": 0,
+                "tool_id": "turbo",
+                "decision_source": "model",
+                "status": "dispatched",
+                "dispatched_candidates": 1,
+                "rationale": "FIRST PRIVATE RATIONALE",
+                "provider_error": "FIRST PRIVATE ERROR",
+            },
+        )
+        db.add(event)
+        db.flush()
+
+        candidate = job.candidates[0]
+        before, _ = ctx["decision_harness"].build_harness_evidence(
+            job,
+            execution_events=[event],
+        )
+        before_messages = ctx["decision_harness"].build_decision_messages(before)
+
+        job.display_name = "SECOND PRIVATE DISPLAY NAME"
+        job.scenario_suite_json = {
+            "cases": [
+                {
+                    "id": "SECOND PRIVATE SCENARIO ID",
+                    "scenario_type": "wind_perturbed",
+                    "seeds": [9001, 9002],
+                    "enabled": True,
+                    "holdout": False,
+                    "config": {"instruction": "SECOND PRIVATE CONFIG"},
+                }
+            ],
+            "common_random_numbers": True,
+        }
+        candidate.label = "SECOND PRIVATE CANDIDATE LABEL"
+        candidate.proposal_reason = "SECOND PRIVATE PROPOSAL REASON"
+        candidate.parameter_json = {"kp_xy": 999.0, "private": "SECOND PRIVATE VALUE"}
+        candidate.aggregated_metric_json = {
+            **candidate.aggregated_metric_json,
+            "rmse": ["SECOND PRIVATE ARRAY INJECTION"],
+            "diagnostic": "SECOND PRIVATE DIAGNOSTIC",
+            "objective_values": {"private": "SECOND PRIVATE OBJECTIVE"},
+        }
+        event.payload_json = {
+            **event.payload_json,
+            "rationale": "SECOND PRIVATE RATIONALE",
+            "provider_error": "SECOND PRIVATE ERROR",
+        }
+
+        after_untrusted, _ = ctx["decision_harness"].build_harness_evidence(
+            job,
+            execution_events=[event],
+        )
+        after_untrusted_messages = ctx["decision_harness"].build_decision_messages(
+            after_untrusted
+        )
+
+        candidate.aggregated_score = 0.8
+        after_trusted, _ = ctx["decision_harness"].build_harness_evidence(
+            job,
+            execution_events=[event],
+        )
+        after_trusted_messages = ctx["decision_harness"].build_decision_messages(
+            after_trusted
+        )
+
+    assert after_untrusted == before
+    assert after_untrusted_messages == before_messages
+    assert after_trusted != before
+    assert after_trusted_messages != before_messages
+    serialized = before_messages[1] + after_untrusted_messages[1]
+    for forbidden in (
+        "FIRST PRIVATE",
+        "SECOND PRIVATE",
+        "999.0",
+    ):
+        assert forbidden not in serialized
+
+
 def test_harness_context_is_bounded_and_keeps_best_plus_recent_evidence(llm_ctx):
     ctx = llm_ctx
     job_id = _create_harness_job(ctx)
@@ -797,7 +902,7 @@ def test_harness_context_is_bounded_and_keeps_best_plus_recent_evidence(llm_ctx)
     with ctx["db_module"].SessionLocal() as db:
         _seed_harness_evidence(ctx, db, job_id)
         job = db.get(ctx["models"].Job, job_id)
-        for generation in range(1, 61):
+        for generation in range(1, 1001):
             db.add(
                 ctx["models"].CandidateParameterSet(
                     job_id=job_id,
@@ -818,19 +923,20 @@ def test_harness_context_is_bounded_and_keeps_best_plus_recent_evidence(llm_ctx)
         ctx["decision_harness"].select_optimizer_tool(db, job, client=fake)
 
     evidence = json.loads(fake.calls[0]["user"])["evidence"]
-    assert evidence["candidate_history_total"] == 61
+    assert evidence["candidate_history_total"] == 1001
     assert evidence["candidate_history_included"] == 12
     assert len(evidence["candidates"]) == 12
     assert evidence["candidates"][0]["is_baseline"] is True
     included_generations = {candidate["generation"] for candidate in evidence["candidates"]}
     assert 1 in included_generations
-    assert 60 in included_generations
-    assert evidence["search"]["candidate_count"] == 61
-    assert evidence["tool_history"][0]["candidate_count"] == 60
+    assert 1000 in included_generations
+    assert evidence["search"]["candidate_count"] == 1001
+    assert evidence["tool_history"][0]["candidate_count"] == 1000
     trend = evidence["search"]["best_score_by_generation"]
     assert len(trend) == 32
     assert trend[0]["generation"] == 0
-    assert trend[-1]["generation"] == 60
+    assert trend[-1]["generation"] == 1000
+    assert len(fake.calls[0]["user"].encode("utf-8")) < 32_768
 
 
 def test_harness_rejects_unknown_tool_and_records_deterministic_fallback(llm_ctx):

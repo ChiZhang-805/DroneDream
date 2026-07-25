@@ -98,10 +98,14 @@ provider quota before deterministic rejection.
 
 Provider-visible evidence never includes user labels, candidate IDs, parameter
 values, scenario IDs or seeds, free-form simulator/model text, credentials, or
-arbitrary JSON. The snapshot keeps the baseline, strongest measured candidates,
-and latest generations so historical quality does not hide recent stagnation.
+arbitrary JSON. Mixed numeric/text metric arrays are rejected as a whole rather
+than letting untrusted text affect the visible array shape. The snapshot keeps
+the baseline, strongest measured candidates, and latest generations so historical
+quality does not hide recent stagnation.
 Long Jobs retain full-history stagnation computation while exposing only the first
-and latest 31 generation-best points, preventing unbounded prompt growth.
+and latest 31 generation-best points, preventing unbounded prompt growth. Tests
+verify byte-for-byte prompt invariance under untrusted-field mutations and keep a
+synthetic 1,001-Candidate history below the minimum configured 32 KiB prompt limit.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic

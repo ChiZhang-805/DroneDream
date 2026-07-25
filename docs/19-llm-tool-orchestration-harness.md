@@ -8084,7 +8084,8 @@ The implemented evidence-v2 compiler:
 - selects at most twelve provider-visible Candidates while reserving representation
   for the baseline, strongest historical evidence, and the latest generations;
 - rejects mappings, strings, labels, free-form diagnostics, proposal rationale,
-  errors, Candidate IDs, parameter values, and arbitrary JSON at the prompt boundary;
+  errors, Candidate IDs, parameter values, arbitrary JSON, and mixed numeric/text
+  metric arrays at the prompt boundary;
 - uses `evidence_schema_version=2.0` and `tool_registry_version=2.0` in capability
   discovery and decision/tool-execution events; and
 - presents a richer static tool manifest with explicit search roles, applicability
@@ -8104,6 +8105,12 @@ pressure, high dimension, tight budget, failure recovery, and mixed tool history
 secretless production messages, and grades a complete case-to-tool prediction file.
 Tests prove that case IDs, acceptable answers, grader rationale, scenario IDs,
 scenario configuration, seeds, and injected text do not enter those messages.
+Byte-invariance tests additionally prove that changing only untrusted display names,
+Candidate labels/reasons/parameter values, scenario IDs/seed values/configuration,
+event rationale/errors, or rejected metrics leaves the exact production messages
+unchanged, while changing a trusted measured score changes the messages. A synthetic
+1,001-Candidate history test keeps twelve Candidate rows, 32 trend rows, and a
+production user message below the minimum configured 32 KiB prompt limit.
 The execution-memory query deliberately avoids loading the mutable SQLAlchemy
 `job.events` relationship, preventing a same-transaction relationship cache from
 hiding decision events written later in the turn.
@@ -8124,7 +8131,7 @@ backend/.venv/Scripts/python.exe -m pytest \
   backend/tests/test_phase8_iterative_loop.py \
   backend/tests/test_capabilities.py -q
 
-43 passed
+44 passed
 
 cd backend
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py

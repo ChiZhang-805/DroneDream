@@ -356,7 +356,7 @@ def _safe_metric(value: object, *, depth: int = 0) -> JsonMetric | None:
         compiled: list[JsonScalar] = []
         for item in value[:64]:
             child = _safe_metric(item, depth=depth + 1)
-            if isinstance(child, list):
+            if isinstance(child, list) or (child is None and item is not None):
                 return None
             compiled.append(child)
         return compiled
