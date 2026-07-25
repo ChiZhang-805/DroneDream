@@ -132,5 +132,8 @@ cases across eight routing regimes and uses the exact production prompt builder.
 Its report includes uniform-random and all eight constant-tool baselines; the best
 constant policy currently scores 14/24, so a candidate router must be compared
 against that 58.33% floor rather than against chance alone.
+The Report 1.1 development gate requires 75% overall, a 15-point lift over the
+best constant tool, and at least 2/3 in every category before a router may advance
+to a frozen simulator comparison.
 It is a regression tool, not evidence that model routing outperforms the
 deterministic portfolio; that claim still requires the frozen simulator campaign.

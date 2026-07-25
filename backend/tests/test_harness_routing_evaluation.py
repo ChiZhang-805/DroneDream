@@ -96,6 +96,26 @@ def test_routing_eval_reports_non_adaptive_baselines_and_prediction_lift() -> No
     assert report.absolute_lift_over_uniform_random == pytest.approx(0.765625)
     assert report.absolute_lift_over_best_constant == pytest.approx(10 / 24)
     assert report.beats_best_constant is True
+    assert report.schema_version == "1.1"
+    assert report.qualification.qualified is True
+    assert report.qualification.failed_requirements == ()
+
+    constant_predictions = {
+        case.case_id: cast(HarnessToolId, "optimizer_portfolio")
+        for case in cases
+    }
+    constant_report = build_routing_eval_report(cases, constant_predictions)
+    assert constant_report.qualification.qualified is False
+    assert "overall_pass_rate" in (
+        constant_report.qualification.failed_requirements
+    )
+    assert "lift_over_best_constant" in (
+        constant_report.qualification.failed_requirements
+    )
+    assert any(
+        requirement.startswith("category_pass_rate:")
+        for requirement in constant_report.qualification.failed_requirements
+    )
 
 
 def test_routing_eval_rejects_incomplete_or_unknown_predictions() -> None:

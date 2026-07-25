@@ -8117,6 +8117,10 @@ then measures supplied predictions against both without using case categories or
 grader rationale. In corpus v1 the random expectation is 23.4375%, while the best
 constant policy (`optimizer_portfolio`) reaches 58.3333% (14/24); therefore raw
 accuracy alone is not sufficient evidence that a router uses the supplied signals.
+Evaluation Report 1.1 adds a deterministic development qualification gate: at
+least 75% overall, at least 15 percentage points above the best constant policy,
+and at least two of three cases passed in every category. These thresholds only
+decide whether a router is worth advancing to the frozen simulator campaign.
 Tests prove that case IDs, acceptable answers, grader rationale, scenario IDs,
 scenario configuration, seeds, and injected text do not enter those messages.
 Byte-invariance tests additionally prove that changing only untrusted display names,

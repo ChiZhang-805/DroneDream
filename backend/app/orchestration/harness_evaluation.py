@@ -30,6 +30,10 @@ from app.orchestration.harness_context import (
 )
 
 HARNESS_ROUTING_EVAL_SCHEMA_VERSION = "1.0"
+HARNESS_ROUTING_REPORT_SCHEMA_VERSION = "1.1"
+HARNESS_ROUTING_MIN_PASS_RATE = 0.75
+HARNESS_ROUTING_MIN_CATEGORY_PASS_RATE = 2 / 3
+HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT = 0.15
 
 HarnessEvalCategory = Literal[
     "cold_start",
@@ -144,13 +148,22 @@ class HarnessRoutingBaselineSummary(_ClosedModel):
     constant_tool_results: tuple[HarnessConstantToolBaseline, ...] = Field(min_length=1)
 
 
+class HarnessRoutingQualification(_ClosedModel):
+    qualified: bool
+    minimum_pass_rate: float = Field(ge=0.0, le=1.0)
+    minimum_category_pass_rate: float = Field(ge=0.0, le=1.0)
+    minimum_lift_over_best_constant: float = Field(ge=0.0, le=1.0)
+    failed_requirements: tuple[str, ...] = ()
+
+
 class HarnessRoutingEvalReport(_ClosedModel):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.1"] = "1.1"
     predictions: HarnessRoutingEvalSummary
     baselines: HarnessRoutingBaselineSummary
     absolute_lift_over_uniform_random: float
     absolute_lift_over_best_constant: float
     beats_best_constant: bool
+    qualification: HarnessRoutingQualification
 
 
 def load_routing_eval_cases(path: Path) -> tuple[HarnessRoutingEvalCase, ...]:
@@ -418,24 +431,52 @@ def build_routing_eval_report(
 
     summary = summarize_routing_predictions(cases, predictions)
     baselines = summarize_routing_baselines(cases)
+    absolute_lift_over_best_constant = (
+        summary.pass_rate - baselines.best_constant_pass_rate
+    )
+    failed_requirements: list[str] = []
+    if summary.pass_rate < HARNESS_ROUTING_MIN_PASS_RATE:
+        failed_requirements.append("overall_pass_rate")
+    if (
+        absolute_lift_over_best_constant
+        < HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT
+    ):
+        failed_requirements.append("lift_over_best_constant")
+    failed_requirements.extend(
+        f"category_pass_rate:{category}"
+        for category, result in sorted(summary.category_results.items())
+        if float(result["pass_rate"]) < HARNESS_ROUTING_MIN_CATEGORY_PASS_RATE
+    )
     return HarnessRoutingEvalReport(
         predictions=summary,
         baselines=baselines,
         absolute_lift_over_uniform_random=(
             summary.pass_rate - baselines.uniform_random_expected_pass_rate
         ),
-        absolute_lift_over_best_constant=(
-            summary.pass_rate - baselines.best_constant_pass_rate
-        ),
+        absolute_lift_over_best_constant=absolute_lift_over_best_constant,
         beats_best_constant=summary.pass_rate > baselines.best_constant_pass_rate,
+        qualification=HarnessRoutingQualification(
+            qualified=not failed_requirements,
+            minimum_pass_rate=HARNESS_ROUTING_MIN_PASS_RATE,
+            minimum_category_pass_rate=HARNESS_ROUTING_MIN_CATEGORY_PASS_RATE,
+            minimum_lift_over_best_constant=(
+                HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT
+            ),
+            failed_requirements=tuple(failed_requirements),
+        ),
     )
 
 
 __all__ = [
     "HARNESS_ROUTING_EVAL_SCHEMA_VERSION",
+    "HARNESS_ROUTING_MIN_CATEGORY_PASS_RATE",
+    "HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT",
+    "HARNESS_ROUTING_MIN_PASS_RATE",
+    "HARNESS_ROUTING_REPORT_SCHEMA_VERSION",
     "HarnessRoutingBaselineSummary",
     "HarnessRoutingEvalCase",
     "HarnessRoutingEvalReport",
+    "HarnessRoutingQualification",
     "HarnessRoutingEvalSummary",
     "HarnessRoutingGrade",
     "HarnessRoutingStimulus",

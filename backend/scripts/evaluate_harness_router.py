@@ -44,7 +44,7 @@ def main() -> int:
     args = _parser().parse_args()
     cases = load_routing_eval_cases(args.corpus)
     result: dict[str, object] = {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "corpus": str(args.corpus),
         "case_count": len(cases),
         "categories": sorted({case.category for case in cases}),
@@ -92,6 +92,7 @@ def main() -> int:
                 report.absolute_lift_over_best_constant
             ),
             "beats_best_constant": report.beats_best_constant,
+            "qualification": report.qualification.model_dump(mode="json"),
         }
 
     print(json.dumps(result, indent=2, sort_keys=True))
