@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import cast
 
@@ -15,7 +16,11 @@ from app.orchestration.harness_context import (
 from app.orchestration.harness_evaluation import (
     build_routing_eval_report,
     compile_routing_eval_snapshot,
+    grade_routing_prediction_artifact,
     load_routing_eval_cases,
+    load_routing_prediction_artifact,
+    routing_corpus_sha256,
+    routing_prompt_suite_sha256,
     summarize_routing_baselines,
     summarize_routing_predictions,
 )
@@ -127,6 +132,58 @@ def test_routing_eval_rejects_incomplete_or_unknown_predictions() -> None:
     wrong = {case.case_id: cast(HarnessToolId, "cma_es") for case in cases}
     summary = summarize_routing_predictions(cases, wrong)
     assert summary.pass_rate < 1.0
+
+
+def test_prediction_artifact_binds_corpus_prompts_versions_and_model(
+    tmp_path,
+) -> None:
+    cases = load_routing_eval_cases(CORPUS)
+    payload = {
+        "schema_version": "1.0",
+        "corpus_sha256": routing_corpus_sha256(cases),
+        "prompt_suite_sha256": routing_prompt_suite_sha256(cases),
+        "evidence_schema_version": "2.2",
+        "tool_registry_version": "2.0",
+        "prompt_template_version": "1.0",
+        "provider": "openai",
+        "model_snapshot": "gpt-test-snapshot",
+        "generation_config": {
+            "temperature": 0.0,
+            "seed": 20260726,
+            "response_format": "json_schema",
+        },
+        "predictions": {
+            case.case_id: {
+                "selected_tool": case.acceptable_tools[0],
+                "rationale": "Bounded test rationale.",
+            }
+            for case in cases
+        },
+    }
+    artifact_path = tmp_path / "predictions.json"
+    artifact_path.write_text(
+        json.dumps(payload, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    artifact = load_routing_prediction_artifact(artifact_path, cases)
+    report = grade_routing_prediction_artifact(artifact, cases)
+
+    assert artifact.model_snapshot == "gpt-test-snapshot"
+    assert report.predictions.pass_rate == 1.0
+    assert report.qualification.qualified is True
+
+    payload["corpus_sha256"] = "0" * 64
+    artifact_path.write_text(
+        json.dumps(payload, sort_keys=True),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="corpus_sha256"):
+        load_routing_prediction_artifact(artifact_path, cases)
+
+    artifact_path.write_text("{}", encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid"):
+        load_routing_prediction_artifact(artifact_path, cases)
 
 
 def test_routing_eval_compiler_preserves_decision_signals() -> None:

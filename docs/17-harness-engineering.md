@@ -135,5 +135,9 @@ against that 58.33% floor rather than against chance alone.
 The Report 1.1 development gate requires 75% overall, a 15-point lift over the
 best constant tool, and at least 2/3 in every category before a router may advance
 to a frozen simulator comparison.
+Prediction Artifact 1.0 binds every offline result to canonical corpus and exact
+production-prompt hashes plus Evidence/Tool/Prompt versions, provider, model
+snapshot, sampling settings, selections, and rationales. Stale or incomplete
+artifacts are rejected before grading.
 It is a regression tool, not evidence that model routing outperforms the
 deterministic portfolio; that claim still requires the frozen simulator campaign.

@@ -5,14 +5,16 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import cast
 
 from app.orchestration.decision_harness import build_decision_messages
-from app.orchestration.harness_context import HARNESS_TOOL_DEFINITIONS, HarnessToolId
+from app.orchestration.harness_context import HARNESS_TOOL_DEFINITIONS
 from app.orchestration.harness_evaluation import (
-    build_routing_eval_report,
     compile_routing_eval_snapshot,
+    grade_routing_prediction_artifact,
     load_routing_eval_cases,
+    load_routing_prediction_artifact,
+    routing_corpus_sha256,
+    routing_prompt_suite_sha256,
     summarize_routing_baselines,
 )
 
@@ -30,7 +32,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--predictions",
         type=Path,
-        help="Optional JSON object mapping every case_id to one registered tool_id.",
+        help=(
+            "Optional strict prediction artifact bound to corpus, prompt, "
+            "schema, provider, and model versions."
+        ),
     )
     parser.add_argument(
         "--emit-prompts",
@@ -49,6 +54,8 @@ def main() -> int:
         "case_count": len(cases),
         "categories": sorted({case.category for case in cases}),
         "tool_count": len(HARNESS_TOOL_DEFINITIONS),
+        "corpus_sha256": routing_corpus_sha256(cases),
+        "prompt_suite_sha256": routing_prompt_suite_sha256(cases),
     }
     result["baselines"] = summarize_routing_baselines(cases).model_dump(mode="json")
 
@@ -71,18 +78,11 @@ def main() -> int:
         result["prompt_output"] = str(args.emit_prompts)
 
     if args.predictions is not None:
-        raw_predictions = json.loads(args.predictions.read_text(encoding="utf-8"))
-        if not isinstance(raw_predictions, dict):
-            raise ValueError("predictions must be a JSON object")
-        predictions: dict[str, HarnessToolId] = {}
-        for case_id, tool_id in raw_predictions.items():
-            if not isinstance(case_id, str) or tool_id not in HARNESS_TOOL_DEFINITIONS:
-                raise ValueError("predictions contain an invalid case or tool ID")
-            predictions[case_id] = cast(HarnessToolId, tool_id)
-        report = build_routing_eval_report(
+        artifact = load_routing_prediction_artifact(
+            args.predictions,
             cases,
-            predictions,
         )
+        report = grade_routing_prediction_artifact(artifact, cases)
         result["grade"] = report.predictions.model_dump(mode="json")
         result["comparison"] = {
             "absolute_lift_over_uniform_random": (
@@ -93,6 +93,11 @@ def main() -> int:
             ),
             "beats_best_constant": report.beats_best_constant,
             "qualification": report.qualification.model_dump(mode="json"),
+        }
+        result["prediction_provenance"] = {
+            "provider": artifact.provider,
+            "model_snapshot": artifact.model_snapshot,
+            "generation_config": artifact.generation_config.model_dump(mode="json"),
         }
 
     print(json.dumps(result, indent=2, sort_keys=True))

@@ -8,6 +8,7 @@ locked simulator campaign is run.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import Counter
 from pathlib import Path
@@ -15,8 +16,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.orchestration.decision_harness import (
+    HARNESS_PROMPT_TEMPLATE_VERSION,
+    build_decision_messages,
+)
 from app.orchestration.harness_context import (
+    HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_TOOL_DEFINITIONS,
+    HARNESS_TOOL_REGISTRY_VERSION,
     HarnessBudgetEvidence,
     HarnessCandidateEvidence,
     HarnessEvidenceSnapshot,
@@ -34,6 +41,7 @@ HARNESS_ROUTING_REPORT_SCHEMA_VERSION = "1.1"
 HARNESS_ROUTING_MIN_PASS_RATE = 0.75
 HARNESS_ROUTING_MIN_CATEGORY_PASS_RATE = 2 / 3
 HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT = 0.15
+HARNESS_ROUTING_PREDICTION_ARTIFACT_SCHEMA_VERSION = "1.0"
 
 HarnessEvalCategory = Literal[
     "cold_start",
@@ -164,6 +172,124 @@ class HarnessRoutingEvalReport(_ClosedModel):
     absolute_lift_over_best_constant: float
     beats_best_constant: bool
     qualification: HarnessRoutingQualification
+
+
+class HarnessRoutingGenerationConfig(_ClosedModel):
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    top_p: float | None = Field(default=None, gt=0.0, le=1.0)
+    seed: int | None = None
+    response_format: Literal["json_schema", "json_object"] = "json_schema"
+
+
+class HarnessRoutingPrediction(_ClosedModel):
+    selected_tool: HarnessToolId
+    rationale: str = Field(min_length=1, max_length=400)
+
+
+class HarnessRoutingPredictionArtifact(_ClosedModel):
+    schema_version: Literal["1.0"] = "1.0"
+    corpus_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    prompt_suite_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_schema_version: str
+    tool_registry_version: str
+    prompt_template_version: str
+    provider: str = Field(min_length=1, max_length=64)
+    model_snapshot: str = Field(min_length=1, max_length=160)
+    generation_config: HarnessRoutingGenerationConfig = Field(
+        default_factory=HarnessRoutingGenerationConfig
+    )
+    predictions: dict[str, HarnessRoutingPrediction]
+
+    @model_validator(mode="after")
+    def _validate_versions(self) -> HarnessRoutingPredictionArtifact:
+        expected = {
+            "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+            "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+            "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
+        }
+        for field_name, expected_value in expected.items():
+            if getattr(self, field_name) != expected_value:
+                raise ValueError(
+                    f"{field_name} must equal current version {expected_value}"
+                )
+        return self
+
+
+def _canonical_json(value: object) -> str:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+
+
+def routing_corpus_sha256(
+    cases: tuple[HarnessRoutingEvalCase, ...],
+) -> str:
+    payload = [case.model_dump(mode="json") for case in cases]
+    return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+def routing_prompt_suite_sha256(
+    cases: tuple[HarnessRoutingEvalCase, ...],
+) -> str:
+    prompts: list[dict[str, str]] = []
+    for case in cases:
+        system, user = build_decision_messages(
+            compile_routing_eval_snapshot(case)
+        )
+        prompts.append(
+            {
+                "case_id": case.case_id,
+                "system": system,
+                "user": user,
+            }
+        )
+    return hashlib.sha256(_canonical_json(prompts).encode("utf-8")).hexdigest()
+
+
+def load_routing_prediction_artifact(
+    path: Path,
+    cases: tuple[HarnessRoutingEvalCase, ...],
+) -> HarnessRoutingPredictionArtifact:
+    """Load predictions only when every provenance binding matches."""
+
+    try:
+        artifact = HarnessRoutingPredictionArtifact.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as exc:
+        raise ValueError("invalid Harness routing prediction artifact") from exc
+    if artifact.corpus_sha256 != routing_corpus_sha256(cases):
+        raise ValueError("prediction artifact corpus_sha256 does not match corpus")
+    if artifact.prompt_suite_sha256 != routing_prompt_suite_sha256(cases):
+        raise ValueError(
+            "prediction artifact prompt_suite_sha256 does not match production prompts"
+        )
+    expected_ids = {case.case_id for case in cases}
+    if set(artifact.predictions) != expected_ids:
+        missing = sorted(expected_ids - set(artifact.predictions))
+        extra = sorted(set(artifact.predictions) - expected_ids)
+        raise ValueError(
+            "prediction artifact must exactly cover the corpus; "
+            f"missing={missing}, extra={extra}"
+        )
+    return artifact
+
+
+def grade_routing_prediction_artifact(
+    artifact: HarnessRoutingPredictionArtifact,
+    cases: tuple[HarnessRoutingEvalCase, ...],
+) -> HarnessRoutingEvalReport:
+    return build_routing_eval_report(
+        cases,
+        {
+            case_id: prediction.selected_tool
+            for case_id, prediction in artifact.predictions.items()
+        },
+    )
 
 
 def load_routing_eval_cases(path: Path) -> tuple[HarnessRoutingEvalCase, ...]:
@@ -472,10 +598,14 @@ __all__ = [
     "HARNESS_ROUTING_MIN_CATEGORY_PASS_RATE",
     "HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT",
     "HARNESS_ROUTING_MIN_PASS_RATE",
+    "HARNESS_ROUTING_PREDICTION_ARTIFACT_SCHEMA_VERSION",
     "HARNESS_ROUTING_REPORT_SCHEMA_VERSION",
     "HarnessRoutingBaselineSummary",
     "HarnessRoutingEvalCase",
     "HarnessRoutingEvalReport",
+    "HarnessRoutingGenerationConfig",
+    "HarnessRoutingPrediction",
+    "HarnessRoutingPredictionArtifact",
     "HarnessRoutingQualification",
     "HarnessRoutingEvalSummary",
     "HarnessRoutingGrade",
@@ -483,7 +613,11 @@ __all__ = [
     "build_routing_eval_report",
     "compile_routing_eval_snapshot",
     "grade_routing_decision",
+    "grade_routing_prediction_artifact",
     "load_routing_eval_cases",
+    "load_routing_prediction_artifact",
+    "routing_corpus_sha256",
+    "routing_prompt_suite_sha256",
     "summarize_routing_baselines",
     "summarize_routing_predictions",
 ]

@@ -8121,6 +8121,12 @@ Evaluation Report 1.1 adds a deterministic development qualification gate: at
 least 75% overall, at least 15 percentage points above the best constant policy,
 and at least two of three cases passed in every category. These thresholds only
 decide whether a router is worth advancing to the frozen simulator campaign.
+Prediction Artifact 1.0 replaces the unaudited bare case-to-tool JSON map. A
+gradeable artifact must bind the canonical corpus SHA-256, the exact production
+prompt-suite SHA-256, Evidence/Tool/Prompt versions, provider, model snapshot,
+sampling configuration, every selected tool, and its bounded rationale. The
+loader rejects stale versions, mismatched hashes, missing/extra cases, or an
+unstructured prediction file before grading.
 Tests prove that case IDs, acceptable answers, grader rationale, scenario IDs,
 scenario configuration, seeds, and injected text do not enter those messages.
 Byte-invariance tests additionally prove that changing only untrusted display names,
@@ -8185,6 +8191,8 @@ uniform-random expectation: 5.625/24 (23.4375%)
 best constant tool: optimizer_portfolio, 14/24 (58.3333%)
 current provider-call traces: Evidence 2.2, Tool Manifest 2.0,
 Prompt Template 1.0, Decision Trace 1.0
+strict offline predictions: Prediction Artifact 1.0 bound to the printed
+corpus_sha256 and prompt_suite_sha256
 ```
 
 ## 31. Reference index
