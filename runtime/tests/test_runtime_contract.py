@@ -187,9 +187,9 @@ class RuntimeManifestContractTests(unittest.TestCase):
 
     def test_packaged_desktop_runtime_requires_supabase_oidc(self) -> None:
         values = {}
-        for raw_line in (RUNTIME / "config" / "runtime.env.default").read_text(
-            encoding="utf-8"
-        ).splitlines():
+        for raw_line in (
+            (RUNTIME / "config" / "runtime.env.default").read_text(encoding="utf-8").splitlines()
+        ):
             line = raw_line.strip()
             if not line or line.startswith("#"):
                 continue
