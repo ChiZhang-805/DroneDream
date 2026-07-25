@@ -5,6 +5,7 @@ import {
   ensureOverallDesktopReadiness,
   resetDesktopReadinessSession,
 } from "../desktop/readiness";
+import { setAuthAccessToken } from "../features/auth/authTokenStore";
 
 function mockFetchOnce(body: unknown, status = 200) {
   const response = new Response(JSON.stringify(body), {
@@ -47,6 +48,7 @@ const runtimeComponents = [
 }));
 
 afterEach(() => {
+  setAuthAccessToken(null);
   resetDesktopReadinessSession();
   delete window.__TAURI__;
   vi.unstubAllGlobals();
@@ -267,6 +269,32 @@ describe("apiClient envelope handling", () => {
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: "Bearer demo-token",
+        }),
+      }),
+    );
+  });
+
+  it("prefers the current cloud account token for authenticated API calls", async () => {
+    setAuthAccessToken("cloud-session-token");
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { items: [], page: 1, page_size: 20, total: 0 },
+          error: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await apiClient.listJobs();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/jobs",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer cloud-session-token",
         }),
       }),
     );

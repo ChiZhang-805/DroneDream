@@ -42,6 +42,10 @@ jobs:
 
       - name: Build the version-pinned Pages site
         shell: pwsh
+        env:
+          DRONEDREAM_CUSTOM_DOMAIN: ${{ vars.DRONEDREAM_CUSTOM_DOMAIN }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: ./website/scripts/build-pages-site.ps1
 
       - name: Configure GitHub Pages

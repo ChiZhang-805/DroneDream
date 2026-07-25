@@ -12,12 +12,13 @@ import logging
 import math
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app import models, schemas
+from app.optimization.experimental_types import ExperimentalOptimizerStrategy
 from app.optimization.scenarios import ScenarioRun, scenario_matrix
 from app.orchestration import constants
 from app.orchestration.aggregation import candidate_is_publishable
@@ -1079,7 +1080,10 @@ def dispatch_next_cma_es_generation(
     return AdaptiveDispatchResult(status="dispatched", dispatched_candidates=1)
 
 
-def _experimental_batch_target(job: models.Job) -> int:
+def _experimental_batch_target(
+    job: models.Job,
+    strategy: ExperimentalOptimizerStrategy,
+) -> int:
     dimensions = 0
     parameter_space = job.parameter_space_json or []
     if not isinstance(parameter_space, list):
@@ -1108,7 +1112,7 @@ def _experimental_batch_target(job: models.Job) -> int:
             dimensions += 1
     if dimensions == 0:
         dimensions = len(constants.BASELINE_PARAMETERS)
-    if job.optimizer_strategy in {
+    if strategy in {
         "surrogate_cma_es",
         "bipop_cma_es",
         "optimizer_portfolio",
@@ -1135,11 +1139,15 @@ def _has_successful_full_fidelity_optimizer_evidence(job: models.Job) -> bool:
 def dispatch_next_experimental_generation(
     db: Session,
     job: models.Job,
+    *,
+    strategy_override: ExperimentalOptimizerStrategy | None = None,
 ) -> AdaptiveDispatchResult:
     """Generate and dispatch one batch from an accuracy-first optimizer."""
 
-    if not is_experimental_strategy(job.optimizer_strategy):
-        raise ValueError(f"unsupported experimental strategy: {job.optimizer_strategy}")
+    strategy_value = strategy_override or job.optimizer_strategy
+    if not is_experimental_strategy(strategy_value):
+        raise ValueError(f"unsupported experimental strategy: {strategy_value}")
+    strategy = cast(ExperimentalOptimizerStrategy, strategy_value)
     generation_index = job.current_generation + 1
     if generation_index > job.max_iterations:
         return AdaptiveDispatchResult(status="max_iterations_reached")
@@ -1158,7 +1166,7 @@ def dispatch_next_experimental_generation(
         configured_runs,
         full_trials_per_candidate=full_trials_per_candidate,
     )
-    can_schedule_reduced_fidelity = job.optimizer_strategy in {
+    can_schedule_reduced_fidelity = strategy in {
         "multi_fidelity_mobo",
         "optimizer_portfolio",
     }
@@ -1177,7 +1185,10 @@ def dispatch_next_experimental_generation(
         # least one optimizer candidate instead of ending with low-fidelity
         # evidence only.
         allocatable_capacity = max(1, capacity - 1)
-    batch_size = min(allocatable_capacity, _experimental_batch_target(job))
+    batch_size = min(
+        allocatable_capacity,
+        _experimental_batch_target(job, strategy),
+    )
     proposals = propose_experimental_generation(
         job=job,
         candidates=list(job.candidates),
@@ -1186,6 +1197,7 @@ def dispatch_next_experimental_generation(
         batch_size=batch_size,
         fidelity_mapping=fidelity_mapping,
         required_fidelity=1.0 if force_full_fidelity else None,
+        strategy_override=strategy,
     )
     dispatched_candidates = 0
     dispatched_trials = 0
@@ -1201,7 +1213,7 @@ def dispatch_next_experimental_generation(
                 "optimizer_candidate_skipped",
                 {
                     "reason": "invalid_fidelity",
-                    "strategy": job.optimizer_strategy,
+                    "strategy": strategy,
                     "generation_index": generation_index,
                     "label": proposal.label,
                 },
@@ -1219,7 +1231,7 @@ def dispatch_next_experimental_generation(
                 "optimizer_candidate_skipped",
                 {
                     "reason": "invalid_parameter_fingerprint",
-                    "strategy": job.optimizer_strategy,
+                    "strategy": strategy,
                     "generation_index": generation_index,
                     "label": proposal.label,
                 },
@@ -1232,7 +1244,7 @@ def dispatch_next_experimental_generation(
                 "optimizer_candidate_skipped",
                 {
                     "reason": "duplicate_in_generation",
-                    "strategy": job.optimizer_strategy,
+                    "strategy": strategy,
                     "generation_index": generation_index,
                     "label": proposal.label,
                 },
@@ -1249,7 +1261,7 @@ def dispatch_next_experimental_generation(
                 "optimizer_candidate_skipped",
                 {
                     "reason": "duplicate_parameters_and_fidelity",
-                    "strategy": job.optimizer_strategy,
+                    "strategy": strategy,
                     "generation_index": generation_index,
                     "label": proposal.label,
                 },
@@ -1289,7 +1301,7 @@ def dispatch_next_experimental_generation(
             "generation_index": generation_index,
             "candidate_count": dispatched_candidates,
             "trial_count": dispatched_trials,
-            "strategy": job.optimizer_strategy,
+            "strategy": strategy,
             "batch_target": batch_size,
         },
     )
@@ -1297,6 +1309,51 @@ def dispatch_next_experimental_generation(
         status="dispatched",
         dispatched_candidates=dispatched_candidates,
     )
+
+
+def dispatch_next_harness_generation(
+    db: Session,
+    job: models.Job,
+    *,
+    client: OpenAIClientLike | None = None,
+) -> AdaptiveDispatchResult:
+    """Let the bounded planner select and dispatch one registered optimizer.
+
+    The planner can only return a registry identifier. This function remains
+    the authority boundary: it maps that identifier to trusted in-process
+    optimizer code without mutating the job's persisted ``llm_harness`` mode.
+    """
+
+    from app.orchestration.decision_harness import (
+        as_experimental_strategy,
+        select_optimizer_tool,
+    )
+
+    decision = select_optimizer_tool(db, job, client=client)
+    if decision.tool_id == "cma_es":
+        result = dispatch_next_cma_es_generation(db, job)
+    else:
+        result = dispatch_next_experimental_generation(
+            db,
+            job,
+            strategy_override=as_experimental_strategy(decision.tool_id),
+        )
+    record_event(
+        db,
+        job.id,
+        "harness_tool_execution_result",
+        {
+            "generation": job.current_generation,
+            "tool_id": decision.tool_id,
+            "decision_source": decision.source,
+            "status": result.status,
+            "dispatched_candidates": result.dispatched_candidates,
+            "evidence_sha256": decision.evidence_sha256,
+            "prompt_sha256": decision.prompt_sha256,
+            "fallback_reason": decision.fallback_reason,
+        },
+    )
+    return result
 
 
 def _fail_job_initialization(db: Session, job_id: str, exc: ValueError) -> None:

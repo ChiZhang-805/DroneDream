@@ -150,13 +150,14 @@ class OpenAIClientLike(Protocol):
         ...
 
 
-class _DefaultOpenAIClient:
-    """Adapter over the official ``openai`` Python SDK.
+class OpenAIJsonClient:
+    """Strict JSON adapter over the official ``openai`` Python SDK.
 
     Uses ``client.chat.completions.create`` with
     ``response_format={"type": "json_schema", ...}`` to get structured JSON
-    output that matches :data:`_STRICT_SCHEMA`. If a future switch to the
-    newer Responses API is desired, only this class needs to change.
+    output that matches the caller-provided schema. Both the direct GPT
+    parameter proposer and the bounded tool-decision harness use this adapter;
+    it has no simulator, shell, database, or filesystem authority.
     """
 
     def __init__(
@@ -354,7 +355,7 @@ def _is_safe_response_tree(value: Any) -> bool:
     return visit(value, 0)
 
 
-def _load_api_key(db: Session, job: models.Job) -> str | None:
+def load_job_api_key(db: Session, job: models.Job) -> str | None:
     now = datetime.now(timezone.utc)
     expired_count = 0
     for stored_secret in job.secrets:
@@ -393,6 +394,10 @@ def _load_api_key(db: Session, job: models.Job) -> str | None:
     except job_secrets.SecretStoreError:
         logger.exception("failed to decrypt job secret for job %s", job.id)
         return None
+
+
+# Compatibility alias retained for the focused secret-expiry regression test.
+_load_api_key = load_job_api_key
 
 
 def _build_prompt(
@@ -722,7 +727,7 @@ def propose_candidates(
 
     effective_client: OpenAIClientLike | None = client
     if effective_client is None:
-        api_key = _load_api_key(db, job)
+        api_key = load_job_api_key(db, job)
         if api_key is None:
             record_event(
                 db,
@@ -732,7 +737,7 @@ def propose_candidates(
             )
             return LlmProposerResult(error="missing_api_key", model=chosen_model)
         settings = get_settings()
-        effective_client = _DefaultOpenAIClient(
+        effective_client = OpenAIJsonClient(
             api_key,
             proposal_schema=_proposal_schema(search_space),
             base_url=job.llm_base_url,
@@ -764,14 +769,23 @@ def propose_candidates(
             record_event(db, job.id, "llm_prompt_compacted", prompt_metadata)
         raw = effective_client.generate(model=chosen_model, system=system, user=user)
     except Exception as exc:  # OpenAI client failure, network, etc.
-        logger.exception("LLM proposer call failed for job %s", job.id)
+        error_type = type(exc).__name__
+        logger.warning(
+            "LLM proposer call failed for job %s (error_type=%s)",
+            job.id,
+            error_type,
+        )
         record_event(
             db,
             job.id,
             "llm_proposal_failed",
-            {"reason": "client_error", "message": str(exc)[:500], "model": chosen_model},
+            {
+                "reason": "client_error",
+                "error_type": error_type[:128],
+                "model": chosen_model,
+            },
         )
-        return LlmProposerResult(error=str(exc), model=chosen_model)
+        return LlmProposerResult(error="client_error", model=chosen_model)
 
     proposals = _validate_response(raw, search_space)
     if not proposals:
@@ -871,6 +885,8 @@ def job_secrets_env_model() -> str | None:
 __all__ = [
     "LlmProposal",
     "LlmProposerResult",
+    "OpenAIJsonClient",
     "OpenAIClientLike",
+    "load_job_api_key",
     "propose_candidates",
 ]

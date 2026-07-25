@@ -17,6 +17,8 @@
 - [16 Experimental Optimizer Benchmark](./16-experimental-optimizer-benchmark.md)
 - [17 Harness Engineering](./17-harness-engineering.md)
 - [18 Quality Audit (2026-07-16)](./18-quality-audit-2026-07-16.md)
+- [19 LLM Tool-Orchestrated Optimization Harness](./19-llm-tool-orchestration-harness.md)
+- [20 Account Authentication and Data Isolation](./20-account-authentication-and-data-isolation.md)
 - [PX4 Parameter Catalog](./PX4_PARAMETER_CATALOG.md)
 - [Deployment](./DEPLOYMENT.md)
 - [real_cli Artifact Schema](./REAL_CLI_ARTIFACT_SCHEMA.md)

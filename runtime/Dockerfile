@@ -3,7 +3,6 @@ ARG UBUNTU_BASE_IMAGE=ubuntu:24.04@sha256:52df9b1ee71626e0088f7d400d5c6b5f7bb916
 FROM ${UBUNTU_BASE_IMAGE}
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG DRONEDREAM_SOURCE_COMMIT
 ARG PX4_VERSION=v1.16.0
 ARG PX4_GIT_URL=https://github.com/PX4/PX4-Autopilot.git
 ARG PX4_GIT_COMMIT=6ea3539157ca358c70a515878b77077af7d4611d
@@ -70,6 +69,7 @@ RUN git clone --filter=blob:none "${VALKEY_GIT_URL}" /tmp/valkey && \
     rm -rf /tmp/valkey
 
 COPY . /opt/dronedream/source
+ARG DRONEDREAM_SOURCE_COMMIT
 RUN test -n "${DRONEDREAM_SOURCE_COMMIT}" && \
     python3 -m venv /opt/dronedream/venv && \
     /opt/dronedream/venv/bin/pip install --disable-pip-version-check --no-cache-dir \
@@ -115,6 +115,7 @@ COPY runtime/systemd/*.timer /etc/systemd/system/
 RUN chmod 0755 /usr/lib/dronedream/runtime-init.sh \
       /usr/lib/dronedream/runtime-check.sh /usr/lib/dronedream/px4-gazebo-smoke.py \
       /usr/lib/dronedream/px4-log-cleanup.py && \
+    install -d -m 0750 -o root -g dronedream /etc/dronedream && \
     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/artifacts && \
     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/runtime-smoke && \
     install -d -m 0750 -o valkey -g valkey /var/lib/valkey && \

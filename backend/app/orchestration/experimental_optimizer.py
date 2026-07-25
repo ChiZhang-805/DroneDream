@@ -395,11 +395,13 @@ def propose_experimental_generation(
     batch_size: int,
     fidelity_mapping: tuple[tuple[float, float], ...] = (),
     required_fidelity: float | None = None,
+    strategy_override: ExperimentalOptimizerStrategy | None = None,
 ) -> list[CandidateProposal]:
     """Generate a deterministic batch for one of the seven strategies."""
 
-    if not is_experimental_strategy(job.optimizer_strategy):
-        raise ValueError(f"unsupported experimental strategy: {job.optimizer_strategy}")
+    strategy_value = strategy_override or job.optimizer_strategy
+    if not is_experimental_strategy(strategy_value):
+        raise ValueError(f"unsupported experimental strategy: {strategy_value}")
     if batch_size < 1:
         return []
     search_space = search_space_for_job(job, baseline_parameters=baseline_parameters)
@@ -408,7 +410,7 @@ def propose_experimental_generation(
         search_space=search_space,
         candidates=candidates,
     )
-    strategy = cast(ExperimentalOptimizerStrategy, job.optimizer_strategy)
+    strategy = cast(ExperimentalOptimizerStrategy, strategy_value)
     request = OptimizerRequest(
         strategy=strategy,
         generation_index=generation_index,

@@ -2,8 +2,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import appIcon from "../../../desktop/src-tauri/icons/128x128.png";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
+import { useAuthOrLocal } from "../features/auth/AuthContext";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
+import { CommunityPage } from "./CommunityPage";
+import { ManualPage } from "./ManualPage";
+import { PricingPage } from "./PricingPage";
 import {
   compareReleaseVersions,
   fallbackRelease,
@@ -23,22 +27,47 @@ const content = {
     metaDescription: "Configure, optimize, simulate, and compare PX4 control parameters in one local Windows workflow.",
     navLabel: "Primary navigation",
     nav: [
-      ["Product", "product"],
-      ["Workflow", "workflow"],
-      ["Manual", "manual"],
-      ["Download", "download"],
+      ["Product", "/pricing/"],
+      ["Workflow", "/"],
+      ["Manual", "/manual/"],
+      ["Community", "/community/"],
     ],
     language: "中文",
     languageLabel: "Switch to Simplified Chinese",
     menu: "Open navigation",
     closeMenu: "Close navigation",
     downloadShort: "Download",
+    console: "Console",
+    signIn: "Sign in",
+    register: "Register",
+    account: "Account",
+    authTitle: "Sign in",
+    registerTitle: "Create account",
+    email: "Email address",
+    password: "Password",
+    passwordPlaceholder: "At least 8 characters",
+    confirmPassword: "Confirm password",
+    confirmPasswordPlaceholder: "Enter the password again",
+    code: "Verification code",
+    codePlaceholder: "Six-digit code",
+    sendCode: "Send code",
+    resendCode: "Resend code",
+    signInAction: "Sign in",
+    createAccount: "Create account",
+    passwordTooShort: "Password must contain at least 8 characters.",
+    passwordMismatch: "The two passwords do not match.",
+    codeRequired: "Send and enter the verification code before creating the account.",
+    registerNow: "New to DroneDream? Register now",
+    backToSignIn: "Already registered? Sign in",
+    openConsole: "Open console",
+    signOut: "Sign out",
+    closeAuth: "Close account dialog",
     eyebrow: "LOCAL-FIRST PX4 / GAZEBO TUNING",
     heroLead: "Tune with evidence.",
     heroAccent: "Fly with confidence.",
     downloadWindows: "Download for Windows",
     explore: "See how it works",
-    releasePrefix: "Preview",
+    releasePrefix: "Version",
     system: "Windows 10 / 11 · x64",
     clickDrone: "Click the drone to begin a starflight",
     scroll: "Scroll to explore",
@@ -156,7 +185,7 @@ const content = {
     manualClose: "Close manual",
     manualChapters: [
       ["1 · Check the computer", ["Use Windows 10 or Windows 11 on an x64 computer.", "Enable WSL2 and reserve at least 52 GiB for the complete Runtime.", "Use a fixed, writable NTFS drive when placing Runtime outside the system disk."]],
-      ["2 · Install the desktop application", ["Download the versioned EXE from this page and verify its SHA-256 if required.", "Run the installer, choose one interface language, and keep the recommended application folder.", "The current preview is unsigned, so SmartScreen may require More info → Run anyway."]],
+      ["2 · Install the desktop application", ["Download the versioned EXE from this page and verify its SHA-256 if required.", "Run the installer, choose one interface language, and keep the recommended application folder.", "The current release is not yet Authenticode-signed, so SmartScreen may require More info → Run anyway."]],
       ["3 · Prepare DroneDreamRuntime", ["Open DroneDream and start Runtime installation from the launch screen.", "Keep the app open while it downloads, verifies, imports, starts, and checks PX4 / Gazebo.", "The dedicated distribution does not replace or modify an existing personal Ubuntu distribution."]],
       ["4 · Create the first experiment", ["Choose a mode, vehicle, PX4 version, Gazebo model, and world.", "Complete the five wizard stages in order; future stages stay locked until the current stage validates.", "Select parameters and ranges, define the scenario and route, set constraints and budget, then review and create after confirming every runtime boundary with confidence while preserving the complete configuration."]],
       ["5 · Read and preserve the result", ["Compare feasible candidates using individual metrics and Pareto trade-offs, not only a combined score.", "Keep logs, artifacts, seeds, parameter snapshots, and the reproducibility manifest with the report.", "Do not use experimental parameters on real hardware without an independent safety review."]],
@@ -164,7 +193,7 @@ const content = {
     integrityTitle: "Download integrity",
     integrityText: "The SHA-256 shown on this page must exactly match the value calculated from the downloaded EXE.",
     github: "View source on GitHub",
-    downloadEyebrow: "WINDOWS PREVIEW",
+    downloadEyebrow: "WINDOWS RELEASE",
     downloadTitle: "Run DroneDream on your PC.",
     downloadBody:
       "Install the app first, then place its isolated Runtime on any eligible NTFS drive.",
@@ -174,9 +203,7 @@ const content = {
     platform: "Platform",
     platformValue: "Windows x64",
     released: "Released",
-    previewNote:
-      "Unsigned preview · Windows SmartScreen confirmation may be required.",
-    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Free code signing provided by SignPath.io, certificate by SignPath Foundation.",
+    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is published while code signing is being prepared.",
     codeSigningPolicy: "Code signing policy",
     privacyPolicy: "Privacy policy",
   },
@@ -186,22 +213,47 @@ const content = {
     metaDescription: "在 Windows 本地完成 PX4 控制参数选择、自动优化、可复现仿真与结果对比。",
     navLabel: "主导航",
     nav: [
-      ["产品", "product"],
-      ["工作流", "workflow"],
-      ["说明书", "manual"],
-      ["下载", "download"],
+      ["产品", "/pricing/"],
+      ["工作流", "/"],
+      ["说明书", "/manual/"],
+      ["社区", "/community/"],
     ],
     language: "English",
     languageLabel: "切换到英文",
     menu: "打开导航",
     closeMenu: "关闭导航",
     downloadShort: "下载",
+    console: "控制台",
+    signIn: "登录",
+    register: "注册",
+    account: "账号",
+    authTitle: "登录",
+    registerTitle: "创建账号",
+    email: "邮箱地址",
+    password: "密码",
+    passwordPlaceholder: "至少 8 个字符",
+    confirmPassword: "确认密码",
+    confirmPasswordPlaceholder: "再次输入密码",
+    code: "邮箱验证码",
+    codePlaceholder: "六位验证码",
+    sendCode: "发送验证码",
+    resendCode: "重新发送",
+    signInAction: "登录",
+    createAccount: "创建账号",
+    passwordTooShort: "密码至少需要 8 个字符。",
+    passwordMismatch: "两次输入的密码不一致。",
+    codeRequired: "请先发送并填写邮箱验证码，再创建账号。",
+    registerNow: "还没有账号？立即注册",
+    backToSignIn: "已经注册？返回登录",
+    openConsole: "进入控制台",
+    signOut: "退出登录",
+    closeAuth: "关闭账号窗口",
     eyebrow: "本地优先的 PX4 / GAZEBO 调优平台",
     heroLead: "让调优有章法",
     heroAccent: "让飞行更加从容",
     downloadWindows: "下载 Windows 版",
     explore: "了解工作方式",
-    releasePrefix: "开发预览版",
+    releasePrefix: "版本",
     system: "Windows 10 / 11 · x64",
     clickDrone: "点击无人机，开启一次星际巡航",
     scroll: "向下探索",
@@ -318,7 +370,7 @@ const content = {
     manualClose: "关闭说明书",
     manualChapters: [
       ["1 · 检查电脑条件", ["使用 x64 架构的 Windows 10 或 Windows 11 电脑。", "启用 WSL2，并为完整运行环境预留至少 52 GiB 空间。", "如果运行环境不放在系统盘，请选择固定、可写的 NTFS 磁盘。"]],
-      ["2 · 安装桌面程序", ["从本页下载带版本号的 EXE；如有需要，先核对 SHA-256。", "运行安装器，选择一种界面语言，并保留推荐的应用程序目录。", "当前预览版尚未签名；SmartScreen 出现时需要选择“更多信息”并确认运行。"]],
+      ["2 · 安装桌面程序", ["从本页下载带版本号的 EXE；如有需要，先核对 SHA-256。", "运行安装器，选择一种界面语言，并保留推荐的应用程序目录。", "当前正式版本尚未完成 Authenticode 签名；SmartScreen 出现时需要选择“更多信息”并确认运行。"]],
       ["3 · 准备专用运行环境", ["打开 DroneDream，在启动界面开始安装 DroneDreamRuntime。", "下载、校验、导入、启动以及 PX4 / Gazebo 检查期间请保持程序开启。", "这个专用发行版不会替换或修改电脑中已有的个人 Ubuntu。"]],
       ["4 · 创建第一次实验", ["选择使用模式、机型、PX4 版本、Gazebo 模型与世界。", "依次完成五个向导步骤；当前步骤通过验证前，后续步骤始终锁定。", "选择参数及范围，设置场景、航迹、约束和预算，同时确认所有候选值、验证规则和运行边界都符合当前任务要求后再创建实验、启动调优并留存完整配置以及全部必要的关键复核证据与材料。"]],
       ["5 · 阅读并保存结果", ["使用单项指标和 Pareto 权衡比较可行候选方案，不要只看一个综合分数。", "将日志、产物、随机种子、参数快照和复现清单与报告一起保留。", "未经独立安全审查和受控试飞，不要把实验参数直接应用到真实飞行器。"]],
@@ -326,7 +378,7 @@ const content = {
     integrityTitle: "下载完整性",
     integrityText: "本页显示的 SHA-256 必须与下载后从 EXE 计算得到的值完全一致。",
     github: "在 GitHub 查看源码",
-    downloadEyebrow: "WINDOWS 预览版",
+    downloadEyebrow: "WINDOWS 正式版",
     downloadTitle: "在本机运行 DroneDream。",
     downloadBody:
       "先安装桌面程序，再将隔离运行环境放到符合条件的 NTFS 磁盘。",
@@ -336,8 +388,7 @@ const content = {
     platform: "平台",
     platformValue: "Windows x64",
     released: "发布日期",
-    previewNote: "未签名预览版 · Windows SmartScreen 可能要求确认。",
-    footerLine: "本地优先的 PX4/Gazebo 控制参数调优平台；代码签名由 SignPath.io 免费提供，证书由 SignPath Foundation 颁发。",
+    footerLine: "本地优先的 PX4/Gazebo 控制参数调优平台；1.0.0 正式版已经发布，代码签名正在按公开流程准备。",
     codeSigningPolicy: "代码签名政策",
     privacyPolicy: "隐私政策",
   },
@@ -419,6 +470,15 @@ function GitHubIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 2.7a9.4 9.4 0 0 0-3 18.3c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 0 1.6 1.1 1.6 1.1.9 1.6 2.4 1.1 2.9.9.1-.7.4-1.1.7-1.4-2.3-.3-4.6-1.1-4.6-4.7 0-1 .4-1.9 1-2.5-.1-.3-.4-1.3.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.3.2 2.3.1 2.6.6.6 1 1.5 1 2.5 0 3.6-2.4 4.4-4.6 4.7.4.3.7 1 .7 1.9v2.8c0 .3.2.6.7.5A9.4 9.4 0 0 0 12 2.7Z" />
+    </svg>
+  );
+}
+
+function AccountIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8" r="3.4" />
+      <path d="M5.5 20c.5-4.1 2.7-6.2 6.5-6.2s6 2.1 6.5 6.2" />
     </svg>
   );
 }
@@ -677,18 +737,34 @@ function StarflightIcon() {
 
 export function SiteApp() {
   const { locale, setLocale } = useI18n();
+  const auth = useAuthOrLocal();
   const copy = content[locale];
   const [release, setRelease] = useState<WebsiteRelease>(fallbackRelease);
   const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [manualOpen, setManualOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authCode, setAuthCode] = useState("");
+  const [authCodeSent, setAuthCodeSent] = useState(false);
+  const [authPassword, setAuthPassword] = useState("");
+  const [authPasswordConfirmation, setAuthPasswordConfirmation] = useState("");
+  const [authPending, setAuthPending] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const droneFlightRef = useRef<(() => void) | null>(null);
-  const manualTriggerRef = useRef<HTMLButtonElement>(null);
-  const manualCloseRef = useRef<HTMLButtonElement>(null);
-  const manualDialogRef = useRef<HTMLElement>(null);
+  const authDialogRef = useRef<HTMLElement>(null);
+  const authCloseRef = useRef<HTMLButtonElement>(null);
+  const path = window.location.pathname.replace(/\/+$/u, "") || "/";
+  const sitePage = path === "/manual"
+    ? "manual"
+    : path === "/pricing"
+      ? "pricing"
+      : path === "/community"
+        ? "community"
+        : "home";
 
   useEffect(() => {
     document.title = copy.metaTitle;
@@ -787,28 +863,36 @@ export function SiteApp() {
   }, []);
 
   useEffect(() => {
-    if (!manualOpen) return;
+    if (!authOpen) return;
     const previousOverflow = document.body.style.overflow;
     const inertTargets = Array.from(document.querySelectorAll<HTMLElement>(
       ".site-header, #main-content, .site-footer",
     ));
-    document.body.style.overflow = "hidden";
     const previousInertStates = inertTargets.map((target) => target.inert);
-    inertTargets.forEach((target) => { target.inert = true; });
-    manualCloseRef.current?.focus();
+    document.body.style.overflow = "hidden";
+    inertTargets.forEach((target) => {
+      target.inert = true;
+    });
+    const focusFrame = window.requestAnimationFrame(() => {
+      const firstInput = authDialogRef.current?.querySelector<HTMLInputElement>(
+        "input:not(:disabled)",
+      );
+      (auth.account ? authCloseRef.current : firstInput)?.focus();
+    });
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setManualOpen(false);
-        window.requestAnimationFrame(() => manualTriggerRef.current?.focus());
+        setAuthOpen(false);
         return;
       }
       if (event.key !== "Tab") return;
-      const focusable = Array.from(manualDialogRef.current?.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      ) ?? []);
-      if (focusable.length === 0) return;
+      const focusable = Array.from(
+        authDialogRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
       const first = focusable[0];
-      const last = focusable[focusable.length - 1];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
@@ -819,13 +903,14 @@ export function SiteApp() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       document.body.style.overflow = previousOverflow;
       inertTargets.forEach((target, index) => {
         target.inert = previousInertStates[index] ?? false;
       });
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [manualOpen]);
+  }, [auth.account, authOpen]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -864,16 +949,87 @@ export function SiteApp() {
   };
 
   const closeMenu = () => setMenuOpen(false);
-  const closeManual = () => {
-    setManualOpen(false);
-    window.requestAnimationFrame(() => manualTriggerRef.current?.focus());
+  const openAccount = (mode: "sign-in" | "register" = "sign-in") => {
+    setAuthMode(mode);
+    setAuthCode("");
+    setAuthCodeSent(false);
+    setAuthPassword("");
+    setAuthPasswordConfirmation("");
+    setAuthError(null);
+    setMenuOpen(false);
+    setAuthOpen(true);
+  };
+
+  const openConsole = () => {
+    if (auth.account) {
+      window.location.assign("/console/");
+      return;
+    }
+    openAccount("sign-in");
+  };
+
+  const submitAuth = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (authPending) return;
+    setAuthPending(true);
+    setAuthError(null);
+    try {
+      if (authMode === "sign-in") {
+        await auth.signInWithPassword(authEmail, authPassword);
+      } else {
+        if (authPassword.length < 8) {
+          throw new Error(copy.passwordTooShort);
+        }
+        if (authPassword !== authPasswordConfirmation) {
+          throw new Error(copy.passwordMismatch);
+        }
+        if (!authCodeSent || !authCode.trim()) {
+          throw new Error(copy.codeRequired);
+        }
+        await auth.verifyRegistrationCode(
+          authEmail,
+          authCode,
+          authPassword,
+        );
+      }
+    } catch (reason) {
+      setAuthError(
+        reason instanceof Error ? reason.message : "Account request failed.",
+      );
+    } finally {
+      setAuthPending(false);
+    }
+  };
+
+  const sendRegistrationCode = async () => {
+    if (authPending) return;
+    setAuthError(null);
+    if (authPassword.length < 8) {
+      setAuthError(copy.passwordTooShort);
+      return;
+    }
+    if (authPassword !== authPasswordConfirmation) {
+      setAuthError(copy.passwordMismatch);
+      return;
+    }
+    setAuthPending(true);
+    try {
+      await auth.sendRegistrationCode(authEmail);
+      setAuthCodeSent(true);
+    } catch (reason) {
+      setAuthError(
+        reason instanceof Error ? reason.message : "Account request failed.",
+      );
+    } finally {
+      setAuthPending(false);
+    }
   };
 
   return (
-    <div className="dd-site" data-locale={locale}>
+    <div className="dd-site" data-locale={locale} data-page={sitePage}>
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
-        <a className="site-brand" href="#home" onClick={closeMenu} aria-label="DroneDream">
+        <a className="site-brand" href="/" onClick={closeMenu} aria-label="DroneDream">
           <img src={appIcon} alt="" />
           <span>DroneDream</span>
         </a>
@@ -883,10 +1039,19 @@ export function SiteApp() {
           aria-label={copy.navLabel}
         >
           {copy.nav.map(([label, target]) => (
-            <a key={target} href={`#${target}`} onClick={closeMenu}>{label}</a>
+            <a key={target} href={target} onClick={closeMenu}>{label}</a>
           ))}
+          <button type="button" onClick={openConsole}>{copy.console}</button>
         </nav>
         <div className="site-header-actions">
+          <button
+            type="button"
+            className="site-account-button"
+            onClick={() => openAccount("sign-in")}
+          >
+            <AccountIcon />
+            <span>{auth.account ? copy.account : copy.signIn}</span>
+          </button>
           <button
             type="button"
             className="site-language"
@@ -916,6 +1081,22 @@ export function SiteApp() {
       </header>
 
       <main id="main-content">
+        {sitePage === "manual" ? (
+          <ManualPage locale={locale} />
+        ) : sitePage === "pricing" ? (
+          <PricingPage
+            locale={locale}
+            authenticated={Boolean(auth.account)}
+            onRequireAccount={() => openAccount("register")}
+          />
+        ) : sitePage === "community" ? (
+          <CommunityPage
+            locale={locale}
+            account={auth.account}
+            onRequireAccount={() => openAccount("sign-in")}
+          />
+        ) : (
+          <>
         <section className="site-hero" id="home" aria-labelledby="hero-title">
           <div className="site-hero-scene" aria-hidden="true">
             <DroneLaunchScene active starflightControllerRef={droneFlightRef} visualOffsetX={1.58} />
@@ -1102,7 +1283,7 @@ export function SiteApp() {
               <p className="site-eyebrow">{copy.manualEyebrow}</p>
               <h2>{copy.manualTitle}</h2>
               <div className="site-manual-links">
-                <button ref={manualTriggerRef} type="button" onClick={() => setManualOpen(true)}><DocumentIcon /><span>{copy.openManual}</span></button>
+                <a href="/manual/"><DocumentIcon /><span>{copy.openManual}</span></a>
                 <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>{copy.github}</span></a>
               </div>
             </div>
@@ -1129,7 +1310,6 @@ export function SiteApp() {
                   <DownloadIcon />
                   {copy.downloadAgain}
                 </a>
-                <small>{copy.previewNote}</small>
               </div>
               <div className="site-release-card">
                 <dl>
@@ -1142,37 +1322,184 @@ export function SiteApp() {
             </div>
           </div>
         </section>
+          </>
+        )}
       </main>
 
-      {manualOpen ? (
+      {authOpen ? (
         <div
-          className="site-manual-backdrop"
+          className="site-auth-backdrop"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeManual();
+            if (event.target === event.currentTarget) setAuthOpen(false);
           }}
         >
-          <section ref={manualDialogRef} className="site-manual-dialog" role="dialog" aria-modal="true" aria-labelledby="site-manual-title">
+          <section
+            ref={authDialogRef}
+            className="site-auth-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="site-auth-title"
+          >
             <header>
-              <div>
-                <p className="site-eyebrow">{copy.manualEyebrow}</p>
-                <h2 id="site-manual-title">{copy.manualDialogTitle}</h2>
-                <p data-copy-block data-copy-id="manual-dialog-intro">{copy.manualDialogIntro}</p>
-              </div>
-              <button ref={manualCloseRef} type="button" aria-label={copy.manualClose} onClick={closeManual}>×</button>
+              <h2 id="site-auth-title">
+                {auth.account
+                  ? copy.account
+                  : authMode === "register"
+                    ? copy.registerTitle
+                    : copy.authTitle}
+              </h2>
+              <button
+                ref={authCloseRef}
+                type="button"
+                aria-label={copy.closeAuth}
+                onClick={() => setAuthOpen(false)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m7 7 10 10M17 7 7 17" />
+                </svg>
+              </button>
             </header>
-            <div className="site-manual-dialog-body">
-              {copy.manualChapters.map(([title, items], chapterIndex) => (
-                <article key={`site-manual-chapter-${chapterIndex}`}>
-                  <h3>{title}</h3>
-                  <ul>{items.map((item, itemIndex) => <li key={`site-manual-item-${chapterIndex}-${itemIndex}`} data-copy-block data-copy-id={`manual-chapter-${chapterIndex}-${itemIndex}`}>{item}</li>)}</ul>
-                </article>
-              ))}
-              <aside>
-                <strong>{copy.integrityTitle}</strong>
-                <p data-copy-block data-copy-id="integrity-text">{copy.integrityText}</p>
-                <code>{release.sha256}</code>
-              </aside>
-            </div>
+            {auth.account ? (
+              <div className="site-auth-account">
+                <AccountIcon />
+                <strong>{auth.account.displayName}</strong>
+                <span>{auth.account.email}</span>
+                <a className="site-button site-button-primary" href="/console/">
+                  {copy.openConsole}
+                  <ArrowRightIcon />
+                </a>
+                <button
+                  type="button"
+                  className="site-auth-text-button"
+                  disabled={authPending}
+                  onClick={() => {
+                    setAuthPending(true);
+                    setAuthError(null);
+                    void auth.signOut()
+                      .catch((reason: unknown) => {
+                        setAuthError(
+                          reason instanceof Error
+                            ? reason.message
+                            : "Account request failed.",
+                        );
+                      })
+                      .finally(() => setAuthPending(false));
+                  }}
+                >
+                  {copy.signOut}
+                </button>
+              </div>
+            ) : (
+              <>
+                <form className="site-auth-form" onSubmit={(event) => void submitAuth(event)}>
+                  <label>
+                    <span>{copy.email}</span>
+                    <input
+                      type="email"
+                      required
+                      autoComplete="email"
+                      value={authEmail}
+                      disabled={
+                        authPending ||
+                        (authMode === "register" && authCodeSent)
+                      }
+                      onChange={(event) => setAuthEmail(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>{copy.password}</span>
+                    <input
+                      type="password"
+                      required
+                      minLength={8}
+                      autoComplete={
+                        authMode === "register"
+                          ? "new-password"
+                          : "current-password"
+                      }
+                      value={authPassword}
+                      placeholder={copy.passwordPlaceholder}
+                      disabled={authPending}
+                      onChange={(event) => setAuthPassword(event.target.value)}
+                    />
+                  </label>
+                  {authMode === "register" ? (
+                    <>
+                      <label>
+                        <span>{copy.confirmPassword}</span>
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          autoComplete="new-password"
+                          value={authPasswordConfirmation}
+                          placeholder={copy.confirmPasswordPlaceholder}
+                          disabled={authPending}
+                          onChange={(event) =>
+                            setAuthPasswordConfirmation(event.target.value)
+                          }
+                        />
+                      </label>
+                      <div className="site-auth-code-field">
+                        <label htmlFor="site-registration-code">
+                          <span>{copy.code}</span>
+                        </label>
+                        <div className="site-auth-code-row">
+                          <input
+                            id="site-registration-code"
+                            type="text"
+                            required
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            minLength={6}
+                            maxLength={12}
+                            value={authCode}
+                            placeholder={copy.codePlaceholder}
+                            disabled={authPending}
+                            onChange={(event) =>
+                              setAuthCode(event.target.value.replace(/\s/gu, ""))
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="site-auth-code-button"
+                            disabled={authPending || !authEmail.trim()}
+                            onClick={() => void sendRegistrationCode()}
+                          >
+                            {authCodeSent ? copy.resendCode : copy.sendCode}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+                  <button type="submit" disabled={authPending || auth.loading}>
+                    {authMode === "register"
+                      ? copy.createAccount
+                      : copy.signInAction}
+                  </button>
+                </form>
+                <button
+                  type="button"
+                  className="site-auth-text-button"
+                  disabled={authPending}
+                  onClick={() => {
+                    setAuthMode((current) =>
+                      current === "sign-in" ? "register" : "sign-in",
+                    );
+                    setAuthCode("");
+                    setAuthCodeSent(false);
+                    setAuthPassword("");
+                    setAuthPasswordConfirmation("");
+                    setAuthError(null);
+                  }}
+                >
+                  {authMode === "sign-in"
+                    ? copy.registerNow
+                    : copy.backToSignIn}
+                </button>
+              </>
+            )}
+            {authError ? <div className="site-auth-error" role="alert">{authError}</div> : null}
           </section>
         </div>
       ) : null}

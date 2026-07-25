@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { History } from "../pages/History";
 import { apiClient } from "../api/client";
+import { fetchAllHistoryJobs } from "../features/history/fetchAllHistoryJobs";
 import { I18nProvider } from "../i18n/I18nProvider";
 
 function renderPage(locale: "en" | "zh-CN" = "en") {
@@ -41,6 +42,32 @@ describe("History compare selection", () => {
     fireEvent.click(await screen.findByLabelText("Select job job_1"));
     fireEvent.click(await screen.findByLabelText("Select job job_2"));
     expect(button).not.toBeDisabled();
+  });
+
+  it("loads every job page instead of hiding history beyond the first page", async () => {
+    const firstPage = Array.from({ length: 200 }, (_, index) => ({
+      id: `job_${index + 1}`,
+    }));
+    const listSpy = vi.spyOn(apiClient, "listJobs")
+      .mockResolvedValueOnce({
+        items: firstPage,
+        page: 1,
+        page_size: 200,
+        total: 201,
+      } as never)
+      .mockResolvedValueOnce({
+        items: [{ id: "job_201" }],
+        page: 2,
+        page_size: 200,
+        total: 201,
+      } as never);
+
+    const jobs = await fetchAllHistoryJobs();
+
+    expect(jobs).toHaveLength(201);
+    expect(jobs.at(-1)?.id).toBe("job_201");
+    expect(listSpy).toHaveBeenNthCalledWith(1, { page: 1, page_size: 200 });
+    expect(listSpy).toHaveBeenNthCalledWith(2, { page: 2, page_size: 200 });
   });
 
   it("filters jobs by name, simulator, and optimizer and clears every filter", async () => {

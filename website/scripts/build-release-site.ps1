@@ -42,6 +42,10 @@ try {
     $env:DRONEDREAM_RELEASE_JSON = $metadata | ConvertTo-Json -Compress
     & npm.cmd --prefix $frontendRoot run site:build
     $siteBuildExitCode = $LASTEXITCODE
+    if ($siteBuildExitCode -eq 0) {
+        & npm.cmd --prefix $frontendRoot run console:build
+        $siteBuildExitCode = $LASTEXITCODE
+    }
 } finally {
     if ($null -eq $previousReleaseJson) {
         Remove-Item Env:\DRONEDREAM_RELEASE_JSON -ErrorAction SilentlyContinue
@@ -98,6 +102,10 @@ Get-ChildItem -LiteralPath $downloadsDirectoryFull -File |
 $siteHtml = Join-Path $outputDirectory "site.html"
 if (-not (Test-Path -LiteralPath $siteHtml -PathType Leaf)) {
     throw "The site build completed without producing $siteHtml"
+}
+$consoleHtml = Join-Path $outputDirectory "console\index.html"
+if (-not (Test-Path -LiteralPath $consoleHtml -PathType Leaf)) {
+    throw "The console build completed without producing $consoleHtml"
 }
 Copy-Item -LiteralPath $siteHtml -Destination (Join-Path $outputDirectory "index.html") -Force
 

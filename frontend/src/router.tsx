@@ -10,13 +10,14 @@ import { AppShell } from "./AppShell";
 import { isDesktopRuntime } from "./desktop/bridge";
 import { getDesktopReadinessSession } from "./desktop/readiness";
 import { Dashboard } from "./pages/Dashboard";
-import { NewJob } from "./pages/NewJob";
+import { NewJobRoute } from "./pages/NewJobRoute";
 import { JobDetail } from "./pages/JobDetail";
 import { TrialDetail } from "./pages/TrialDetail";
 import { History } from "./pages/History";
 import { JobCompare } from "./pages/JobCompare";
 import { ECE498 } from "./pages/ECE498";
 import { DesktopSetup } from "./pages/DesktopSetup";
+import { ExperimentAssistant } from "./pages/ExperimentAssistant";
 
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
   const requireDesktopReadiness = (feature: "experiment" | "job") =>
@@ -25,7 +26,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         ? null
         : redirect(`/dashboard?settings=runtime&required=${feature}`)
       : undefined;
-  const fallbackPath = desktopRuntime ? "/dashboard" : "/";
+  const fallbackPath = "/assistant";
 
   return [
     {
@@ -36,12 +37,17 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
           index: true,
           element: desktopRuntime
             ? <Navigate to="/desktop/setup" replace />
-            : <Dashboard />,
+            : <Navigate to="/assistant" replace />,
+        },
+        {
+          path: "assistant",
+          element: <ExperimentAssistant />,
+          loader: requireDesktopReadiness("experiment"),
         },
         { path: "dashboard", element: <Dashboard /> },
         {
           path: "jobs/new",
-          element: <NewJob />,
+          element: <NewJobRoute />,
           loader: requireDesktopReadiness("experiment"),
         },
         {
@@ -74,7 +80,13 @@ export function createAppRouter(desktopRuntime = isDesktopRuntime()) {
   // A packaged Tauri app has no HTTP server to resolve /desktop/setup after a
   // WebView reload. Hash history keeps every asset request on index.html while
   // the hosted web app retains clean browser URLs and normal deep links.
-  return desktopRuntime ? createHashRouter(routes) : createBrowserRouter(routes);
+  if (desktopRuntime) return createHashRouter(routes);
+  const pathname = window.location.pathname;
+  const basename =
+    pathname === "/console" || pathname.startsWith("/console/")
+      ? "/console"
+      : undefined;
+  return createBrowserRouter(routes, basename ? { basename } : undefined);
 }
 
 export const router = createAppRouter();

@@ -49,6 +49,7 @@ OptimizerStrategy = Literal[
     "none",
     "heuristic",
     "gpt",
+    "llm_harness",
     "cma_es",
     "constrained_mobo",
     "multi_fidelity_mobo",
@@ -202,6 +203,130 @@ class LLMProviderConfig(_Strict):
         if self.provider != "openai" and (not self.model or not self.base_url):
             raise ValueError("non-openai providers require model and base_url")
         return self
+
+
+AssistantFieldValue = str | float | int | bool
+AssistantPatchSource = Literal["explicit", "derived", "proposed_default"]
+
+
+class ExperimentAssistantPatch(_Strict):
+    field_id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z][a-z0-9_]*$",
+    )
+    value: AssistantFieldValue
+    provenance: AssistantPatchSource
+    source_message_id: str | None = Field(default=None, max_length=128)
+
+
+class ExperimentAssistantRejectedPatch(_Strict):
+    field_id: str
+    code: str
+    message: str
+
+
+class ExperimentAssistantParameterPatch(_Strict):
+    name: str = Field(pattern=r"^[A-Z][A-Z0-9_]{1,63}$")
+    selected: bool = True
+    baseline: float | int | None = None
+    search_min: float | int | None = None
+    search_max: float | int | None = None
+    scale: ParameterScale | None = None
+    provenance: AssistantPatchSource
+    source_message_id: str | None = Field(default=None, max_length=128)
+
+
+class ExperimentAssistantQuestion(_Strict):
+    field_ids: list[str] = Field(min_length=1, max_length=8)
+    question: str = Field(min_length=1, max_length=500)
+
+
+class ExperimentAssistantUsage(_Strict):
+    input_tokens: Annotated[int, Field(ge=0)] | None = None
+    output_tokens: Annotated[int, Field(ge=0)] | None = None
+    total_tokens: Annotated[int, Field(ge=0)] | None = None
+    estimated: bool = False
+
+
+class ExperimentAssistantCurrentParameter(_Strict):
+    name: str = Field(pattern=r"^[A-Z][A-Z0-9_]{1,63}$")
+    selected: bool = True
+    baseline: float | int
+    search_min: float | int
+    search_max: float | int
+    scale: ParameterScale
+
+    @model_validator(mode="after")
+    def _validate_values(self) -> ExperimentAssistantCurrentParameter:
+        values = (self.baseline, self.search_min, self.search_max)
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or not math.isfinite(float(value))
+            for value in values
+        ):
+            raise ValueError("assistant parameter values must be finite numbers")
+        if self.search_min >= self.search_max:
+            raise ValueError("assistant parameter search_min must be below search_max")
+        if self.baseline < self.search_min or self.baseline > self.search_max:
+            raise ValueError("assistant parameter baseline must be inside its search range")
+        return self
+
+
+class ExperimentAssistantTurnRequest(_Strict):
+    message_id: str = Field(min_length=1, max_length=128)
+    message: str = Field(min_length=1, max_length=12_000)
+    locale: Literal["en", "zh-CN"] = "en"
+    conversation_summary: str = Field(default="", max_length=4_000)
+    current_values: dict[str, AssistantFieldValue] = Field(
+        default_factory=dict,
+        max_length=96,
+    )
+    explicit_field_ids: list[str] = Field(default_factory=list, max_length=96)
+    current_parameters: list[ExperimentAssistantCurrentParameter] = Field(
+        default_factory=list,
+        max_length=64,
+    )
+    llm: LLMProviderConfig
+
+    @model_validator(mode="after")
+    def _validate_turn(self) -> ExperimentAssistantTurnRequest:
+        if any(
+            not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", field_id)
+            for field_id in self.current_values
+        ):
+            raise ValueError("current_values contains an invalid field id")
+        if any(
+            not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", field_id)
+            for field_id in self.explicit_field_ids
+        ):
+            raise ValueError("explicit_field_ids contains an invalid field id")
+        if len(set(self.explicit_field_ids)) != len(self.explicit_field_ids):
+            raise ValueError("explicit_field_ids must be unique")
+        parameter_names = [item.name for item in self.current_parameters]
+        if len(set(parameter_names)) != len(parameter_names):
+            raise ValueError("current_parameters must contain unique names")
+        return self
+
+
+class ExperimentAssistantTurnResponse(_Strict):
+    schema_version: Literal["1.0"] = "1.0"
+    experiment_summary: str = Field(max_length=2_000)
+    accepted_patches: list[ExperimentAssistantPatch] = Field(max_length=96)
+    rejected_patches: list[ExperimentAssistantRejectedPatch] = Field(max_length=96)
+    accepted_parameter_patches: list[ExperimentAssistantParameterPatch] = Field(
+        max_length=64
+    )
+    rejected_parameter_patches: list[ExperimentAssistantRejectedPatch] = Field(
+        max_length=64
+    )
+    missing_field_ids: list[str] = Field(max_length=32)
+    review_field_ids: list[str] = Field(max_length=32)
+    questions: list[ExperimentAssistantQuestion] = Field(max_length=4)
+    usage: ExperimentAssistantUsage = Field(default_factory=ExperimentAssistantUsage)
+    provider: str
+    model: str
 
 
 class VehicleProfileConfig(_Strict):
@@ -539,6 +664,7 @@ class JobCreateRequest(_Strict):
             raise ValueError("parameter_space names must be unique")
         enabled = [item for item in self.parameter_space if item.enabled and not item.locked]
         experimental_optimizers = {
+            "llm_harness",
             "constrained_mobo",
             "multi_fidelity_mobo",
             "turbo",
@@ -910,6 +1036,14 @@ __all__ = [
     "ObjectiveConfig",
     "ObjectiveSpec",
     "ConstraintSpec",
+    "ExperimentAssistantCurrentParameter",
+    "ExperimentAssistantPatch",
+    "ExperimentAssistantParameterPatch",
+    "ExperimentAssistantQuestion",
+    "ExperimentAssistantRejectedPatch",
+    "ExperimentAssistantTurnRequest",
+    "ExperimentAssistantTurnResponse",
+    "ExperimentAssistantUsage",
     "LLMProviderConfig",
     "OpenAIConfig",
     "OptimizationOutcome",

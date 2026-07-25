@@ -327,12 +327,9 @@ async function collectLocale(page, locale) {
     await page.keyboard.press("Escape");
   }
 
-  await page.locator(".site-manual-links button").click();
-  await page.locator(".site-manual-dialog").waitFor({ state: "visible" });
-  await waitForStableLayout(page);
-  await mergeVisibleCopy(page, copy);
-  await addLayoutSnapshot(page, layout, locale, "manual-dialog");
-  await page.locator(".site-manual-dialog > header > button").click();
+  const manualLink = page.locator('.site-manual-links a[href="/manual/"]');
+  await manualLink.waitFor({ state: "visible" });
+  await addLayoutSnapshot(page, layout, locale, "manual-links");
   return { copy, layout };
 }
 
@@ -344,8 +341,12 @@ try {
     if (message.type() === "error" && !message.text().startsWith("Failed to load resource")) diagnostics.push(message.text());
   });
   page.on("requestfailed", (request) => {
+    const failure = request.failure()?.errorText ?? "request failed";
+    // Locale switches and route changes can cancel an in-flight favicon request.
+    // Chromium reports that expected navigation cleanup as ERR_ABORTED.
+    if (failure === "net::ERR_ABORTED") return;
     if (!request.url().endsWith("/downloads/latest.json")) {
-      diagnostics.push(`${request.url()}: ${request.failure()?.errorText ?? "request failed"}`);
+      diagnostics.push(`${request.url()}: ${failure}`);
     }
   });
   page.on("response", (response) => {

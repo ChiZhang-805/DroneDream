@@ -14,6 +14,11 @@ holdout matrix before DroneDream can publish it as the final recommendation.
 - `gpt`: provider-neutral LLM proposals. Supported
   configurations include OpenAI, Qwen, DeepSeek, and an explicitly allowlisted
   OpenAI-compatible endpoint.
+- `llm_harness`: one bounded planning turn at each generation boundary selects
+  an optimizer from a closed registry using compact prior evidence. DroneDream,
+  not the model, executes the tool and enforces parameter, budget, simulation,
+  and acceptance boundaries. Invalid or unavailable decisions are audibly
+  recorded and fall back to `optimizer_portfolio`.
 
 Seven accuracy-first engines are available as an experimental group. New wizard
 experiments default to the adaptive portfolio, while API clients may select any

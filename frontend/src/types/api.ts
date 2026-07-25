@@ -292,6 +292,7 @@ export type OptimizerStrategy =
   | "none"
   | "heuristic"
   | "gpt"
+  | "llm_harness"
   | "cma_es"
   | "constrained_mobo"
   | "multi_fidelity_mobo"
@@ -311,6 +312,10 @@ export const EXPERIMENTAL_OPTIMIZER_STRATEGIES = [
   "optimizer_portfolio",
 ] as const satisfies readonly OptimizerStrategy[];
 
+export const HARNESS_OPTIMIZER_STRATEGIES = [
+  "llm_harness",
+] as const satisfies readonly OptimizerStrategy[];
+
 export const LEGACY_OPTIMIZER_STRATEGIES = [
   "none",
   "heuristic",
@@ -319,9 +324,14 @@ export const LEGACY_OPTIMIZER_STRATEGIES = [
 ] as const satisfies readonly OptimizerStrategy[];
 
 export const OPTIMIZER_STRATEGIES: readonly OptimizerStrategy[] = [
+  ...HARNESS_OPTIMIZER_STRATEGIES,
   ...EXPERIMENTAL_OPTIMIZER_STRATEGIES,
   ...LEGACY_OPTIMIZER_STRATEGIES,
 ];
+
+export function optimizerUsesModelAccess(strategy: OptimizerStrategy): boolean {
+  return strategy === "gpt" || strategy === "llm_harness";
+}
 
 export type OptimizationOutcome =
   | "success"
@@ -347,6 +357,83 @@ export interface LLMProviderConfig {
   api_key: string;
   model?: string | null;
   base_url?: string | null;
+}
+
+export type ExperimentAssistantFieldValue = string | number | boolean;
+export type ExperimentAssistantPatchSource =
+  | "explicit"
+  | "derived"
+  | "proposed_default";
+
+export interface ExperimentAssistantPatch {
+  field_id: string;
+  value: ExperimentAssistantFieldValue;
+  provenance: ExperimentAssistantPatchSource;
+  source_message_id: string | null;
+}
+
+export interface ExperimentAssistantParameterPatch {
+  name: string;
+  selected: boolean;
+  baseline: number | null;
+  search_min: number | null;
+  search_max: number | null;
+  scale: ParameterScale | null;
+  provenance: ExperimentAssistantPatchSource;
+  source_message_id: string | null;
+}
+
+export interface ExperimentAssistantRejectedPatch {
+  field_id: string;
+  code: string;
+  message: string;
+}
+
+export interface ExperimentAssistantQuestion {
+  field_ids: string[];
+  question: string;
+}
+
+export interface ExperimentAssistantUsage {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  estimated: boolean;
+}
+
+export interface ExperimentAssistantCurrentParameter {
+  name: string;
+  selected: boolean;
+  baseline: number;
+  search_min: number;
+  search_max: number;
+  scale: ParameterScale;
+}
+
+export interface ExperimentAssistantTurnRequest {
+  message_id: string;
+  message: string;
+  locale: "en" | "zh-CN";
+  conversation_summary: string;
+  current_values: Record<string, ExperimentAssistantFieldValue>;
+  explicit_field_ids: string[];
+  current_parameters: ExperimentAssistantCurrentParameter[];
+  llm: LLMProviderConfig;
+}
+
+export interface ExperimentAssistantTurnResponse {
+  schema_version: "1.0";
+  experiment_summary: string;
+  accepted_patches: ExperimentAssistantPatch[];
+  rejected_patches: ExperimentAssistantRejectedPatch[];
+  accepted_parameter_patches: ExperimentAssistantParameterPatch[];
+  rejected_parameter_patches: ExperimentAssistantRejectedPatch[];
+  missing_field_ids: string[];
+  review_field_ids: string[];
+  questions: ExperimentAssistantQuestion[];
+  usage: ExperimentAssistantUsage;
+  provider: string;
+  model: string;
 }
 
 export interface VehicleProfileConfig {
@@ -570,6 +657,16 @@ export interface BackendCapabilityItem {
 
 export interface BackendCapabilitiesResponse {
   service_version: string;
+  features?: Record<
+    string,
+    {
+      available: boolean;
+      schema_version?: string;
+      decision_schema_version?: string;
+      draft_only?: boolean;
+      tool_registry?: string;
+    }
+  >;
   simulators: {
     configuration_scope: "api_process" | string;
     authoritative: boolean;

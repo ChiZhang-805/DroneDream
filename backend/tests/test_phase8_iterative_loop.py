@@ -85,7 +85,9 @@ def _create_job(
             target_rmse=target_rmse, min_pass_rate=min_pass_rate
         ),
         openai=(
-            schemas.OpenAIConfig(api_key="sk-iterative-test") if strategy == "gpt" else None
+            schemas.OpenAIConfig(api_key="sk-iterative-test")
+            if strategy in {"gpt", "llm_harness"}
+            else None
         ),
     )
     with db_module.SessionLocal() as db:
@@ -154,6 +156,41 @@ def test_gpt_loop_dispatches_generation_after_baseline(gpt_ctx):
         assert "llm_proposal_started" in event_types
         assert "generation_dispatched" in event_types
         assert "candidate_generated_from_llm" in event_types
+
+
+def test_llm_harness_selects_and_executes_registered_tool_after_baseline(gpt_ctx):
+    ctx = gpt_ctx
+    job_id = _create_job(
+        ctx,
+        strategy="llm_harness",
+        target_rmse=0.01,
+        max_iterations=1,
+    )
+    client = FakeOpenAIClient(
+        [
+            {
+                "decision": {
+                    "tool_id": "cma_es",
+                    "rationale": "Use bounded evolutionary search after the baseline.",
+                }
+            }
+        ]
+    )
+    status = _drive(ctx, job_id, client=client, max_ticks=80)
+    assert status == "COMPLETED"
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.optimizer_strategy == "llm_harness"
+        assert job.current_generation == 1
+        assert any(
+            candidate.source_type == "optimizer"
+            for candidate in job.candidates
+        )
+        event_types = [event.event_type for event in job.events]
+        assert "harness_decision_started" in event_types
+        assert "harness_decision_accepted" in event_types
+        assert "harness_tool_execution_result" in event_types
+        assert "generation_dispatched" in event_types
 
 
 def test_gpt_max_iterations_reached_yields_best_so_far(gpt_ctx):

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Alert } from "../components/Alert";
 import { ParameterSelector } from "../components/ParameterSelector";
@@ -8,14 +8,17 @@ import { SectionCard } from "../components/SectionCard";
 import { TrackEditor2D } from "../components/TrackEditor2D";
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
+import { publicDemoConsole } from "../features/demo/publicDemo";
 import {
   EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+  HARNESS_OPTIMIZER_STRATEGIES,
   LEGACY_OPTIMIZER_STRATEGIES,
   OBJECTIVE_PROFILES,
   OPTIMIZER_STRATEGIES,
   SENSOR_NOISE_LEVELS,
   SIMULATOR_BACKENDS,
   TRACK_TYPES,
+  optimizerUsesModelAccess,
 } from "../types/api";
 import type {
   BaselineParameters,
@@ -61,237 +64,30 @@ import {
   persistStudyForJob,
   saveExperimentDraft,
 } from "../features/experiment/draftStorage";
+import { recordManualDraftEdits } from "../features/experiment/assistantDraft";
+import { useOptionalAuth } from "../features/auth/AuthContext";
+import {
+  EXPERIMENT_DRAFT_SCHEMA,
+  EXPERIMENT_FORM_DEFAULTS,
+  type ExperimentFormState,
+  type ScenarioPreset,
+} from "../features/experiment/formState";
+import {
+  createExperimentWorkspaceId,
+  listExperimentWorkspaces,
+  registerExperimentWorkspace,
+  updateExperimentWorkspace,
+} from "../features/experiment/workspaceRegistry";
 import { generateReferenceTrack } from "../utils/referenceTrack";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey, TranslationParams } from "../i18n/I18nProvider";
 
 type Translate = (key: TranslationKey, params?: TranslationParams) => string;
-type ScenarioPreset = "nominal" | "wind" | "sensor" | "stress";
-
-interface FormState {
-  tuning_mode: TuningMode;
-  display_name: string;
-  px4_version: string;
-  firmware_commit: string;
-  vehicle_type: string;
-  airframe: string;
-  simulator_model: string;
-  simulator_world: string;
-  simulator_headless: boolean;
-  simulation_speed_factor: string;
-  instance_id: string;
-  track_type: TrackType;
-  baseline_kp_xy: string;
-  baseline_kd_xy: string;
-  baseline_ki_xy: string;
-  baseline_vel_limit: string;
-  baseline_accel_limit: string;
-  baseline_disturbance_rejection: string;
-  circle_radius_m: string;
-  u_turn_straight_length_m: string;
-  u_turn_turn_radius_m: string;
-  lemniscate_scale_m: string;
-  reference_track_json: string;
-  start_x: string;
-  start_y: string;
-  altitude_m: string;
-  wind_north: string;
-  wind_east: string;
-  wind_south: string;
-  wind_west: string;
-  sensor_noise_level: SensorNoiseLevel;
-  objective_profile: ObjectiveProfile;
-  objective_weight_tracking: string;
-  objective_weight_speed: string;
-  objective_weight_smoothness: string;
-  objective_weight_robustness: string;
-  robust_aggregation: RobustAggregation;
-  cvar_alpha: string;
-  percentile: string;
-  simulator_backend: SimulatorBackend;
-  optimizer_strategy: OptimizerStrategy;
-  max_iterations: string;
-  trials_per_candidate: string;
-  max_total_trials: string;
-  target_rmse: string;
-  target_max_error: string;
-  min_pass_rate: string;
-  llm_provider: string;
-  llm_api_key: string;
-  llm_model: string;
-  llm_base_url: string;
-  advanced_enabled: boolean;
-  gust_enabled: boolean;
-  gust_magnitude_mps: string;
-  gust_direction_deg: string;
-  gust_period_s: string;
-  gps_noise_m: string;
-  baro_noise_m: string;
-  imu_noise_scale: string;
-  dropout_rate: string;
-  battery_initial_percent: string;
-  battery_voltage_sag: boolean;
-  mass_payload_kg: string;
-  obstacles_json: string;
-  search_seeds: string;
-  holdout_seeds: string;
-  nominal_search_enabled: boolean;
-  wind_search_enabled: boolean;
-  noise_search_enabled: boolean;
-  nominal_holdout_enabled: boolean;
-  combined_holdout_enabled: boolean;
-  common_random_numbers: boolean;
-  scenario_preset: ScenarioPreset;
-}
-
-const DEFAULTS: FormState = {
-  tuning_mode: "basic",
-  display_name: "",
-  px4_version: "v1.16",
-  firmware_commit: "",
-  vehicle_type: "multicopter",
-  airframe: "x500",
-  simulator_model: "gz_x500",
-  simulator_world: "default",
-  simulator_headless: true,
-  simulation_speed_factor: "1",
-  instance_id: "0",
-  track_type: "circle",
-  baseline_kp_xy: "1",
-  baseline_kd_xy: "0.2",
-  baseline_ki_xy: "0.05",
-  baseline_vel_limit: "5",
-  baseline_accel_limit: "4",
-  baseline_disturbance_rejection: "0.5",
-  circle_radius_m: "5",
-  u_turn_straight_length_m: "10",
-  u_turn_turn_radius_m: "3",
-  lemniscate_scale_m: "4",
-  reference_track_json: "",
-  start_x: "0",
-  start_y: "0",
-  altitude_m: "3.0",
-  wind_north: "0",
-  wind_east: "0",
-  wind_south: "0",
-  wind_west: "0",
-  sensor_noise_level: "medium",
-  objective_profile: "robust",
-  objective_weight_tracking: "1",
-  objective_weight_speed: "0.25",
-  objective_weight_smoothness: "0.35",
-  objective_weight_robustness: "1",
-  robust_aggregation: "cvar",
-  cvar_alpha: "0.2",
-  percentile: "95",
-  simulator_backend: "mock",
-  optimizer_strategy: "optimizer_portfolio",
-  max_iterations: "12",
-  trials_per_candidate: "3",
-  max_total_trials: "220",
-  target_rmse: "0.5",
-  target_max_error: "",
-  min_pass_rate: "0.8",
-  llm_provider: "openai",
-  llm_api_key: "",
-  llm_model: "",
-  llm_base_url: "",
-  advanced_enabled: false,
-  gust_enabled: false,
-  gust_magnitude_mps: "0",
-  gust_direction_deg: "0",
-  gust_period_s: "10",
-  gps_noise_m: "0",
-  baro_noise_m: "0",
-  imu_noise_scale: "1",
-  dropout_rate: "0",
-  battery_initial_percent: "100",
-  battery_voltage_sag: false,
-  mass_payload_kg: "",
-  obstacles_json: "[]",
-  search_seeds: "101, 202, 303",
-  holdout_seeds: "901, 902",
-  nominal_search_enabled: true,
-  wind_search_enabled: false,
-  noise_search_enabled: false,
-  nominal_holdout_enabled: true,
-  combined_holdout_enabled: false,
-  common_random_numbers: true,
-  scenario_preset: "nominal",
-};
-
-const DRAFT_ENUM_VALUES: Partial<Record<keyof FormState, readonly string[]>> = {
-  tuning_mode: ["basic", "advanced", "expert"],
-  track_type: TRACK_TYPES,
-  sensor_noise_level: SENSOR_NOISE_LEVELS,
-  objective_profile: OBJECTIVE_PROFILES,
-  robust_aggregation: ["mean", "worst", "cvar", "percentile"],
-  simulator_backend: SIMULATOR_BACKENDS,
-  optimizer_strategy: OPTIMIZER_STRATEGIES,
-  llm_provider: ["openai", "qwen", "deepseek", "custom"],
-  scenario_preset: ["nominal", "wind", "sensor", "stress"],
-};
+type FormState = ExperimentFormState;
+const DEFAULTS = EXPERIMENT_FORM_DEFAULTS;
 
 function isDraftRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function normalizeDraftForm(value: unknown): FormState | null {
-  if (!isDraftRecord(value)) return null;
-  const normalized: Record<string, unknown> = { ...DEFAULTS };
-  for (const key of Object.keys(DEFAULTS) as Array<keyof FormState>) {
-    const candidate = value[key];
-    if (typeof candidate === typeof DEFAULTS[key]) {
-      normalized[key] = candidate;
-    }
-  }
-  for (const [key, allowedValues] of Object.entries(DRAFT_ENUM_VALUES)) {
-    const candidate = value[key];
-    if (typeof candidate !== "string" || !allowedValues?.includes(candidate)) {
-      normalized[key] = DEFAULTS[key as keyof FormState];
-    }
-  }
-  if (
-    typeof value.optimizer_strategy !== "string"
-    || !OPTIMIZER_STRATEGIES.includes(value.optimizer_strategy as OptimizerStrategy)
-  ) {
-    // Drafts created before optimizer_strategy existed must retain the old,
-    // inexpensive default. Only a genuinely new form defaults to Portfolio.
-    normalized.optimizer_strategy = "heuristic";
-  }
-  // Secrets are never restored even if an older or manually edited draft
-  // contains one.
-  normalized.llm_api_key = "";
-  return normalized as unknown as FormState;
-}
-
-function normalizeDraftSelections(value: unknown): ParameterSelectionMap | null {
-  if (!isDraftRecord(value)) return null;
-  const normalized: ParameterSelectionMap = Object.create(null) as ParameterSelectionMap;
-  for (const [name, candidate] of Object.entries(value)) {
-    if (!/^[A-Z][A-Z0-9_]{0,63}$/u.test(name) || !isDraftRecord(candidate)) continue;
-    if (
-      typeof candidate.baseline !== "number" ||
-      !Number.isFinite(candidate.baseline) ||
-      typeof candidate.search_min !== "number" ||
-      !Number.isFinite(candidate.search_min) ||
-      typeof candidate.search_max !== "number" ||
-      !Number.isFinite(candidate.search_max) ||
-      (candidate.scale !== "linear" && candidate.scale !== "log") ||
-      typeof candidate.selected !== "boolean"
-    ) {
-      continue;
-    }
-    normalized[name] = {
-      name,
-      baseline: candidate.baseline,
-      search_min: candidate.search_min,
-      search_max: candidate.search_max,
-      scale: candidate.scale,
-      selected: candidate.selected,
-    };
-  }
-  return normalized;
 }
 
 type FieldErrors = Record<string, string>;
@@ -971,7 +767,7 @@ function validate(
   }
   if (!OPTIMIZER_STRATEGIES.includes(form.optimizer_strategy)) {
     errors.optimizer_strategy = t("wizard.validation.optimizerStrategy");
-  } else if (form.optimizer_strategy === "gpt") {
+  } else if (optimizerUsesModelAccess(form.optimizer_strategy)) {
     Object.assign(
       errors,
       runtimeCapabilityErrors(
@@ -1017,7 +813,7 @@ function validate(
   }
   const passRate = parseNumber(form.min_pass_rate);
   if (passRate === null || passRate < 0 || passRate > 1) errors.min_pass_rate = t("wizard.validation.between", { min: 0, max: 1 });
-  if (form.optimizer_strategy === "gpt") {
+  if (optimizerUsesModelAccess(form.optimizer_strategy)) {
     if (form.llm_api_key.trim() === "") {
       errors.llm_api_key = t("wizard.validation.apiKeyRequired");
     } else if (form.llm_api_key.length > 512) {
@@ -1242,7 +1038,7 @@ function formToRequest(
       min_pass_rate: Number(form.min_pass_rate),
     },
   };
-  if (form.optimizer_strategy === "gpt") {
+  if (optimizerUsesModelAccess(form.optimizer_strategy)) {
     request.llm = {
       provider: form.llm_provider,
       api_key: form.llm_api_key.trim(),
@@ -1365,14 +1161,28 @@ function mergeSelections(
 
 export function NewJob() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { t } = useI18n();
+  const auth = useOptionalAuth();
+  const ownerId = auth?.account?.id ?? "local";
   const { settings: modelAccess } = useModelAccess();
+  const initialWorkspaceId = useRef((() => {
+    const requested = searchParams.get("experiment");
+    if (!requested || !/^[a-zA-Z0-9_-]{8,128}$/u.test(requested)) {
+      return null;
+    }
+    return listExperimentWorkspaces(ownerId).some(
+      (workspace) => workspace.id === requested && !workspace.archived,
+    )
+      ? requested
+      : null;
+  })()).current;
+  const [workspaceId, setWorkspaceId] = useState<string | null>(
+    initialWorkspaceId,
+  );
+  const migratedWorkspaceIdRef = useRef<string | null>(null);
   const initialDraft = useRef(
-    loadExperimentDraft({
-      maxActiveStep: 4,
-      normalizeForm: normalizeDraftForm,
-      normalizeSelections: normalizeDraftSelections,
-    }),
+    loadExperimentDraft(EXPERIMENT_DRAFT_SCHEMA, initialWorkspaceId),
   ).current;
   const [form, setForm] = useState<FormState>(() => ({
     ...DEFAULTS,
@@ -1389,11 +1199,25 @@ export function NewJob() {
       initialDraft?.selections,
     ),
   );
+  const manualEditOriginForm = useRef<FormState>(
+    initialDraft?.conversation ? initialDraft.form : DEFAULTS,
+  ).current;
+  const manualEditOriginSelections = useRef<ParameterSelectionMap>(
+    initialDraft?.conversation
+      ? initialDraft.selections
+      : createParameterSelections(
+        BUILTIN_PARAMETER_CATALOG.parameters,
+        initialDraft?.form.tuning_mode ?? "basic",
+      ),
+  ).current;
+  const conversationRef = useRef(initialDraft?.conversation ?? null);
   const [step, setStep] = useState(() => Math.min(4, Math.max(0, initialDraft?.active_step ?? 0)));
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => {
     return new Set(initialDraft?.completed_steps ?? []);
   });
-  const [nameConfirmed, setNameConfirmed] = useState(false);
+  const [nameConfirmed, setNameConfirmed] = useState(
+    () => Boolean(initialDraft?.form.display_name.trim()),
+  );
   const [experimentName, setExperimentName] = useState(
     () => initialDraft?.form.display_name ?? DEFAULTS.display_name,
   );
@@ -1418,6 +1242,46 @@ export function NewJob() {
   ).length;
   const trialPlan = calculateTrialPlan(form, selectedCount);
   const estimatedTrials = trialPlan.scheduledTrials;
+
+  useEffect(() => {
+    if (
+      workspaceId
+      || migratedWorkspaceIdRef.current
+      || !initialDraft?.form.display_name.trim()
+    ) {
+      return;
+    }
+    const migratedWorkspaceId = createExperimentWorkspaceId();
+    migratedWorkspaceIdRef.current = migratedWorkspaceId;
+    saveExperimentDraft({
+      active_step: initialDraft.active_step,
+      completed_steps: initialDraft.completed_steps,
+      form: { ...initialDraft.form, llm_api_key: "" },
+      selections: initialDraft.selections,
+      conversation: initialDraft.conversation,
+    }, migratedWorkspaceId);
+    registerExperimentWorkspace({
+      id: migratedWorkspaceId,
+      ownerId,
+      name: initialDraft.form.display_name,
+      source: initialDraft.conversation ? "assistant" : "manual",
+      activeStep: initialDraft.active_step,
+      completedSteps: initialDraft.completed_steps,
+    });
+    setWorkspaceId(migratedWorkspaceId);
+  }, [initialDraft, ownerId, workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId || !initialDraft?.form.display_name.trim()) return;
+    registerExperimentWorkspace({
+      id: workspaceId,
+      ownerId,
+      name: initialDraft.form.display_name,
+      source: initialDraft.conversation ? "assistant" : "manual",
+      activeStep: initialDraft.active_step,
+      completedSteps: initialDraft.completed_steps,
+    });
+  }, [initialDraft, ownerId, workspaceId]);
 
   useEffect(() => {
     setForm((current) => {
@@ -1491,15 +1355,40 @@ export function NewJob() {
   useEffect(() => {
     if (!nameConfirmed) return undefined;
     const timer = window.setTimeout(() => {
+      conversationRef.current = recordManualDraftEdits(
+        conversationRef.current,
+        manualEditOriginForm,
+        form,
+        manualEditOriginSelections,
+        selections,
+      );
       saveExperimentDraft({
         active_step: step,
         completed_steps: [...completedSteps].sort((left, right) => left - right),
         form: { ...form, llm_api_key: "" },
         selections,
-      });
+        conversation: conversationRef.current,
+      }, workspaceId);
+      if (workspaceId) {
+        updateExperimentWorkspace(ownerId, workspaceId, {
+          name: form.display_name,
+          activeStep: step,
+          completedSteps: [...completedSteps],
+        });
+      }
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [completedSteps, form, nameConfirmed, selections, step]);
+  }, [
+    completedSteps,
+    form,
+    manualEditOriginForm,
+    manualEditOriginSelections,
+    nameConfirmed,
+    ownerId,
+    selections,
+    step,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     if (
@@ -1738,13 +1627,32 @@ export function NewJob() {
     activeStep: number,
     nextForm: FormState = form,
     nextCompletedSteps: Set<number> = completedSteps,
+    targetWorkspaceId: string | null = workspaceId,
   ): void {
+    conversationRef.current = recordManualDraftEdits(
+      conversationRef.current,
+      manualEditOriginForm,
+      nextForm,
+      manualEditOriginSelections,
+      selections,
+    );
     saveExperimentDraft({
       active_step: activeStep,
       completed_steps: [...nextCompletedSteps].sort((left, right) => left - right),
       form: { ...nextForm, llm_api_key: "" },
       selections,
-    });
+      conversation: conversationRef.current,
+    }, targetWorkspaceId);
+    if (targetWorkspaceId) {
+      registerExperimentWorkspace({
+        id: targetWorkspaceId,
+        ownerId,
+        name: nextForm.display_name,
+        source: conversationRef.current ? "assistant" : "manual",
+        activeStep,
+        completedSteps: [...nextCompletedSteps],
+      });
+    }
   }
 
   function confirmExperimentName(event: FormEvent<HTMLFormElement>): void {
@@ -1759,11 +1667,13 @@ export function NewJob() {
       return;
     }
     const nextForm = { ...form, display_name: trimmedName };
+    const targetWorkspaceId = workspaceId ?? createExperimentWorkspaceId();
     setForm(nextForm);
     setExperimentName(trimmedName);
     setExperimentNameError(null);
     setNameConfirmed(true);
-    persistDraft(step, nextForm);
+    setWorkspaceId(targetWorkspaceId);
+    persistDraft(step, nextForm, completedSteps, targetWorkspaceId);
   }
 
   function errorsForStep(targetStep: number): FieldErrors {
@@ -1822,6 +1732,18 @@ export function NewJob() {
     const advancedRequest = formToRequest(form, selections, catalog);
     let usedLegacyApi = false;
     try {
+      if (publicDemoConsole) {
+        persistDraft(4);
+        if (workspaceId) {
+          updateExperimentWorkspace(ownerId, workspaceId, {
+            status: "draft",
+            activeStep: 4,
+            completedSteps: [0, 1, 2, 3, 4],
+          });
+        }
+        navigate("/dashboard", { replace: false });
+        return;
+      }
       let created;
       try {
         created = await apiClient.createJob(advancedRequest);
@@ -1844,7 +1766,15 @@ export function NewJob() {
         created.id,
         buildStudyMetadata(form, selections, estimatedTrials, usedLegacyApi),
       );
-      clearExperimentDraft();
+      if (workspaceId) {
+        updateExperimentWorkspace(ownerId, workspaceId, {
+          status: "created",
+          jobId: created.id,
+          activeStep: 4,
+          completedSteps: [0, 1, 2, 3, 4],
+        });
+      }
+      clearExperimentDraft(workspaceId);
       navigate(`/jobs/${created.id}`, { replace: false });
     } catch (error) {
       setSubmitError(
@@ -1861,7 +1791,7 @@ export function NewJob() {
   const customTrack = parseReferenceTrackInput(form.reference_track_json, t).points ?? [];
   const selectedParameterRows = selectedParameters(selections);
   const realCliCapability = capabilities?.simulators.items.real_cli;
-  const gptCapability = capabilities?.optimizers.items.gpt;
+  const modelOptimizerCapability = capabilities?.optimizers.items[form.optimizer_strategy];
   const preflightErrors = validate(form, selections, catalog, capabilities, t);
   const preflightSteps = [...new Set(
     Object.keys(preflightErrors).map((key) => errorStep(key, catalog)),
@@ -2352,6 +2282,13 @@ export function NewJob() {
                     hint={optimizerStrategyDescription(form.optimizer_strategy, t)}
                   >
                     <select id="optimizer_strategy" value={form.optimizer_strategy} onChange={(event) => update("optimizer_strategy", event.target.value as OptimizerStrategy)}>
+                      <optgroup label={t("wizard.optimizerHarnessGroup")}>
+                        {HARNESS_OPTIMIZER_STRATEGIES.map((strategy) => (
+                          <option key={strategy} value={strategy}>
+                            {optimizerStrategyLabel(strategy, t)}
+                          </option>
+                        ))}
+                      </optgroup>
                       <optgroup label={t("wizard.optimizerExperimentalGroup")}>
                         {EXPERIMENTAL_OPTIMIZER_STRATEGIES.map((strategy) => (
                           <option key={strategy} value={strategy}>
@@ -2383,7 +2320,7 @@ export function NewJob() {
                     {t("wizard.realCliText")}
                   </Alert>
                 ) : null}
-                {form.optimizer_strategy === "gpt" && !capabilitiesUnavailable && !gptCapability?.ready ? (
+                {optimizerUsesModelAccess(form.optimizer_strategy) && !capabilitiesUnavailable && !modelOptimizerCapability?.ready ? (
                   <Alert
                     tone={capabilities?.optimizers.authoritative ? "danger" : "warning"}
                     title={t("wizard.gptPreflightTitle")}
@@ -2665,7 +2602,6 @@ function OptimizationStrategyCard({
       aria-label={t("wizard.pipeline.aria")}
     >
       <header className="optimization-strategy-heading">
-        <span>{t("wizard.strategyCard.kicker")}</span>
         <h3>{presentation.label}</h3>
         <p>{presentation.description}</p>
       </header>
@@ -2675,12 +2611,12 @@ function OptimizationStrategyCard({
             <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
             <div>
               <strong>{stage}</strong>
-              <small>{flowDetails[index]}</small>
+              <p>{flowDetails[index]}</p>
             </div>
           </div>
         ))}
       </div>
-      {strategy === "gpt" ? (
+      {optimizerUsesModelAccess(strategy) ? (
         <div className={`optimization-model-status${modelConfigured ? " configured" : ""}`}>
           <span>{t("wizard.strategyCard.modelAccess")}</span>
           <strong>{modelStatus}</strong>

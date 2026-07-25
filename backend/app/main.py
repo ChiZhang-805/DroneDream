@@ -23,6 +23,7 @@ from app.response import err
 from app.routers import artifacts as artifacts_router
 from app.routers import batches as batches_router
 from app.routers import capabilities as capabilities_router
+from app.routers import experiment_assistant as experiment_assistant_router
 from app.routers import health
 from app.routers import jobs as jobs_router
 from app.routers import parameter_catalog as parameter_catalog_router
@@ -137,6 +138,7 @@ def create_app() -> FastAPI:
     api_v1.include_router(artifacts_router.router)
     api_v1.include_router(parameter_catalog_router.router)
     api_v1.include_router(capabilities_router.router)
+    api_v1.include_router(experiment_assistant_router.router)
 
     _register_exception_handlers(api_v1)
     app.mount("/api/v1", api_v1)

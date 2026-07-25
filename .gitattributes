@@ -16,6 +16,11 @@
 *.rs text eol=lf
 *.nsh text eol=lf
 *.sh text eol=lf
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
 
 /runtime/** text eol=lf
 /scripts/**/*.sh text eol=lf

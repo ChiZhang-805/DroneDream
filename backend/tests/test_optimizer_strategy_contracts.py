@@ -10,6 +10,7 @@ from app.optimization.experimental_types import (
     EXPERIMENTAL_OPTIMIZER_STRATEGIES,
     ExperimentalOptimizerStrategy,
 )
+from app.orchestration.decision_harness import HARNESS_TOOL_REGISTRY
 from app.routers.capabilities import (
     _EXPERIMENTAL_OPTIMIZERS,
     _experimental_optimizer_capabilities,
@@ -17,7 +18,9 @@ from app.routers.capabilities import (
 from app.schemas import OptimizerStrategy
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-LEGACY_STRATEGIES = ("none", "heuristic", "gpt", "cma_es")
+LEGACY_STRATEGIES = ("none", "heuristic", "gpt")
+HARNESS_STRATEGIES = ("llm_harness",)
+ADAPTIVE_LEGACY_STRATEGIES = ("cma_es",)
 EXPECTED_EXPERIMENTAL_STRATEGIES = (
     "constrained_mobo",
     "multi_fidelity_mobo",
@@ -27,7 +30,12 @@ EXPECTED_EXPERIMENTAL_STRATEGIES = (
     "bipop_cma_es",
     "optimizer_portfolio",
 )
-ALL_STRATEGIES = (*LEGACY_STRATEGIES, *EXPECTED_EXPERIMENTAL_STRATEGIES)
+ALL_STRATEGIES = (
+    *LEGACY_STRATEGIES,
+    *HARNESS_STRATEGIES,
+    *ADAPTIVE_LEGACY_STRATEGIES,
+    *EXPECTED_EXPERIMENTAL_STRATEGIES,
+)
 
 
 def _read(relative_path: str) -> str:
@@ -53,6 +61,10 @@ def test_backend_experimental_optimizer_enums_match() -> None:
     capabilities = _experimental_optimizer_capabilities()
     assert tuple(capabilities) == EXPECTED_EXPERIMENTAL_STRATEGIES
     assert all(item["experimental"] is True for item in capabilities.values())
+    assert tuple(HARNESS_TOOL_REGISTRY) == (
+        *ADAPTIVE_LEGACY_STRATEGIES,
+        *EXPECTED_EXPERIMENTAL_STRATEGIES,
+    )
 
 
 def test_frontend_optimizer_types_and_presentations_match_backend() -> None:

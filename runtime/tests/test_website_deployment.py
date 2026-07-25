@@ -36,6 +36,12 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
                     config,
                     r'~\^/assets/\s+"public, max-age=31536000, immutable";',
                 )
+                self.assertIn("~^/console/assets/", config)
+                self.assertIn("location /console/", config)
+                self.assertIn("/console/index.html", config)
+                self.assertIn("https://*.supabase.co", config)
+                self.assertIn("camera=(self)", config)
+                self.assertIn("microphone=(self)", config)
                 self.assertRegex(
                     config,
                     r'~\^/downloads/latest\\\.json\$\s+"no-store";',
@@ -74,6 +80,23 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("dronedream-public.conf", wrapper)
         self.assertIn("max-age=31536000", wrapper)
         self.assertNotRegex(wrapper, re.compile(r"(?i)private[-_ ]?key\s*=\s*['\"]"))
+
+        remote_deploy = self.read("website/scripts/deploy-static-baota.sh")
+        self.assertIn("http://127.0.0.1:18080/console/", remote_deploy)
+        self.assertIn("http://127.0.0.1/console/", remote_deploy)
+        self.assertIn("camera=\\(self\\)", remote_deploy)
+
+    def test_pages_custom_domain_is_opt_in_until_dns_is_ready(self) -> None:
+        builder = self.read("website/scripts/build-pages-site.ps1")
+        workflow = self.read(".github/workflows/pages.yml")
+
+        self.assertIn("DRONEDREAM_CUSTOM_DOMAIN", builder)
+        self.assertIn("Remove-Item -LiteralPath $cnamePath", builder)
+        self.assertNotIn('"getdronedream.com$([Environment]::NewLine)"', builder)
+        self.assertIn(
+            "DRONEDREAM_CUSTOM_DOMAIN: ${{ vars.DRONEDREAM_CUSTOM_DOMAIN }}",
+            workflow,
+        )
 
 
 if __name__ == "__main__":

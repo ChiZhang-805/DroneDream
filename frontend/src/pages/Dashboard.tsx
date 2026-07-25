@@ -84,9 +84,31 @@ export function Dashboard() {
   const { t } = useI18n();
   const jobsQuery = useQuery({
     queryKey: ["jobs", "dashboard"],
-    queryFn: () => apiClient.listJobs({ page: 1, page_size: 10 }),
+    queryFn: async () => {
+      const [recentPage, ...statusPages] = await Promise.all([
+        apiClient.listJobs({ page: 1, page_size: 5 }),
+        ...JOB_STATUSES.map((status) =>
+          apiClient.listJobs({ page: 1, page_size: 1, status })
+        ),
+      ]);
+      const counts: Partial<Record<JobStatus, number>> = {};
+      JOB_STATUSES.forEach((status, index) => {
+        counts[status] = statusPages[index]?.total ?? 0;
+      });
+      return {
+        recentJobs: recentPage.items,
+        totalJobs: JOB_STATUSES.reduce(
+          (total, status) => total + (counts[status] ?? 0),
+          0,
+        ),
+        counts,
+      };
+    },
     enabled: runtimeAccess.canUseRuntime,
   });
+  const runtimeNetworkUnavailable =
+    jobsQuery.error instanceof ApiClientError &&
+    (jobsQuery.error.code === "NETWORK_ERROR" || jobsQuery.error.httpStatus === 0);
 
   return (
     <section className="dashboard-page">
@@ -117,6 +139,11 @@ export function Dashboard() {
         <RuntimeAccessNotice page="dashboard" />
       ) : jobsQuery.isLoading ? (
         <Loading label={t("dashboard.loading")} />
+      ) : runtimeNetworkUnavailable ? (
+        <div className="dashboard-runtime-fallback">
+          <RuntimeAccessNotice page="dashboard" />
+          <DashboardBody recentJobs={[]} totalJobs={0} counts={{}} />
+        </div>
       ) : jobsQuery.isError ? (
         <ErrorState
           description={
@@ -135,17 +162,27 @@ export function Dashboard() {
           }
         />
       ) : (
-        <DashboardBody jobs={jobsQuery.data?.items ?? []} />
+        <DashboardBody
+          recentJobs={jobsQuery.data?.recentJobs ?? []}
+          totalJobs={jobsQuery.data?.totalJobs ?? 0}
+          counts={jobsQuery.data?.counts ?? {}}
+        />
       )}
     </section>
   );
 }
 
-function DashboardBody({ jobs }: { jobs: Job[] }) {
+function DashboardBody({
+  recentJobs,
+  totalJobs,
+  counts,
+}: {
+  recentJobs: Job[];
+  totalJobs: number;
+  counts: Partial<Record<JobStatus, number>>;
+}) {
   const { t } = useI18n();
-  const counts = countByStatus(jobs);
   const columns = buildJobColumns(t);
-  const recentJobs = jobs.slice(0, 5);
 
   return (
     <div className="dashboard-body">
@@ -153,7 +190,7 @@ function DashboardBody({ jobs }: { jobs: Job[] }) {
         <div className="metric-grid">
           <MetricCard
             label={t("dashboard.totalJobs")}
-            value={jobs.length}
+            value={totalJobs}
           />
           <MetricCard
             label={t("dashboard.active")}
@@ -207,11 +244,4 @@ function DashboardBody({ jobs }: { jobs: Job[] }) {
       </SectionCard>
     </div>
   );
-}
-
-function countByStatus(jobs: Job[]): Partial<Record<JobStatus, number>> {
-  const counts: Partial<Record<JobStatus, number>> = {};
-  for (const s of JOB_STATUSES) counts[s] = 0;
-  for (const j of jobs) counts[j.status] = (counts[j.status] ?? 0) + 1;
-  return counts;
 }

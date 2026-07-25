@@ -232,7 +232,7 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const browser = await import("../router");
     await browser.router.navigate("/removed-route");
-    expect(browser.router.state.location.pathname).toBe("/");
+    expect(browser.router.state.location.pathname).toBe("/assistant");
     expect(window.location.hash).toBe("");
     browser.router.dispose();
   });

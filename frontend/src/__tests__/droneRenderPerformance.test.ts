@@ -56,19 +56,18 @@ describe("drone render performance controller", () => {
 
   it("only raises quality after a long stable interactive period and returns to idle", () => {
     const controller = new AdaptiveDprController(2, 0);
-    let changed: number | null = null;
-
     for (let now = 1_600; now <= 14_000; now += 100) {
-      changed = controller.recordFrameGap({
-        gapMs: 16.7,
-        budgetMs: 21.7,
-        now,
-        interactive: true,
-      });
-      expect(changed).toBeNull();
+      expect(
+        controller.recordFrameGap({
+          gapMs: 16.7,
+          budgetMs: 21.7,
+          now,
+          interactive: true,
+        }),
+      ).toBeNull();
     }
 
-    changed = controller.recordFrameGap({
+    const changed = controller.recordFrameGap({
       gapMs: 16.7,
       budgetMs: 21.7,
       now: 14_100,

@@ -137,7 +137,7 @@ afterEach(() => {
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
-      .querySelectorAll("a")).toHaveLength(3);
+      .querySelectorAll("a")).toHaveLength(4);
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);
@@ -195,9 +195,11 @@ afterEach(() => {
     );
 
     expect(await screen.findByText("Runtime data is not available yet")).toBeInTheDocument();
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
+      .toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
+      .toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
@@ -256,9 +258,11 @@ afterEach(() => {
 
     expect(await screen.findByText("Runtime data is not available yet"))
       .toBeInTheDocument();
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
+      .toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
+      .toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
     expect(await screen.findByText("The local runtime could not start"))
       .toBeInTheDocument();
@@ -333,7 +337,8 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
+      .toHaveLength(0);
     await act(async () => {
       await router.navigate("/history?view=recent");
     });
@@ -342,11 +347,14 @@ afterEach(() => {
       .toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
+      .toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "简体中文" }));
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
+      .toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "English" }));
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
+      .toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))

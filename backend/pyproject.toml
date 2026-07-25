@@ -56,6 +56,7 @@ ignore = ["UP017"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "scripts"]
+known-third-party = ["alembic", "sqlalchemy"]
 
 [tool.mypy]
 python_version = "3.11"

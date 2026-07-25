@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 
 import { useI18n } from "../i18n/I18nProvider";
@@ -38,21 +38,15 @@ interface CourseStage {
 }
 
 interface CourseCopy {
-  pageEyebrow: string;
   courseName: string;
   subtitle: string;
   summary: string;
   professorName: string;
   gratitude: string;
-  memoryLabel: string;
-  memoryStory: string;
   professorStoryCta: string;
-  professorStoryTitle: string;
   professorStoryParagraphs: string[];
   closeProfessorStory: string;
-  timelineEyebrow: string;
   timelineTitle: string;
-  timelineHint: string;
   detailLabel: string;
   methodLabel: string;
   evidenceLabel: string;
@@ -63,121 +57,22 @@ interface CourseCopy {
   boundaryContext: string;
   courseLink: string;
   linksLabel: string;
-  disclaimer: string;
   timelineAriaLabel: string;
   stages: CourseStage[];
 }
 
 const COURSE_URL = "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html";
 
-type StageEnding = Record<"changed" | "evidence" | "method" | "boundary", string>;
-
-const STAGE_ENDINGS: Record<Locale, Record<CourseStageId, StageEnding>> = {
-  en: {
-    hw1: {
-      changed: " This evidence remains reviewable in context.",
-      evidence: " The audit remains clear throughout.",
-      method: "",
-      boundary: " Its scope stays explicit in every recorded result.",
-    },
-    hw2: {
-      changed: "",
-      evidence: " The trace stays complete for later review.",
-      method: "",
-      boundary: " That limit stays visible after every run.",
-    },
-    hw3: {
-      changed: " The loop stays deliberate throughout.",
-      evidence: " The comparison across every run remains comparable.",
-      method: "",
-      boundary: " That distinction stays clear during every review.",
-    },
-    hw4: {
-      changed: "",
-      evidence: " The diagnosis remains reproducible.",
-      method: "",
-      boundary: " That reconstruction caveat remains visible.",
-    },
-    hw5: {
-      changed: " Each stays clear.",
-      evidence: "",
-      method: "",
-      boundary: " Its provenance stays visible during every later reuse with source and outcome.",
-    },
-    final: {
-      changed: " The protocol is fixed before use begins.",
-      evidence: " The comparison remains auditable.",
-      method: " That record supports later audit across every matched experimental comparison with its exact evidence and limits intact for every later engineering review without losing its experimental context or provenance during later technical decisions with clear ownership of each conclusion.",
-      boundary: " The remaining work stays explicit throughout.",
-    },
-    dronedream: {
-      changed: "",
-      evidence: " Reviewers can follow it directly from evidence.",
-      method: " The record remains ready for later audit and human review across every experiment a user runs without hiding evidence, limits, or ownership.",
-      boundary: " That authority remains visible throughout the system and every review today.",
-    },
-  },
-  "zh-CN": {
-    hw1: {
-      changed: " 证据始终可以复查。",
-      evidence: " 审查结论保持清楚。",
-      method: " 并保留完整复核依据。",
-      boundary: " 适用范围在每次审查中可见，而且始终可复核。",
-    },
-    hw2: {
-      changed: " 过程可独立复核。",
-      evidence: " 改进轨迹保持完整。",
-      method: " 并保留完整复核依据。",
-      boundary: " 这项限制始终可见且明确。",
-    },
-    hw3: {
-      changed: " 闭环中的每一步都有明确依据并始终可查，每项结论始终都有依据。",
-      evidence: " 对比覆盖每一次运行。",
-      method: " 步骤始终可以复核，每个动作都保留依据，可查。",
-      boundary: " 这一区分始终清楚。",
-    },
-    hw4: {
-      changed: " 诊断过程始终可查，每次分析都保留依据。",
-      evidence: " 诊断证据可以重复核验，所有输入输出均可追溯。",
-      method: " 每个步骤都可复查，每次判断都保留依据。",
-      boundary: " 重建材料的适用范围在审查中始终明确，并保留原始说明。",
-    },
-    hw5: {
-      changed: " 每条经验都保留原始来源并始终可查，每次调用均保留出处与依据。",
-      evidence: " 所有结果都可以复查，并保持完整可追溯，每项证据始终都有出处。",
-      method: " 来源与结果始终同时保留。",
-      boundary: " 来源信息始终清楚可查。",
-    },
-    final: {
-      changed: " 协议在执行前已经冻结。",
-      evidence: " 证据与结论始终可以追溯，每组比较均保留证据。",
-      method: " 这份记录支持每项结论复查，而且始终可以追溯，每项结论始终有出处并可查。",
-      boundary: " 后续工作仍被明确记录。",
-    },
-    dronedream: {
-      changed: " 整个过程始终可查，全流程始终保留证据与边界。",
-      evidence: " 审查者可以直接追踪全部过程与结果，而且随时可以复核，完整记录始终都可查。",
-      method: " 记录与审查路径始终清楚可见，每项决定都可以追踪，所有决定始终有依据且可查。",
-      boundary: " 这项权限在整个系统中始终清楚可见。",
-    },
-  },
-};
-
 const COURSE_COPY: Record<Locale, CourseCopy> = {
   en: {
-    pageEyebrow: "A STUDENT-BUILT COURSE TRIBUTE",
     courseName: "LLM Reasoning for Engineering",
     subtitle: "From plausible answers to verified engineering systems",
     summary:
-      "This course asks a harder question than ‘Can an LLM answer?’: can its output survive tools, simulation, controlled comparison, and domain verification? DroneDream is my attempt to carry that discipline from coursework into a complete product.",
+      "This course asks a harder question than ‘Can an LLM answer?’: can its output survive tools, simulation, controlled comparison, and domain verification? DroneDream is my attempt to carry that discipline from coursework into a complete product, where evidence rather than fluency remains the authority.",
     professorName: "Professor Bin Hu",
     gratitude:
       "Professor Hu teaches with exceptional care, intellectual honesty, and a rare sense for where engineering AI is heading. Every frontier idea must earn trust through a clear question, a verifier, evidence, and an honest account of failure. That rigor transformed a frustrating drone-tuning experience into DroneDream. That standard still guides how I build.",
-    memoryLabel: "A student's classroom memory",
-    memoryStory:
-      "Long before I encountered the industry phrase ‘harness engineering,’ Professor Hu was already asking us to organize models, tools, structured outputs, automated verification, memory, and feedback loops into one engineering system. Only later did I understand how forward-looking that framework was.",
     professorStoryCta: "Read the classroom story",
-    professorStoryTitle: "Why Professor Hu's course stayed with me",
     professorStoryParagraphs: [
       "Professor Hu teaches with unusual seriousness and generosity. He does not chase novelty for its own sake: new ideas are connected to engineering questions, evidence, failure analysis, and the responsibility to say exactly what a result does and does not prove. That combination made the course both timely and deeply practical. It gave each experiment a clear limit.",
       "One class left a lasting impression on me. Professor Hu unexpectedly shared two readings about what was then still an unfamiliar idea: harness engineering. Many of us had never heard the term, and it felt almost out of place in the AI vocabulary of that moment. He nevertheless unpacked the articles and the system-level thinking behind them — how tools, context, verification, memory, and feedback can unlock capability that the base model alone cannot reliably deliver in practice.",
@@ -185,9 +80,7 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
       "I am sincerely grateful to Professor Hu for a course that was innovative without being careless, current without being superficial, and ambitious without relaxing engineering standards. DroneDream exists because the course encouraged me to turn a real frustration into a question that could be tested, audited, improved, and eventually shared with others.",
     ],
     closeProfessorStory: "Close classroom story",
-    timelineEyebrow: "COURSEWORK → ENGINEERING SYSTEM",
     timelineTitle: "Seven steps from reasoning to DroneDream",
-    timelineHint: "Hover, focus, or select a milestone to inspect the lesson it contributed.",
     detailLabel: "What this stage changed",
     methodLabel: "Engineering method",
     evidenceLabel: "Measured evidence",
@@ -202,7 +95,6 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
       "This limit prevents an unsupported safety or performance claim.",
     courseLink: "Course website",
     linksLabel: "Explore the course",
-    disclaimer: "A personal student tribute and project retrospective — not an official UIUC or course webpage.",
     timelineAriaLabel: "Course project progression",
     stages: [
       {
@@ -320,7 +212,6 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
     ],
   },
   "zh-CN": {
-    pageEyebrow: "学生制作的课程致敬页",
     courseName: "大语言模型在工程推理中的应用",
     subtitle: "从看似合理的回答，走向经得起验证的工程系统",
     summary:
@@ -328,11 +219,7 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
     professorName: "胡斌教授",
     gratitude:
       "胡斌教授教学极其认真负责，对学术诚实和工程证据始终有很高要求，也对工程智能的发展方向有难得的前瞻性。每一个前沿想法都必须用清楚的问题、验证器、实验证据和对失败的诚实复盘来赢得信任。正是这份严谨，让一次令人困扰的无人机调参经历逐渐成长为 DroneDream。这份标准至今仍指导我提出问题、核验结果，并诚实记录每次失败与边界，也始终清楚可查。",
-    memoryLabel: "一段学生亲历的课堂记忆",
-    memoryStory:
-      "在 harness engineering 这个概念后来受到广泛关注之前，胡斌教授已经在课堂中要求我们把模型、工具、结构化输出、自动验证、记忆与反馈循环组织成完整工程系统。后来回头看，我才真正理解这套课程框架有多么前瞻。",
     professorStoryCta: "展开这段课堂故事",
-    professorStoryTitle: "为什么胡斌教授的课程让我印象如此深刻",
     professorStoryParagraphs: [
       "胡斌教授对教学极其认真负责，也非常愿意把真正前沿的研究思想带进课堂。他不会为了追逐新概念而停留在表面，而是始终把新方法放回工程问题、实验证据、失败分析和研究责任之中。正因如此，这门课既紧跟时代，又不是一门只展示新名词的课。",
       "那学期有一节课让我至今记忆很深。老师突然给了我们两篇讨论 harness engineering 的文章。当时这个概念远没有后来这样受到重视，班上的同学也普遍没有听说过，甚至觉得这个词出现在人工智能课堂里有些突兀。胡斌教授却已经开始讲解文章中的系统思想：如何把工具、上下文、结构化输出、自动验证、记忆和反馈组织起来，让基础模型无法独立稳定完成的任务成为可能，而且始终接受复核。",
@@ -340,9 +227,7 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
       "我真诚感谢胡斌教授开设并认真打磨这门课程。它有创新性，却从不牺牲严谨；它关注最新进展，却不流于表面；它鼓励大胆探索，也要求我们诚实说明每个结果究竟证明了什么、还没有证明什么。正是这样的训练，让我把一次真实的无人机调参困难转化成可以实验、可以审计、可以持续改进，并最终愿意分享给更多人的 DroneDream。这份工程训练至今仍在指引我，并始终保持清楚。",
     ],
     closeProfessorStory: "关闭课堂故事",
-    timelineEyebrow: "课程作业 → 工程系统",
     timelineTitle: "从推理到 DroneDream 的七个阶段",
-    timelineHint: "悬停、键盘聚焦或点击任一节点，可以查看它为项目留下的能力。",
     detailLabel: "这一阶段改变了什么",
     methodLabel: "工程方法",
     evidenceLabel: "实验证据",
@@ -350,14 +235,13 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
     changeContext:
       "它的输入、结果和失败轨迹始终可以检查和复查。",
     methodContext:
-      "DroneDream 在这里把配置、运行、日志与验收关口全部明确记录。",
+      "DroneDream 同时把配置、运行、日志与验收关口写入同一条实验记录，使每次提议的依据、执行环境和验收结论都能沿原始证据追溯。",
     evidenceContext:
       "每个结果都对应明确的实验设置、证据和可检查记录。",
     boundaryContext:
       "这条边界可以避免把有限证据夸大成安全或性能结论。",
     courseLink: "课程官网",
     linksLabel: "进一步了解课程",
-    disclaimer: "本页为学生个人课程致敬与项目回顾，并非 UIUC 或课程官方页面。",
     timelineAriaLabel: "课程项目成长时间线",
     stages: [
       {
@@ -400,7 +284,7 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         summary:
           "五个无人机任务共用一套跟踪误差、超调和稳定性验证器；模型读取仿真反馈，再提出下一组受边界约束的参数。",
         method:
-          "让所有任务共享同一套工具契约和结构化观测，只有上一轮产生了可诊断证据之后，系统才允许据此发起下一次尝试。",
+          "让所有任务共享同一套工具契约和结构化观测，只有上一轮产生了可诊断证据之后，系统才允许据此发起下一次尝试；下一轮必须逐项回应已经测得的异常，不能无依据重试。",
         evidence:
           "无工具条件为十三次通过、十二次失败；加入工具后达到二十二次通过、三次失败。多轮改进还救回了三次首轮失败。",
         boundary:
@@ -636,6 +520,104 @@ function EngineeringBackdrop() {
   );
 }
 
+function lastLineOccupancy(paragraph: HTMLParagraphElement): number {
+  const range = document.createRange();
+  const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+  const characterRects: DOMRect[] = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const text = node.textContent ?? "";
+    for (let offset = 0; offset < text.length; offset += 1) {
+      if (text[offset]?.trim() === "") continue;
+      range.setStart(node, offset);
+      range.setEnd(node, offset + 1);
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0) characterRects.push(rect);
+    }
+  }
+  if (characterRects.length === 0 || paragraph.clientWidth <= 0) return 1;
+  const lastTop = Math.max(...characterRects.map((rect) => rect.top));
+  const lastLine = characterRects.filter((rect) => Math.abs(rect.top - lastTop) < 1);
+  const left = Math.min(...lastLine.map((rect) => rect.left));
+  const right = Math.max(...lastLine.map((rect) => rect.right));
+  return (right - left) / paragraph.clientWidth;
+}
+
+function FittedParagraph({
+  children,
+  className,
+  id,
+}: {
+  children: ReactNode;
+  className?: string;
+  id?: string;
+}) {
+  const paragraphRef = useRef<HTMLParagraphElement>(null);
+
+  useLayoutEffect(() => {
+    const paragraph = paragraphRef.current;
+    if (!paragraph) return undefined;
+    let frame = 0;
+    let cancelled = false;
+
+    const fit = () => {
+      if (cancelled) return;
+      paragraph.style.removeProperty("font-size");
+      paragraph.style.removeProperty("letter-spacing");
+      const baseSize = Number.parseFloat(window.getComputedStyle(paragraph).fontSize);
+      if (!Number.isFinite(baseSize) || baseSize <= 0) return;
+
+      let best = {
+        score: Number.NEGATIVE_INFINITY,
+        occupancy: 0,
+        scale: 1,
+        spacing: 0,
+      };
+      for (const spacing of [0, -0.01, 0.01, -0.02, 0.02, -0.03, 0.03]) {
+        for (let step = 0; step <= 12; step += 1) {
+          const direction = step % 2 === 0 ? 1 : -1;
+          const magnitude = Math.ceil(step / 2) * 0.01;
+          const scale = 1 + direction * magnitude;
+          if (scale < 0.94 || scale > 1.06) continue;
+          paragraph.style.fontSize = `${baseSize * scale}px`;
+          paragraph.style.letterSpacing = `${spacing}em`;
+          const occupancy = lastLineOccupancy(paragraph);
+          const passes = occupancy >= 0.8 && occupancy <= 1.01;
+          const score = (passes ? 100 : occupancy * 10)
+            - Math.abs(scale - 1) * 20
+            - Math.abs(spacing) * 20;
+          if (score > best.score) {
+            best = { score, occupancy, scale, spacing };
+          }
+        }
+      }
+
+      paragraph.style.fontSize = `${baseSize * best.scale}px`;
+      paragraph.style.letterSpacing = `${best.spacing}em`;
+      paragraph.dataset.lastLineOccupancy = best.occupancy.toFixed(3);
+    };
+
+    const scheduleFit = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(fit);
+    };
+    scheduleFit();
+    void document.fonts?.ready.then(scheduleFit);
+    window.addEventListener("resize", scheduleFit);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", scheduleFit);
+    };
+  }, [children]);
+
+  return (
+    <p ref={paragraphRef} className={className} id={id}>
+      {children}
+    </p>
+  );
+}
+
 export function ECE498() {
   const { locale } = useI18n();
   const copy = COURSE_COPY[locale];
@@ -649,7 +631,6 @@ export function ECE498() {
     [activeStageId, copy.stages],
   );
   const activeIndex = copy.stages.findIndex((stage) => stage.id === activeStage.id);
-  const stageEnding = STAGE_ENDINGS[locale][activeStage.id];
   const timelineStyle = {
     "--ece498-progress": `${(activeIndex / Math.max(copy.stages.length - 1, 1)) * 100}%`,
   } as CSSProperties;
@@ -724,9 +705,9 @@ export function ECE498() {
             <span>ECE498BH</span>
             <strong>{copy.courseName}</strong>
           </h1>
-          <p className="ece498-course-summary">
+          <FittedParagraph className="ece498-course-summary">
             {copy.subtitle}{locale === "zh-CN" ? "。" : ". "}{copy.summary}
-          </p>
+          </FittedParagraph>
         </div>
         <nav className="ece498-hero-actions" aria-label={copy.linksLabel}>
           <a
@@ -788,9 +769,9 @@ export function ECE498() {
               </button>
             </header>
             <div className="ece498-story-body">
-              <p>{copy.gratitude}</p>
+              <FittedParagraph>{copy.gratitude}</FittedParagraph>
               {copy.professorStoryParagraphs.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
+                <FittedParagraph key={paragraph}>{paragraph}</FittedParagraph>
               ))}
             </div>
           </section>
@@ -850,19 +831,18 @@ export function ECE498() {
           <div className="ece498-stage-sections">
             <section className="ece498-stage-copy-section">
               <span>{copy.detailLabel}</span>
-              <p>
+              <FittedParagraph>
                 {activeStage.summary} {copy.changeContext}
                 {activeStage.id === "dronedream"
                   ? locale === "zh-CN"
-                    ? " 整个平台始终保持端到端可检查、可复核。"
+                    ? " 整个平台始终保持端到端可检查、可复核，每一项结论都能回到对应的提议、运行与裁决。"
                     : " The platform remains inspectable end to end across every experiment and review."
                   : ""}
-                {stageEnding.changed}
-              </p>
+              </FittedParagraph>
             </section>
             <section className="ece498-stage-copy-section ece498-stage-evidence">
               <span>{copy.evidenceLabel}</span>
-              <p>
+              <FittedParagraph>
                 {activeStage.evidence} {copy.evidenceContext}
                 {activeStage.id === "hw2"
                   ? locale === "zh-CN"
@@ -873,24 +853,24 @@ export function ECE498() {
                     ? " 完整的决策路径始终清晰可见、可查。"
                     : " The full decision path remains visible."
                   : ""}
-                {stageEnding.evidence}
-              </p>
+              </FittedParagraph>
             </section>
             <section className="ece498-stage-copy-section">
               <span>{copy.methodLabel}</span>
-              <p>{activeStage.method} {copy.methodContext}{stageEnding.method}</p>
+              <FittedParagraph>
+                {activeStage.method} {copy.methodContext}
+              </FittedParagraph>
             </section>
             <section className="ece498-stage-copy-section ece498-stage-boundary">
               <span>{copy.boundaryLabel}</span>
-              <p>
+              <FittedParagraph>
                 {activeStage.boundary} {copy.boundaryContext}
                 {activeStage.id === "dronedream"
                   ? locale === "zh-CN"
                     ? " 最终决定权始终掌握在用户手中。"
                     : " The human operator makes that final decision in every recorded experiment."
                   : ""}
-                {stageEnding.boundary}
-              </p>
+              </FittedParagraph>
             </section>
           </div>
         </div>
