@@ -158,7 +158,10 @@ precedence: complete evidence, hard feasibility, hard-constraint violation,
 training failure rate, preference plus soft-constraint loss, then a stable
 tiebreak. Hard constraints are no longer folded into `scalar_loss` and are no
 longer represented by a `1,000,000` magic penalty. Soft constraints remain a
-declared loss term; failed Trials remain a separately weighted rate. Traditional
+declared loss term; failed Trials remain a separately weighted rate. The
+optimizer-learning reliability boundary (`failure_rate < 0.5`) is a named
+constant sealed into the contract, and multiple bounds on one metric retain
+separate constraint IDs instead of overwriting one observation. Traditional
 CMA centering, public ranking, experimental optimizer observations, and reports
 therefore consume compatible meanings instead of silently double-counting hard
 feasibility.

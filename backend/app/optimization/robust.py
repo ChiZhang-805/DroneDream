@@ -141,6 +141,12 @@ def _constraint_violation(value: float, constraint: ConstraintSpec) -> float:
     return raw / max(1.0, abs(threshold))
 
 
+def _constraint_key(constraint: ConstraintSpec) -> str:
+    return (
+        f"{constraint.metric}:{constraint.operator}:{constraint.threshold:g}"
+    )
+
+
 def _objective_value(
     samples: Sequence[Mapping[str, float]],
     objective: ObjectiveSpec,
@@ -204,9 +210,9 @@ def evaluate_candidate(
             raise ValueError(f"missing constraint metric: {constraint.metric}") from exc
         observed = _constraint_observed(values, constraint)
         violation = _constraint_violation(observed, constraint)
-        constraint_values[constraint.metric] = observed
+        key = _constraint_key(constraint)
+        constraint_values[key] = observed
         if violation > 0:
-            key = f"{constraint.metric}:{constraint.operator}:{constraint.threshold:g}"
             violations[key] = violation
             total_violation += violation
             if constraint.hard:

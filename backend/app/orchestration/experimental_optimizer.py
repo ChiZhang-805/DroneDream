@@ -18,6 +18,9 @@ from app.optimization.experimental_types import (
     OptimizerObservation,
     OptimizerRequest,
 )
+from app.optimization.outcome_contract import (
+    OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
+)
 from app.orchestration import constants
 from app.orchestration.optimizer import CandidateProposal
 from app.orchestration.parameter_constraints import validator_for_job
@@ -268,7 +271,11 @@ def observations_for_job(
         feasible_marker = (
             True if "feasible" not in aggregate else aggregate_feasible is True
         )
-        feasible = loss is not None and feasible_marker and failure_rate < 0.5
+        feasible = (
+            loss is not None
+            and feasible_marker
+            and failure_rate < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
+        )
         raw_optimizer_strategy = metadata.get("child_strategy") or metadata.get("strategy")
         candidate_id = candidate.id
         if not candidate_id:

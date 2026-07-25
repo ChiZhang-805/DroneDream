@@ -116,6 +116,8 @@ def test_advanced_experiment_round_trips_and_reruns(client: TestClient) -> None:
     assert contract["domain_failure_policy"] == {
         "failed_trial_treatment": "separate_rate_penalty",
         "failed_trial_weight_decimal": "1.5",
+        "optimizer_learning_failure_rate_operator": "lt",
+        "optimizer_learning_failure_rate_limit_decimal": "0.5",
         "hard_constraint_penalty_in_scalar_loss": False,
         "soft_constraint_penalty_in_scalar_loss": True,
     }

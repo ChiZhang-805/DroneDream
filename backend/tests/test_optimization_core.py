@@ -192,6 +192,10 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert first.scenario_population.cases[1].holdout is True
     assert first.scenario_population.cases[1].config_sha256
     assert first.domain_failure_policy.hard_constraint_penalty_in_scalar_loss is False
+    assert (
+        first.domain_failure_policy.optimizer_learning_failure_rate_limit_decimal
+        == "0.5"
+    )
     assert first.selection_policy.precedence[:3] == (
         "evidence_complete",
         "hard_feasible",
@@ -290,6 +294,40 @@ def test_selection_key_is_lexicographic_not_magic_penalty_based() -> None:
         )
     }
     assert selection_order_key(maximize_reward, -1)[-1] == -1
+
+
+def test_constraint_observations_do_not_collide_for_two_bounds_on_one_metric() -> None:
+    evaluation = evaluate_candidate(
+        [{"corridor_margin": -1.0}, {"corridor_margin": 2.0}],
+        ObjectiveConfig(
+            objectives=[
+                ObjectiveSpec(
+                    metric="corridor_margin",
+                    direction="maximize",
+                )
+            ],
+            constraints=[
+                ConstraintSpec(
+                    metric="corridor_margin",
+                    operator="gte",
+                    threshold=0,
+                    hard=True,
+                ),
+                ConstraintSpec(
+                    metric="corridor_margin",
+                    operator="lte",
+                    threshold=1,
+                    hard=True,
+                ),
+            ],
+        ),
+    )
+
+    assert evaluation.constraint_values == {
+        "corridor_margin:gte:0": -1.0,
+        "corridor_margin:lte:1": 2.0,
+    }
+    assert set(evaluation.violations) == set(evaluation.constraint_values)
 
 
 def test_objective_targets_apply_one_sided_aspiration_loss() -> None:

@@ -29,6 +29,9 @@ from app.optimization.experimental_types import (
     OptimizerObservation,
     OptimizerRequest,
 )
+from app.optimization.outcome_contract import (
+    OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
+)
 
 FloatArray = NDArray[np.float64]
 
@@ -392,7 +395,11 @@ def _soft_feasibility_target(observation: OptimizerObservation) -> float:
 
 
 def _is_effectively_feasible(observation: OptimizerObservation) -> bool:
-    return observation.feasible and observation.failure_rate < 0.5
+    return (
+        observation.feasible
+        and observation.failure_rate
+        < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
+    )
 
 
 def _rank_key(point: _TrainingPoint) -> tuple[float, float, float, tuple[float, ...]]:

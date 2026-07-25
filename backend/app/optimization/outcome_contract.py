@@ -15,6 +15,7 @@ from app import schemas
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
 OUTCOME_CONTRACT_COMPILER_VERSION = "1.0"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
+OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
 MetricSource = Literal[
     "canonical_trial_metric",
@@ -115,6 +116,8 @@ class OutcomeScenarioPopulation(_FrozenModel):
 class OutcomeFailurePolicy(_FrozenModel):
     failed_trial_treatment: Literal["separate_rate_penalty"] = "separate_rate_penalty"
     failed_trial_weight_decimal: str
+    optimizer_learning_failure_rate_operator: Literal["lt"] = "lt"
+    optimizer_learning_failure_rate_limit_decimal: str
     hard_constraint_penalty_in_scalar_loss: Literal[False] = False
     soft_constraint_penalty_in_scalar_loss: Literal[True] = True
 
@@ -236,7 +239,7 @@ def compile_outcome_contract(
     constraints = tuple(
         OutcomeConstraint(
             constraint_id=(
-                f"constraint-{index + 1}:{item.metric}:{item.operator}:{_decimal(item.threshold)}"
+                f"{item.metric}:{item.operator}:{_decimal(item.threshold)}"
             ),
             metric=_metric_reference(item.metric),
             operator=item.operator,
@@ -246,7 +249,7 @@ def compile_outcome_contract(
             observation_policy="worst_completed_sample",
             violation_scale_policy="max_one_or_absolute_threshold",
         )
-        for index, item in enumerate(objective_config.constraints)
+        for item in objective_config.constraints
     )
     cases = tuple(
         OutcomeScenarioCase(
@@ -283,6 +286,9 @@ def compile_outcome_contract(
         ).model_dump(mode="json"),
         "domain_failure_policy": OutcomeFailurePolicy(
             failed_trial_weight_decimal=_decimal(failed_trial_weight),
+            optimizer_learning_failure_rate_limit_decimal=_decimal(
+                OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
+            ),
         ).model_dump(mode="json"),
         "selection_policy": OutcomeSelectionPolicy().model_dump(mode="json"),
         "final_promotion_policy": OutcomePromotionPolicy(
@@ -309,6 +315,9 @@ def compile_outcome_contract(
         ),
         domain_failure_policy=OutcomeFailurePolicy(
             failed_trial_weight_decimal=_decimal(failed_trial_weight),
+            optimizer_learning_failure_rate_limit_decimal=_decimal(
+                OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
+            ),
         ),
         selection_policy=OutcomeSelectionPolicy(),
         final_promotion_policy=OutcomePromotionPolicy(
@@ -519,6 +528,7 @@ def selection_order_key(
 __all__ = [
     "OUTCOME_CONTRACT_COMPILER_VERSION",
     "OUTCOME_CONTRACT_SCHEMA",
+    "OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT",
     "SELECTION_KEY_SCHEMA_VERSION",
     "OptimizationOutcomeContractV1",
     "build_selection_key",

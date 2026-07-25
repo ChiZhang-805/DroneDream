@@ -18,6 +18,9 @@ from app.optimization.experimental_types import (
     OptimizerObservation,
     OptimizerRequest,
 )
+from app.optimization.outcome_contract import (
+    OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
+)
 
 _CHILD_STRATEGIES: tuple[ExperimentalOptimizerStrategy, ...] = (
     "constrained_mobo",
@@ -100,7 +103,8 @@ def _finite_feasible_generation_losses(
     for item in observations:
         if (
             not item.feasible
-            or item.failure_rate >= 0.5
+            or item.failure_rate
+            >= OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
             or item.loss is None
             or not math.isfinite(item.loss)
         ):
@@ -168,7 +172,12 @@ def portfolio_statistics(request: OptimizerRequest) -> tuple[PortfolioStatistic,
             common_baseline=common_baseline,
         )
         feasibility_rate = (
-            sum(item.feasible and item.failure_rate < 0.5 for item in comparable_history)
+            sum(
+                item.feasible
+                and item.failure_rate
+                < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
+                for item in comparable_history
+            )
             / len(comparable_history)
             if comparable_history
             else 0.5
@@ -193,7 +202,8 @@ def portfolio_statistics(request: OptimizerRequest) -> tuple[PortfolioStatistic,
                 full_fidelity_observations=len(comparable_history),
                 feasible_observations=sum(
                     item.feasible
-                    and item.failure_rate < 0.5
+                    and item.failure_rate
+                    < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
                     and item.loss is not None
                     and math.isfinite(item.loss)
                     for item in comparable_history
