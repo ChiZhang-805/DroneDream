@@ -229,6 +229,17 @@ the actual executed fraction after this minimum is applied, so a small nominal
 budget cannot silently omit difficult cases or claim less work than it ran.
 Holdout cases remain reserved for full verification.
 
+Outcome Contract compiler 1.9 defines
+`dronedream.trial-outcome-taxonomy/v1`. Timeout, simulator failure, and
+unstable-controller outcomes remain physical/domain failures; adapter,
+simulator-process, artifact, and result-persistence failures are
+infrastructure outcomes; cancellation and invalid evidence remain separate.
+Only domain failures plus unknown failures enter the optimizer-learning
+failure rate, with unknown codes treated conservatively. Every non-success
+still remains in acceptance/completion denominators, blocks complete evidence,
+and retains its incurred work; infrastructure exclusion never turns a failed
+run into a passing result.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

@@ -17,6 +17,10 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
 
+from app.optimization.outcome_taxonomy import (
+    TRIAL_OUTCOME_TAXONOMY_SCHEMA,
+)
+
 CANDIDATE_OUTCOME_EVIDENCE_SCHEMA = "dronedream.candidate-outcome-evidence/v1"
 
 FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
@@ -69,6 +73,12 @@ class CandidateOutcomeEvidenceV1(_FrozenModel):
     completed_trial_count: NonnegativeInt
     failed_trial_count: NonnegativeInt
     passing_trial_count: NonnegativeInt
+    trial_outcome_taxonomy_schema: Literal[
+        "dronedream.trial-outcome-taxonomy/v1"
+    ]
+    trial_outcome_counts: dict[str, NonnegativeInt]
+    trial_outcome_rates: dict[str, Rate]
+    optimizer_learning_failure_rate: Rate
     objective_values: dict[str, FiniteFloat]
     constraint_values: dict[str, FiniteFloat]
     constraint_violations: dict[str, NonnegativeFloat]
@@ -185,6 +195,19 @@ def compile_candidate_outcome_evidence(
             aggregate.get("training_passing_trial_count"),
             field_name="training_passing_trial_count",
         ),
+        "trial_outcome_taxonomy_schema": (
+            TRIAL_OUTCOME_TAXONOMY_SCHEMA
+        ),
+        "trial_outcome_counts": aggregate.get(
+            "training_trial_outcome_counts"
+        ),
+        "trial_outcome_rates": aggregate.get(
+            "training_trial_outcome_rates"
+        ),
+        "optimizer_learning_failure_rate": _finite_number(
+            aggregate.get("optimizer_learning_failure_rate"),
+            field_name="optimizer_learning_failure_rate",
+        ),
         "objective_values": _finite_mapping(
             aggregate.get("objective_values"),
             field_name="objective_values",
@@ -286,6 +309,18 @@ def authoritative_outcome_projection(aggregate: object) -> dict[str, Any]:
         "training_completed_trial_count": evidence.completed_trial_count,
         "training_failed_trial_count": evidence.failed_trial_count,
         "training_passing_trial_count": evidence.passing_trial_count,
+        "trial_outcome_taxonomy_schema": (
+            evidence.trial_outcome_taxonomy_schema
+        ),
+        "training_trial_outcome_counts": dict(
+            evidence.trial_outcome_counts
+        ),
+        "training_trial_outcome_rates": dict(
+            evidence.trial_outcome_rates
+        ),
+        "optimizer_learning_failure_rate": (
+            evidence.optimizer_learning_failure_rate
+        ),
         "training_failure_rate": evidence.selection_key.training_failure_rate,
         "failure_rate": evidence.selection_key.training_failure_rate,
         "acceptance_projection_schema": acceptance.schema_id,

@@ -48,6 +48,14 @@ from app.optimization.outcome_evidence import (
     candidate_outcome_evidence_required,
     compile_candidate_outcome_evidence,
 )
+from app.optimization.outcome_taxonomy import (
+    TRIAL_OUTCOME_CLASSES,
+    TRIAL_OUTCOME_TAXONOMY_SCHEMA,
+    TrialOutcomeClass,
+    classify_trial_outcome,
+    is_optimizer_learning_failure,
+    is_optimizer_learning_outcome,
+)
 from app.optimization.robust import (
     CandidateEvaluation,
     aggregate_metric,
@@ -345,6 +353,14 @@ def _trial_outcome_evidence_row(trial: models.Trial) -> dict[str, Any]:
     }
 
 
+def _trial_outcome_class(trial: models.Trial) -> TrialOutcomeClass:
+    return classify_trial_outcome(
+        status=getattr(trial, "status", None),
+        failure_code=getattr(trial, "failure_code", None),
+        usable_metric=_trial_has_usable_metric(trial),
+    )
+
+
 def _trial_passed_with_usable_metric(trial: models.Trial) -> bool:
     metric = getattr(trial, "metric", None)
     return (
@@ -488,6 +504,7 @@ def _aggregate_candidate(
         completed_count = sum(1 for trial in rows if _trial_has_usable_metric(trial))
         failed_count = len(rows) - completed_count
         passing_count = sum(1 for trial in rows if _trial_passed_with_usable_metric(trial))
+        outcome_counts = Counter(_trial_outcome_class(trial) for trial in rows)
         if not grouped:
             return {
                 "trial_count": 0,
@@ -500,6 +517,19 @@ def _aggregate_candidate(
                 "scenario_case_count": 0,
                 "scenario_weight_total": 0.0,
                 "scenario_cases": [],
+                "trial_outcome_taxonomy_schema": (
+                    TRIAL_OUTCOME_TAXONOMY_SCHEMA
+                ),
+                "trial_outcome_counts": {
+                    outcome_class: 0
+                    for outcome_class in TRIAL_OUTCOME_CLASSES
+                },
+                "trial_outcome_rates": {
+                    outcome_class: 0.0
+                    for outcome_class in TRIAL_OUTCOME_CLASSES
+                },
+                "optimizer_learning_failure_rate": 0.0,
+                "optimizer_learning_case_weight_total": 0.0,
             }
 
         weight_total = sum(
@@ -508,6 +538,12 @@ def _aggregate_candidate(
         weighted_completion = 0.0
         weighted_failure = 0.0
         weighted_pass = 0.0
+        weighted_outcome_rates = {
+            outcome_class: 0.0
+            for outcome_class in TRIAL_OUTCOME_CLASSES
+        }
+        weighted_optimizer_learning_failure = 0.0
+        optimizer_learning_weight_total = 0.0
         case_summaries: list[dict[str, Any]] = []
         for group_key, (case, case_rows) in grouped.items():
             weight = float(case.weight) if case is not None else 1.0
@@ -515,9 +551,33 @@ def _aggregate_candidate(
             case_completed = sum(1 for trial in case_rows if _trial_has_usable_metric(trial))
             case_failed = denominator - case_completed
             case_passing = sum(1 for trial in case_rows if _trial_passed_with_usable_metric(trial))
+            case_outcome_counts = Counter(
+                _trial_outcome_class(trial) for trial in case_rows
+            )
+            learning_count = sum(
+                count
+                for outcome_class, count in case_outcome_counts.items()
+                if is_optimizer_learning_outcome(outcome_class)
+            )
+            learning_failure_count = sum(
+                count
+                for outcome_class, count in case_outcome_counts.items()
+                if is_optimizer_learning_failure(outcome_class)
+            )
             weighted_completion += weight * case_completed / denominator
             weighted_failure += weight * case_failed / denominator
             weighted_pass += weight * case_passing / denominator
+            for outcome_class in TRIAL_OUTCOME_CLASSES:
+                weighted_outcome_rates[outcome_class] += (
+                    weight
+                    * case_outcome_counts[outcome_class]
+                    / denominator
+                )
+            if learning_count > 0:
+                weighted_optimizer_learning_failure += (
+                    weight * learning_failure_count / learning_count
+                )
+                optimizer_learning_weight_total += weight
             case_summaries.append(
                 {
                     "scenario_case_id": (
@@ -534,6 +594,18 @@ def _aggregate_candidate(
                     "completion_rate": round(case_completed / denominator, 8),
                     "failure_rate": round(case_failed / denominator, 8),
                     "pass_rate": round(case_passing / denominator, 8),
+                    "trial_outcome_counts": {
+                        outcome_class: case_outcome_counts[outcome_class]
+                        for outcome_class in TRIAL_OUTCOME_CLASSES
+                    },
+                    "optimizer_learning_failure_rate": (
+                        round(
+                            learning_failure_count / learning_count,
+                            8,
+                        )
+                        if learning_count > 0
+                        else None
+                    ),
                 }
             )
 
@@ -548,6 +620,27 @@ def _aggregate_candidate(
             "scenario_case_count": len(grouped),
             "scenario_weight_total": round(weight_total, 8),
             "scenario_cases": case_summaries,
+            "trial_outcome_taxonomy_schema": (
+                TRIAL_OUTCOME_TAXONOMY_SCHEMA
+            ),
+            "trial_outcome_counts": {
+                outcome_class: outcome_counts[outcome_class]
+                for outcome_class in TRIAL_OUTCOME_CLASSES
+            },
+            "trial_outcome_rates": {
+                outcome_class: weighted_outcome_rates[outcome_class]
+                / weight_total
+                for outcome_class in TRIAL_OUTCOME_CLASSES
+            },
+            "optimizer_learning_failure_rate": (
+                weighted_optimizer_learning_failure
+                / optimizer_learning_weight_total
+                if optimizer_learning_weight_total > 0.0
+                else 0.0
+            ),
+            "optimizer_learning_case_weight_total": (
+                optimizer_learning_weight_total
+            ),
         }
 
     def _case_weighted_metric_mean(
@@ -676,6 +769,17 @@ def _aggregate_candidate(
         "pass_rate": overall_rates["pass_rate"],
         "rate_aggregation": "scenario_case_weighted_v1",
         "scenario_case_rates": overall_rates["scenario_cases"],
+        "trial_outcome_taxonomy_schema": overall_rates[
+            "trial_outcome_taxonomy_schema"
+        ],
+        "trial_outcome_counts": overall_rates["trial_outcome_counts"],
+        "trial_outcome_rates": overall_rates["trial_outcome_rates"],
+        "optimizer_learning_failure_rate": overall_rates[
+            "optimizer_learning_failure_rate"
+        ],
+        "optimizer_learning_case_weight_total": overall_rates[
+            "optimizer_learning_case_weight_total"
+        ],
     }
     if objective_config is not None:
         within_case_mode = objective_config.robust_aggregation
@@ -910,6 +1014,21 @@ def _aggregate_candidate(
                 "training_failure_rate": training_rates["failure_rate"],
                 "training_pass_rate": training_rates["pass_rate"],
                 "training_scenario_case_rates": training_rates["scenario_cases"],
+                "training_trial_outcome_taxonomy_schema": training_rates[
+                    "trial_outcome_taxonomy_schema"
+                ],
+                "training_trial_outcome_counts": training_rates[
+                    "trial_outcome_counts"
+                ],
+                "training_trial_outcome_rates": training_rates[
+                    "trial_outcome_rates"
+                ],
+                "optimizer_learning_failure_rate": training_rates[
+                    "optimizer_learning_failure_rate"
+                ],
+                "optimizer_learning_case_weight_total": training_rates[
+                    "optimizer_learning_case_weight_total"
+                ],
             }
         )
         training_failure_rate = float(training_rates["failure_rate"])
@@ -965,6 +1084,15 @@ def _aggregate_candidate(
                 "scenario_case_count": int(holdout_rates["scenario_case_count"]),
                 "scenario_weight_total": float(holdout_rates["scenario_weight_total"]),
                 "scenario_case_rates": holdout_rates["scenario_cases"],
+                "trial_outcome_taxonomy_schema": holdout_rates[
+                    "trial_outcome_taxonomy_schema"
+                ],
+                "trial_outcome_counts": holdout_rates[
+                    "trial_outcome_counts"
+                ],
+                "trial_outcome_rates": holdout_rates[
+                    "trial_outcome_rates"
+                ],
             }
             try:
                 holdout_result = _evaluate_rows(holdout_trials)

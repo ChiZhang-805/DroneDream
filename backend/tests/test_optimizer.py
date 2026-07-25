@@ -19,6 +19,7 @@ from app.optimization.outcome_contract import build_selection_key
 from app.optimization.outcome_evidence import (
     compile_candidate_outcome_evidence,
 )
+from app.optimization.outcome_taxonomy import classify_trial_outcome
 from app.orchestration import acceptance, aggregation, constants, job_manager
 from app.orchestration.optimizer import (
     generate_candidates,
@@ -373,6 +374,101 @@ def test_aggregation_rejects_completed_trial_with_missing_required_metric() -> N
     assert candidate.aggregated_score is None
 
 
+@pytest.mark.parametrize(
+    ("status", "failure_code", "usable_metric", "expected"),
+    [
+        ("COMPLETED", None, True, "success"),
+        ("FAILED", "TIMEOUT", False, "domain_failure"),
+        (
+            "FAILED",
+            "ADAPTER_UNAVAILABLE",
+            False,
+            "infrastructure_failure",
+        ),
+        ("CANCELLED", "CANCELLED", False, "cancelled"),
+        ("COMPLETED", None, False, "invalid_evidence"),
+        ("FAILED", "UNRECOGNIZED_FAILURE", False, "unknown_failure"),
+    ],
+)
+def test_trial_outcome_taxonomy_is_closed_and_unknowns_stay_conservative(
+    status: str,
+    failure_code: str | None,
+    usable_metric: bool,
+    expected: str,
+) -> None:
+    assert (
+        classify_trial_outcome(
+            status=status,
+            failure_code=failure_code,
+            usable_metric=usable_metric,
+        )
+        == expected
+    )
+
+
+def test_infrastructure_failures_block_acceptance_without_poisoning_optimizer() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_failure_taxonomy",
+        job_id="job_failure_taxonomy",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    completed = _aggregation_trial(
+        candidate=candidate,
+        trial_id="taxonomy_success",
+        case_id="nominal",
+        seed=1,
+        rmse=0.2,
+    )
+    infrastructure = _aggregation_trial(
+        candidate=candidate,
+        trial_id="taxonomy_infrastructure",
+        case_id="nominal",
+        seed=2,
+        status="FAILED",
+    )
+    infrastructure.failure_code = "ADAPTER_UNAVAILABLE"
+
+    result = aggregation._aggregate_candidate(
+        candidate,
+        [completed, infrastructure],
+        objective_config=schemas.ObjectiveConfig(
+            objectives=[schemas.ObjectiveSpec(metric="rmse")]
+        ),
+        scenario_suite=schemas.ScenarioSuiteConfig(
+            cases=[
+                schemas.ScenarioCaseConfig(
+                    id="nominal",
+                    seeds=[1, 2],
+                )
+            ]
+        ),
+    )
+
+    assert result is not None
+    assert result["training_failure_rate"] == pytest.approx(0.5)
+    assert result["optimizer_learning_failure_rate"] == pytest.approx(0.0)
+    assert result["training_trial_outcome_counts"] == {
+        "success": 1,
+        "domain_failure": 0,
+        "infrastructure_failure": 1,
+        "cancelled": 0,
+        "invalid_evidence": 0,
+        "unknown_failure": 0,
+    }
+    acceptance_result = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=1.0,
+            target_max_error=1.0,
+            min_pass_rate=1.0,
+        ),
+    )
+    assert acceptance_result.passed is False
+    assert acceptance_result.reason == "pass_rate_too_low"
+
+
 def test_score_weights_match_expected_public_values() -> None:
     # If a weight changes, this test flags the scoring-formula change so it
     # can be documented in a migration note.
@@ -658,6 +754,15 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
             "completion_rate": 0.75,
             "failure_rate": 0.25,
             "pass_rate": 0.75,
+            "trial_outcome_counts": {
+                "success": 3,
+                "domain_failure": 0,
+                "infrastructure_failure": 0,
+                "cancelled": 0,
+                "invalid_evidence": 0,
+                "unknown_failure": 1,
+            },
+            "optimizer_learning_failure_rate": 0.25,
         },
         {
             "scenario_case_id": "case-b",
@@ -670,6 +775,15 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
             "completion_rate": 1.0,
             "failure_rate": 0.0,
             "pass_rate": 0.0,
+            "trial_outcome_counts": {
+                "success": 1,
+                "domain_failure": 0,
+                "infrastructure_failure": 0,
+                "cancelled": 0,
+                "invalid_evidence": 0,
+                "unknown_failure": 0,
+            },
+            "optimizer_learning_failure_rate": 0.0,
         },
     ]
     # Failed-seed penalty uses the weighted case failure rate, not raw 1/5.
@@ -1236,6 +1350,23 @@ def test_acceptance_prefers_verified_candidate_outcome_evidence() -> None:
         "training_completed_trial_count": 3,
         "training_failed_trial_count": 0,
         "training_passing_trial_count": 3,
+        "training_trial_outcome_counts": {
+            "success": 3,
+            "domain_failure": 0,
+            "infrastructure_failure": 0,
+            "cancelled": 0,
+            "invalid_evidence": 0,
+            "unknown_failure": 0,
+        },
+        "training_trial_outcome_rates": {
+            "success": 1.0,
+            "domain_failure": 0.0,
+            "infrastructure_failure": 0.0,
+            "cancelled": 0.0,
+            "invalid_evidence": 0.0,
+            "unknown_failure": 0.0,
+        },
+        "optimizer_learning_failure_rate": 0.0,
         "objective_values": {"rmse": 0.1},
         "constraint_values": {},
         "constraint_violations": {},

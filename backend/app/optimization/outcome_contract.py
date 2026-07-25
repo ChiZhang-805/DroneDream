@@ -17,7 +17,7 @@ from app.optimization.outcome_evidence import (
 )
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "1.8"
+OUTCOME_CONTRACT_COMPILER_VERSION = "1.9"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 
@@ -144,12 +144,24 @@ class OutcomeScenarioPopulation(_FrozenModel):
 
 
 class OutcomeFailurePolicy(_FrozenModel):
+    trial_outcome_taxonomy_schema: Literal[
+        "dronedream.trial-outcome-taxonomy/v1"
+    ] = "dronedream.trial-outcome-taxonomy/v1"
     failed_trial_treatment: Literal["separate_rate_penalty"] = "separate_rate_penalty"
     failed_trial_weight_decimal: str
     optimizer_learning_failure_rate_operator: Literal["lt"] = "lt"
     optimizer_learning_failure_rate_limit_decimal: str
     hard_constraint_penalty_in_scalar_loss: Literal[False] = False
     soft_constraint_penalty_in_scalar_loss: Literal[True] = True
+    optimizer_learning_outcome_policy: Literal[
+        "domain_and_unknown_failures_excluding_nonphysical_outcomes"
+    ] = "domain_and_unknown_failures_excluding_nonphysical_outcomes"
+    unknown_failure_policy: Literal[
+        "conservative_optimizer_failure"
+    ] = "conservative_optimizer_failure"
+    acceptance_non_success_policy: Literal[
+        "all_non_successes_remain_in_denominator"
+    ] = "all_non_successes_remain_in_denominator"
 
 
 class OutcomeSelectionPolicy(_FrozenModel):
@@ -208,7 +220,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["1.8"] = "1.8"
+    compiler_version: Literal["1.9"] = "1.9"
     contract_id: str
     metric_admission_policy: Literal["registered_metrics_only"] = (
         "registered_metrics_only"

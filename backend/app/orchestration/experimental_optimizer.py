@@ -104,7 +104,10 @@ def _candidate_failure_rate(candidate: models.CandidateParameterSet) -> float:
     )
     if evidence_required and not aggregate:
         return 1.0
-    raw = aggregate.get("training_failure_rate", aggregate.get("failure_rate"))
+    raw = aggregate.get(
+        "optimizer_learning_failure_rate",
+        aggregate.get("training_failure_rate", aggregate.get("failure_rate")),
+    )
     if (
         not isinstance(raw, bool)
         and isinstance(raw, int | float)

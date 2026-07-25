@@ -215,6 +215,22 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     )
     assert first.domain_failure_policy.hard_constraint_penalty_in_scalar_loss is False
     assert (
+        first.domain_failure_policy.trial_outcome_taxonomy_schema
+        == "dronedream.trial-outcome-taxonomy/v1"
+    )
+    assert (
+        first.domain_failure_policy.optimizer_learning_outcome_policy
+        == "domain_and_unknown_failures_excluding_nonphysical_outcomes"
+    )
+    assert (
+        first.domain_failure_policy.unknown_failure_policy
+        == "conservative_optimizer_failure"
+    )
+    assert (
+        first.domain_failure_policy.acceptance_non_success_policy
+        == "all_non_successes_remain_in_denominator"
+    )
+    assert (
         first.domain_failure_policy.optimizer_learning_failure_rate_limit_decimal
         == "0.5"
     )
@@ -223,7 +239,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "1.8"
+    assert first.compiler_version == "1.9"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -301,6 +317,23 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
         "training_completed_trial_count": 2,
         "training_failed_trial_count": 0,
         "training_passing_trial_count": 2,
+        "training_trial_outcome_counts": {
+            "success": 2,
+            "domain_failure": 0,
+            "infrastructure_failure": 0,
+            "cancelled": 0,
+            "invalid_evidence": 0,
+            "unknown_failure": 0,
+        },
+        "training_trial_outcome_rates": {
+            "success": 1.0,
+            "domain_failure": 0.0,
+            "infrastructure_failure": 0.0,
+            "cancelled": 0.0,
+            "invalid_evidence": 0.0,
+            "unknown_failure": 0.0,
+        },
+        "optimizer_learning_failure_rate": 0.0,
         "objective_values": {"rmse": 0.4},
         "constraint_values": {"crash_flag:lte:0": 0.0},
         "constraint_violations": {"crash_flag:lte:0": 0.0},

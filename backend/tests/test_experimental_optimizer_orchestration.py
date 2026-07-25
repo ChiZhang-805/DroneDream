@@ -654,6 +654,59 @@ def test_job_objective_preferences_reach_bayesian_vector_acquisition(
         assert metadata["objective_normalizations"] == {"rmse": 1.0}
 
 
+def test_optimizer_learning_excludes_infrastructure_failure_rate(
+    experimental_ctx: dict[str, Any],
+) -> None:
+    ctx = experimental_ctx
+    job_id = _create_job(ctx, "constrained_mobo")
+    from app.orchestration.experimental_optimizer import (
+        observations_for_job,
+        search_space_for_job,
+    )
+
+    with ctx["db"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        candidate = ctx["models"].CandidateParameterSet(
+            job_id=job.id,
+            generation_index=1,
+            source_type="optimizer",
+            label="infrastructure-exclusion",
+            parameter_json={"MPC_XY_P": 1.0},
+            aggregated_score=0.2,
+            aggregated_metric_json={
+                "objective_values": {"rmse": 0.2},
+                "constraint_violations": {},
+                "scalar_loss": 0.2,
+                "feasible": True,
+                "training_failure_rate": 0.5,
+                "optimizer_learning_failure_rate": 0.0,
+            },
+            optimizer_metadata_json={
+                "strategy": "constrained_mobo",
+                "fidelity": 1.0,
+            },
+            trial_count=2,
+            completed_trial_count=1,
+            failed_trial_count=1,
+        )
+        search_space = search_space_for_job(
+            job,
+            baseline_parameters={"MPC_XY_P": 0.95},
+        )
+
+        observations = observations_for_job(
+            job,
+            search_space=search_space,
+            candidates=[candidate],
+        )
+
+        assert len(observations) == 1
+        assert observations[0].completed is True
+        assert observations[0].failure_rate == pytest.approx(0.0)
+        assert observations[0].feasible is True
+
+
 @pytest.mark.parametrize("strategy", ("surrogate_cma_es", "bipop_cma_es"))
 def test_pending_cma_offspring_reserves_its_cohort_position_without_training(
     experimental_ctx: dict[str, Any], strategy: str
