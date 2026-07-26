@@ -13,6 +13,7 @@ from typing import Any, cast
 from app.optimization.design import MAX_HALTON_DIMENSIONS, halton_design
 from app.optimization.domain import SearchSpace
 from app.optimization.experimental_types import (
+    OPTIMIZER_LEARNING_OBSERVATION_ROLES,
     ExperimentalOptimizerStrategy,
     ExperimentalProposal,
     OptimizerObservation,
@@ -169,6 +170,7 @@ def _reward_eligible(observation: OptimizerObservation) -> bool:
 def _full_fidelity_observation(observation: OptimizerObservation) -> bool:
     return (
         observation.completed
+        and observation.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
         and observation.fidelity >= 1.0 - 1e-9
         and observation.requested_fidelity >= 1.0 - 1e-9
     )

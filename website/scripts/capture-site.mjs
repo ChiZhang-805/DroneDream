@@ -39,7 +39,7 @@ const isOptionalPreviewManifest = (value) => value.includes("/downloads/latest.j
 const isBenignStaticAbort = (request) =>
   request.failure()?.errorText === "net::ERR_ABORTED" &&
   (
-    request.url().endsWith("/drone-favicon.svg") ||
+    request.url().endsWith("/drone-favicon.png") ||
     request.url().includes("/assets/128x128-")
   );
 const browser = await chromium.launch({

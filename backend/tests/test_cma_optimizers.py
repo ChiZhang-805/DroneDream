@@ -459,7 +459,11 @@ def test_cma_waits_for_every_persisted_cohort_member_to_finish() -> None:
         == []
     )
 
-    terminal_failure = replace(observations[-1], completed=True)
+    terminal_failure = replace(
+        observations[-1],
+        completed=True,
+        role="constraint_only",
+    )
     completed = reconstruct_cma_state(
         space,
         (*observations[:-1], terminal_failure),
@@ -467,6 +471,50 @@ def test_cma_waits_for_every_persisted_cohort_member_to_finish() -> None:
         population_size=8,
     )
     assert completed.updates == 1
+
+
+def test_cma_reissues_a_quarantined_cohort_position_without_updating_state() -> None:
+    space = _space()
+    proposals = propose_surrogate_cma_es(
+        space,
+        _request("surrogate_cma_es", generation=1, batch_size=8, seed=813),
+    )
+    observations = tuple(
+        _observation_from_proposal(
+            space,
+            proposal,
+            candidate_id=f"learning-{index}",
+            generation=1,
+            loss=float(index),
+        )
+        for index, proposal in enumerate(proposals[:-1])
+    )
+
+    state = reconstruct_cma_state(
+        space,
+        observations,
+        strategy="surrogate_cma_es",
+        population_size=8,
+    )
+    retried = propose_surrogate_cma_es(
+        space,
+        _request(
+            "surrogate_cma_es",
+            observations,
+            generation=2,
+            batch_size=3,
+            seed=814,
+        ),
+    )
+
+    assert state.updates == 0
+    assert state.pending_offspring == 7
+    assert len(retried) == 1
+    assert retried[0].metadata["cma_cohort_index"] == 0
+    assert retried[0].metadata["cma_cohort_position"] == 7
+    assert retried[0].metadata["cma_distribution_sha256"] == (
+        proposals[-1].metadata["cma_distribution_sha256"]
+    )
 
 
 def test_covariance_repair_preserves_regular_scale_and_bounds_condition() -> None:

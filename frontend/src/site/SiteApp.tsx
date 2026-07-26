@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import appIcon from "../../../desktop/src-tauri/icons/128x128.png";
+import { BrandLockup } from "../components/BrandLockup";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
@@ -1071,8 +1071,7 @@ export function SiteApp() {
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
         <a className="site-brand" href="/" onClick={closeMenu} aria-label="DroneDream">
-          <img src={appIcon} alt="" />
-          <span>DroneDream</span>
+          <BrandLockup variant="primary" />
         </a>
         <nav
           id="site-navigation"
@@ -1556,7 +1555,9 @@ export function SiteApp() {
 
       <footer className="site-footer">
         <div className="site-shell">
-          <div className="site-footer-brand"><img src={appIcon} alt="" /><strong>DroneDream</strong></div>
+          <div className="site-footer-brand" role="img" aria-label="DroneDream">
+            <BrandLockup variant="primary" />
+          </div>
           <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
           <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
             <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">

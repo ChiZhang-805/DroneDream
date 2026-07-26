@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Iterable
+from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, cast
 
 from app import models, schemas
@@ -20,6 +21,7 @@ from app.optimization.experimental_types import (
     EXPERIMENTAL_OPTIMIZER_STRATEGIES,
     ExperimentalOptimizerStrategy,
     OptimizerObservation,
+    OptimizerObservationRole,
     OptimizerRequest,
 )
 from app.optimization.experimental_types import (
@@ -32,6 +34,12 @@ from app.optimization.outcome_evidence import (
     authoritative_candidate_trial_outcome_projection,
     candidate_outcome_evidence_required,
     candidate_training_trial_evidence_rows,
+)
+from app.optimization.outcome_taxonomy import (
+    TRIAL_OUTCOME_CLASSES,
+    TRIAL_OUTCOME_TAXONOMY_SCHEMA,
+    TrialOutcomeClass,
+    classify_trial_outcome,
 )
 from app.orchestration import constants
 from app.orchestration.optimizer import CandidateProposal
@@ -103,55 +111,87 @@ def _objective_directions(job: models.Job) -> dict[str, str]:
     return {objective.metric: objective.direction for objective in config.objectives}
 
 
-def _candidate_failure_rate(candidate: models.CandidateParameterSet) -> float:
-    raw_aggregate = candidate.aggregated_metric_json
-    ledger_required = candidate_evidence_receipt_required(candidate)
-    evidence_required = (
-        candidate_outcome_evidence_required(raw_aggregate)
-        or ledger_required
+def _trial_metric_payload_is_usable(metric: object) -> bool:
+    if not isinstance(metric, Mapping):
+        return False
+
+    def finite_number(name: str, *, nonnegative: bool = True) -> bool:
+        value = metric.get(name)
+        return (
+            not isinstance(value, bool)
+            and isinstance(value, int | float)
+            and math.isfinite(float(value))
+            and (not nonnegative or float(value) >= 0.0)
+        )
+
+    overshoot = metric.get("overshoot_count")
+    return (
+        finite_number("rmse")
+        and finite_number("max_error")
+        and finite_number("completion_time")
+        and finite_number("score", nonnegative=False)
+        and finite_number("final_error")
+        and isinstance(overshoot, int)
+        and not isinstance(overshoot, bool)
+        and overshoot >= 0
+        and all(
+            isinstance(metric.get(name), bool)
+            for name in (
+                "crash_flag",
+                "timeout_flag",
+                "pass_flag",
+                "instability_flag",
+            )
+        )
     )
-    if ledger_required and not candidate_evidence_chain_matches_current(
-        candidate,
-        raw_aggregate,
-    ):
-        raw_aggregate = {}
-    aggregate = authoritative_candidate_trial_outcome_projection(
-        candidate_id=candidate.id,
-        generation_index=candidate.generation_index,
-        parameter_snapshot=candidate.parameter_json,
-        trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
-        aggregate=raw_aggregate,
-    )
-    if evidence_required and not aggregate:
-        return 1.0
-    raw = aggregate.get(
-        "optimizer_learning_failure_rate",
-        aggregate.get("training_failure_rate", aggregate.get("failure_rate")),
-    )
+
+
+def _authoritative_training_outcome_counts(
+    *,
+    trial_evidence_rows: object,
+    aggregate: Mapping[str, Any],
+) -> dict[TrialOutcomeClass, int] | None:
+    """Classify canonical Trial rows and reject divergent aggregate claims."""
+
     if (
-        not isinstance(raw, bool)
-        and isinstance(raw, int | float)
-        and math.isfinite(float(raw))
+        isinstance(trial_evidence_rows, str | bytes)
+        or not isinstance(trial_evidence_rows, Sequence)
+        or any(not isinstance(row, Mapping) for row in trial_evidence_rows)
     ):
-        return max(0.0, min(1.0, float(raw)))
-    trial_count = candidate.trial_count
-    failed_count = candidate.failed_trial_count
-    if (
-        isinstance(trial_count, bool)
-        or not isinstance(trial_count, int)
-        or trial_count <= 0
-    ):
-        return 0.0
-    if (
-        isinstance(failed_count, bool)
-        or not isinstance(failed_count, int)
-        or failed_count < 0
-    ):
-        return 1.0
-    return max(
-        0.0,
-        min(1.0, failed_count / trial_count),
+        return None
+    counts: Counter[TrialOutcomeClass] = Counter()
+    for raw_row in trial_evidence_rows:
+        row = cast(Mapping[str, object], raw_row)
+        outcome = classify_trial_outcome(
+            status=row.get("status"),
+            failure_code=row.get("failure_code"),
+            usable_metric=_trial_metric_payload_is_usable(row.get("metric")),
+        )
+        counts[outcome] += 1
+    result = {
+        outcome: counts.get(outcome, 0)
+        for outcome in TRIAL_OUTCOME_CLASSES
+    }
+
+    declared = aggregate.get(
+        "training_trial_outcome_counts",
+        aggregate.get("trial_outcome_counts"),
     )
+    if declared is not None:
+        schema = aggregate.get("trial_outcome_taxonomy_schema")
+        if schema not in {None, TRIAL_OUTCOME_TAXONOMY_SCHEMA}:
+            return None
+        if not isinstance(declared, Mapping):
+            return None
+        normalized: dict[str, int] = {}
+        for outcome in TRIAL_OUTCOME_CLASSES:
+            value = declared.get(outcome)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                return None
+            normalized[outcome] = value
+        if set(declared) != set(TRIAL_OUTCOME_CLASSES) or normalized != result:
+            return None
+    return result
 
 
 def observations_for_job(
@@ -226,6 +266,7 @@ def observations_for_job(
             candidate_outcome_evidence_required(raw_aggregate)
             or ledger_required
         )
+        trial_evidence_rows = candidate_training_trial_evidence_rows(candidate)
         if ledger_required and not candidate_evidence_chain_matches_current(
             candidate,
             raw_aggregate,
@@ -235,11 +276,39 @@ def observations_for_job(
             candidate_id=candidate.id,
             generation_index=candidate.generation_index,
             parameter_snapshot=parameter_snapshot,
-            trial_evidence_rows=candidate_training_trial_evidence_rows(
-                candidate
-            ),
+            trial_evidence_rows=trial_evidence_rows,
             aggregate=raw_aggregate,
         )
+        if completed and evidence_required and not aggregate:
+            # Evidence-marked rows are all-or-nothing. A stale parameter,
+            # Trial, artifact, or attempt binding must not become either an
+            # objective or a false constraint observation.
+            continue
+        outcome_counts = (
+            _authoritative_training_outcome_counts(
+                trial_evidence_rows=trial_evidence_rows,
+                aggregate=aggregate,
+            )
+            if completed
+            else None
+        )
+        has_canonical_trial_rows = bool(trial_evidence_rows)
+        if completed and has_canonical_trial_rows and outcome_counts is None:
+            continue
+        learning_outcome_count = (
+            outcome_counts["success"] + outcome_counts["domain_failure"]
+            if outcome_counts is not None
+            else 0
+        )
+        if (
+            completed
+            and has_canonical_trial_rows
+            and learning_outcome_count == 0
+        ):
+            # Infrastructure failures, cancellations, invalid evidence, and
+            # unknown-only histories are quarantined. They remain visible in
+            # reports but cannot change a model, proposal, CMA state, or seed.
+            continue
         raw_objectives = aggregate.get("objective_values", {})
         objectives = {
             str(name): float(value)
@@ -282,7 +351,25 @@ def observations_for_job(
             or (loss is not None and not math.isfinite(float(loss)))
         ):
             loss = None
-        failure_rate = _candidate_failure_rate(candidate)
+        if learning_outcome_count > 0 and outcome_counts is not None:
+            failure_rate = (
+                outcome_counts["domain_failure"] / learning_outcome_count
+            )
+        else:
+            raw_failure_rate = aggregate.get(
+                "optimizer_learning_failure_rate",
+                aggregate.get(
+                    "training_failure_rate",
+                    aggregate.get("failure_rate", 0.0),
+                ),
+            )
+            failure_rate = (
+                max(0.0, min(1.0, float(raw_failure_rate)))
+                if not isinstance(raw_failure_rate, bool)
+                and isinstance(raw_failure_rate, int | float)
+                and math.isfinite(float(raw_failure_rate))
+                else 0.0
+            )
         metadata = (
             candidate.optimizer_metadata_json
             if isinstance(candidate.optimizer_metadata_json, dict)
@@ -312,12 +399,34 @@ def observations_for_job(
             else 0.05
         )
         requested_fidelity = max(0.05, min(1.0, requested_fidelity))
+        has_objective_evidence = loss is not None or bool(objectives)
+        role: OptimizerObservationRole
+        if not completed:
+            role = "pending_reservation"
+            failure_rate = 0.0
+        elif has_objective_evidence:
+            role = "objective"
+        elif (
+            has_canonical_trial_rows
+            and outcome_counts is not None
+            and outcome_counts["domain_failure"] > 0
+        ):
+            # A trusted physical/simulation-domain failure carries useful
+            # feasibility evidence even when no objective metric survived.
+            role = "constraint_only"
+            objectives = {}
+            loss = None
+        else:
+            # Legacy objective aggregates remain readable, but an ambiguous
+            # terminal row with no objective and no canonical domain-failure
+            # evidence cannot teach the optimizer.
+            continue
         aggregate_feasible = aggregate.get("feasible")
         feasible_marker = (
             True if "feasible" not in aggregate else aggregate_feasible is True
         )
         feasible = (
-            loss is not None
+            role == "objective"
             and feasible_marker
             and failure_rate < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
         )
@@ -358,6 +467,7 @@ def observations_for_job(
                 ),
                 optimizer_metadata=dict(metadata),
                 completed=completed,
+                role=role,
             )
         )
     return tuple(observations)
@@ -387,6 +497,13 @@ def _seed_for_request(
                     "optimizer_strategy": item.optimizer_strategy,
                     "optimizer_metadata": item.optimizer_metadata,
                     "completed": item.completed,
+                    # Preserve historical objective-only seeds while making
+                    # newly explicit non-objective roles seed-visible.
+                    **(
+                        {"role": item.role}
+                        if item.role != "objective"
+                        else {}
+                    ),
                 }
             ),
         )

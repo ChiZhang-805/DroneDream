@@ -1599,14 +1599,14 @@ def test_acceptance_prefers_verified_candidate_outcome_evidence() -> None:
     )[0]
     assert observation.loss == pytest.approx(0.1)
     candidate.parameter_json = {"MPC_XY_P": 1.05}
-    rejected_observation = observations_for_job(
-        optimizer_job,
-        search_space=search_space,
-        candidates=[candidate],
-    )[0]
-    assert rejected_observation.loss is None
-    assert rejected_observation.failure_rate == 1.0
-    assert rejected_observation.feasible is False
+    assert (
+        observations_for_job(
+            optimizer_job,
+            search_space=search_space,
+            candidates=[candidate],
+        )
+        == ()
+    )
     candidate.parameter_json = {"MPC_XY_P": 0.95}
 
     candidate.trials[0].metric.rmse = 99.0
@@ -1621,13 +1621,14 @@ def test_acceptance_prefers_verified_candidate_outcome_evidence() -> None:
     assert changed_trial.passed is False
     assert changed_trial.reason == "invalid_outcome_evidence"
     assert aggregation.candidate_is_publishable(candidate) is False
-    changed_trial_observation = observations_for_job(
-        optimizer_job,
-        search_space=search_space,
-        candidates=[candidate],
-    )[0]
-    assert changed_trial_observation.loss is None
-    assert changed_trial_observation.failure_rate == 1.0
+    assert (
+        observations_for_job(
+            optimizer_job,
+            search_space=search_space,
+            candidates=[candidate],
+        )
+        == ()
+    )
     candidate.trials[0].metric.rmse = 0.1
 
     candidate.aggregated_metric_json["candidate_outcome_evidence"]["scalar_loss"] = -1.0

@@ -25,6 +25,7 @@ from numpy.typing import NDArray
 
 from app.optimization.domain import SearchSpace
 from app.optimization.experimental_types import (
+    OPTIMIZER_LEARNING_OBSERVATION_ROLES,
     ExperimentalProposal,
     OptimizerObservation,
     OptimizerRequest,
@@ -154,7 +155,9 @@ class _CohortRecord:
     @property
     def complete(self) -> bool:
         return self.persisted_count == self.population_size and all(
-            item.completed for item in self.positions.values()
+            item.completed
+            and item.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
+            for item in self.positions.values()
         )
 
 
@@ -221,6 +224,11 @@ def _observation_seed_payload(item: OptimizerObservation) -> dict[str, Any]:
                 "strategy": item.optimizer_strategy,
                 "effective_fidelity": item.fidelity,
                 "requested_fidelity": item.requested_fidelity,
+                **(
+                    {"role": item.role}
+                    if item.role != "objective"
+                    else {}
+                ),
             }
         ).items()
     }
@@ -510,7 +518,11 @@ def _legacy_generation_cohorts(
         sorted(grouped[generation], key=_rank_key)
         for generation in sorted(grouped)
         if len(grouped[generation]) == population_size
-        and all(point.observation.completed for point in grouped[generation])
+        and all(
+            point.observation.completed
+            and point.observation.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
+            for point in grouped[generation]
+        )
     ]
 
 
@@ -591,6 +603,7 @@ def _initial_state(
         point
         for point in ranked
         if point.observation.loss is not None
+        and point.observation.role == "objective"
         and math.isfinite(point.observation.loss)
         and _is_effectively_feasible(point.observation)
     ]
@@ -747,6 +760,7 @@ def reconstruct_cma_state(
         point
         for point in points
         if not _strategy_matches(point.observation, strategy)
+        and point.observation.role == "objective"
         and _is_effectively_feasible(point.observation)
         and (
             first_own_generation is None
@@ -991,6 +1005,7 @@ def _surrogate_models(
         point
         for point in _training_points(search_space, observations)
         if point.observation.completed
+        and point.observation.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
     ]
     feasibility_source_count = len(points)
     objective_points = [
@@ -1000,6 +1015,7 @@ def _surrogate_models(
             observations if objective_observations is None else objective_observations,
         )
         if point.observation.completed
+        and point.observation.role == "objective"
     ]
     successful = [
         point
@@ -1358,7 +1374,11 @@ def _restart_boundaries(
         for generation_index in sorted(by_generation):
             population_size = bipop_restart_plan(restart_index, dimensions).population_size
             cohort = by_generation[generation_index]
-            if len(cohort) != population_size or not all(item.completed for item in cohort):
+            if len(cohort) != population_size or not all(
+                item.completed
+                and item.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
+                for item in cohort
+            ):
                 continue
             cohorts.append((restart_index, generation_index, cohort))
 

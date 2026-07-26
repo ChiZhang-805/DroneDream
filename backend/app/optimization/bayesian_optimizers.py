@@ -27,6 +27,7 @@ from typing import Literal, Protocol
 from app.optimization.design import MAX_HALTON_DIMENSIONS, halton_design
 from app.optimization.domain import SearchSpace
 from app.optimization.experimental_types import (
+    OPTIMIZER_LEARNING_OBSERVATION_ROLES,
     ExperimentalProposal,
     OptimizerObservation,
     OptimizerRequest,
@@ -372,7 +373,12 @@ class _FeasibilityModel:
         *,
         feature_builder: Callable[[OptimizerObservation], tuple[float, ...]],
     ) -> None:
-        observations = tuple(item for item in observations if item.completed)
+        observations = tuple(
+            item
+            for item in observations
+            if item.completed
+            and item.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
+        )
         self.source_count = len(observations)
         self.sample_count = len(observations)
         if not observations:
@@ -435,7 +441,7 @@ def _metric_names(observations: Sequence[OptimizerObservation]) -> tuple[str, ..
         {
             name
             for observation in observations
-            if observation.completed
+            if observation.completed and observation.role == "objective"
             for name, value in observation.objectives.items()
             if math.isfinite(value)
         }
@@ -446,6 +452,7 @@ def _metric_names(observations: Sequence[OptimizerObservation]) -> tuple[str, ..
 def _informative_count(observations: Sequence[OptimizerObservation]) -> int:
     return sum(
         observation.completed
+        and observation.role == "objective"
         and (
             observation.loss is not None
             or any(math.isfinite(value) for value in observation.objectives.values())
@@ -467,7 +474,7 @@ def _fit_metric_model(
 ) -> _MetricModel | None:
     entries: list[_ActiveSetEntry] = []
     for observation in observations:
-        if not observation.completed:
+        if not observation.completed or observation.role != "objective":
             continue
         if name == "__loss__":
             value = observation.loss
@@ -651,7 +658,11 @@ def _joint_scalarized_incumbents(
 
     rows: list[tuple[OptimizerObservation, tuple[float, ...]]] = []
     for observation in observations:
-        if not observation.completed or not observation.feasible:
+        if (
+            not observation.completed
+            or observation.role != "objective"
+            or not observation.feasible
+        ):
             continue
         values: list[float] = []
         for model in models:
@@ -920,6 +931,7 @@ def _cold_start(
         ):
             if (
                 not observation.completed
+                or observation.role != "objective"
                 or not observation.feasible
                 or observation.loss is None
                 or not math.isfinite(observation.loss)
@@ -1398,6 +1410,7 @@ def _turbo_radius(observations: Sequence[OptimizerObservation]) -> float:
     for observation in observations:
         if (
             not observation.completed
+            or observation.role not in OPTIMIZER_LEARNING_OBSERVATION_ROLES
             or observation.requested_fidelity < 1.0 - 1e-9
             or not _is_turbo_observation(observation)
         ):
@@ -1450,6 +1463,7 @@ def _turbo(search_space: SearchSpace, request: OptimizerRequest) -> list[Experim
         observation
         for observation in model_request.observations
         if observation.completed
+        and observation.role == "objective"
         and observation.feasible
         and observation.loss is not None
         and math.isfinite(observation.loss)

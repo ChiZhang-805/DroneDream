@@ -11,22 +11,25 @@ Working title:
 
 > **DroneDream 1.0: Evidence-Gated Autonomous Tuning for UAV Simulation**
 
-The visual identity follows DroneDream's purple-pink product language under
-the name **Dreamline Violet**:
+The visual identity follows the approved bright purple-pink-blue product
+language under the name **Dreamline Prism**:
 
-- primary violet `#6D28D9`;
-- gradient magenta `#C026D3`;
-- highlight rose `#FB7185`;
-- night-flight plum `#0B0614`;
-- print-safe heading violet `#5B21B6`;
-- pale lavender `#C4B5FD`;
+- primary electric violet `#684BFF`;
+- light violet `#9B72FF`;
+- gradient magenta `#F166D8`;
+- rising-wing coral `#FF4E70`;
+- verification blue `#3A74FF`;
+- night-flight ink `#171225`;
+- print-safe heading violet `#684BFF`;
+- pale lavender `#EEE9FF`;
 - verified green `#22C55E`.
 
-Cover pages and architecture figures use a restrained
-`#6D28D9 → #C026D3 → #FB7185` gradient over night-flight plum. White-page
-headings use print-safe violet rather than bright blue. Charts reuse the same
-ordered palette and also carry direct labels, markers, hatching, or line styles;
-color never replaces an evidence-class label, confidence interval, or status.
+The title-page lockup uses the fixed approved brand asset rather than rebuilding
+the icon or wordmark inside Word. White-page headings use electric violet with
+magenta reserved for secondary emphasis. Charts may add coral and flight blue
+to the ordered violet-pink palette, but also carry direct labels, markers,
+hatching, or line styles; color never replaces an evidence-class label,
+confidence interval, or status.
 
 ## Claim classes
 

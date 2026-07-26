@@ -754,6 +754,7 @@ def test_pending_candidate_is_visible_but_excluded_from_bayesian_training(
         )
 
         assert pending_observation.completed is False
+        assert pending_observation.role == "pending_reservation"
         assert pending_observation.loss is None
         assert pending_observation.failure_rate == pytest.approx(0.0)
         assert pending_observation.objectives == {}
@@ -887,6 +888,172 @@ def test_optimizer_learning_excludes_infrastructure_failure_rate(
         assert observations[0].completed is True
         assert observations[0].failure_rate == pytest.approx(0.0)
         assert observations[0].feasible is True
+
+
+@pytest.mark.parametrize("strategy", ("constrained_mobo", "surrogate_cma_es"))
+@pytest.mark.parametrize(
+    ("status", "failure_code"),
+    (
+        ("FAILED", "SIM_ERROR"),
+        ("CANCELLED", None),
+        ("FAILED", "INVALID_SIMULATOR_RESULT"),
+        ("FAILED", "UNREGISTERED_FAILURE"),
+    ),
+)
+def test_non_learning_history_is_quarantined_from_seed_and_proposal(
+    experimental_ctx: dict[str, Any],
+    strategy: str,
+    status: str,
+    failure_code: str | None,
+) -> None:
+    ctx = experimental_ctx
+    job_id = _create_job(ctx, strategy)
+    from app.orchestration.experimental_optimizer import (
+        observations_for_job,
+        propose_experimental_generation,
+        search_space_for_job,
+    )
+    with ctx["db"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        candidate = ctx["models"].CandidateParameterSet(
+            job_id=job.id,
+            generation_index=1,
+            source_type="optimizer",
+            label="quarantined-infrastructure",
+            parameter_json={"MPC_XY_P": 1.0},
+            aggregated_score=0.2,
+            aggregated_metric_json={
+                "objective_values": {"rmse": 0.2},
+                "constraint_violations": {},
+                "scalar_loss": 0.2,
+                "feasible": True,
+                "optimizer_learning_failure_rate": 0.0,
+            },
+            optimizer_metadata_json={"strategy": strategy, "fidelity": 1.0},
+            trial_count=1,
+            completed_trial_count=0,
+            failed_trial_count=1,
+        )
+        candidate.trials.append(
+            ctx["models"].Trial(
+                job_id=job.id,
+                seed=805,
+                scenario_type="nominal",
+                scenario_config_json={},
+                status=status,
+                failure_code=failure_code,
+            )
+        )
+        job.candidates.append(candidate)
+        db.flush()
+        search_space = search_space_for_job(
+            job,
+            baseline_parameters={"MPC_XY_P": 0.95},
+        )
+
+        assert (
+            observations_for_job(
+                job,
+                search_space=search_space,
+                candidates=[candidate],
+            )
+            == ()
+        )
+        without_failure = propose_experimental_generation(
+            job=job,
+            candidates=[],
+            baseline_parameters={"MPC_XY_P": 0.95},
+            generation_index=2,
+            batch_size=1,
+        )
+        with_failure = propose_experimental_generation(
+            job=job,
+            candidates=[candidate],
+            baseline_parameters={"MPC_XY_P": 0.95},
+            generation_index=2,
+            batch_size=1,
+        )
+
+        assert with_failure == without_failure
+
+
+@pytest.mark.parametrize("strategy", ("constrained_mobo", "surrogate_cma_es"))
+def test_domain_failure_becomes_constraint_only_learning_evidence(
+    experimental_ctx: dict[str, Any],
+    strategy: str,
+) -> None:
+    ctx = experimental_ctx
+    job_id = _create_job(ctx, strategy)
+    from app.orchestration.experimental_optimizer import (
+        observations_for_job,
+        propose_experimental_generation,
+        search_space_for_job,
+    )
+    from app.simulator.base import FAILURE_TIMEOUT
+
+    with ctx["db"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        candidate = ctx["models"].CandidateParameterSet(
+            job_id=job.id,
+            generation_index=1,
+            source_type="optimizer",
+            label="trusted-domain-failure",
+            parameter_json={"MPC_XY_P": 1.0},
+            optimizer_metadata_json={"strategy": strategy, "fidelity": 1.0},
+            trial_count=1,
+            completed_trial_count=0,
+            failed_trial_count=1,
+        )
+        candidate.trials.append(
+            ctx["models"].Trial(
+                job_id=job.id,
+                seed=805,
+                scenario_type="nominal",
+                scenario_config_json={},
+                status="FAILED",
+                failure_code=FAILURE_TIMEOUT,
+            )
+        )
+        job.candidates.append(candidate)
+        db.flush()
+        search_space = search_space_for_job(
+            job,
+            baseline_parameters={"MPC_XY_P": 0.95},
+        )
+
+        observations = observations_for_job(
+            job,
+            search_space=search_space,
+            candidates=[candidate],
+        )
+        assert len(observations) == 1
+        assert observations[0].role == "constraint_only"
+        assert observations[0].completed is True
+        assert observations[0].loss is None
+        assert observations[0].objectives == {}
+        assert observations[0].failure_rate == pytest.approx(1.0)
+        assert observations[0].feasible is False
+
+        proposals = propose_experimental_generation(
+            job=job,
+            candidates=[candidate],
+            baseline_parameters={"MPC_XY_P": 0.95},
+            generation_index=2,
+            batch_size=1,
+        )
+        assert proposals
+        metadata = proposals[0].metadata
+        if strategy == "constrained_mobo":
+            assert metadata["gp_training_set"]["feasibility"] == {
+                "source": 1,
+                "active": 1,
+            }
+            assert metadata["gp_training_set"]["metrics"] == {}
+        else:
+            assert metadata["rbf_training_set"]["feasibility_source"] == 1
+            assert metadata["rbf_training_set"]["objective_source"] == 0
 
 
 @pytest.mark.parametrize("strategy", ("surrogate_cma_es", "bipop_cma_es"))

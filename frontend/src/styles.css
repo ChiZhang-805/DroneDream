@@ -93,25 +93,16 @@ code {
 .app-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 700;
-  font-size: 1.05rem;
   color: var(--text);
   padding: 0.5rem 0.5rem 1rem;
 }
 
-.app-title-mark {
-  display: inline-flex;
-  width: 1.55rem;
-  height: 1.55rem;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
-}
-
-.app-title-mark svg {
-  width: 1.35rem;
-  height: 1.35rem;
+.app-title .brand-lockup {
+  display: block;
+  width: auto;
+  height: 24px;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .app-title:hover {
@@ -1643,7 +1634,6 @@ body {
   max-width: 1240px;
 }
 
-.app-title-mark,
 .app-nav a.active,
 a {
   color: var(--primary);
@@ -4629,46 +4619,19 @@ a {
 .launcher-brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
   color: #f8f4ff;
-  font-size: 1.08rem;
-  font-weight: 760;
-  letter-spacing: -0.015em;
 }
 
 .launcher-brand:hover {
   text-decoration: none;
 }
 
-.launcher-brand-mark {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid rgba(111, 229, 255, 0.48);
-  border-radius: 10px;
-  background: linear-gradient(145deg, rgba(86, 233, 255, 0.18), rgba(255, 72, 219, 0.16));
-  box-shadow: 0 0 28px rgba(140, 86, 255, 0.28), inset 0 0 18px rgba(255, 255, 255, 0.05);
-  transform: rotate(45deg);
+.launcher-brand .brand-lockup {
+  display: block;
+  width: auto;
+  height: 24px;
+  object-fit: contain;
 }
-
-.launcher-brand-mark::before,
-.launcher-brand-mark::after,
-.launcher-brand-mark span::before,
-.launcher-brand-mark span::after {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  border: 1px solid rgba(226, 247, 255, 0.9);
-  border-radius: 50%;
-  content: "";
-}
-
-.launcher-brand-mark::before { top: 6px; left: 6px; }
-.launcher-brand-mark::after { right: 6px; bottom: 6px; }
-.launcher-brand-mark span::before { top: 6px; right: 6px; }
-.launcher-brand-mark span::after { bottom: 6px; left: 6px; }
 
 .launcher-chrome-actions,
 .launcher-runtime-indicator {
@@ -7799,9 +7762,9 @@ a {
   font-size: 1.34rem;
 }
 
-.app-shell:not(.app-shell-launcher) .app-title-mark {
-  font-size: 1.2rem;
-  line-height: 1;
+.app-shell:not(.app-shell-launcher) .app-title .brand-lockup {
+  width: auto;
+  height: 25px;
 }
 
 .app-shell:not(.app-shell-launcher) .app-nav a {

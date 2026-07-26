@@ -97,17 +97,15 @@ body:has(#site-root) a {
   display: inline-flex;
   align-items: center;
   justify-self: start;
-  gap: 0.82rem;
-  color: #fff;
-  font-family: "Space Grotesk Variable", "Space Grotesk", Inter, "Segoe UI", sans-serif;
-  font-size: 2.22rem;
-  font-weight: 720;
-  letter-spacing: -0.05em;
-  line-height: 1;
   text-decoration: none;
 }
 
-.site-brand img { width: 48px; height: 48px; border-radius: 13px; }
+.site-brand .brand-lockup {
+  display: block;
+  width: auto;
+  height: 32px;
+  object-fit: contain;
+}
 
 .site-nav {
   display: flex;
@@ -1261,15 +1259,10 @@ html[lang="zh-CN"] .site-hero h1 {
     gap: 0.9rem;
   }
 
-  .dd-site[data-page="pricing"] .site-footer-brand img,
-  .dd-site[data-page="community"] .site-footer-brand img {
-    width: 30px;
-    height: 30px;
-  }
-
-  .dd-site[data-page="pricing"] .site-footer-brand strong,
-  .dd-site[data-page="community"] .site-footer-brand strong {
-    font-size: 1.3rem;
+  .dd-site[data-page="pricing"] .site-footer-brand .brand-lockup,
+  .dd-site[data-page="community"] .site-footer-brand .brand-lockup {
+    width: auto;
+    height: 25px;
   }
 }
 
@@ -2250,8 +2243,7 @@ html[lang="zh-CN"] .site-hero h1 {
 .site-footer { padding: 2.4rem 0; border-top: 1px solid rgba(255,255,255,.07); color: rgba(232,235,246,.7); background: #070913; }
 .site-footer .site-shell { display: grid; align-items: center; grid-template-columns: auto 1fr auto auto; gap: 1.4rem; }
 .site-footer-brand { display: flex; align-items: center; gap: .72rem; color: #f4f6ff; }
-.site-footer-brand img { width: 44px; height: 44px; border-radius: 12px; }
-.site-footer-brand strong { font-family: "Space Grotesk Variable", "Space Grotesk", Inter, "Segoe UI", sans-serif; font-size: 2rem; font-weight: 720; letter-spacing: -.045em; line-height: 1; }
+.site-footer-brand .brand-lockup { display: block; width: auto; height: 30px; object-fit: contain; }
 .site-footer p, .site-footer span { margin: 0; font-size: .68rem; }
 .site-footer a { display: inline-flex; align-items: center; gap: .45rem; color: #bfc8ff; font-size: .7rem; text-decoration: none; }
 .site-footer a svg { width: 20px; height: 20px; fill: currentColor; }
@@ -2419,13 +2411,11 @@ html[lang="zh-CN"] .site-hero h1 {
     padding-left: 24px;
   }
   .site-brand {
-    gap: .58rem;
-    font-size: 1.72rem;
+    min-width: 0;
   }
-  .site-brand img {
-    width: 38px;
-    height: 38px;
-    border-radius: 11px;
+  .site-brand .brand-lockup {
+    width: auto;
+    height: 28px;
   }
   .site-nav { gap: 1.35rem; }
   .site-nav a,
@@ -2521,8 +2511,7 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-header { height: 66px; padding: 0 18px; }
   .site-nav,
   .site-header.is-scrolled .site-nav { top: 66px; }
-  .site-brand { font-size: 1.65rem; }
-  .site-brand img { width: 36px; height: 36px; }
+  .site-brand .brand-lockup { height: 27px; }
   .site-header-download { display: none; }
   .site-language { padding: .45rem; }
   .site-hero { min-height: 720px; height: 100svh; }
@@ -2728,8 +2717,7 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 @media (max-width: 520px) {
-  .site-brand { gap: .58rem; font-size: 1.42rem; }
-  .site-brand img { width: 32px; height: 32px; border-radius: 9px; }
+  .site-brand .brand-lockup { height: 24px; }
   .site-language { font-size: .7rem; }
   .site-account-button { width: 38px; height: 38px; padding: 0; }
   .site-account-button span { display: none; }

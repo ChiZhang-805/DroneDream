@@ -24,6 +24,14 @@ ExperimentalOptimizerStrategy = Literal[
     "bipop_cma_es",
     "optimizer_portfolio",
 ]
+OptimizerObservationRole = Literal[
+    "objective",
+    "constraint_only",
+    "pending_reservation",
+]
+OPTIMIZER_LEARNING_OBSERVATION_ROLES = frozenset(
+    {"objective", "constraint_only"}
+)
 
 EXPERIMENTAL_OPTIMIZER_STRATEGIES: tuple[ExperimentalOptimizerStrategy, ...] = (
     "constrained_mobo",
@@ -177,11 +185,13 @@ def _validate_json_compatible(name: str, value: object) -> None:
 
 @dataclass(frozen=True)
 class OptimizerObservation:
-    """One completed or failed candidate visible to an optimizer.
+    """One trusted learning outcome or pending reservation.
 
-    ``loss`` is always minimized.  A failed candidate may have ``loss=None``;
-    it still contributes to the feasibility model instead of being discarded
-    or receiving an arbitrary giant objective value.
+    ``objective`` observations may train objective and feasibility models.
+    Trusted physical failures use ``constraint_only`` and never receive a
+    fabricated loss. ``pending_reservation`` points only prevent duplicate
+    dispatch. Infrastructure, cancellation, invalid, and unknown-only terminal
+    outcomes are quarantined before this contract is constructed.
     """
 
     candidate_id: str
@@ -206,6 +216,10 @@ class OptimizerObservation:
     # the portfolio uses eligibility fields to exclude fallback proposals.
     optimizer_metadata: dict[str, Any] = field(default_factory=dict)
     completed: bool = True
+    # Added after ``completed`` so historical positional constructors and
+    # persisted payloads remain readable. Historical ``completed=False`` rows
+    # are normalized to pending reservations below.
+    role: OptimizerObservationRole = "objective"
 
     def __post_init__(self) -> None:
         if not isinstance(self.candidate_id, str) or not self.candidate_id:
@@ -270,6 +284,26 @@ class OptimizerObservation:
             raise ValueError("optimizer_strategy must be a non-empty string when provided")
         if not isinstance(self.completed, bool):
             raise ValueError("completed must be a boolean")
+        role = self.role
+        if role not in {
+            "objective",
+            "constraint_only",
+            "pending_reservation",
+        }:
+            raise ValueError("unsupported optimizer observation role")
+        if not self.completed and role == "objective":
+            role = "pending_reservation"
+        if self.completed == (role == "pending_reservation"):
+            raise ValueError(
+                "pending reservations must be incomplete and learning observations "
+                "must be completed"
+            )
+        if role == "constraint_only" and (
+            self.loss is not None or self.objectives
+        ):
+            raise ValueError(
+                "constraint-only observations cannot contain objective values"
+            )
         _validate_json_compatible("optimizer_metadata", self.optimizer_metadata)
         object.__setattr__(self, "parameters", _freeze_json(self.parameters))
         object.__setattr__(self, "unit_vector", vector)
@@ -277,6 +311,7 @@ class OptimizerObservation:
         object.__setattr__(self, "objective_directions", _freeze_json(self.objective_directions))
         object.__setattr__(self, "constraints", _freeze_json(self.constraints))
         object.__setattr__(self, "optimizer_metadata", _freeze_json(self.optimizer_metadata))
+        object.__setattr__(self, "role", role)
 
 
 @dataclass(frozen=True)
@@ -431,8 +466,10 @@ class OptimizerRequest:
 
 __all__ = [
     "EXPERIMENTAL_OPTIMIZER_STRATEGIES",
+    "OPTIMIZER_LEARNING_OBSERVATION_ROLES",
     "ExperimentalOptimizerStrategy",
     "ExperimentalProposal",
     "OptimizerObservation",
+    "OptimizerObservationRole",
     "OptimizerRequest",
 ]

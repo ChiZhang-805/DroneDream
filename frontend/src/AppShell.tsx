@@ -12,7 +12,6 @@ import {
   BotMessageSquare,
   Camera,
   CircleUserRound,
-  Drone,
   GraduationCap,
   History,
   ImagePlus,
@@ -30,6 +29,7 @@ import {
   ArchivedExperimentManager,
   ExperimentWorkspaceSidebar,
 } from "./components/ExperimentWorkspaceSidebar";
+import { BrandLockup } from "./components/BrandLockup";
 import {
   getDesktopWindowHandle,
   isDesktopRuntime,
@@ -1854,10 +1854,7 @@ function AppShellContent() {
         </a>
         <header className="launcher-chrome">
           <Link to="/desktop/setup" className="launcher-brand" aria-label="DroneDream">
-            <span className="launcher-brand-mark" aria-hidden="true">
-              <span />
-            </span>
-            <span>DroneDream</span>
+            <BrandLockup variant="compact" />
           </Link>
           <div className="launcher-chrome-actions">
             <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
@@ -1939,11 +1936,8 @@ function AppShellContent() {
         {t("app.skipToContent")}
       </a>
       <aside className="app-sidebar">
-        <Link to="/assistant" className="app-title">
-          <span className="app-title-mark" aria-hidden="true">
-            <Drone strokeWidth={1.8} />
-          </span>
-          <span>DroneDream</span>
+        <Link to="/assistant" className="app-title" aria-label="DroneDream">
+          <BrandLockup variant="compact" />
         </Link>
         <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">

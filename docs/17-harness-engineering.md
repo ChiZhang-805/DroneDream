@@ -239,11 +239,18 @@ Outcome Contract compiler 1.9 defines
 unstable-controller outcomes remain physical/domain failures; adapter,
 simulator-process, artifact, and result-persistence failures are
 infrastructure outcomes; cancellation and invalid evidence remain separate.
-Only domain failures plus unknown failures enter the optimizer-learning
-failure rate, with unknown codes treated conservatively. Every non-success
-still remains in acceptance/completion denominators, blocks complete evidence,
-and retains its incurred work; infrastructure exclusion never turns a failed
-run into a passing result.
+Only successes and trusted domain failures enter the optimizer-learning
+denominator; unknown codes fail closed outside parameter learning. The
+database-to-optimizer adapter materializes three explicit observation roles:
+`objective` trains objective and feasibility models, `constraint_only` carries
+trusted domain-failure feasibility evidence without a fabricated loss, and
+`pending_reservation` prevents duplicate dispatch without training a model.
+Terminal histories containing only infrastructure failures, cancellations,
+invalid evidence, or unknown outcomes are quarantined before Bayesian, CMA,
+portfolio, or optimizer-seed construction. Every non-success still remains in
+acceptance/completion denominators, blocks complete evidence, and retains its
+incurred work; this quarantine isolates optimizer learning only and never turns
+a failed run into a passing or completed result.
 
 Outcome Contract compiler 2.0 adds
 `dronedream.portfolio-sources/v1` for same-batch proposal attribution. An exact
@@ -546,9 +553,11 @@ the adapter's own wall-clock kill becomes the infrastructure code
 
 All three classes block completeness and acceptance. They are excluded from
 parameter learning, Candidate ranking penalties, and LLM scenario feedback.
-Only trusted domain failures and conservative unknown canonical codes may shape
-the optimizer. GPT prompt schema 2.1 derives its trial denominator and failure
-rate from this same closed optimizer-learning projection.
+Only trusted domain failures may shape the optimizer's constraint model.
+Unknown canonical codes remain visible operational evidence but are
+quarantined from optimizer learning. GPT prompt schema 2.1 derives its trial
+denominator and failure rate from this same closed optimizer-learning
+projection.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
