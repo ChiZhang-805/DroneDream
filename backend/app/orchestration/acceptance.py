@@ -68,9 +68,9 @@ def _safe_float(value: object) -> float | None:
 
 def _safe_rate(value: object) -> float | None:
     parsed = _safe_float(value)
-    if parsed is None:
+    if parsed is None or not 0.0 <= parsed <= 1.0:
         return None
-    return min(1.0, max(0.0, parsed))
+    return parsed
 
 
 def _safe_nonnegative_int(value: object) -> int:
@@ -134,17 +134,24 @@ def evaluate_candidate(
             )
         ),
     )
-    stored_completion_rate = _safe_rate(
-        agg.get(
-            "acceptance_completion_rate",
-            agg.get("training_completion_rate"),
-        )
+    raw_completion_rate = agg.get(
+        "acceptance_completion_rate",
+        agg.get("training_completion_rate"),
+    )
+    stored_completion_rate = _safe_rate(raw_completion_rate)
+    invalid_completion_rate = (
+        raw_completion_rate is not None and stored_completion_rate is None
     )
     if (
         stored_completion_rate is None
+        and not invalid_completion_rate
         and agg.get("rate_aggregation") == "scenario_case_weighted_v1"
     ):
-        stored_completion_rate = _safe_rate(agg.get("completion_rate"))
+        raw_completion_rate = agg.get("completion_rate")
+        stored_completion_rate = _safe_rate(raw_completion_rate)
+        invalid_completion_rate = (
+            raw_completion_rate is not None and stored_completion_rate is None
+        )
     completion_rate = (
         stored_completion_rate
         if stored_completion_rate is not None
@@ -170,17 +177,20 @@ def evaluate_candidate(
             )
         ),
     )
-    stored_pass_rate = _safe_rate(
-        agg.get(
-            "acceptance_pass_rate",
-            agg.get("training_pass_rate"),
-        )
+    raw_pass_rate = agg.get(
+        "acceptance_pass_rate",
+        agg.get("training_pass_rate"),
     )
+    stored_pass_rate = _safe_rate(raw_pass_rate)
+    invalid_pass_rate = raw_pass_rate is not None and stored_pass_rate is None
     if (
         stored_pass_rate is None
+        and not invalid_pass_rate
         and agg.get("rate_aggregation") == "scenario_case_weighted_v1"
     ):
-        stored_pass_rate = _safe_rate(agg.get("pass_rate"))
+        raw_pass_rate = agg.get("pass_rate")
+        stored_pass_rate = _safe_rate(raw_pass_rate)
+        invalid_pass_rate = raw_pass_rate is not None and stored_pass_rate is None
     pass_rate = (
         stored_pass_rate
         if stored_pass_rate is not None
@@ -195,6 +205,15 @@ def evaluate_candidate(
         return AcceptanceResult(
             False,
             "invalid_outcome_evidence",
+            pass_rate,
+            completion_rate,
+            rmse,
+            max_error,
+        )
+    if invalid_completion_rate or invalid_pass_rate:
+        return AcceptanceResult(
+            False,
+            "invalid_rate_evidence",
             pass_rate,
             completion_rate,
             rmse,

@@ -732,7 +732,7 @@ contract. The code audit found the following gaps:
 | Outcome Contract compilers 2.8-2.17 bind retained Artifact bytes, accepted-attempt identity, PX4 telemetry semantics and raw ULog bytes, independently derived evaluation windows, core geometry, outcome verdict, score, and trusted external-failure classification through Trial and Candidate evidence | addressed for the bundled local PX4 path and current v3 aggregation; SQL/object-store atomic publication and operational WORM controls remain separate boundaries |
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
 | legacy aggregation initially mixes all metrics and only the modern objective path replaces key fields with training values | compatibility paths remain too easy to use as if they had the same isolation guarantees |
-| rate parsing clamps values into `[0, 1]` | corrupted persisted evidence can be silently normalized instead of stopping the decision |
+| rate parsing previously clamped values into `[0, 1]` | addressed: acceptance now rejects non-finite or out-of-range persisted pass/completion rates as `invalid_rate_evidence` instead of normalizing corrupted evidence |
 | completed metrics are rounded before durable aggregation | display precision and evidence precision are conflated |
 
 The target therefore treats **evidence compilation** as a first-class trusted stage,

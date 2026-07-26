@@ -1667,6 +1667,80 @@ def test_acceptance_never_treats_invalid_metrics_as_passing(unsafe: object) -> N
     assert result.passed is False
 
 
+@pytest.mark.parametrize(
+    ("rate_field", "unsafe_rate"),
+    (
+        ("acceptance_pass_rate", -0.01),
+        ("acceptance_pass_rate", 1.01),
+        ("acceptance_pass_rate", float("nan")),
+        ("acceptance_completion_rate", -0.01),
+        ("acceptance_completion_rate", 1.01),
+        ("acceptance_completion_rate", float("inf")),
+    ),
+)
+def test_acceptance_rejects_corrupted_persisted_rates(
+    rate_field: str,
+    unsafe_rate: float,
+) -> None:
+    candidate = _FakeCandidate(
+        candidate_id="invalid-rate",
+        score=1.0,
+        generation_index=1,
+    )
+    candidate.aggregated_metric_json = {
+        "training_trial_count": 3,
+        "training_completed_trial_count": 3,
+        "training_passing_trial_count": 3,
+        "acceptance_rmse": 0.1,
+        "acceptance_max_error": 0.1,
+        "acceptance_pass_rate": 1.0,
+        "acceptance_completion_rate": 1.0,
+        rate_field: unsafe_rate,
+    }
+
+    result = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=1.0,
+            target_max_error=1.0,
+            min_pass_rate=0.5,
+        ),
+    )
+
+    assert result.passed is False
+    assert result.reason == "invalid_rate_evidence"
+
+
+def test_acceptance_rejects_corrupted_legacy_case_weighted_rate() -> None:
+    candidate = _FakeCandidate(
+        candidate_id="invalid-legacy-rate",
+        score=1.0,
+        generation_index=1,
+    )
+    candidate.aggregated_metric_json = {
+        "training_trial_count": 3,
+        "training_completed_trial_count": 3,
+        "training_passing_trial_count": 3,
+        "rmse": 0.1,
+        "max_error_worst": 0.1,
+        "rate_aggregation": "scenario_case_weighted_v1",
+        "pass_rate": 1.2,
+        "completion_rate": 1.0,
+    }
+
+    result = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=1.0,
+            target_max_error=1.0,
+            min_pass_rate=0.5,
+        ),
+    )
+
+    assert result.passed is False
+    assert result.reason == "invalid_rate_evidence"
+
+
 def test_acceptance_uses_unrounded_versioned_projection_fields() -> None:
     candidate = _FakeCandidate(
         candidate_id="exact-acceptance-projection",
