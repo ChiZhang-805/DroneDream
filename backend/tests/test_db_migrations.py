@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import os
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -53,6 +55,17 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                     id VARCHAR(64) PRIMARY KEY,
                     job_id VARCHAR(64) NOT NULL,
                     report_status VARCHAR(16) NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE winner_freeze_receipts (
+                    id VARCHAR(64) PRIMARY KEY,
+                    job_id VARCHAR(64) NOT NULL,
+                    evidence_id VARCHAR(71) NOT NULL
                 )
                 """
             )
@@ -136,6 +149,16 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 text("PRAGMA table_info('job_reports')")
             ).fetchall()
         }
+        winner_freeze_triggers = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='trigger' "
+                    "AND tbl_name='winner_freeze_receipts'"
+                )
+            ).fetchall()
+        }
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
@@ -144,6 +167,10 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     assert "optimizer_metadata_json" in candidate_columns
     assert "winner_evidence_json" in report_columns
     assert "winner_freeze_receipt_id" in report_columns
+    assert winner_freeze_triggers == {
+        "trg_winner_freeze_receipts_no_update",
+        "trg_winner_freeze_receipts_no_delete",
+    }
 
 
 def test_sqlite_engine_enables_foreign_key_enforcement(tmp_path) -> None:
@@ -187,4 +214,63 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (tmp_path / "encoded%25password.db").is_file()
+    migrated_path = tmp_path / "encoded%25password.db"
+    assert migrated_path.is_file()
+    with sqlite3.connect(migrated_path) as connection:
+        trigger_names = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='trigger' "
+                "AND tbl_name='winner_freeze_receipts'"
+            ).fetchall()
+        }
+    assert trigger_names == {
+        "trg_winner_freeze_receipts_no_update",
+        "trg_winner_freeze_receipts_no_delete",
+    }
+
+
+def test_postgresql_winner_freeze_migration_emits_immutable_trigger(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260726_0006_winner_freeze_guards.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "winner_freeze_guards_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _PostgresOp:
+        @staticmethod
+        def get_bind():
+            return type(
+                "_Bind",
+                (),
+                {"dialect": type("_Dialect", (), {"name": "postgresql"})()},
+            )()
+
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration.upgrade()
+
+    sql = "\n".join(emitted)
+    assert "CREATE FUNCTION dronedream_reject_winner_freeze_mutation()" in sql
+    assert (
+        "CREATE TRIGGER trg_winner_freeze_receipts_immutable" in sql
+    )
+    assert "BEFORE UPDATE OR DELETE ON winner_freeze_receipts" in sql
+    assert "winner freeze receipts are append-only" in sql

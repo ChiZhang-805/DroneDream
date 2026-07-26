@@ -15,6 +15,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import DatabaseError
 
 
 def _clear_settings_cache() -> None:
@@ -289,17 +291,31 @@ def test_winner_freeze_is_idempotent_but_rejects_mutation_and_late_rebuild(
 
         job.winner_freeze.winner_candidate_id = "cand_tampered"
         with pytest.raises(
-            WinnerFreezeError,
-            match="not an exact evidence match",
+            DatabaseError,
+            match="append-only",
         ):
-            freeze_winner_selection(
-                db,
-                job=job,
-                evidence=evidence,
-            )
+            db.flush()
         db.rollback()
 
     with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.winner_freeze is not None
+        db.delete(job.winner_freeze)
+        with pytest.raises(
+            DatabaseError,
+            match="append-only",
+        ):
+            db.flush()
+        db.rollback()
+
+    with ctx["db_module"].SessionLocal() as db:
+        db.execute(
+            text(
+                "DROP TRIGGER IF EXISTS "
+                "trg_winner_freeze_receipts_no_delete"
+            )
+        )
         job = db.get(ctx["models"].Job, job_id)
         assert job is not None
         assert job.winner_freeze is not None
@@ -1352,6 +1368,12 @@ def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
         job = db.get(ctx["models"].Job, job_id)
         assert job is not None
         assert job.winner_freeze is not None
+        db.execute(
+            text(
+                "DROP TRIGGER IF EXISTS "
+                "trg_winner_freeze_receipts_no_update"
+            )
+        )
         job.winner_freeze.winner_candidate_id = "cand_tampered"
         db.commit()
 

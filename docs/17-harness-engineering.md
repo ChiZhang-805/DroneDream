@@ -320,6 +320,16 @@ application-enforced compatibility ledger: external artifact files are not
 atomically committed with the database, and a future append-only database role
 or trigger should prohibit privileged out-of-band updates physically.
 
+Outcome Contract compiler 2.7 makes the receipt append-only at the supported
+database boundary. SQLite local/test initialization and Alembic install
+`BEFORE UPDATE` and `BEFORE DELETE` guards; PostgreSQL installs the equivalent
+trigger function. Unsupported production dialects fail migration instead of
+silently omitting the invariant. Tests prove both mutations are rejected, then
+deliberately remove a SQLite trigger to prove the independent API evidence
+verifier still fails closed after a privileged bypass. A database owner can
+still drop its own trigger, so operational role separation and audited
+migration ownership remain deployment responsibilities.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

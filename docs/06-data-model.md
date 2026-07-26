@@ -119,7 +119,9 @@ insert-once `WinnerFreezeReceipt`. The receipt binds one Job, outcome contract,
 baseline, winner, evidence ID, full evidence JSON, and freeze timestamp; Job
 and evidence ID are unique. The envelope and receipt are required for modern
 evidence-bound optimization reports and nullable only for legacy
-compatibility. Report states are `PENDING`, `READY`, and `FAILED`.
+compatibility. Supported SQLite and PostgreSQL schemas reject receipt updates
+and deletes with database triggers; readers still reverify the content hash
+and Job bindings. Report states are `PENDING`, `READY`, and `FAILED`.
 
 ## Artifact
 

@@ -185,6 +185,37 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         "ADD COLUMN winner_freeze_receipt_id VARCHAR(64)"
                     )
                 )
+        if "winner_freeze_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_winner_freeze_receipts_no_update
+                    BEFORE UPDATE ON winner_freeze_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'winner freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_winner_freeze_receipts_no_delete
+                    BEFORE DELETE ON winner_freeze_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'winner freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
         columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()

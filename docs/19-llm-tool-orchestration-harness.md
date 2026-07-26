@@ -8369,13 +8369,25 @@ terminal state use one database transaction, but privileged out-of-band SQL is
 detected rather than physically forbidden, file artifacts are not committed
 atomically with SQL, and the sealed final-test service remains future work.
 
+Outcome Contract compiler 2.7 adds
+`database_reject_update_delete_v1`. SQLite development/test databases and the
+Alembic migration install update/delete rejection triggers on
+`winner_freeze_receipts`; PostgreSQL receives an equivalent PL/pgSQL trigger.
+The migration fails explicitly on unsupported production dialects. Automated
+tests show that ordinary SQLAlchemy update and delete attempts abort at the
+database boundary, and separately remove a SQLite trigger to demonstrate that
+the content-addressed report reader still detects a privileged bypass. This
+provides defense in depth, not protection against a database owner who can
+drop triggers; production must keep migration ownership separate from the
+application role and audit privileged DDL.
+
 Current focused validation:
 
 ```text
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-821 passed
+822 passed
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 

@@ -17,7 +17,7 @@ from app.optimization.outcome_evidence import (
 )
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "2.6"
+OUTCOME_CONTRACT_COMPILER_VERSION = "2.7"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 PORTFOLIO_REWARD_SCALE = 1.0
@@ -210,6 +210,9 @@ class OutcomeSelectionPolicy(_FrozenModel):
     winner_freeze_persistence_policy: Literal[
         "insert_once_per_job_exact_evidence_v1"
     ] = "insert_once_per_job_exact_evidence_v1"
+    winner_freeze_mutation_policy: Literal[
+        "database_reject_update_delete_v1"
+    ] = "database_reject_update_delete_v1"
     portfolio_source_schema: Literal[
         "dronedream.portfolio-sources/v1"
     ] = "dronedream.portfolio-sources/v1"
@@ -265,7 +268,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["2.6"] = "2.6"
+    compiler_version: Literal["2.7"] = "2.7"
     contract_id: str
     metric_admission_policy: Literal["registered_metrics_only"] = (
         "registered_metrics_only"
