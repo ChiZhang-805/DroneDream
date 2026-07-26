@@ -213,6 +213,7 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
+    assert "accepted_attempt_id" in columns
     assert "cancelled_at" in batch_columns
     assert "expires_at" in secret_columns
     assert "optimizer_metadata_json" in candidate_columns
@@ -285,8 +286,19 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "WHERE type='trigger' "
                 "AND tbl_name IN ("
                 "'winner_freeze_receipts', "
-                "'artifact_digest_receipts'"
+                "'artifact_digest_receipts', "
+                "'trial_execution_attempts', "
+                "'trial_execution_attempt_outcomes', "
+                "'trials'"
                 ")"
+            ).fetchall()
+        }
+        attempt_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' "
+                "AND name LIKE 'trial_execution_attempt%'"
             ).fetchall()
         }
     assert trigger_names == {
@@ -294,6 +306,16 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "trg_winner_freeze_receipts_no_delete",
         "trg_artifact_digest_receipts_no_update",
         "trg_artifact_digest_receipts_no_delete",
+        "trg_trial_execution_attempts_no_update",
+        "trg_trial_execution_attempts_no_delete",
+        "trg_trial_execution_attempt_outcomes_no_update",
+        "trg_trial_execution_attempt_outcomes_no_delete",
+        "trg_trials_accepted_attempt_immutable",
+    }
+    assert attempt_tables == {
+        "trial_execution_attempts",
+        "trial_execution_attempt_outcomes",
+        "trial_execution_attempt_delete_authorizations",
     }
 
 
@@ -412,3 +434,72 @@ def test_postgresql_artifact_digest_migration_emits_immutable_trigger(
     assert "BEFORE UPDATE OR DELETE ON artifact_digest_receipts" in sql
     assert "artifact_digest_delete_authorizations" in sql
     assert "artifact digest receipts are append-only" in sql
+
+
+def test_postgresql_trial_attempt_migration_emits_immutable_guards(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260726_0008_trial_execution_attempts.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "trial_attempt_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _PostgresOp:
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration._install_postgres_guards()
+
+    sql = "\n".join(emitted)
+    assert (
+        "CREATE FUNCTION "
+        "dronedream_reject_trial_execution_attempt_mutation()"
+    ) in sql
+    assert (
+        "BEFORE UPDATE OR DELETE ON trial_execution_attempts"
+        in sql
+    )
+    assert (
+        "BEFORE UPDATE OR DELETE ON trial_execution_attempt_outcomes"
+        in sql
+    )
+    assert "trial_execution_attempt_delete_authorizations" in sql
+    assert (
+        "CREATE FUNCTION dronedream_guard_trial_accepted_attempt()"
+        in sql
+    )
+    assert "BEFORE UPDATE OF accepted_attempt_id ON trials" in sql
+    assert "belongs to another Trial" in sql
+
+
+def test_alembic_has_one_trial_attempt_head() -> None:
+    backend_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "heads"],
+        cwd=backend_root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    heads = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if line.strip()
+    ]
+    assert heads == ["20260726_0008 (head)"]

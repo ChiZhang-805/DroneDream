@@ -385,6 +385,41 @@ binding for the current compatibility layer. Physical execution-attempt
 lineage, an append-only relational Candidate evidence ledger, object-store/SQL
 atomicity, and an operational WORM policy remain separate future boundaries.
 
+Outcome Contract compiler 2.10 adds
+`dronedream.trial-execution-attempt-claim/v1`,
+`dronedream.trial-execution-attempt-outcome/v1`,
+`dronedream.trial-accepted-attempt-evidence/v1`,
+`dronedream.trial-outcome-evidence/v3`,
+`dronedream.candidate-outcome-evidence/v3`, and
+`dronedream.candidate-report-evidence/v3`. Every newly claimed physical
+execution now receives an immutable relational claim receipt binding the
+logical Trial/Candidate/Job IDs, attempt count, backend, worker-ID hash,
+lease-token hash, Candidate parameters, scenario/seed, Job configuration, and
+claim timestamp. Its insert-once outcome is either the accepted terminal
+result or an explicit `SUPERSEDED` result. Accepted outcomes bind the closed
+failure taxonomy, metric snapshot hash, and the exact Trial artifact-evidence
+hash. Each logical Trial has a one-time accepted-attempt pointer; a stale
+worker can neither replace it nor publish metrics after a newer fencing token
+wins.
+
+Stale reclaim closes every older open claim before creating the new claim.
+User cancellation seals an owned open claim as accepted cancellation. SQLite
+and PostgreSQL triggers reject claim/outcome updates, ordinary deletes,
+cross-Trial accepted pointers, and accepted-pointer replacement. Explicit
+terminal Job deletion creates transaction-scoped authorization rows so user
+data remains deletable. Training Candidate v3 evidence contains accepted
+attempts only for training Trials; Candidate report v3 evidence independently
+binds all accepted attempts, including holdout. Legacy Candidate v1/v2
+envelopes retain their original verification rules.
+
+This closes the logical-Trial-to-physical-attempt-to-artifact-to-Candidate
+lineage at current aggregation, winner, report, and replay readers. Candidate
+evidence is still embedded in mutable compatibility JSON rather than its own
+append-only relational table. A database owner can drop the guards, SQL and
+object storage are not one atomic commit, and simulator-authored metrics still
+need the stronger independent telemetry/unit/frame/time verifier described in
+the full Harness design.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

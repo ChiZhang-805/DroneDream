@@ -117,6 +117,10 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
     ctx = experimental_ctx
     job_id = _create_job(ctx, strategy)
     from app.optimization.outcome_evidence import (
+        CandidateOutcomeEvidenceV3,
+        CandidateReportEvidenceV3,
+        candidate_report_trial_evidence_rows,
+        candidate_training_trial_evidence_rows,
         verify_candidate_outcome_evidence,
         verify_candidate_report_evidence,
     )
@@ -232,17 +236,45 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
                     aggregate.get("candidate_outcome_evidence")
                 )
                 assert evidence is not None
+                assert isinstance(evidence, CandidateOutcomeEvidenceV3)
                 assert evidence.candidate_id == candidate.id
                 assert evidence.outcome_contract_id == aggregate[
                     "outcome_contract_id"
                 ]
+                assert evidence.accepted_attempt_count == evidence.trial_count
+                assert (
+                    evidence.trial_attempt_evidence_schema
+                    == "dronedream.trial-accepted-attempt-evidence/v1"
+                )
                 report_evidence = verify_candidate_report_evidence(
                     aggregate.get("candidate_report_evidence")
                 )
                 assert report_evidence is not None
+                assert isinstance(report_evidence, CandidateReportEvidenceV3)
                 assert (
                     report_evidence.candidate_outcome_evidence_id
                     == evidence.evidence_id
+                )
+                assert report_evidence.accepted_attempt_count == len(
+                    candidate.trials
+                )
+                training_rows = candidate_training_trial_evidence_rows(
+                    candidate,
+                    verify_artifact_bytes=True,
+                )
+                report_rows = candidate_report_trial_evidence_rows(
+                    candidate,
+                    verify_artifact_bytes=True,
+                )
+                assert training_rows is not None
+                assert report_rows is not None
+                assert len(training_rows) == evidence.trial_count
+                assert len(report_rows) == len(candidate.trials)
+                assert all(
+                    row["evidence_schema"]
+                    == "dronedream.trial-outcome-evidence/v3"
+                    and "accepted_attempt_evidence" in row
+                    for row in report_rows
                 )
 
         if strategy == "multi_fidelity_mobo":

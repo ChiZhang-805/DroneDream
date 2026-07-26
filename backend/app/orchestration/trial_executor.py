@@ -36,6 +36,13 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.config import get_settings
+from app.optimization.outcome_taxonomy import classify_trial_outcome
+from app.orchestration.attempt_evidence import (
+    TrialAttemptEvidenceError,
+    record_accepted_trial_attempt_outcome,
+    record_superseded_trial_attempt_outcome,
+    record_trial_attempt_claim,
+)
 from app.orchestration.events import record_event
 from app.parameters import get_parameter, validate_parameter_values
 from app.simulator import (
@@ -54,6 +61,7 @@ from app.simulator.base import (
     FAILURE_SIM_ERROR,
 )
 from app.storage import get_artifact_storage
+from app.storage.evidence import candidate_trial_artifact_evidence
 from app.storage.integrity import (
     ArtifactIntegrityError,
     artifact_content_digest,
@@ -131,6 +139,67 @@ class _TrialLeaseToken:
     trial_id: str
     worker_id: str
     attempt_count: int
+
+
+def _attempt_for_token(
+    db: Session,
+    token: _TrialLeaseToken,
+) -> models.TrialExecutionAttempt | None:
+    return db.scalar(
+        select(models.TrialExecutionAttempt).where(
+            models.TrialExecutionAttempt.trial_id == token.trial_id,
+            models.TrialExecutionAttempt.attempt_count
+            == token.attempt_count,
+        )
+    )
+
+
+def _trial_artifact_evidence(
+    trial: models.Trial,
+    *,
+    verify_bytes: bool,
+) -> dict[str, Any]:
+    mapping = candidate_trial_artifact_evidence(
+        trial.candidate,
+        [trial],
+        verify_bytes=verify_bytes,
+    )
+    if mapping is None or trial.id not in mapping:
+        raise TrialAttemptEvidenceError(
+            "physical attempt cannot resolve its Trial artifact evidence"
+        )
+    return mapping[trial.id]
+
+
+def _seal_accepted_attempt(
+    db: Session,
+    *,
+    trial: models.Trial,
+    attempt_id: str | None,
+) -> None:
+    if attempt_id is None:
+        return
+    db.flush()
+    attempt = db.get(models.TrialExecutionAttempt, attempt_id)
+    if attempt is None:
+        raise TrialAttemptEvidenceError(
+            "terminal Trial is missing its physical attempt claim"
+        )
+    outcome_class = classify_trial_outcome(
+        status=trial.status,
+        failure_code=trial.failure_code,
+        usable_metric=trial.metric is not None,
+    )
+    record_accepted_trial_attempt_outcome(
+        db,
+        trial=trial,
+        attempt=attempt,
+        outcome_class=outcome_class,
+        artifact_evidence=_trial_artifact_evidence(
+            trial,
+            verify_bytes=True,
+        ),
+    )
 
 
 def _renew_owned_lease(
@@ -225,6 +294,21 @@ def _acquire_completion_fence(
 
     if not _renew_owned_lease(db, token, lease_seconds=lease_seconds):
         db.rollback()
+        current = db.get(models.Trial, token.trial_id)
+        attempt = _attempt_for_token(db, token)
+        if (
+            current is not None
+            and attempt is not None
+            and attempt.outcome is None
+            and current.attempt_count > token.attempt_count
+        ):
+            record_superseded_trial_attempt_outcome(
+                db,
+                attempt=attempt,
+                superseded_by_attempt_count=current.attempt_count,
+                finished_at=_now(),
+            )
+            db.commit()
         logger.warning(
             "discarding stale result for trial %s attempt=%d worker=%s",
             token.trial_id,
@@ -577,12 +661,18 @@ def _handle_artifact_persistence_failure(
         if trial is None:  # pragma: no cover - defensive only.
             db.rollback()
             return
+        current_attempt = _attempt_for_token(db, token)
         _mark_trial_failed(
             db,
             trial,
             code=failure_code,
             reason=failure_reason,
             log_excerpt=log_excerpt,
+            attempt_id=(
+                current_attempt.id
+                if current_attempt is not None
+                else None
+            ),
         )
     finally:
         _finalize_adapter_run(simulator, ctx, None)
@@ -667,25 +757,69 @@ def claim_and_run_one_pending_trial(
     if trial is None:
         db.rollback()
         return None
+    candidate = db.get(models.CandidateParameterSet, trial.candidate_id)
+    job = db.get(models.Job, trial.job_id)
     if adapter is None:
-        job_row = db.get(models.Job, job_id)
         backend_override = _resolve_backend_override(
             env_backend=env_backend,
             job_backend_requested=(
-                str(job_row.simulator_backend_requested)
-                if job_row is not None and job_row.simulator_backend_requested
+                str(job.simulator_backend_requested)
+                if job is not None and job.simulator_backend_requested
                 else None
             ),
         )
     sim = adapter or get_simulator_adapter(backend_override)
     trial.simulator_backend = sim.backend_name
+    attempt_id: str | None = None
+    if candidate is not None and job is not None:
+        if not was_pending:
+            previous_open_attempts = list(
+                db.scalars(
+                    select(models.TrialExecutionAttempt)
+                    .outerjoin(models.TrialExecutionAttemptOutcome)
+                    .where(
+                        models.TrialExecutionAttempt.trial_id == trial.id,
+                        models.TrialExecutionAttempt.attempt_count
+                        < trial.attempt_count,
+                        models.TrialExecutionAttemptOutcome.id.is_(None),
+                    )
+                    .order_by(
+                        models.TrialExecutionAttempt.attempt_count.asc()
+                    )
+                )
+            )
+            for previous in previous_open_attempts:
+                record_superseded_trial_attempt_outcome(
+                    db,
+                    attempt=previous,
+                    superseded_by_attempt_count=trial.attempt_count,
+                    finished_at=now,
+                )
+        attempt = record_trial_attempt_claim(
+            db,
+            trial=trial,
+            job=job,
+            candidate=candidate,
+            worker_id=worker_id,
+            simulator_backend=sim.backend_name,
+            claim_kind=(
+                "initial" if was_pending else "stale-reclaim"
+            ),
+            claimed_at=now,
+        )
+        attempt_id = attempt.id
     db.commit()
     db.refresh(trial)
     record_event(
         db,
         trial.job_id,
         "trial_reclaimed_from_stale_worker" if not was_pending else "trial_claimed",
-        {"trial_id": trial.id, "worker_id": worker_id},
+        {
+            "trial_id": trial.id,
+            "worker_id": worker_id,
+            "attempt_id": attempt_id,
+            "attempt_count": trial.attempt_count,
+        },
     )
     db.commit()
     db.refresh(trial)
@@ -714,7 +848,11 @@ def claim_and_run_one_pending_trial(
             db.rollback()
             return trial_id
         _mark_trial_failed(
-            db, trial, code="CANDIDATE_NOT_FOUND", reason="Candidate row disappeared."
+            db,
+            trial,
+            code="CANDIDATE_NOT_FOUND",
+            reason="Candidate row disappeared.",
+            attempt_id=attempt_id,
         )
         return trial_id
     job = db.get(models.Job, trial.job_id)
@@ -725,7 +863,13 @@ def claim_and_run_one_pending_trial(
         if trial is None:  # pragma: no cover - defensive only.
             db.rollback()
             return trial_id
-        _mark_trial_failed(db, trial, code="JOB_NOT_FOUND", reason="Job row disappeared.")
+        _mark_trial_failed(
+            db,
+            trial,
+            code="JOB_NOT_FOUND",
+            reason="Job row disappeared.",
+            attempt_id=attempt_id,
+        )
         return trial_id
 
     cancellation_event = threading.Event()
@@ -753,6 +897,7 @@ def claim_and_run_one_pending_trial(
             trial,
             code=FAILURE_INVALID_PARAMETERS,
             reason=str(exc)[:1000],
+            attempt_id=attempt_id,
         )
         return trial_id
     # Do not hold the main session's read transaction open while PX4/Gazebo
@@ -778,6 +923,7 @@ def claim_and_run_one_pending_trial(
             trial,
             code=FAILURE_INVALID_PARAMETERS,
             reason=str(exc)[:1000],
+            attempt_id=attempt_id,
         )
         return trial_id
 
@@ -831,7 +977,13 @@ def claim_and_run_one_pending_trial(
         return trial_id
     job = db.get(models.Job, job_id)
     if job is None:  # pragma: no cover - defensive only.
-        _mark_trial_failed(db, trial, code="JOB_NOT_FOUND", reason="Job row disappeared.")
+        _mark_trial_failed(
+            db,
+            trial,
+            code="JOB_NOT_FOUND",
+            reason="Job row disappeared.",
+            attempt_id=attempt_id,
+        )
         _finalize_adapter_run(sim, ctx, result)
         return trial_id
 
@@ -841,6 +993,7 @@ def claim_and_run_one_pending_trial(
             trial,
             code=FAILURE_SIM_ERROR,
             reason=str(execution_error)[:500],
+            attempt_id=attempt_id,
         )
         _finalize_adapter_run(sim, ctx, result)
         return trial_id
@@ -850,6 +1003,7 @@ def claim_and_run_one_pending_trial(
             trial,
             code=FAILURE_SIM_ERROR,
             reason="Adapter returned without a TrialResult.",
+            attempt_id=attempt_id,
         )
         _finalize_adapter_run(sim, ctx, result)
         return trial_id
@@ -868,6 +1022,7 @@ def claim_and_run_one_pending_trial(
                 code=failure.code,
                 reason=failure.reason,
                 log_excerpt=result.log_excerpt,
+                attempt_id=attempt_id,
             )
         except Exception:
             logger.exception("artifact persistence failed for trial %s", trial.id)
@@ -922,6 +1077,11 @@ def claim_and_run_one_pending_trial(
         f"[{sim.backend_name}] scenario={trial.scenario_type} seed={trial.seed} "
         f"rmse={payload.rmse} score={payload.score}"
     )
+    _seal_accepted_attempt(
+        db,
+        trial=trial,
+        attempt_id=attempt_id,
+    )
 
     _refresh_progress_counters(db, job)
     record_event(
@@ -935,6 +1095,7 @@ def claim_and_run_one_pending_trial(
             "status": "COMPLETED",
             "score": payload.score,
             "backend": sim.backend_name,
+            "attempt_id": attempt_id,
         },
     )
 
@@ -969,6 +1130,7 @@ def _mark_trial_failed(
     code: str,
     reason: str,
     log_excerpt: str | None = None,
+    attempt_id: str | None = None,
 ) -> None:
     trial.status = "FAILED"
     trial.finished_at = _now()
@@ -978,6 +1140,11 @@ def _mark_trial_failed(
     trial.failure_reason = reason
     if log_excerpt is not None:
         trial.log_excerpt = log_excerpt
+    _seal_accepted_attempt(
+        db,
+        trial=trial,
+        attempt_id=attempt_id,
+    )
 
     job = db.get(models.Job, trial.job_id)
     if job is not None:
@@ -992,6 +1159,7 @@ def _mark_trial_failed(
                 "scenario": trial.scenario_type,
                 "status": "FAILED",
                 "failure_code": code,
+                "attempt_id": attempt_id,
             },
         )
 

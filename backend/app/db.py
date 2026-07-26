@@ -292,8 +292,139 @@ def _apply_sqlite_lightweight_migrations() -> None:
             add_sql.append("ALTER TABLE trials ADD COLUMN lease_expires_at DATETIME")
         if "claimed_at" not in columns:
             add_sql.append("ALTER TABLE trials ADD COLUMN claimed_at DATETIME")
+        if "accepted_attempt_id" not in columns:
+            add_sql.append(
+                "ALTER TABLE trials ADD COLUMN accepted_attempt_id VARCHAR(64)"
+            )
         for stmt in add_sql:
             conn.execute(text(stmt))
+        if "trial_execution_attempts" in table_names:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_trials_accepted_attempt_id "
+                    "ON trials(accepted_attempt_id) "
+                    "WHERE accepted_attempt_id IS NOT NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    trial_execution_attempt_delete_authorizations (
+                        attempt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(attempt_id)
+                            REFERENCES trial_execution_attempts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trial_execution_attempts_no_update
+                    BEFORE UPDATE ON trial_execution_attempts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'trial execution attempts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trial_execution_attempts_no_delete
+                    BEFORE DELETE ON trial_execution_attempts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM trial_execution_attempt_delete_authorizations
+                        WHERE attempt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'trial execution attempts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trial_execution_attempt_outcomes_no_update
+                    BEFORE UPDATE ON trial_execution_attempt_outcomes
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'trial execution attempt outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trial_execution_attempt_outcomes_no_delete
+                    BEFORE DELETE ON trial_execution_attempt_outcomes
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM trial_execution_attempt_delete_authorizations
+                        WHERE attempt_id = OLD.attempt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'trial execution attempt outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trials_accepted_attempt_immutable
+                    BEFORE UPDATE OF accepted_attempt_id ON trials
+                    WHEN (
+                        OLD.accepted_attempt_id IS NOT NULL
+                        AND NEW.accepted_attempt_id
+                            IS NOT OLD.accepted_attempt_id
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM trial_execution_attempt_delete_authorizations
+                            WHERE attempt_id = OLD.accepted_attempt_id
+                        )
+                    ) OR (
+                        NEW.accepted_attempt_id IS NOT NULL
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM trial_execution_attempts
+                            WHERE id = NEW.accepted_attempt_id
+                              AND trial_id = OLD.id
+                        )
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'accepted Trial execution attempt is immutable or mismatched'
+                        );
+                    END
+                    """
+                )
+            )
 
 
 def get_db() -> Iterator[Session]:

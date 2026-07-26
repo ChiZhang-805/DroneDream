@@ -27,6 +27,10 @@ from app.optimization.pareto import ParetoPoint, nondominated_front, representat
 from app.optimization.robust import CandidateEvaluation, evaluate_candidate
 from app.orchestration import constants
 from app.orchestration.aggregation import candidate_is_publishable
+from app.orchestration.attempt_evidence import (
+    authorize_trial_attempt_deletion,
+    record_accepted_trial_attempt_outcome,
+)
 from app.orchestration.events import record_event
 from app.parameters import (
     classify_airframe,
@@ -38,6 +42,7 @@ from app.parameters import (
     validate_search_selections,
 )
 from app.storage import get_artifact_storage
+from app.storage.evidence import candidate_trial_artifact_evidence
 from app.storage.integrity import authorize_artifact_integrity_deletion
 
 logger = logging.getLogger(__name__)
@@ -991,6 +996,33 @@ def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
         trial.finished_at = now
         trial.lease_owner = None
         trial.lease_expires_at = None
+        attempt = db.scalar(
+            select(models.TrialExecutionAttempt).where(
+                models.TrialExecutionAttempt.trial_id == trial.id,
+                models.TrialExecutionAttempt.attempt_count
+                == trial.attempt_count,
+            )
+        )
+        if attempt is not None and attempt.outcome is None:
+            db.flush()
+            artifact_mapping = candidate_trial_artifact_evidence(
+                trial.candidate,
+                [trial],
+                verify_bytes=True,
+            )
+            if artifact_mapping is None or trial.id not in artifact_mapping:
+                raise JobServiceError(
+                    "TRIAL_ATTEMPT_EVIDENCE_INVALID",
+                    "Cannot seal the cancelled physical Trial attempt.",
+                    http_status=500,
+                )
+            record_accepted_trial_attempt_outcome(
+                db,
+                trial=trial,
+                attempt=attempt,
+                outcome_class="cancelled",
+                artifact_evidence=artifact_mapping[trial.id],
+            )
     purge_job_secrets(db, job, reason="job_cancelled")
     db.add(models.JobEvent(job_id=job.id, event_type="job_cancelled", payload_json=None))
     db.commit()
@@ -1007,6 +1039,17 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
             http_status=409,
         )
     trial_ids = [t.id for t in job.trials]
+    attempt_rows = (
+        list(
+            db.scalars(
+                select(models.TrialExecutionAttempt).where(
+                    models.TrialExecutionAttempt.trial_id.in_(trial_ids)
+                )
+            )
+        )
+        if trial_ids
+        else []
+    )
     artifact_rows = list(
         db.scalars(
             select(models.Artifact).where(
@@ -1025,6 +1068,12 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
             authorize_artifact_integrity_deletion(
                 db,
                 artifact=artifact,
+                reason="job_delete",
+            )
+        for attempt in attempt_rows:
+            authorize_trial_attempt_deletion(
+                db,
+                attempt=attempt,
                 reason="job_delete",
             )
         for artifact in real_artifacts:

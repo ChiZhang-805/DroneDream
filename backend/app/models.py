@@ -261,6 +261,12 @@ class Trial(Base):
     )
     simulator_backend: Mapped[str | None] = mapped_column(String(64), nullable=True)
     log_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    accepted_attempt_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("trial_execution_attempts.id"),
+        nullable=True,
+        unique=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
@@ -272,6 +278,16 @@ class Trial(Base):
     candidate: Mapped[CandidateParameterSet] = relationship(back_populates="trials")
     metric: Mapped[TrialMetric | None] = relationship(
         back_populates="trial", cascade="all, delete-orphan", uselist=False
+    )
+    execution_attempts: Mapped[list[TrialExecutionAttempt]] = relationship(
+        back_populates="trial",
+        cascade="all, delete-orphan",
+        foreign_keys="TrialExecutionAttempt.trial_id",
+    )
+    accepted_attempt: Mapped[TrialExecutionAttempt | None] = relationship(
+        foreign_keys=[accepted_attempt_id],
+        post_update=True,
+        uselist=False,
     )
 
 
@@ -447,6 +463,98 @@ class ArtifactDigestDeleteAuthorization(Base):
     )
 
 
+class TrialExecutionAttempt(Base):
+    """Immutable claim receipt for one physical execution of a logical Trial."""
+
+    __tablename__ = "trial_execution_attempts"
+    __table_args__ = (
+        UniqueConstraint(
+            "trial_id",
+            "attempt_count",
+            name="uq_trial_execution_attempts_trial_attempt",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    trial_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("trials.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    job_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    candidate_id: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    worker_id_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    simulator_backend: Mapped[str] = mapped_column(String(64), nullable=False)
+    claim_evidence_id: Mapped[str] = mapped_column(
+        String(71), nullable=False, unique=True, index=True
+    )
+    claim_evidence_json: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False
+    )
+    claimed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    trial: Mapped[Trial] = relationship(
+        back_populates="execution_attempts",
+        foreign_keys=[trial_id],
+    )
+    outcome: Mapped[TrialExecutionAttemptOutcome | None] = relationship(
+        back_populates="attempt",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+class TrialExecutionAttemptOutcome(Base):
+    """Immutable terminal or superseded outcome for one execution attempt."""
+
+    __tablename__ = "trial_execution_attempt_outcomes"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    attempt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("trial_execution_attempts.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    evidence_id: Mapped[str] = mapped_column(
+        String(71), nullable=False, unique=True, index=True
+    )
+    terminal_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    outcome_class: Mapped[str] = mapped_column(String(64), nullable=False)
+    accepted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    finished_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    attempt: Mapped[TrialExecutionAttempt] = relationship(
+        back_populates="outcome"
+    )
+
+
+class TrialExecutionAttemptDeleteAuthorization(Base):
+    """Transaction-scoped authorization for lifecycle deletion of a ledger."""
+
+    __tablename__ = "trial_execution_attempt_delete_authorizations"
+
+    attempt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("trial_execution_attempts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+
 class JobEvent(Base):
     __tablename__ = "job_events"
 
@@ -492,6 +600,9 @@ __all__ = [
     "JobReport",
     "JobSecret",
     "Trial",
+    "TrialExecutionAttempt",
+    "TrialExecutionAttemptDeleteAuthorization",
+    "TrialExecutionAttemptOutcome",
     "TrialMetric",
     "User",
 ]

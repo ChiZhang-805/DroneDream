@@ -1150,6 +1150,7 @@ def _aggregate_candidate(
             report_trial_rows = candidate_report_trial_evidence_rows(
                 candidate,
                 bind_artifacts=True,
+                bind_attempts=True,
                 verify_artifact_bytes=True,
             )
             if report_trial_rows is None:
@@ -1172,6 +1173,7 @@ def _aggregate_candidate(
                 trial_evidence_rows=training_trial_rows,
                 aggregate=agg,
                 bind_trial_artifacts=True,
+                bind_trial_attempts=True,
             )
             agg["candidate_outcome_evidence_required"] = True
             agg["candidate_outcome_evidence"] = evidence.model_dump(mode="json")

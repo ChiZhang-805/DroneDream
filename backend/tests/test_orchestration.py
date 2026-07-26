@@ -16,6 +16,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import select, update
+from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import Session
 
 from app.simulator import (
@@ -55,6 +57,10 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     else:
         models_module = importlib.import_module("app.models")
 
+    import app.orchestration.attempt_evidence as attempt_evidence_module
+
+    importlib.reload(attempt_evidence_module)
+
     import app.services.jobs as jobs_service_module
 
     importlib.reload(jobs_service_module)
@@ -87,6 +93,7 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
         "jobs_service": jobs_service_module,
         "job_manager": job_manager_module,
         "trial_executor": trial_executor_module,
+        "attempt_evidence": attempt_evidence_module,
         "aggregation": aggregation_module,
         "runner": runner_module,
     }
@@ -548,6 +555,32 @@ def test_claim_and_run_one_pending_trial_completes(orchestration_ctx):
         assert trial.metric.score is not None
         assert trial.metric.rmse is not None
         assert trial.log_excerpt is not None
+        assert trial.accepted_attempt_id is not None
+        assert len(trial.execution_attempts) == 1
+        attempt = trial.execution_attempts[0]
+        assert attempt.id == trial.accepted_attempt_id
+        assert attempt.attempt_count == 1
+        assert attempt.outcome is not None
+        assert attempt.outcome.accepted is True
+        assert attempt.outcome.terminal_status == "COMPLETED"
+        assert attempt.outcome.outcome_class == "success"
+        assert "test-worker" not in str(attempt.claim_evidence_json)
+
+        from app.storage.evidence import candidate_trial_artifact_evidence
+
+        artifact_evidence = candidate_trial_artifact_evidence(
+            trial.candidate,
+            [trial],
+            verify_bytes=True,
+        )
+        assert artifact_evidence is not None
+        accepted = ctx["attempt_evidence"].accepted_trial_attempt_evidence(
+            trial,
+            artifact_evidence=artifact_evidence[trial.id],
+        )
+        assert accepted is not None
+        assert accepted.attempt_id == attempt.id
+        assert accepted.outcome_evidence_id == attempt.outcome.evidence_id
 
         job = db.get(ctx["models"].Job, job_id)
         assert job.progress_completed_trials == 1
@@ -754,6 +787,268 @@ def test_reclaimed_attempt_fences_stale_result_persistence(orchestration_ctx):
         assert trial.lease_owner == "worker-new"
         assert trial.attempt_count == 2
         assert trial.metric is None
+        assert trial.accepted_attempt_id is None
+        assert len(trial.execution_attempts) == 1
+        stale_attempt = trial.execution_attempts[0]
+        assert stale_attempt.outcome is not None
+        assert stale_attempt.outcome.accepted is False
+        assert stale_attempt.outcome.terminal_status == "SUPERSEDED"
+        assert (
+            stale_attempt.outcome.evidence_json["superseded_by_attempt_count"]
+            == 2
+        )
+
+
+def test_interrupted_attempt_is_superseded_and_reclaim_is_accepted(
+    orchestration_ctx,
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+
+    class InterruptingCleanupAdapter(MockSimulatorAdapter):
+        def cleanup(self, _trial_ctx: TrialContext) -> None:
+            raise SystemExit(41)
+
+    with ctx["db_module"].SessionLocal() as db, pytest.raises(
+        SystemExit,
+        match="41",
+    ):
+        ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-interrupted",
+            adapter=InterruptingCleanupAdapter(),
+        )
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        assert len(trial.execution_attempts) == 1
+        assert trial.execution_attempts[0].outcome is None
+        trial.lease_expires_at = datetime.now(timezone.utc) - timedelta(
+            seconds=1
+        )
+        db.commit()
+
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-reclaim",
+                adapter=MockSimulatorAdapter(),
+            )
+            == trial_id
+        )
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "COMPLETED"
+        assert trial.accepted_attempt_id is not None
+        attempts = sorted(
+            trial.execution_attempts,
+            key=lambda item: item.attempt_count,
+        )
+        assert [item.attempt_count for item in attempts] == [1, 2]
+        assert attempts[0].outcome is not None
+        assert attempts[0].outcome.accepted is False
+        assert attempts[0].outcome.outcome_class == "superseded"
+        assert attempts[1].outcome is not None
+        assert attempts[1].outcome.accepted is True
+        assert attempts[1].id == trial.accepted_attempt_id
+
+
+def test_accepted_attempt_evidence_fails_after_input_or_metric_mutation(
+    orchestration_ctx,
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-evidence",
+            )
+            == trial_id
+        )
+
+    from app.storage.evidence import candidate_trial_artifact_evidence
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        artifact_evidence = candidate_trial_artifact_evidence(
+            trial.candidate,
+            [trial],
+            verify_bytes=True,
+        )
+        assert artifact_evidence is not None
+        current_artifacts = artifact_evidence[trial.id]
+        assert (
+            ctx["attempt_evidence"].accepted_trial_attempt_evidence(
+                trial,
+                artifact_evidence=current_artifacts,
+            )
+            is not None
+        )
+
+        trial.candidate.parameter_json = {"kp_xy": 1.25}
+        assert (
+            ctx["attempt_evidence"].accepted_trial_attempt_evidence(
+                trial,
+                artifact_evidence=current_artifacts,
+            )
+            is None
+        )
+        trial.candidate.parameter_json = {"kp_xy": 1.0}
+        assert trial.metric is not None
+        trial.metric.score = float(trial.metric.score or 0.0) + 1.0
+        assert (
+            ctx["attempt_evidence"].accepted_trial_attempt_evidence(
+                trial,
+                artifact_evidence=current_artifacts,
+            )
+            is None
+        )
+
+
+def test_attempt_ledger_rows_and_accepted_pointer_are_append_only(
+    orchestration_ctx,
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-immutable",
+            )
+            == trial_id
+        )
+
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        attempt = trial.accepted_attempt
+        assert attempt is not None
+        assert attempt.outcome is not None
+
+        with pytest.raises(DatabaseError):
+            db.execute(
+                update(models.TrialExecutionAttempt)
+                .where(models.TrialExecutionAttempt.id == attempt.id)
+                .values(simulator_backend="tampered")
+            )
+            db.commit()
+        db.rollback()
+
+        with pytest.raises(DatabaseError):
+            db.execute(
+                update(models.TrialExecutionAttemptOutcome)
+                .where(
+                    models.TrialExecutionAttemptOutcome.id
+                    == attempt.outcome.id
+                )
+                .values(outcome_class="tampered")
+            )
+            db.commit()
+        db.rollback()
+
+        with pytest.raises(DatabaseError):
+            db.execute(
+                update(models.Trial)
+                .where(models.Trial.id == trial_id)
+                .values(accepted_attempt_id=None)
+            )
+            db.commit()
+        db.rollback()
+
+        other_trial = models.Trial(
+            job_id=trial.job_id,
+            candidate_id=trial.candidate_id,
+            status="PENDING",
+        )
+        db.add(other_trial)
+        db.commit()
+        with pytest.raises(DatabaseError):
+            db.execute(
+                update(models.Trial)
+                .where(models.Trial.id == other_trial.id)
+                .values(accepted_attempt_id=attempt.id)
+            )
+            db.commit()
+        db.rollback()
+
+
+def test_authorized_job_delete_removes_attempt_ledger(orchestration_ctx) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-delete",
+            )
+            == trial_id
+        )
+
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        job_id = trial.job_id
+        trial.job.status = "COMPLETED"
+        db.commit()
+        assert ctx["jobs_service"].delete_job(db, job_id) == {
+            "id": job_id,
+            "deleted": True,
+        }
+
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            db.scalar(
+                select(models.TrialExecutionAttempt).where(
+                    models.TrialExecutionAttempt.trial_id == trial_id
+                )
+            )
+            is None
+        )
+
+
+def test_cancel_job_seals_an_open_physical_attempt(orchestration_ctx) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+
+    class InterruptingCleanupAdapter(MockSimulatorAdapter):
+        def cleanup(self, _trial_ctx: TrialContext) -> None:
+            raise SystemExit(52)
+
+    with ctx["db_module"].SessionLocal() as db, pytest.raises(
+        SystemExit,
+        match="52",
+    ):
+        ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-cancel",
+            adapter=InterruptingCleanupAdapter(),
+        )
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        ctx["jobs_service"].cancel_job(db, trial.job_id)
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "CANCELLED"
+        assert trial.accepted_attempt_id is not None
+        attempt = trial.accepted_attempt
+        assert attempt is not None
+        assert attempt.outcome is not None
+        assert attempt.outcome.accepted is True
+        assert attempt.outcome.terminal_status == "CANCELLED"
+        assert attempt.outcome.outcome_class == "cancelled"
 
 
 def test_real_cli_artifacts_are_persisted_before_transient_run_cleanup(
