@@ -555,9 +555,28 @@ All three classes block completeness and acceptance. They are excluded from
 parameter learning, Candidate ranking penalties, and LLM scenario feedback.
 Only trusted domain failures may shape the optimizer's constraint model.
 Unknown canonical codes remain visible operational evidence but are
-quarantined from optimizer learning. GPT prompt schema 2.1 derives its trial
+quarantined from optimizer learning. GPT prompt schema 2.2 derives its trial
 denominator and failure rate from this same closed optimizer-learning
 projection.
+
+Outcome Contract compiler 2.18 closes the model-feedback read boundary.
+`compile_candidate_feedback()` is now the single training-feedback compiler
+shared by the closed-tool Harness and the direct GPT parameter proposer. For a
+modern Candidate it independently regenerates canonical training Trial rows,
+verifies the content-addressed Candidate outcome projection against the current
+Candidate ID, generation, parameter snapshot, and Trial evidence hash, and
+derives the provider-visible score, feasibility, metrics, and outcome counts
+from that verified projection.
+
+Mutable sibling values such as `aggregated_score`, `scalar_loss`, or `rmse`
+cannot override the evidence-bound values. A changed parameter snapshot,
+changed Trial metric, incomplete relationship, or malformed evidence produces
+an empty `quarantined` feedback view: it is neither treated as progress nor
+converted into a parameter penalty. Legacy Candidates remain readable as
+explicit `legacy_unsealed` feedback for migration compatibility. The direct
+proposer exposes this closed status through Prompt Schema 2.2; the Harness keeps
+its existing Evidence 2.4 shape while replacing the data source behind that
+shape.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic

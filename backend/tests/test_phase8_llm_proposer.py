@@ -51,6 +51,7 @@ def llm_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     import app.models as models_module  # type: ignore[import-not-found]
     import app.orchestration.acceptance as acceptance_module  # type: ignore[import-not-found]
     import app.orchestration.decision_harness as decision_harness_module  # type: ignore[import-not-found]
+    import app.orchestration.harness_context as harness_context_module  # type: ignore[import-not-found]
     import app.orchestration.job_manager as job_manager_module  # type: ignore[import-not-found]
     import app.orchestration.llm_parameter_proposer as proposer_module  # type: ignore[import-not-found]
     import app.services.jobs as jobs_service_module  # type: ignore[import-not-found]  # noqa: I001
@@ -64,6 +65,7 @@ def llm_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
         "jobs_service": jobs_service_module,
         "acceptance": acceptance_module,
         "decision_harness": decision_harness_module,
+        "harness_context": harness_context_module,
         "job_manager": job_manager_module,
         "proposer": proposer_module,
     }
@@ -351,6 +353,180 @@ def test_gpt_prompt_excludes_nonphysical_failures_from_parameter_evidence(
     assert "UNVERIFIED_SIMULATOR_FAILURE" not in user_prompt
 
 
+def test_model_paths_share_verified_feedback_and_quarantine_divergence(
+    llm_ctx,
+) -> None:
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+    outcome_evidence = __import__(
+        "app.optimization.outcome_evidence",
+        fromlist=[
+            "candidate_training_trial_evidence_rows",
+            "compile_candidate_outcome_evidence",
+        ],
+    )
+
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        job.scenario_suite_json = {
+            "cases": [
+                {
+                    "id": "nominal",
+                    "scenario_type": "nominal",
+                    "seeds": [101],
+                    "weight": 1.0,
+                    "enabled": True,
+                    "holdout": False,
+                    "config": {},
+                }
+            ],
+            "common_random_numbers": True,
+        }
+        search_space = ctx["proposer"]._search_space_for_job(job)
+        candidate = ctx["models"].CandidateParameterSet(
+            job_id=job_id,
+            generation_index=0,
+            source_type="baseline",
+            parameter_json=search_space.baseline(),
+            is_baseline=True,
+            trial_count=1,
+            completed_trial_count=1,
+            aggregated_score=999.0,
+        )
+        db.add(candidate)
+        db.flush()
+        trial = ctx["models"].Trial(
+            job_id=job_id,
+            candidate_id=candidate.id,
+            seed=101,
+            scenario_type="nominal",
+            scenario_config_json={
+                "scenario_case_id": "nominal",
+                "holdout": False,
+            },
+            status="COMPLETED",
+        )
+        db.add(trial)
+        db.flush()
+        metric = ctx["models"].TrialMetric(
+            trial_id=trial.id,
+            score=0.4,
+            rmse=0.4,
+            max_error=0.8,
+            overshoot_count=1,
+            completion_time=9.0,
+            crash_flag=False,
+            timeout_flag=False,
+            final_error=0.1,
+            pass_flag=True,
+            instability_flag=False,
+        )
+        db.add(metric)
+        db.flush()
+        rows = outcome_evidence.candidate_training_trial_evidence_rows(
+            candidate
+        )
+        assert rows is not None
+        aggregate = {
+            "training_trial_count": 1,
+            "training_completed_trial_count": 1,
+            "training_failed_trial_count": 0,
+            "training_passing_trial_count": 1,
+            "training_trial_outcome_counts": {
+                "success": 1,
+                "domain_failure": 0,
+                "infrastructure_failure": 0,
+                "cancelled": 0,
+                "invalid_evidence": 0,
+                "unknown_failure": 0,
+            },
+            "training_trial_outcome_rates": {
+                "success": 1.0,
+                "domain_failure": 0.0,
+                "infrastructure_failure": 0.0,
+                "cancelled": 0.0,
+                "invalid_evidence": 0.0,
+                "unknown_failure": 0.0,
+            },
+            "optimizer_learning_failure_rate": 0.0,
+            "objective_values": {"rmse": 0.4},
+            "constraint_values": {},
+            "constraint_violations": {},
+            "feasible": True,
+            "preference_loss": 0.3,
+            "soft_constraint_penalty": 0.0,
+            "scalar_loss": 0.3,
+            "selection_key": {
+                "schema_version": "1.0",
+                "evidence_complete": True,
+                "hard_feasible": True,
+                "hard_constraint_violation": 0.0,
+                "training_failure_rate": 0.0,
+                "decision_loss": 0.3,
+            },
+            "acceptance_rmse": 0.4,
+            "acceptance_max_error": 0.8,
+            "acceptance_pass_rate": 1.0,
+            "acceptance_completion_rate": 1.0,
+        }
+        evidence = outcome_evidence.compile_candidate_outcome_evidence(
+            outcome_contract_id="sha256:" + "a" * 64,
+            candidate_id=candidate.id,
+            generation_index=candidate.generation_index,
+            parameter_snapshot=candidate.parameter_json,
+            trial_evidence_rows=rows,
+            aggregate=aggregate,
+        )
+        candidate.aggregated_metric_json = {
+            **aggregate,
+            "scalar_loss": -999.0,
+            "rmse": 0.000001,
+            "candidate_outcome_evidence_required": True,
+            "candidate_outcome_evidence": evidence.model_dump(mode="json"),
+        }
+        criteria = ctx["acceptance"].criteria_for_job(job)
+
+        _, prompt, _ = ctx["proposer"]._build_prompt(
+            job,
+            criteria,
+            [candidate],
+            search_space,
+        )
+        prior = json.loads(prompt)["previous_candidates"][0]
+        assert prior["feedback_status"] == "verified"
+        assert prior["aggregated_score"] == pytest.approx(0.3)
+        assert prior["aggregated_metrics"]["scalar_loss"] == pytest.approx(0.3)
+        assert prior["aggregated_metrics"]["rmse"] == pytest.approx(0.4)
+
+        snapshot, has_scored = ctx["harness_context"].build_harness_evidence(job)
+        assert has_scored is True
+        assert snapshot.search.best_score == pytest.approx(0.3)
+        assert snapshot.candidates[0].aggregated_score == pytest.approx(0.3)
+        assert snapshot.candidates[0].metrics["scalar_loss"] == pytest.approx(0.3)
+
+        metric.rmse = 0.9
+        db.flush()
+
+        _, prompt, _ = ctx["proposer"]._build_prompt(
+            job,
+            criteria,
+            [candidate],
+            search_space,
+        )
+        quarantined = json.loads(prompt)["previous_candidates"][0]
+        assert quarantined["feedback_status"] == "quarantined"
+        assert quarantined["aggregated_score"] is None
+        assert quarantined["aggregated_metrics"]["trial_count"] == 0
+        assert quarantined["scenario_feedback"] == []
+
+        snapshot, has_scored = ctx["harness_context"].build_harness_evidence(job)
+        assert has_scored is False
+        assert snapshot.search.scored_candidate_count == 0
+        assert snapshot.candidates[0].aggregated_score is None
+        assert snapshot.candidates[0].metrics == {}
+
+
 def test_gpt_prompt_seals_holdout_and_compiles_closed_training_contract(
     llm_ctx,
 ):
@@ -431,7 +607,7 @@ def test_gpt_prompt_seals_holdout_and_compiles_closed_training_contract(
         )
 
     payload = json.loads(user)
-    assert payload["prompt_schema_version"] == "2.1"
+    assert payload["prompt_schema_version"] == "2.2"
     assert payload["vehicle_profile"]["px4_version"] == "custom_px4_version"
     assert payload["objective_config"]["objectives"][0]["metric"] == ("custom_objective_1")
     scenario = payload["scenario_suite"]

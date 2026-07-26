@@ -37,6 +37,7 @@ from app.orchestration import constants
 from app.orchestration.acceptance import AcceptanceCriteria
 from app.orchestration.events import record_event
 from app.orchestration.parameter_constraints import validator_for_job
+from app.orchestration.provider_feedback import compile_candidate_feedback
 from app.parameters import (
     SUPPORTED_PX4_VERSIONS,
     SUPPORTED_TRIAL_METRICS,
@@ -58,7 +59,7 @@ _MIN_PROPOSALS = 1
 _MAX_RESPONSE_NODES = 10_000
 _MAX_RESPONSE_DEPTH = 16
 _MAX_PROMPT_CANDIDATES = 8
-LLM_PROPOSER_PROMPT_SCHEMA_VERSION = "2.1"
+LLM_PROPOSER_PROMPT_SCHEMA_VERSION = "2.2"
 _PROMPT_AGGREGATE_KEYS = (
     "rmse",
     "max_error",
@@ -596,6 +597,13 @@ def _build_prompt(
         }
         for domain in search_space.domains
     }
+    feedback_by_id = {
+        candidate.id: compile_candidate_feedback(
+            candidate,
+            scenario_suite=scenario_suite,
+        )
+        for candidate in candidates
+    }
 
     selected_history: dict[str, models.CandidateParameterSet] = {}
     for candidate in candidates:
@@ -605,10 +613,14 @@ def _build_prompt(
         (
             item
             for item in candidates
-            if _finite_number(item.aggregated_score) is not None
+            if feedback_by_id[item.id].score is not None
         ),
         key=lambda item: (
-            item.aggregated_score if item.aggregated_score is not None else float("inf"),
+            (
+                feedback_by_id[item.id].score
+                if feedback_by_id[item.id].score is not None
+                else float("inf")
+            ),
             item.generation_index,
         ),
     )[:2]:
@@ -628,13 +640,19 @@ def _build_prompt(
         selected_history.values(),
         key=lambda c: (c.generation_index, not c.is_baseline, c.id),
     ):
-        agg = cand.aggregated_metric_json or {}
+        feedback = feedback_by_id[cand.id]
+        agg = feedback.aggregate
         trial_count = 0
         completed_trial_count = 0
         failed_trial_count = 0
         passing_trial_count = 0
         scenario_feedback: dict[str, dict[str, Any]] = {}
-        for trial in sorted(cand.trials, key=lambda t: (t.created_at, t.id)):
+        trusted_trials = (
+            sorted(cand.trials, key=lambda t: (t.created_at, t.id))
+            if feedback.usable
+            else ()
+        )
+        for trial in trusted_trials:
             resolution = resolve_scenario_case(
                 scenario_suite,
                 scenario_type=trial.scenario_type,
@@ -756,13 +774,14 @@ def _build_prompt(
                     if cand.source_type in {"baseline", "optimizer", "llm_optimizer"}
                     else "unknown"
                 ),
+                "feedback_status": feedback.feedback_status,
                 "parameters": {
                     key: value
                     for key, value in (cand.parameter_json or {}).items()
                     if key in domain_names and _finite_number(value) is not None
                 },
                 "aggregated_metrics": prompt_aggregate,
-                "aggregated_score": _finite_number(cand.aggregated_score),
+                "aggregated_score": feedback.score,
                 "pass_rate": (
                     round((passing_trial_count / trial_count), 4)
                     if trial_count > 0

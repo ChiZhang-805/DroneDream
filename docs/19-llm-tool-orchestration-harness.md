@@ -8191,7 +8191,7 @@ the deterministic portfolio. Frozen provider/model artifacts, blocked simulator 
 the locked test bank, immutable decision/model/tool ledgers, and evidence-v3 remain
 required before that stronger claim.
 
-The older direct `gpt` parameter proposer now uses Prompt Schema 2.0 as well. Its
+The older direct `gpt` parameter proposer now uses Prompt Schema 2.2. Its
 feedback path already excluded holdout Trial rows; it now also compiles the scenario
 suite so that only training scenario enums, counts, weights, and allowlisted numeric
 Runtime inputs are visible. Holdout cases expose counts only—not types, IDs, seeds,
@@ -8199,9 +8199,20 @@ weights, configuration, outcomes, or metrics. Vehicle identity is reduced to
 catalog-backed categories, objective/constraint names are restricted to supported
 Trial metrics or stable `custom_*` aliases, and Candidate IDs/labels, arbitrary
 aggregate mappings, unrecognized scenario keys, and unknown failure-code strings
-are excluded. Capabilities report `prompt_schema_version=2.1` for this path;
+are excluded. Capabilities report `prompt_schema_version=2.2` for this path;
 nonphysical Trial outcomes are also excluded from parameter-learning counts and
 scenario failure feedback.
+
+Prompt Schema 2.2 and the Harness Evidence 2.4 compiler now share
+`compile_candidate_feedback()`. Modern Candidate feedback is admitted only
+after the current Candidate identity, generation, parameters, and canonical
+training Trial rows reproduce its content-addressed outcome evidence. Scores,
+feasibility, aggregate metrics, and optimizer-learning counts are derived from
+that verified projection rather than mutable compatibility columns. Any
+divergence is labeled `quarantined` in the direct proposer and contributes no
+score, metric, scenario feedback, or synthetic failure penalty to either model
+path. Pre-evidence Candidates remain available only as explicit
+`legacy_unsealed` migration data.
 
 This hardening does not make the direct proposer equivalent to `llm_harness`: it
 still proposes numeric parameters and therefore retains more model authority. The

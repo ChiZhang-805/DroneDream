@@ -83,7 +83,7 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert "probabilistic GPS dropout" in scenario_effects["requires_runtime_extension"]
     assert real_cli["unverified_effect_passthrough_opt_in"] is True
     assert data["optimizers"]["items"]["gpt"]["ready"] is False
-    assert data["optimizers"]["items"]["gpt"]["prompt_schema_version"] == "2.1"
+    assert data["optimizers"]["items"]["gpt"]["prompt_schema_version"] == "2.2"
     assert data["optimizers"]["items"]["llm_harness"] == {
         "ready": False,
         "status": "server_secret_not_configured",
