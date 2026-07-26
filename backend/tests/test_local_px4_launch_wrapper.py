@@ -656,6 +656,51 @@ def test_preflight_allows_bundled_wind_and_obstacles_together() -> None:
     assert wrapper._preflight_scenario_effects(request_with_obstacle, site_dry_run=False) is None
 
 
+def test_trusted_local_xml_rejects_path_escape_and_entity_declarations(
+    tmp_path: Path,
+) -> None:
+    trusted_root = tmp_path / "trusted"
+    trusted_root.mkdir()
+    escaped = tmp_path / "escaped.sdf"
+    escaped.write_text("<sdf/>", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="outside its trusted local root"):
+        wrapper._parse_trusted_local_xml(
+            escaped,
+            trusted_root=trusted_root,
+            context="test XML",
+        )
+
+    malicious = trusted_root / "malicious.sdf"
+    malicious.write_text(
+        '<!DOCTYPE sdf [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>'
+        "<sdf>&xxe;</sdf>",
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="forbidden DTD or entity declaration"):
+        wrapper._parse_trusted_local_xml(
+            malicious,
+            trusted_root=trusted_root,
+            context="test XML",
+        )
+
+
+def test_bounded_xml_text_rejects_oversize_and_entity_declarations() -> None:
+    with pytest.raises(RuntimeError, match="exceeds the XML evidence limit"):
+        wrapper._parse_bounded_xml_text(
+            "<sdf/>",
+            byte_limit=1,
+            context="generated XML",
+        )
+
+    with pytest.raises(RuntimeError, match="forbidden DTD or entity declaration"):
+        wrapper._parse_bounded_xml_text(
+            '<!ENTITY payload "untrusted"><sdf/>',
+            byte_limit=1024,
+            context="generated XML",
+        )
+
+
 def test_steady_wind_overlay_is_trial_local_and_prepended_to_gazebo_paths(
     tmp_path: Path,
 ) -> None:

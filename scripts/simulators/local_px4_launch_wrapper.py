@@ -58,9 +58,11 @@ MAX_JSON_BYTES = 16 * 1024 * 1024
 MAX_TELEMETRY_SAMPLES = 50_000
 MAX_ULOG_BYTES = 1024 * 1024 * 1024
 MAX_GENERATED_WORLD_SDF_BYTES = 16 * 1024 * 1024
+MAX_TRUSTED_LOCAL_XML_BYTES = 16 * 1024 * 1024
 RETAINED_ULOG_NAME = "px4_source.ulg"
 WIND_EFFECTS_PLUGIN_FILENAME = "gz-sim-wind-effects-system"
 WIND_EFFECTS_PLUGIN_NAME = "gz::sim::systems::WindEffects"
+_FORBIDDEN_XML_DECLARATION = re.compile(rb"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
 
 REQUIRED_SAMPLE_KEYS = (
     "t",
@@ -79,6 +81,66 @@ REQUIRED_SAMPLE_KEYS = (
 
 class ScenarioEffectUnsupportedError(RuntimeError):
     """The running Gazebo instance cannot provide a requested capability."""
+
+
+def _checked_xml_bytes(raw: bytes, *, byte_limit: int, context: str) -> bytes:
+    if len(raw) > byte_limit:
+        raise RuntimeError(f"{context} exceeds the XML evidence limit")
+    if _FORBIDDEN_XML_DECLARATION.search(raw):
+        raise RuntimeError(f"{context} contains a forbidden DTD or entity declaration")
+    return raw
+
+
+def _parse_trusted_local_xml(
+    path: Path,
+    *,
+    trusted_root: Path,
+    context: str,
+) -> ET.ElementTree:
+    """Parse bounded XML only after proving it remains inside a trusted local root."""
+
+    try:
+        resolved_root = trusted_root.resolve(strict=True)
+        resolved_path = path.resolve(strict=True)
+        resolved_path.relative_to(resolved_root)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"{context} is outside its trusted local root") from exc
+    if not resolved_path.is_file() or resolved_path.is_symlink():
+        raise RuntimeError(f"{context} is not a trusted regular file")
+    try:
+        raw = resolved_path.read_bytes()
+    except OSError as exc:
+        raise RuntimeError(f"{context} could not be read") from exc
+    checked = _checked_xml_bytes(
+        raw,
+        byte_limit=MAX_TRUSTED_LOCAL_XML_BYTES,
+        context=context,
+    )
+    try:
+        # ElementTree is safe here because DTD/entity declarations are rejected,
+        # bytes are bounded, and the resolved file is confined to a trusted root.
+        return ET.ElementTree(ET.fromstring(checked))  # noqa: S314
+    except ET.ParseError as exc:
+        raise RuntimeError(f"{context} is invalid XML") from exc
+
+
+def _parse_bounded_xml_text(
+    value: str,
+    *,
+    byte_limit: int,
+    context: str,
+) -> ET.Element:
+    raw = _checked_xml_bytes(
+        value.encode("utf-8"),
+        byte_limit=byte_limit,
+        context=context,
+    )
+    try:
+        # The encoded payload is bounded and DTD/entity declarations are rejected
+        # before the standard-library parser sees it.
+        return ET.fromstring(raw)  # noqa: S314
+    except ET.ParseError as exc:
+        raise RuntimeError(f"{context} is invalid XML") from exc
 
 
 def _parse_bool(raw: str | None, *, default: bool) -> bool:
@@ -492,9 +554,7 @@ def _prepare_steady_wind_overlay(
     source_rootfs = build_root / "rootfs"
     px4_executable = build_root / "bin" / "px4"
     px4_plugins = build_root / "src" / "modules" / "simulation" / "gz_plugins"
-    px4_server_config = (
-        px4_root / "src" / "modules" / "simulation" / "gz_bridge" / "server.config"
-    )
+    px4_server_config = px4_root / "src" / "modules" / "simulation" / "gz_bridge" / "server.config"
     required_runtime_paths = (
         source_rootfs,
         px4_executable,
@@ -520,7 +580,11 @@ def _prepare_steady_wind_overlay(
     shutil.copy2(source_world_sdf, overlay_world_sdf)
 
     overlay_model_sdf = overlay_model_dir / "model.sdf"
-    model_tree = ET.parse(overlay_model_sdf)
+    model_tree = _parse_trusted_local_xml(
+        overlay_model_sdf,
+        trusted_root=runtime_root,
+        context="Trial-local PX4 model SDF",
+    )
     model_root_xml = model_tree.getroot()
     base_link = model_root_xml.find("./model[@name='x500_base']/link[@name='base_link']")
     if base_link is None:
@@ -559,7 +623,11 @@ def _prepare_steady_wind_overlay(
     ET.indent(model_tree, space="  ")
     model_tree.write(overlay_model_sdf, encoding="utf-8", xml_declaration=True)
 
-    world_tree = ET.parse(overlay_world_sdf)
+    world_tree = _parse_trusted_local_xml(
+        overlay_world_sdf,
+        trusted_root=runtime_root,
+        context="Trial-local PX4 world SDF",
+    )
     world_root_xml = world_tree.getroot()
     world_xml = world_root_xml.find(f"./world[@name='{world_name}']")
     if world_xml is None:
@@ -569,7 +637,11 @@ def _prepare_steady_wind_overlay(
     # declares an SDF system plugin of its own.  Materialize the pinned PX4
     # systems into this Trial-local world before adding WindEffects so PX4 still
     # gets scene/info, entity creation, physics, sensors, and the bridge inputs.
-    server_config_tree = ET.parse(px4_server_config)
+    server_config_tree = _parse_trusted_local_xml(
+        px4_server_config,
+        trusted_root=px4_root,
+        context="pinned PX4 Gazebo server config",
+    )
     configured_plugins = server_config_tree.findall("./plugins/plugin")
     if not configured_plugins:
         raise RuntimeError("pinned PX4 Gazebo server config has no system plugins")
@@ -808,10 +880,11 @@ def _runtime_wind_mode_observation(
     generated_path: Path,
     expected_vehicle_model: str,
 ) -> dict[str, Any]:
-    try:
-        root = ET.fromstring(generated_sdf)
-    except ET.ParseError as exc:
-        raise RuntimeError("Gazebo generated-world-SDF response is invalid XML") from exc
+    root = _parse_bounded_xml_text(
+        generated_sdf,
+        byte_limit=MAX_GENERATED_WORLD_SDF_BYTES,
+        context="Gazebo generated-world-SDF response",
+    )
     enabled = False
     for model in root.iter("model"):
         if model.get("name") != expected_vehicle_model:
@@ -985,9 +1058,8 @@ def _apply_steady_wind_effects(
     runtime_sdf: dict[str, Any] | None = None
     runtime_sdf_error = ""
     expected_vehicle_model = overlay.get("px4_vehicle_model_instance")
-    if (
-        not isinstance(expected_vehicle_model, str)
-        or not re.fullmatch(r"x500(?:_depth|_vision)?_0", expected_vehicle_model)
+    if not isinstance(expected_vehicle_model, str) or not re.fullmatch(
+        r"x500(?:_depth|_vision)?_0", expected_vehicle_model
     ):
         raise RuntimeError("Trial-local expected PX4 vehicle instance metadata is invalid")
     runtime_sdf_attempts = max(
@@ -1064,9 +1136,7 @@ def _apply_steady_wind_effects(
                 "sha256": overlay["world_sdf_sha256"],
                 "linear_velocity_mps": vector,
                 "wind_effects_plugin": overlay["wind_effects_plugin"],
-                "materialized_px4_system_plugins": overlay[
-                    "materialized_px4_system_plugins"
-                ],
+                "materialized_px4_system_plugins": overlay["materialized_px4_system_plugins"],
                 "px4_server_config": {
                     "path": overlay["px4_server_config_path"],
                     "sha256": overlay["px4_server_config_sha256"],
@@ -1080,9 +1150,7 @@ def _apply_steady_wind_effects(
                 "path": overlay["model_sdf_path"],
                 "sha256": overlay["model_sdf_sha256"],
                 "wind_enabled_link": overlay["wind_enabled_link"],
-                "sanitized_classic_material_scripts": overlay[
-                    "sanitized_classic_material_scripts"
-                ],
+                "sanitized_classic_material_scripts": overlay["sanitized_classic_material_scripts"],
             },
         },
         {
