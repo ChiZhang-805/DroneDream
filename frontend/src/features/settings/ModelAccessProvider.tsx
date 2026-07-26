@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { ModelAccessContext } from "./ModelAccessContext";
 import type {
   ModelAccessContextValue,
+  ModelAccessMode,
   ModelAccessProfile,
   ModelAccessSettings,
   ModelProvider,
@@ -15,6 +16,7 @@ import type {
 
 interface PersistedModelAccessProfile {
   id: string;
+  accessMode: ModelAccessMode;
   provider: ModelProvider;
   model: string;
   baseUrl: string;
@@ -35,6 +37,7 @@ const LEGACY_MODEL_ACCESS_SESSION_KEY = "dronedream:model-access-key:v1";
 const DEFAULT_PROFILE_ID = "default";
 
 const DEFAULT_MODEL_ACCESS: ModelAccessSettings = {
+  accessMode: "platform",
   provider: "openai",
   apiKey: "",
   model: "",
@@ -59,6 +62,10 @@ const PROVIDER_DEFAULTS: Record<
 
 function isModelProvider(value: unknown): value is ModelProvider {
   return ["openai", "qwen", "deepseek", "custom"].includes(String(value));
+}
+
+function isModelAccessMode(value: unknown): value is ModelAccessMode {
+  return value === "platform" || value === "byok";
 }
 
 function newProfileId(): string {
@@ -92,6 +99,9 @@ function parsePersistedProfile(value: unknown): PersistedModelAccessProfile | nu
   }
   return {
     id: candidate.id,
+    accessMode: isModelAccessMode(candidate.accessMode)
+      ? candidate.accessMode
+      : "platform",
     provider: candidate.provider,
     model: candidate.model,
     baseUrl: candidate.baseUrl,
@@ -141,6 +151,7 @@ function loadModelAccessState(): ModelAccessState {
         activeProfileId: DEFAULT_PROFILE_ID,
         profiles: [{
           id: DEFAULT_PROFILE_ID,
+          accessMode: "platform",
           provider: candidate.provider,
           model: candidate.model,
           baseUrl: candidate.baseUrl,
@@ -181,11 +192,17 @@ export function ModelAccessProvider({
   const [state, setState] = useState<ModelAccessState>(() => {
     const loaded = loadModelAccessState();
     if (!initialSettings) return loaded;
+    const normalizedInitialSettings = (
+      initialSettings.apiKey
+      && initialSettings.accessMode === undefined
+    )
+      ? { ...initialSettings, accessMode: "byok" as const }
+      : initialSettings;
     return {
       ...loaded,
       profiles: loaded.profiles.map((profile) =>
         profile.id === loaded.activeProfileId
-          ? { ...profile, ...initialSettings }
+          ? { ...profile, ...normalizedInitialSettings }
           : profile
       ),
     };
@@ -202,6 +219,7 @@ export function ModelAccessProvider({
           activeProfileId: state.activeProfileId,
           profiles: state.profiles.map((profile) => ({
             id: profile.id,
+            accessMode: profile.accessMode,
             provider: profile.provider,
             model: profile.model,
             baseUrl: profile.baseUrl,
@@ -244,6 +262,17 @@ export function ModelAccessProvider({
     }));
   }, []);
 
+  const selectAccessMode = useCallback((accessMode: ModelAccessMode) => {
+    setState((current) => ({
+      ...current,
+      profiles: current.profiles.map((profile) =>
+        profile.id === current.activeProfileId
+          ? { ...profile, accessMode }
+          : profile
+      ),
+    }));
+  }, []);
+
   const selectProfile = useCallback((profileId: string) => {
     setState((current) =>
       current.profiles.some((profile) => profile.id === profileId)
@@ -262,6 +291,7 @@ export function ModelAccessProvider({
           ...current.profiles,
           {
             id,
+            accessMode: "byok",
             provider: "custom",
             apiKey: "",
             ...PROVIDER_DEFAULTS.custom,
@@ -289,6 +319,7 @@ export function ModelAccessProvider({
     profiles: state.profiles,
     activeProfileId: state.activeProfileId,
     updateSettings,
+    selectAccessMode,
     selectProvider,
     selectProfile,
     addProfile,
@@ -298,6 +329,7 @@ export function ModelAccessProvider({
     removeActiveProfile,
     selectProfile,
     selectProvider,
+    selectAccessMode,
     settings,
     state.activeProfileId,
     state.profiles,

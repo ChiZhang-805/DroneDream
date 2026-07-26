@@ -140,6 +140,11 @@ describe("desktop launcher chrome", () => {
       .toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "简体中文" }).querySelector("svg"))
       .toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Included allowance/ }))
+      .toHaveAttribute("aria-pressed", "true");
+    expect(within(dialog).getByRole("link", { name: "Manage subscription" }))
+      .toHaveAttribute("href", "https://getdronedream.com/pricing/");
+    fireEvent.click(within(dialog).getByRole("button", { name: /Use my API key/ }));
     expect(within(dialog).getByLabelText("Model profile")).toHaveValue("default");
 
     fireEvent.change(within(dialog).getByLabelText("Model provider"), {

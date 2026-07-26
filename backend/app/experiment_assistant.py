@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import math
+import uuid
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -584,17 +585,38 @@ def _provider_generate(
             status_code=503,
         ) from exc
 
-    model = request.llm.model or _DEFAULT_MODEL
+    platform_access = request.llm.access_mode == "platform"
+    base_url: str | None
+    if platform_access:
+        model = settings.model_gateway_managed_model_alias
+        api_key = request.llm.platform_grant
+        base_url = settings.model_gateway_base_url.strip().rstrip("/")
+        if not base_url or not api_key:
+            raise ExperimentAssistantError(
+                "MODEL_GATEWAY_NOT_CONFIGURED",
+                "The DroneDream managed-model gateway is not configured.",
+                status_code=503,
+            )
+    else:
+        model = request.llm.model or _DEFAULT_MODEL
+        api_key = request.llm.api_key
+        base_url = request.llm.base_url
+        if not api_key:
+            raise ExperimentAssistantError(
+                "MODEL_AUTHENTICATION_FAILED",
+                "The configured model credential is missing.",
+                status_code=422,
+            )
     client_kwargs: dict[str, Any] = {
-        "api_key": request.llm.api_key,
+        "api_key": api_key,
         "timeout": settings.llm_request_timeout_seconds,
         "max_retries": settings.llm_max_retries,
     }
-    if request.llm.base_url:
-        client_kwargs["base_url"] = request.llm.base_url
+    if base_url:
+        client_kwargs["base_url"] = base_url
     try:
         client = OpenAI(**client_kwargs)
-        if request.llm.base_url:
+        if base_url:
             response_format: Any = {"type": "json_object"}
         else:
             response_format = {
@@ -613,6 +635,7 @@ def _provider_generate(
             model=model,
             messages=messages,
             response_format=response_format,
+            extra_headers={"Idempotency-Key": f"dd-{uuid.uuid4()}"},
         )
         content = response.choices[0].message.content or "{}"
     except Exception as exc:
@@ -939,7 +962,10 @@ def compile_experiment_turn(
 ) -> schemas.ExperimentAssistantTurnResponse:
     """Call one configured model and compile a safe draft-only response."""
 
-    if not llm_base_url_is_allowed(request.llm.base_url):
+    if (
+        request.llm.access_mode == "byok"
+        and not llm_base_url_is_allowed(request.llm.base_url)
+    ):
         raise ExperimentAssistantError(
             "LLM_BASE_URL_NOT_ALLOWED",
             (

@@ -33,6 +33,10 @@ def llm_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("APP_SECRET_KEY", "dev-unit-key")
+    monkeypatch.setenv(
+        "MODEL_GATEWAY_BASE_URL",
+        "https://example.supabase.co/functions/v1/model-gateway",
+    )
     from app import config as config_module
 
     config_module.get_settings.cache_clear()
@@ -637,6 +641,53 @@ def test_create_job_rejects_gpt_without_api_key(llm_ctx):
         with pytest.raises(jobs_service.JobServiceError) as exc:
             jobs_service.create_job(db, req)
         assert exc.value.code == "INVALID_INPUT"
+
+
+def test_managed_platform_grant_is_scoped_encrypted_and_never_returned(llm_ctx):
+    ctx = llm_ctx
+    schemas = ctx["schemas"]
+    jobs_service = ctx["jobs_service"]
+    db_module = ctx["db_module"]
+    grant = "ddg_" + "A" * 48
+    request = schemas.JobCreateRequest(
+        optimizer_strategy="llm_harness",
+        llm=schemas.LLMProviderConfig(
+            access_mode="platform",
+            provider="dronedream",
+            platform_grant=grant,
+        ),
+    )
+
+    with db_module.SessionLocal() as db:
+        job = jobs_service.create_job(db, request)
+        db.flush()
+        assert job.llm_provider == "dronedream"
+        assert job.openai_model == "DroneDream Managed"
+        assert job.llm_base_url == (
+            "https://example.supabase.co/functions/v1/model-gateway"
+        )
+        assert len(job.secrets) == 1
+        assert job.secrets[0].provider == "dronedream_gateway"
+        assert grant not in repr(jobs_service.to_job_schema(job).model_dump())
+        assert ctx["proposer"].load_job_api_key(db, job) == grant
+
+
+def test_managed_platform_config_rejects_client_selected_model_or_byok_key(llm_ctx):
+    schemas = llm_ctx["schemas"]
+    with pytest.raises(ValueError, match="cannot include api_key"):
+        schemas.LLMProviderConfig(
+            access_mode="platform",
+            provider="dronedream",
+            api_key="must-not-mix",
+            platform_grant="ddg_" + "A" * 48,
+        )
+    with pytest.raises(ValueError, match="selected by the DroneDream gateway"):
+        schemas.LLMProviderConfig(
+            access_mode="platform",
+            provider="dronedream",
+            platform_grant="ddg_" + "A" * 48,
+            model="expensive-client-choice",
+        )
 
 def test_job_create_request_defaults_are_keyless_heuristic_and_20(llm_ctx):
     schemas = llm_ctx["schemas"]

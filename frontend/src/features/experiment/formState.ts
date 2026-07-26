@@ -73,6 +73,7 @@ export interface ExperimentFormState {
   target_rmse: string;
   target_max_error: string;
   min_pass_rate: string;
+  llm_access_mode: "platform" | "byok";
   llm_provider: string;
   llm_api_key: string;
   llm_model: string;
@@ -149,6 +150,7 @@ export const EXPERIMENT_FORM_DEFAULTS: ExperimentFormState = {
   target_rmse: "0.5",
   target_max_error: "",
   min_pass_rate: "0.8",
+  llm_access_mode: "platform",
   llm_provider: "openai",
   llm_api_key: "",
   llm_model: "",
@@ -187,6 +189,7 @@ const DRAFT_ENUM_VALUES: Partial<
   robust_aggregation: ["mean", "worst", "cvar", "percentile"],
   simulator_backend: SIMULATOR_BACKENDS,
   optimizer_strategy: OPTIMIZER_STRATEGIES,
+  llm_access_mode: ["platform", "byok"],
   llm_provider: ["openai", "qwen", "deepseek", "custom"],
   scenario_preset: ["nominal", "wind", "sensor", "stress"],
 };

@@ -224,7 +224,7 @@ describe("conversational experiment drafting", () => {
       .toHaveValue("default");
   });
 
-  it("shows None instead of an unconfigured provider in the model selector", () => {
+  it("shows the included managed model by default without exposing a key", () => {
     render(
       <I18nProvider>
         <MemoryRouter>
@@ -236,8 +236,8 @@ describe("conversational experiment drafting", () => {
     );
 
     const selector = screen.getByRole("combobox", { name: "Model" });
-    expect(selector).toHaveValue("none");
-    expect(selector).toHaveTextContent("None");
+    expect(selector).toHaveValue("managed");
+    expect(selector).toHaveTextContent("DroneDream Managed");
     expect(selector).not.toHaveTextContent("OpenAI");
     expect(selector).not.toHaveTextContent("key required");
   });

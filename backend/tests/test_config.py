@@ -52,6 +52,20 @@ def test_finalization_lease_covers_llm_retry_window() -> None:
     assert settings.finalization_lease_seconds == 3700
 
 
+def test_managed_model_gateway_requires_credential_free_https() -> None:
+    settings = Settings(
+        model_gateway_base_url=(
+            "https://example.supabase.co/functions/v1/model-gateway"
+        )
+    )
+    assert settings.model_gateway_base_url.endswith("/model-gateway")
+
+    with pytest.raises(ValidationError, match="credential-free absolute HTTPS"):
+        Settings(model_gateway_base_url="http://example.com/model-gateway")
+    with pytest.raises(ValidationError, match="credential-free absolute HTTPS"):
+        Settings(model_gateway_base_url="https://user:pass@example.com/model-gateway")
+
+
 def test_runtime_id_is_optional_and_requires_a_canonical_uuid() -> None:
     assert Settings().dronedream_runtime_id is None
     assert (

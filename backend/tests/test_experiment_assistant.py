@@ -35,6 +35,7 @@ def test_registered_fields_cover_shared_form_contract() -> None:
         )
     )
     intentionally_local_fields = {
+        "llm_access_mode",
         "llm_provider",
         "llm_api_key",
         "llm_model",

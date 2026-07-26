@@ -61,10 +61,30 @@ def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
     if req.optimizer_strategy not in {"gpt", "llm_harness"}:
         return
     provider_config = req.llm or req.openai
-    if provider_config is None or not provider_config.api_key:
+    if provider_config is None:
         raise JobServiceError(
             "INVALID_INPUT",
-            "llm.api_key (or legacy openai.api_key) is required for model-guided optimization.",
+            "llm credentials are required for model-guided optimization.",
+            http_status=422,
+        )
+    if isinstance(provider_config, schemas.LLMProviderConfig):
+        if provider_config.access_mode == "platform":
+            if not get_settings().model_gateway_base_url.strip():
+                raise JobServiceError(
+                    "MODEL_GATEWAY_NOT_CONFIGURED",
+                    "The DroneDream managed-model gateway is not configured.",
+                    http_status=503,
+                )
+        elif not provider_config.api_key:
+            raise JobServiceError(
+                "INVALID_INPUT",
+                "llm.api_key is required for BYOK model-guided optimization.",
+                http_status=422,
+            )
+    elif not provider_config.api_key:
+        raise JobServiceError(
+            "INVALID_INPUT",
+            "openai.api_key is required for model-guided optimization.",
             http_status=422,
         )
     if not job_secrets.is_configured():
@@ -78,6 +98,7 @@ def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
         )
     if (
         req.llm is not None
+        and req.llm.access_mode == "byok"
         and req.llm.base_url
         and not llm_base_url_is_allowed(req.llm.base_url)
     ):
@@ -287,16 +308,33 @@ def _create_job_from_config(
         persist_scenario_suite = (
             "scenario_suite" in req.model_fields_set or experimental_optimizer
         )
-    llm_provider = req.llm.provider if req.llm is not None else (
-        "openai" if req.openai is not None else None
-    )
-    llm_model = req.llm.model if req.llm is not None else (
-        req.openai.model if req.openai is not None else None
-    )
-    llm_base_url = req.llm.base_url if req.llm is not None else None
-    llm_api_key = req.llm.api_key if req.llm is not None else (
-        req.openai.api_key if req.openai is not None else None
-    )
+    settings = get_settings()
+    platform_access = req.llm is not None and req.llm.access_mode == "platform"
+    if req.llm is not None:
+        llm_provider = req.llm.provider
+        llm_model = (
+            settings.model_gateway_managed_model_alias
+            if platform_access
+            else req.llm.model
+        )
+        llm_base_url = (
+            settings.model_gateway_base_url.strip().rstrip("/")
+            if platform_access
+            else req.llm.base_url
+        )
+        llm_credential = (
+            req.llm.platform_grant if platform_access else req.llm.api_key
+        )
+    elif req.openai is not None:
+        llm_provider = "openai"
+        llm_model = req.openai.model
+        llm_base_url = None
+        llm_credential = req.openai.api_key
+    else:
+        llm_provider = None
+        llm_model = None
+        llm_base_url = None
+        llm_credential = None
     job = models.Job(
         user_id=user.id,
         track_type=req.track_type,
@@ -359,17 +397,22 @@ def _create_job_from_config(
     )
     db.add(job)
     db.flush()
-    if llm_api_key:
+    if llm_credential:
         secret_expires_at = now + timedelta(
             seconds=get_settings().job_secret_ttl_seconds
         )
         db.add(
             models.JobSecret(
                 job_id=job.id,
-                # The current proposer consumes an OpenAI-compatible client.
-                # Actual provider identity is retained on Job metadata.
-                provider="openai",
-                encrypted_api_key=job_secrets.encrypt_secret(llm_api_key),
+                # Both BYOK and the opaque managed grant drive the same
+                # OpenAI-compatible client. The provider tag keeps them
+                # unambiguous and prevents accidentally using a grant as BYOK.
+                provider=(
+                    "dronedream_gateway"
+                    if platform_access
+                    else "openai"
+                ),
+                encrypted_api_key=job_secrets.encrypt_secret(llm_credential),
                 expires_at=secret_expires_at,
             )
         )
@@ -576,23 +619,34 @@ def rerun_job(
     rerun_llm: schemas.LLMProviderConfig | None = None
     if strategy in {"gpt", "llm_harness"}:
         provider_config = llm or openai
-        if provider_config is None or not provider_config.api_key:
+        if provider_config is None:
             raise JobServiceError(
                 "INVALID_INPUT",
-                "llm.api_key (or legacy openai.api_key) is required when rerunning "
-                "a model-guided job.",
+                "llm credentials are required when rerunning a model-guided job.",
                 http_status=422,
             )
-        if llm is not None or source.llm_provider not in {None, "openai"}:
+        if isinstance(provider_config, schemas.LLMProviderConfig):
+            credential_present = (
+                provider_config.platform_grant
+                if provider_config.access_mode == "platform"
+                else provider_config.api_key
+            )
+        else:
+            credential_present = provider_config.api_key
+        if not credential_present:
+            raise JobServiceError(
+                "INVALID_INPUT",
+                "A model credential is required when rerunning a model-guided job.",
+                http_status=422,
+            )
+        if isinstance(provider_config, schemas.LLMProviderConfig):
             rerun_llm = schemas.LLMProviderConfig(
-                provider=(llm.provider if llm is not None else source.llm_provider or "openai"),
+                access_mode=provider_config.access_mode,
+                provider=provider_config.provider,
                 api_key=provider_config.api_key,
-                model=(
-                    provider_config.model
-                    if provider_config.model is not None
-                    else source.openai_model
-                ),
-                base_url=(llm.base_url if llm is not None else source.llm_base_url),
+                platform_grant=provider_config.platform_grant,
+                model=provider_config.model,
+                base_url=provider_config.base_url,
             )
         else:
             rerun_openai = schemas.OpenAIConfig(

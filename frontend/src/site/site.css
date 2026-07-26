@@ -1150,6 +1150,26 @@ html[lang="zh-CN"] .site-hero h1 {
   vertical-align: top;
 }
 
+.pricing-allowance {
+  display: grid;
+  gap: 0.18rem;
+  margin-top: 0.75rem;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid #e3e5ee;
+  border-radius: 14px;
+  background: #f8f8fc;
+}
+
+.pricing-allowance strong {
+  color: #25283a;
+  font-size: clamp(1.05rem, 1.45vw, 1.35rem);
+}
+
+.pricing-allowance span {
+  color: #73788b;
+  font-size: 0.78rem;
+}
+
 .pricing-card > button {
   min-height: 42px;
   margin-top: clamp(0.75rem, 1.5vh, 1.25rem);
@@ -1191,6 +1211,14 @@ html[lang="zh-CN"] .site-hero h1 {
   color: #484d60;
   font-size: clamp(0.79rem, 1vw, 0.92rem);
   line-height: 1.4;
+}
+
+.pricing-credit-definition {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0.8rem auto 0;
+  color: #7b8090;
+  font-size: 0.78rem;
+  text-align: center;
 }
 
 @media (min-width: 901px) {
@@ -1316,6 +1344,7 @@ html[lang="zh-CN"] .site-hero h1 {
   cursor: pointer;
 }
 .payment-methods button[aria-pressed="true"] { border-color: #7ceaff; background: rgba(124,234,255,.08); }
+.payment-methods button:disabled { opacity: .42; cursor: not-allowed; }
 .payment-method-logo {
   display: grid;
   width: 34px;
@@ -1338,6 +1367,20 @@ html[lang="zh-CN"] .site-hero h1 {
   font-weight: 740;
 }
 .payment-state { margin-bottom: 0; text-align: center; }
+.payment-qr {
+  display: grid;
+  justify-items: center;
+  gap: .8rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: rgba(255,255,255,.06);
+}
+.payment-qr img {
+  width: min(260px, 72vw);
+  border-radius: 10px;
+  background: #fff;
+}
 
 /* Community */
 .community-page {

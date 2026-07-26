@@ -813,8 +813,10 @@ describe("NewJob experiment wizard", () => {
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
     expect(createSpy.mock.calls[0][0].optimizer_strategy).toBe("llm_harness");
     expect(createSpy.mock.calls[0][0].llm).toEqual({
+      access_mode: "byok",
       provider: "qwen",
       api_key: "dashscope-key",
+      platform_grant: null,
       model: "qwen-plus",
       base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     });

@@ -5,11 +5,15 @@ import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 
 function ModelAccessProbe() {
-  const { settings, selectProvider } = useModelAccess();
+  const { settings, selectAccessMode, selectProvider } = useModelAccess();
   return (
     <>
       <output aria-label="provider">{settings.provider}</output>
       <output aria-label="api-key">{settings.apiKey}</output>
+      <output aria-label="access-mode">{settings.accessMode}</output>
+      <button type="button" onClick={() => selectAccessMode("byok")}>
+        Use my key
+      </button>
       <button type="button" onClick={() => selectProvider("qwen")}>
         Select Qwen
       </button>
@@ -38,6 +42,25 @@ describe("ModelAccessProvider", () => {
     await waitFor(() => {
       expect(window.localStorage.getItem("dronedream:model-access:v1"))
         .not.toContain("openai-secret");
+    });
+  });
+
+  it("defaults to the included platform allowance and persists only the mode", async () => {
+    render(
+      <ModelAccessProvider
+        initialSettings={{ accessMode: "platform", apiKey: "never-persist" }}
+      >
+        <ModelAccessProbe />
+      </ModelAccessProvider>,
+    );
+
+    expect(screen.getByLabelText("access-mode")).toHaveTextContent("platform");
+    fireEvent.click(screen.getByRole("button", { name: "Use my key" }));
+    expect(screen.getByLabelText("access-mode")).toHaveTextContent("byok");
+    await waitFor(() => {
+      const stored = window.localStorage.getItem("dronedream:model-access:v1") ?? "";
+      expect(stored).toContain("\"accessMode\":\"byok\"");
+      expect(stored).not.toContain("never-persist");
     });
   });
 });

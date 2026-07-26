@@ -34,6 +34,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        protected_namespaces=("model_validate", "model_dump", "settings_"),
     )
 
     app_env: str = Field(default="development")
@@ -91,6 +92,12 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=1, ge=0, le=5)
     llm_max_response_bytes: int = Field(default=1_000_000, ge=1024, le=10_000_000)
     llm_max_prompt_bytes: int = Field(default=262_144, ge=32_768, le=2_000_000)
+    model_gateway_base_url: str = Field(default="")
+    model_gateway_managed_model_alias: str = Field(
+        default="DroneDream Managed",
+        min_length=1,
+        max_length=128,
+    )
     # User-supplied LLM credentials are deliberately short-lived even if a job
     # remains queued because no worker is available.  Terminal jobs purge them
     # earlier through the normal lifecycle hooks.
@@ -172,6 +179,19 @@ class Settings(BaseSettings):
                 "CORS_ORIGINS must list exact trusted origins; wildcard origins "
                 "are incompatible with credentialed CORS"
             )
+        if self.model_gateway_base_url.strip():
+            gateway_url = urlsplit(self.model_gateway_base_url.strip().rstrip("/"))
+            if (
+                gateway_url.scheme != "https"
+                or not gateway_url.hostname
+                or gateway_url.username
+                or gateway_url.password
+                or gateway_url.query
+                or gateway_url.fragment
+            ):
+                raise ValueError(
+                    "MODEL_GATEWAY_BASE_URL must be a credential-free absolute HTTPS URL"
+                )
         for origin in self.cors_origin_list:
             parsed_origin = urlsplit(origin)
             try:

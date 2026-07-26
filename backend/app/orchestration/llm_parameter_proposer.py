@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Protocol
@@ -265,21 +266,29 @@ class OpenAIJsonClient:
                     "strict": True,
                 },
             }
+        def create_completion(*, include_response_format: bool) -> Any:
+            arguments: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                # The managed gateway uses this key to make SDK network retries
+                # non-billable duplicates. A deliberate response-format
+                # fallback gets a new key because it is a distinct request.
+                "extra_headers": {
+                    "Idempotency-Key": f"dd-{uuid.uuid4()}",
+                },
+            }
+            if include_response_format:
+                arguments["response_format"] = response_format
+            return client.chat.completions.create(**arguments)
+
         try:
-            chat = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                response_format=response_format,
-            )
+            chat = create_completion(include_response_format=True)
         except Exception as exc:
             if not self._base_url or not _is_unsupported_response_format_error(exc):
                 raise
             # Some OpenAI-compatible providers accept chat completions but not
             # response_format. The prompt and local validator remain strict.
-            chat = client.chat.completions.create(
-                model=model,
-                messages=messages,
-            )
+            chat = create_completion(include_response_format=False)
         content = chat.choices[0].message.content or "{}"
         if len(content.encode("utf-8")) > self._max_response_bytes:
             raise RuntimeError(
@@ -435,11 +444,20 @@ def load_job_api_key(db: Session, job: models.Job) -> str | None:
         # Flush before returning so another code path in this transaction
         # cannot accidentally reuse an expired credential.
         db.flush()
+    expected_secret_provider = (
+        "dronedream_gateway"
+        if job.llm_provider == "dronedream"
+        else "openai"
+    )
     secret = next(
         (
             s
             for s in sorted(job.secrets, key=lambda s: s.created_at, reverse=True)
-            if s.provider == "openai" and s.deleted_at is None and s.encrypted_api_key
+            if (
+                s.provider == expected_secret_provider
+                and s.deleted_at is None
+                and s.encrypted_api_key
+            )
         ),
         None,
     )

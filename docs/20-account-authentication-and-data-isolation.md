@@ -59,8 +59,15 @@ The frontend has a Supabase account layer for public desktop builds:
 - Google and Apple buttons are build flags and stay hidden in the desktop
   WebView until its signed deep-link callback is implemented.
 
-The model API key remains separate from account authentication. It is never
-placed in an experiment draft or persistent browser storage.
+Model access remains separate from account authentication:
+
+- included DroneDream model access uses a short-lived, purpose-scoped gateway
+  grant; the platform provider key exists only in an Edge Function secret;
+- BYOK credentials remain memory-only and are never placed in an experiment
+  draft or persistent browser storage.
+
+The quota, grant, and payment boundary is documented in
+[21 Managed Model Access, Allowances, and Billing](./21-managed-model-access-and-billing.md).
 
 ## Configuration contract
 

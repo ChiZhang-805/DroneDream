@@ -54,6 +54,7 @@ import {
   optimizerStrategyLabel,
 } from "../features/experiment/optimizerStrategies";
 import { useModelAccess } from "../features/settings/ModelAccessContext";
+import { issueManagedModelGrant } from "../features/settings/cloudModelAccess";
 import {
   calculateTrialPlan as calculateTrialPlanFromInputs,
   type TrialPlan,
@@ -814,25 +815,27 @@ function validate(
   const passRate = parseNumber(form.min_pass_rate);
   if (passRate === null || passRate < 0 || passRate > 1) errors.min_pass_rate = t("wizard.validation.between", { min: 0, max: 1 });
   if (optimizerUsesModelAccess(form.optimizer_strategy)) {
-    if (form.llm_api_key.trim() === "") {
-      errors.llm_api_key = t("wizard.validation.apiKeyRequired");
-    } else if (form.llm_api_key.length > 512) {
-      errors.llm_api_key = t("wizard.validation.apiKeyMax");
-    }
-    if (form.llm_provider !== "openai" && form.llm_model.trim() === "") {
-      errors.llm_model = t("wizard.validation.modelRequired");
-    } else if (form.llm_model.length > 128) {
-      errors.llm_model = t("wizard.validation.modelMax");
-    }
-    if (form.llm_provider !== "openai" && form.llm_base_url.trim() === "") {
-      errors.llm_base_url = t("wizard.validation.baseUrlRequired");
-    } else if (
-      form.llm_base_url.trim() !== "" &&
-      !isValidLlmBaseUrl(form.llm_base_url.trim())
-    ) {
-      errors.llm_base_url = t("wizard.validation.baseUrlInvalid");
-    } else if (form.llm_base_url.length > 2048) {
-      errors.llm_base_url = t("wizard.validation.baseUrlMax");
+    if (form.llm_access_mode === "byok") {
+      if (form.llm_api_key.trim() === "") {
+        errors.llm_api_key = t("wizard.validation.apiKeyRequired");
+      } else if (form.llm_api_key.length > 512) {
+        errors.llm_api_key = t("wizard.validation.apiKeyMax");
+      }
+      if (form.llm_provider !== "openai" && form.llm_model.trim() === "") {
+        errors.llm_model = t("wizard.validation.modelRequired");
+      } else if (form.llm_model.length > 128) {
+        errors.llm_model = t("wizard.validation.modelMax");
+      }
+      if (form.llm_provider !== "openai" && form.llm_base_url.trim() === "") {
+        errors.llm_base_url = t("wizard.validation.baseUrlRequired");
+      } else if (
+        form.llm_base_url.trim() !== "" &&
+        !isValidLlmBaseUrl(form.llm_base_url.trim())
+      ) {
+        errors.llm_base_url = t("wizard.validation.baseUrlInvalid");
+      } else if (form.llm_base_url.length > 2048) {
+        errors.llm_base_url = t("wizard.validation.baseUrlMax");
+      }
     }
   }
   return errors;
@@ -977,6 +980,7 @@ function formToRequest(
   form: FormState,
   selections: ParameterSelectionMap,
   catalog: ParameterCatalogResponse,
+  platformGrant: string | null = null,
 ): JobCreateRequest {
   const parameterMap = new Map(catalog.parameters.map((parameter) => [parameter.name, parameter]));
   const parameterSpace: ParameterSpaceSelection[] = selectedParameters(selections).map((selection) => {
@@ -1039,12 +1043,23 @@ function formToRequest(
     },
   };
   if (optimizerUsesModelAccess(form.optimizer_strategy)) {
-    request.llm = {
-      provider: form.llm_provider,
-      api_key: form.llm_api_key.trim(),
-      model: form.llm_model.trim() === "" ? null : form.llm_model.trim(),
-      base_url: form.llm_base_url.trim() === "" ? null : form.llm_base_url.trim(),
-    };
+    request.llm = form.llm_access_mode === "platform"
+      ? {
+          access_mode: "platform",
+          provider: "dronedream",
+          platform_grant: platformGrant,
+          api_key: null,
+          model: null,
+          base_url: null,
+        }
+      : {
+          access_mode: "byok",
+          provider: form.llm_provider,
+          api_key: form.llm_api_key.trim(),
+          platform_grant: null,
+          model: form.llm_model.trim() === "" ? null : form.llm_model.trim(),
+          base_url: form.llm_base_url.trim() === "" ? null : form.llm_base_url.trim(),
+        };
   }
   return request;
 }
@@ -1060,6 +1075,7 @@ function legacyRequest(request: JobCreateRequest): JobCreateRequest {
   delete legacy.max_total_trials;
   delete legacy.llm;
   if (llm) {
+    if (llm.access_mode === "platform" || !llm.api_key) return legacy;
     return {
       ...legacy,
       openai: { api_key: llm.api_key, model: llm.model ?? null },
@@ -1188,6 +1204,7 @@ export function NewJob() {
     ...DEFAULTS,
     ...(initialDraft?.form ?? {}),
     llm_provider: modelAccess.provider,
+    llm_access_mode: modelAccess.accessMode,
     llm_api_key: modelAccess.apiKey,
     llm_model: modelAccess.model,
     llm_base_url: modelAccess.baseUrl,
@@ -1287,6 +1304,7 @@ export function NewJob() {
     setForm((current) => {
       if (
         current.llm_provider === modelAccess.provider
+        && current.llm_access_mode === modelAccess.accessMode
         && current.llm_api_key === modelAccess.apiKey
         && current.llm_model === modelAccess.model
         && current.llm_base_url === modelAccess.baseUrl
@@ -1295,6 +1313,7 @@ export function NewJob() {
       }
       return {
         ...current,
+        llm_access_mode: modelAccess.accessMode,
         llm_provider: modelAccess.provider,
         llm_api_key: modelAccess.apiKey,
         llm_model: modelAccess.model,
@@ -1729,7 +1748,6 @@ export function NewJob() {
     }
     submittingRef.current = true;
     setSubmitting(true);
-    const advancedRequest = formToRequest(form, selections, catalog);
     let usedLegacyApi = false;
     try {
       if (publicDemoConsole) {
@@ -1744,11 +1762,34 @@ export function NewJob() {
         navigate("/dashboard", { replace: false });
         return;
       }
+      const platformGrant = (
+        optimizerUsesModelAccess(form.optimizer_strategy)
+        && form.llm_access_mode === "platform"
+      )
+        ? (await issueManagedModelGrant(
+            "job",
+            workspaceId ?? `draft:${ownerId}`,
+          )).grant
+        : null;
+      const advancedRequest = formToRequest(
+        form,
+        selections,
+        catalog,
+        platformGrant,
+      );
       let created;
       try {
         created = await apiClient.createJob(advancedRequest);
       } catch (error) {
         if (!isLegacyContractRejection(error, advancedRequest)) throw error;
+        if (advancedRequest.llm?.access_mode === "platform") {
+          throw new ApiClientError(
+            "BACKEND_UPGRADE_REQUIRED",
+            t("wizard.experimentalBackendRequired"),
+            null,
+            422,
+          );
+        }
         if (EXPERIMENTAL_OPTIMIZER_STRATEGIES.some(
           (strategy) => strategy === advancedRequest.optimizer_strategy,
         )) {
@@ -2339,7 +2380,10 @@ export function NewJob() {
                 t={t}
                 modelProvider={llmProviderLabel(form.llm_provider, t)}
                 modelName={form.llm_model}
-                modelConfigured={form.llm_api_key.trim() !== ""}
+                modelConfigured={
+                  form.llm_access_mode === "platform"
+                  || form.llm_api_key.trim() !== ""
+                }
               />
             </div>
           </SectionCard>

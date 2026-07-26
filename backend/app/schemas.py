@@ -172,28 +172,51 @@ class OpenAIConfig(_Strict):
 class LLMProviderConfig(_Strict):
     """Provider-neutral configuration for an OpenAI-compatible optimizer.
 
-    ``api_key`` is accepted only in the create/rerun request and is encrypted
-    before persistence.  The response exposes provider/model metadata but
-    never returns this object or the secret.
+    BYOK ``api_key`` and managed ``platform_grant`` values are accepted only in
+    create/rerun or draft-turn requests and are encrypted before persistence
+    when a Job is queued. Responses expose provider/model metadata but never
+    return this object or either credential.
     """
 
+    access_mode: Literal["platform", "byok"] = "byok"
     provider: str = Field(
         default="openai", min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$"
     )
-    api_key: str = Field(min_length=1, max_length=512)
+    api_key: str | None = Field(default=None, max_length=512)
+    platform_grant: str | None = Field(default=None, max_length=128)
     model: str | None = Field(default=None, max_length=128)
     base_url: str | None = Field(default=None, max_length=2048)
 
     @model_validator(mode="after")
     def _validate_provider(self) -> LLMProviderConfig:
         self.provider = self.provider.strip().lower()
-        self.api_key = self.api_key.strip()
-        if not self.api_key:
-            raise ValueError("llm api_key cannot be blank")
+        if self.api_key is not None:
+            self.api_key = self.api_key.strip() or None
+        if self.platform_grant is not None:
+            self.platform_grant = self.platform_grant.strip() or None
         if self.model is not None:
             self.model = self.model.strip() or None
         if self.base_url is not None:
             self.base_url = self.base_url.strip().rstrip("/") or None
+        if self.access_mode == "platform":
+            if self.provider != "dronedream":
+                raise ValueError("platform model access requires provider=dronedream")
+            if self.api_key is not None:
+                raise ValueError("platform model access cannot include api_key")
+            if self.model is not None or self.base_url is not None:
+                raise ValueError(
+                    "platform model and base_url are selected by the DroneDream gateway"
+                )
+            if self.platform_grant is None or not re.fullmatch(
+                r"ddg_[A-Za-z0-9_-]{40,100}",
+                self.platform_grant,
+            ):
+                raise ValueError("platform model access requires a valid scoped grant")
+            return self
+        if self.platform_grant is not None:
+            raise ValueError("BYOK model access cannot include platform_grant")
+        if self.api_key is None:
+            raise ValueError("BYOK model access requires api_key")
         if self.base_url:
             parsed = urlsplit(self.base_url)
             if parsed.scheme not in {"http", "https"} or not parsed.hostname:

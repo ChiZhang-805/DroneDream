@@ -5,7 +5,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { ChangeEvent, RefObject } from "react";
+import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Apple,
@@ -67,6 +67,11 @@ import {
   type ModelProvider,
 } from "./features/settings/ModelAccessContext";
 import { ModelAccessProvider } from "./features/settings/ModelAccessProvider";
+import {
+  CloudModelAccessError,
+  getManagedModelUsage,
+  type ManagedModelUsageSnapshot,
+} from "./features/settings/cloudModelAccess";
 import {
   hasExperimentDraft,
   persistExperimentDraftsForExit,
@@ -239,6 +244,7 @@ function SettingsDialog({
   onClose: () => void;
 }) {
   const { locale, setLocale, t } = useI18n();
+  const auth = useAuth();
   const {
     settings: modelAccess,
     profiles: modelProfiles,
@@ -246,9 +252,64 @@ function SettingsDialog({
     selectProfile,
     addProfile,
     removeActiveProfile,
+    selectAccessMode,
     selectProvider,
     updateSettings,
   } = useModelAccess();
+  const [managedUsage, setManagedUsage] =
+    useState<ManagedModelUsageSnapshot | null>(null);
+  const [managedUsageState, setManagedUsageState] =
+    useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [managedUsageError, setManagedUsageError] = useState<string | null>(null);
+  const [subscriptionOpenError, setSubscriptionOpenError] =
+    useState<string | null>(null);
+  const openSubscriptionPage = useCallback((
+    event: MouseEvent<HTMLAnchorElement>,
+  ) => {
+    if (!isDesktopRuntime()) return;
+    event.preventDefault();
+    setSubscriptionOpenError(null);
+    void import("@tauri-apps/plugin-opener")
+      .then(({ openUrl }) =>
+        openUrl("https://getdronedream.com/pricing/")
+      )
+      .catch(() => {
+        setSubscriptionOpenError(t("settings.model.subscriptionOpenFailed"));
+      });
+  }, [t]);
+  const refreshManagedUsage = useCallback(async () => {
+    if (!auth.account || modelAccess.accessMode !== "platform") return;
+    setManagedUsageState("loading");
+    setManagedUsageError(null);
+    try {
+      setManagedUsage(await getManagedModelUsage());
+      setManagedUsageState("ready");
+    } catch (error) {
+      setManagedUsageState("error");
+      setManagedUsageError(
+        error instanceof CloudModelAccessError
+          ? error.message
+          : t("settings.model.usageUnavailable"),
+      );
+    }
+  }, [auth.account, modelAccess.accessMode, t]);
+  useEffect(() => {
+    void refreshManagedUsage();
+  }, [refreshManagedUsage]);
+  const numberFormatter = new Intl.NumberFormat(locale === "zh-CN" ? "zh-CN" : "en");
+  const creditRatio = managedUsage
+    ? Math.min(
+        100,
+        Math.max(
+          0,
+          managedUsage.plan.included_ai_credits > 0
+            ? managedUsage.usage.consumed_ai_credits
+              / managedUsage.plan.included_ai_credits
+              * 100
+            : 0,
+        ),
+      )
+    : 0;
   const level = runtimeHealthLevel(access);
   const snapshot = access.snapshot;
   const details: string[] = [];
@@ -346,93 +407,226 @@ function SettingsDialog({
       <section className="settings-model-panel" aria-labelledby="settings-model-title">
         <div className="settings-model-heading">
           <h3 id="settings-model-title">{t("settings.model.title")}</h3>
-          <span className={modelAccess.apiKey ? "configured" : undefined}>
+          <span className={
+            modelAccess.accessMode === "platform" || modelAccess.apiKey
+              ? "configured"
+              : undefined
+          }>
             <i aria-hidden="true" />
-            {t(modelAccess.apiKey ? "settings.model.configured" : "settings.model.notConfigured")}
+            {t(
+              modelAccess.accessMode === "platform"
+                ? "settings.model.managed"
+                : modelAccess.apiKey
+                  ? "settings.model.configured"
+                  : "settings.model.notConfigured",
+            )}
           </span>
         </div>
-        <div className="settings-model-profile-row">
-          <label htmlFor="settings_model_profile">
-            <span>{t("settings.model.profile")}</span>
-            <select
-              id="settings_model_profile"
-              value={activeProfileId}
-              onChange={(event) => selectProfile(event.target.value)}
-            >
-              {modelProfiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {modelProviderLabel(profile.provider)} ·{" "}
-                  {profile.model || t("wizard.field.backendDefault")}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="settings-model-access-mode" role="group" aria-label={t("settings.model.accessMode")}>
           <button
             type="button"
-            className="btn"
-            onClick={addProfile}
-            disabled={modelProfiles.length >= 12}
+            className={modelAccess.accessMode === "platform" ? "selected" : undefined}
+            aria-pressed={modelAccess.accessMode === "platform"}
+            onClick={() => selectAccessMode("platform")}
           >
-            {t("settings.model.addProfile")}
+            <strong>{t("settings.model.includedAllowance")}</strong>
+            <span>{t("settings.model.includedAllowanceDetail")}</span>
           </button>
           <button
             type="button"
-            className="btn"
-            onClick={removeActiveProfile}
-            disabled={modelProfiles.length <= 1}
+            className={modelAccess.accessMode === "byok" ? "selected" : undefined}
+            aria-pressed={modelAccess.accessMode === "byok"}
+            onClick={() => selectAccessMode("byok")}
           >
-            {t("settings.model.removeProfile")}
+            <strong>{t("settings.model.byok")}</strong>
+            <span>{t("settings.model.byokDetail")}</span>
           </button>
         </div>
-        <div className="settings-model-grid">
-          <label htmlFor="settings_model_provider">
-            <span>{t("wizard.field.llmProvider")}</span>
-            <select
-              id="settings_model_provider"
-              value={modelAccess.provider}
-              onChange={(event) => selectProvider(event.target.value as ModelProvider)}
-            >
-              <option value="openai">OpenAI</option>
-              <option value="qwen">Qwen</option>
-              <option value="deepseek">DeepSeek</option>
-              <option value="custom">{t("wizard.llm.customProvider")}</option>
-            </select>
-          </label>
-          <label htmlFor="settings_model_name">
-            <span>{t("wizard.field.llmModel")}</span>
-            <input
-              id="settings_model_name"
-              value={modelAccess.model}
-              maxLength={128}
-              onChange={(event) => updateSettings({ model: event.target.value })}
-              placeholder={t("wizard.field.backendDefault")}
-            />
-          </label>
-          <label className="settings-model-wide" htmlFor="settings_model_api_key">
-            <span>{t("wizard.field.llmApiKey")}</span>
-            <input
-              id="settings_model_api_key"
-              type="password"
-              autoComplete="off"
-              value={modelAccess.apiKey}
-              maxLength={512}
-              onChange={(event) => updateSettings({ apiKey: event.target.value })}
-              placeholder={t("settings.model.apiKeyPlaceholder")}
-            />
-          </label>
-          <label className="settings-model-wide" htmlFor="settings_model_base_url">
-            <span>{t("wizard.field.llmBaseUrl")}</span>
-            <input
-              id="settings_model_base_url"
-              type="url"
-              value={modelAccess.baseUrl}
-              maxLength={2048}
-              onChange={(event) => updateSettings({ baseUrl: event.target.value })}
-              placeholder="https://…/v1"
-            />
-          </label>
-        </div>
-        <p className="settings-model-security-note">{t("settings.model.securityNote")}</p>
+        {modelAccess.accessMode === "platform" ? (
+          <div className="settings-model-usage">
+            <div className="settings-model-plan-row">
+              <div>
+                <span>{t("settings.model.currentPlan")}</span>
+                <strong>{managedUsage?.plan.name ?? "Free / Plus / Pro"}</strong>
+              </div>
+              <a
+                href="https://getdronedream.com/pricing/"
+                target="_blank"
+                rel="noreferrer"
+                className="btn"
+                onClick={openSubscriptionPage}
+              >
+                {t("settings.model.manageSubscription")}
+              </a>
+            </div>
+            {subscriptionOpenError ? (
+              <p className="settings-model-usage-message" role="alert">
+                {subscriptionOpenError}
+              </p>
+            ) : null}
+            {!auth.account ? (
+              <p className="settings-model-usage-message">
+                {t("settings.model.signInForAllowance")}
+              </p>
+            ) : managedUsage ? (
+              <>
+                <div className="settings-model-quota-heading">
+                  <span>{t("settings.model.periodUsage")}</span>
+                  <strong>
+                    {numberFormatter.format(managedUsage.usage.consumed_ai_credits)}
+                    {" / "}
+                    {numberFormatter.format(managedUsage.plan.included_ai_credits)}
+                    {" "}
+                    {t("settings.model.credits")}
+                  </strong>
+                </div>
+                <div
+                  className="settings-model-quota-track"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={managedUsage.plan.included_ai_credits}
+                  aria-valuenow={managedUsage.usage.consumed_ai_credits}
+                >
+                  <span style={{ width: `${creditRatio}%` }} />
+                </div>
+                <div className="settings-model-usage-grid">
+                  <div>
+                    <span>{t("settings.model.remaining")}</span>
+                    <strong>{numberFormatter.format(managedUsage.usage.remaining_ai_credits)}</strong>
+                  </div>
+                  <div>
+                    <span>{t("settings.model.requests")}</span>
+                    <strong>{numberFormatter.format(managedUsage.usage.request_count)}</strong>
+                  </div>
+                  <div>
+                    <span>{t("settings.model.inputTokens")}</span>
+                    <strong>{numberFormatter.format(managedUsage.usage.input_tokens)}</strong>
+                  </div>
+                  <div>
+                    <span>{t("settings.model.outputTokens")}</span>
+                    <strong>{numberFormatter.format(managedUsage.usage.output_tokens)}</strong>
+                  </div>
+                </div>
+                <p className="settings-model-period">
+                  {t("settings.model.resetsAt")}:{" "}
+                  {new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(managedUsage.period.ends_at))}
+                  {managedUsage.usage.estimated_request_count > 0
+                    ? ` · ${t("settings.model.estimatedUsage", {
+                        count: managedUsage.usage.estimated_request_count,
+                      })}`
+                    : ""}
+                </p>
+              </>
+            ) : (
+              <p className="settings-model-usage-message" role="status">
+                {managedUsageState === "loading"
+                  ? t("settings.model.loadingUsage")
+                  : managedUsageError ?? t("settings.model.usageUnavailable")}
+              </p>
+            )}
+            {auth.account ? (
+              <button
+                type="button"
+                className="btn settings-model-refresh"
+                disabled={managedUsageState === "loading"}
+                onClick={() => void refreshManagedUsage()}
+              >
+                {t("settings.model.refreshUsage")}
+              </button>
+            ) : null}
+            <p className="settings-model-security-note">
+              {t("settings.model.platformSecurityNote")}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="settings-model-profile-row">
+              <label htmlFor="settings_model_profile">
+                <span>{t("settings.model.profile")}</span>
+                <select
+                  id="settings_model_profile"
+                  value={activeProfileId}
+                  onChange={(event) => selectProfile(event.target.value)}
+                >
+                  {modelProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {modelProviderLabel(profile.provider)} ·{" "}
+                      {profile.model || t("wizard.field.backendDefault")}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="btn"
+                onClick={addProfile}
+                disabled={modelProfiles.length >= 12}
+              >
+                {t("settings.model.addProfile")}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={removeActiveProfile}
+                disabled={modelProfiles.length <= 1}
+              >
+                {t("settings.model.removeProfile")}
+              </button>
+            </div>
+            <div className="settings-model-grid">
+              <label htmlFor="settings_model_provider">
+                <span>{t("wizard.field.llmProvider")}</span>
+                <select
+                  id="settings_model_provider"
+                  value={modelAccess.provider}
+                  onChange={(event) => selectProvider(event.target.value as ModelProvider)}
+                >
+                  <option value="openai">OpenAI</option>
+                  <option value="qwen">Qwen</option>
+                  <option value="deepseek">DeepSeek</option>
+                  <option value="custom">{t("wizard.llm.customProvider")}</option>
+                </select>
+              </label>
+              <label htmlFor="settings_model_name">
+                <span>{t("wizard.field.llmModel")}</span>
+                <input
+                  id="settings_model_name"
+                  value={modelAccess.model}
+                  maxLength={128}
+                  onChange={(event) => updateSettings({ model: event.target.value })}
+                  placeholder={t("wizard.field.backendDefault")}
+                />
+              </label>
+              <label className="settings-model-wide" htmlFor="settings_model_api_key">
+                <span>{t("wizard.field.llmApiKey")}</span>
+                <input
+                  id="settings_model_api_key"
+                  type="password"
+                  autoComplete="off"
+                  value={modelAccess.apiKey}
+                  maxLength={512}
+                  onChange={(event) => updateSettings({ apiKey: event.target.value })}
+                  placeholder={t("settings.model.apiKeyPlaceholder")}
+                />
+              </label>
+              <label className="settings-model-wide" htmlFor="settings_model_base_url">
+                <span>{t("wizard.field.llmBaseUrl")}</span>
+                <input
+                  id="settings_model_base_url"
+                  type="url"
+                  value={modelAccess.baseUrl}
+                  maxLength={2048}
+                  onChange={(event) => updateSettings({ baseUrl: event.target.value })}
+                  placeholder="https://…/v1"
+                />
+              </label>
+            </div>
+            <p className="settings-model-security-note">{t("settings.model.securityNote")}</p>
+          </>
+        )}
       </section>
       {access.desktopRuntime ? (
         <section className="settings-runtime-panel" aria-labelledby="settings-runtime-title">

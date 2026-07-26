@@ -126,22 +126,26 @@ describe("DroneDream public website", () => {
     expect(screen.queryByRole("dialog", { name: /manual/i })).toBeNull();
   });
 
-  it("renders personal and business plans on the dedicated pricing page", () => {
+  it("renders exactly three plans whose capabilities differ only by allowance", () => {
     window.history.replaceState(null, "", "/pricing/");
 
     renderSite();
 
-    expect(screen.getByRole("heading", { name: "Choose the right workspace for every flight." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "The same complete product. More included AI." })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Free" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Plus" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Pro" })).toBeVisible();
-    fireEvent.click(screen.getByRole("tab", { name: "Business" }));
-    expect(screen.getByRole("heading", { name: "Business Free" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Business Plus" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Business Pro" })).toBeVisible();
+    expect(screen.queryByRole("tab")).toBeNull();
+    expect(screen.queryByText(/Business Plus/i)).toBeNull();
+    expect(screen.getByText("100,000")).toBeVisible();
+    expect(screen.getByText("1,000,000")).toBeVisible();
+    expect(screen.getByText("5,000,000")).toBeVisible();
+    expect(screen.getAllByText(
+      "The same Harness, optimizers, simulation, and reports",
+    )).toHaveLength(3);
   });
 
-  it("shows honest inactive payment options without simulating a purchase", () => {
+  it("shows honest inactive payment options without simulating a purchase", async () => {
     render(
       <PricingPage
         locale="en"
@@ -150,7 +154,7 @@ describe("DroneDream public website", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Upgrade Plus" }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Plus" }));
 
     expect(screen.getByRole("dialog", { name: "Choose a payment method" })).toBeVisible();
     expect(screen.getByRole("button", { name: "WeChat Pay" })).toHaveAttribute(
@@ -159,7 +163,9 @@ describe("DroneDream public website", () => {
     );
     expect(screen.getByRole("button", { name: "Alipay" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Continue to payment" })).toBeDisabled();
-    expect(screen.getByText("Merchant payment activation is in progress.")).toBeVisible();
+    expect(
+      await screen.findByText("Merchant payment activation is still required."),
+    ).toBeVisible();
   });
 
   it("requires an account before a visitor can publish a community topic", () => {

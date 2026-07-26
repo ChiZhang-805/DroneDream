@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 
 export type ModelProvider = "openai" | "qwen" | "deepseek" | "custom";
+export type ModelAccessMode = "platform" | "byok";
 
 export function modelProviderLabel(provider: ModelProvider): string {
   return {
@@ -12,6 +13,7 @@ export function modelProviderLabel(provider: ModelProvider): string {
 }
 
 export interface ModelAccessSettings {
+  accessMode: ModelAccessMode;
   provider: ModelProvider;
   apiKey: string;
   model: string;
@@ -27,6 +29,7 @@ export interface ModelAccessContextValue {
   profiles: ModelAccessProfile[];
   activeProfileId: string;
   updateSettings: (values: Partial<ModelAccessSettings>) => void;
+  selectAccessMode: (mode: ModelAccessMode) => void;
   selectProvider: (provider: ModelProvider) => void;
   selectProfile: (profileId: string) => void;
   addProfile: () => void;

@@ -45,6 +45,10 @@ import {
   modelProviderLabel,
   useModelAccess,
 } from "../features/settings/ModelAccessContext";
+import {
+  CloudModelAccessError,
+  issueManagedModelGrant,
+} from "../features/settings/cloudModelAccess";
 import { useI18n } from "../i18n/I18nProvider";
 import type { ExperimentAssistantTurnResponse } from "../types/api";
 
@@ -84,7 +88,8 @@ const COPY = {
     needsReview: "Still to decide",
     model: "Model",
     noModel: "None",
-    modelRequired: "Configure a model and API key in Settings before sending.",
+    managedModel: "DroneDream Managed",
+    modelRequired: "Use the included allowance or configure your API key in Settings.",
     requestFailed: "The model could not compile this draft turn.",
     runtimeOutdated:
       "This installed DroneDreamRuntime does not support AI experiment drafting yet. Update the Runtime before sending again.",
@@ -145,7 +150,8 @@ const COPY = {
     needsReview: "仍需确认",
     model: "模型",
     noModel: "无",
-    modelRequired: "请先在设置中配置模型和 API Key。",
+    managedModel: "DroneDream 托管模型",
+    modelRequired: "请在设置中使用赠送额度，或配置自己的 API Key。",
     requestFailed: "模型未能完成这次实验草稿编译。",
     runtimeOutdated:
       "当前安装的 DroneDreamRuntime 尚不支持 AI 创建实验，请先更新 Runtime 再重新发送。",
@@ -271,6 +277,9 @@ function assistantErrorMessage(
   reason: unknown,
   copy: (typeof COPY)[keyof typeof COPY],
 ): string {
+  if (reason instanceof CloudModelAccessError) {
+    return reason.message || copy.requestFailed;
+  }
   if (!(reason instanceof ApiClientError)) return copy.requestFailed;
   if (reason.httpStatus === 404 || reason.code === "NOT_FOUND") {
     return copy.runtimeOutdated;
@@ -299,11 +308,13 @@ export function ExperimentAssistant() {
   const configuredModelProfiles = modelProfiles.filter((profile) =>
     profile.apiKey.trim(),
   );
-  const selectedModelProfileId = configuredModelProfiles.some(
+  const selectedModelProfileId = modelAccess.accessMode === "platform"
+    ? "managed"
+    : configuredModelProfiles.some(
     (profile) => profile.id === activeProfileId,
   )
-    ? activeProfileId
-    : "none";
+      ? activeProfileId
+      : "none";
   const [draft, setDraft] = useState<AssistantDraft>(loadAssistantDraft);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
@@ -389,7 +400,7 @@ export function ExperimentAssistant() {
       setError(copy.messageTooLong);
       return;
     }
-    if (!modelAccess.apiKey.trim()) {
+    if (modelAccess.accessMode === "byok" && !modelAccess.apiKey.trim()) {
       setError(copy.modelRequired);
       openAppSettings();
       return;
@@ -398,6 +409,12 @@ export function ExperimentAssistant() {
     setPending(true);
     setError(null);
     try {
+      const platformGrant = modelAccess.accessMode === "platform"
+        ? (await issueManagedModelGrant(
+            "assistant",
+            workspaceId ?? `draft:${ownerId}`,
+          )).grant
+        : null;
       const result = await apiClient.compileExperimentAssistantTurn({
         message_id: id,
         message,
@@ -406,12 +423,23 @@ export function ExperimentAssistant() {
         current_values: assistantCurrentValues(draft.form),
         explicit_field_ids: explicitAssistantFields(draft.conversation),
         current_parameters: assistantCurrentParameters(draft.selections),
-        llm: {
-          provider: modelAccess.provider,
-          api_key: modelAccess.apiKey,
-          model: modelAccess.model.trim() || null,
-          base_url: modelAccess.baseUrl.trim() || null,
-        },
+        llm: modelAccess.accessMode === "platform"
+          ? {
+              access_mode: "platform",
+              provider: "dronedream",
+              platform_grant: platformGrant,
+              api_key: null,
+              model: null,
+              base_url: null,
+            }
+          : {
+              access_mode: "byok",
+              provider: modelAccess.provider,
+              api_key: modelAccess.apiKey,
+              platform_grant: null,
+              model: modelAccess.model.trim() || null,
+              base_url: modelAccess.baseUrl.trim() || null,
+            },
       });
       const targetWorkspaceId = workspaceId ?? createExperimentWorkspaceId();
       const next = applyAssistantTurn(
@@ -666,6 +694,9 @@ export function ExperimentAssistant() {
               }
             }}
           >
+            {modelAccess.accessMode === "platform" ? (
+              <option value="managed">{copy.managedModel}</option>
+            ) : null}
             <option value="none">{copy.noModel}</option>
             {configuredModelProfiles.map((profile) => (
               <option key={profile.id} value={profile.id}>

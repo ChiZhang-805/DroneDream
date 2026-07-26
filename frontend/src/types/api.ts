@@ -353,8 +353,10 @@ export interface OpenAIConfig {
 }
 
 export interface LLMProviderConfig {
+  access_mode?: "platform" | "byok";
   provider: string;
-  api_key: string;
+  api_key?: string | null;
+  platform_grant?: string | null;
   model?: string | null;
   base_url?: string | null;
 }

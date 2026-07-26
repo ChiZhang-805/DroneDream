@@ -5009,6 +5009,110 @@ a {
   margin: 0;
 }
 
+.settings-model-access-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.settings-model-access-mode > button {
+  display: grid;
+  gap: 0.18rem;
+  min-height: 68px;
+  padding: 0.72rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  text-align: left;
+}
+
+.settings-model-access-mode > button.selected {
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--border));
+  background: color-mix(in srgb, var(--accent) 11%, var(--panel));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.settings-model-access-mode > button span,
+.settings-model-plan-row span,
+.settings-model-quota-heading span,
+.settings-model-usage-grid span,
+.settings-model-period {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.settings-model-usage {
+  display: grid;
+  gap: 0.72rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+}
+
+.settings-model-plan-row,
+.settings-model-quota-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.settings-model-plan-row > div {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.settings-model-plan-row strong {
+  font-size: 1.15rem;
+}
+
+.settings-model-quota-track {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+
+.settings-model-quota-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #59dcf7, #8d72ee, #de56c9);
+  transition: width 180ms ease;
+}
+
+.settings-model-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.settings-model-usage-grid > div {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+  padding: 0.55rem;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+}
+
+.settings-model-usage-grid strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.88rem;
+}
+
+.settings-model-period,
+.settings-model-usage-message {
+  margin: 0;
+}
+
+.settings-model-refresh {
+  justify-self: start;
+}
+
 .settings-model-heading h3 {
   font-size: 1rem;
 }
