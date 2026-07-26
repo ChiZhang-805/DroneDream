@@ -195,7 +195,7 @@ model calls, simulator runs, or feedback writebacks. This is
 after repository publication and must not be described as permanently blind.
 
 The deterministic fallback outcome campaign contains 15 complete Job runs
-and 573 persisted Trial executions: five seed blocks multiplied by the direct
+and 579 persisted Trial executions: five seed blocks multiplied by the direct
 portfolio, provider-error fallback, and invalid-response fallback arms. Both
 fallback arms match the direct portfolio in all 10 blockwise comparisons for
 normalized Candidates, Trials, budget use, winner, holdout loss, failure

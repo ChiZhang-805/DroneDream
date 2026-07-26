@@ -68,7 +68,7 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     assert outcome_campaign["summary"] == {
         "seed_block_count": 5,
         "arm_run_count": 15,
-        "total_persisted_trials": 573,
+        "total_persisted_trials": 579,
         "fallback_comparison_count": 10,
         "exact_outcome_match_count": 10,
         "all_fallback_outcomes_match_direct_portfolio": True,

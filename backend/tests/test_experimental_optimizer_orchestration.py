@@ -1312,6 +1312,31 @@ def test_identical_experiments_do_not_derive_seed_from_random_database_ids(
         assert first_proposals == second_proposals
 
 
+def test_optimizer_seed_state_ignores_cross_runtime_ulp_noise() -> None:
+    from app.orchestration.experimental_optimizer import _canonical_seed_value
+
+    lower_ulp = {
+        "loss": 0.5823333333333333,
+        "objectives": {"rmse": 0.5823333333333333},
+        "unit_vector": (0.1, 0.2),
+    }
+    upper_ulp = {
+        "loss": 0.5823333333333334,
+        "objectives": {"rmse": 0.5823333333333334},
+        "unit_vector": (0.1, 0.2),
+    }
+    materially_different = {
+        **lower_ulp,
+        "loss": 0.5824333333333333,
+    }
+
+    assert _canonical_seed_value(lower_ulp) == _canonical_seed_value(upper_ulp)
+    assert _canonical_seed_value(lower_ulp) != _canonical_seed_value(
+        materially_different
+    )
+    assert _canonical_seed_value(-0.0) == 0.0
+
+
 def test_experimental_adapter_protects_identity_and_validates_output(
     experimental_ctx: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:

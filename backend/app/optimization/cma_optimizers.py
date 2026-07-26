@@ -28,6 +28,7 @@ from app.optimization.experimental_types import (
     ExperimentalProposal,
     OptimizerObservation,
     OptimizerRequest,
+    canonical_optimizer_seed_value,
 )
 from app.optimization.outcome_contract import (
     OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
@@ -205,18 +206,23 @@ def _observation_seed_payload(item: OptimizerObservation) -> dict[str, Any]:
     """Canonical observation content independent of database-generated IDs."""
 
     return {
-        "generation": item.generation_index,
-        "unit": list(item.unit_vector),
-        "parameters": item.parameters,
-        "loss": item.loss,
-        "objectives": item.objectives,
-        "objective_directions": item.objective_directions,
-        "feasible": item.feasible,
-        "failure_rate": item.failure_rate,
-        "constraints": item.constraints,
-        "strategy": item.optimizer_strategy,
-        "effective_fidelity": item.fidelity,
-        "requested_fidelity": item.requested_fidelity,
+        str(key): value
+        for key, value in canonical_optimizer_seed_value(
+            {
+                "generation": item.generation_index,
+                "unit": list(item.unit_vector),
+                "parameters": item.parameters,
+                "loss": item.loss,
+                "objectives": item.objectives,
+                "objective_directions": item.objective_directions,
+                "feasible": item.feasible,
+                "failure_rate": item.failure_rate,
+                "constraints": item.constraints,
+                "strategy": item.optimizer_strategy,
+                "effective_fidelity": item.fidelity,
+                "requested_fidelity": item.requested_fidelity,
+            }
+        ).items()
     }
 
 
@@ -316,7 +322,7 @@ def _canonical_seed(
         "extra": extra or {},
     }
     encoded = json.dumps(
-        payload,
+        canonical_optimizer_seed_value(payload),
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,

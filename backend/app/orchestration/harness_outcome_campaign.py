@@ -153,7 +153,8 @@ def _normalized_json(value: object) -> object:
     if isinstance(value, float):
         if not math.isfinite(value):
             raise ValueError("campaign outcome contains a non-finite number")
-        return value
+        normalized = float(format(value, ".12g"))
+        return 0.0 if normalized == 0.0 else normalized
     if isinstance(value, list | tuple):
         return [_normalized_json(item) for item in value]
     if isinstance(value, dict):

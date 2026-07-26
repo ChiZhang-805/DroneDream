@@ -43,7 +43,7 @@ def test_committed_campaign_is_strictly_equivalent_and_claim_bounded() -> None:
     assert artifact["summary"] == {
         "seed_block_count": 5,
         "arm_run_count": 15,
-        "total_persisted_trials": 573,
+        "total_persisted_trials": 579,
         "fallback_comparison_count": 10,
         "exact_outcome_match_count": 10,
         "all_fallback_outcomes_match_direct_portfolio": True,

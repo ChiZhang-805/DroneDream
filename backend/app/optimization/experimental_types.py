@@ -34,6 +34,36 @@ EXPERIMENTAL_OPTIMIZER_STRATEGIES: tuple[ExperimentalOptimizerStrategy, ...] = (
     "bipop_cma_es",
     "optimizer_portfolio",
 )
+OPTIMIZER_SEED_FLOAT_SIGNIFICANT_DIGITS = 12
+
+
+def canonical_optimizer_seed_value(value: Any) -> Any:
+    """Return stable JSON state for deterministic optimizer seed derivation.
+
+    Supported Python runtimes can differ by one binary ULP when aggregating
+    the same finite metrics. Hashing the raw float spelling would turn that
+    harmless representation noise into an unrelated optimizer random stream.
+    """
+
+    if value is None or isinstance(value, str | bool | int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("optimizer seed state must contain only finite numbers")
+        normalized = float(
+            format(value, f".{OPTIMIZER_SEED_FLOAT_SIGNIFICANT_DIGITS}g")
+        )
+        return 0.0 if normalized == 0.0 else normalized
+    if isinstance(value, Mapping):
+        return {
+            str(key): canonical_optimizer_seed_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list | tuple):
+        return [canonical_optimizer_seed_value(item) for item in value]
+    raise ValueError(
+        f"optimizer seed state contains unsupported {type(value).__name__}"
+    )
 
 
 class _FrozenDict(dict[str, Any]):

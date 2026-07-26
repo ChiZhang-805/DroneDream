@@ -22,6 +22,9 @@ from app.optimization.experimental_types import (
     OptimizerObservation,
     OptimizerRequest,
 )
+from app.optimization.experimental_types import (
+    canonical_optimizer_seed_value as _canonical_seed_value,
+)
 from app.optimization.outcome_contract import (
     OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
 )
@@ -368,20 +371,25 @@ def _seed_for_request(
     observations: tuple[OptimizerObservation, ...],
 ) -> int:
     history = [
-        {
-            "generation": item.generation_index,
-            "unit_vector": item.unit_vector,
-            "loss": item.loss,
-            "feasible": item.feasible,
-            "failure_rate": item.failure_rate,
-            "fidelity": item.fidelity,
-            "requested_fidelity": item.requested_fidelity,
-            "objectives": item.objectives,
-            "constraints": item.constraints,
-            "optimizer_strategy": item.optimizer_strategy,
-            "optimizer_metadata": item.optimizer_metadata,
-            "completed": item.completed,
-        }
+        cast(
+            dict[str, Any],
+            _canonical_seed_value(
+                {
+                    "generation": item.generation_index,
+                    "unit_vector": item.unit_vector,
+                    "loss": item.loss,
+                    "feasible": item.feasible,
+                    "failure_rate": item.failure_rate,
+                    "fidelity": item.fidelity,
+                    "requested_fidelity": item.requested_fidelity,
+                    "objectives": item.objectives,
+                    "constraints": item.constraints,
+                    "optimizer_strategy": item.optimizer_strategy,
+                    "optimizer_metadata": item.optimizer_metadata,
+                    "completed": item.completed,
+                }
+            ),
+        )
         for item in observations
     ]
     history.sort(
@@ -397,9 +405,10 @@ def _seed_for_request(
         "baseline_parameters": job.baseline_parameter_json,
         "history": history,
     }
+    canonical_payload = _canonical_seed_value(payload)
     digest = hashlib.sha256(
         json.dumps(
-            payload,
+            canonical_payload,
             sort_keys=True,
             separators=(",", ":"),
             allow_nan=False,
