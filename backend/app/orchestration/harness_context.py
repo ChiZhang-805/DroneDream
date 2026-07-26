@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app import models, schemas
 from app.optimization.outcome_taxonomy import (
+    TrialOutcomeClass,
     classify_trial_outcome,
     is_optimizer_learning_failure,
     is_optimizer_learning_outcome,
@@ -41,6 +42,7 @@ HarnessTrackType = Literal["circle", "u_turn", "lemniscate", "custom", "unknown"
 
 HARNESS_EVIDENCE_SCHEMA_VERSION = "2.4"
 HARNESS_TOOL_REGISTRY_VERSION = "2.1"
+HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION = "1.1"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
 MAX_GENERATION_TREND_ITEMS = 32
@@ -378,6 +380,42 @@ def _safe_metric(value: object, *, depth: int = 0) -> JsonMetric | None:
     return None
 
 
+def compile_provider_safe_metric(value: object) -> JsonMetric | None:
+    """Compile one metric through the production provider trust boundary.
+
+    The public wrapper exists so deterministic contract audits can exercise
+    the same filter as live context compilation without copying its rules.
+    A ``None`` result means the value must not enter provider-visible metrics.
+    """
+
+    return _safe_metric(value)
+
+
+def optimizer_learning_outcome_for_trial(
+    *,
+    scenario_matched: bool,
+    scenario_holdout: bool,
+    status: object,
+    failure_code: object,
+    usable_metric: bool,
+) -> TrialOutcomeClass | None:
+    """Return the trusted training outcome, or ``None`` when quarantined.
+
+    Holdout and unresolved scenario rows are isolated before the closed
+    outcome taxonomy is applied. Infrastructure, cancellation, malformed,
+    and unknown evidence therefore cannot become optimizer observations.
+    """
+
+    if not scenario_matched or scenario_holdout:
+        return None
+    outcome_class = classify_trial_outcome(
+        status=status,
+        failure_code=failure_code,
+        usable_metric=usable_metric,
+    )
+    return outcome_class if is_optimizer_learning_outcome(outcome_class) else None
+
+
 def _candidate_evidence(
     candidate: models.CandidateParameterSet,
     scenario_suite: schemas.ScenarioSuiteConfig | None,
@@ -502,6 +540,8 @@ def _candidate_optimizer_learning_counts(
     completed_count = 0
     failed_count = 0
     for trial in candidate.trials:
+        scenario_matched = True
+        scenario_holdout = False
         if scenario_suite is not None:
             resolution = resolve_scenario_case(
                 scenario_suite,
@@ -509,19 +549,18 @@ def _candidate_optimizer_learning_counts(
                 scenario_config=trial.scenario_config_json,
                 seed=trial.seed,
             )
-            if (
-                not resolution.matched
-                or resolution.case is None
-                or resolution.case.holdout
-            ):
-                continue
+            scenario_matched = resolution.matched and resolution.case is not None
+            scenario_holdout = resolution.case.holdout if resolution.case is not None else False
         else:
             scenario_config = trial.scenario_config_json
             if not isinstance(scenario_config, dict):
-                continue
-            holdout = scenario_config.get("holdout", False)
-            if not isinstance(holdout, bool) or holdout:
-                continue
+                scenario_matched = False
+            else:
+                holdout = scenario_config.get("holdout", False)
+                if not isinstance(holdout, bool):
+                    scenario_matched = False
+                else:
+                    scenario_holdout = holdout
         metric = trial.metric
         usable_metric = (
             trial.status == "COMPLETED"
@@ -530,12 +569,14 @@ def _candidate_optimizer_learning_counts(
             and _finite(metric.max_error) is not None
             and _finite(metric.completion_time) is not None
         )
-        outcome_class = classify_trial_outcome(
+        outcome_class = optimizer_learning_outcome_for_trial(
+            scenario_matched=scenario_matched,
+            scenario_holdout=scenario_holdout,
             status=trial.status,
             failure_code=trial.failure_code,
             usable_metric=usable_metric,
         )
-        if not is_optimizer_learning_outcome(outcome_class):
+        if outcome_class is None:
             continue
         learning_count += 1
         if outcome_class == "success":
@@ -611,8 +652,7 @@ def _search_summary(
         )
 
     learning_counts = [
-        _candidate_optimizer_learning_counts(candidate, scenario_suite)
-        for candidate in candidates
+        _candidate_optimizer_learning_counts(candidate, scenario_suite) for candidate in candidates
     ]
     total_trials = sum(counts[0] for counts in learning_counts)
     failed_trials = sum(counts[2] for counts in learning_counts)
@@ -874,9 +914,7 @@ def _select_candidates(
             item.id,
         ),
     )
-    return tuple(
-        _candidate_evidence(candidate, scenario_suite) for candidate in ordered
-    )
+    return tuple(_candidate_evidence(candidate, scenario_suite) for candidate in ordered)
 
 
 def build_harness_evidence(
@@ -977,8 +1015,7 @@ def eligible_harness_tools(
     # level even when its total run count is greater than one.
     if (
         snapshot.scenarios.training_case_count > 0
-        and snapshot.scenarios.training_replicate_count
-        > snapshot.scenarios.training_case_count
+        and snapshot.scenarios.training_replicate_count > snapshot.scenarios.training_case_count
     ):
         eligible.add("multi_fidelity_mobo")
     if snapshot.search.scored_candidate_count >= 4 and snapshot.search.feasible_candidate_count > 0:
@@ -1018,6 +1055,7 @@ def provider_tool_manifest(
 
 __all__ = [
     "HARNESS_EVIDENCE_SCHEMA_VERSION",
+    "HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION",
     "HARNESS_TOOL_DEFINITIONS",
     "HARNESS_TOOL_REGISTRY",
     "HARNESS_TOOL_REGISTRY_VERSION",
@@ -1026,6 +1064,8 @@ __all__ = [
     "HarnessEvidenceSnapshot",
     "HarnessToolId",
     "build_harness_evidence",
+    "compile_provider_safe_metric",
     "eligible_harness_tools",
+    "optimizer_learning_outcome_for_trial",
     "provider_tool_manifest",
 ]

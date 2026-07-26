@@ -583,3 +583,28 @@ prior freeze.
 
 It is a regression tool, not evidence that model routing outperforms the
 deterministic portfolio; that claim still requires the frozen simulator campaign.
+
+### Locked deterministic router-policy holdout
+
+The separate
+`backend/tests/fixtures/harness_routing_policy_holdout_v1.jsonl` corpus is a
+16-case, hash-locked **deterministic tool-eligibility policy holdout**. It is
+not the 24-case development corpus, not a provider/model benchmark, and not
+PX4/Gazebo evidence. Its strict manifest binds the canonical corpus, case IDs,
+compiled policy inputs, and current development-corpus hash; all case IDs are
+required to be disjoint.
+
+`backend/scripts/run_locked_harness_routing_policy_holdout.py` evaluates the
+exact production `eligible_harness_tools` capability gate without any network
+or simulator call. Every expected eligible-tool set must match exactly. The
+result is an immutable evaluation-only artifact. A central flow guard rejects
+attempts to route the locked source into development evidence, model prompt
+examples, router training, or runtime optimizer feedback, and the online
+provider campaign refuses the locked source before creating a client.
+
+This closes deterministic policy-boundary regression and leakage risks. It does
+not show that an LLM selects the best optimizer or that any optimizer improves
+simulation outcomes. The hand-authored labels are repository-visible after the
+freeze, so this is also not a permanently blind generalization benchmark. Those
+claims still require a separately frozen provider campaign and locked simulator
+comparisons.

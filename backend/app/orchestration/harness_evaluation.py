@@ -43,6 +43,14 @@ HARNESS_ROUTING_MIN_CATEGORY_PASS_RATE = 2 / 3
 HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT = 0.15
 HARNESS_ROUTING_PREDICTION_ARTIFACT_SCHEMA_VERSION = "1.0"
 
+HarnessRoutingCorpusRole = Literal["development", "locked_holdout"]
+HarnessRoutingResultDestination = Literal[
+    "evaluation_artifact",
+    "development_evidence",
+    "router_training",
+    "runtime_feedback",
+]
+
 HarnessEvalCategory = Literal[
     "cold_start",
     "local_progress",
@@ -209,9 +217,7 @@ class HarnessRoutingPredictionArtifact(_ClosedModel):
         }
         for field_name, expected_value in expected.items():
             if getattr(self, field_name) != expected_value:
-                raise ValueError(
-                    f"{field_name} must equal current version {expected_value}"
-                )
+                raise ValueError(f"{field_name} must equal current version {expected_value}")
         return self
 
 
@@ -223,6 +229,24 @@ def _canonical_json(value: object) -> str:
         ensure_ascii=False,
         allow_nan=False,
     )
+
+
+def assert_routing_result_flow(
+    source_role: HarnessRoutingCorpusRole,
+    destination: HarnessRoutingResultDestination,
+) -> None:
+    """Fail closed when locked holdout evidence could influence development.
+
+    Holdout labels and results may only be materialized as immutable evaluation
+    artifacts. They must never become prompt examples, router-training data,
+    development evidence, or live optimizer feedback.
+    """
+
+    if source_role == "locked_holdout" and destination != "evaluation_artifact":
+        raise ValueError(
+            "locked Harness routing holdout results are evaluation-only and "
+            f"cannot flow to {destination}"
+        )
 
 
 def routing_corpus_sha256(
@@ -237,9 +261,7 @@ def routing_prompt_suite_sha256(
 ) -> str:
     prompts: list[dict[str, str]] = []
     for case in cases:
-        system, user = build_decision_messages(
-            compile_routing_eval_snapshot(case)
-        )
+        system, user = build_decision_messages(compile_routing_eval_snapshot(case))
         prompts.append(
             {
                 "case_id": case.case_id,
@@ -273,8 +295,7 @@ def load_routing_prediction_artifact(
         missing = sorted(expected_ids - set(artifact.predictions))
         extra = sorted(set(artifact.predictions) - expected_ids)
         raise ValueError(
-            "prediction artifact must exactly cover the corpus; "
-            f"missing={missing}, extra={extra}"
+            f"prediction artifact must exactly cover the corpus; missing={missing}, extra={extra}"
         )
     return artifact
 
@@ -285,10 +306,7 @@ def grade_routing_prediction_artifact(
 ) -> HarnessRoutingEvalReport:
     return build_routing_eval_report(
         cases,
-        {
-            case_id: prediction.selected_tool
-            for case_id, prediction in artifact.predictions.items()
-        },
+        {case_id: prediction.selected_tool for case_id, prediction in artifact.predictions.items()},
     )
 
 
@@ -385,14 +403,10 @@ def compile_routing_eval_snapshot(
         )
         for item in stimulus.tool_history
     )
-    ordered_scores = sorted(
-        (stimulus.baseline_score, stimulus.best_score)
-    )
+    ordered_scores = sorted((stimulus.baseline_score, stimulus.best_score))
     score_gap = ordered_scores[1] - ordered_scores[0]
     relative_score_gap = (
-        score_gap / abs(ordered_scores[0])
-        if abs(ordered_scores[0]) > 1e-12
-        else None
+        score_gap / abs(ordered_scores[0]) if abs(ordered_scores[0]) > 1e-12 else None
     )
     return HarnessEvidenceSnapshot(
         job=HarnessJobEvidence(
@@ -430,13 +444,10 @@ def compile_routing_eval_snapshot(
             completed_candidate_count=stimulus.scored_candidate_count,
             incomplete_candidate_count=0,
             completed_candidate_rate=1.0,
-            feasibility_observed_candidate_count=(
-                stimulus.scored_candidate_count
-            ),
+            feasibility_observed_candidate_count=(stimulus.scored_candidate_count),
             feasible_candidate_count=stimulus.feasible_candidate_count,
             feasible_candidate_rate=(
-                stimulus.feasible_candidate_count
-                / stimulus.scored_candidate_count
+                stimulus.feasible_candidate_count / stimulus.scored_candidate_count
             ),
             total_trial_count=(stimulus.scored_candidate_count * stimulus.trials_per_candidate),
             failed_trial_count=round(
@@ -530,9 +541,7 @@ def summarize_routing_baselines(
         )
     constant_results = tuple(constant_result_items)
     best_passed = max(result.passed_count for result in constant_results)
-    expected_random_passed = sum(
-        len(case.acceptable_tools) / len(tool_ids) for case in cases
-    )
+    expected_random_passed = sum(len(case.acceptable_tools) / len(tool_ids) for case in cases)
     return HarnessRoutingBaselineSummary(
         case_count=len(cases),
         tool_count=len(tool_ids),
@@ -541,9 +550,7 @@ def summarize_routing_baselines(
         best_constant_passed_count=best_passed,
         best_constant_pass_rate=best_passed / len(cases),
         best_constant_tools=tuple(
-            result.tool_id
-            for result in constant_results
-            if result.passed_count == best_passed
+            result.tool_id for result in constant_results if result.passed_count == best_passed
         ),
         constant_tool_results=constant_results,
     )
@@ -557,16 +564,11 @@ def build_routing_eval_report(
 
     summary = summarize_routing_predictions(cases, predictions)
     baselines = summarize_routing_baselines(cases)
-    absolute_lift_over_best_constant = (
-        summary.pass_rate - baselines.best_constant_pass_rate
-    )
+    absolute_lift_over_best_constant = summary.pass_rate - baselines.best_constant_pass_rate
     failed_requirements: list[str] = []
     if summary.pass_rate < HARNESS_ROUTING_MIN_PASS_RATE:
         failed_requirements.append("overall_pass_rate")
-    if (
-        absolute_lift_over_best_constant
-        < HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT
-    ):
+    if absolute_lift_over_best_constant < HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT:
         failed_requirements.append("lift_over_best_constant")
     failed_requirements.extend(
         f"category_pass_rate:{category}"
@@ -585,9 +587,7 @@ def build_routing_eval_report(
             qualified=not failed_requirements,
             minimum_pass_rate=HARNESS_ROUTING_MIN_PASS_RATE,
             minimum_category_pass_rate=HARNESS_ROUTING_MIN_CATEGORY_PASS_RATE,
-            minimum_lift_over_best_constant=(
-                HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT
-            ),
+            minimum_lift_over_best_constant=(HARNESS_ROUTING_MIN_LIFT_OVER_BEST_CONSTANT),
             failed_requirements=tuple(failed_requirements),
         ),
     )
@@ -601,6 +601,7 @@ __all__ = [
     "HARNESS_ROUTING_PREDICTION_ARTIFACT_SCHEMA_VERSION",
     "HARNESS_ROUTING_REPORT_SCHEMA_VERSION",
     "HarnessRoutingBaselineSummary",
+    "HarnessRoutingCorpusRole",
     "HarnessRoutingEvalCase",
     "HarnessRoutingEvalReport",
     "HarnessRoutingGenerationConfig",
@@ -610,6 +611,8 @@ __all__ = [
     "HarnessRoutingEvalSummary",
     "HarnessRoutingGrade",
     "HarnessRoutingStimulus",
+    "HarnessRoutingResultDestination",
+    "assert_routing_result_flow",
     "build_routing_eval_report",
     "compile_routing_eval_snapshot",
     "grade_routing_decision",

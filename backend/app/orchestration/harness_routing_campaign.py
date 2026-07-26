@@ -9,6 +9,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
+from pydantic import BaseModel
+
 from app.orchestration.decision_harness import (
     HARNESS_PROMPT_TEMPLATE_VERSION,
     build_decision_messages,
@@ -20,10 +22,12 @@ from app.orchestration.harness_context import (
     HARNESS_TOOL_REGISTRY_VERSION,
 )
 from app.orchestration.harness_evaluation import (
+    HarnessRoutingCorpusRole,
     HarnessRoutingEvalCase,
     HarnessRoutingGenerationConfig,
     HarnessRoutingPrediction,
     HarnessRoutingPredictionArtifact,
+    assert_routing_result_flow,
     compile_routing_eval_snapshot,
     routing_corpus_sha256,
     routing_prompt_suite_sha256,
@@ -51,9 +55,11 @@ def run_harness_routing_campaign(
     model_snapshot: str,
     generation_config: HarnessRoutingGenerationConfig,
     client_factory: HarnessRoutingClientFactory,
+    source_role: HarnessRoutingCorpusRole = "development",
 ) -> HarnessRoutingPredictionArtifact:
     """Run every case and return an artifact only after complete validation."""
 
+    assert_routing_result_flow(source_role, "development_evidence")
     normalized_provider = provider.strip()
     normalized_model = model_snapshot.strip()
     if not normalized_provider:
@@ -104,7 +110,7 @@ def run_harness_routing_campaign(
 
 def write_frozen_routing_artifact(
     path: Path,
-    artifact: HarnessRoutingPredictionArtifact,
+    artifact: BaseModel,
 ) -> None:
     """Atomically create a new artifact without replacing a prior freeze."""
 

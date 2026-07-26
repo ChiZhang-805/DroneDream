@@ -22,19 +22,38 @@ REPOSITORY_ROOT = BACKEND_ROOT.parent
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
+from app.orchestration.harness_ablation import (  # noqa: E402
+    load_harness_ablation_artifact,
+)
 from app.orchestration.harness_evaluation import (  # noqa: E402
     grade_routing_prediction_artifact,
     load_routing_eval_cases,
     load_routing_prediction_artifact,
 )
+from app.orchestration.harness_routing_holdout import (  # noqa: E402
+    load_locked_routing_policy_holdout,
+    load_locked_routing_policy_result,
+)
 
-REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v1"
+REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v2"
 DEFAULT_ROUTING_CORPUS = BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_eval_v1.jsonl"
 DEFAULT_ROUTING_PREDICTIONS = (
     BACKEND_ROOT / "evaluation_artifacts" / "harness-routing-gpt-4.1-2025-04-14.json"
 )
 DEFAULT_SIMULATION_COVERAGE = (
     BACKEND_ROOT / "evaluation_artifacts" / "simulation-coverage-mock-v2.json"
+)
+DEFAULT_HARNESS_ABLATIONS = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v1.json"
+)
+DEFAULT_ROUTING_HOLDOUT_CORPUS = (
+    BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_policy_holdout_v1.jsonl"
+)
+DEFAULT_ROUTING_HOLDOUT_MANIFEST = (
+    BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_policy_holdout_v1.manifest.json"
+)
+DEFAULT_ROUTING_HOLDOUT_RESULT = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-routing-policy-holdout-v1.json"
 )
 
 
@@ -206,6 +225,10 @@ def build_report_evidence_bundle(
     routing_corpus_path: Path = DEFAULT_ROUTING_CORPUS,
     routing_predictions_path: Path = DEFAULT_ROUTING_PREDICTIONS,
     simulation_coverage_path: Path = DEFAULT_SIMULATION_COVERAGE,
+    harness_ablations_path: Path = DEFAULT_HARNESS_ABLATIONS,
+    routing_holdout_corpus_path: Path = DEFAULT_ROUTING_HOLDOUT_CORPUS,
+    routing_holdout_manifest_path: Path = DEFAULT_ROUTING_HOLDOUT_MANIFEST,
+    routing_holdout_result_path: Path = DEFAULT_ROUTING_HOLDOUT_RESULT,
 ) -> dict[str, Any]:
     """Build a deterministic report bundle from verified repository artifacts."""
 
@@ -247,6 +270,63 @@ def build_report_evidence_bundle(
     }
     coverage_payload = _load_json_object(simulation_coverage_path)
     coverage = summarize_simulation_coverage(coverage_payload)
+    ablation_artifact = load_harness_ablation_artifact(harness_ablations_path)
+    harness_ablations = {
+        "evidence_class": ablation_artifact["evidence_class"],
+        "claim_boundary": ablation_artifact["claim_boundary"],
+        "causal_claim_permitted": ablation_artifact["causal_claim_permitted"],
+        "physical_fidelity": ablation_artifact["physical_fidelity"],
+        "live_model_calls": ablation_artifact["live_model_calls"],
+        "simulator_runs": ablation_artifact["simulator_runs"],
+        "artifact_sha256": ablation_artifact["artifact_sha256"],
+        "summary": ablation_artifact["summary"],
+        "component_rows": ablation_artifact["component_rows"],
+    }
+    holdout_bundle = load_locked_routing_policy_holdout(
+        routing_holdout_corpus_path,
+        routing_holdout_manifest_path,
+        routing_corpus_path,
+    )
+    holdout_result = load_locked_routing_policy_result(
+        routing_holdout_result_path,
+        holdout_bundle,
+    )
+    holdout_category_counts: Counter[str] = Counter()
+    holdout_category_passes: Counter[str] = Counter()
+    for grade in holdout_result.grades:
+        holdout_category_counts[grade.category] += 1
+        holdout_category_passes[grade.category] += int(grade.passed)
+    routing_policy_holdout = {
+        "evidence_class": holdout_result.evidence_class,
+        "claim_boundary": (
+            "Measures exact production tool-eligibility sets on a separate, "
+            "hash-locked deterministic policy corpus. It makes no LLM routing "
+            "quality, simulator outcome, or permanent-blindness claim."
+        ),
+        "corpus_role": holdout_result.source_role,
+        "case_count": holdout_result.case_count,
+        "passed_count": holdout_result.passed_count,
+        "pass_rate": holdout_result.pass_rate,
+        "qualified": holdout_result.qualified,
+        "online_calls": 0,
+        "simulator_runs": 0,
+        "feedback_writebacks": 0,
+        "corpus_sha256": holdout_result.corpus_sha256,
+        "manifest_sha256": holdout_result.manifest_sha256,
+        "policy_input_suite_sha256": holdout_result.policy_input_suite_sha256,
+        "development_corpus_sha256": holdout_result.development_corpus_sha256,
+        "category_rows": [
+            {
+                "category": category,
+                "case_count": holdout_category_counts[category],
+                "passed_count": holdout_category_passes[category],
+                "pass_rate": (
+                    holdout_category_passes[category] / holdout_category_counts[category]
+                ),
+            }
+            for category in sorted(holdout_category_counts)
+        ],
+    }
     sources = {
         "routing_corpus": {
             "path": routing_corpus_path.relative_to(REPOSITORY_ROOT).as_posix(),
@@ -260,12 +340,30 @@ def build_report_evidence_bundle(
             "path": simulation_coverage_path.relative_to(REPOSITORY_ROOT).as_posix(),
             "sha256": _sha256_file(simulation_coverage_path),
         },
+        "harness_ablations": {
+            "path": harness_ablations_path.relative_to(REPOSITORY_ROOT).as_posix(),
+            "sha256": _sha256_file(harness_ablations_path),
+        },
+        "routing_policy_holdout_corpus": {
+            "path": routing_holdout_corpus_path.relative_to(REPOSITORY_ROOT).as_posix(),
+            "sha256": _sha256_file(routing_holdout_corpus_path),
+        },
+        "routing_policy_holdout_manifest": {
+            "path": routing_holdout_manifest_path.relative_to(REPOSITORY_ROOT).as_posix(),
+            "sha256": _sha256_file(routing_holdout_manifest_path),
+        },
+        "routing_policy_holdout_result": {
+            "path": routing_holdout_result_path.relative_to(REPOSITORY_ROOT).as_posix(),
+            "sha256": _sha256_file(routing_holdout_result_path),
+        },
     }
     unsigned_bundle: dict[str, Any] = {
         "schema_version": REPORT_EVIDENCE_SCHEMA_VERSION,
         "sources": sources,
         "routing": routing,
         "simulation_coverage": coverage,
+        "harness_ablations": harness_ablations,
+        "routing_policy_holdout": routing_policy_holdout,
     }
     return {
         **unsigned_bundle,
@@ -300,6 +398,8 @@ def write_report_evidence_bundle(
         return
     routing = bundle["routing"]
     coverage = bundle["simulation_coverage"]
+    harness_ablations = bundle["harness_ablations"]
+    routing_policy_holdout = bundle["routing_policy_holdout"]
     _write_csv(
         csv_directory / "routing_categories.csv",
         routing["category_rows"],
@@ -311,6 +411,14 @@ def write_report_evidence_bundle(
     _write_csv(
         csv_directory / "synthetic_scenario_holdout.csv",
         coverage["scenario_rows"],
+    )
+    _write_csv(
+        csv_directory / "harness_contract_ablations.csv",
+        harness_ablations["component_rows"],
+    )
+    _write_csv(
+        csv_directory / "routing_policy_holdout_categories.csv",
+        routing_policy_holdout["category_rows"],
     )
 
 
@@ -342,6 +450,26 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_SIMULATION_COVERAGE,
     )
+    parser.add_argument(
+        "--harness-ablations",
+        type=Path,
+        default=DEFAULT_HARNESS_ABLATIONS,
+    )
+    parser.add_argument(
+        "--routing-holdout-corpus",
+        type=Path,
+        default=DEFAULT_ROUTING_HOLDOUT_CORPUS,
+    )
+    parser.add_argument(
+        "--routing-holdout-manifest",
+        type=Path,
+        default=DEFAULT_ROUTING_HOLDOUT_MANIFEST,
+    )
+    parser.add_argument(
+        "--routing-holdout-result",
+        type=Path,
+        default=DEFAULT_ROUTING_HOLDOUT_RESULT,
+    )
     return parser.parse_args()
 
 
@@ -351,6 +479,10 @@ def main() -> int:
         routing_corpus_path=args.routing_corpus.resolve(),
         routing_predictions_path=args.routing_predictions.resolve(),
         simulation_coverage_path=args.simulation_coverage.resolve(),
+        harness_ablations_path=args.harness_ablations.resolve(),
+        routing_holdout_corpus_path=args.routing_holdout_corpus.resolve(),
+        routing_holdout_manifest_path=args.routing_holdout_manifest.resolve(),
+        routing_holdout_result_path=args.routing_holdout_result.resolve(),
     )
     write_report_evidence_bundle(
         bundle,

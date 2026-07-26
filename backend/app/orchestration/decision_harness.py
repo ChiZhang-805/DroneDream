@@ -45,7 +45,7 @@ HarnessDispatchStrategy = HarnessToolId
 HarnessDecisionSource = Literal["model", "deterministic_fallback"]
 
 _DEFAULT_MODEL = "gpt-4.1"
-_FALLBACK_TOOL: HarnessToolId = "optimizer_portfolio"
+HARNESS_FALLBACK_TOOL: HarnessToolId = "optimizer_portfolio"
 _MAX_RATIONALE_LENGTH = 400
 HARNESS_PROMPT_TEMPLATE_VERSION = "1.1"
 HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.1"
@@ -312,7 +312,7 @@ def _fallback(
         "harness_decision_fallback",
         {
             "reason": reason,
-            "tool_id": _FALLBACK_TOOL,
+            "tool_id": HARNESS_FALLBACK_TOOL,
             "evidence_sha256": evidence_sha256,
             "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
             "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
@@ -320,7 +320,7 @@ def _fallback(
         },
     )
     return HarnessDecision(
-        tool_id=_FALLBACK_TOOL,
+        tool_id=HARNESS_FALLBACK_TOOL,
         rationale=(
             "The model decision was unavailable or invalid, so the bounded "
             "deterministic optimizer portfolio was selected."
@@ -525,6 +525,7 @@ def as_experimental_strategy(
 
 __all__ = [
     "HARNESS_DECISION_TRACE_SCHEMA_VERSION",
+    "HARNESS_FALLBACK_TOOL",
     "HARNESS_PROMPT_TEMPLATE_VERSION",
     "HARNESS_TOOL_REGISTRY",
     "HarnessDecision",

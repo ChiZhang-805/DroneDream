@@ -35,6 +35,8 @@ Every result, table, and figure carries one of these labels:
 | Label | Permitted claim | Forbidden upgrade |
 | --- | --- | --- |
 | `SOURCE_VERIFIED` | Code path and automated contract tests exist | Customer Runtime or physical outcome |
+| `SOURCE_ABLATION` | Constructed probes compare a shipped guard with an intentionally weakened software-contract comparator | Causal component contribution, optimizer quality, simulation outcomes, or safety |
+| `POLICY_HOLDOUT` | Exact production tool-eligibility sets on the separate hash-locked deterministic policy corpus | LLM routing quality, simulator outcomes, or permanent blindness |
 | `DEV_ROUTING` | Acceptable tool selection on the versioned development corpus | Simulator quality, general reasoning, or unseen-case accuracy |
 | `SYNTHETIC_MOCK` | Deterministic search, aggregation, and holdout logic on the named mock landscape | PX4/Gazebo physics or real-flight improvement |
 | `PX4_GAZEBO` | Repeated, provenance-complete results from the pinned Runtime | Real-aircraft safety or transfer |
@@ -44,6 +46,11 @@ Every result, table, and figure carries one of these labels:
 for chart-ready evidence already present in the repository. It validates
 provenance, recomputes headline metrics, emits hashes, and refuses to relabel a
 mock campaign as physical evidence.
+
+`backend/scripts/evaluate_harness_ablations.py` independently reproduces the
+source-contract ablation JSON, CSV, and file-hash manifest. Its comparator is
+not a product mode: it intentionally removes one named guard at a time so the
+contract probe can demonstrate what that guard rejects or preserves.
 
 ## Report modules
 
@@ -93,7 +100,7 @@ mock campaign as physical evidence.
 | F8 | Optimizer quality/sample efficiency curves | `PX4_GAZEBO` | experiment required |
 | F9 | Track × scenario robustness heatmap | `PX4_GAZEBO` | experiment required |
 | F10 | Failure/recovery Sankey or stacked bars | `PX4_GAZEBO` | experiment required |
-| F11 | Ablation radar (normalized, CI shown separately) | mixed locked campaign | experiment required |
+| F11 | Harness guard ablations (three-line table or grouped bars) | `SOURCE_ABLATION` | exportable now |
 | F12 | Time-to-ready and entry/exit success | `USER_STUDY` or automated UX | experiment required |
 | T1 | Claim ledger | all | in progress |
 | T2 | Supported capability matrix | source + Runtime acceptance | in progress |
@@ -161,9 +168,22 @@ The exporter currently produces:
   losses improve. This is `SYNTHETIC_MOCK`, with
   `physical_fidelity=false`.
 
-The real PX4/Gazebo main table, multi-seed confidence intervals, full Harness
-ablations, latency/token/cost results, and UX measurements remain unfilled
-until their locked experiments run.
+The deterministic source-contract ablation now contains 20 constructed probes
+covering provider trust filtering, tool eligibility, deterministic fallback,
+and scenario/outcome isolation. The full production contracts satisfy 20/20
+declared expectations; the deliberately weakened comparators satisfy 6/20.
+This is `SOURCE_ABLATION`: it demonstrates guard behavior on named inputs, not
+causal performance lift or simulation quality.
+
+The separate deterministic router-policy holdout contains 16 hash-locked cases
+and currently passes 16/16 exact eligible-tool-set comparisons with zero online
+model calls, simulator runs, or feedback writebacks. This is
+`POLICY_HOLDOUT`, not an LLM or simulator benchmark; its labels are visible
+after repository publication and must not be described as permanently blind.
+
+The real PX4/Gazebo main table, multi-seed confidence intervals, outcome-level
+Harness ablations, latency/token/cost results, and UX measurements remain
+unfilled until their locked experiments run.
 
 ## Reproduction
 
@@ -171,11 +191,20 @@ From the repository root:
 
 ```powershell
 backend\.venv\Scripts\python.exe `
+  backend\scripts\evaluate_harness_ablations.py
+
+backend\.venv\Scripts\python.exe `
+  backend\scripts\evaluate_harness_ablations.py `
+  --check
+
+backend\.venv\Scripts\python.exe `
   backend\scripts\export_technical_report_evidence.py `
   --output artifacts\technical-report\evidence.json `
   --csv-directory artifacts\technical-report\csv
 ```
 
-The resulting JSON includes SHA-256 hashes for every source artifact and a
-digest over the normalized bundle. Generated files are report build artifacts,
-not source-controlled performance evidence.
+The resulting report JSON includes SHA-256 hashes for every source artifact
+and a digest over the normalized bundle. The versioned ablation JSON/CSV/hash
+under `backend/evaluation_artifacts/` are source-controlled software-contract
+evidence; generated files under `artifacts/technical-report/` are report build
+artifacts and are not physical-performance evidence.

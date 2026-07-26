@@ -44,6 +44,26 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
         for row in coverage["scenario_rows"]
     )
 
+    ablations = first["harness_ablations"]
+    assert ablations["evidence_class"] == "source_contract_ablation"
+    assert ablations["causal_claim_permitted"] is False
+    assert ablations["physical_fidelity"] is False
+    assert ablations["summary"]["component_count"] == 4
+    assert ablations["summary"]["probe_count"] == 20
+    assert ablations["summary"]["full_contract_correct_count"] == 20
+    assert ablations["summary"]["ablated_contract_correct_count"] == 6
+
+    holdout = first["routing_policy_holdout"]
+    assert holdout["evidence_class"] == "deterministic_router_policy_holdout"
+    assert holdout["corpus_role"] == "locked_holdout"
+    assert holdout["case_count"] == 16
+    assert holdout["passed_count"] == 16
+    assert holdout["pass_rate"] == 1.0
+    assert holdout["qualified"] is True
+    assert holdout["online_calls"] == 0
+    assert holdout["simulator_runs"] == 0
+    assert holdout["feedback_writebacks"] == 0
+
 
 def test_report_evidence_refuses_to_upgrade_mock_to_physical() -> None:
     source = (
@@ -92,3 +112,19 @@ def test_report_evidence_writes_chart_ready_csv(tmp_path: Path) -> None:
     assert {row["scenario"] for row in rows} == {
         row["scenario"] for row in bundle["simulation_coverage"]["scenario_rows"]
     }
+    with (csv_directory / "harness_contract_ablations.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        ablation_rows = list(csv.DictReader(handle))
+    assert len(ablation_rows) == 4
+    assert {row["component"] for row in ablation_rows} == {
+        row["component"] for row in bundle["harness_ablations"]["component_rows"]
+    }
+    with (csv_directory / "routing_policy_holdout_categories.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        holdout_rows = list(csv.DictReader(handle))
+    assert sum(int(row["case_count"]) for row in holdout_rows) == 16
+    assert all(float(row["pass_rate"]) == 1.0 for row in holdout_rows)
