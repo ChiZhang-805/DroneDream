@@ -581,6 +581,25 @@ def _inverse_sqrt(covariance: FloatArray) -> FloatArray:
     return np.asarray((eigenvectors * inverse) @ eigenvectors.T, dtype=np.float64)
 
 
+def _symmetric_sqrt(covariance: FloatArray) -> FloatArray:
+    """Return the unique symmetric positive-definite covariance square root.
+
+    ``eigenvectors @ diag(sqrt(eigenvalues))`` is a valid sampling factor, but
+    it is not unique when eigenvalues repeat. BLAS/LAPACK implementations may
+    choose different orthonormal bases for the same degenerate eigenspace,
+    rotating an otherwise identical seeded normal sample into a different
+    candidate. The principal symmetric square root is invariant to that basis
+    choice and therefore keeps seeded CMA proposals portable across supported
+    CPUs and Python runners.
+    """
+
+    stable = _stabilize_covariance(covariance)
+    eigenvalues, eigenvectors = np.linalg.eigh(stable)
+    roots = np.sqrt(np.maximum(eigenvalues, _MIN_EIGENVALUE))
+    transform = (eigenvectors * roots) @ eigenvectors.T
+    return np.asarray((transform + transform.T) * 0.5, dtype=np.float64)
+
+
 def _initial_state(
     search_space: SearchSpace,
     warm_points: Sequence[_TrainingPoint],
@@ -876,9 +895,7 @@ def _sample_projected_pool(
     if dimensions == 0:
         empty = np.empty(0, dtype=np.float64)
         return [(search_space.baseline(), empty, empty, 0.0)]
-    covariance = _stabilize_covariance(state.covariance)
-    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
-    transform = eigenvectors @ np.diag(np.sqrt(np.maximum(eigenvalues, _MIN_EIGENVALUE)))
+    transform = _symmetric_sqrt(state.covariance)
     seen = _history_keys(search_space, observations)
     pool: list[tuple[dict[str, float], FloatArray, FloatArray, float]] = []
     attempts = 0
@@ -886,7 +903,10 @@ def _sample_projected_pool(
     while len(pool) < requested and attempts < max_attempts:
         standard = rng.standard_normal(dimensions)
         raw = state.mean + state.sigma * (transform @ standard)
-        reflected = _reflect_unit(raw)
+        reflected = np.asarray(
+            canonical_optimizer_seed_value(_reflect_unit(raw).tolist()),
+            dtype=np.float64,
+        )
         attempts += 1
         try:
             parameters = search_space.from_unit_vector(reflected.tolist())

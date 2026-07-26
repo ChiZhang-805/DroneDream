@@ -42,6 +42,25 @@ _GENERATION_COUNT = 8
 _BATCH_SIZE = 6
 _LOSS_TOLERANCE = 1e-12
 _SHA256_PATTERN = r"^[0-9a-f]{64}$"
+_TRANSCRIPT_EVIDENCE_FIELDS: tuple[str, ...] = (
+    "candidate_id",
+    "generation_index",
+    "parameters",
+    "training_loss",
+    "feasible",
+    "optimizer_strategy",
+)
+_TRANSCRIPT_ROUTE_METADATA_FIELDS: tuple[str, ...] = (
+    "design",
+    "design_index",
+    "child_strategy",
+    "optimizer_generated_by",
+    "effective_fidelity",
+    "requested_fidelity",
+    "portfolio_slot_role",
+    "cma_cohort_position",
+    "cma_restart_index",
+)
 
 _SCENARIO_TYPES: tuple[str, ...] = (
     "nominal",
@@ -139,6 +158,40 @@ def _canonical_sha256(value: object) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _optimizer_transcript_evidence_payload(
+    transcript: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Project optimizer events onto causal, cross-platform evidence.
+
+    The complete optimizer metadata remains available to runtime diagnostics,
+    but it contains floating-point GP/CMA internals whose equivalent values can
+    vary across BLAS kernels. A frozen campaign transcript binds the decisions
+    that were actually executed: candidate identity/order, parameters, loss,
+    feasibility, selected optimizer route, fidelity, and CMA cohort position.
+    Cosmetic numerical diagnostics cannot invalidate otherwise identical
+    executions, while any candidate, result, or route change still changes the
+    transcript hash.
+    """
+
+    payload: list[dict[str, object]] = []
+    for entry in transcript:
+        metadata = entry.get("optimizer_metadata")
+        if not isinstance(metadata, dict):
+            raise ValueError("optimizer transcript metadata must be an object")
+        causal = {field: entry[field] for field in _TRANSCRIPT_EVIDENCE_FIELDS}
+        causal["optimizer_route"] = {
+            field: metadata[field]
+            for field in _TRANSCRIPT_ROUTE_METADATA_FIELDS
+            if field in metadata
+        }
+        payload.append(causal)
+    return payload
+
+
+def _optimizer_transcript_sha256(transcript: list[dict[str, object]]) -> str:
+    return _canonical_sha256(_optimizer_transcript_evidence_payload(transcript))
 
 
 def _search_space() -> SearchSpace:
@@ -499,7 +552,7 @@ def run_simulation_coverage_campaign() -> SimulationCoverageArtifact:
         mock_landscape_schema=MOCK_LANDSCAPE_SCHEMA_VERSION,
         physical_fidelity=False,
         campaign_spec_sha256=_canonical_sha256(_campaign_spec()),
-        optimizer_transcript_sha256=_canonical_sha256(transcript),
+        optimizer_transcript_sha256=_optimizer_transcript_sha256(transcript),
         optimizer_strategy="optimizer_portfolio",
         optimizer_seed=_OPTIMIZER_SEED,
         scenario_types=_SCENARIO_TYPES,

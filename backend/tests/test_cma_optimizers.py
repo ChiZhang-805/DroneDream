@@ -14,6 +14,7 @@ from app.optimization.cma_optimizers import (
     _MAX_CONDITION_NUMBER,
     _soft_feasibility_target,
     _stabilize_covariance,
+    _symmetric_sqrt,
     bipop_restart_plan,
     propose_bipop_cma_es,
     propose_evolutionary_candidates,
@@ -531,6 +532,30 @@ def test_covariance_repair_preserves_regular_scale_and_bounds_condition() -> Non
     assert float(np.max(eigenvalues) / np.min(eigenvalues)) <= _MAX_CONDITION_NUMBER * (
         1.0 + 1e-8
     )
+
+
+def test_symmetric_covariance_root_is_invariant_to_degenerate_eigenbasis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    covariance = np.eye(2, dtype=np.float64)
+    angle = np.pi / 5.0
+    rotated = np.asarray(
+        (
+            (np.cos(angle), -np.sin(angle)),
+            (np.sin(angle), np.cos(angle)),
+        ),
+        dtype=np.float64,
+    )
+    original_eigh = np.linalg.eigh
+
+    def rotated_identity_eigh(matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        if matrix.shape == (2, 2) and np.allclose(matrix, covariance):
+            return np.ones(2, dtype=np.float64), rotated
+        return original_eigh(matrix)
+
+    monkeypatch.setattr(np.linalg, "eigh", rotated_identity_eigh)
+
+    assert _symmetric_sqrt(covariance) == pytest.approx(covariance, abs=1e-14)
 
 
 def test_surrogate_cma_reconstruction_does_not_depend_on_current_batch_size() -> None:

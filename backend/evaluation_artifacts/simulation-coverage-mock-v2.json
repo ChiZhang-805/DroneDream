@@ -75,7 +75,7 @@
   "mock_landscape_schema": "dronedream.mock.synthetic.v2",
   "optimizer_seed": 12345,
   "optimizer_strategy": "optimizer_portfolio",
-  "optimizer_transcript_sha256": "1853dbcf718aca44bc9df9f33d6d8ffb03ebc3e62604d84e62b675875e46484c",
+  "optimizer_transcript_sha256": "e47ad6e62d1c5439f91a06158eab50595c7af931545e48516ae714f4396bc690",
   "oracle": {
     "holdout_all_pass": true,
     "holdout_by_scenario": {

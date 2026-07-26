@@ -8,6 +8,7 @@ import pytest
 from app.optimization.simulation_coverage_campaign import (
     SimulationCoverageArtifact,
     _canonical_sha256,
+    _optimizer_transcript_sha256,
     run_simulation_coverage_campaign,
     write_frozen_simulation_coverage_artifact,
 )
@@ -52,6 +53,42 @@ def test_campaign_transcript_hash_ignores_cross_runtime_ulp_noise() -> None:
 
     assert _canonical_sha256(lower_ulp) == _canonical_sha256(upper_ulp)
     assert _canonical_sha256(lower_ulp) != _canonical_sha256(material_change)
+
+
+def test_campaign_transcript_hash_binds_causal_execution_not_blas_diagnostics() -> None:
+    baseline = [
+        {
+            "candidate_id": "generation-01-00",
+            "generation_index": 1,
+            "parameters": {"kp": 1.2},
+            "training_loss": 0.4,
+            "feasible": True,
+            "optimizer_strategy": "optimizer_portfolio",
+            "optimizer_metadata": {
+                "child_strategy": "bipop_cma_es",
+                "optimizer_generated_by": "bipop_cma_es",
+                "cma_cohort_position": 0,
+                "mahalanobis_squared": 2.987321765792121,
+                "cma_state": {"covariance": [[1.0, 1e-16], [1e-16, 1.0]]},
+            },
+        }
+    ]
+    equivalent_diagnostics = json.loads(json.dumps(baseline))
+    equivalent_diagnostics[0]["optimizer_metadata"]["mahalanobis_squared"] = (  # type: ignore[index]
+        7.025120301676976
+    )
+    equivalent_diagnostics[0]["optimizer_metadata"]["cma_state"] = {  # type: ignore[index]
+        "covariance": [[1.0, -1e-16], [-1e-16, 1.0]]
+    }
+    changed_candidate = json.loads(json.dumps(baseline))
+    changed_candidate[0]["parameters"]["kp"] = 1.3  # type: ignore[index]
+    changed_route = json.loads(json.dumps(baseline))
+    changed_route[0]["optimizer_metadata"]["child_strategy"] = "turbo"  # type: ignore[index]
+
+    baseline_hash = _optimizer_transcript_sha256(baseline)
+    assert _optimizer_transcript_sha256(equivalent_diagnostics) == baseline_hash
+    assert _optimizer_transcript_sha256(changed_candidate) != baseline_hash
+    assert _optimizer_transcript_sha256(changed_route) != baseline_hash
 
 
 def test_simulation_coverage_freeze_refuses_overwrite(

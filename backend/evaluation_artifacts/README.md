@@ -25,10 +25,19 @@ scenario types, evaluates disjoint holdout seeds, and compares the selected
 candidate with an exhaustive 2,430-point finite-grid oracle. The artifact
 explicitly records `physical_fidelity: false`; it validates synthetic search,
 scenario routing, and holdout logic, not PX4/Gazebo physics or sim-to-real
-transfer. Regenerate it with:
+transfer. Its transcript hash binds executed candidate order, parameters,
+losses, feasibility, optimizer route, fidelity, and CMA cohort position.
+Floating GP/CMA diagnostic matrices remain available in runtime metadata but
+are deliberately excluded from the freeze hash because equivalent BLAS kernels
+may spell those non-causal internals differently.
+
+CMA sampling uses the unique symmetric covariance square root and canonical
+unit-vector spelling, so repeated-eigenvalue bases cannot rotate a fixed seeded
+sample into a different candidate on another supported CPU. Generate a
+reviewable successor without overwriting the committed freeze:
 
 ```powershell
 cd backend
 .venv\Scripts\python.exe scripts\run_simulation_coverage_campaign.py `
-  --output evaluation_artifacts\simulation-coverage-mock-v2.json
+  --output evaluation_artifacts\simulation-coverage-mock-v2.next.json
 ```
