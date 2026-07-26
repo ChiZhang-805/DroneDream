@@ -51,6 +51,11 @@ from app.parameters import (  # noqa: E402 - path bootstrap must precede backend
     normalize_px4_version,
     validate_parameter_values,
 )
+from app.simulator.px4_metric_evidence import (  # noqa: E402 - see path bootstrap above
+    Px4CoreMetricEvidenceError,
+    compile_px4_core_metric_evidence,
+    require_px4_core_metric_binding,
+)
 from app.simulator.px4_parameters import (  # noqa: E402 - see path bootstrap above
     APPLIED_EVIDENCE_NAME,
     BEFORE_EVIDENCE_NAME,
@@ -2260,6 +2265,8 @@ def _compute_metrics(
             ),
             "evaluation_start_t": round(float(evaluation_samples[0]["t"]), 6),
             "evaluation_end_t": round(float(evaluation_samples[-1]["t"]), 6),
+            "evaluation_start_index": eval_window.start_idx,
+            "evaluation_end_index": eval_window.end_idx,
             "evaluation_sample_count": len(evaluation_samples),
             "total_sample_count": total_sample_count,
             "rmse_integration": "time_weighted_trapezoidal",
@@ -3141,6 +3148,25 @@ def run_once(input_path: Path, output_path: Path) -> int:
             ),
             scenario_effect_contract=scenario_effect_contract,
         )
+        try:
+            core_metric_evidence = compile_px4_core_metric_evidence(
+                telemetry_payload=telemetry,
+                reference_track_payload={
+                    "schema_version": "dronedream.reference_track.v1",
+                    "reference_track": reference_track,
+                },
+                evaluation_start_index=metrics["raw_metric_json"].get("evaluation_start_index"),
+                evaluation_end_index=metrics["raw_metric_json"].get("evaluation_end_index"),
+            )
+            metrics["raw_metric_json"]["px4_core_metric_evidence"] = (
+                core_metric_evidence.model_dump(mode="json")
+            )
+            require_px4_core_metric_binding(
+                metrics,
+                core_metric_evidence,
+            )
+        except Px4CoreMetricEvidenceError as exc:
+            raise RunnerError(f"independent PX4 core-metric verification failed: {exc}") from exc
         if not env.keep_raw_logs:
             _remove_success_raw_logs(run_dir)
 

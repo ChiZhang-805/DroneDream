@@ -466,10 +466,26 @@ or metric binding is missing or divergent.
 
 This closes the previously identified telemetry-semantic and sampling-weight
 gaps for the bundled runner. It does not preserve every original ULog byte
-under a WORM policy, independently recompute the full track projection and
-score in the backend, or prove that an origin digest corresponds to a raw log
-that was not retained. Those remain explicit future verifier/deployment
-boundaries.
+under a WORM policy or prove that an origin digest corresponds to a raw log
+that was not retained.
+
+Outcome Contract compiler 2.13 adds
+`dronedream.px4-core-metric-evidence/v1`. The runner records exact evaluation
+sample indices, but a separate backend compiler ignores its reported core
+metric values, reloads retained telemetry/reference-track evidence, repeats the
+bounded ordered local three-dimensional segment projection, and independently
+recomputes evaluation/full-log time-weighted RMSE, maximum error, duration,
+endpoint error, tracking-error peak count, sampling, and the maximum-error
+sample. Its content-addressed evidence, top-level metrics, and raw projections
+must match exactly. A changed reference path, evaluation index, telemetry
+sample, metric value, or nested evidence field fails the complete Trial.
+
+This closes trust in runner-authored core geometry values for the bundled
+PX4 path. The verifier still consumes the declared evaluation indices instead
+of independently deriving them from offboard timing/takeoff policy, and it
+does not yet independently recompile crash, instability, directed-progress
+pass, or composite-score semantics. Those remain the next metric-verifier
+boundary.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic

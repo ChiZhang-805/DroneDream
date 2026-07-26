@@ -58,6 +58,10 @@ from app.simulator.base import (
     TrialMetricsPayload,
     TrialResult,
 )
+from app.simulator.px4_metric_evidence import (
+    compile_px4_core_metric_evidence,
+    require_px4_core_metric_binding,
+)
 from app.simulator.scenario_effects import build_scenario_effect_request
 from app.simulator.telemetry_evidence import (
     verify_telemetry_semantic_contract,
@@ -962,6 +966,9 @@ def _require_px4_metric_evidence(
             "reference-track artifact"
         )
     telemetry = _load_bounded_json_artifact(telemetry_artifacts[0])
+    reference_track = _load_bounded_json_artifact(
+        reference_artifacts[0]
+    )
     contract = verify_telemetry_semantic_contract(telemetry)
     if contract is None:
         raise ValueError(
@@ -989,6 +996,18 @@ def _require_px4_metric_evidence(
         raise ValueError(
             "PX4/Gazebo metrics do not bind the verified telemetry contract"
         )
+    core_metric_evidence = compile_px4_core_metric_evidence(
+        telemetry_payload=telemetry,
+        reference_track_payload=reference_track,
+        evaluation_start_index=raw_metric.get(
+            "evaluation_start_index"
+        ),
+        evaluation_end_index=raw_metric.get("evaluation_end_index"),
+    )
+    require_px4_core_metric_binding(
+        metrics.as_dict(),
+        core_metric_evidence,
+    )
 
 
 def _reject_nonfinite_json_constant(value: str) -> None:

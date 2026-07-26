@@ -130,12 +130,24 @@ telemetry, independently revalidates its contract and samples, and compares
 all of those bindings. Missing, duplicate, mutated, or mismatched evidence
 invalidates the Trial.
 
-This contract proves the semantics and integrity relationships of the retained
-normalized telemetry. It does not yet make the original ULog permanently
-replayable when that raw log is not retained, and the backend does not yet
-independently recompile every trajectory projection, overshoot, pass, or score
-field. Those remain separate stronger-verifier boundaries rather than implied
-guarantees.
+Every bundled result also carries
+`dronedream.px4-core-metric-evidence/v1`. From the retained telemetry and
+reference track—not from the runner's reported metric values—the backend
+independently repeats the bounded ordered three-dimensional segment projection,
+selects the declared evaluation sample indices, and recomputes time-weighted
+evaluation/full-log RMSE, maximum error, completion duration, final endpoint
+error, tracking-error peak count, evaluation sampling, and the maximum-error
+sample. The content-addressed evidence and top-level/raw metric projections
+must all match exactly.
+
+These contracts prove the semantics and core geometric measurements of the
+retained normalized telemetry. They do not yet make the original ULog
+permanently replayable when that raw log is not retained. The independent
+compiler currently verifies the declared evaluation interval, but does not yet
+re-derive that interval from offboard timing/takeoff policy or independently
+recompile crash, instability, directed-progress pass, and composite-score
+semantics. Those remain separate stronger-verifier boundaries rather than
+implied guarantees.
 
 ## PX4 parameter evidence
 

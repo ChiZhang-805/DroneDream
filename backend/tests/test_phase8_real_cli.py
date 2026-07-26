@@ -27,6 +27,9 @@ from app.simulator.base import (
     TrialContext,
     TrialMetricsPayload,
 )
+from app.simulator.px4_metric_evidence import (
+    compile_px4_core_metric_evidence,
+)
 from app.simulator.real_cli import (
     _MAX_KNOWN_JSON_ARTIFACT_BYTES,
     _MAX_RESULT_ARTIFACTS,
@@ -106,29 +109,33 @@ def _px4_metric_evidence(
         synthetic=False,
     )
     telemetry_path = tmp_path / "telemetry.json"
+    telemetry_payload = {
+        "schema_version": TELEMETRY_SCHEMA_V2,
+        "samples": samples,
+        "meta": {"source": "test"},
+        "semantic_contract": contract.model_dump(mode="json"),
+    }
     telemetry_path.write_text(
-        json.dumps(
-            {
-                "schema_version": TELEMETRY_SCHEMA_V2,
-                "samples": samples,
-                "meta": {"source": "test"},
-                "semantic_contract": contract.model_dump(mode="json"),
-            }
-        ),
+        json.dumps(telemetry_payload),
         encoding="utf-8",
     )
     reference_path = tmp_path / "reference_track.json"
+    reference_payload = {
+        "schema_version": "dronedream.reference_track.v1",
+        "reference_track": [
+            {"x": 0.0, "y": 0.0, "z": 3.0},
+            {"x": 1.0, "y": 0.0, "z": 3.0},
+        ],
+    }
     reference_path.write_text(
-        json.dumps(
-            {
-                "schema_version": "dronedream.reference_track.v1",
-                "reference_track": [
-                    {"x": 0.0, "y": 0.0, "z": 3.0},
-                    {"x": 1.0, "y": 0.0, "z": 3.0},
-                ],
-            }
-        ),
+        json.dumps(reference_payload),
         encoding="utf-8",
+    )
+    core_metric_evidence = compile_px4_core_metric_evidence(
+        telemetry_payload=telemetry_payload,
+        reference_track_payload=reference_payload,
+        evaluation_start_index=0,
+        evaluation_end_index=len(samples) - 1,
     )
     raw_metric_json = {
         "rmse_integration": "time_weighted_trapezoidal",
@@ -139,16 +146,47 @@ def _px4_metric_evidence(
         "telemetry_position_unit": contract.position_unit,
         "telemetry_time_unit": contract.time_unit,
         "telemetry_sampling": contract.sampling.model_dump(mode="json"),
+        "evaluation_start_index": (
+            core_metric_evidence.evaluation_start_index
+        ),
+        "evaluation_end_index": (
+            core_metric_evidence.evaluation_end_index
+        ),
+        "evaluation_start_t": (
+            core_metric_evidence.evaluation_start_time_s
+        ),
+        "evaluation_end_t": core_metric_evidence.evaluation_end_time_s,
+        "evaluation_sample_count": (
+            core_metric_evidence.evaluation_sample_count
+        ),
+        "total_sample_count": core_metric_evidence.total_sample_count,
+        "evaluation_sampling": (
+            core_metric_evidence.evaluation_sampling.model_dump(
+                mode="json"
+            )
+        ),
+        "full_log_rmse": core_metric_evidence.full_log_rmse_m,
+        "full_log_max_error": (
+            core_metric_evidence.full_log_max_error_m
+        ),
+        "evaluation_max_error_sample": (
+            core_metric_evidence.evaluation_max_error_sample.model_dump(
+                mode="json"
+            )
+        ),
+        "px4_core_metric_evidence": (
+            core_metric_evidence.model_dump(mode="json")
+        ),
     }
     metrics = TrialMetricsPayload(
-        rmse=0.0,
-        max_error=0.0,
-        overshoot_count=0,
-        completion_time=1.9,
+        rmse=core_metric_evidence.rmse_m,
+        max_error=core_metric_evidence.max_error_m,
+        overshoot_count=core_metric_evidence.overshoot_count,
+        completion_time=core_metric_evidence.evaluation_duration_s,
         crash_flag=False,
         timeout_flag=False,
         score=1.0,
-        final_error=0.0,
+        final_error=core_metric_evidence.final_error_m,
         pass_flag=True,
         instability_flag=False,
         raw_metric_json=raw_metric_json,
@@ -797,6 +835,79 @@ def test_px4_metric_evidence_rejects_telemetry_mutation(
     with pytest.raises(
         ValueError,
         match="telemetry semantic contract is invalid",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_metric_evidence_rejects_reference_track_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    reference_path = Path(artifacts[1].storage_path)
+    payload = json.loads(reference_path.read_text(encoding="utf-8"))
+    payload["reference_track"][1]["y"] = 10.0
+    reference_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        ValueError,
+        match="top-level metrics do not match independently compiled",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_metric_evidence_rejects_top_level_metric_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    metrics.rmse += 0.1
+
+    with pytest.raises(
+        ValueError,
+        match="top-level metrics do not match independently compiled",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_metric_evidence_rejects_evaluation_window_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    metrics.raw_metric_json["evaluation_start_index"] = 1
+
+    with pytest.raises(
+        ValueError,
+        match="independently compiled core evidence",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_metric_evidence_rejects_compiled_evidence_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    evidence = metrics.raw_metric_json["px4_core_metric_evidence"]
+    assert isinstance(evidence, dict)
+    evidence["rmse_m"] = 999.0
+
+    with pytest.raises(
+        ValueError,
+        match="raw metrics do not match independently compiled",
     ):
         _require_px4_metric_evidence(
             raw,

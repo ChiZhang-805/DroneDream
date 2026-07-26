@@ -1806,6 +1806,14 @@ def test_real_cli_integration_with_px4_runner_dry_run(
     assert result.success is True, result.failure
     assert result.metrics is not None
     assert result.metrics.raw_metric_json.get("mode") == "dry_run"
+    core_evidence = result.metrics.raw_metric_json.get(
+        "px4_core_metric_evidence"
+    )
+    assert isinstance(core_evidence, dict)
+    assert core_evidence["schema_id"] == (
+        "dronedream.px4-core-metric-evidence/v1"
+    )
+    assert core_evidence["rmse_m"] == result.metrics.rmse
     run_dir = tmp_path / "jobs" / "job-1" / "trials" / "trial-1"
     assert (run_dir / "telemetry.json").exists()
     assert (run_dir / "trajectory.json").exists()
