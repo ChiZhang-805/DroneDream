@@ -250,7 +250,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "2.7"
+    assert first.compiler_version == "2.8"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -316,6 +316,19 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert (
         first.selection_policy.winner_freeze_mutation_policy
         == "database_reject_update_delete_v1"
+    )
+    assert (
+        first.selection_policy.artifact_digest_receipt_schema
+        == "dronedream.artifact-digest-receipt/v1"
+    )
+    assert first.selection_policy.artifact_integrity_policy == "sha256-v1"
+    assert (
+        first.selection_policy.artifact_digest_mutation_policy
+        == "database_reject_update_unauthorized_delete_v1"
+    )
+    assert (
+        first.selection_policy.artifact_download_verification_policy
+        == "verify_bound_bytes_before_stream_v1"
     )
     assert (
         first.selection_policy.portfolio_source_schema

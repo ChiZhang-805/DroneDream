@@ -380,6 +380,68 @@ class Artifact(Base):
     # 32-bit INTEGER ceiling. SQLite already stores 64-bit integers, while
     # BigInteger keeps the production schema portable and lossless.
     file_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    integrity_policy: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    digest_receipt: Mapped[ArtifactDigestReceipt | None] = relationship(
+        back_populates="artifact",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+class ArtifactDigestReceipt(Base):
+    __tablename__ = "artifact_digest_receipts"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("adr")
+    )
+    artifact_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("artifacts.id"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    evidence_id: Mapped[str] = mapped_column(
+        String(71), nullable=False, unique=True, index=True
+    )
+    content_sha256: Mapped[str] = mapped_column(
+        String(64), nullable=False
+    )
+    content_size_bytes: Mapped[int] = mapped_column(
+        BigInteger, nullable=False
+    )
+    storage_path_sha256: Mapped[str] = mapped_column(
+        String(64), nullable=False
+    )
+    owner_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    artifact_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    artifact: Mapped[Artifact] = relationship(
+        back_populates="digest_receipt"
+    )
+
+
+class ArtifactDigestDeleteAuthorization(Base):
+    """Transaction-scoped authorization for lifecycle deletion of a receipt."""
+
+    __tablename__ = "artifact_digest_delete_authorizations"
+
+    artifact_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("artifacts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )

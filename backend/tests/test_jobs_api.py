@@ -915,6 +915,7 @@ def test_artifacts_includes_trial_scoped_artifacts(client: TestClient) -> None:
 def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) -> None:
     from app import models
     from app.db import SessionLocal
+    from app.storage.integrity import bind_artifact_integrity
 
     job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     other = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
@@ -931,6 +932,21 @@ def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) 
         art_file = tmp_path / "mock_artifacts" / "artifact.bin"
         art_file.parent.mkdir(parents=True, exist_ok=True)
         art_file.write_bytes(b"x")
+        sealed_file = art_file.with_name("sealed.bin")
+        sealed_file.write_bytes(b"sealed")
+        sealed_artifact = models.Artifact(
+            owner_type="job",
+            owner_id=j.id,
+            artifact_type="report_json",
+            storage_path=str(sealed_file),
+        )
+        db.add(sealed_artifact)
+        db.flush()
+        bind_artifact_integrity(
+            db,
+            artifact=sealed_artifact,
+            content=sealed_file,
+        )
         db.add(
             models.Artifact(
                 owner_type="job",
@@ -967,6 +983,14 @@ def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) 
         assert all(a.owner_id != job['id'] for a in remaining)
         assert any(a.owner_id == other['id'] for a in remaining)
         assert not art_file.exists()
+        assert not sealed_file.exists()
+        assert (
+            db.query(models.ArtifactDigestReceipt).count() == 0
+        )
+        assert (
+            db.query(models.ArtifactDigestDeleteAuthorization).count()
+            == 0
+        )
 
 
 def test_delete_active_job_conflict(client: TestClient) -> None:

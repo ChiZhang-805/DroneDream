@@ -20,6 +20,7 @@ from app.optimization.outcome_evidence import (
 )
 from app.orchestration.constants import BASELINE_PARAMETERS, PARAMETER_SAFE_RANGES, SCORE_WEIGHTS
 from app.orchestration.winner_freeze import require_winner_freeze_receipt
+from app.time_utils import canonical_utc_iso
 
 _SAFE_ENV_ALLOWLIST: tuple[str, ...] = (
     "PX4_GAZEBO_WORLD",
@@ -39,7 +40,7 @@ _SENSITIVE_ENV_TOKENS: tuple[str, ...] = ("KEY", "TOKEN", "SECRET", "PASSWORD")
 
 
 def _fmt_dt(value: datetime | None) -> str | None:
-    return value.isoformat() if value is not None else None
+    return canonical_utc_iso(value)
 
 
 def _find_repo_root(start: Path) -> Path | None:
@@ -161,7 +162,14 @@ def sanitize_payload(payload: Any) -> Any:
 
 
 def _candidate_summaries(job: models.Job) -> list[dict[str, Any]]:
-    rows = sorted(job.candidates, key=lambda c: (c.generation_index, c.created_at))
+    rows = sorted(
+        job.candidates,
+        key=lambda candidate: (
+            candidate.generation_index,
+            canonical_utc_iso(candidate.created_at) or "",
+            candidate.id,
+        ),
+    )
     summaries: list[dict[str, Any]] = []
     for candidate in rows:
         aggregate = require_authoritative_candidate_report_projection(
@@ -185,7 +193,13 @@ def _candidate_summaries(job: models.Job) -> list[dict[str, Any]]:
 
 
 def _trial_summaries(job: models.Job) -> list[dict[str, Any]]:
-    rows = sorted(job.trials, key=lambda t: t.created_at)
+    rows = sorted(
+        job.trials,
+        key=lambda trial: (
+            canonical_utc_iso(trial.created_at) or "",
+            trial.id,
+        ),
+    )
     return [
         {
             "trial_id": t.id,
@@ -306,7 +320,7 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
                     "receipt_id": winner_freeze.id,
                     "receipt_schema": winner_freeze.receipt_schema,
                     "evidence_id": winner_freeze.evidence_id,
-                    "frozen_at": winner_freeze.frozen_at.isoformat(),
+                    "frozen_at": canonical_utc_iso(winner_freeze.frozen_at),
                 }
                 if verified_winner is not None
                 and winner_freeze is not None

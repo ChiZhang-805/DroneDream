@@ -54,6 +54,11 @@ from app.simulator.base import (
     FAILURE_SIM_ERROR,
 )
 from app.storage import get_artifact_storage
+from app.storage.integrity import (
+    ArtifactIntegrityError,
+    artifact_content_digest,
+    bind_artifact_integrity,
+)
 from app.storage.registration import guard_artifact_registration
 
 
@@ -423,9 +428,11 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
     guard_artifact_registration(db, owner_type="trial", owner_id=trial.id)
     storage = get_artifact_storage()
     settings = get_settings()
+    seen_storage_keys: set[str] = set()
     for meta in artifacts:
         storage_path = meta.storage_path
         local_path = Path(storage_path)
+        digest_source: bytes | Path | None = None
         persisted_size = meta.file_size_bytes
         if local_path.exists() and local_path.is_file():
             safe_name = Path(meta.display_name or local_path.name).name
@@ -440,7 +447,17 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
                 for char in meta.artifact_type
             ).strip(".")
             safe_type = safe_type[:128] or "artifact"
-            key = f"jobs/{trial.job_id}/trials/{trial.id}/{safe_type}/{safe_name}"
+            source_sha256, source_size = artifact_content_digest(local_path)
+            key = (
+                f"jobs/{trial.job_id}/trials/{trial.id}/"
+                f"attempts/{trial.attempt_count}/{safe_type}/"
+                f"{source_sha256}-{safe_name}"
+            )
+            if key in seen_storage_keys:
+                raise ArtifactIntegrityError(
+                    "trial returned duplicate artifact content metadata"
+                )
+            seen_storage_keys.add(key)
             if settings.artifact_storage_backend == "local":
                 # LocalArtifactStorage intentionally returns the source path.
                 # Materialize real-simulator artifacts under the durable local
@@ -451,19 +468,33 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
                     raise ValueError("Trial artifact target escaped the local artifact root")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if local_path.resolve() != target:
-                    temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
-                    try:
-                        shutil.copy2(local_path, temporary)
-                        temporary.replace(target)
-                    finally:
-                        try:
-                            temporary.unlink(missing_ok=True)
-                        except OSError:
-                            logger.warning(
-                                "failed to remove temporary artifact copy %s",
-                                temporary,
-                                exc_info=True,
+                    if target.is_file():
+                        target_sha256, target_size = artifact_content_digest(
+                            target
+                        )
+                        if (
+                            target_sha256 != source_sha256
+                            or target_size != source_size
+                        ):
+                            raise ArtifactIntegrityError(
+                                "content-addressed artifact target was modified"
                             )
+                    else:
+                        temporary = target.with_name(
+                            f".{target.name}.{os.getpid()}.tmp"
+                        )
+                        try:
+                            shutil.copy2(local_path, temporary)
+                            temporary.replace(target)
+                        finally:
+                            try:
+                                temporary.unlink(missing_ok=True)
+                            except OSError:
+                                logger.warning(
+                                    "failed to remove temporary artifact copy %s",
+                                    temporary,
+                                    exc_info=True,
+                                )
                 local_path = target
             storage_path = storage.put_file(
                 local_path,
@@ -471,17 +502,36 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
                 content_type=meta.mime_type,
             )
             persisted_size = local_path.stat().st_size
-        db.add(
-            models.Artifact(
-                owner_type="trial",
-                owner_id=trial.id,
-                artifact_type=meta.artifact_type,
-                display_name=meta.display_name,
-                storage_path=storage_path,
-                mime_type=meta.mime_type,
-                file_size_bytes=persisted_size,
-            )
+            digest_source = local_path
+            if settings.artifact_storage_backend != "local":
+                stored_content = storage.read_bytes(storage_path)
+                stored_sha256, stored_size = artifact_content_digest(
+                    stored_content
+                )
+                if (
+                    stored_sha256 != source_sha256
+                    or stored_size != source_size
+                ):
+                    raise ArtifactIntegrityError(
+                        "artifact storage did not preserve simulator bytes"
+                    )
+                digest_source = stored_content
+        artifact = models.Artifact(
+            owner_type="trial",
+            owner_id=trial.id,
+            artifact_type=meta.artifact_type,
+            display_name=meta.display_name,
+            storage_path=storage_path,
+            mime_type=meta.mime_type,
+            file_size_bytes=persisted_size,
         )
+        db.add(artifact)
+        if digest_source is not None:
+            bind_artifact_integrity(
+                db,
+                artifact=artifact,
+                content=digest_source,
+            )
 
 
 def _finalize_adapter_run(

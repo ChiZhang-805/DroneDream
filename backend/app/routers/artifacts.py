@@ -15,6 +15,10 @@ from app.auth import get_current_user
 from app.config import get_settings
 from app.db import get_db
 from app.storage import get_artifact_storage
+from app.storage.integrity import (
+    ArtifactIntegrityError,
+    require_artifact_integrity,
+)
 from app.storage.s3 import S3StorageConfigError
 
 router = APIRouter(tags=["artifacts"])
@@ -96,6 +100,17 @@ def download_artifact(
             detail={"code": "ARTIFACT_NOT_FOUND", "message": "Artifact not found."},
         )
 
+    try:
+        digest_receipt = require_artifact_integrity(artifact)
+    except ArtifactIntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "ARTIFACT_INTEGRITY_INVALID",
+                "message": "Artifact integrity metadata is invalid.",
+            },
+        ) from exc
+
     if artifact.storage_path.startswith("s3://"):
         try:
             storage = get_artifact_storage()
@@ -108,7 +123,7 @@ def download_artifact(
                     },
                 )
             presign = getattr(storage, "presign_download", None)
-            if callable(presign):
+            if digest_receipt is None and callable(presign):
                 signed_url = presign(
                     artifact.storage_path,
                     expires_seconds=get_settings().artifact_presign_expiry_seconds,
@@ -116,6 +131,19 @@ def download_artifact(
                 if signed_url:
                     return RedirectResponse(url=signed_url, status_code=307)
             content = storage.read_bytes(artifact.storage_path)
+            if digest_receipt is not None:
+                require_artifact_integrity(
+                    artifact,
+                    content=content,
+                )
+        except ArtifactIntegrityError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "ARTIFACT_INTEGRITY_INVALID",
+                    "message": "Artifact bytes failed integrity verification.",
+                },
+            ) from exc
         except S3StorageConfigError as exc:
             raise HTTPException(
                 status_code=500,
@@ -153,6 +181,20 @@ def download_artifact(
             status_code=404,
             detail={"code": "ARTIFACT_FILE_MISSING", "message": "Artifact file does not exist."},
         )
+
+    try:
+        require_artifact_integrity(
+            artifact,
+            content=path,
+        )
+    except ArtifactIntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "ARTIFACT_INTEGRITY_INVALID",
+                "message": "Artifact bytes failed integrity verification.",
+            },
+        ) from exc
 
     return FileResponse(
         path=path,

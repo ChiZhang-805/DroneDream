@@ -216,6 +216,71 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        if "artifacts" in table_names:
+            artifact_columns = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info('artifacts')")
+                ).fetchall()
+            }
+            if "integrity_policy" not in artifact_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE artifacts "
+                        "ADD COLUMN integrity_policy VARCHAR(32)"
+                    )
+                )
+        if "artifact_digest_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    artifact_digest_delete_authorizations (
+                        artifact_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(artifact_id)
+                            REFERENCES artifacts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_artifact_digest_receipts_no_update
+                    BEFORE UPDATE ON artifact_digest_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'artifact digest receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_artifact_digest_receipts_no_delete
+                    BEFORE DELETE ON artifact_digest_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM artifact_digest_delete_authorizations
+                        WHERE artifact_id = OLD.artifact_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'artifact digest receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
         columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()

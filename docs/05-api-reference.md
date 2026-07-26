@@ -400,16 +400,20 @@ matches its evidence or Job selection, returns
 
 Returns the artifact metadata list for a job. Each row includes
 `artifact_type`, `display_name`, `storage_path`, `mime_type`, file size, and
-timestamps. Storage paths may identify mock, managed local, or S3-compatible
-objects.
+timestamps. Digest-bound rows additionally expose `integrity_policy`,
+`digest_evidence_id`, and `content_sha256`. Storage paths may identify mock,
+managed local, or S3-compatible objects.
 
 ### 9.3 `GET /api/v1/artifacts/{artifact_id}/download`
 
-Downloads an owned managed-local artifact, or returns a short-lived redirect
-for an owned S3-compatible object when presigning is available. Mock artifacts
-are metadata-only and return `ARTIFACT_NOT_DOWNLOADABLE`. Missing objects,
-paths outside the configured artifact roots, and cross-user artifacts fail
-closed.
+Downloads an owned managed-local or S3-compatible artifact. When an Artifact is
+digest-bound, the service reads and verifies its bytes against the insert-once
+receipt before streaming; digest-bound S3 objects never use an unverified
+presigned redirect. A receipt/metadata/byte mismatch returns HTTP 409 with
+`error.code=ARTIFACT_INTEGRITY_INVALID`. Legacy unbound S3 objects may still
+return a short-lived redirect when presigning is available. Mock artifacts are
+metadata-only and return `ARTIFACT_NOT_DOWNLOADABLE`. Missing objects, paths
+outside the configured artifact roots, and cross-user artifacts fail closed.
 
 ---
 

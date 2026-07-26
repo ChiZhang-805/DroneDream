@@ -8381,13 +8381,39 @@ provides defense in depth, not protection against a database owner who can
 drop triggers; production must keep migration ownership separate from the
 application role and audit privileged DDL.
 
+Outcome Contract compiler 2.8 adds
+`dronedream.artifact-digest-receipt/v1`,
+`sha256-v1`, and `verify_bound_bytes_before_stream_v1`. Newly retained real
+Trial artifacts and generated Job artifacts receive one content-addressed
+receipt that binds Artifact identity, polymorphic owner, type, storage-path
+hash, content hash, and byte count. Trial storage keys include the physical
+attempt and source digest; a repeated attempt therefore cannot silently replace
+different bytes. Deterministic report JSON/text/PDF generation verifies an
+existing object before treating regeneration as an idempotent retry, and
+canonical UTC timestamps eliminate SQLite timezone round-trip drift.
+Digest-bound local and S3-compatible downloads read and hash bytes before
+returning them; a bound S3 object is never redirected around the verifier.
+SQLite/PostgreSQL receipt mutation guards and independent read-time
+reverification provide defense in depth. Receipt updates and ordinary deletes
+fail, while explicit Job deletion and retention cleanup use a
+transaction-scoped, foreign-key-cascaded authorization so immutable evidence
+cannot hold user data hostage. Legacy mock/unbound Artifacts remain readable.
+
+This is not an atomic object-store/database commit or an operational WORM
+guarantee. Storage-owner deletion/replacement, a database owner dropping
+triggers, object versioning/retention, and role-separation controls remain
+deployment concerns. The digest receipts are not yet part of the canonical
+Trial rows hashed by Candidate outcome/report evidence; binding that sorted
+receipt set into the Trial-to-Candidate evidence chain is the next compiler
+step.
+
 Current focused validation:
 
 ```text
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-822 passed
+827 passed
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 

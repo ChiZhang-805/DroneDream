@@ -330,6 +330,36 @@ verifier still fails closed after a privileged bypass. A database owner can
 still drop its own trigger, so operational role separation and audited
 migration ownership remain deployment responsibilities.
 
+Outcome Contract compiler 2.8 adds
+`dronedream.artifact-digest-receipt/v1`. Every newly persisted real Trial
+artifact and generated Job report artifact receives one content-addressed,
+insert-once receipt binding the Artifact ID, owner type/ID, artifact type,
+storage-path hash, content SHA-256, and byte count. Real Trial bytes use
+attempt- and content-addressed keys of the form
+`jobs/{job}/trials/{trial}/attempts/{attempt}/{type}/{sha256}-{name}`; exact
+retries reuse verified bytes, while changed content cannot overwrite the
+sealed object. Report JSON, event logs, reproducibility manifests, and PDF
+generation canonicalize ordering and UTC timestamps; regeneration first
+verifies existing bytes and rejects a changed result before any storage write.
+Digest-bound local and S3-compatible downloads read and verify the stored bytes
+before returning them, so a digest-bound S3 artifact never bypasses verification
+through a presigned redirect. SQLite and PostgreSQL reject digest-receipt
+updates and unauthorized deletes with database triggers. Explicit Job deletion
+and retention cleanup create a transaction-scoped authorization row that is
+removed by the same Artifact deletion, so sealed evidence does not make user
+data undeletable. Unsupported production dialects fail migration. Legacy
+metadata-only/mock artifacts remain nullable and retain their prior behavior.
+
+This closes the retained-byte tampering gap at the supported application and
+database boundaries, but it does not make object storage and SQL one atomic
+transaction. A storage administrator can still delete or replace objects, and
+a database owner can drop the mutation guards; production therefore still
+needs object versioning/retention, least-privilege storage credentials,
+separate migration ownership, and privileged-operation audit. The receipts are
+also not yet summarized into each Trial's canonical Candidate outcome/report
+evidence, so that cross-layer evidence binding remains the next implementation
+step.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

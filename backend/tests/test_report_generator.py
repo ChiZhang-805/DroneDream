@@ -601,6 +601,95 @@ def test_real_cli_job_artifacts_are_real_files_and_idempotent(ctx, tmp_path, mon
         assert "has_reference_track_json" in trial_summary[0]
 
 
+def test_real_cli_artifact_regeneration_mismatch_preserves_verified_bytes(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from app.storage.integrity import ArtifactIntegrityError
+
+    rg = ctx["report_generator"]
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+        )
+        db.add(job)
+        db.flush()
+        best = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0},
+            is_baseline=True,
+            is_best=True,
+        )
+        db.add(best)
+        db.flush()
+        report_body = {
+            "summary_text": "sealed summary",
+            "baseline_metric_json": {"rmse": 1.0},
+            "optimized_metric_json": {"rmse": 0.9},
+            "comparison_metric_json": [],
+            "best_parameter_json": {"kp_xy": 1.0},
+        }
+        rg.ensure_job_artifacts(
+            db,
+            job=job,
+            report_body=report_body,
+            best=best,
+        )
+        db.commit()
+
+        report_path = (
+            tmp_path
+            / "jobs"
+            / job.id
+            / "job_artifacts"
+            / "report.json"
+        )
+        sealed_bytes = report_path.read_bytes()
+        report_row = (
+            db.query(models.Artifact)
+            .filter(models.Artifact.owner_id == job.id)
+            .filter(models.Artifact.artifact_type == "report_json")
+            .one()
+        )
+        assert report_row.digest_receipt is not None
+        sealed_evidence_id = report_row.digest_receipt.evidence_id
+        report_artifact_id = report_row.id
+
+        changed_body = dict(report_body)
+        changed_body["summary_text"] = "attempted replacement"
+        with pytest.raises(
+            ArtifactIntegrityError,
+            match="not an exact match",
+        ):
+            rg.ensure_job_artifacts(
+                db,
+                job=job,
+                report_body=changed_body,
+                best=best,
+            )
+        db.rollback()
+
+        assert report_path.read_bytes() == sealed_bytes
+        db.expire_all()
+        report_row = db.get(models.Artifact, report_artifact_id)
+        assert report_row is not None
+        assert report_row.digest_receipt is not None
+        assert report_row.digest_receipt.evidence_id == sealed_evidence_id
+
+
 def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
     rg = ctx["report_generator"]
     models = ctx["models"]

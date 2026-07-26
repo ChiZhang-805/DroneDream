@@ -16,6 +16,7 @@ from app.optimization.outcome_evidence import (
 )
 from app.orchestration.acceptance import criteria_for_job, evaluate_candidate
 from app.orchestration.winner_freeze import require_winner_freeze_receipt
+from app.time_utils import canonical_utc_iso
 
 _SECRET_TOKENS = (
     "secret",
@@ -35,7 +36,7 @@ def _worst_max_error(aggregate: dict[str, Any]) -> Any:
 
 
 def _fmt_dt(value: datetime | None) -> str:
-    return value.isoformat() if value is not None else "—"
+    return canonical_utc_iso(value) or "—"
 
 
 def _fmt_num(value: Any, *, digits: int = 3) -> str:
@@ -121,21 +122,25 @@ def _collect_artifacts(job: models.Job) -> tuple[list[models.Artifact], list[mod
         return [], []
     job_artifacts = list(
         session.scalars(
-        select(models.Artifact)
-        .where(models.Artifact.owner_type == "job")
-        .where(models.Artifact.owner_id == job.id)
-        .order_by(models.Artifact.created_at.asc())
-    ).all()
+            select(models.Artifact)
+            .where(models.Artifact.owner_type == "job")
+            .where(models.Artifact.owner_id == job.id)
+            # A report cannot include its own byte size without making the
+            # report recursively self-dependent and non-deterministic.
+            .where(models.Artifact.artifact_type != "pdf_report")
+            .order_by(models.Artifact.artifact_type.asc(), models.Artifact.id.asc())
+        ).all()
     )
     trial_ids = [t.id for t in job.trials]
     if not trial_ids:
         return job_artifacts, []
     trial_artifacts = list(
         session.scalars(
-        select(models.Artifact)
-        .where(models.Artifact.owner_type == "trial")
-        .where(models.Artifact.owner_id.in_(trial_ids))
-    ).all()
+            select(models.Artifact)
+            .where(models.Artifact.owner_type == "trial")
+            .where(models.Artifact.owner_id.in_(trial_ids))
+            .order_by(models.Artifact.artifact_type.asc(), models.Artifact.id.asc())
+        ).all()
     )
     return job_artifacts, trial_artifacts
 
@@ -438,7 +443,11 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add("6) Candidate summary")
     sorted_candidates = sorted(
         job.candidates,
-        key=lambda item: (item.generation_index, item.created_at),
+        key=lambda item: (
+            item.generation_index,
+            canonical_utc_iso(item.created_at) or "",
+            item.id,
+        ),
     )
     for candidate in sorted_candidates:
         agg = require_authoritative_candidate_report_projection(candidate)
@@ -479,7 +488,13 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add("")
     add("7) Trial summary")
     trial_to_label = {c.id: c.label or c.id for c in job.candidates}
-    for trial in sorted(job.trials, key=lambda item: item.created_at):
+    for trial in sorted(
+        job.trials,
+        key=lambda item: (
+            canonical_utc_iso(item.created_at) or "",
+            item.id,
+        ),
+    ):
         metric = trial.metric
         candidate_label = trial_to_label.get(trial.candidate_id, "—")
         header = (
@@ -540,7 +555,13 @@ def build_job_report_lines(job: models.Job) -> list[str]:
 
     add("")
     add("10) Failure appendix")
-    failed_trials = [t for t in job.trials if t.status == "FAILED"]
+    failed_trials = sorted(
+        (trial for trial in job.trials if trial.status == "FAILED"),
+        key=lambda trial: (
+            canonical_utc_iso(trial.created_at) or "",
+            trial.id,
+        ),
+    )
     if job.status == "FAILED":
         add(
             "- Job failure: "
@@ -591,9 +612,18 @@ def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -
 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = (output_dir / f"{job.id} report.pdf").resolve()
-    lines = build_job_report_lines(job)
-    output_path.write_bytes(_build_pdf(lines))
+    output_path.write_bytes(render_job_pdf_report(job))
     return output_path
 
 
-__all__ = ["build_job_report_lines", "generate_job_pdf_report"]
+def render_job_pdf_report(job: models.Job) -> bytes:
+    """Render deterministic PDF bytes without mutating artifact storage."""
+
+    return _build_pdf(build_job_report_lines(job))
+
+
+__all__ = [
+    "build_job_report_lines",
+    "generate_job_pdf_report",
+    "render_job_pdf_report",
+]

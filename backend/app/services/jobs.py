@@ -38,6 +38,7 @@ from app.parameters import (
     validate_search_selections,
 )
 from app.storage import get_artifact_storage
+from app.storage.integrity import authorize_artifact_integrity_deletion
 
 logger = logging.getLogger(__name__)
 
@@ -966,6 +967,12 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
     real_artifacts = [a for a in artifact_rows if not a.storage_path.startswith("mock://")]
     storage = get_artifact_storage() if real_artifacts else None
     try:
+        for artifact in artifact_rows:
+            authorize_artifact_integrity_deletion(
+                db,
+                artifact=artifact,
+                reason="job_delete",
+            )
         for artifact in real_artifacts:
             if storage is None:
                 continue
@@ -1209,6 +1216,17 @@ def to_artifact_schema(artifact: models.Artifact) -> schemas.Artifact:
         storage_path=artifact.storage_path,
         mime_type=artifact.mime_type,
         file_size_bytes=artifact.file_size_bytes,
+        integrity_policy=artifact.integrity_policy,
+        digest_evidence_id=(
+            artifact.digest_receipt.evidence_id
+            if artifact.digest_receipt is not None
+            else None
+        ),
+        content_sha256=(
+            artifact.digest_receipt.content_sha256
+            if artifact.digest_receipt is not None
+            else None
+        ),
         created_at=artifact.created_at,
     )
 

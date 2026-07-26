@@ -73,6 +73,31 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         conn.execute(
             text(
                 """
+                CREATE TABLE artifacts (
+                    id VARCHAR(64) PRIMARY KEY,
+                    owner_type VARCHAR(32) NOT NULL,
+                    owner_id VARCHAR(64) NOT NULL,
+                    artifact_type VARCHAR(32) NOT NULL,
+                    storage_path VARCHAR(512) NOT NULL,
+                    created_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE artifact_digest_receipts (
+                    id VARCHAR(64) PRIMARY KEY,
+                    artifact_id VARCHAR(64) NOT NULL,
+                    evidence_id VARCHAR(71) NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
                 CREATE TABLE trials (
                     id VARCHAR(64) PRIMARY KEY,
                     job_id VARCHAR(64) NOT NULL,
@@ -159,6 +184,32 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 )
             ).fetchall()
         }
+        artifact_columns = {
+            row[1]
+            for row in conn.execute(
+                text("PRAGMA table_info('artifacts')")
+            ).fetchall()
+        }
+        artifact_digest_triggers = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='trigger' "
+                    "AND tbl_name='artifact_digest_receipts'"
+                )
+            ).fetchall()
+        }
+        artifact_digest_delete_authorization_columns = {
+            row[1]
+            for row in conn.execute(
+                text(
+                    "PRAGMA table_info("
+                    "'artifact_digest_delete_authorizations'"
+                    ")"
+                )
+            ).fetchall()
+        }
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
@@ -170,6 +221,16 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     assert winner_freeze_triggers == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
+    }
+    assert "integrity_policy" in artifact_columns
+    assert artifact_digest_triggers == {
+        "trg_artifact_digest_receipts_no_update",
+        "trg_artifact_digest_receipts_no_delete",
+    }
+    assert artifact_digest_delete_authorization_columns == {
+        "artifact_id",
+        "reason",
+        "created_at",
     }
 
 
@@ -222,12 +283,17 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
             for row in connection.execute(
                 "SELECT name FROM sqlite_master "
                 "WHERE type='trigger' "
-                "AND tbl_name='winner_freeze_receipts'"
+                "AND tbl_name IN ("
+                "'winner_freeze_receipts', "
+                "'artifact_digest_receipts'"
+                ")"
             ).fetchall()
         }
     assert trigger_names == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
+        "trg_artifact_digest_receipts_no_update",
+        "trg_artifact_digest_receipts_no_delete",
     }
 
 
@@ -274,3 +340,75 @@ def test_postgresql_winner_freeze_migration_emits_immutable_trigger(
     )
     assert "BEFORE UPDATE OR DELETE ON winner_freeze_receipts" in sql
     assert "winner freeze receipts are append-only" in sql
+
+
+def test_postgresql_artifact_digest_migration_emits_immutable_trigger(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260726_0007_artifact_digests.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "artifact_digest_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _BatchOp:
+        @staticmethod
+        def add_column(column) -> None:
+            assert column.name == "integrity_policy"
+
+    class _BatchContext:
+        def __enter__(self):
+            return _BatchOp()
+
+        def __exit__(self, exc_type, exc, traceback) -> None:
+            _ = exc_type, exc, traceback
+
+    class _PostgresOp:
+        @staticmethod
+        def get_bind():
+            return type(
+                "_Bind",
+                (),
+                {"dialect": type("_Dialect", (), {"name": "postgresql"})()},
+            )()
+
+        @staticmethod
+        def batch_alter_table(table_name: str):
+            assert table_name == "artifacts"
+            return _BatchContext()
+
+        @staticmethod
+        def create_table(table_name: str, *columns) -> None:
+            assert table_name in {
+                "artifact_digest_receipts",
+                "artifact_digest_delete_authorizations",
+            }
+            assert columns
+
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration.upgrade()
+
+    sql = "\n".join(emitted)
+    assert (
+        "CREATE FUNCTION dronedream_reject_artifact_digest_mutation()"
+        in sql
+    )
+    assert "CREATE TRIGGER trg_artifact_digest_receipts_immutable" in sql
+    assert "BEFORE UPDATE OR DELETE ON artifact_digest_receipts" in sql
+    assert "artifact_digest_delete_authorizations" in sql
+    assert "artifact digest receipts are append-only" in sql

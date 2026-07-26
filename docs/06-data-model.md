@@ -27,7 +27,9 @@ reviewed Alembic migrations under `backend/alembic/versions/`.
 7. `TrialMetric` — one validated metric record per Trial.
 8. `JobReport` — finalized comparison and recommendation.
 9. `Artifact` — metadata for one Job- or Trial-owned object.
-10. `JobEvent` — append-only operational/audit event.
+10. `ArtifactDigestReceipt` — insert-once content/ownership binding for a
+    retained Artifact.
+11. `JobEvent` — append-only operational/audit event.
 
 ## User and compatibility batch
 
@@ -128,8 +130,33 @@ and Job bindings. Report states are `PENDING`, `READY`, and `FAILED`.
 Artifacts use the polymorphic pair `(owner_type, owner_id)`, where
 `owner_type` is only `job` or `trial`. Metadata includes artifact type,
 display name, managed storage path, MIME type, 64-bit file size, and creation
-time. Authorization rechecks the owning Job before returning local bytes or an
-S3 redirect.
+time. New retained bytes set `integrity_policy=sha256-v1` and have one
+`ArtifactDigestReceipt`. That receipt binds Artifact ID, owner type/ID,
+artifact type, a SHA-256 of the storage path, content SHA-256, content byte
+count, and a content-addressed evidence ID.
+
+Real Trial artifacts use attempt- and content-addressed storage keys so a retry
+cannot overwrite a prior attempt:
+
+```text
+jobs/{job}/trials/{trial}/attempts/{attempt}/{type}/{sha256}-{name}
+```
+
+Generated Job artifacts are also deterministic and insert-once by content:
+regeneration verifies the current stored bytes before accepting an exact retry,
+and rejects changed content before writing. Authorization still rechecks the
+owning Job. Digest-bound local and S3-compatible objects are read and verified
+before download; only legacy unbound S3 objects may use a presigned redirect.
+Legacy mock/metadata-only rows remain nullable for compatibility.
+
+Supported SQLite and PostgreSQL schemas reject digest-receipt updates and
+unauthorized deletes with database triggers. Explicit Job deletion and
+retention cleanup insert a transaction-scoped
+`ArtifactDigestDeleteAuthorization`; its Artifact foreign-key cascade removes
+the authorization in the same transaction. This preserves normal user-data
+deletion without creating a general receipt-deletion path. Object-store
+retention/versioning and separation of database owner from application roles
+remain deployment responsibilities.
 
 ## JobEvent
 
@@ -147,12 +174,15 @@ is no separate free-form `event_message` column.
 - Candidate -> Trials: one-to-many.
 - Trial -> TrialMetric: one-to-one.
 - Artifact -> Job or Trial: validated polymorphic ownership.
+- Artifact -> ArtifactDigestReceipt: optional one-to-one for legacy
+  compatibility, required for newly retained real bytes.
 
 ## Index and migration expectations
 
 High-value indexes cover user/time and status Job queries, source/batch IDs,
 candidate generation/best/baseline lookups, Trial job/candidate/status/lease
 queries, unique Trial metrics and reports, artifact ownership, and JobEvent
-time order. Production startup must run Alembic and keep
+time order. Artifact ID and digest evidence ID are unique in the receipt table.
+Production startup must run Alembic and keep
 `AUTO_CREATE_SCHEMA=false`; application startup must not silently mutate a
 production schema.

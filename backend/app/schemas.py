@@ -946,6 +946,9 @@ class Artifact(BaseModel):
     storage_path: str
     mime_type: str | None = None
     file_size_bytes: int | None = None
+    integrity_policy: str | None = None
+    digest_evidence_id: str | None = None
+    content_sha256: str | None = None
     created_at: datetime
 
 

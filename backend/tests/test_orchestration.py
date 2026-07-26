@@ -798,6 +798,14 @@ def test_real_cli_artifacts_are_persisted_before_transient_run_cleanup(
                 stored = Path(artifact.storage_path)
                 assert stored.is_file()
                 assert stored.resolve().is_relative_to(durable_root.resolve())
+                assert "attempts" in stored.parts
+                assert str(trial.attempt_count) in stored.parts
+                assert artifact.integrity_policy == "sha256-v1"
+                assert artifact.digest_receipt is not None
+                assert (
+                    artifact.digest_receipt.content_size_bytes
+                    == stored.stat().st_size
+                )
 
         transient_dir = run_root / "jobs" / trial.job_id / "trials" / trial_id
         assert not transient_dir.exists()
