@@ -250,7 +250,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "2.5"
+    assert first.compiler_version == "2.6"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -304,6 +304,14 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert (
         first.selection_policy.winner_selection_tiebreak_policy
         == "optimizer_before_baseline_then_generation_then_candidate_id"
+    )
+    assert (
+        first.selection_policy.winner_freeze_receipt_schema
+        == "dronedream.winner-freeze-receipt/v1"
+    )
+    assert (
+        first.selection_policy.winner_freeze_persistence_policy
+        == "insert_once_per_job_exact_evidence_v1"
     )
     assert (
         first.selection_policy.portfolio_source_schema

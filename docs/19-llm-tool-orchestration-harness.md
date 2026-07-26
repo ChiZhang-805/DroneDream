@@ -8355,13 +8355,27 @@ missing, tampered, incomplete, or winner-mismatched envelopes. Legacy reports
 remain readable. This is a verifiable current-state winner receipt, not yet an
 atomic append-only `WINNER_FROZEN` transition or sealed final-test service.
 
+Outcome Contract compiler 2.6 adds an insert-once
+`dronedream.winner-freeze-receipt/v1` persistence boundary. A modern Job may
+create one receipt only while it owns `FINALIZING`; unique Job and evidence-ID
+constraints prevent a second row, and idempotent re-entry requires the same
+verified envelope and scalar bindings. JobReport stores the receipt foreign
+key, terminal events carry the receipt ID, and the report API,
+reproducibility manifest, real-runtime report JSON, and PDF generator
+independently reverify receipt content, baseline, winner, and Job identity.
+Direct row mutation therefore causes a fail-closed read rather than silently
+changing the published winner. Legacy reports remain nullable. The receipt and
+terminal state use one database transaction, but privileged out-of-band SQL is
+detected rather than physically forbidden, file artifacts are not committed
+atomically with SQL, and the sealed final-test service remains future work.
+
 Current focused validation:
 
 ```text
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-819 passed
+821 passed
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 

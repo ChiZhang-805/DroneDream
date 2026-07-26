@@ -386,11 +386,15 @@ For `COMPLETED` jobs, returns:
 - `best_parameters` (flat key/value map).
 - `winner_evidence_id` (content-addressed final-selection receipt for modern
   evidence-bound jobs; `null` for legacy reports).
+- `winner_freeze_receipt_id` (insert-once Job-level freeze row referenced by
+  modern reports; `null` for legacy reports).
 
 For `FAILED` jobs, returns a structured error envelope with
 `error.code=JOB_FAILED` and `error.details.failure_code` set to a
 job-level failure code (see §5.2). For jobs still in flight, returns
-`error.code=REPORT_NOT_READY`.
+`error.code=REPORT_NOT_READY`. If a modern winner-freeze receipt no longer
+matches its evidence or Job selection, returns
+`error.code=REPORT_EVIDENCE_INVALID`.
 
 ### 9.2 `GET /api/v1/jobs/{job_id}/artifacts`
 

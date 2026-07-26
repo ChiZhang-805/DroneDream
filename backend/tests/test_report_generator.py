@@ -260,6 +260,62 @@ def test_report_refuses_winner_that_diverges_from_selection_evidence(ctx):
             )
 
 
+def test_winner_freeze_is_idempotent_but_rejects_mutation_and_late_rebuild(
+    ctx,
+):
+    from app.orchestration.winner_freeze import (
+        WinnerFreezeError,
+        freeze_winner_selection,
+    )
+
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.report is not None
+        assert job.winner_freeze is not None
+        receipt_id = job.winner_freeze.id
+        evidence = job.report.winner_evidence_json
+
+        same = freeze_winner_selection(
+            db,
+            job=job,
+            evidence=evidence,
+        )
+        assert same.id == receipt_id
+
+        job.winner_freeze.winner_candidate_id = "cand_tampered"
+        with pytest.raises(
+            WinnerFreezeError,
+            match="not an exact evidence match",
+        ):
+            freeze_winner_selection(
+                db,
+                job=job,
+                evidence=evidence,
+            )
+        db.rollback()
+
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.winner_freeze is not None
+        db.delete(job.winner_freeze)
+        db.flush()
+        with pytest.raises(
+            WinnerFreezeError,
+            match="only during FINALIZING",
+        ):
+            freeze_winner_selection(
+                db,
+                job=job,
+                evidence=job.report.winner_evidence_json,
+            )
+
+
 def test_summary_text_reports_tradeoff_when_optimized_slower(ctx):
     """Hand-craft a job so the optimized winner is slower than baseline."""
 
@@ -945,6 +1001,13 @@ def test_repro_manifest_generated_for_mock_job(ctx):
             winner_evidence["evidence_id"]
             == job.report.winner_evidence_json["evidence_id"]
         )
+        winner_freeze = payload["optimizer"]["winner_freeze_receipt"]
+        assert isinstance(winner_freeze, dict)
+        assert winner_freeze["receipt_id"] == job.winner_freeze.id
+        assert (
+            winner_freeze["evidence_id"]
+            == winner_evidence["evidence_id"]
+        )
         assert isinstance(payload["trials"], list)
         assert payload["trials"]
         assert "track_type" in payload["job"]
@@ -1254,6 +1317,7 @@ def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
         expected_evidence_id = job.report.winner_evidence_json[
             "evidence_id"
         ]
+        expected_receipt_id = job.winner_freeze.id
 
     with TestClient(main_module.app) as client:
         response = client.get(f"/api/v1/jobs/{job_id}/report")
@@ -1263,6 +1327,39 @@ def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
         response.json()["data"]["winner_evidence_id"]
         == expected_evidence_id
     )
+    assert (
+        response.json()["data"]["winner_freeze_receipt_id"]
+        == expected_receipt_id
+    )
+
+
+def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
+    import app.main as main_module
+    import app.routers.jobs as jobs_router
+    import app.routers.trials as trials_router
+
+    importlib.reload(jobs_router)
+    importlib.reload(trials_router)
+    importlib.reload(main_module)
+
+    from fastapi.testclient import TestClient
+
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.winner_freeze is not None
+        job.winner_freeze.winner_candidate_id = "cand_tampered"
+        db.commit()
+
+    with TestClient(main_module.app) as client:
+        response = client.get(f"/api/v1/jobs/{job_id}/report")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "REPORT_EVIDENCE_INVALID"
 
 
 def test_report_endpoint_returns_job_failed_when_job_failed(ctx):

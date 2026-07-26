@@ -114,8 +114,11 @@ and requested physical-effect evidence before committing success.
 
 One Report per Job stores status, best candidate, summary text, baseline and
 optimized aggregates, comparison data, best parameters, and an optional
-content-addressed winner-selection evidence envelope. The envelope is required
-for modern evidence-bound optimization reports and nullable only for legacy
+content-addressed winner-selection evidence envelope plus a foreign key to an
+insert-once `WinnerFreezeReceipt`. The receipt binds one Job, outcome contract,
+baseline, winner, evidence ID, full evidence JSON, and freeze timestamp; Job
+and evidence ID are unique. The envelope and receipt are required for modern
+evidence-bound optimization reports and nullable only for legacy
 compatibility. Report states are `PENDING`, `READY`, and `FAILED`.
 
 ## Artifact

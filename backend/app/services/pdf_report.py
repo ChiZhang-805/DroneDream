@@ -15,6 +15,7 @@ from app.optimization.outcome_evidence import (
     require_authoritative_candidate_report_projection,
 )
 from app.orchestration.acceptance import criteria_for_job, evaluate_candidate
+from app.orchestration.winner_freeze import require_winner_freeze_receipt
 
 _SECRET_TOKENS = (
     "secret",
@@ -281,15 +282,38 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         "- Best candidate: "
         f"{(best.label if best else '—')} / {(best.id if best else '—')}"
     )
-    winner_evidence = (
-        report.winner_evidence_json
+    verified_winner = (
+        require_winner_freeze_receipt(
+            report.winner_freeze_receipt,
+            job=job,
+            evidence=report.winner_evidence_json,
+        )
         if report is not None
-        and isinstance(report.winner_evidence_json, dict)
-        else {}
+        and report.winner_freeze_receipt is not None
+        else None
+    )
+    winner_evidence = (
+        verified_winner.model_dump(mode="json")
+        if verified_winner is not None
+        else (
+            report.winner_evidence_json
+            if report is not None
+            and isinstance(report.winner_evidence_json, dict)
+            else {}
+        )
     )
     add(
         "- Winner selection evidence: "
         f"{winner_evidence.get('evidence_id', 'legacy / unavailable')}"
+    )
+    winner_freeze_receipt_id = (
+        report.winner_freeze_receipt_id
+        if report is not None and report.winner_freeze_receipt_id
+        else "legacy / unavailable"
+    )
+    add(
+        "- Winner freeze receipt: "
+        f"{winner_freeze_receipt_id}"
     )
     add(
         "- Baseline vs best RMSE change: "

@@ -185,6 +185,9 @@ class Job(Base):
     report: Mapped[JobReport | None] = relationship(
         back_populates="job", cascade="all, delete-orphan", uselist=False
     )
+    winner_freeze: Mapped[WinnerFreezeReceipt | None] = relationship(
+        back_populates="job", cascade="all, delete-orphan", uselist=False
+    )
     events: Mapped[list[JobEvent]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
@@ -300,6 +303,33 @@ class TrialMetric(Base):
     trial: Mapped[Trial] = relationship(back_populates="metric")
 
 
+class WinnerFreezeReceipt(Base):
+    __tablename__ = "winner_freeze_receipts"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("wfr")
+    )
+    job_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("jobs.id"), nullable=False, unique=True, index=True
+    )
+    receipt_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    evidence_id: Mapped[str] = mapped_column(
+        String(71), nullable=False, unique=True, index=True
+    )
+    outcome_contract_id: Mapped[str] = mapped_column(String(71), nullable=False)
+    baseline_candidate_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    winner_candidate_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    frozen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    job: Mapped[Job] = relationship(back_populates="winner_freeze")
+    report: Mapped[JobReport | None] = relationship(
+        back_populates="winner_freeze_receipt", uselist=False
+    )
+
+
 class JobReport(Base):
     __tablename__ = "job_reports"
 
@@ -316,6 +346,12 @@ class JobReport(Base):
     winner_evidence_json: Mapped[dict[str, Any] | None] = mapped_column(
         JSON, nullable=True
     )
+    winner_freeze_receipt_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("winner_freeze_receipts.id"),
+        nullable=True,
+        unique=True,
+    )
     report_status: Mapped[str] = mapped_column(String(16), nullable=False, default="PENDING")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
@@ -325,6 +361,9 @@ class JobReport(Base):
     )
 
     job: Mapped[Job] = relationship(back_populates="report")
+    winner_freeze_receipt: Mapped[WinnerFreezeReceipt | None] = relationship(
+        back_populates="report"
+    )
 
 
 class Artifact(Base):

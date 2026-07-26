@@ -1491,6 +1491,7 @@ def finalize_job_if_ready(
         if isinstance(report.winner_evidence_json, dict)
         else None
     )
+    winner_freeze_receipt_id = report.winner_freeze_receipt_id
     if _job_is_cancelled(job.id):
         db.rollback()
         return True
@@ -1519,6 +1520,7 @@ def finalize_job_if_ready(
             "baseline_score": baseline.aggregated_score,
             "optimization_outcome": outcome,
             "winner_evidence_id": winner_evidence_id,
+            "winner_freeze_receipt_id": winner_freeze_receipt_id,
         },
     )
     if terminal_status == "COMPLETED":
@@ -1531,6 +1533,7 @@ def finalize_job_if_ready(
                 "aggregated_score": best.aggregated_score,
                 "optimization_outcome": outcome,
                 "winner_evidence_id": winner_evidence_id,
+                "winner_freeze_receipt_id": winner_freeze_receipt_id,
             },
         )
     else:

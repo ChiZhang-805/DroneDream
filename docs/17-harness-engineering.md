@@ -307,6 +307,19 @@ proof. This proves the current deterministic selection over the persisted
 Candidate set, but it is not yet the future atomic winner-freeze ledger or
 sealed final-test boundary.
 
+Outcome Contract compiler 2.6 adds
+`dronedream.winner-freeze-receipt/v1`. Modern finalization inserts exactly one
+receipt per Job while the Job holds `FINALIZING`; database uniqueness covers
+both Job and evidence ID, and application re-entry succeeds only for an exact
+evidence match. JobReport references the receipt, terminal events expose its
+ID, and API/artifact/PDF readers reverify the receipt's full evidence plus
+Job baseline/winner bindings before use. Missing or mutated modern receipts
+fail closed, while legacy reports remain nullable. The receipt and terminal
+state share the caller's database transaction, but this remains an
+application-enforced compatibility ledger: external artifact files are not
+atomically committed with the database, and a future append-only database role
+or trigger should prohibit privileged out-of-band updates physically.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

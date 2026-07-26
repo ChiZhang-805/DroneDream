@@ -931,6 +931,7 @@ class JobReport(BaseModel):
     comparison: list[ComparisonPoint]
     best_parameters: dict[str, Any]
     winner_evidence_id: str | None = None
+    winner_freeze_receipt_id: str | None = None
     report_status: ReportStatus
     created_at: datetime
     updated_at: datetime

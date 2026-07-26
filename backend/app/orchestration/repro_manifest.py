@@ -19,6 +19,7 @@ from app.optimization.outcome_evidence import (
     require_authoritative_candidate_report_projection,
 )
 from app.orchestration.constants import BASELINE_PARAMETERS, PARAMETER_SAFE_RANGES, SCORE_WEIGHTS
+from app.orchestration.winner_freeze import require_winner_freeze_receipt
 
 _SAFE_ENV_ALLOWLIST: tuple[str, ...] = (
     "PX4_GAZEBO_WORLD",
@@ -209,6 +210,20 @@ def _trial_summaries(job: models.Job) -> list[dict[str, Any]]:
 def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet) -> dict[str, Any]:
     git = _git_info()
     best_aggregate = require_authoritative_candidate_report_projection(best)
+    winner_freeze = job.winner_freeze
+    verified_winner = (
+        require_winner_freeze_receipt(
+            winner_freeze,
+            job=job,
+            evidence=(
+                job.report.winner_evidence_json
+                if job.report is not None
+                else None
+            ),
+        )
+        if winner_freeze is not None
+        else None
+    )
     candidate_summaries = _candidate_summaries(job)
     outcome_contract = compile_job_outcome_contract(
         job,
@@ -282,8 +297,19 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
         "optimizer": {
             "optimization_outcome_contract": outcome_contract.model_dump(mode="json"),
             "winner_selection_evidence": sanitize_payload(
-                job.report.winner_evidence_json
-                if job.report is not None
+                verified_winner.model_dump(mode="json")
+                if verified_winner is not None
+                else None
+            ),
+            "winner_freeze_receipt": sanitize_payload(
+                {
+                    "receipt_id": winner_freeze.id,
+                    "receipt_schema": winner_freeze.receipt_schema,
+                    "evidence_id": winner_freeze.evidence_id,
+                    "frozen_at": winner_freeze.frozen_at.isoformat(),
+                }
+                if verified_winner is not None
+                and winner_freeze is not None
                 else None
             ),
             "parameter_safe_ranges": {

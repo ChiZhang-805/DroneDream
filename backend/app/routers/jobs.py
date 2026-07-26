@@ -14,6 +14,10 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.auth import get_current_user
 from app.db import get_db
+from app.orchestration.winner_freeze import (
+    WinnerFreezeError,
+    require_winner_freeze_receipt,
+)
 from app.response import ok
 from app.services import jobs as job_service
 
@@ -328,6 +332,25 @@ def get_job_report(
             },
         )
 
+    verified_winner = None
+    if report.winner_freeze_receipt is not None:
+        try:
+            verified_winner = require_winner_freeze_receipt(
+                report.winner_freeze_receipt,
+                job=job,
+                evidence=report.winner_evidence_json,
+            )
+        except WinnerFreezeError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "REPORT_EVIDENCE_INVALID",
+                    "message": (
+                        "Winner freeze receipt no longer matches the report."
+                    ),
+                },
+            ) from exc
+
     data = schemas.JobReport(
         job_id=job.id,
         best_candidate_id=report.best_candidate_id or "",
@@ -339,10 +362,15 @@ def get_job_report(
         ],
         best_parameters=report.best_parameter_json or {},
         winner_evidence_id=(
-            report.winner_evidence_json.get("evidence_id")
-            if isinstance(report.winner_evidence_json, dict)
-            else None
+            verified_winner.evidence_id
+            if verified_winner is not None
+            else (
+                report.winner_evidence_json.get("evidence_id")
+                if isinstance(report.winner_evidence_json, dict)
+                else None
+            )
         ),
+        winner_freeze_receipt_id=report.winner_freeze_receipt_id,
         report_status=report.report_status,  # type: ignore[arg-type]
         created_at=report.created_at,
         updated_at=report.updated_at,

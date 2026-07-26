@@ -178,6 +178,13 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         "ADD COLUMN winner_evidence_json JSON"
                     )
                 )
+            if "winner_freeze_receipt_id" not in report_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE job_reports "
+                        "ADD COLUMN winner_freeze_receipt_id VARCHAR(64)"
+                    )
+                )
         columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()

@@ -40,6 +40,11 @@ from app.optimization.winner_evidence import (
 )
 from app.orchestration.events import record_event
 from app.orchestration.repro_manifest import build_repro_manifest, sanitize_payload
+from app.orchestration.winner_freeze import (
+    WinnerFreezeError,
+    freeze_winner_selection,
+    require_winner_freeze_receipt,
+)
 from app.services.pdf_report import generate_job_pdf_report
 from app.storage import get_artifact_storage
 from app.storage.registration import guard_artifact_registration
@@ -312,6 +317,7 @@ def persist_report(
     best: models.CandidateParameterSet,
     report_body: dict[str, Any],
     winner_evidence: dict[str, Any] | None = None,
+    winner_freeze_receipt: models.WinnerFreezeReceipt | None = None,
 ) -> models.JobReport:
     """Upsert the JobReport row for ``job`` and mark it READY."""
 
@@ -329,6 +335,12 @@ def persist_report(
     existing.comparison_metric_json = report_body["comparison_metric_json"]
     existing.best_parameter_json = report_body["best_parameter_json"]
     existing.winner_evidence_json = winner_evidence
+    existing.winner_freeze_receipt = winner_freeze_receipt
+    existing.winner_freeze_receipt_id = (
+        winner_freeze_receipt.id
+        if winner_freeze_receipt is not None
+        else None
+    )
     existing.report_status = "READY"
     return existing
 
@@ -445,12 +457,37 @@ def ensure_real_job_artifacts(
     guard_artifact_registration(db, owner_type="job", owner_id=job.id)
     artifact_dir = _real_artifact_root() / "jobs" / job.id / "job_artifacts"
     custom_track_count, custom_track_preview = _custom_track_summary(job)
+    winner_freeze = job.winner_freeze
+    verified_winner = (
+        require_winner_freeze_receipt(
+            winner_freeze,
+            job=job,
+            evidence=(
+                job.report.winner_evidence_json
+                if job.report is not None
+                else None
+            ),
+        )
+        if winner_freeze is not None
+        else None
+    )
     report_payload = {
         "job_id": job.id,
         "best_candidate_id": best.id,
         "winner_selection_evidence": sanitize_payload(
-            job.report.winner_evidence_json
-            if job.report is not None
+            verified_winner.model_dump(mode="json")
+            if verified_winner is not None
+            else None
+        ),
+        "winner_freeze_receipt": sanitize_payload(
+            {
+                "receipt_id": winner_freeze.id,
+                "receipt_schema": winner_freeze.receipt_schema,
+                "evidence_id": winner_freeze.evidence_id,
+                "frozen_at": winner_freeze.frozen_at.isoformat(),
+            }
+            if verified_winner is not None
+            and winner_freeze is not None
             else None
         ),
         "summary_text": report_body["summary_text"],
@@ -891,6 +928,16 @@ def generate_and_persist_report(
             f"{body['summary_text']} Custom track points: {custom_track_count} "
             "(preview limited to first 5 points in artifacts/PDF)."
         )
+    winner_freeze_receipt = None
+    if verified_winner is not None:
+        try:
+            winner_freeze_receipt = freeze_winner_selection(
+                db,
+                job=job,
+                evidence=verified_winner,
+            )
+        except WinnerFreezeError as exc:
+            raise ReportEvidenceError(str(exc)) from exc
     report = persist_report(
         db,
         job=job,
@@ -901,6 +948,7 @@ def generate_and_persist_report(
             if verified_winner is not None
             else None
         ),
+        winner_freeze_receipt=winner_freeze_receipt,
     )
     ensure_job_artifacts(db, job=job, report_body=body, best=best)
     try:

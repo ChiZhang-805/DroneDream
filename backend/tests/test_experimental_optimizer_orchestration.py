@@ -189,6 +189,7 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
         assert generation_events
         assert all(event.payload_json["strategy"] == strategy for event in generation_events)
         assert job.report is not None
+        assert job.winner_freeze is not None
         winner_evidence = verify_winner_selection_evidence(
             job.report.winner_evidence_json
         )
@@ -196,6 +197,11 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
         assert winner_evidence.winner_candidate_id == job.best_candidate_id
         assert winner_evidence.baseline_candidate_id == job.baseline_candidate_id
         assert winner_evidence.candidate_count == len(candidates)
+        assert job.winner_freeze.evidence_id == winner_evidence.evidence_id
+        assert (
+            job.report.winner_freeze_receipt_id
+            == job.winner_freeze.id
+        )
         assert {
             decision.candidate_id
             for decision in winner_evidence.candidates
@@ -208,6 +214,10 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
         assert (
             selected_event.payload_json["winner_evidence_id"]
             == winner_evidence.evidence_id
+        )
+        assert (
+            selected_event.payload_json["winner_freeze_receipt_id"]
+            == job.winner_freeze.id
         )
 
         history = ctx["jobs"].optimization_history(job)

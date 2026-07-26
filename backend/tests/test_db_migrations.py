@@ -143,6 +143,7 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     assert "expires_at" in secret_columns
     assert "optimizer_metadata_json" in candidate_columns
     assert "winner_evidence_json" in report_columns
+    assert "winner_freeze_receipt_id" in report_columns
 
 
 def test_sqlite_engine_enables_foreign_key_enforcement(tmp_path) -> None:
