@@ -252,7 +252,7 @@ function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 
-async function rsaSign(message: string, privateKeyPem: string): Promise<string> {
+export async function rsaSign(message: string, privateKeyPem: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "pkcs8",
     arrayBuffer(pemBytes(privateKeyPem, "PRIVATE KEY")),
@@ -268,7 +268,7 @@ async function rsaSign(message: string, privateKeyPem: string): Promise<string> 
   return bytesToBase64(new Uint8Array(signature));
 }
 
-async function rsaVerify(
+export async function rsaVerify(
   message: string,
   signatureBase64: string,
   publicKeyPem: string,
@@ -366,7 +366,7 @@ export async function verifyStripeSignature(
   return signatures.some((signature) => constantTimeHexEqual(signature, expected));
 }
 
-function canonicalParameters(
+export function canonicalParameters(
   parameters: URLSearchParams,
   excluded: Set<string> = new Set(),
 ): string {
@@ -375,6 +375,19 @@ function canonicalParameters(
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, value]) => `${key}=${value}`)
     .join("&");
+}
+
+export function alipayNotificationProtocolMatches(
+  parameters: URLSearchParams,
+  expectedAppId: string,
+  expectedSellerId: string,
+): boolean {
+  return parameters.get("sign_type") === "RSA2"
+    && parameters.get("app_id") === expectedAppId
+    && parameters.get("seller_id") === expectedSellerId
+    && ["TRADE_SUCCESS", "TRADE_FINISHED"].includes(
+      parameters.get("trade_status") ?? "",
+    );
 }
 
 function alipayTimestamp(): string {
@@ -710,9 +723,11 @@ async function handleAlipayNotify(request: Request): Promise<Response> {
   const eventReference = parameters.get("notify_id") ?? transactionId;
   if (
     !verified
-    || parameters.get("app_id") !== requiredEnv("ALIPAY_APP_ID")
-    || parameters.get("seller_id") !== requiredEnv("ALIPAY_SELLER_ID")
-    || !["TRADE_SUCCESS", "TRADE_FINISHED"].includes(parameters.get("trade_status") ?? "")
+    || !alipayNotificationProtocolMatches(
+      parameters,
+      requiredEnv("ALIPAY_APP_ID"),
+      requiredEnv("ALIPAY_SELLER_ID"),
+    )
     || !/^[0-9a-f-]{36}$/iu.test(orderId)
     || !transactionId
     || !eventReference
@@ -779,6 +794,20 @@ async function decryptWechatResource(resource: JsonRecord): Promise<JsonRecord> 
   return parsed;
 }
 
+export function isWechatTransactionSuccessEnvelope(
+  value: unknown,
+): value is JsonRecord & { resource: JsonRecord } {
+  if (!isRecord(value) || value.event_type !== "TRANSACTION.SUCCESS") {
+    return false;
+  }
+  const resource = value.resource;
+  return isRecord(resource)
+    && resource.algorithm === "AEAD_AES_256_GCM"
+    && resource.original_type === "transaction"
+    && typeof resource.ciphertext === "string"
+    && typeof resource.nonce === "string";
+}
+
 async function handleWechatNotify(request: Request): Promise<Response> {
   if (!wechatConfigured()) {
     return jsonResponse(request, 503, { code: "FAIL", message: "not configured" });
@@ -803,7 +832,7 @@ async function handleWechatNotify(request: Request): Promise<Response> {
   }
   try {
     const notification: unknown = JSON.parse(raw);
-    if (!isRecord(notification) || !isRecord(notification.resource)) {
+    if (!isWechatTransactionSuccessEnvelope(notification)) {
       throw new Error("invalid notification");
     }
     const resource = await decryptWechatResource(notification.resource);
