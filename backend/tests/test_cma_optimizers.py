@@ -845,6 +845,33 @@ def test_portfolio_only_awards_improvement_credit_at_full_fidelity() -> None:
     assert statistic.normalized_improvement == 0.0
 
 
+def test_portfolio_rejects_nominal_full_fidelity_with_partial_effective_coverage() -> None:
+    space = _space()
+    partial = replace(
+        _observation(
+            space,
+            candidate_id="nominal-full-effective-partial",
+            generation=1,
+            vector=(0.4, 0.4, 0.5, 0.5),
+            loss=0.1,
+            strategy="multi_fidelity_mobo",
+        ),
+        fidelity=0.25,
+        requested_fidelity=1.0,
+    )
+
+    statistic = {
+        item.strategy: item
+        for item in portfolio_statistics(
+            _request("optimizer_portfolio", (partial,), generation=2)
+        )
+    }["multi_fidelity_mobo"]
+
+    assert statistic.observations == 1
+    assert statistic.full_fidelity_observations == 0
+    assert statistic.normalized_improvement == 0.0
+
+
 def test_portfolio_uses_a_common_baseline_instead_of_each_childs_bad_start() -> None:
     space = _space()
     baseline = _observation(
@@ -899,6 +926,157 @@ def test_portfolio_uses_a_common_baseline_instead_of_each_childs_bad_start() -> 
 
     assert statistics["surrogate_cma_es"].normalized_improvement == 0.0
     assert statistics["bipop_cma_es"].normalized_improvement == pytest.approx(0.2)
+
+
+def test_portfolio_only_rewards_improvement_over_the_pre_generation_incumbent() -> None:
+    space = _space()
+    history = (
+        _observation(
+            space,
+            candidate_id="baseline",
+            generation=0,
+            vector=(0.5, 0.5, 0.5, 0.5),
+            loss=1.0,
+            strategy="baseline",
+        ),
+        _observation(
+            space,
+            candidate_id="first-improvement",
+            generation=1,
+            vector=(0.4, 0.4, 0.5, 0.5),
+            loss=0.4,
+            strategy="surrogate_cma_es",
+        ),
+        _observation(
+            space,
+            candidate_id="late-non-improvement",
+            generation=2,
+            vector=(0.6, 0.6, 0.5, 0.5),
+            loss=0.6,
+            strategy="bipop_cma_es",
+        ),
+    )
+    statistics = {
+        item.strategy: item
+        for item in portfolio_statistics(
+            _request("optimizer_portfolio", history, generation=3)
+        )
+    }
+
+    assert statistics["surrogate_cma_es"].normalized_improvement == pytest.approx(0.6)
+    assert statistics["bipop_cma_es"].normalized_improvement == 0.0
+
+
+def test_portfolio_incumbent_includes_reward_ineligible_valid_candidates() -> None:
+    space = _space()
+    history = (
+        _observation(
+            space,
+            candidate_id="baseline",
+            generation=0,
+            vector=(0.5, 0.5, 0.5, 0.5),
+            loss=1.0,
+            strategy="baseline",
+        ),
+        _observation(
+            space,
+            candidate_id="ineligible-but-valid-incumbent",
+            generation=1,
+            vector=(0.4, 0.4, 0.5, 0.5),
+            loss=0.4,
+            strategy="surrogate_cma_es",
+            optimizer_metadata={"portfolio_reward_eligible": False},
+        ),
+        _observation(
+            space,
+            candidate_id="later-worse-than-incumbent",
+            generation=2,
+            vector=(0.6, 0.6, 0.5, 0.5),
+            loss=0.6,
+            strategy="turbo",
+        ),
+    )
+    statistics = {
+        item.strategy: item
+        for item in portfolio_statistics(
+            _request("optimizer_portfolio", history, generation=3)
+        )
+    }
+
+    assert statistics["surrogate_cma_es"].normalized_improvement == 0.0
+    assert statistics["turbo"].normalized_improvement == 0.0
+
+
+def test_portfolio_reward_uses_a_fixed_loss_scale() -> None:
+    space = _space()
+
+    def reward(*, baseline_loss: float, improved_loss: float) -> float:
+        history = (
+            _observation(
+                space,
+                candidate_id=f"baseline-{baseline_loss}",
+                generation=0,
+                vector=(0.5, 0.5, 0.5, 0.5),
+                loss=baseline_loss,
+                strategy="baseline",
+            ),
+            _observation(
+                space,
+                candidate_id=f"improved-{improved_loss}",
+                generation=1,
+                vector=(0.4, 0.4, 0.5, 0.5),
+                loss=improved_loss,
+                strategy="turbo",
+            ),
+        )
+        return {
+            item.strategy: item
+            for item in portfolio_statistics(
+                _request("optimizer_portfolio", history, generation=2)
+            )
+        }["turbo"].normalized_improvement
+
+    assert reward(baseline_loss=1.0, improved_loss=0.75) == pytest.approx(0.25)
+    assert reward(baseline_loss=100.0, improved_loss=99.75) == pytest.approx(0.25)
+    assert reward(baseline_loss=100.0, improved_loss=98.0) == 1.0
+
+
+def test_portfolio_counts_at_most_one_best_reward_per_tool_generation() -> None:
+    space = _space()
+    history = (
+        _observation(
+            space,
+            candidate_id="baseline",
+            generation=0,
+            vector=(0.5, 0.5, 0.5, 0.5),
+            loss=1.0,
+            strategy="baseline",
+        ),
+        _observation(
+            space,
+            candidate_id="same-generation-good",
+            generation=1,
+            vector=(0.4, 0.4, 0.5, 0.5),
+            loss=0.8,
+            strategy="surrogate_cma_es",
+        ),
+        _observation(
+            space,
+            candidate_id="same-generation-best",
+            generation=1,
+            vector=(0.3, 0.3, 0.5, 0.5),
+            loss=0.7,
+            strategy="surrogate_cma_es",
+        ),
+    )
+    statistic = {
+        item.strategy: item
+        for item in portfolio_statistics(
+            _request("optimizer_portfolio", history, generation=2)
+        )
+    }["surrogate_cma_es"]
+
+    assert statistic.normalized_improvement == pytest.approx(0.3)
 
 
 def test_portfolio_full_fidelity_feasibility_ignores_easy_low_fidelity_rows() -> None:
@@ -1248,16 +1426,32 @@ def test_portfolio_exact_collision_preserves_equal_cross_tool_credit(
         generation=1,
         loss=0.5,
     )
+    baseline = _observation(
+        space,
+        candidate_id="shared-credit-baseline",
+        generation=0,
+        vector=(0.5, 0.5, 0.5, 0.5),
+        loss=1.0,
+        strategy="baseline",
+    )
     statistics = {
         item.strategy: item
         for item in portfolio_statistics(
-            _request("optimizer_portfolio", (observation,), generation=2)
+            _request(
+                "optimizer_portfolio",
+                (baseline, observation),
+                generation=2,
+            )
         )
     }
     assert statistics["constrained_mobo"].full_fidelity_observations == 1
     assert statistics["turbo"].full_fidelity_observations == 1
     assert statistics["constrained_mobo"].reward_credit == pytest.approx(0.5)
     assert statistics["turbo"].reward_credit == pytest.approx(0.5)
+    assert statistics["constrained_mobo"].normalized_improvement == pytest.approx(
+        0.25
+    )
+    assert statistics["turbo"].normalized_improvement == pytest.approx(0.25)
 
 
 def test_portfolio_same_child_fidelity_upgrade_keeps_one_materialized_source(

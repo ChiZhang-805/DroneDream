@@ -17,9 +17,10 @@ from app.optimization.outcome_evidence import (
 )
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "2.0"
+OUTCOME_CONTRACT_COMPILER_VERSION = "2.1"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
+PORTFOLIO_REWARD_SCALE = 1.0
 
 MetricSource = Literal[
     "canonical_trial_metric",
@@ -194,6 +195,17 @@ class OutcomeSelectionPolicy(_FrozenModel):
     portfolio_material_change_policy: Literal[
         "superseded_source_ineligible_for_reward"
     ] = "superseded_source_ineligible_for_reward"
+    portfolio_reward_contract: Literal[
+        "fixed_scale_pre_generation_incumbent_v1"
+    ] = "fixed_scale_pre_generation_incumbent_v1"
+    portfolio_reward_scale_decimal: Literal["1"] = "1"
+    portfolio_incumbent_scope: Literal[
+        "global_comparable_full_fidelity_before_generation"
+    ] = "global_comparable_full_fidelity_before_generation"
+    portfolio_generation_credit_policy: Literal[
+        "best_attributed_reward_once_per_generation"
+    ] = "best_attributed_reward_once_per_generation"
+    portfolio_reward_bound: Literal["zero_to_one"] = "zero_to_one"
     precedence: tuple[str, ...] = (
         "evidence_complete",
         "hard_feasible",
@@ -229,7 +241,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["2.0"] = "2.0"
+    compiler_version: Literal["2.1"] = "2.1"
     contract_id: str
     metric_admission_policy: Literal["registered_metrics_only"] = (
         "registered_metrics_only"
@@ -672,6 +684,7 @@ __all__ = [
     "OUTCOME_CONTRACT_COMPILER_VERSION",
     "OUTCOME_CONTRACT_SCHEMA",
     "OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT",
+    "PORTFOLIO_REWARD_SCALE",
     "SELECTION_KEY_SCHEMA_VERSION",
     "OptimizationOutcomeContractV1",
     "build_selection_key",

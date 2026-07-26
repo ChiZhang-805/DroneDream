@@ -251,6 +251,16 @@ fractional credit rather than awarding one full reward to every source. This
 does not yet replace the need for an append-only routing-opportunity/action
 ledger capable of preserving collisions against historical Candidates.
 
+Outcome Contract compiler 2.1 freezes the online portfolio reward definition.
+Each child is credited only for reducing the globally comparable full-fidelity
+incumbent that existed before its generation began. Reward uses one fixed
+normalized preference-loss unit, is bounded to `[0, 1]`, applies exact-source
+shares, and records at most the best attributed reward once per child per
+generation. Later tools cannot claim improvement over an obsolete baseline,
+same-generation batch size cannot add rewards together, and observed extrema
+cannot rescale historical credit. Cost, delay, action probability, and
+append-only reward events remain outside this compatibility slice.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

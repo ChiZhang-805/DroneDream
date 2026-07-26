@@ -20,6 +20,7 @@ from app.optimization.experimental_types import (
 )
 from app.optimization.outcome_contract import (
     OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
+    PORTFOLIO_REWARD_SCALE,
 )
 
 _CHILD_STRATEGIES: tuple[ExperimentalOptimizerStrategy, ...] = (
@@ -165,57 +166,93 @@ def _reward_eligible(observation: OptimizerObservation) -> bool:
     return str(metadata.get("optimizer_generated_by", "")) != "halton_fallback"
 
 
-def _full_fidelity_reward_observation(observation: OptimizerObservation) -> bool:
+def _full_fidelity_observation(observation: OptimizerObservation) -> bool:
     return (
         observation.completed
+        and observation.fidelity >= 1.0 - 1e-9
         and observation.requested_fidelity >= 1.0 - 1e-9
-        and _reward_eligible(observation)
     )
 
 
-def _finite_feasible_generation_losses(
+def _full_fidelity_reward_observation(observation: OptimizerObservation) -> bool:
+    return _full_fidelity_observation(observation) and _reward_eligible(
+        observation
+    )
+
+
+def _comparable_loss(observation: OptimizerObservation) -> float | None:
+    if (
+        not observation.feasible
+        or observation.failure_rate
+        >= OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
+        or observation.loss is None
+        or not math.isfinite(observation.loss)
+    ):
+        return None
+    return float(observation.loss)
+
+
+def _pre_generation_incumbents(
     observations: list[OptimizerObservation],
-) -> list[tuple[int, float]]:
-    """Return one best comparable loss per optimizer generation."""
+) -> dict[int, float | None]:
+    """Freeze the best earlier loss before each generation starts."""
 
-    generation_best: dict[int, float] = {}
-    for item in observations:
-        if (
-            not item.feasible
-            or item.failure_rate
-            >= OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
-            or item.loss is None
-            or not math.isfinite(item.loss)
-        ):
-            continue
-        loss = float(item.loss)
-        generation_best[item.generation_index] = min(
-            loss,
-            generation_best.get(item.generation_index, math.inf),
-        )
-    return sorted(generation_best.items())
+    by_generation: dict[int, list[OptimizerObservation]] = defaultdict(list)
+    for observation in observations:
+        by_generation[observation.generation_index].append(observation)
+    incumbent: float | None = None
+    result: dict[int, float | None] = {}
+    for generation in sorted(by_generation):
+        result[generation] = incumbent
+        generation_losses = [
+            loss
+            for observation in by_generation[generation]
+            if (loss := _comparable_loss(observation)) is not None
+        ]
+        if generation_losses:
+            generation_best = min(generation_losses)
+            incumbent = (
+                generation_best
+                if incumbent is None
+                else min(incumbent, generation_best)
+            )
+    return result
 
 
-def _improvement_statistics(
-    losses: list[tuple[int, float]],
+def _attributed_improvement_statistics(
+    entries: list[tuple[OptimizerObservation, float]],
     *,
-    common_baseline: float | None,
+    pre_generation_incumbents: Mapping[int, float | None],
 ) -> tuple[float, float]:
-    if not losses or common_baseline is None or not math.isfinite(common_baseline):
-        return 0.0, 0.0
-    best = min(item[1] for item in losses)
-    scale = max(1e-9, abs(common_baseline), abs(best))
-    normalized = max(0.0, common_baseline - best) / scale
+    """Return bounded fixed-scale reward with at most one credit per generation."""
 
-    split = max(1, len(losses) // 2)
-    earlier_best = min(common_baseline, *(item[1] for item in losses[:split]))
-    recent_rows = losses[split:]
-    if not recent_rows:
-        return normalized, 0.0
-    recent_best = min(item[1] for item in recent_rows)
-    recent_scale = max(1e-9, abs(earlier_best), abs(recent_best))
-    recent = max(0.0, earlier_best - recent_best) / recent_scale
-    return normalized, recent
+    generation_rewards: dict[int, float] = {}
+    for observation, share in entries:
+        incumbent = pre_generation_incumbents.get(
+            observation.generation_index
+        )
+        loss = _comparable_loss(observation)
+        if incumbent is None or loss is None:
+            reward = 0.0
+        else:
+            reward = min(
+                1.0,
+                max(0.0, incumbent - loss) / PORTFOLIO_REWARD_SCALE,
+            ) * share
+        generation_rewards[observation.generation_index] = max(
+            reward,
+            generation_rewards.get(observation.generation_index, 0.0),
+        )
+    ordered = sorted(generation_rewards.items())
+    if not ordered:
+        return 0.0, 0.0
+    total = min(1.0, sum(reward for _generation, reward in ordered))
+    split = max(1, len(ordered) // 2)
+    recent = min(
+        1.0,
+        sum(reward for _generation, reward in ordered[split:]),
+    )
+    return total, recent
 
 
 def portfolio_statistics(request: OptimizerRequest) -> tuple[PortfolioStatistic, ...]:
@@ -240,10 +277,11 @@ def portfolio_statistics(request: OptimizerRequest) -> tuple[PortfolioStatistic,
         for strategy in _CHILD_STRATEGIES
     }
     global_comparable = [
-        item for item in request.observations if _full_fidelity_reward_observation(item)
+        item for item in request.observations if _full_fidelity_observation(item)
     ]
-    global_losses = _finite_feasible_generation_losses(global_comparable)
-    common_baseline = global_losses[0][1] if global_losses else None
+    pre_generation_incumbents = _pre_generation_incumbents(
+        global_comparable
+    )
     # Only completed full-fidelity evaluations are comparable enough to award
     # improvement credit. Lower-fidelity results still inform each child model
     # and the safety signal below, but cannot win portfolio budget by appearing
@@ -259,18 +297,10 @@ def portfolio_statistics(request: OptimizerRequest) -> tuple[PortfolioStatistic,
         comparable_entries = reward_history[strategy]
         comparable_history = [item for item, _share in comparable_entries]
         reward_credit = sum(share for _item, share in comparable_entries)
-        losses = _finite_feasible_generation_losses(comparable_history)
-        normalized, recent = _improvement_statistics(
-            losses,
-            common_baseline=common_baseline,
+        normalized, recent = _attributed_improvement_statistics(
+            comparable_entries,
+            pre_generation_incumbents=pre_generation_incumbents,
         )
-        credit_factor = (
-            reward_credit / len(comparable_entries)
-            if comparable_entries
-            else 0.0
-        )
-        normalized *= credit_factor
-        recent *= credit_factor
         feasibility_rate = (
             sum(
                 share
