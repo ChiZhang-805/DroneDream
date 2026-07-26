@@ -126,7 +126,7 @@ describe("DroneDream public website", () => {
     expect(screen.queryByRole("dialog", { name: /manual/i })).toBeNull();
   });
 
-  it("renders exactly three plans whose capabilities differ only by allowance", () => {
+  it("renders exactly three plans whose capabilities differ only by allowance", async () => {
     window.history.replaceState(null, "", "/pricing/");
 
     renderSite();
@@ -137,12 +137,18 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("heading", { name: "Pro" })).toBeVisible();
     expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.queryByText(/Business Plus/i)).toBeNull();
-    expect(screen.getByText("100,000")).toBeVisible();
-    expect(screen.getByText("1,000,000")).toBeVisible();
-    expect(screen.getByText("5,000,000")).toBeVisible();
+    expect(screen.getByText("300,000")).toBeVisible();
+    expect(screen.getByText("3,000,000")).toBeVisible();
+    expect(screen.getByText("15,000,000")).toBeVisible();
     expect(screen.getAllByText(
       "The same Harness, optimizers, simulation, and reports",
     )).toHaveLength(3);
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/billing-checkout/availability"),
+        expect.any(Object),
+      );
+    });
   });
 
   it("shows honest inactive payment options without simulating a purchase", async () => {

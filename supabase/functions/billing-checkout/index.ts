@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2.110.8";
 
 type JsonRecord = Record<string, unknown>;
-type PaymentMethod = "alipay" | "wechat";
+type PaymentMethod = "alipay" | "wechat" | "card";
 
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://getdronedream.com",
@@ -83,6 +83,10 @@ function jsonResponse(
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isPaymentMethod(value: unknown): value is PaymentMethod {
+  return value === "alipay" || value === "wechat" || value === "card";
 }
 
 function endpointPath(request: Request): string {
@@ -175,8 +179,19 @@ function wechatConfigured(): boolean {
   ].every((name) => Boolean(env(name)));
 }
 
+function cardConfigured(): boolean {
+  return paymentEnabled() && [
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_SUCCESS_URL",
+    "STRIPE_CANCEL_URL",
+  ].every((name) => Boolean(env(name)));
+}
+
 function channelConfigured(method: PaymentMethod): boolean {
-  return method === "alipay" ? alipayConfigured() : wechatConfigured();
+  if (method === "alipay") return alipayConfigured();
+  if (method === "wechat") return wechatConfigured();
+  return cardConfigured();
 }
 
 async function availability(): Promise<JsonRecord> {
@@ -194,6 +209,7 @@ async function availability(): Promise<JsonRecord> {
     methods: {
       alipay: alipayConfigured(),
       wechat: wechatConfigured(),
+      card: cardConfigured(),
     },
     entitlement_activation: "verified_server_callback_only",
     plans: (plans ?? []).map((plan) => ({
@@ -287,6 +303,69 @@ async function sha256Hex(value: string): Promise<string> {
   return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function bytesToHex(bytes: Uint8Array): string {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function hmacSha256Hex(secret: string, value: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return bytesToHex(new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)),
+  ));
+}
+
+function constantTimeHexEqual(left: string, right: string): boolean {
+  if (
+    left.length !== right.length
+    || left.length === 0
+    || !/^[0-9a-f]+$/iu.test(left)
+    || !/^[0-9a-f]+$/iu.test(right)
+  ) {
+    return false;
+  }
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
+export async function verifyStripeSignature(
+  rawBody: string,
+  signatureHeader: string,
+  webhookSecret: string,
+  nowMilliseconds = Date.now(),
+): Promise<boolean> {
+  const components = signatureHeader.split(",").map((component) => component.trim());
+  const timestampText = components
+    .find((component) => component.startsWith("t="))
+    ?.slice(2) ?? "";
+  const timestamp = Number(timestampText);
+  const signatures = components
+    .filter((component) => component.startsWith("v1="))
+    .map((component) => component.slice(3));
+  if (
+    !webhookSecret
+    || !Number.isSafeInteger(timestamp)
+    || timestamp <= 0
+    || Math.abs(nowMilliseconds / 1_000 - timestamp) > 300
+    || signatures.length === 0
+  ) {
+    return false;
+  }
+  const expected = await hmacSha256Hex(
+    webhookSecret,
+    `${timestampText}.${rawBody}`,
+  );
+  return signatures.some((signature) => constantTimeHexEqual(signature, expected));
+}
+
 function canonicalParameters(
   parameters: URLSearchParams,
   excluded: Set<string> = new Set(),
@@ -332,7 +411,7 @@ function asOrder(value: unknown): PaymentOrder {
     !isRecord(value)
     || typeof value.order_id !== "string"
     || (value.plan_id !== "plus" && value.plan_id !== "pro")
-    || (value.payment_method !== "alipay" && value.payment_method !== "wechat")
+    || !isPaymentMethod(value.payment_method)
     || !Number.isSafeInteger(value.amount_cny_fen)
     || typeof value.status !== "string"
     || typeof value.checkout_expires_at !== "string"
@@ -456,6 +535,76 @@ async function createWechatCheckout(order: PaymentOrder): Promise<JsonRecord> {
   return { kind: "qr_code", code_url: responseJson.code_url };
 }
 
+async function createCardCheckout(order: PaymentOrder): Promise<JsonRecord> {
+  const parameters = new URLSearchParams({
+    mode: "payment",
+    client_reference_id: order.order_id,
+    success_url: requiredEnv("STRIPE_SUCCESS_URL"),
+    cancel_url: requiredEnv("STRIPE_CANCEL_URL"),
+    "payment_method_types[0]": "card",
+    "line_items[0][quantity]": "1",
+    "line_items[0][price_data][currency]": "cny",
+    "line_items[0][price_data][unit_amount]": String(order.amount_cny_fen),
+    "line_items[0][price_data][product_data][name]":
+      `DroneDream ${order.plan_id === "plus" ? "Plus" : "Pro"} · 1 month`,
+    "metadata[order_id]": order.order_id,
+    "metadata[plan_id]": order.plan_id,
+    "payment_intent_data[metadata][order_id]": order.order_id,
+    // Stripe permits 30 minutes to 24 hours. The database checkout deadline is
+    // 35 minutes so the provider session always expires first.
+    expires_at: String(Math.floor(Date.now() / 1_000) + 30 * 60 + 30),
+  });
+  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requiredEnv("STRIPE_SECRET_KEY")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      "Idempotency-Key": `dronedream-${order.order_id}`,
+      "User-Agent": "DroneDream-Billing/1.0.0",
+    },
+    body: parameters.toString(),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const responseText = await response.text();
+  let responseJson: unknown;
+  try {
+    responseJson = JSON.parse(responseText);
+  } catch {
+    responseJson = null;
+  }
+  const checkoutUrl = isRecord(responseJson) && typeof responseJson.url === "string"
+    ? responseJson.url
+    : "";
+  let trustedCheckoutUrl = false;
+  try {
+    const parsed = new URL(checkoutUrl);
+    trustedCheckoutUrl = parsed.protocol === "https:"
+      && (
+        parsed.hostname === "checkout.stripe.com"
+        || parsed.hostname.endsWith(".checkout.stripe.com")
+      );
+  } catch {
+    trustedCheckoutUrl = false;
+  }
+  if (
+    !response.ok
+    || !isRecord(responseJson)
+    || responseJson.object !== "checkout.session"
+    || typeof responseJson.id !== "string"
+    || !responseJson.id.startsWith("cs_")
+    || !trustedCheckoutUrl
+  ) {
+    console.error("Card checkout creation failed", response.status);
+    throw new BillingError(
+      "PAYMENT_PROVIDER_FAILED",
+      "Card payment could not create the checkout.",
+      502,
+    );
+  }
+  return { kind: "redirect", url: checkoutUrl };
+}
+
 async function handleCreate(request: Request): Promise<Response> {
   const user = await authenticatedUser(request);
   const body = await readJsonBody(request);
@@ -463,7 +612,7 @@ async function handleCreate(request: Request): Promise<Response> {
   const paymentMethod = body.payment_method;
   if (
     (planId !== "plus" && planId !== "pro")
-    || (paymentMethod !== "alipay" && paymentMethod !== "wechat")
+    || !isPaymentMethod(paymentMethod)
   ) {
     throw new BillingError("INVALID_REQUEST", "Choose Plus or Pro and a payment method.", 400);
   }
@@ -498,7 +647,9 @@ async function handleCreate(request: Request): Promise<Response> {
   }
   const checkout = paymentMethod === "alipay"
     ? await createAlipayCheckout(order)
-    : await createWechatCheckout(order);
+    : paymentMethod === "wechat"
+      ? await createWechatCheckout(order)
+      : await createCardCheckout(order);
   return jsonResponse(request, 201, {
     data: {
       order_id: order.order_id,
@@ -688,6 +839,84 @@ async function handleWechatNotify(request: Request): Promise<Response> {
   }
 }
 
+async function handleCardNotify(request: Request): Promise<Response> {
+  if (!cardConfigured()) {
+    return new Response("not configured", { status: 503 });
+  }
+  const raw = await readBodyText(request);
+  const signature = request.headers.get("Stripe-Signature") ?? "";
+  if (
+    !await verifyStripeSignature(
+      raw,
+      signature,
+      requiredEnv("STRIPE_WEBHOOK_SECRET"),
+    )
+  ) {
+    return new Response("invalid signature", { status: 401 });
+  }
+  let event: unknown;
+  try {
+    event = JSON.parse(raw);
+  } catch {
+    return new Response("invalid payload", { status: 400 });
+  }
+  if (
+    !isRecord(event)
+    || typeof event.id !== "string"
+    || !event.id.startsWith("evt_")
+    || typeof event.type !== "string"
+    || !isRecord(event.data)
+    || !isRecord(event.data.object)
+  ) {
+    return new Response("invalid payload", { status: 400 });
+  }
+  if (event.type !== "checkout.session.completed") {
+    return new Response("ignored", { status: 200 });
+  }
+  const session = event.data.object;
+  const metadata = isRecord(session.metadata) ? session.metadata : null;
+  const orderId = typeof session.client_reference_id === "string"
+    ? session.client_reference_id
+    : "";
+  const sessionId = typeof session.id === "string" ? session.id : "";
+  const paymentIntent = typeof session.payment_intent === "string"
+    ? session.payment_intent
+    : "";
+  if (
+    session.object !== "checkout.session"
+    || session.mode !== "payment"
+    || session.payment_status !== "paid"
+    || session.status !== "complete"
+    || session.currency !== "cny"
+    || metadata?.order_id !== orderId
+    || !/^[0-9a-f-]{36}$/iu.test(orderId)
+    || !sessionId.startsWith("cs_")
+    || !paymentIntent.startsWith("pi_")
+  ) {
+    return new Response("payment fields do not match", { status: 400 });
+  }
+  try {
+    const order = await paymentOrder(orderId, "card");
+    if (
+      metadata?.plan_id !== order.plan_id
+      || integerValue(session.amount_total) !== order.amount_cny_fen
+    ) {
+      return new Response("payment amount does not match", { status: 400 });
+    }
+    await markPaid(
+      order,
+      sessionId,
+      paymentIntent,
+      event.id,
+      await sha256Hex(raw),
+    );
+    return new Response("received", { status: 200 });
+  } catch (error) {
+    console.error("Card notification processing failed", error);
+    return new Response("processing failed", { status: 500 });
+  }
+}
+
 function integerValue(value: unknown): number | null {
   return Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : null;
 }
@@ -715,7 +944,7 @@ function errorResponse(request: Request, error: unknown): Response {
   });
 }
 
-Deno.serve(async (request: Request) => {
+export async function handleBillingRequest(request: Request): Promise<Response> {
   const path = endpointPath(request);
   // Provider callbacks do not use browser CORS and must receive their exact
   // protocol acknowledgements instead of the generic JSON envelope.
@@ -724,6 +953,9 @@ Deno.serve(async (request: Request) => {
   }
   if (request.method === "POST" && path === "/webhooks/wechat") {
     return handleWechatNotify(request);
+  }
+  if (request.method === "POST" && path === "/webhooks/card") {
+    return handleCardNotify(request);
   }
   try {
     const cors = corsHeaders(request);
@@ -742,4 +974,8 @@ Deno.serve(async (request: Request) => {
   } catch (error) {
     return errorResponse(request, error);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleBillingRequest);
+}

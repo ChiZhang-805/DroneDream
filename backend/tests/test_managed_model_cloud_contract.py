@@ -25,9 +25,10 @@ def test_three_plans_share_one_capability_set_and_only_quota_price_vary() -> Non
 
     assert "check (capability_set = 'core-v1')" in migration
     assert "check (plan_id in ('free', 'plus', 'pro'))" in migration
-    assert "('free', 'Free', 1, 0, 100000, 'core-v1', 1)" in migration
-    assert "('plus', 'Plus', 2, 2000, 1000000, 'core-v1', 1)" in migration
-    assert "('pro', 'Pro', 3, 20000, 5000000, 'core-v1', 1)" in migration
+    assert "('free', 'Free', 1, 0, 300000, 'core-v1', 1)" in migration
+    assert "('plus', 'Plus', 2, 3900, 3000000, 'core-v1', 1)" in migration
+    assert "('pro', 'Pro', 3, 12900, 15000000, 'core-v1', 1)" in migration
+    assert "payment_method in ('alipay', 'wechat', 'card')" in migration
     assert "business" not in migration.lower()
 
 
@@ -97,5 +98,11 @@ def test_non_jwt_edge_routes_implement_explicit_auth_and_payment_verification() 
     assert "decryptWechatResource" in billing
     assert "WECHAT_PLATFORM_CERTIFICATE_SERIAL" in billing
     assert "amount?.currency !== \"CNY\"" in billing
+    assert "verifyStripeSignature(" in billing
+    assert 'request.headers.get("Stripe-Signature")' in billing
+    assert 'event.type !== "checkout.session.completed"' in billing
+    assert 'session.currency !== "cny"' in billing
+    assert "metadata?.plan_id !== order.plan_id" in billing
+    assert 'path === "/webhooks/card"' in billing
     assert "verified_server_callback_only" in billing
     assert "billing_mark_order_paid" in billing

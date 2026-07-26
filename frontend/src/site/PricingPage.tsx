@@ -1,4 +1,4 @@
-import { Check, ShieldCheck, X } from "lucide-react";
+import { Check, CreditCard, ShieldCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -27,9 +27,9 @@ interface Plan {
 }
 
 const PLANS: readonly Plan[] = [
-  { id: "free", name: "Free", price: 0, includedCredits: 100_000 },
-  { id: "plus", name: "Plus", price: 20, includedCredits: 1_000_000, featured: true },
-  { id: "pro", name: "Pro", price: 200, includedCredits: 5_000_000 },
+  { id: "free", name: "Free", price: 0, includedCredits: 300_000 },
+  { id: "plus", name: "Plus", price: 39, includedCredits: 3_000_000, featured: true },
+  { id: "pro", name: "Pro", price: 129, includedCredits: 15_000_000 },
 ];
 
 const pricingContent = {
@@ -60,6 +60,7 @@ const pricingContent = {
       "This purchases one month of the selected allowance. Renewal is manual until wallet auto-renewal is separately activated.",
     wechat: "WeChat Pay",
     alipay: "Alipay",
+    card: "Credit or debit card",
     continue: "Continue to payment",
     checking: "Checking payment availability…",
     unavailable: "Merchant payment activation is still required.",
@@ -96,6 +97,7 @@ const pricingContent = {
       "本次购买一个月的对应额度；在钱包自动续费能力另行签约前，到期后由用户手动续费。",
     wechat: "微信支付",
     alipay: "支付宝",
+    card: "信用卡或借记卡",
     continue: "继续付款",
     checking: "正在检查支付渠道…",
     unavailable: "仍需完成商户支付能力开通。",
@@ -150,7 +152,7 @@ export function PricingPage({
         });
         setPaymentMethod((current) => {
           if (result.methods[current]) return current;
-          const availableMethod = (["wechat", "alipay"] as const).find(
+          const availableMethod = (["wechat", "alipay", "card"] as const).find(
             (method) => result.methods[method],
           );
           return availableMethod ?? current;
@@ -304,6 +306,18 @@ export function PricingPage({
               >
                 <span className="payment-method-logo is-alipay">支</span>
                 {copy.alipay}
+              </button>
+              <button
+                type="button"
+                aria-label={copy.card}
+                aria-pressed={paymentMethod === "card"}
+                disabled={availability ? !availability.methods.card : false}
+                onClick={() => setPaymentMethod("card")}
+              >
+                <span className="payment-method-logo is-card">
+                  <CreditCard aria-hidden="true" />
+                </span>
+                {copy.card}
               </button>
             </div>
             {wechatQr ? (

@@ -52,8 +52,8 @@ describe("cloud model access client", () => {
       plan: {
         id: "plus",
         name: "Plus",
-        monthly_price_cny_fen: 2_000,
-        included_ai_credits: 1_000_000,
+        monthly_price_cny_fen: 3_900,
+        included_ai_credits: 3_000_000,
         capability_set: "core-v1",
       },
       period: {
@@ -63,7 +63,7 @@ describe("cloud model access client", () => {
       usage: {
         reserved_ai_credits: 0,
         consumed_ai_credits: 1_200,
-        remaining_ai_credits: 998_800,
+        remaining_ai_credits: 2_998_800,
         request_count: 2,
         input_tokens: 400,
         output_tokens: 200,
@@ -134,28 +134,28 @@ describe("cloud model access client", () => {
     const availability = {
       enabled: true,
       billing_mode: "manual_monthly_renewal",
-      methods: { alipay: true, wechat: true },
+      methods: { alipay: true, wechat: true, card: false },
       entitlement_activation: "verified_server_callback_only",
       plans: [
         {
           id: "free",
           name: "Free",
           monthly_price_cny_fen: 0,
-          included_ai_credits: 100_000,
+          included_ai_credits: 300_000,
           capability_set: "core-v1",
         },
         {
           id: "plus",
           name: "Plus",
-          monthly_price_cny_fen: 2_000,
-          included_ai_credits: 1_000_000,
+          monthly_price_cny_fen: 3_900,
+          included_ai_credits: 3_000_000,
           capability_set: "core-v1",
         },
         {
           id: "pro",
           name: "Pro",
-          monthly_price_cny_fen: 20_000,
-          included_ai_credits: 5_000_000,
+          monthly_price_cny_fen: 12_900,
+          included_ai_credits: 15_000_000,
           capability_set: "core-v1",
         },
       ],
@@ -167,7 +167,7 @@ describe("cloud model access client", () => {
           order_id: "79ed4e92-7d9d-42ca-8d36-dd0fbd4d1550",
           plan_id: "plus",
           payment_method: "wechat",
-          amount_cny_fen: 2_000,
+          amount_cny_fen: 3_900,
           currency: "CNY",
           expires_at: "2026-07-26T05:30:00Z",
           checkout: {

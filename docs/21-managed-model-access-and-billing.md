@@ -17,14 +17,18 @@ The migration seeds these operator-editable launch defaults:
 
 | Plan | Monthly price | Included credits |
 | --- | ---: | ---: |
-| Free | ¥0 | 100,000 |
-| Plus | ¥20 | 1,000,000 |
-| Pro | ¥200 | 5,000,000 |
+| Free | ¥0 | 300,000 |
+| Plus | ¥39 | 3,000,000 |
+| Pro | ¥129 | 15,000,000 |
 
-These are launch configuration defaults, not hard-coded commercial promises.
-The authoritative rows live in `public.model_subscription_plans`; the website
-loads them from the billing Edge Function and uses its embedded values only as
-an offline fallback.
+These launch values deliberately use simple 10× and 50× allowance steps while
+keeping every product capability identical. The price points sit below the
+current entry and high-usage tiers of broad AI assistants while leaving room
+for provider cost, payment fees, failed requests, support, and exchange-rate
+movement. They remain operator-editable launch configuration, not hard-coded
+commercial promises. The authoritative rows live in
+`public.model_subscription_plans`; the website loads them from the billing Edge
+Function and uses its embedded values only as an offline fallback.
 
 ## Trust boundary
 
@@ -153,6 +157,7 @@ payloads are not exposed.
 | `POST /create` | Supabase user JWT | Create a server-priced Plus/Pro order |
 | `POST /webhooks/alipay` | Alipay RSA2 signature | Verify and activate an Alipay payment |
 | `POST /webhooks/wechat` | WeChat platform signature + APIv3 encryption | Verify and activate a WeChat payment |
+| `POST /webhooks/card` | Stripe endpoint signature | Verify and activate a card payment |
 
 `verify_jwt=false` in `supabase/config.toml` is intentional. Supabase's generic
 JWT pre-check would reject opaque model grants and payment-provider callbacks.
@@ -210,6 +215,15 @@ WECHAT_API_V3_KEY=
 WECHAT_NOTIFY_URL=https://PROJECT_REF.supabase.co/functions/v1/billing-checkout/webhooks/wechat
 ```
 
+Credit and debit card (Stripe-hosted Checkout):
+
+```dotenv
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_SUCCESS_URL=https://getdronedream.com/pricing/?payment=success
+STRIPE_CANCEL_URL=https://getdronedream.com/pricing/?payment=cancelled
+```
+
 Keep `PAYMENTS_ENABLED=false` until sandbox/low-value end-to-end callbacks have
 passed. The availability endpoint still returns plans, but every checkout
 button remains honestly disabled unless the selected channel has every
@@ -259,10 +273,11 @@ verification intentionally fails closed.
 9. Set `PAYMENTS_ENABLED=true`, recheck `/availability`, and perform a monitored
    real purchase/refund run before public announcement.
 
-## Merchant and card-payment prerequisites
+## Merchant and payment prerequisites
 
-The code supports Alipay computer-website payment and WeChat Native QR payment,
-but code cannot create merchant eligibility:
+The code supports Alipay computer-website payment, WeChat Native QR payment,
+and a Stripe-hosted one-time card checkout. Code cannot create merchant
+eligibility:
 
 - WeChat's official onboarding material supports ordinary merchants. Its
   partner-assisted small/micro-merchant flow can accept an operator identity,
@@ -277,14 +292,17 @@ but code cannot create merchant eligibility:
 - True wallet auto-renewal requires separate entrusted-deduction products,
   agreements, cancellation UX, and provider review. This implementation uses
   one-month manual renewal and must not be marketed as automatic renewal.
-
-International cards are deliberately not implemented yet. Stripe supports Hong
-Kong, but opening a Hong Kong account requires a real eligible Hong Kong
-business/account configuration, identity and entity verification, and a payout
-bank account. A mainland personal operator should not select Hong Kong merely
-to bypass onboarding. Add card checkout only after a valid merchant entity is
-chosen; then use a hosted checkout and webhook flow rather than handling card
-numbers in DroneDream.
+- Stripe card checkout remains disabled until an eligible merchant account,
+  payout account, server key, and endpoint-specific webhook secret exist. The
+  browser is redirected to Stripe's hosted Checkout, so DroneDream never
+  receives or stores card numbers. Entitlement activation requires a
+  `checkout.session.completed` event whose unmodified body, five-minute
+  timestamp, amount, CNY currency, order metadata, and payment state all pass
+  server verification.
+- Stripe supports Hong Kong, but opening a Hong Kong account requires a real
+  eligible Hong Kong business/account configuration, identity and entity
+  verification, and a payout bank account. A mainland personal operator should
+  not select Hong Kong merely to bypass onboarding.
 
 Official references:
 
@@ -306,6 +324,10 @@ Official references:
   <https://stripe.com/global>
 - Stripe verification documents:
   <https://docs.stripe.com/acceptable-verification-documents?country=HK>
+- Stripe-hosted Checkout:
+  <https://docs.stripe.com/payments/checkout>
+- Stripe webhook signatures:
+  <https://docs.stripe.com/webhooks/signature>
 
 ## Validation gates
 
@@ -319,7 +341,8 @@ Before release, all of the following must be green:
 - two-user RLS isolation;
 - concurrent quota reservation and stale-reservation recovery;
 - provider token-accounting receipt comparison;
-- Alipay/WeChat signature, amount, currency, replay, and callback idempotency;
+- Alipay/WeChat/Stripe signature, amount, currency, replay, and callback
+  idempotency;
 - website desktop/mobile screenshots;
 - one monitored live payment and one refund/reconciliation exercise.
 

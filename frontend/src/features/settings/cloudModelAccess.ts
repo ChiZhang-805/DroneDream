@@ -2,7 +2,7 @@ import { getAuthAccessToken } from "../auth/authTokenStore";
 
 export type ManagedModelPlanId = "free" | "plus" | "pro";
 export type ManagedModelGrantScope = "assistant" | "job";
-export type PaymentMethod = "alipay" | "wechat";
+export type PaymentMethod = "alipay" | "wechat" | "card";
 
 export interface ManagedModelPlan {
   id: ManagedModelPlanId;

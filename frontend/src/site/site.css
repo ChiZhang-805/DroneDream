@@ -1330,7 +1330,7 @@ html[lang="zh-CN"] .site-hero h1 {
   background: rgba(255,255,255,.06);
 }
 
-.payment-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.payment-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; }
 .payment-methods button {
   display: flex;
   align-items: center;
@@ -1356,6 +1356,8 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 .payment-method-logo.is-wechat { background: #13ad65; }
 .payment-method-logo.is-alipay { background: #1677ff; }
+.payment-method-logo.is-card { background: #5b5bd6; }
+.payment-method-logo.is-card svg { width: 19px; color: #fff; }
 .payment-continue {
   width: 100%;
   height: 50px;

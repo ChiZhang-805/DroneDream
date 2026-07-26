@@ -35,9 +35,9 @@ insert into public.model_subscription_plans (
   credit_policy_version
 )
 values
-  ('free', 'Free', 1, 0, 100000, 'core-v1', 1),
-  ('plus', 'Plus', 2, 2000, 1000000, 'core-v1', 1),
-  ('pro', 'Pro', 3, 20000, 5000000, 'core-v1', 1)
+  ('free', 'Free', 1, 0, 300000, 'core-v1', 1),
+  ('plus', 'Plus', 2, 3900, 3000000, 'core-v1', 1),
+  ('pro', 'Pro', 3, 12900, 15000000, 'core-v1', 1)
 on conflict (plan_id) do update
 set
   display_name = excluded.display_name,
@@ -60,7 +60,10 @@ create table if not exists public.account_entitlements (
   source text not null default 'free'
     check (source in ('free', 'payment', 'admin')),
   payment_provider text
-    check (payment_provider is null or payment_provider in ('alipay', 'wechat')),
+    check (
+      payment_provider is null
+      or payment_provider in ('alipay', 'wechat', 'card')
+    ),
   provider_subscription_reference text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -171,7 +174,8 @@ create table if not exists public.payment_orders (
     check (length(idempotency_key) between 8 and 128),
   plan_id text not null references public.model_subscription_plans(plan_id)
     check (plan_id in ('plus', 'pro')),
-  payment_method text not null check (payment_method in ('alipay', 'wechat')),
+  payment_method text not null
+    check (payment_method in ('alipay', 'wechat', 'card')),
   billing_period_months integer not null default 1
     check (billing_period_months between 1 and 12),
   amount_cny_fen integer not null check (amount_cny_fen > 0),
@@ -198,7 +202,8 @@ create index if not exists payment_orders_user_created_idx
 
 create table if not exists public.payment_webhook_events (
   event_id uuid primary key default gen_random_uuid(),
-  payment_method text not null check (payment_method in ('alipay', 'wechat')),
+  payment_method text not null
+    check (payment_method in ('alipay', 'wechat', 'card')),
   provider_event_reference text not null,
   payload_sha256 text not null check (payload_sha256 ~ '^[0-9a-f]{64}$'),
   signature_verified boolean not null,
@@ -877,7 +882,7 @@ declare
   created_order public.payment_orders%rowtype;
 begin
   if p_plan_id not in ('plus', 'pro')
-    or p_payment_method not in ('alipay', 'wechat')
+    or p_payment_method not in ('alipay', 'wechat', 'card')
     or p_billing_period_months not between 1 and 12
     or length(p_idempotency_key) not between 8 and 128
     or p_idempotency_key !~ '^[A-Za-z0-9_.:-]+$'
@@ -925,7 +930,7 @@ begin
     p_payment_method,
     p_billing_period_months,
     selected_plan.monthly_price_cny_fen * p_billing_period_months,
-    now() + interval '30 minutes'
+    now() + interval '35 minutes'
   )
   returning * into created_order;
 
