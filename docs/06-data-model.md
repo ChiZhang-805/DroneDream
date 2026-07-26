@@ -113,8 +113,10 @@ and requested physical-effect evidence before committing success.
 ## JobReport
 
 One Report per Job stores status, best candidate, summary text, baseline and
-optimized aggregates, comparison data, and best parameters. Report states are
-`PENDING`, `READY`, and `FAILED`.
+optimized aggregates, comparison data, best parameters, and an optional
+content-addressed winner-selection evidence envelope. The envelope is required
+for modern evidence-bound optimization reports and nullable only for legacy
+compatibility. Report states are `PENDING`, `READY`, and `FAILED`.
 
 ## Artifact
 

@@ -164,6 +164,20 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         "ADD COLUMN optimizer_metadata_json JSON"
                     )
                 )
+        if "job_reports" in table_names:
+            report_columns = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info('job_reports')")
+                ).fetchall()
+            }
+            if "winner_evidence_json" not in report_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE job_reports "
+                        "ADD COLUMN winner_evidence_json JSON"
+                    )
+                )
         columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()

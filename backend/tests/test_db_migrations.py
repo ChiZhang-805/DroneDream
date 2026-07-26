@@ -49,6 +49,17 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         conn.execute(
             text(
                 """
+                CREATE TABLE job_reports (
+                    id VARCHAR(64) PRIMARY KEY,
+                    job_id VARCHAR(64) NOT NULL,
+                    report_status VARCHAR(16) NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
                 CREATE TABLE trials (
                     id VARCHAR(64) PRIMARY KEY,
                     job_id VARCHAR(64) NOT NULL,
@@ -119,12 +130,19 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 text("PRAGMA table_info('candidate_parameter_sets')")
             ).fetchall()
         }
+        report_columns = {
+            row[1]
+            for row in conn.execute(
+                text("PRAGMA table_info('job_reports')")
+            ).fetchall()
+        }
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
     assert "cancelled_at" in batch_columns
     assert "expires_at" in secret_columns
     assert "optimizer_metadata_json" in candidate_columns
+    assert "winner_evidence_json" in report_columns
 
 
 def test_sqlite_engine_enables_foreign_key_enforcement(tmp_path) -> None:

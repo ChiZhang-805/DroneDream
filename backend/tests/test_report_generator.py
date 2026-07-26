@@ -216,6 +216,50 @@ def test_bound_report_projection_ignores_compatibility_fields_and_fails_closed(
             )
 
 
+def test_report_refuses_winner_that_diverges_from_selection_evidence(ctx):
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    rg = ctx["report_generator"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.report is not None
+        original_best = next(
+            candidate
+            for candidate in job.candidates
+            if candidate.id == job.best_candidate_id
+        )
+        alternate = next(
+            candidate
+            for candidate in job.candidates
+            if candidate.id != original_best.id
+            and candidate.aggregated_metric_json is not None
+        )
+        baseline = next(
+            candidate
+            for candidate in job.candidates
+            if candidate.id == job.baseline_candidate_id
+        )
+
+        job.best_candidate_id = alternate.id
+        original_best.is_best = False
+        alternate.is_best = True
+        with pytest.raises(
+            rg.ReportEvidenceError,
+            match="winner-selection evidence",
+        ):
+            rg.generate_and_persist_report(
+                db,
+                job=job,
+                best=alternate,
+                baseline_agg=baseline.aggregated_metric_json,
+                best_agg=alternate.aggregated_metric_json,
+                winner_evidence=job.report.winner_evidence_json,
+            )
+
+
 def test_summary_text_reports_tradeoff_when_optimized_slower(ctx):
     """Hand-craft a job so the optimized winner is slower than baseline."""
 
@@ -889,6 +933,18 @@ def test_repro_manifest_generated_for_mock_job(ctx):
         payload = json.loads(Path(artifact.storage_path).read_text(encoding="utf-8"))
         assert payload["job"]["job_id"] == job_id
         assert payload["optimizer"]["best_candidate_id"] == job.best_candidate_id
+        winner_evidence = payload["optimizer"][
+            "winner_selection_evidence"
+        ]
+        assert isinstance(winner_evidence, dict)
+        assert (
+            winner_evidence["winner_candidate_id"]
+            == job.best_candidate_id
+        )
+        assert (
+            winner_evidence["evidence_id"]
+            == job.report.winner_evidence_json["evidence_id"]
+        )
         assert isinstance(payload["trials"], list)
         assert payload["trials"]
         assert "track_type" in payload["job"]
@@ -1174,6 +1230,39 @@ def test_build_job_report_lines_includes_new_sections(ctx):
 
 
 # --- API error paths ------------------------------------------------------
+
+
+def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
+    import app.main as main_module
+    import app.routers.jobs as jobs_router
+    import app.routers.trials as trials_router
+
+    importlib.reload(jobs_router)
+    importlib.reload(trials_router)
+    importlib.reload(main_module)
+
+    from fastapi.testclient import TestClient
+
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.report is not None
+        expected_evidence_id = job.report.winner_evidence_json[
+            "evidence_id"
+        ]
+
+    with TestClient(main_module.app) as client:
+        response = client.get(f"/api/v1/jobs/{job_id}/report")
+
+    assert response.status_code == 200
+    assert (
+        response.json()["data"]["winner_evidence_id"]
+        == expected_evidence_id
+    )
 
 
 def test_report_endpoint_returns_job_failed_when_job_failed(ctx):

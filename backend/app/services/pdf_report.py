@@ -281,6 +281,16 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         "- Best candidate: "
         f"{(best.label if best else '—')} / {(best.id if best else '—')}"
     )
+    winner_evidence = (
+        report.winner_evidence_json
+        if report is not None
+        and isinstance(report.winner_evidence_json, dict)
+        else {}
+    )
+    add(
+        "- Winner selection evidence: "
+        f"{winner_evidence.get('evidence_id', 'legacy / unavailable')}"
+    )
     add(
         "- Baseline vs best RMSE change: "
         f"{_pct_change(baseline_agg.get('rmse'), best_agg.get('rmse'))}"

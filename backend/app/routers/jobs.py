@@ -338,6 +338,11 @@ def get_job_report(
             schemas.ComparisonPoint(**c) for c in (report.comparison_metric_json or [])
         ],
         best_parameters=report.best_parameter_json or {},
+        winner_evidence_id=(
+            report.winner_evidence_json.get("evidence_id")
+            if isinstance(report.winner_evidence_json, dict)
+            else None
+        ),
         report_status=report.report_status,  # type: ignore[arg-type]
         created_at=report.created_at,
         updated_at=report.updated_at,

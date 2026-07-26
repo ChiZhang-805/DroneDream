@@ -281,6 +281,11 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
         },
         "optimizer": {
             "optimization_outcome_contract": outcome_contract.model_dump(mode="json"),
+            "winner_selection_evidence": sanitize_payload(
+                job.report.winner_evidence_json
+                if job.report is not None
+                else None
+            ),
             "parameter_safe_ranges": {
                 key: {"min": lo, "max": hi} for key, (lo, hi) in PARAMETER_SAFE_RANGES.items()
             },

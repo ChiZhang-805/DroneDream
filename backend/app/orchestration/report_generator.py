@@ -27,8 +27,16 @@ from app import models
 from app.config import get_settings
 from app.optimization.outcome_evidence import (
     CandidateReportEvidenceError,
+    authoritative_candidate_trial_outcome_projection,
+    candidate_report_evidence_required,
+    candidate_training_trial_evidence_rows,
     require_authoritative_candidate_report_projection,
     trial_is_holdout,
+)
+from app.optimization.winner_evidence import (
+    WinnerSelectionEvidenceV1,
+    verify_winner_selection_evidence,
+    winner_evidence_matches_current_candidates,
 )
 from app.orchestration.events import record_event
 from app.orchestration.repro_manifest import build_repro_manifest, sanitize_payload
@@ -303,6 +311,7 @@ def persist_report(
     job: models.Job,
     best: models.CandidateParameterSet,
     report_body: dict[str, Any],
+    winner_evidence: dict[str, Any] | None = None,
 ) -> models.JobReport:
     """Upsert the JobReport row for ``job`` and mark it READY."""
 
@@ -312,12 +321,14 @@ def persist_report(
     if existing is None:
         existing = models.JobReport(job_id=job.id)
         db.add(existing)
+    existing.job = job
     existing.best_candidate_id = best.id
     existing.summary_text = report_body["summary_text"]
     existing.baseline_metric_json = report_body["baseline_metric_json"]
     existing.optimized_metric_json = report_body["optimized_metric_json"]
     existing.comparison_metric_json = report_body["comparison_metric_json"]
     existing.best_parameter_json = report_body["best_parameter_json"]
+    existing.winner_evidence_json = winner_evidence
     existing.report_status = "READY"
     return existing
 
@@ -437,6 +448,11 @@ def ensure_real_job_artifacts(
     report_payload = {
         "job_id": job.id,
         "best_candidate_id": best.id,
+        "winner_selection_evidence": sanitize_payload(
+            job.report.winner_evidence_json
+            if job.report is not None
+            else None
+        ),
         "summary_text": report_body["summary_text"],
         "custom_track_point_count": custom_track_count,
         "custom_track_preview": sanitize_payload(custom_track_preview),
@@ -746,6 +762,7 @@ def generate_and_persist_report(
     best: models.CandidateParameterSet,
     baseline_agg: dict[str, Any],
     best_agg: dict[str, Any],
+    winner_evidence: WinnerSelectionEvidenceV1 | dict[str, Any] | None = None,
 ) -> models.JobReport:
     """Build the JobReport payload, persist it, and create mock artifacts.
 
@@ -772,6 +789,72 @@ def generate_and_persist_report(
         for candidate in job.candidates
         if candidate.aggregated_metric_json is not None
     }
+    outcome_projections: dict[str, dict[str, Any]] = {}
+    for candidate in job.candidates:
+        if candidate.aggregated_metric_json is None:
+            continue
+        projection = authoritative_candidate_trial_outcome_projection(
+            candidate_id=candidate.id,
+            generation_index=candidate.generation_index,
+            parameter_snapshot=candidate.parameter_json,
+            trial_evidence_rows=candidate_training_trial_evidence_rows(
+                candidate
+            ),
+            aggregate=candidate.aggregated_metric_json,
+        )
+        if (
+            candidate_report_evidence_required(
+                candidate.aggregated_metric_json
+            )
+            and not projection
+        ):
+            raise ReportEvidenceError(
+                "Candidate outcome evidence is invalid at report boundary"
+            )
+        outcome_projections[candidate.id] = projection
+    winner_payload = (
+        winner_evidence.model_dump(mode="json")
+        if isinstance(winner_evidence, WinnerSelectionEvidenceV1)
+        else winner_evidence
+    )
+    verified_winner = verify_winner_selection_evidence(winner_payload)
+    winner_required = (
+        job.best_candidate_id is not None
+        and any(
+            candidate_report_evidence_required(
+                candidate.aggregated_metric_json
+            )
+            for candidate in job.candidates
+        )
+    )
+    if winner_payload is not None and verified_winner is None:
+        raise ReportEvidenceError(
+            "winner-selection evidence content hash is invalid"
+        )
+    if winner_required and verified_winner is None:
+        raise ReportEvidenceError(
+            "winner-selection evidence is required for this report"
+        )
+    if verified_winner is not None and (
+        verified_winner.winner_candidate_id != best.id
+        or verified_winner.winner_candidate_id != job.best_candidate_id
+        or verified_winner.baseline_candidate_id
+        != job.baseline_candidate_id
+        or any(
+            projection.get("outcome_contract_id")
+            != verified_winner.outcome_contract_id
+            for projection in outcome_projections.values()
+        )
+        or not winner_evidence_matches_current_candidates(
+            verified_winner.model_dump(mode="json"),
+            candidates=job.candidates,
+            outcome_projections=outcome_projections,
+            report_projections=verified_aggregates,
+        )
+    ):
+        raise ReportEvidenceError(
+            "winner-selection evidence no longer matches current ranking"
+        )
     baseline_agg = verified_aggregates.get(
         baseline.id
     ) or _authoritative_report_aggregate(baseline, baseline_agg)
@@ -808,7 +891,17 @@ def generate_and_persist_report(
             f"{body['summary_text']} Custom track points: {custom_track_count} "
             "(preview limited to first 5 points in artifacts/PDF)."
         )
-    report = persist_report(db, job=job, best=best, report_body=body)
+    report = persist_report(
+        db,
+        job=job,
+        best=best,
+        report_body=body,
+        winner_evidence=(
+            verified_winner.model_dump(mode="json")
+            if verified_winner is not None
+            else None
+        ),
+    )
     ensure_job_artifacts(db, job=job, report_body=body, best=best)
     try:
         ensure_repro_manifest_artifact(db, job=job, best=best)

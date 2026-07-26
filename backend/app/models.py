@@ -313,6 +313,9 @@ class JobReport(Base):
     optimized_metric_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     comparison_metric_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     best_parameter_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    winner_evidence_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
     report_status: Mapped[str] = mapped_column(String(16), nullable=False, default="PENDING")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False

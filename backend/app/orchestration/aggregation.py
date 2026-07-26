@@ -46,10 +46,12 @@ from app.optimization.outcome_contract import (
 from app.optimization.outcome_evidence import (
     authoritative_candidate_trial_outcome_projection,
     candidate_outcome_evidence_required,
+    candidate_report_evidence_required,
     candidate_report_trial_evidence_rows,
     candidate_training_trial_evidence_rows,
     compile_candidate_outcome_evidence,
     compile_candidate_report_evidence,
+    require_authoritative_candidate_report_projection,
     trial_is_holdout,
     trial_outcome_evidence_row,
 )
@@ -69,6 +71,12 @@ from app.optimization.robust import (
     evaluate_candidate as evaluate_objectives,
 )
 from app.optimization.scenarios import scenario_matrix
+from app.optimization.winner_evidence import (
+    WinnerSelectionEvidenceError,
+    WinnerSelectionEvidenceV1,
+    compile_winner_selection_evidence,
+    winner_evidence_matches_current_candidates,
+)
 from app.orchestration import constants, report_generator
 from app.orchestration.acceptance import (
     AcceptanceCriteria,
@@ -1219,6 +1227,87 @@ def _rank_and_select_best(
     return best
 
 
+def _compile_current_winner_evidence(
+    *,
+    candidates: list[models.CandidateParameterSet],
+    baseline: models.CandidateParameterSet,
+    best: models.CandidateParameterSet,
+    outcome_contract: OptimizationOutcomeContractV1,
+) -> WinnerSelectionEvidenceV1:
+    inputs: list[dict[str, object]] = []
+    outcome_projections: dict[str, dict[str, Any]] = {}
+    report_projections: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        outcome = authoritative_candidate_trial_outcome_projection(
+            candidate_id=candidate.id,
+            generation_index=candidate.generation_index,
+            parameter_snapshot=candidate.parameter_json,
+            trial_evidence_rows=candidate_training_trial_evidence_rows(
+                candidate
+            ),
+            aggregate=candidate.aggregated_metric_json,
+        )
+        try:
+            report = require_authoritative_candidate_report_projection(
+                candidate
+            )
+        except ValueError as exc:
+            raise WinnerSelectionEvidenceError(str(exc)) from exc
+        order = selection_order_key(
+            candidate.aggregated_metric_json,
+            candidate.aggregated_score,
+        )
+        if not outcome or not report:
+            raise WinnerSelectionEvidenceError(
+                "winner evidence requires authoritative Candidate inputs "
+                f"for {candidate.id}"
+            )
+        finite_order = (
+            order
+            if all(math.isfinite(float(value)) for value in order)
+            else None
+        )
+        eligible = candidate_is_publishable(candidate)
+        if eligible and finite_order is None:
+            raise WinnerSelectionEvidenceError(
+                "publishable Candidate has a non-finite Selection Key: "
+                f"{candidate.id} -> {order}"
+            )
+        inputs.append(
+            {
+                "candidate_id": candidate.id,
+                "generation_index": candidate.generation_index,
+                "is_baseline": candidate.is_baseline,
+                "eligible": eligible,
+                "candidate_outcome_evidence_id": report.get(
+                    "candidate_outcome_evidence_id"
+                ),
+                "candidate_report_evidence_id": report.get(
+                    "candidate_report_evidence_id"
+                ),
+                "selection_order_key": finite_order,
+            }
+        )
+        outcome_projections[candidate.id] = outcome
+        report_projections[candidate.id] = report
+    evidence = compile_winner_selection_evidence(
+        outcome_contract_id=outcome_contract.contract_id,
+        baseline_candidate_id=baseline.id,
+        winner_candidate_id=best.id,
+        candidates=inputs,
+    )
+    if not winner_evidence_matches_current_candidates(
+        evidence.model_dump(mode="json"),
+        candidates=candidates,
+        outcome_projections=outcome_projections,
+        report_projections=report_projections,
+    ):
+        raise WinnerSelectionEvidenceError(
+            "winner evidence does not match persisted Candidate ranks"
+        )
+    return evidence
+
+
 # --- Finalization ----------------------------------------------------------
 
 
@@ -1352,25 +1441,56 @@ def finalize_job_if_ready(
     job.best_candidate_id = best.id
 
     try:
-        report_generator.generate_and_persist_report(
+        winner_evidence = (
+            _compile_current_winner_evidence(
+                candidates=candidates,
+                baseline=baseline,
+                best=best,
+                outcome_contract=outcome_contract,
+            )
+            if outcome_contract is not None
+            and any(
+                candidate_report_evidence_required(
+                    candidate.aggregated_metric_json
+                )
+                for candidate in candidates
+            )
+            else None
+        )
+        report = report_generator.generate_and_persist_report(
             db,
             job=job,
             best=best,
             baseline_agg=baseline_agg,
             best_agg=best.aggregated_metric_json,
+            winner_evidence=winner_evidence,
         )
-    except report_generator.ReportEvidenceError:
+    except (
+        report_generator.ReportEvidenceError,
+        WinnerSelectionEvidenceError,
+    ) as exc:
+        logger.warning(
+            "job %s report evidence rejected (%s): %s",
+            job.id,
+            type(exc).__name__,
+            exc,
+        )
         _fail_job(
             db,
             job,
             code="REPORT_EVIDENCE_INVALID",
             message=(
-                "One or more Candidate report envelopes no longer match "
-                "current Candidate/Trial evidence; refusing to publish."
+                "Candidate report or winner-selection evidence no longer "
+                "matches current Candidate/Trial state; refusing to publish."
             ),
         )
         return True
 
+    winner_evidence_id = (
+        report.winner_evidence_json.get("evidence_id")
+        if isinstance(report.winner_evidence_json, dict)
+        else None
+    )
     if _job_is_cancelled(job.id):
         db.rollback()
         return True
@@ -1398,6 +1518,7 @@ def finalize_job_if_ready(
             "best_score": best.aggregated_score,
             "baseline_score": baseline.aggregated_score,
             "optimization_outcome": outcome,
+            "winner_evidence_id": winner_evidence_id,
         },
     )
     if terminal_status == "COMPLETED":
@@ -1409,6 +1530,7 @@ def finalize_job_if_ready(
                 "best_candidate_id": best.id,
                 "aggregated_score": best.aggregated_score,
                 "optimization_outcome": outcome,
+                "winner_evidence_id": winner_evidence_id,
             },
         )
     else:

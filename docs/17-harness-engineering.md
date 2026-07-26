@@ -292,6 +292,21 @@ closed. Legacy aggregates remain readable. The evidence is still embedded in
 aggregate JSON, so immutable physical-attempt rows, artifact digests, and a
 relational evidence ledger remain future work.
 
+Outcome Contract compiler 2.5 adds
+`dronedream.winner-selection-evidence/v1`. Finalization records the complete
+aggregated Candidate universe, each Candidate's outcome/report evidence IDs,
+publishability disposition, Selection Key 1.0 tuple, deterministic rank, and
+the stable optimizer-before-baseline/generation/ID tie-break. The envelope is
+content-addressed and is reverified against current Candidate rows, Trial-bound
+projections, ranks, baseline, and selected winner before any modern report is
+published. JobReport, completion events, real-runtime report JSON,
+reproducibility manifests, and PDF reports carry the resulting evidence or its
+ID. Modern evidence-bound jobs fail closed when the envelope is missing or
+diverges; legacy reports remain readable without manufacturing historical
+proof. This proves the current deterministic selection over the persisted
+Candidate set, but it is not yet the future atomic winner-freeze ledger or
+sealed final-test boundary.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

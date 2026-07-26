@@ -8339,13 +8339,29 @@ Legacy aggregates remain readable. The envelope is still an embedded migration
 layer, not the target append-only physical-attempt, artifact-digest, winner,
 and routing-evidence ledger.
 
+Outcome Contract compiler 2.5 adds
+`dronedream.winner-selection-evidence/v1`. The finalization boundary now
+content-addresses the full aggregated Candidate set rather than trusting only
+`best_candidate_id`, `rank_in_job`, and `is_best`. Each decision binds the
+Candidate identity, generation, baseline role, publishability disposition,
+Selection Key 1.0 tuple when finite, Candidate outcome/report evidence IDs,
+and deterministic rank. The verifier recomputes the ordering with the frozen
+optimizer-before-baseline, generation, and Candidate-ID tie-break and then
+matches it back to current Candidate/Trial-bound projections before reports are
+persisted. The evidence is stored with JobReport and propagated into terminal
+events, real-runtime report JSON, reproducibility manifests, and PDF summaries;
+the public report API exposes its ID. Modern evidence-bound reports reject
+missing, tampered, incomplete, or winner-mismatched envelopes. Legacy reports
+remain readable. This is a verifiable current-state winner receipt, not yet an
+atomic append-only `WINNER_FROZEN` transition or sealed final-test service.
+
 Current focused validation:
 
 ```text
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-816 passed
+819 passed
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 

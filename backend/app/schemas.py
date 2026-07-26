@@ -930,6 +930,7 @@ class JobReport(BaseModel):
     optimized_metrics: AggregatedMetrics
     comparison: list[ComparisonPoint]
     best_parameters: dict[str, Any]
+    winner_evidence_id: str | None = None
     report_status: ReportStatus
     created_at: datetime
     updated_at: datetime

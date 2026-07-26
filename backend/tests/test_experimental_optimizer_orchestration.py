@@ -120,6 +120,9 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
         verify_candidate_outcome_evidence,
         verify_candidate_report_evidence,
     )
+    from app.optimization.winner_evidence import (
+        verify_winner_selection_evidence,
+    )
 
     assert _drive_to_terminal(ctx, job_id) == "COMPLETED"
 
@@ -185,6 +188,27 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
         ]
         assert generation_events
         assert all(event.payload_json["strategy"] == strategy for event in generation_events)
+        assert job.report is not None
+        winner_evidence = verify_winner_selection_evidence(
+            job.report.winner_evidence_json
+        )
+        assert winner_evidence is not None
+        assert winner_evidence.winner_candidate_id == job.best_candidate_id
+        assert winner_evidence.baseline_candidate_id == job.baseline_candidate_id
+        assert winner_evidence.candidate_count == len(candidates)
+        assert {
+            decision.candidate_id
+            for decision in winner_evidence.candidates
+        } == {candidate.id for candidate in candidates}
+        selected_event = next(
+            event
+            for event in job.events
+            if event.event_type == "best_candidate_selected"
+        )
+        assert (
+            selected_event.payload_json["winner_evidence_id"]
+            == winner_evidence.evidence_id
+        )
 
         history = ctx["jobs"].optimization_history(job)
         history_by_id = {item.id: item for item in history.items}

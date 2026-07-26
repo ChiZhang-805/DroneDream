@@ -384,6 +384,8 @@ For `COMPLETED` jobs, returns:
 - `baseline_metrics` and `optimized_metrics` (keyed metric blocks).
 - `comparison` (array of `{metric, baseline, optimized, lower_is_better}`).
 - `best_parameters` (flat key/value map).
+- `winner_evidence_id` (content-addressed final-selection receipt for modern
+  evidence-bound jobs; `null` for legacy reports).
 
 For `FAILED` jobs, returns a structured error envelope with
 `error.code=JOB_FAILED` and `error.details.failure_code` set to a

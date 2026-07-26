@@ -29,6 +29,11 @@ from app.optimization.outcome_evidence import (
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import aggregate_metric, evaluate_candidate
 from app.optimization.scenarios import holdout_matrix, scenario_matrix, training_matrix
+from app.optimization.winner_evidence import (
+    WinnerSelectionEvidenceError,
+    compile_winner_selection_evidence,
+    verify_winner_selection_evidence,
+)
 from app.schemas import (
     AcceptanceCriteria,
     ConstraintSpec,
@@ -245,7 +250,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "2.4"
+    assert first.compiler_version == "2.5"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -291,6 +296,14 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert (
         first.selection_policy.candidate_report_trial_binding_policy
         == "all_candidate_trial_rows_sha256"
+    )
+    assert (
+        first.selection_policy.winner_selection_evidence_policy
+        == "content_addressed_full_candidate_set_v1"
+    )
+    assert (
+        first.selection_policy.winner_selection_tiebreak_policy
+        == "optimizer_before_baseline_then_generation_then_candidate_id"
     )
     assert (
         first.selection_policy.portfolio_source_schema
@@ -356,6 +369,96 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
             suite,
             acceptance,
             failed_trial_weight=float("nan"),
+        )
+
+
+def test_winner_evidence_binds_full_ranking_and_stable_tie_break() -> None:
+    contract_id = "sha256:" + "a" * 64
+    outcome_ids = {
+        "candidate-baseline": "sha256:" + "b" * 64,
+        "candidate-optimizer": "sha256:" + "c" * 64,
+        "candidate-ineligible": "sha256:" + "d" * 64,
+    }
+    report_ids = {
+        "candidate-baseline": "sha256:" + "e" * 64,
+        "candidate-optimizer": "sha256:" + "f" * 64,
+        "candidate-ineligible": "sha256:" + "1" * 64,
+    }
+    tied_order = (0, 0, 0.0, 0.0, 0.4)
+    candidates = [
+        {
+            "candidate_id": "candidate-baseline",
+            "generation_index": 0,
+            "is_baseline": True,
+            "eligible": True,
+            "candidate_outcome_evidence_id": outcome_ids[
+                "candidate-baseline"
+            ],
+            "candidate_report_evidence_id": report_ids[
+                "candidate-baseline"
+            ],
+            "selection_order_key": tied_order,
+        },
+        {
+            "candidate_id": "candidate-optimizer",
+            "generation_index": 1,
+            "is_baseline": False,
+            "eligible": True,
+            "candidate_outcome_evidence_id": outcome_ids[
+                "candidate-optimizer"
+            ],
+            "candidate_report_evidence_id": report_ids[
+                "candidate-optimizer"
+            ],
+            "selection_order_key": tied_order,
+        },
+        {
+            "candidate_id": "candidate-ineligible",
+            "generation_index": 2,
+            "is_baseline": False,
+            "eligible": False,
+            "candidate_outcome_evidence_id": outcome_ids[
+                "candidate-ineligible"
+            ],
+            "candidate_report_evidence_id": report_ids[
+                "candidate-ineligible"
+            ],
+            "selection_order_key": (1, 1, 10.0, 1.0, 100.0),
+        },
+    ]
+
+    evidence = compile_winner_selection_evidence(
+        outcome_contract_id=contract_id,
+        baseline_candidate_id="candidate-baseline",
+        winner_candidate_id="candidate-optimizer",
+        candidates=candidates,
+    )
+
+    assert verify_winner_selection_evidence(
+        evidence.model_dump(mode="json")
+    ) == evidence
+    decisions = {
+        item.candidate_id: item for item in evidence.candidates
+    }
+    assert decisions["candidate-optimizer"].rank == 1
+    assert decisions["candidate-baseline"].rank == 2
+    assert decisions["candidate-ineligible"].rank is None
+    assert evidence.candidate_count == 3
+    assert evidence.eligible_candidate_count == 2
+
+    tampered = evidence.model_dump(mode="json")
+    tampered["candidates"][0]["rank"] = 99
+    assert verify_winner_selection_evidence(tampered) is None
+
+    with pytest.raises(
+        WinnerSelectionEvidenceError,
+        match="declared winner",
+    ):
+        compile_winner_selection_evidence(
+            outcome_contract_id=contract_id,
+            baseline_candidate_id="candidate-baseline",
+            winner_candidate_id="candidate-baseline",
+            candidates=candidates,
         )
 
 
