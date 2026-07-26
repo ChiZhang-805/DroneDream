@@ -15,12 +15,14 @@ from types import SimpleNamespace
 import pytest
 
 from app import models, schemas
+from app.optimization.domain import ParameterDomain, SearchSpace
 from app.optimization.outcome_contract import build_selection_key
 from app.optimization.outcome_evidence import (
     compile_candidate_outcome_evidence,
 )
 from app.optimization.outcome_taxonomy import classify_trial_outcome
 from app.orchestration import acceptance, aggregation, constants, job_manager
+from app.orchestration.experimental_optimizer import observations_for_job
 from app.orchestration.optimizer import (
     generate_candidates,
     generate_selected_parameter_candidates,
@@ -1136,8 +1138,10 @@ class _FakeCandidate:
         completed: int = 3,
         generation_index: int = 1,
         fidelity: float = 1.0,
+        parameters: dict[str, float] | None = None,
     ) -> None:
         self.id = candidate_id
+        self.parameter_json = parameters or {"MPC_XY_P": 0.95}
         self.aggregated_score = score
         self.aggregated_metric_json: dict[str, float] | None = (
             None if score is None else {"aggregated_score": score}
@@ -1411,6 +1415,57 @@ def test_acceptance_prefers_verified_candidate_outcome_evidence() -> None:
 
     assert result.passed is True
     assert result.rmse == pytest.approx(0.1)
+    assert aggregation.candidate_is_publishable(candidate) is True
+
+    candidate.parameter_json = {"MPC_XY_P": 1.05}
+    wrong_parameters = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=0.2,
+            target_max_error=0.3,
+            min_pass_rate=1.0,
+        ),
+    )
+    assert wrong_parameters.passed is False
+    assert wrong_parameters.reason == "invalid_outcome_evidence"
+    assert aggregation.candidate_is_publishable(candidate) is False
+    candidate.parameter_json = {"MPC_XY_P": 0.95}
+    optimizer_job = SimpleNamespace(
+        objective_config_json={
+            "objectives": [
+                {
+                    "metric": "rmse",
+                    "direction": "minimize",
+                }
+            ]
+        }
+    )
+    search_space = SearchSpace(
+        (
+            ParameterDomain(
+                name="MPC_XY_P",
+                baseline=0.95,
+                minimum=0.6,
+                maximum=1.3,
+            ),
+        )
+    )
+    observation = observations_for_job(
+        optimizer_job,
+        search_space=search_space,
+        candidates=[candidate],
+    )[0]
+    assert observation.loss == pytest.approx(0.1)
+    candidate.parameter_json = {"MPC_XY_P": 1.05}
+    rejected_observation = observations_for_job(
+        optimizer_job,
+        search_space=search_space,
+        candidates=[candidate],
+    )[0]
+    assert rejected_observation.loss is None
+    assert rejected_observation.failure_rate == 1.0
+    assert rejected_observation.feasible is False
+    candidate.parameter_json = {"MPC_XY_P": 0.95}
 
     candidate.aggregated_metric_json["candidate_outcome_evidence"][
         "scalar_loss"

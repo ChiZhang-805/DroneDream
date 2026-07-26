@@ -17,7 +17,7 @@ from app.optimization.outcome_evidence import (
 )
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "2.1"
+OUTCOME_CONTRACT_COMPILER_VERSION = "2.2"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 PORTFOLIO_REWARD_SCALE = 1.0
@@ -186,6 +186,9 @@ class OutcomeSelectionPolicy(_FrozenModel):
     candidate_outcome_evidence_policy: Literal[
         "content_addressed_search_projection"
     ] = "content_addressed_search_projection"
+    candidate_outcome_context_binding_policy: Literal[
+        "candidate_id_generation_parameter_sha256"
+    ] = "candidate_id_generation_parameter_sha256"
     portfolio_source_schema: Literal[
         "dronedream.portfolio-sources/v1"
     ] = "dronedream.portfolio-sources/v1"
@@ -241,7 +244,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["2.1"] = "2.1"
+    compiler_version: Literal["2.2"] = "2.2"
     contract_id: str
     metric_admission_policy: Literal["registered_metrics_only"] = (
         "registered_metrics_only"

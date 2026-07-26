@@ -16,6 +16,7 @@ from app.optimization.outcome_contract import (
     selection_order_key,
 )
 from app.optimization.outcome_evidence import (
+    authoritative_candidate_outcome_projection,
     authoritative_outcome_projection,
     compile_candidate_outcome_evidence,
     verify_candidate_outcome_evidence,
@@ -239,7 +240,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "2.1"
+    assert first.compiler_version == "2.2"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -269,6 +270,10 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert (
         first.selection_policy.candidate_outcome_evidence_policy
         == "content_addressed_search_projection"
+    )
+    assert (
+        first.selection_policy.candidate_outcome_context_binding_policy
+        == "candidate_id_generation_parameter_sha256"
     )
     assert (
         first.selection_policy.portfolio_source_schema
@@ -407,6 +412,40 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
     assert projection["scalar_loss"] == pytest.approx(0.4)
     assert projection["holdout"]["validation_status"] == "passed"
     assert selection_order_key(wrapped, -1_000_000.0)[-1] == pytest.approx(0.4)
+    candidate_projection = authoritative_candidate_outcome_projection(
+        candidate_id="candidate-evidence",
+        generation_index=2,
+        parameter_snapshot={"MPC_XY_P": 0.95},
+        aggregate=wrapped,
+    )
+    assert candidate_projection["scalar_loss"] == pytest.approx(0.4)
+    assert (
+        authoritative_candidate_outcome_projection(
+            candidate_id="wrong-candidate",
+            generation_index=2,
+            parameter_snapshot={"MPC_XY_P": 0.95},
+            aggregate=wrapped,
+        )
+        == {}
+    )
+    assert (
+        authoritative_candidate_outcome_projection(
+            candidate_id="candidate-evidence",
+            generation_index=3,
+            parameter_snapshot={"MPC_XY_P": 0.95},
+            aggregate=wrapped,
+        )
+        == {}
+    )
+    assert (
+        authoritative_candidate_outcome_projection(
+            candidate_id="candidate-evidence",
+            generation_index=2,
+            parameter_snapshot={"MPC_XY_P": 1.05},
+            aggregate=wrapped,
+        )
+        == {}
+    )
 
     holdout_tampered = {
         **wrapped,

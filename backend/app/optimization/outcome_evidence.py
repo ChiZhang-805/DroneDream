@@ -334,11 +334,54 @@ def authoritative_outcome_projection(aggregate: object) -> dict[str, Any]:
     return projection
 
 
+def authoritative_candidate_outcome_projection(
+    *,
+    candidate_id: object,
+    generation_index: object,
+    parameter_snapshot: object,
+    aggregate: object,
+) -> dict[str, Any]:
+    """Resolve evidence only when it still belongs to the current Candidate.
+
+    ``authoritative_outcome_projection`` verifies the evidence payload and its
+    holdout binding. This candidate-aware boundary additionally checks the
+    immutable identity fields that the evidence was compiled from. Legacy
+    aggregates remain readable until their migration marker requires evidence.
+    """
+
+    projection = authoritative_outcome_projection(aggregate)
+    if not candidate_outcome_evidence_required(aggregate):
+        return projection
+    if not projection or not isinstance(aggregate, Mapping):
+        return {}
+    evidence = verify_candidate_outcome_evidence(
+        aggregate.get("candidate_outcome_evidence")
+    )
+    if (
+        evidence is None
+        or not isinstance(candidate_id, str)
+        or candidate_id != evidence.candidate_id
+        or isinstance(generation_index, bool)
+        or not isinstance(generation_index, int)
+        or generation_index != evidence.generation_index
+        or not isinstance(parameter_snapshot, Mapping)
+    ):
+        return {}
+    try:
+        current_parameter_sha256 = _sha256_id(parameter_snapshot)
+    except (TypeError, ValueError):
+        return {}
+    if current_parameter_sha256 != evidence.parameter_sha256:
+        return {}
+    return projection
+
+
 __all__ = [
     "CANDIDATE_OUTCOME_EVIDENCE_SCHEMA",
     "CandidateAcceptanceProjectionV1",
     "CandidateOutcomeEvidenceV1",
     "CandidateSelectionKeyV1",
+    "authoritative_candidate_outcome_projection",
     "authoritative_outcome_projection",
     "candidate_outcome_evidence_required",
     "compile_candidate_outcome_evidence",

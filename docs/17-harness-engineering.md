@@ -261,6 +261,15 @@ same-generation batch size cannot add rewards together, and observed extrema
 cannot rescale historical credit. Cost, delay, action probability, and
 append-only reward events remain outside this compatibility slice.
 
+Outcome Contract compiler 2.2 closes the Candidate-context replay boundary.
+When a Candidate carries required outcome evidence, acceptance, publishability,
+and optimizer-learning readers now verify that the evidence's Candidate ID,
+generation index, and parameter SHA-256 still match the current Candidate row.
+A copied evidence envelope, changed generation, non-canonical parameter
+snapshot, or post-aggregation parameter mutation produces no authoritative
+projection and fails closed. The embedded evidence still needs a future
+append-only relational ledger and current Trial-row re-verification.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

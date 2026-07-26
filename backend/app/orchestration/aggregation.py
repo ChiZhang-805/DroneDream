@@ -44,7 +44,7 @@ from app.optimization.outcome_contract import (
     selection_order_key,
 )
 from app.optimization.outcome_evidence import (
-    authoritative_outcome_projection,
+    authoritative_candidate_outcome_projection,
     candidate_outcome_evidence_required,
     compile_candidate_outcome_evidence,
 )
@@ -186,7 +186,12 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     aggregate = candidate.aggregated_metric_json
     if not isinstance(aggregate, dict):
         return False
-    authoritative_aggregate = authoritative_outcome_projection(aggregate)
+    authoritative_aggregate = authoritative_candidate_outcome_projection(
+        candidate_id=getattr(candidate, "id", None),
+        generation_index=getattr(candidate, "generation_index", None),
+        parameter_snapshot=getattr(candidate, "parameter_json", None),
+        aggregate=aggregate,
+    )
     if candidate_outcome_evidence_required(aggregate) and not authoritative_aggregate:
         return False
     aggregate = authoritative_aggregate
