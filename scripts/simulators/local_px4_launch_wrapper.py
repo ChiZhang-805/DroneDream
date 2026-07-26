@@ -937,9 +937,7 @@ def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, wor
             "origin_extraction_revision": "pyulog-vehicle-local-position-1.0",
             "origin_coordinate_frame": "PX4_LOCAL_NED",
             "coordinate_transform": (
-                "x=north_m;y=east_m;z=-down_m;"
-                "vx=north_mps;vy=east_mps;vz=-down_mps;"
-                "yaw=px4_ned_rad"
+                "x=north_m;y=east_m;z=-down_m;vx=north_mps;vy=east_mps;vz=-down_mps;yaw=px4_ned_rad"
             ),
             "vehicle": vehicle,
             "world": world,
