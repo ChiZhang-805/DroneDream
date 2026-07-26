@@ -1,5 +1,6 @@
 * text=auto
 
+.gitattributes text eol=lf
 *.py text eol=lf
 *.toml text eol=lf
 *.json text eol=lf
@@ -13,6 +14,7 @@
 *.html text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+backend/evaluation_artifacts/*.csv text eol=lf
 *.rs text eol=lf
 *.nsh text eol=lf
 *.sh text eol=lf
