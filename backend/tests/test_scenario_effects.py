@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 
 import pytest
 
@@ -10,6 +11,8 @@ from app.simulator.scenario_effects import (
     ScenarioEffectContractError,
     build_scenario_effect_evidence,
     build_scenario_effect_request,
+    compile_bundled_steady_wind,
+    scenario_effect_value_sha256,
     validate_scenario_effect_evidence,
     validate_scenario_effect_request,
 )
@@ -41,6 +44,74 @@ def _request(*, advanced: dict[str, object], wind: bool = False):
         },
         advanced_config=advanced,
     )
+
+
+def _wind_only_request(
+    *,
+    seed: int = 42,
+    cardinal: dict[str, float] | None = None,
+    wind_mps: float | None = 3.0,
+) -> dict[str, object]:
+    scenario_config = {} if wind_mps is None else {"wind_mps": wind_mps}
+    return build_scenario_effect_request(
+        execution_identity={**_identity(), "seed": seed},
+        scenario_type="nominal",
+        scenario_config=scenario_config,
+        job_config={
+            "wind": cardinal or {"north": 1.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+
+
+def _wind_evidence_records(request: dict[str, object]) -> list[dict[str, object]]:
+    compiled = compile_bundled_steady_wind(request)
+    assert compiled is not None
+    readback = {
+        "linear_velocity_mps": dict(compiled["linear_velocity_mps"]),
+        "enable_wind": True,
+    }
+    runtime_sdf = {
+        "source_vehicle_model": "x500_base",
+        "vehicle_model": "x500_0",
+        "link_name": "base_link",
+        "enable_wind": True,
+        "sdf_path": "/tmp/generated_world.sdf",
+        "sdf_sha256": "a" * 64,
+    }
+    observations = [
+        {
+            "source": "/world/default/wind_info",
+            "kind": "readback",
+            "value": readback,
+            "sha256": scenario_effect_value_sha256(readback),
+        },
+        {
+            "source": "/world/default/generate_world_sdf",
+            "kind": "artifact",
+            "value": runtime_sdf,
+            "sha256": scenario_effect_value_sha256(runtime_sdf),
+        },
+    ]
+    return [
+        {
+            "effect_id": effect["effect_id"],
+            "mechanism": effect["mechanism"],
+            "status": "applied",
+            "capability": {"status": "available", "reason": "bundled steady wind"},
+            "evidence": {
+                "requested_value_sha256": scenario_effect_value_sha256(effect["requested_value"]),
+                "compiled_wind": compiled,
+                "verification": {
+                    "status": "verified",
+                    "method": "gazebo_wind_info_and_generated_world_sdf",
+                    "observations": copy.deepcopy(observations),
+                },
+            },
+        }
+        for effect in request["effects"]
+    ]
 
 
 def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
@@ -94,6 +165,9 @@ def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
     }
     assert effects["obstacles"]["capability"]["status"] == "available"
     assert effects["obstacles"]["mechanism"] == "gazebo_entity_factory"
+    assert effects["job_config.wind"]["capability"]["status"] == "available"
+    assert effects["scenario_config.wind_mps"]["capability"]["status"] == "available"
+    assert effects["wind_gusts"]["capability"]["status"] == "requires_runtime_extension"
     assert effects["wind_gusts"]["requested_value"] == {
         "enabled": True,
         "magnitude_mps": 4.0,
@@ -197,8 +271,17 @@ def test_launcher_cannot_claim_unimplemented_wind_as_applied_without_readback() 
         validate_scenario_effect_evidence(request, payload)
 
 
-def test_extended_launcher_can_prove_an_applied_effect_with_bound_readback() -> None:
-    request = _request(advanced={}, wind=True)
+def test_extended_launcher_can_prove_site_specific_effect_with_bound_readback() -> None:
+    request = build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type="custom",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
     records = []
     for item in request["effects"]:
         value_hash = hashlib.sha256(
@@ -249,6 +332,97 @@ def test_extended_launcher_can_prove_an_applied_effect_with_bound_readback() -> 
     rejected["effects"][0]["evidence"]["verification"]["observations"][0]["sha256"] = "0" * 64
     with pytest.raises(ScenarioEffectContractError, match="hash does not match"):
         validate_scenario_effect_evidence(request, rejected)
+
+
+def test_bundled_steady_wind_compiles_cardinal_components_into_gazebo_enu() -> None:
+    request = _wind_only_request(
+        cardinal={"north": 3.0, "east": 4.0, "south": 1.0, "west": 0.5},
+        wind_mps=None,
+    )
+
+    compiled = compile_bundled_steady_wind(request)
+
+    assert compiled is not None
+    assert compiled["coordinate_frame"] == "GAZEBO_WORLD_ENU"
+    assert compiled["linear_velocity_mps"] == {"x": 3.5, "y": 2.0, "z": 0.0}
+    assert compiled["speed_mps"] == pytest.approx(math.hypot(3.5, 2.0))
+
+
+def test_scalar_steady_wind_direction_is_seeded_and_repeatable() -> None:
+    first = compile_bundled_steady_wind(
+        _wind_only_request(
+            seed=42,
+            cardinal={"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+        )
+    )
+    repeated = compile_bundled_steady_wind(
+        _wind_only_request(
+            seed=42,
+            cardinal={"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+        )
+    )
+    different = compile_bundled_steady_wind(
+        _wind_only_request(
+            seed=43,
+            cardinal={"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+        )
+    )
+
+    assert first == repeated
+    assert first is not None and different is not None
+    assert first["speed_mps"] == pytest.approx(3.0)
+    assert first["linear_velocity_mps"] != different["linear_velocity_mps"]
+
+
+def test_combined_steady_wind_limit_is_fail_closed() -> None:
+    with pytest.raises(ScenarioEffectContractError, match="combined steady wind"):
+        _wind_only_request(
+            cardinal={"north": 29.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            wind_mps=3.0,
+        )
+
+
+def test_bundled_steady_wind_requires_exact_readback_and_runtime_wind_mode() -> None:
+    request = _wind_only_request()
+    records = _wind_evidence_records(request)
+    payload = build_scenario_effect_evidence(
+        request,
+        launcher="bundled-test-launcher",
+        world="default",
+        effects=records,
+    )
+
+    normalized = validate_scenario_effect_evidence(request, payload)
+
+    assert normalized["verification_status"] == "verified_applied"
+    assert normalized["applied_effects"] == [
+        "job_config.wind",
+        "scenario_config.wind_mps",
+    ]
+
+    mismatched = copy.deepcopy(payload)
+    mismatched["effects"][0]["evidence"]["verification"]["observations"][0]["value"][
+        "linear_velocity_mps"
+    ]["x"] += 0.5
+    mismatched["effects"][0]["evidence"]["verification"]["observations"][0]["sha256"] = (
+        scenario_effect_value_sha256(
+            mismatched["effects"][0]["evidence"]["verification"]["observations"][0]["value"]
+        )
+    )
+    with pytest.raises(ScenarioEffectContractError, match="exact Gazebo wind_info"):
+        validate_scenario_effect_evidence(request, mismatched)
+
+    no_wind_mode = copy.deepcopy(payload)
+    no_wind_mode["effects"][0]["evidence"]["verification"]["observations"][1]["value"][
+        "enable_wind"
+    ] = False
+    no_wind_mode["effects"][0]["evidence"]["verification"]["observations"][1]["sha256"] = (
+        scenario_effect_value_sha256(
+            no_wind_mode["effects"][0]["evidence"]["verification"]["observations"][1]["value"]
+        )
+    )
+    with pytest.raises(ScenarioEffectContractError, match="WindMode"):
+        validate_scenario_effect_evidence(request, no_wind_mode)
 
 
 def test_extended_evidence_rejects_requested_value_hash_mismatch() -> None:

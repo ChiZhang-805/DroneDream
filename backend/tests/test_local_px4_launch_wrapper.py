@@ -4,6 +4,7 @@ import importlib.util
 import json
 import math
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -11,9 +12,11 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.simulator import scenario_effects
 from app.simulator.scenario_effects import (
     EVIDENCE_ARTIFACT_NAME,
     build_scenario_effect_request,
+    compile_bundled_steady_wind,
     validate_scenario_effect_evidence,
 )
 
@@ -443,6 +446,137 @@ def _obstacle_effect() -> dict[str, object]:
     }
 
 
+def _wind_request() -> dict[str, object]:
+    return build_scenario_effect_request(
+        execution_identity={
+            "trial_id": "t",
+            "job_id": "j",
+            "candidate_id": "c",
+            "seed": 42,
+            "attempt_count": 1,
+        },
+        scenario_type="nominal",
+        scenario_config={"wind_mps": 2.0},
+        job_config={
+            "wind": {"north": 1.0, "east": 0.5, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+
+
+def _minimal_px4_gazebo_tree(tmp_path: Path, *, world: str = "default") -> Path:
+    px4_root = tmp_path / "PX4-Autopilot"
+    model_dir = px4_root / "Tools" / "simulation" / "gz" / "models" / "x500_base"
+    world_dir = px4_root / "Tools" / "simulation" / "gz" / "worlds"
+    build_root = px4_root / "build" / "px4_sitl_default"
+    rootfs = build_root / "rootfs"
+    executable = build_root / "bin" / "px4"
+    plugins = build_root / "src" / "modules" / "simulation" / "gz_plugins"
+    server_config = px4_root / "src" / "modules" / "simulation" / "gz_bridge" / "server.config"
+    model_dir.mkdir(parents=True)
+    world_dir.mkdir(parents=True)
+    rootfs.mkdir(parents=True)
+    executable.parent.mkdir(parents=True)
+    plugins.mkdir(parents=True)
+    server_config.parent.mkdir(parents=True)
+    (rootfs / "gz_env.sh").write_text("original", encoding="utf-8")
+    (rootfs / "parameters.bson").write_text("stale", encoding="utf-8")
+    (rootfs / "dataman").write_text("stale", encoding="utf-8")
+    (rootfs / "log").mkdir()
+    (rootfs / "log" / "stale.ulg").write_text("stale", encoding="utf-8")
+    executable.write_text("px4", encoding="utf-8")
+    server_config.write_text(
+        """
+<server_config>
+  <plugins>
+    <plugin entity_name="*" entity_type="world"
+            filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin entity_name="*" entity_type="world"
+            filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin entity_name="*" entity_type="world"
+            filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+  </plugins>
+</server_config>
+""".strip(),
+        encoding="utf-8",
+    )
+    (model_dir / "model.sdf").write_text(
+        """
+<sdf version="1.9">
+  <model name="x500_base">
+    <link name="base_link">
+      <inertial><mass>2</mass></inertial>
+      <visual name="rotor">
+        <geometry><box><size>1 1 1</size></box></geometry>
+        <material>
+          <script>
+            <name>Gazebo/DarkGrey</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
+""".strip(),
+        encoding="utf-8",
+    )
+    (model_dir / "model.config").write_text("<model/>", encoding="utf-8")
+    (world_dir / f"{world}.sdf").write_text(
+        f"""
+<sdf version="1.9">
+  <world name="{world}">
+    <gravity>0 0 -9.8</gravity>
+  </world>
+</sdf>
+""".strip(),
+        encoding="utf-8",
+    )
+    return px4_root
+
+
+def _overlay_stub(request: dict[str, object], tmp_path: Path) -> dict[str, object]:
+    compiled = compile_bundled_steady_wind(request)
+    assert compiled is not None
+    world_sdf = tmp_path / "world.sdf"
+    model_sdf = tmp_path / "model.sdf"
+    trial_rootfs = tmp_path / "px4_rootfs"
+    trial_rootfs.mkdir(exist_ok=True)
+    trial_gz_env = trial_rootfs / "gz_env.sh"
+    world_sdf.write_text("<sdf/>", encoding="utf-8")
+    model_sdf.write_text("<sdf/>", encoding="utf-8")
+    trial_gz_env.write_text("export PX4_GZ_WORLDS=/trial", encoding="utf-8")
+    return {
+        "compiled_wind": compiled,
+        "model_sdf_path": str(model_sdf),
+        "model_sdf_sha256": "a" * 64,
+        "sanitized_classic_material_scripts": 1,
+        "world_sdf_path": str(world_sdf),
+        "world_sdf_sha256": "b" * 64,
+        "wind_enabled_link": "x500_base/base_link",
+        "wind_effects_plugin": {
+            "filename": wrapper.WIND_EFFECTS_PLUGIN_FILENAME,
+            "name": wrapper.WIND_EFFECTS_PLUGIN_NAME,
+        },
+        "materialized_px4_system_plugins": [
+            {
+                "filename": "gz-sim-physics-system",
+                "name": "gz::sim::systems::Physics",
+            }
+        ],
+        "px4_server_config_path": str(tmp_path / "server.config"),
+        "px4_server_config_sha256": "d" * 64,
+        "px4_vehicle_model_instance": "x500_0",
+        "px4_trial_rootfs_path": str(trial_rootfs),
+        "px4_trial_gz_env_path": str(trial_gz_env),
+        "px4_trial_gz_env_sha256": "c" * 64,
+    }
+
+
 def test_obstacle_sdf_and_entity_factory_ack_are_verifiable(tmp_path: Path, monkeypatch) -> None:
     responses = [
         SimpleNamespace(
@@ -500,9 +634,263 @@ def test_preflight_reports_each_unsupported_effect_without_partial_launch() -> N
     by_id = {item["effect_id"]: item for item in records}
     assert by_id["obstacles"]["status"] == "skipped"
     assert by_id["obstacles"]["capability"]["status"] == "available"
-    assert by_id["job_config.wind"]["status"] == "unsupported"
+    assert by_id["job_config.wind"]["status"] == "skipped"
+    assert by_id["job_config.wind"]["capability"]["status"] == "available"
     assert by_id["sensor_degradation.dropout_rate"]["status"] == "unsupported"
     assert "not a probabilistic dropout rate" in by_id["sensor_degradation.dropout_rate"]["reason"]
+
+
+def test_preflight_allows_bundled_wind_and_obstacles_together() -> None:
+    request = _wind_request()
+    request_with_obstacle = build_scenario_effect_request(
+        execution_identity=request["execution_identity"],
+        scenario_type="nominal",
+        scenario_config={"wind_mps": 2.0},
+        job_config={
+            "wind": {"north": 1.0, "east": 0.5, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={"obstacles": [_obstacle_effect()["requested_value"][0]]},
+    )
+
+    assert wrapper._preflight_scenario_effects(request_with_obstacle, site_dry_run=False) is None
+
+
+def test_steady_wind_overlay_is_trial_local_and_prepended_to_gazebo_paths(
+    tmp_path: Path,
+) -> None:
+    request = _wind_request()
+    px4_root = _minimal_px4_gazebo_tree(tmp_path)
+    launch_env = {"GZ_SIM_RESOURCE_PATH": "/existing"}
+
+    overlay = wrapper._prepare_steady_wind_overlay(
+        request,
+        scenario_effects,
+        run_dir=tmp_path / "run",
+        autopilot_dir=str(px4_root),
+        simulator_model="gz_x500",
+        world="default",
+        launch_env=launch_env,
+    )
+
+    assert overlay is not None
+    model_tree = wrapper.ET.parse(overlay["model_sdf_path"])
+    assert (
+        model_tree.findtext("./model[@name='x500_base']/link[@name='base_link']/enable_wind")
+        == "true"
+    )
+    assert model_tree.find(".//material/script") is None
+    assert model_tree.findtext(".//material/ambient") == "0.2 0.2 0.2 1"
+    assert overlay["sanitized_classic_material_scripts"] == 1
+    world_tree = wrapper.ET.parse(overlay["world_sdf_path"])
+    plugin = world_tree.find(
+        f"./world[@name='default']/plugin[@name='{wrapper.WIND_EFFECTS_PLUGIN_NAME}']"
+    )
+    assert plugin is not None
+    assert plugin.get("filename") == wrapper.WIND_EFFECTS_PLUGIN_FILENAME
+    physics_plugin = world_tree.find(
+        "./world[@name='default']/plugin[@name='gz::sim::systems::Physics']"
+    )
+    user_commands_plugin = world_tree.find(
+        "./world[@name='default']/plugin[@name='gz::sim::systems::UserCommands']"
+    )
+    scene_broadcaster_plugin = world_tree.find(
+        "./world[@name='default']/plugin[@name='gz::sim::systems::SceneBroadcaster']"
+    )
+    assert physics_plugin is not None
+    assert user_commands_plugin is not None
+    assert scene_broadcaster_plugin is not None
+    assert physics_plugin.get("entity_name") is None
+    assert physics_plugin.get("entity_type") is None
+    assert len(overlay["materialized_px4_system_plugins"]) == 3
+    assert len(overlay["px4_server_config_sha256"]) == 64
+    assert world_tree.findtext("./world[@name='default']/wind/linear_velocity")
+    resource_paths = launch_env["GZ_SIM_RESOURCE_PATH"].split(os.pathsep)
+    assert Path(resource_paths[0]).parts[-2:] == ("scenario_runtime", "models")
+    assert Path(resource_paths[1]).parts[-2:] == ("scenario_runtime", "worlds")
+    assert resource_paths[2] == "/existing"
+    trial_rootfs = Path(overlay["px4_trial_rootfs_path"])
+    assert (trial_rootfs / "gz_env.sh").is_file()
+    assert not (trial_rootfs / "parameters.bson").exists()
+    assert not (trial_rootfs / "dataman").exists()
+    assert not (trial_rootfs / "log").exists()
+    trial_env = (trial_rootfs / "gz_env.sh").read_text(encoding="utf-8")
+    assert str(tmp_path / "run" / "scenario_runtime" / "worlds") in trial_env
+    assert str(tmp_path / "run" / "scenario_runtime" / "models") in trial_env
+
+
+def test_trial_wind_world_launches_from_clean_rootfs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    trial_rootfs = tmp_path / "scenario_runtime" / "px4_rootfs"
+    executable = tmp_path / "PX4-Autopilot" / "build" / "px4_sitl_default" / "bin" / "px4"
+    trial_rootfs.mkdir(parents=True)
+    executable.parent.mkdir(parents=True)
+    executable.write_text("px4", encoding="utf-8")
+    launch_env: dict[str, str] = {}
+    monkeypatch.delenv("PX4_LAUNCH_COMMAND_TEMPLATE", raising=False)
+
+    command = wrapper._wrap_launch_command_for_trial_world(
+        "cd /opt/PX4-Autopilot; HEADLESS=1 make px4_sitl gz_x500",
+        {
+            "px4_trial_rootfs_path": str(trial_rootfs),
+            "px4_executable_path": str(executable),
+            "px4_sim_model": "gz_x500",
+        },
+        launch_env=launch_env,
+        headless=True,
+    )
+
+    assert "PX4_GZ_STANDALONE" not in launch_env
+    assert launch_env["GZ_IP"] == "127.0.0.1"
+    assert str(trial_rootfs.resolve()) in command
+    assert "HEADLESS=1" in command
+    assert "PX4_SIM_MODEL=gz_x500" in command
+    assert str(executable.resolve()) in command
+    quoted_rootfs = shlex.quote(str(trial_rootfs.resolve()))
+    assert f"-d -w {quoted_rootfs} {quoted_rootfs}" in command
+    assert "make px4_sitl" not in command
+
+
+def test_trial_wind_world_refuses_unverifiable_custom_launcher(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    world_sdf = tmp_path / "default.sdf"
+    world_sdf.write_text("<sdf version='1.9'/>", encoding="utf-8")
+    monkeypatch.setenv("PX4_LAUNCH_COMMAND_TEMPLATE", "custom-launch")
+
+    with pytest.raises(
+        wrapper.ScenarioEffectUnsupportedError,
+        match="custom PX4_LAUNCH_COMMAND_TEMPLATE",
+    ):
+        wrapper._wrap_launch_command_for_trial_world(
+            "custom-launch",
+            {"world_sdf_path": str(world_sdf)},
+            launch_env={},
+            headless=True,
+        )
+
+
+def test_steady_wind_application_requires_readback_and_runtime_sdf(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _wind_request()
+    compiled = compile_bundled_steady_wind(request)
+    assert compiled is not None
+    vector = compiled["linear_velocity_mps"]
+    generated_sdf = """
+<sdf version="1.9">
+  <world name="default">
+    <model name="x500_0">
+      <link name="base_link"><enable_wind>true</enable_wind></link>
+    </model>
+  </world>
+</sdf>
+""".strip()
+    world_before_vehicle_spawn = '<sdf version="1.9"><world name="default"></world></sdf>'
+    responses = [
+        SimpleNamespace(
+            returncode=0,
+            stdout=("/world/default/wind_info\n/world/default/generate_world_sdf\n"),
+            stderr="",
+        ),
+        SimpleNamespace(returncode=0, stdout="", stderr=""),
+        SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "linear_velocity {\n"
+                f"  x: {vector['x']}\n"
+                f"  y: {vector['y']}\n"
+                f"  z: {vector['z']}\n"
+                "}\nenable_wind: true\n"
+            ),
+            stderr="",
+        ),
+        SimpleNamespace(
+            returncode=0,
+            stdout=f"data: {json.dumps(world_before_vehicle_spawn)}\n",
+            stderr="",
+        ),
+        SimpleNamespace(
+            returncode=0,
+            stdout=f"data: {json.dumps(generated_sdf)}\n",
+            stderr="",
+        ),
+    ]
+    commands: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        return responses.pop(0)
+
+    monkeypatch.setattr(wrapper, "_gazebo_cli", lambda: "/usr/bin/gz")
+    monkeypatch.setattr(wrapper.subprocess, "run", fake_run)
+    monkeypatch.setattr(wrapper.time, "sleep", lambda _seconds: None)
+    monkeypatch.setenv("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "1")
+    monkeypatch.setenv("PX4_GAZEBO_RUNTIME_SDF_ATTEMPTS", "2")
+
+    records = wrapper._apply_steady_wind_effects(
+        request,
+        scenario_effects,
+        _overlay_stub(request, tmp_path),
+        run_dir=tmp_path / "run",
+        world="default",
+    )
+
+    assert set(records) == {"job_config.wind", "scenario_config.wind_mps"}
+    payload = scenario_effects.build_scenario_effect_evidence(
+        request,
+        launcher="test",
+        world="default",
+        effects=[records[effect["effect_id"]] for effect in request["effects"]],
+    )
+    normalized = validate_scenario_effect_evidence(request, payload)
+    assert normalized["verification_status"] == "verified_applied"
+    assert (tmp_path / "run" / "scenario_runtime" / "generated_world.sdf").is_file()
+    assert (
+        tmp_path / "run" / "scenario_runtime" / "generated_world.last_attempt.sdf"
+    ).is_file()
+    assert commands[1][1:3] == ["topic", "-t"]
+    assert "gz.msgs.Empty" in commands[2]
+    assert "gz.msgs.SdfGeneratorConfig" in commands[3]
+    assert "expand_include_tags" in commands[3][-1]
+    assert "gz.msgs.SdfGeneratorConfig" in commands[4]
+
+
+def test_steady_wind_application_rejects_mismatched_readback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _wind_request()
+    responses = [
+        SimpleNamespace(
+            returncode=0,
+            stdout="/world/default/wind_info\n/world/default/generate_world_sdf\n",
+            stderr="",
+        ),
+        SimpleNamespace(returncode=0, stdout="", stderr=""),
+        SimpleNamespace(
+            returncode=0,
+            stdout=("linear_velocity { x: 99 y: 0 z: 0 }\nenable_wind: true\n"),
+            stderr="",
+        ),
+    ]
+
+    monkeypatch.setattr(wrapper, "_gazebo_cli", lambda: "/usr/bin/gz")
+    monkeypatch.setattr(wrapper.subprocess, "run", lambda *_args, **_kwargs: responses.pop(0))
+    monkeypatch.setenv("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "1")
+
+    with pytest.raises(RuntimeError, match="never matched"):
+        wrapper._apply_steady_wind_effects(
+            request,
+            scenario_effects,
+            _overlay_stub(request, tmp_path),
+            run_dir=tmp_path / "run",
+            world="default",
+        )
 
 
 def test_site_dry_run_writes_explicit_unphysical_effect_evidence(

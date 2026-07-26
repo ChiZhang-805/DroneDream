@@ -49,26 +49,31 @@ weakening the result semantics.
 | Effect | Current bundled Runtime status | Required proof |
 | --- | --- | --- |
 | Static box/cylinder obstacles | Implemented in bundled runner source; released-Runtime acceptance pending | Gazebo EntityFactory returns `data: true`; evidence stores entity name, service, source index, and generated SDF hash |
-| Wind vector and periodic gusts | Runtime extension required | Generated world/plugin configuration plus observed Gazebo wind state |
+| Constant horizontal wind (`x500` family) | Verified in pinned dedicated WSL Runtime; signed installer Runtime acceptance pending | Trial-local model/world/rootfs hashes, exact `/wind_info` vector read-back, and expanded runtime SDF proving the exact spawned instance (for example `x500_0/base_link`) has WindMode |
+| Periodic gusts and turbulence | Runtime extension required | Versioned stochastic plugin configuration, seed binding, and bounded observed wind-state evidence |
 | GPS, barometer, and IMU noise | Runtime extension required | Generated sensor SDF plus model/sensor identity and effective noise configuration |
 | GPS dropout/failure schedule | Runtime extension required | PX4 failure command/event timeline plus observed estimator/sensor state |
 | Battery degradation | Runtime extension required | Applied PX4 battery simulation settings and read-back telemetry |
 | Payload mass/inertia | Runtime extension required | Generated model/inertial definition and Gazebo entity read-back |
 | Actuator delay/failure | Runtime extension required | Supported PX4/Gazebo injection mechanism and timestamped response evidence |
 
-“Runtime extension required” is deliberate: the desktop UI can collect and
-validate the scenario, but the real runner refuses to label it as physically
-applied until the dedicated Runtime contains a verified adapter.
+“Verified in pinned dedicated WSL Runtime” is not the same as “released to
+customers.” Static obstacles and constant wind still require a rebuilt,
+smoke-tested, signed installer `DroneDreamRuntime`. “Runtime extension required” is
+deliberate: the desktop UI can collect and validate the remaining scenarios,
+but the real runner refuses to label them as physically applied until the
+dedicated Runtime contains a verified adapter.
 
 ## Expansion order
 
-1. Add deterministic wind world generation and a wind-observation smoke gate.
-2. Add per-trial sensor model generation for GPS, barometer, and IMU noise.
-3. Add PX4-supported failure injection with an explicit event scheduler.
-4. Add battery and payload model adapters with telemetry/read-back checks.
-5. Add actuator fault adapters only for mechanisms supported by the pinned PX4
+1. Rebuild the Runtime and pass the constant-wind plus obstacle smoke matrix.
+2. Add versioned gust/turbulence generation with seed and interval read-back.
+3. Add per-trial sensor model generation for GPS, barometer, and IMU noise.
+4. Add PX4-supported failure injection with an explicit event scheduler.
+5. Add battery and payload model adapters with telemetry/read-back checks.
+6. Add actuator fault adapters only for mechanisms supported by the pinned PX4
    and Gazebo versions.
-6. Rebuild, smoke-test, sign, and release `DroneDreamRuntime`; source changes do
+7. Rebuild, smoke-test, sign, and release `DroneDreamRuntime`; source changes do
    not become customer capabilities until this release gate passes.
 
 ## Safety and reproducibility rules

@@ -25,6 +25,15 @@ MAX_EFFECTS_PER_REQUEST = 64
 MAX_EVIDENCE_OBSERVATIONS = 1024
 MAX_JSON_DEPTH = 32
 MAX_JSON_NODES = 20_000
+MAX_BUNDLED_STEADY_WIND_MPS = 30.0
+DEFAULT_SCENARIO_STEADY_WIND_MPS = 3.0
+BUNDLED_STEADY_WIND_EFFECT_IDS = frozenset(
+    {
+        "job_config.wind",
+        "scenario_config.wind_mps",
+        "scenario_type.wind_perturbed",
+    }
+)
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -50,6 +59,13 @@ def _request_hash(payload: dict[str, Any]) -> str:
 
 def _value_hash(value: object) -> str:
     return hashlib.sha256(_canonical_bytes(value)).hexdigest()
+
+
+def scenario_effect_value_sha256(value: object) -> str:
+    """Return the canonical digest used by scenario-effect evidence."""
+
+    _validate_json_tree(value, path="scenario effect value")
+    return _value_hash(value)
 
 
 def _validate_json_tree(
@@ -124,16 +140,13 @@ def _finite_number(
 
 def _unsupported_reason(effect_id: str) -> str:
     if effect_id in {
-        "job_config.wind",
-        "scenario_config.wind_mps",
         "wind_gusts",
-        "scenario_type.wind_perturbed",
         "scenario_type.turbulence",
     }:
         return (
-            "the bundled runtime has no per-trial WindEffects world generator; "
-            "exact wind vector/gust evidence must come from a configured Gazebo "
-            "WindEffects plugin and /world/<world>/wind_info observation"
+            "the bundled runtime supports a constant per-trial WindEffects vector, "
+            "but not a time-varying gust/turbulence schedule with exact timestamped "
+            "readback"
         )
     if effect_id in {
         "job_config.sensor_noise_level",
@@ -202,6 +215,129 @@ def _mechanism_for(effect_id: str) -> str:
     return "site_specific"
 
 
+def _available_reason(effect_id: str) -> str:
+    if effect_id == "obstacles":
+        return (
+            "the bundled launcher can create static obstacles through Gazebo "
+            "/world/<world>/create and verifies the Boolean service response"
+        )
+    if effect_id in BUNDLED_STEADY_WIND_EFFECT_IDS:
+        return (
+            "the bundled launcher generates a Trial-local Gazebo WindEffects world/model "
+            "overlay, verifies /world/<world>/wind_info, and inspects generated runtime SDF"
+        )
+    raise ScenarioEffectContractError(f"no bundled capability reason for {effect_id}")
+
+
+def _seed_bearing_deg(execution_identity: dict[str, Any]) -> float:
+    seed = execution_identity.get("seed")
+    seed_material: object
+    if isinstance(seed, int) and not isinstance(seed, bool):
+        seed_material = {"seed": seed}
+    else:
+        seed_material = {"execution_identity": execution_identity}
+    digest = hashlib.sha256(_canonical_bytes(seed_material)).digest()
+    # A millidegree grid is deterministic across Python/platform versions and
+    # covers every horizontal direction without importing a PRNG.
+    return (int.from_bytes(digest[:8], "big") % 360_000) / 1000.0
+
+
+def _wind_vector_from_bearing(magnitude_mps: float, bearing_deg: float) -> dict[str, float]:
+    """Convert a compass bearing into Gazebo ENU x/east, y/north, z/up."""
+
+    radians = math.radians(bearing_deg)
+    return {
+        "x": round(magnitude_mps * math.sin(radians), 12),
+        "y": round(magnitude_mps * math.cos(radians), 12),
+        "z": 0.0,
+    }
+
+
+def _compile_bundled_steady_wind_unchecked(request: dict[str, Any]) -> dict[str, Any] | None:
+    steady_effects = [
+        effect
+        for effect in request.get("effects", [])
+        if effect.get("effect_id") in BUNDLED_STEADY_WIND_EFFECT_IDS
+    ]
+    if not steady_effects:
+        return None
+
+    components: list[dict[str, Any]] = []
+    total = {"x": 0.0, "y": 0.0, "z": 0.0}
+    seed_bearing = _seed_bearing_deg(request.get("execution_identity", {}))
+    for effect in steady_effects:
+        effect_id = effect["effect_id"]
+        requested_value = effect["requested_value"]
+        if effect_id == "job_config.wind":
+            if not isinstance(requested_value, dict):
+                raise ScenarioEffectContractError("job_config.wind effect value must be an object")
+            vector = {
+                # Gazebo's world frame is ENU: x=east, y=north, z=up.
+                "x": round(
+                    float(requested_value.get("east", 0.0))
+                    - float(requested_value.get("west", 0.0)),
+                    12,
+                ),
+                "y": round(
+                    float(requested_value.get("north", 0.0))
+                    - float(requested_value.get("south", 0.0)),
+                    12,
+                ),
+                "z": 0.0,
+            }
+            rule = "cardinal_components_to_gazebo_enu"
+            bearing: float | None = None
+        elif effect_id == "scenario_config.wind_mps":
+            magnitude = float(requested_value)
+            vector = _wind_vector_from_bearing(magnitude, seed_bearing)
+            rule = "trial_seed_compass_bearing_clockwise_from_north"
+            bearing = seed_bearing
+        else:
+            vector = _wind_vector_from_bearing(
+                DEFAULT_SCENARIO_STEADY_WIND_MPS,
+                seed_bearing,
+            )
+            rule = "wind_perturbed_default_trial_seed_compass_bearing"
+            bearing = seed_bearing
+
+        component_speed = math.hypot(vector["x"], vector["y"])
+        if component_speed > MAX_BUNDLED_STEADY_WIND_MPS + 1e-9:
+            raise ScenarioEffectContractError(
+                f"{effect_id} steady wind magnitude exceeds {MAX_BUNDLED_STEADY_WIND_MPS:g} m/s"
+            )
+        total["x"] = round(total["x"] + vector["x"], 12)
+        total["y"] = round(total["y"] + vector["y"], 12)
+        components.append(
+            {
+                "effect_id": effect_id,
+                "linear_velocity_mps": vector,
+                "direction_rule": rule,
+                "bearing_deg_clockwise_from_north": bearing,
+            }
+        )
+
+    total_speed = math.hypot(total["x"], total["y"])
+    if total_speed > MAX_BUNDLED_STEADY_WIND_MPS + 1e-9:
+        raise ScenarioEffectContractError(
+            f"combined steady wind magnitude exceeds {MAX_BUNDLED_STEADY_WIND_MPS:g} m/s"
+        )
+    return {
+        "coordinate_frame": "GAZEBO_WORLD_ENU",
+        "linear_velocity_mps": total,
+        "speed_mps": round(total_speed, 12),
+        "aggregation": "vector_sum",
+        "components": components,
+        "requested_effect_ids": sorted(effect["effect_id"] for effect in steady_effects),
+    }
+
+
+def compile_bundled_steady_wind(request: dict[str, Any]) -> dict[str, Any] | None:
+    """Compile all bundled steady-wind effects into one deterministic ENU vector."""
+
+    validate_scenario_effect_request(request)
+    return _compile_bundled_steady_wind_unchecked(request)
+
+
 def build_scenario_effect_request(
     *,
     execution_identity: dict[str, Any],
@@ -230,9 +366,8 @@ def build_scenario_effect_request(
     def add(effect_id: str, source: str, value: Any) -> None:
         if any(item["effect_id"] == effect_id for item in effects):
             return
-        capability_status = (
-            "available" if effect_id == "obstacles" else "requires_runtime_extension"
-        )
+        bundled = effect_id == "obstacles" or effect_id in BUNDLED_STEADY_WIND_EFFECT_IDS
+        capability_status = "available" if bundled else "requires_runtime_extension"
         effects.append(
             {
                 "effect_id": effect_id,
@@ -245,12 +380,9 @@ def build_scenario_effect_request(
                 "mechanism": _mechanism_for(effect_id),
                 "capability": {
                     "status": capability_status,
-                    "reason": (
-                        "the bundled launcher can create static obstacles through "
-                        "Gazebo /world/<world>/create and verifies the Boolean service response"
-                        if effect_id == "obstacles"
-                        else _unsupported_reason(effect_id)
-                    ),
+                    "reason": _available_reason(effect_id)
+                    if bundled
+                    else _unsupported_reason(effect_id),
                 },
             }
         )
@@ -290,6 +422,10 @@ def build_scenario_effect_request(
         if wind_mps < 0.0:
             raise ScenarioEffectContractError(
                 "scenario_config.wind_mps must be finite and non-negative"
+            )
+        if wind_mps > MAX_BUNDLED_STEADY_WIND_MPS:
+            raise ScenarioEffectContractError(
+                f"scenario_config.wind_mps must not exceed {MAX_BUNDLED_STEADY_WIND_MPS:g} m/s"
             )
         if wind_mps > 0.0:
             add("scenario_config.wind_mps", "scenario_config.wind_mps", wind_mps)
@@ -638,6 +774,7 @@ def validate_scenario_effect_request(payload: object) -> dict[str, Any]:
             raise ScenarioEffectContractError(
                 f"scenario effect {effect_id} capability reason is invalid"
             )
+    _compile_bundled_steady_wind_unchecked(payload)
     return payload
 
 
@@ -799,6 +936,65 @@ def _validate_extension_evidence(
             )
 
 
+def _validate_bundled_steady_wind_evidence(
+    request: dict[str, Any],
+    requested: dict[str, Any],
+    evidence_record: dict[str, Any],
+) -> None:
+    _validate_extension_evidence(requested, evidence_record)
+    details = evidence_record["evidence"]
+    expected = _compile_bundled_steady_wind_unchecked(request)
+    if expected is None or details.get("compiled_wind") != expected:
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} compiled wind does not match the request"
+        )
+
+    observations = details["verification"]["observations"]
+    readbacks = [
+        item
+        for item in observations
+        if item.get("kind") == "readback"
+        and isinstance(item.get("source"), str)
+        and item["source"].endswith("/wind_info")
+    ]
+    expected_readback = {
+        "linear_velocity_mps": expected["linear_velocity_mps"],
+        "enable_wind": True,
+    }
+    if len(readbacks) != 1 or readbacks[0].get("value") != expected_readback:
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} requires exact Gazebo wind_info readback"
+        )
+
+    runtime_sdf = [
+        item
+        for item in observations
+        if item.get("kind") == "artifact"
+        and isinstance(item.get("source"), str)
+        and item["source"].endswith("/generate_world_sdf")
+    ]
+    if len(runtime_sdf) != 1:
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} requires one generated-world-SDF observation"
+        )
+    sdf_value = runtime_sdf[0].get("value")
+    vehicle_model = sdf_value.get("vehicle_model") if isinstance(sdf_value, dict) else None
+    if (
+        not isinstance(sdf_value, dict)
+        or sdf_value.get("source_vehicle_model") != "x500_base"
+        or not isinstance(vehicle_model, str)
+        or not re.fullmatch(r"x500(?:_depth|_vision)?_0", vehicle_model)
+        or sdf_value.get("link_name") != "base_link"
+        or sdf_value.get("enable_wind") is not True
+        or not isinstance(sdf_value.get("sdf_sha256"), str)
+        or not _SHA256.fullmatch(sdf_value["sdf_sha256"])
+    ):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} runtime SDF does not prove "
+            "an allowed PX4 x500-family runtime instance/base_link WindMode"
+        )
+
+
 def validate_scenario_effect_evidence(request: dict[str, Any], payload: object) -> dict[str, Any]:
     validate_scenario_effect_request(request)
     if not isinstance(payload, dict):
@@ -862,6 +1058,12 @@ def validate_scenario_effect_evidence(request: dict[str, Any], payload: object) 
                 )
             if effect_id == "obstacles":
                 _validate_obstacle_evidence(requested_by_id[effect_id], effect)
+            elif effect_id in BUNDLED_STEADY_WIND_EFFECT_IDS:
+                _validate_bundled_steady_wind_evidence(
+                    request,
+                    requested_by_id[effect_id],
+                    effect,
+                )
             else:
                 _validate_extension_evidence(requested_by_id[effect_id], effect)
         else:
@@ -914,15 +1116,32 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
 
     return {
         "schema_version": REQUEST_SCHEMA_VERSION,
-        "physically_applied": ["obstacles"],
+        "physically_applied": ["obstacles", "steady_wind"],
         "obstacles": {
             "status": "available",
             "mechanism": "gazebo_entity_factory",
             "requires": ["gz CLI", "/world/<world>/create UserCommands service"],
             "evidence": "Gazebo Boolean create response plus SDF SHA-256",
         },
+        "steady_wind": {
+            "status": "available",
+            "effect_ids": sorted(BUNDLED_STEADY_WIND_EFFECT_IDS),
+            "mechanism": "gazebo_wind_effects",
+            "maximum_combined_speed_mps": MAX_BUNDLED_STEADY_WIND_MPS,
+            "requires": [
+                "gz CLI",
+                "Gazebo WindEffects system",
+                "/world/<world>/wind_info",
+                "/world/<world>/generate_world_sdf",
+                "PX4 x500_base model",
+            ],
+            "evidence": (
+                "exact Wind readback plus generated runtime SDF proving "
+                "the exact x500-family runtime instance/base_link enable_wind"
+            ),
+        },
         "requires_runtime_extension": [
-            "wind vector and gust profile",
+            "time-varying wind gust and turbulence profile",
             "sensor noise and degradation",
             "probabilistic GPS dropout",
             "battery initial state and voltage sag",
@@ -933,16 +1152,21 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
 
 
 __all__ = [
+    "BUNDLED_STEADY_WIND_EFFECT_IDS",
+    "DEFAULT_SCENARIO_STEADY_WIND_MPS",
     "EVIDENCE_ARTIFACT_NAME",
     "EVIDENCE_SCHEMA_VERSION",
+    "MAX_BUNDLED_STEADY_WIND_MPS",
     "REQUEST_ARTIFACT_NAME",
     "REQUEST_SCHEMA_VERSION",
     "ScenarioEffectContractError",
     "build_scenario_effect_evidence",
     "build_scenario_effect_request",
     "bundled_launcher_capabilities",
+    "compile_bundled_steady_wind",
     "load_scenario_effect_evidence",
     "load_scenario_effect_request",
+    "scenario_effect_value_sha256",
     "validate_scenario_effect_evidence",
     "validate_scenario_effect_request",
     "write_json_atomic",

@@ -93,8 +93,10 @@ Known JSON artifacts are validated before persistence:
 - `scenario_effect_request_json` and `scenario_effect_evidence_json`: the
   normalized physical-effect request and the launcher's validated application
   evidence. Static box/cylinder obstacles have a bundled Gazebo EntityFactory
-  path; other requested effects require a site Runtime extension and fail
-  closed without evidence.
+  path. Constant horizontal wind for the bundled `x500` family has a
+  Trial-local world/model overlay plus exact `wind_info` and expanded
+  runtime-SDF proof path. Other requested effects require a site Runtime
+  extension and fail closed without evidence.
 - `simulator_runtime_manifest_json`: attempt identity plus requested/observed
   firmware, scenario-effect support, simulator profile, and timeout evidence.
 

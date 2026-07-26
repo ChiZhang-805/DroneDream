@@ -1093,17 +1093,22 @@ demonstrates the distinction:
 - `real_cli.py` exports `DRONEDREAM_TRIAL_SEED`;
 - `px4_gazebo_runner.py` validates it and forwards `PX4_TRIAL_SEED`;
 - deterministic dry-run telemetry uses `random.Random(seed)`;
-- the bundled `local_px4_launch_wrapper.py` never reads `PX4_TRIAL_SEED`, does not
-  launch Gazebo with `gz sim --seed`, and emits no seed-effect readback; and
-- the bundled scenario-effect capability contract can physically apply only static
-  obstacles. Wind, gust, sensor noise/degradation, probabilistic GPS dropout,
-  battery state/sag, payload mass, and actuator delay fail closed as
+- the bundled `local_px4_launch_wrapper.py` still does not launch Gazebo with
+  `gz sim --seed`, so it cannot claim global simulator-randomness control;
+- constant scalar wind uses the Trial execution identity to derive a
+  repeatable compass bearing, while explicitly directional job wind does not
+  depend on a random generator; and
+- the bundled scenario-effect capability contract can physically apply static
+  obstacles and constant horizontal wind for the `x500` family. Gust,
+  turbulence, sensor noise/degradation, probabilistic GPS dropout, battery
+  state/sag, payload mass, and actuator delay fail closed as
   `requires_runtime_extension`.
 
-Consequently, current real PX4/Gazebo Trials may record an intended seed but must not
-claim that the seed controls physics, wind, sensor noise, PX4 scheduling, or the
-offboard executor. An environment variable inherited by a child process is only
-transport evidence.
+Consequently, current real PX4/Gazebo Trials may claim only the exact constant
+wind vector proved by `wind_info` and the runtime SDF. They must not claim that
+the seed controls global physics, sensor noise, PX4 scheduling, or the offboard
+executor. An environment variable inherited by a child process is only
+transport evidence unless a named mechanism and read-back bind it to behavior.
 
 #### 8.9.1 Closed randomness domains
 
@@ -1187,13 +1192,19 @@ bytes and world bytes are hashed because changing a noise distribution while ret
 the same integer is a different treatment.
 
 Wind evidence is similarly physical rather than declarative. Gazebo's official
-`WindEffects` system adds filtered, sinusoidal, and noise terms and publishes
-ground-truth wind on `/world/{world_name}/wind_info`:
+`WindEffects` system publishes ground-truth wind on
+`/world/{world_name}/wind_info`:
 [Gazebo WindEffects API](https://gazebosim.org/api/sim/9/classgz_1_1sim_1_1systems_1_1WindEffects.html).
-A supported adapter hashes the world/plugin configuration, sets the derived wind
-stream before the server starts, and retains bounded `wind_info` observations across
-the evaluation interval. A service acknowledgement that merely changed a requested
-mean is insufficient when the stochastic realization itself matters.
+The bundled constant-wind adapter hashes its Trial-local world/model overlay,
+enables WindMode on the `x500_base/base_link` source template, publishes the
+compiled ENU vector, requires an exact `wind_info` read-back, and retains the
+expanded generated SDF that proves the exact spawned instance (for example
+`x500_0/base_link`) has WindMode. This is sufficient for the named constant
+treatment in the isolated Trial, but not for future gust or turbulent
+treatments. Those stochastic treatments must additionally retain bounded
+observations across the evaluation interval and prove their seed binding. A
+service acknowledgement that merely changed a requested mean is insufficient
+when the stochastic realization itself matters.
 
 Probabilistic dropout is compiled into a finite event schedule before simulation where
 possible. The compiler uses `scenario.dropout`, persists the schedule hash and event

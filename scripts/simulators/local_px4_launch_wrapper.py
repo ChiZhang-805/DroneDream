@@ -10,8 +10,10 @@ This script is intentionally a thin, configurable launcher layer:
 from __future__ import annotations
 
 import argparse
+import ast
 import asyncio
 import contextlib
+import copy
 import hashlib
 import json
 import math
@@ -55,7 +57,10 @@ DEFAULT_TRACK_MARKER_MODE = "line_strip"
 MAX_JSON_BYTES = 16 * 1024 * 1024
 MAX_TELEMETRY_SAMPLES = 50_000
 MAX_ULOG_BYTES = 1024 * 1024 * 1024
+MAX_GENERATED_WORLD_SDF_BYTES = 16 * 1024 * 1024
 RETAINED_ULOG_NAME = "px4_source.ulg"
+WIND_EFFECTS_PLUGIN_FILENAME = "gz-sim-wind-effects-system"
+WIND_EFFECTS_PLUGIN_NAME = "gz::sim::systems::WindEffects"
 
 REQUIRED_SAMPLE_KEYS = (
     "t",
@@ -278,6 +283,48 @@ def _write_scenario_effect_evidence(
     engine.write_json_atomic(evidence_path, payload)
 
 
+def _scenario_effect_failure_records(
+    request: dict[str, Any],
+    *,
+    applied_by_id: dict[str, dict[str, Any]],
+    failing_ids: set[str],
+    reason: str,
+    unsupported: bool,
+) -> list[dict[str, Any]]:
+    blocked_reason = (
+        "another requested scenario effect failed; the bundled launcher does not "
+        "continue a partially applied physical scenario"
+    )
+    records: list[dict[str, Any]] = []
+    for effect in request["effects"]:
+        effect_id = effect["effect_id"]
+        if effect_id in applied_by_id:
+            records.append(applied_by_id[effect_id])
+        elif effect_id in failing_ids:
+            records.append(
+                _scenario_effect_record(
+                    effect,
+                    status="unsupported" if unsupported else "failed",
+                    capability_status="unsupported" if unsupported else "available",
+                    reason=reason,
+                )
+            )
+        else:
+            records.append(
+                _scenario_effect_record(
+                    effect,
+                    status="skipped",
+                    capability_status=(
+                        "available"
+                        if effect.get("capability", {}).get("status") == "available"
+                        else "unsupported"
+                    ),
+                    reason=blocked_reason,
+                )
+            )
+    return records
+
+
 def _preflight_scenario_effects(
     request: dict[str, Any] | None,
     *,
@@ -301,10 +348,12 @@ def _preflight_scenario_effects(
             for effect in request["effects"]
         ]
 
+    engine = _load_scenario_effect_engine()
+    bundled_ids = {"obstacles", *engine.BUNDLED_STEADY_WIND_EFFECT_IDS}
     unavailable = [
         effect
         for effect in request["effects"]
-        if effect["effect_id"] != "obstacles"
+        if effect["effect_id"] not in bundled_ids
         or effect.get("capability", {}).get("status") != "available"
     ]
     if not unavailable:
@@ -372,11 +421,706 @@ def _protobuf_quote(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def _sha256_hex(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _validated_world_name(world: str) -> str:
+    if (
+        not world
+        or len(world) > 128
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", world)
+        or Path(world).name != world
+    ):
+        raise ScenarioEffectUnsupportedError(
+            "bundled steady wind requires a simple Gazebo world name"
+        )
+    return world
+
+
+def _prepare_steady_wind_overlay(
+    request: dict[str, Any],
+    engine: Any,
+    *,
+    run_dir: Path,
+    autopilot_dir: str | None,
+    simulator_model: str,
+    world: str,
+    launch_env: dict[str, str],
+) -> dict[str, Any] | None:
+    """Create an isolated world/model overlay before Gazebo starts."""
+
+    compiled = engine.compile_bundled_steady_wind(request)
+    if compiled is None:
+        return None
+    normalized_model = simulator_model.removeprefix("gz_")
+    if normalized_model not in {"x500", "x500_depth", "x500_vision"}:
+        raise ScenarioEffectUnsupportedError(
+            "bundled steady wind currently supports PX4 x500, x500_depth, and "
+            "x500_vision simulator models"
+        )
+    if not autopilot_dir:
+        raise ScenarioEffectUnsupportedError(
+            "PX4_AUTOPILOT_DIR is required to build the trusted Trial-local wind overlay"
+        )
+
+    world_name = _validated_world_name(world)
+    px4_root = Path(autopilot_dir).resolve()
+    if not px4_root.is_dir():
+        raise ScenarioEffectUnsupportedError("PX4_AUTOPILOT_DIR is unavailable")
+    gazebo_root = px4_root / "Tools" / "simulation" / "gz"
+    source_model_dir = gazebo_root / "models" / "x500_base"
+    source_model_sdf = source_model_dir / "model.sdf"
+    source_world_sdf = gazebo_root / "worlds" / f"{world_name}.sdf"
+    for source in (source_model_sdf, source_world_sdf):
+        if not source.is_file() or source.is_symlink():
+            raise ScenarioEffectUnsupportedError(
+                f"trusted pinned PX4 Gazebo input is missing or unsafe: {source}"
+            )
+        try:
+            source.resolve().relative_to(px4_root)
+        except ValueError as exc:
+            raise ScenarioEffectUnsupportedError(
+                f"trusted PX4 Gazebo input escapes PX4_AUTOPILOT_DIR: {source}"
+            ) from exc
+
+    build_root = px4_root / "build" / "px4_sitl_default"
+    source_rootfs = build_root / "rootfs"
+    px4_executable = build_root / "bin" / "px4"
+    px4_plugins = build_root / "src" / "modules" / "simulation" / "gz_plugins"
+    px4_server_config = (
+        px4_root / "src" / "modules" / "simulation" / "gz_bridge" / "server.config"
+    )
+    required_runtime_paths = (
+        source_rootfs,
+        px4_executable,
+        px4_plugins,
+        px4_server_config,
+    )
+    if any(not path.exists() for path in required_runtime_paths):
+        raise ScenarioEffectUnsupportedError(
+            "the pinned PX4 SITL build is incomplete; Trial-local wind launch "
+            "requires rootfs, px4, Gazebo plugins, and server config"
+        )
+
+    runtime_root = run_dir / "scenario_runtime"
+    model_root = runtime_root / "models"
+    world_root = runtime_root / "worlds"
+    overlay_model_dir = model_root / "x500_base"
+    overlay_world_sdf = world_root / f"{world_name}.sdf"
+    if overlay_model_dir.exists() or overlay_world_sdf.exists():
+        raise RuntimeError("Trial-local scenario runtime overlay already exists")
+    model_root.mkdir(parents=True, exist_ok=True)
+    world_root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_model_dir, overlay_model_dir)
+    shutil.copy2(source_world_sdf, overlay_world_sdf)
+
+    overlay_model_sdf = overlay_model_dir / "model.sdf"
+    model_tree = ET.parse(overlay_model_sdf)
+    model_root_xml = model_tree.getroot()
+    base_link = model_root_xml.find("./model[@name='x500_base']/link[@name='base_link']")
+    if base_link is None:
+        raise RuntimeError("pinned x500_base model has no base_link")
+    enable_wind = base_link.find("enable_wind")
+    if enable_wind is None:
+        enable_wind = ET.SubElement(base_link, "enable_wind")
+    enable_wind.text = "true"
+
+    sanitized_classic_material_scripts = 0
+    for material in model_root_xml.findall(".//material"):
+        script = material.find("script")
+        if script is None:
+            continue
+        uri = script.findtext("uri", default="").strip()
+        if uri != "file://media/materials/scripts/gazebo.material":
+            continue
+        material_name = script.findtext("name", default="").strip()
+        if material_name != "Gazebo/DarkGrey":
+            raise RuntimeError(
+                "pinned x500_base model has an unsupported Gazebo Classic material "
+                f"reference: {material_name or '<unnamed>'}"
+            )
+        material.remove(script)
+        for tag, value in (
+            ("ambient", "0.2 0.2 0.2 1"),
+            ("diffuse", "0.2 0.2 0.2 1"),
+            ("specular", "0.1 0.1 0.1 1"),
+        ):
+            color = material.find(tag)
+            if color is None:
+                color = ET.SubElement(material, tag)
+            color.text = value
+        sanitized_classic_material_scripts += 1
+
+    ET.indent(model_tree, space="  ")
+    model_tree.write(overlay_model_sdf, encoding="utf-8", xml_declaration=True)
+
+    world_tree = ET.parse(overlay_world_sdf)
+    world_root_xml = world_tree.getroot()
+    world_xml = world_root_xml.find(f"./world[@name='{world_name}']")
+    if world_xml is None:
+        raise RuntimeError(f"pinned world SDF does not define world {world_name!r}")
+
+    # Gazebo does not inject the default server-config systems once a world
+    # declares an SDF system plugin of its own.  Materialize the pinned PX4
+    # systems into this Trial-local world before adding WindEffects so PX4 still
+    # gets scene/info, entity creation, physics, sensors, and the bridge inputs.
+    server_config_tree = ET.parse(px4_server_config)
+    configured_plugins = server_config_tree.findall("./plugins/plugin")
+    if not configured_plugins:
+        raise RuntimeError("pinned PX4 Gazebo server config has no system plugins")
+    plugin_keys = {
+        (plugin.get("filename"), plugin.get("name")) for plugin in world_xml.findall("plugin")
+    }
+    for configured_plugin in configured_plugins:
+        plugin_key = (configured_plugin.get("filename"), configured_plugin.get("name"))
+        if not all(plugin_key):
+            raise RuntimeError("pinned PX4 Gazebo server config has an invalid system plugin")
+        if plugin_key in plugin_keys:
+            continue
+        materialized_plugin = copy.deepcopy(configured_plugin)
+        materialized_plugin.attrib.pop("entity_name", None)
+        materialized_plugin.attrib.pop("entity_type", None)
+        world_xml.append(materialized_plugin)
+        plugin_keys.add(plugin_key)
+
+    wind_xml = world_xml.find("wind")
+    if wind_xml is None:
+        wind_xml = ET.SubElement(world_xml, "wind")
+    linear_velocity = wind_xml.find("linear_velocity")
+    if linear_velocity is None:
+        linear_velocity = ET.SubElement(wind_xml, "linear_velocity")
+    vector = compiled["linear_velocity_mps"]
+    linear_velocity.text = f"{vector['x']:.17g} {vector['y']:.17g} {vector['z']:.17g}"
+
+    plugins = [
+        plugin
+        for plugin in world_xml.findall("plugin")
+        if plugin.get("name") == WIND_EFFECTS_PLUGIN_NAME
+        or plugin.get("filename") == WIND_EFFECTS_PLUGIN_FILENAME
+    ]
+    if len(plugins) > 1:
+        raise RuntimeError("world SDF contains multiple conflicting WindEffects plugins")
+    if plugins:
+        plugin = plugins[0]
+        plugin.set("filename", WIND_EFFECTS_PLUGIN_FILENAME)
+        plugin.set("name", WIND_EFFECTS_PLUGIN_NAME)
+    else:
+        ET.SubElement(
+            world_xml,
+            "plugin",
+            {
+                "filename": WIND_EFFECTS_PLUGIN_FILENAME,
+                "name": WIND_EFFECTS_PLUGIN_NAME,
+            },
+        )
+    ET.indent(world_tree, space="  ")
+    world_tree.write(overlay_world_sdf, encoding="utf-8", xml_declaration=True)
+
+    existing_resource_path = launch_env.get("GZ_SIM_RESOURCE_PATH", "")
+    overlay_paths = [str(model_root), str(world_root)]
+    if existing_resource_path:
+        overlay_paths.append(existing_resource_path)
+    launch_env["GZ_SIM_RESOURCE_PATH"] = os.pathsep.join(overlay_paths)
+
+    for source in source_rootfs.rglob("*"):
+        if not source.is_symlink():
+            continue
+        try:
+            source.resolve(strict=True).relative_to(px4_root)
+        except (OSError, ValueError) as exc:
+            raise ScenarioEffectUnsupportedError(
+                f"PX4 rootfs contains an unsafe external symlink: {source}"
+            ) from exc
+
+    trial_rootfs = runtime_root / "px4_rootfs"
+    shutil.copytree(
+        source_rootfs,
+        trial_rootfs,
+        symlinks=False,
+        ignore=shutil.ignore_patterns(
+            "dataman",
+            "eeprom",
+            "log",
+            "parameters.bson",
+            "parameters_backup.bson",
+        ),
+    )
+    resource_paths = [
+        str(model_root),
+        str(gazebo_root / "models"),
+        str(world_root),
+        str(gazebo_root / "worlds"),
+    ]
+    if existing_resource_path:
+        resource_paths.append(existing_resource_path)
+    trial_gz_env = trial_rootfs / "gz_env.sh"
+    trial_gz_env.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "# Generated per Trial by DroneDream; never edits the pinned PX4 checkout.",
+                f"export PX4_GZ_MODELS={shlex.quote(str(gazebo_root / 'models'))}",
+                f"export PX4_GZ_WORLDS={shlex.quote(str(world_root))}",
+                f"export PX4_GZ_PLUGINS={shlex.quote(str(px4_plugins))}",
+                f"export PX4_GZ_SERVER_CONFIG={shlex.quote(str(px4_server_config))}",
+                f"export GZ_SIM_RESOURCE_PATH={shlex.quote(os.pathsep.join(resource_paths))}",
+                f"export GZ_SIM_SYSTEM_PLUGIN_PATH={shlex.quote(str(px4_plugins))}",
+                f"export GZ_SIM_SERVER_CONFIG_PATH={shlex.quote(str(px4_server_config))}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    px4_sim_model = (
+        simulator_model if simulator_model.startswith("gz_") else f"gz_{normalized_model}"
+    )
+    return {
+        "compiled_wind": compiled,
+        "model_sdf_path": str(overlay_model_sdf),
+        "model_sdf_sha256": _sha256_hex(overlay_model_sdf),
+        "sanitized_classic_material_scripts": sanitized_classic_material_scripts,
+        "world_sdf_path": str(overlay_world_sdf),
+        "world_sdf_sha256": _sha256_hex(overlay_world_sdf),
+        "wind_enabled_link": "x500_base/base_link",
+        "wind_effects_plugin": {
+            "filename": WIND_EFFECTS_PLUGIN_FILENAME,
+            "name": WIND_EFFECTS_PLUGIN_NAME,
+        },
+        "materialized_px4_system_plugins": [
+            {
+                "filename": plugin.get("filename"),
+                "name": plugin.get("name"),
+            }
+            for plugin in configured_plugins
+        ],
+        "px4_server_config_path": str(px4_server_config),
+        "px4_server_config_sha256": _sha256_hex(px4_server_config),
+        "px4_executable_path": str(px4_executable),
+        "px4_sim_model": px4_sim_model,
+        "px4_vehicle_model_instance": f"{normalized_model}_0",
+        "px4_trial_rootfs_path": str(trial_rootfs),
+        "px4_trial_gz_env_path": str(trial_gz_env),
+        "px4_trial_gz_env_sha256": _sha256_hex(trial_gz_env),
+    }
+
+
+def _wrap_launch_command_for_trial_world(
+    command: str,
+    overlay: dict[str, Any],
+    *,
+    launch_env: dict[str, str],
+    headless: bool,
+) -> str:
+    """Launch PX4 from a clean Trial rootfs whose ``gz_env.sh`` selects the overlay."""
+
+    if os.environ.get("PX4_LAUNCH_COMMAND_TEMPLATE", "").strip():
+        raise ScenarioEffectUnsupportedError(
+            "bundled steady wind cannot prove Trial-world selection with a custom "
+            "PX4_LAUNCH_COMMAND_TEMPLATE; the site launcher must emit its own "
+            "physical-effect evidence"
+        )
+    rootfs_raw = overlay.get("px4_trial_rootfs_path")
+    executable_raw = overlay.get("px4_executable_path")
+    simulator_model = overlay.get("px4_sim_model")
+    if (
+        not isinstance(rootfs_raw, str)
+        or not isinstance(executable_raw, str)
+        or not isinstance(simulator_model, str)
+    ):
+        raise RuntimeError("Trial-local PX4 launch metadata is incomplete")
+    rootfs = Path(rootfs_raw).resolve()
+    executable = Path(executable_raw).resolve()
+    if not rootfs.is_dir() or not executable.is_file():
+        raise RuntimeError("Trial-local PX4 rootfs or pinned executable is unavailable")
+    if not re.fullmatch(r"gz_[A-Za-z0-9_.-]+", simulator_model):
+        raise RuntimeError("Trial-local PX4 simulator model is invalid")
+    launch_env.pop("PX4_GZ_STANDALONE", None)
+    launch_env["GZ_IP"] = os.environ.get("GZ_IP", "127.0.0.1")
+    quoted_rootfs = shlex.quote(str(rootfs))
+    return (
+        f"cd {quoted_rootfs}; "
+        f"HEADLESS={'1' if headless else '0'} "
+        f"PX4_SIM_MODEL={shlex.quote(simulator_model)} "
+        f"GZ_IP={shlex.quote(launch_env['GZ_IP'])} "
+        f"{shlex.quote(str(executable))} -d -w {quoted_rootfs} {quoted_rootfs}"
+    )
+
+
 def _gazebo_cli() -> str | None:
     configured = os.environ.get("DRONEDREAM_GAZEBO_EXECUTABLE", "").strip()
     if configured and Path(configured).is_file():
         return configured
     return shutil.which("gz")
+
+
+_PROTOBUF_NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+
+
+def _parse_wind_info_response(response_text: str) -> dict[str, Any]:
+    velocity_match = re.search(
+        r"\blinear_velocity\s*\{(?P<body>.*?)\}",
+        response_text,
+        re.DOTALL,
+    )
+    if velocity_match is None:
+        raise RuntimeError("Gazebo wind_info response omitted linear_velocity")
+    body = velocity_match.group("body")
+    vector: dict[str, float] = {}
+    for axis in ("x", "y", "z"):
+        match = re.search(rf"\b{axis}\s*:\s*({_PROTOBUF_NUMBER})", body)
+        vector[axis] = round(float(match.group(1)), 12) if match else 0.0
+    enable_match = re.search(r"\benable_wind\s*:\s*(true|false)\b", response_text, re.I)
+    if enable_match is None:
+        raise RuntimeError("Gazebo wind_info response omitted enable_wind")
+    return {
+        "linear_velocity_mps": vector,
+        "enable_wind": enable_match.group(1).lower() == "true",
+    }
+
+
+def _parse_protobuf_string_message(response_text: str) -> str:
+    match = re.search(
+        r'\bdata\s*:\s*("(?:\\.|[^"\\])*")',
+        response_text,
+        re.DOTALL,
+    )
+    if match is None:
+        raise RuntimeError("Gazebo generated-world-SDF response omitted StringMsg.data")
+    try:
+        value = ast.literal_eval(match.group(1))
+    except (SyntaxError, ValueError) as exc:
+        raise RuntimeError("Gazebo generated-world-SDF response is malformed") from exc
+    if not isinstance(value, str):
+        raise RuntimeError("Gazebo generated-world-SDF response is not text")
+    if len(value.encode("utf-8")) > MAX_GENERATED_WORLD_SDF_BYTES:
+        raise RuntimeError("Gazebo generated-world-SDF response exceeds the evidence limit")
+    return value
+
+
+def _runtime_wind_mode_observation(
+    generated_sdf: str,
+    *,
+    generated_path: Path,
+    expected_vehicle_model: str,
+) -> dict[str, Any]:
+    try:
+        root = ET.fromstring(generated_sdf)
+    except ET.ParseError as exc:
+        raise RuntimeError("Gazebo generated-world-SDF response is invalid XML") from exc
+    enabled = False
+    for model in root.iter("model"):
+        if model.get("name") != expected_vehicle_model:
+            continue
+        link = model.find("./link[@name='base_link']")
+        if link is not None and (link.findtext("enable_wind") or "").strip().lower() == "true":
+            enabled = True
+            break
+    if not enabled:
+        raise RuntimeError(
+            "generated runtime SDF does not prove expected wind-enabled vehicle "
+            f"{expected_vehicle_model}/base_link enable_wind=true"
+        )
+    generated_path.parent.mkdir(parents=True, exist_ok=True)
+    generated_path.write_text(generated_sdf, encoding="utf-8")
+    return {
+        "source_vehicle_model": "x500_base",
+        "vehicle_model": expected_vehicle_model,
+        "link_name": "base_link",
+        "enable_wind": True,
+        "sdf_path": str(generated_path),
+        "sdf_sha256": _sha256_hex(generated_path),
+    }
+
+
+def _run_gazebo_command(
+    argv: list[str],
+    *,
+    timeout: float,
+    failure_context: str,
+) -> str:
+    try:
+        response = subprocess.run(  # noqa: S603 - resolved gz executable, fixed argv.
+            argv,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(f"{failure_context}: {exc}") from exc
+    response_text = _subprocess_text(response.stdout) + "\n" + _subprocess_text(response.stderr)
+    if response.returncode != 0:
+        raise RuntimeError(
+            f"{failure_context}: exit={response.returncode}, response={response_text.strip()[:400]}"
+        )
+    return response_text
+
+
+def _apply_steady_wind_effects(
+    request: dict[str, Any],
+    engine: Any,
+    overlay: dict[str, Any] | None,
+    *,
+    run_dir: Path,
+    world: str,
+) -> dict[str, dict[str, Any]]:
+    compiled = engine.compile_bundled_steady_wind(request)
+    if compiled is None:
+        return {}
+    if overlay is None or overlay.get("compiled_wind") != compiled:
+        raise RuntimeError("Trial-local steady-wind overlay is missing or request-mismatched")
+    gz_cli = _gazebo_cli()
+    if not gz_cli:
+        raise ScenarioEffectUnsupportedError(
+            "Gazebo gz CLI is unavailable; steady wind requires wind_info and "
+            "generate_world_sdf verification services"
+        )
+    world_name = _validated_world_name(world)
+    wind_topic = f"/world/{world_name}/wind"
+    wind_info_service = f"/world/{world_name}/wind_info"
+    generated_sdf_service = f"/world/{world_name}/generate_world_sdf"
+    services_text = _run_gazebo_command(
+        [gz_cli, "service", "--list"],
+        timeout=10.0,
+        failure_context="could not inspect Gazebo services",
+    )
+    services = set(services_text.split())
+    missing_services = sorted(
+        service for service in (wind_info_service, generated_sdf_service) if service not in services
+    )
+    if missing_services:
+        raise ScenarioEffectUnsupportedError(
+            "Gazebo steady-wind verification services are unavailable: "
+            + ", ".join(missing_services)
+        )
+
+    timeout_ms = max(
+        100,
+        _parse_int(os.environ.get("PX4_GAZEBO_WIND_TIMEOUT_MS"), default=5000),
+    )
+    vector = compiled["linear_velocity_mps"]
+    wind_message = (
+        "linear_velocity { "
+        f"x: {vector['x']:.17g} y: {vector['y']:.17g} z: {vector['z']:.17g}"
+        " } enable_wind: true"
+    )
+    _run_gazebo_command(
+        [
+            gz_cli,
+            "topic",
+            "-t",
+            wind_topic,
+            "-m",
+            "gz.msgs.Wind",
+            "-p",
+            wind_message,
+        ],
+        timeout=max(5.0, (timeout_ms / 1000.0) + 2.0),
+        failure_context="could not publish Gazebo steady wind",
+    )
+
+    readback: dict[str, Any] | None = None
+    readback_error = ""
+    attempts = max(
+        1,
+        min(
+            50,
+            _parse_int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS"), default=10),
+        ),
+    )
+    for attempt in range(attempts):
+        try:
+            response_text = _run_gazebo_command(
+                [
+                    gz_cli,
+                    "service",
+                    "-s",
+                    wind_info_service,
+                    "--reqtype",
+                    "gz.msgs.Empty",
+                    "--reptype",
+                    "gz.msgs.Wind",
+                    "--timeout",
+                    str(timeout_ms),
+                    "--req",
+                    "",
+                ],
+                timeout=max(5.0, (timeout_ms / 1000.0) + 2.0),
+                failure_context="Gazebo wind_info request failed",
+            )
+            candidate = _parse_wind_info_response(response_text)
+            vector_matches = all(
+                math.isclose(
+                    candidate["linear_velocity_mps"][axis],
+                    vector[axis],
+                    rel_tol=1e-9,
+                    abs_tol=1e-9,
+                )
+                for axis in ("x", "y", "z")
+            )
+            if vector_matches and candidate["enable_wind"] is True:
+                readback = {
+                    "linear_velocity_mps": {
+                        axis: round(candidate["linear_velocity_mps"][axis], 12)
+                        for axis in ("x", "y", "z")
+                    },
+                    "enable_wind": True,
+                }
+                break
+            readback_error = f"mismatched readback {candidate}"
+        except RuntimeError as exc:
+            readback_error = str(exc)
+        if attempt + 1 < attempts:
+            time.sleep(0.1)
+    if readback is None:
+        raise RuntimeError(
+            "Gazebo wind_info never matched the requested steady wind: " + readback_error
+        )
+
+    runtime_sdf: dict[str, Any] | None = None
+    runtime_sdf_error = ""
+    expected_vehicle_model = overlay.get("px4_vehicle_model_instance")
+    if (
+        not isinstance(expected_vehicle_model, str)
+        or not re.fullmatch(r"x500(?:_depth|_vision)?_0", expected_vehicle_model)
+    ):
+        raise RuntimeError("Trial-local expected PX4 vehicle instance metadata is invalid")
+    runtime_sdf_attempts = max(
+        1,
+        min(
+            120,
+            _parse_int(
+                os.environ.get("PX4_GAZEBO_RUNTIME_SDF_ATTEMPTS"),
+                default=60,
+            ),
+        ),
+    )
+    generated_path = run_dir / "scenario_runtime" / "generated_world.sdf"
+    last_attempt_path = run_dir / "scenario_runtime" / "generated_world.last_attempt.sdf"
+    for attempt in range(runtime_sdf_attempts):
+        generated_response = _run_gazebo_command(
+            [
+                gz_cli,
+                "service",
+                "-s",
+                generated_sdf_service,
+                "--reqtype",
+                "gz.msgs.SdfGeneratorConfig",
+                "--reptype",
+                "gz.msgs.StringMsg",
+                "--timeout",
+                str(timeout_ms),
+                "--req",
+                "global_entity_gen_config { expand_include_tags { data: true } }",
+            ],
+            timeout=max(5.0, (timeout_ms / 1000.0) + 5.0),
+            failure_context="Gazebo generated-world-SDF request failed",
+        )
+        generated_sdf = _parse_protobuf_string_message(generated_response)
+        last_attempt_path.parent.mkdir(parents=True, exist_ok=True)
+        last_attempt_path.write_text(generated_sdf, encoding="utf-8")
+        try:
+            runtime_sdf = _runtime_wind_mode_observation(
+                generated_sdf,
+                generated_path=generated_path,
+                expected_vehicle_model=expected_vehicle_model,
+            )
+            break
+        except RuntimeError as exc:
+            runtime_sdf_error = str(exc)
+            if not runtime_sdf_error.startswith(
+                "generated runtime SDF does not prove expected wind-enabled vehicle "
+            ):
+                raise
+        if attempt + 1 < runtime_sdf_attempts:
+            time.sleep(0.25)
+    if runtime_sdf is None:
+        raise RuntimeError(
+            "Gazebo runtime SDF never exposed the wind-enabled vehicle model: " + runtime_sdf_error
+        )
+    observations = [
+        {
+            "source": wind_info_service,
+            "kind": "readback",
+            "value": readback,
+            "sha256": engine.scenario_effect_value_sha256(readback),
+        },
+        {
+            "source": generated_sdf_service,
+            "kind": "artifact",
+            "value": runtime_sdf,
+            "sha256": engine.scenario_effect_value_sha256(runtime_sdf),
+        },
+        {
+            "source": "trial_overlay/world_sdf",
+            "kind": "artifact",
+            "value": {
+                "path": overlay["world_sdf_path"],
+                "sha256": overlay["world_sdf_sha256"],
+                "linear_velocity_mps": vector,
+                "wind_effects_plugin": overlay["wind_effects_plugin"],
+                "materialized_px4_system_plugins": overlay[
+                    "materialized_px4_system_plugins"
+                ],
+                "px4_server_config": {
+                    "path": overlay["px4_server_config_path"],
+                    "sha256": overlay["px4_server_config_sha256"],
+                },
+            },
+        },
+        {
+            "source": "trial_overlay/x500_base_model_sdf",
+            "kind": "artifact",
+            "value": {
+                "path": overlay["model_sdf_path"],
+                "sha256": overlay["model_sdf_sha256"],
+                "wind_enabled_link": overlay["wind_enabled_link"],
+                "sanitized_classic_material_scripts": overlay[
+                    "sanitized_classic_material_scripts"
+                ],
+            },
+        },
+        {
+            "source": "trial_overlay/px4_gz_env",
+            "kind": "artifact",
+            "value": {
+                "path": overlay["px4_trial_gz_env_path"],
+                "sha256": overlay["px4_trial_gz_env_sha256"],
+                "rootfs_path": overlay["px4_trial_rootfs_path"],
+                "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom",
+            },
+        },
+    ]
+    effects_by_id = {effect["effect_id"]: effect for effect in request["effects"]}
+    records: dict[str, dict[str, Any]] = {}
+    for effect_id in compiled["requested_effect_ids"]:
+        effect = effects_by_id[effect_id]
+        records[effect_id] = _scenario_effect_record(
+            effect,
+            status="applied",
+            capability_status="available",
+            reason=(
+                "Gazebo wind_info matched the compiled ENU vector and generated runtime "
+                f"SDF proved {expected_vehicle_model}/base_link WindMode"
+            ),
+            evidence={
+                "requested_value_sha256": engine.scenario_effect_value_sha256(
+                    effect["requested_value"]
+                ),
+                "compiled_wind": compiled,
+                "verification": {
+                    "status": "verified",
+                    "method": "gazebo_wind_info_and_generated_world_sdf",
+                    "observations": observations,
+                },
+            },
+        )
+    return records
 
 
 def _apply_obstacle_effect(
@@ -1714,6 +2458,7 @@ def main() -> int:
 
     px4_proc: subprocess.Popen[str] | None = None
     gui_proc: subprocess.Popen[str] | None = None
+    steady_wind_overlay: dict[str, Any] | None = None
     previous_signal_handlers: dict[int, Any] = {}
 
     def _raise_shutdown(signum: int, _frame: Any) -> None:
@@ -1725,6 +2470,65 @@ def main() -> int:
             signal.signal(shutdown_signal, _raise_shutdown)
     try:
         command, resolved_autopilot_dir = _resolve_real_launch_command(args)
+        if scenario_effect_request is not None:
+            steady_wind_ids = {
+                effect["effect_id"]
+                for effect in scenario_effect_request["effects"]
+                if effect["effect_id"] in scenario_engine.BUNDLED_STEADY_WIND_EFFECT_IDS
+            }
+            if steady_wind_ids:
+                try:
+                    steady_wind_overlay = _prepare_steady_wind_overlay(
+                        scenario_effect_request,
+                        scenario_engine,
+                        run_dir=args.run_dir,
+                        autopilot_dir=resolved_autopilot_dir,
+                        simulator_model=args.simulator_model or args.vehicle,
+                        world=args.world,
+                        launch_env=launch_env,
+                    )
+                except ScenarioEffectUnsupportedError as exc:
+                    _write_scenario_effect_evidence(
+                        scenario_engine,
+                        scenario_effect_request,
+                        scenario_effect_evidence_path,
+                        world=args.world,
+                        effects=_scenario_effect_failure_records(
+                            scenario_effect_request,
+                            applied_by_id={},
+                            failing_ids=steady_wind_ids,
+                            reason=str(exc),
+                            unsupported=True,
+                        ),
+                    )
+                    raise
+                except Exception as exc:
+                    _write_scenario_effect_evidence(
+                        scenario_engine,
+                        scenario_effect_request,
+                        scenario_effect_evidence_path,
+                        world=args.world,
+                        effects=_scenario_effect_failure_records(
+                            scenario_effect_request,
+                            applied_by_id={},
+                            failing_ids=steady_wind_ids,
+                            reason=str(exc),
+                            unsupported=False,
+                        ),
+                    )
+                    raise
+        if steady_wind_overlay is not None:
+            command = _wrap_launch_command_for_trial_world(
+                command,
+                steady_wind_overlay,
+                launch_env=launch_env,
+                headless=headless,
+            )
+            if automatic_ulog is not None:
+                automatic_ulog = (
+                    Path(steady_wind_overlay["px4_trial_rootfs_path"]) / "log",
+                    {},
+                )
         _write_launch_config(
             args,
             autopilot_dir=resolved_autopilot_dir,
@@ -1770,60 +2574,123 @@ def main() -> int:
             )
 
         if scenario_effect_request is not None and scenario_effect_request["effects"]:
-            obstacle_effect = next(
-                effect
+            applied_by_id: dict[str, dict[str, Any]] = {}
+            steady_wind_ids = {
+                effect["effect_id"]
                 for effect in scenario_effect_request["effects"]
-                if effect["effect_id"] == "obstacles"
+                if effect["effect_id"] in scenario_engine.BUNDLED_STEADY_WIND_EFFECT_IDS
+            }
+            if steady_wind_ids:
+                try:
+                    applied_by_id.update(
+                        _apply_steady_wind_effects(
+                            scenario_effect_request,
+                            scenario_engine,
+                            steady_wind_overlay,
+                            run_dir=args.run_dir,
+                            world=args.world,
+                        )
+                    )
+                except ScenarioEffectUnsupportedError as exc:
+                    _write_scenario_effect_evidence(
+                        scenario_engine,
+                        scenario_effect_request,
+                        scenario_effect_evidence_path,
+                        world=args.world,
+                        effects=_scenario_effect_failure_records(
+                            scenario_effect_request,
+                            applied_by_id=applied_by_id,
+                            failing_ids=steady_wind_ids,
+                            reason=str(exc),
+                            unsupported=True,
+                        ),
+                    )
+                    raise
+                except Exception as exc:
+                    _write_scenario_effect_evidence(
+                        scenario_engine,
+                        scenario_effect_request,
+                        scenario_effect_evidence_path,
+                        world=args.world,
+                        effects=_scenario_effect_failure_records(
+                            scenario_effect_request,
+                            applied_by_id=applied_by_id,
+                            failing_ids=steady_wind_ids,
+                            reason=str(exc),
+                            unsupported=False,
+                        ),
+                    )
+                    raise
+
+            obstacle_effect = next(
+                (
+                    effect
+                    for effect in scenario_effect_request["effects"]
+                    if effect["effect_id"] == "obstacles"
+                ),
+                None,
             )
-            try:
-                applied_obstacles = _apply_obstacle_effect(
-                    obstacle_effect,
-                    run_dir=args.run_dir,
-                    world=args.world,
-                )
-            except ScenarioEffectUnsupportedError as exc:
-                _write_scenario_effect_evidence(
-                    scenario_engine,
-                    scenario_effect_request,
-                    scenario_effect_evidence_path,
-                    world=args.world,
-                    effects=[
-                        _scenario_effect_record(
-                            obstacle_effect,
-                            status="unsupported",
-                            capability_status="unsupported",
+            if obstacle_effect is not None:
+                try:
+                    applied_by_id["obstacles"] = _apply_obstacle_effect(
+                        obstacle_effect,
+                        run_dir=args.run_dir,
+                        world=args.world,
+                    )
+                except ScenarioEffectUnsupportedError as exc:
+                    _write_scenario_effect_evidence(
+                        scenario_engine,
+                        scenario_effect_request,
+                        scenario_effect_evidence_path,
+                        world=args.world,
+                        effects=_scenario_effect_failure_records(
+                            scenario_effect_request,
+                            applied_by_id=applied_by_id,
+                            failing_ids={"obstacles"},
                             reason=str(exc),
-                        )
-                    ],
-                )
-                raise
-            except Exception as exc:
-                _write_scenario_effect_evidence(
-                    scenario_engine,
-                    scenario_effect_request,
-                    scenario_effect_evidence_path,
-                    world=args.world,
-                    effects=[
-                        _scenario_effect_record(
-                            obstacle_effect,
-                            status="failed",
-                            capability_status="available",
+                            unsupported=True,
+                        ),
+                    )
+                    raise
+                except Exception as exc:
+                    _write_scenario_effect_evidence(
+                        scenario_engine,
+                        scenario_effect_request,
+                        scenario_effect_evidence_path,
+                        world=args.world,
+                        effects=_scenario_effect_failure_records(
+                            scenario_effect_request,
+                            applied_by_id=applied_by_id,
+                            failing_ids={"obstacles"},
                             reason=str(exc),
-                        )
-                    ],
+                            unsupported=False,
+                        ),
+                    )
+                    raise
+            if set(applied_by_id) != {
+                effect["effect_id"] for effect in scenario_effect_request["effects"]
+            }:
+                missing = sorted(
+                    {effect["effect_id"] for effect in scenario_effect_request["effects"]}
+                    - set(applied_by_id)
                 )
-                raise
+                raise RuntimeError(
+                    "scenario-effect dispatcher omitted available effects: " + ", ".join(missing)
+                )
             _write_scenario_effect_evidence(
                 scenario_engine,
                 scenario_effect_request,
                 scenario_effect_evidence_path,
                 world=args.world,
-                effects=[applied_obstacles],
+                effects=[
+                    applied_by_id[effect["effect_id"]]
+                    for effect in scenario_effect_request["effects"]
+                ],
             )
             _append_log(
                 args.stdout_log,
-                "[local_px4_launch_wrapper] Gazebo obstacle creation acknowledged "
-                "and scenario-effect evidence written",
+                "[local_px4_launch_wrapper] Gazebo scenario effects applied with "
+                "runtime readback evidence",
             )
 
         should_launch_gui = (not headless) and gui_launch_enabled and bool(display)

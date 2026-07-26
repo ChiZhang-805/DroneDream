@@ -329,9 +329,32 @@ Current PX4/Gazebo integration status in this repository:
 - obstacle application is accepted only when Gazebo returns `data: true`, and
   evidence records the entity name, service, source index, and generated SDF
   SHA-256;
-- wind/gust, sensor/GPS degradation, battery, payload, actuator-delay, and
-  other advanced physical effects do not yet have bundled injection/readback
-  adapters; and
+- constant horizontal wind has a bundled source implementation for
+  `x500`, `x500_depth`, and `x500_vision`: the wrapper creates a Trial-local
+  model/world overlay, enables wind in the `x500_base/base_link` source
+  template, installs the official Gazebo `WindEffects` system, publishes the
+  compiled wind vector, verifies an exact `/world/{world}/wind_info` read-back,
+  and retains an expanded runtime-SDF artifact proving that the exact spawned
+  instance (for example `x500_0/base_link`) had link wind active;
+- job-configured cardinal wind is mapped to Gazebo's ENU world frame
+  (`x=east`, `y=north`, `z=up`). Scalar scenario wind receives a deterministic
+  compass bearing derived from the Trial execution identity; simultaneous
+  sources are vector-summed and rejected above the bundled 30 m/s limit;
+- the overlay is stored inside the Trial artifacts and never mutates the pinned
+  PX4 checkout. Source world/model bytes, overlay bytes, generated runtime SDF,
+  request binding, and exact applied vector are hashed or retained as evidence;
+- the wrapper launches PX4 with an explicit Trial rootfs and working directory,
+  excludes prior parameters/dataman/log/eeprom state, materializes the pinned
+  PX4 server systems into the custom world, and removes four obsolete
+  Gazebo-Classic material-script references from the Trial copy so expanded-SDF
+  evidence remains resolvable;
+- a dedicated WSL smoke using PX4 commit
+  `6ea3539157ca358c70a515878b77077af7d4611d` and Gazebo 8.14.0 completed with
+  `verified_applied` evidence for both cardinal job wind and scalar scenario
+  wind. The signed installer Runtime must still repeat this acceptance gate;
+- gust/turbulence, sensor/GPS degradation, battery, payload, actuator-delay,
+  unsupported vehicles, and other advanced physical effects do not yet have
+  bundled injection/readback adapters; and
 - requesting an unsupported effect fails fast with
   `UNSUPPORTED_SCENARIO_EFFECT` by default.
 
@@ -344,10 +367,10 @@ A site-specific custom simulator can implement these effects, but it must emit
 its own truthful applied-effect evidence rather than relying on the bundled
 runner's passthrough mode.
 
-The same fail-closed rule applies in real mode to non-`nominal`
-`scenario_type`, `scenario_config.wind_mps`, non-zero job wind, and non-default
-sensor-noise profiles unless every requested effect is applied and evidenced.
-Dry-run records supported fixture perturbations as
+The same fail-closed rule applies in real mode to every requested effect. A
+constant-wind request can pass only when its exact compiled vector and runtime
+WindMode evidence validate; any additional unsupported effect still prevents
+the Trial from passing. Dry-run records supported fixture perturbations as
 `application_mode=dry_run_surrogate`; it never labels them as real physics.
 
 ---
