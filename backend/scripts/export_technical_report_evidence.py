@@ -30,12 +30,15 @@ from app.orchestration.harness_evaluation import (  # noqa: E402
     load_routing_eval_cases,
     load_routing_prediction_artifact,
 )
+from app.orchestration.harness_outcome_campaign import (  # noqa: E402
+    load_harness_outcome_campaign,
+)
 from app.orchestration.harness_routing_holdout import (  # noqa: E402
     load_locked_routing_policy_holdout,
     load_locked_routing_policy_result,
 )
 
-REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v2"
+REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v3"
 DEFAULT_ROUTING_CORPUS = BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_eval_v1.jsonl"
 DEFAULT_ROUTING_PREDICTIONS = (
     BACKEND_ROOT / "evaluation_artifacts" / "harness-routing-gpt-4.1-2025-04-14.json"
@@ -45,6 +48,11 @@ DEFAULT_SIMULATION_COVERAGE = (
 )
 DEFAULT_HARNESS_ABLATIONS = (
     BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v1.json"
+)
+DEFAULT_HARNESS_OUTCOME_CAMPAIGN = (
+    BACKEND_ROOT
+    / "evaluation_artifacts"
+    / "harness-fallback-outcome-campaign-v1.json"
 )
 DEFAULT_ROUTING_HOLDOUT_CORPUS = (
     BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_policy_holdout_v1.jsonl"
@@ -226,6 +234,7 @@ def build_report_evidence_bundle(
     routing_predictions_path: Path = DEFAULT_ROUTING_PREDICTIONS,
     simulation_coverage_path: Path = DEFAULT_SIMULATION_COVERAGE,
     harness_ablations_path: Path = DEFAULT_HARNESS_ABLATIONS,
+    harness_outcome_campaign_path: Path = DEFAULT_HARNESS_OUTCOME_CAMPAIGN,
     routing_holdout_corpus_path: Path = DEFAULT_ROUTING_HOLDOUT_CORPUS,
     routing_holdout_manifest_path: Path = DEFAULT_ROUTING_HOLDOUT_MANIFEST,
     routing_holdout_result_path: Path = DEFAULT_ROUTING_HOLDOUT_RESULT,
@@ -281,6 +290,68 @@ def build_report_evidence_bundle(
         "artifact_sha256": ablation_artifact["artifact_sha256"],
         "summary": ablation_artifact["summary"],
         "component_rows": ablation_artifact["component_rows"],
+    }
+    outcome_artifact = load_harness_outcome_campaign(
+        harness_outcome_campaign_path
+    )
+    harness_outcome_rows: list[dict[str, Any]] = []
+    for block in outcome_artifact["block_rows"]:
+        direct_hash = next(
+            arm["outcome_sha256"]
+            for arm in block["arms"]
+            if arm["arm"] == "direct_portfolio"
+        )
+        for arm in block["arms"]:
+            outcome = arm["outcome"]
+            budget = outcome["budget"]
+            harness_outcome_rows.append(
+                {
+                    "block_id": block["block_id"],
+                    "seed_block": block["seed_block"],
+                    "arm": arm["arm"],
+                    "provider_calls": arm["provider_calls"],
+                    "network_calls": arm["network_calls"],
+                    "candidate_count": budget["candidate_count"],
+                    "trial_count": budget["trial_count"],
+                    "dispatched_trials": budget["dispatched_trials"],
+                    "winner_candidate_key": outcome["winner"]["candidate_key"],
+                    "holdout_loss": outcome["holdout_loss"],
+                    "failure_count": outcome["failure_count"],
+                    "evidence_completeness_rate": outcome[
+                        "evidence_completeness"
+                    ]["completeness_rate"],
+                    "exact_match_to_direct_portfolio": (
+                        arm["outcome_sha256"] == direct_hash
+                    ),
+                }
+            )
+    harness_outcome_campaign = {
+        "evidence_class": outcome_artifact["evidence_class"],
+        "claim_label": outcome_artifact["claim_label"],
+        "claim_boundary": outcome_artifact["claim_boundary"],
+        "physical_fidelity": outcome_artifact["physical_fidelity"],
+        "simulator_backend": outcome_artifact["simulator_backend"],
+        "live_model_calls": outcome_artifact["live_model_calls"],
+        "network_calls": outcome_artifact["network_calls"],
+        "network_connect_guard_enforced": all(
+            arm["network_connect_guard_enforced"] is True
+            for block in outcome_artifact["block_rows"]
+            for arm in block["arms"]
+        ),
+        "real_credentials_used": outcome_artifact["real_credentials_used"],
+        "llm_superiority_claim_permitted": outcome_artifact[
+            "llm_superiority_claim_permitted"
+        ],
+        "harness_causal_benefit_claim_permitted": outcome_artifact[
+            "harness_causal_benefit_claim_permitted"
+        ],
+        "px4_or_flight_claim_permitted": outcome_artifact[
+            "px4_or_flight_claim_permitted"
+        ],
+        "artifact_sha256": outcome_artifact["artifact_sha256"],
+        "protocol": outcome_artifact["protocol"],
+        "summary": outcome_artifact["summary"],
+        "arm_rows": harness_outcome_rows,
     }
     holdout_bundle = load_locked_routing_policy_holdout(
         routing_holdout_corpus_path,
@@ -344,6 +415,12 @@ def build_report_evidence_bundle(
             "path": harness_ablations_path.relative_to(REPOSITORY_ROOT).as_posix(),
             "sha256": _sha256_file(harness_ablations_path),
         },
+        "harness_outcome_campaign": {
+            "path": harness_outcome_campaign_path.relative_to(
+                REPOSITORY_ROOT
+            ).as_posix(),
+            "sha256": _sha256_file(harness_outcome_campaign_path),
+        },
         "routing_policy_holdout_corpus": {
             "path": routing_holdout_corpus_path.relative_to(REPOSITORY_ROOT).as_posix(),
             "sha256": _sha256_file(routing_holdout_corpus_path),
@@ -363,6 +440,7 @@ def build_report_evidence_bundle(
         "routing": routing,
         "simulation_coverage": coverage,
         "harness_ablations": harness_ablations,
+        "harness_outcome_campaign": harness_outcome_campaign,
         "routing_policy_holdout": routing_policy_holdout,
     }
     return {
@@ -399,6 +477,7 @@ def write_report_evidence_bundle(
     routing = bundle["routing"]
     coverage = bundle["simulation_coverage"]
     harness_ablations = bundle["harness_ablations"]
+    harness_outcome_campaign = bundle["harness_outcome_campaign"]
     routing_policy_holdout = bundle["routing_policy_holdout"]
     _write_csv(
         csv_directory / "routing_categories.csv",
@@ -415,6 +494,10 @@ def write_report_evidence_bundle(
     _write_csv(
         csv_directory / "harness_contract_ablations.csv",
         harness_ablations["component_rows"],
+    )
+    _write_csv(
+        csv_directory / "harness_fallback_outcomes.csv",
+        harness_outcome_campaign["arm_rows"],
     )
     _write_csv(
         csv_directory / "routing_policy_holdout_categories.csv",
@@ -456,6 +539,11 @@ def _parse_args() -> argparse.Namespace:
         default=DEFAULT_HARNESS_ABLATIONS,
     )
     parser.add_argument(
+        "--harness-outcome-campaign",
+        type=Path,
+        default=DEFAULT_HARNESS_OUTCOME_CAMPAIGN,
+    )
+    parser.add_argument(
         "--routing-holdout-corpus",
         type=Path,
         default=DEFAULT_ROUTING_HOLDOUT_CORPUS,
@@ -480,6 +568,7 @@ def main() -> int:
         routing_predictions_path=args.routing_predictions.resolve(),
         simulation_coverage_path=args.simulation_coverage.resolve(),
         harness_ablations_path=args.harness_ablations.resolve(),
+        harness_outcome_campaign_path=args.harness_outcome_campaign.resolve(),
         routing_holdout_corpus_path=args.routing_holdout_corpus.resolve(),
         routing_holdout_manifest_path=args.routing_holdout_manifest.resolve(),
         routing_holdout_result_path=args.routing_holdout_result.resolve(),

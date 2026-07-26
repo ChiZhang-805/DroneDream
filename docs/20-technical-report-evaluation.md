@@ -52,6 +52,18 @@ source-contract ablation JSON, CSV, and file-hash manifest. Its comparator is
 not a product mode: it intentionally removes one named guard at a time so the
 contract probe can demonstrate what that guard rejects or preserves.
 
+`backend/scripts/evaluate_harness_outcome_campaign.py` runs a separate
+outcome-level fallback-equivalence campaign. It uses temporary SQLite
+databases, `MockSimulatorAdapter`, five fixed seed blocks, and three
+matched-budget arms: direct portfolio, provider-error fallback, and
+invalid-response fallback. It makes no network call and persists no real
+credential. Each arm installs a runtime guard that blocks and counts
+`socket.connect`, `socket.connect_ex`, and `socket.create_connection`; a
+single attempt fails the campaign. The fake clients enter only through an
+in-process test override that is absent from `JobCreateRequest` and cannot be
+submitted through the production API. Its `--check` mode reruns all 15 arms
+before comparing the deterministic JSON, CSV, and SHA-256 manifest.
+
 ## Report modules
 
 1. **Executive abstract and claim ledger** — product scope, strongest verified
@@ -101,7 +113,8 @@ contract probe can demonstrate what that guard rejects or preserves.
 | F9 | Track × scenario robustness heatmap | `PX4_GAZEBO` | experiment required |
 | F10 | Failure/recovery Sankey or stacked bars | `PX4_GAZEBO` | experiment required |
 | F11 | Harness guard ablations (three-line table or grouped bars) | `SOURCE_ABLATION` | exportable now |
-| F12 | Time-to-ready and entry/exit success | `USER_STUDY` or automated UX | experiment required |
+| F12 | Fallback outcome equivalence across five seed blocks | `SYNTHETIC_MOCK` | exportable now |
+| F13 | Time-to-ready and entry/exit success | `USER_STUDY` or automated UX | experiment required |
 | T1 | Claim ledger | all | in progress |
 | T2 | Supported capability matrix | source + Runtime acceptance | in progress |
 | T3 | Experimental arms and budgets | locked protocol | designed |
@@ -181,9 +194,19 @@ model calls, simulator runs, or feedback writebacks. This is
 `POLICY_HOLDOUT`, not an LLM or simulator benchmark; its labels are visible
 after repository publication and must not be described as permanently blind.
 
-The real PX4/Gazebo main table, multi-seed confidence intervals, outcome-level
-Harness ablations, latency/token/cost results, and UX measurements remain
-unfilled until their locked experiments run.
+The deterministic fallback outcome campaign contains 15 complete Job runs
+and 573 persisted Trial executions: five seed blocks multiplied by the direct
+portfolio, provider-error fallback, and invalid-response fallback arms. Both
+fallback arms match the direct portfolio in all 10 blockwise comparisons for
+normalized Candidates, Trials, budget use, winner, holdout loss, failure
+count, and evidence completeness; all arms report 100% evidence completeness.
+This is `SYNTHETIC_MOCK` fallback-equivalence evidence only. It is not LLM
+superiority, causal Harness benefit, PX4/Gazebo performance, or flight
+evidence.
+
+The real PX4/Gazebo main table, broader component-level outcome ablations,
+multi-seed physical confidence intervals, latency/token/cost results, and UX
+measurements remain unfilled until their locked experiments run.
 
 ## Reproduction
 
@@ -195,6 +218,13 @@ backend\.venv\Scripts\python.exe `
 
 backend\.venv\Scripts\python.exe `
   backend\scripts\evaluate_harness_ablations.py `
+  --check
+
+backend\.venv\Scripts\python.exe `
+  backend\scripts\evaluate_harness_outcome_campaign.py
+
+backend\.venv\Scripts\python.exe `
+  backend\scripts\evaluate_harness_outcome_campaign.py `
   --check
 
 backend\.venv\Scripts\python.exe `

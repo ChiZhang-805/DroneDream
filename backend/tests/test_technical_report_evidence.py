@@ -53,6 +53,34 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     assert ablations["summary"]["full_contract_correct_count"] == 20
     assert ablations["summary"]["ablated_contract_correct_count"] == 6
 
+    outcome_campaign = first["harness_outcome_campaign"]
+    assert outcome_campaign["evidence_class"] == "synthetic_mock_campaign"
+    assert outcome_campaign["claim_label"] == "SYNTHETIC_MOCK"
+    assert outcome_campaign["physical_fidelity"] is False
+    assert outcome_campaign["simulator_backend"] == "mock"
+    assert outcome_campaign["live_model_calls"] is False
+    assert outcome_campaign["network_calls"] == 0
+    assert outcome_campaign["network_connect_guard_enforced"] is True
+    assert outcome_campaign["real_credentials_used"] is False
+    assert outcome_campaign["llm_superiority_claim_permitted"] is False
+    assert outcome_campaign["harness_causal_benefit_claim_permitted"] is False
+    assert outcome_campaign["px4_or_flight_claim_permitted"] is False
+    assert outcome_campaign["summary"] == {
+        "seed_block_count": 5,
+        "arm_run_count": 15,
+        "total_persisted_trials": 573,
+        "fallback_comparison_count": 10,
+        "exact_outcome_match_count": 10,
+        "all_fallback_outcomes_match_direct_portfolio": True,
+        "all_evidence_complete": True,
+    }
+    assert len(outcome_campaign["arm_rows"]) == 15
+    assert all(
+        row["exact_match_to_direct_portfolio"] is True
+        and row["evidence_completeness_rate"] == 1.0
+        for row in outcome_campaign["arm_rows"]
+    )
+
     holdout = first["routing_policy_holdout"]
     assert holdout["evidence_class"] == "deterministic_router_policy_holdout"
     assert holdout["corpus_role"] == "locked_holdout"
@@ -121,6 +149,17 @@ def test_report_evidence_writes_chart_ready_csv(tmp_path: Path) -> None:
     assert {row["component"] for row in ablation_rows} == {
         row["component"] for row in bundle["harness_ablations"]["component_rows"]
     }
+    with (csv_directory / "harness_fallback_outcomes.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        outcome_rows = list(csv.DictReader(handle))
+    assert len(outcome_rows) == 15
+    assert all(
+        row["exact_match_to_direct_portfolio"] == "True"
+        and float(row["evidence_completeness_rate"]) == 1.0
+        for row in outcome_rows
+    )
     with (csv_directory / "routing_policy_holdout_categories.csv").open(
         encoding="utf-8",
         newline="",

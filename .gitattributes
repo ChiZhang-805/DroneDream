@@ -15,6 +15,7 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 backend/evaluation_artifacts/*.csv text eol=lf
+backend/evaluation_artifacts/*.sha256 text eol=lf
 *.rs text eol=lf
 *.nsh text eol=lf
 *.sh text eol=lf

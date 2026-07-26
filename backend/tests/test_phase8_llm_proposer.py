@@ -1285,10 +1285,14 @@ def test_harness_prompt_excludes_infrastructure_invalid_and_holdout_failures(
             ctx["models"].Trial(
                 job_id=job_id,
                 candidate_id=candidate.id,
-                seed=1,
+                seed=101,
+                scenario_type="nominal",
                 status="FAILED",
                 failure_code="SIMULATION_FAILED",
-                scenario_config_json={"holdout": False},
+                scenario_config_json={
+                    "scenario_case_id": "nominal",
+                    "holdout": False,
+                },
             )
         )
         db.flush()
@@ -1296,21 +1300,25 @@ def test_harness_prompt_excludes_infrastructure_invalid_and_holdout_failures(
         domain_snapshot, _ = ctx["decision_harness"].build_harness_evidence(job)
         domain_messages = ctx["decision_harness"].build_decision_messages(domain_snapshot)
 
-        for seed, failure_code, holdout in (
-            (2, "ADAPTER_UNAVAILABLE", False),
-            (3, "UNVERIFIED_SIMULATOR_FAILURE", False),
-            (4, "SIMULATION_FAILED", True),
+        for seed, scenario_type, case_id, failure_code, holdout in (
+            (202, "noise_perturbed", "sensor-noise", "ADAPTER_UNAVAILABLE", False),
+            (303, "wind_perturbed", "wind", "UNVERIFIED_SIMULATOR_FAILURE", False),
+            (404, "combined_perturbed", "combined", "SIMULATION_FAILED", True),
         ):
             db.add(
                 ctx["models"].Trial(
                     job_id=job_id,
                     candidate_id=candidate.id,
                     seed=seed,
+                    scenario_type=scenario_type,
                     status="FAILED",
                     failure_code=failure_code,
-                    scenario_config_json={"holdout": holdout},
+                    scenario_config_json={
+                        "scenario_case_id": case_id,
+                        "holdout": holdout,
+                    },
                 )
-                )
+            )
         db.flush()
         db.expire(candidate, ["trials"])
         excluded_snapshot, _ = ctx["decision_harness"].build_harness_evidence(job)
@@ -1320,10 +1328,14 @@ def test_harness_prompt_excludes_infrastructure_invalid_and_holdout_failures(
             ctx["models"].Trial(
                 job_id=job_id,
                 candidate_id=candidate.id,
-                seed=5,
+                seed=101,
+                scenario_type="nominal",
                 status="FAILED",
                 failure_code="UNSTABLE_CANDIDATE",
-                scenario_config_json={"holdout": False},
+                scenario_config_json={
+                    "scenario_case_id": "nominal",
+                    "holdout": False,
+                },
             )
         )
         db.flush()
@@ -1557,6 +1569,24 @@ def test_create_job_rejects_harness_without_api_key(llm_ctx):
         with pytest.raises(jobs_service.JobServiceError) as exc:
             jobs_service.create_job(db, req)
         assert exc.value.code == "INVALID_INPUT"
+
+
+def test_create_harness_job_persists_default_outcome_contract_inputs(llm_ctx):
+    ctx = llm_ctx
+    schemas = ctx["schemas"]
+    jobs_service = ctx["jobs_service"]
+    db_module = ctx["db_module"]
+
+    req = schemas.JobCreateRequest(
+        optimizer_strategy="llm_harness",
+        openai=schemas.OpenAIConfig(api_key="sk-contract-persistence-test"),
+    )
+    with db_module.SessionLocal() as db:
+        job = jobs_service.create_job(db, req)
+
+        assert job.optimizer_strategy == "llm_harness"
+        assert job.objective_config_json == req.objective_config.model_dump(mode="json")
+        assert job.scenario_suite_json == req.scenario_suite.model_dump(mode="json")
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -305,13 +305,22 @@ def _create_job_from_config(
             http_status=422,
         ) from exc
     now = _now()
-    experimental_optimizer = req.optimizer_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES
+    # ``llm_harness`` is a bounded router over the experimental optimizers.
+    # Persist the same default objective/scenario contracts as a direct
+    # experimental strategy; otherwise a deterministic fallback can select
+    # the same tool while silently evaluating it under the legacy aggregate.
+    evidence_gated_optimizer = (
+        req.optimizer_strategy == "llm_harness"
+        or req.optimizer_strategy in EXPERIMENTAL_OPTIMIZER_STRATEGIES
+    )
     if persist_objective_config is None:
         persist_objective_config = (
-            "objective_config" in req.model_fields_set or experimental_optimizer
+            "objective_config" in req.model_fields_set or evidence_gated_optimizer
         )
     if persist_scenario_suite is None:
-        persist_scenario_suite = "scenario_suite" in req.model_fields_set or experimental_optimizer
+        persist_scenario_suite = (
+            "scenario_suite" in req.model_fields_set or evidence_gated_optimizer
+        )
     settings = get_settings()
     platform_access = req.llm is not None and req.llm.access_mode == "platform"
     if req.llm is not None:
