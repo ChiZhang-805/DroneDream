@@ -15,6 +15,9 @@ from typing import Any
 
 from app import models
 from app.optimization.outcome_contract import compile_job_outcome_contract
+from app.optimization.outcome_evidence import (
+    require_authoritative_candidate_report_projection,
+)
 from app.orchestration.constants import BASELINE_PARAMETERS, PARAMETER_SAFE_RANGES, SCORE_WEIGHTS
 
 _SAFE_ENV_ALLOWLIST: tuple[str, ...] = (
@@ -158,19 +161,26 @@ def sanitize_payload(payload: Any) -> Any:
 
 def _candidate_summaries(job: models.Job) -> list[dict[str, Any]]:
     rows = sorted(job.candidates, key=lambda c: (c.generation_index, c.created_at))
-    return [
-        {
-            "id": c.id,
-            "label": c.label,
-            "generation": c.generation_index,
-            "source": c.source_type,
-            "parameters": sanitize_payload(c.parameter_json),
-            "aggregated_score": c.aggregated_score,
-            "aggregated_feedback": sanitize_payload(c.aggregated_metric_json),
-            "optimizer_metadata": sanitize_payload(c.optimizer_metadata_json),
-        }
-        for c in rows
-    ]
+    summaries: list[dict[str, Any]] = []
+    for candidate in rows:
+        aggregate = require_authoritative_candidate_report_projection(
+            candidate
+        )
+        summaries.append(
+            {
+                "id": candidate.id,
+                "label": candidate.label,
+                "generation": candidate.generation_index,
+                "source": candidate.source_type,
+                "parameters": sanitize_payload(candidate.parameter_json),
+                "aggregated_score": aggregate.get("aggregated_score"),
+                "aggregated_feedback": sanitize_payload(aggregate),
+                "optimizer_metadata": sanitize_payload(
+                    candidate.optimizer_metadata_json
+                ),
+            }
+        )
+    return summaries
 
 
 def _trial_summaries(job: models.Job) -> list[dict[str, Any]]:
@@ -198,6 +208,8 @@ def _trial_summaries(job: models.Job) -> list[dict[str, Any]]:
 
 def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet) -> dict[str, Any]:
     git = _git_info()
+    best_aggregate = require_authoritative_candidate_report_projection(best)
+    candidate_summaries = _candidate_summaries(job)
     outcome_contract = compile_job_outcome_contract(
         job,
         failed_trial_weight=SCORE_WEIGHTS["failed_trial"],
@@ -279,11 +291,11 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
                 "label": best.label,
                 "generation_index": best.generation_index,
                 "source_type": best.source_type,
-                "aggregated_score": best.aggregated_score,
+                "aggregated_score": best_aggregate.get("aggregated_score"),
                 "optimizer_metadata": sanitize_payload(best.optimizer_metadata_json),
             },
             "best_parameters": sanitize_payload(dict(best.parameter_json or {})),
-            "candidate_summaries": _candidate_summaries(job),
+            "candidate_summaries": candidate_summaries,
         },
         "simulator": {
             "real_simulator_command": _hash_or_redact_command(real_command),

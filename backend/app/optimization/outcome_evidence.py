@@ -22,6 +22,7 @@ from app.optimization.outcome_taxonomy import (
 )
 
 CANDIDATE_OUTCOME_EVIDENCE_SCHEMA = "dronedream.candidate-outcome-evidence/v1"
+CANDIDATE_REPORT_EVIDENCE_SCHEMA = "dronedream.candidate-report-evidence/v1"
 
 FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
 NonnegativeFloat = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
@@ -88,6 +89,37 @@ class CandidateOutcomeEvidenceV1(_FrozenModel):
     scalar_loss: FiniteFloat
     selection_key: CandidateSelectionKeyV1
     acceptance_projection: CandidateAcceptanceProjectionV1
+
+
+class CandidateReportProjectionV1(_FrozenModel):
+    schema_id: Literal["dronedream.candidate-report-projection/v1"] = (
+        "dronedream.candidate-report-projection/v1"
+    )
+    rmse: NonnegativeFloat
+    max_error: NonnegativeFloat
+    max_error_mean: NonnegativeFloat
+    max_error_worst: NonnegativeFloat
+    overshoot_count: NonnegativeInt
+    completion_time: NonnegativeFloat
+    score: FiniteFloat
+    aggregated_score: FiniteFloat
+    completion_rate: Rate
+    failure_rate: Rate
+    pass_rate: Rate
+
+
+class CandidateReportEvidenceV1(_FrozenModel):
+    schema_id: Literal["dronedream.candidate-report-evidence/v1"] = (
+        "dronedream.candidate-report-evidence/v1"
+    )
+    evidence_id: Sha256Id
+    candidate_outcome_evidence_id: Sha256Id
+    report_trial_evidence_sha256: Sha256Id
+    projection: CandidateReportProjectionV1
+
+
+class CandidateReportEvidenceError(ValueError):
+    """Raised when a required Candidate report projection does not verify."""
 
 
 def _canonical_json(value: object) -> str:
@@ -237,6 +269,32 @@ def candidate_training_trial_evidence_rows(
     )
 
 
+def candidate_report_trial_evidence_rows(
+    candidate: object,
+) -> tuple[dict[str, Any], ...] | None:
+    """Return every current Trial row used by final report artifacts."""
+
+    try:
+        raw_trials = candidate.trials  # type: ignore[attr-defined]
+        trials = list(raw_trials)
+    except Exception:  # pragma: no cover - detached/lazy ORM state fails closed
+        return None
+    try:
+        rows = [trial_outcome_evidence_row(trial) for trial in trials]
+    except Exception:  # pragma: no cover - malformed ORM evidence fails closed
+        return None
+    return tuple(
+        sorted(
+            rows,
+            key=lambda row: (
+                str(row["scenario_type"]),
+                int(row["seed"]),
+                str(row["trial_id"]),
+            ),
+        )
+    )
+
+
 def compile_candidate_outcome_evidence(
     *,
     outcome_contract_id: str,
@@ -347,6 +405,92 @@ def compile_candidate_outcome_evidence(
     )
 
 
+def compile_candidate_report_evidence(
+    *,
+    candidate_outcome_evidence: object,
+    report_trial_evidence_rows: Sequence[Mapping[str, Any]],
+    aggregate: Mapping[str, Any],
+) -> CandidateReportEvidenceV1:
+    """Compile immutable report metrics from one verified outcome projection."""
+
+    outcome_evidence = verify_candidate_outcome_evidence(
+        candidate_outcome_evidence
+    )
+    if outcome_evidence is None:
+        raise ValueError("candidate report evidence requires valid outcome evidence")
+    max_error = _finite_number(
+        aggregate.get("max_error"),
+        field_name="max_error",
+    )
+    projection = CandidateReportProjectionV1(
+        rmse=_finite_number(aggregate.get("rmse"), field_name="rmse"),
+        max_error=max_error,
+        max_error_mean=_finite_number(
+            aggregate.get("max_error_mean", max_error),
+            field_name="max_error_mean",
+        ),
+        max_error_worst=_finite_number(
+            aggregate.get("max_error_worst", max_error),
+            field_name="max_error_worst",
+        ),
+        overshoot_count=_nonnegative_int(
+            aggregate.get("overshoot_count"),
+            field_name="overshoot_count",
+        ),
+        completion_time=_finite_number(
+            aggregate.get("completion_time"),
+            field_name="completion_time",
+        ),
+        score=_finite_number(aggregate.get("score"), field_name="score"),
+        aggregated_score=_finite_number(
+            aggregate.get("aggregated_score"),
+            field_name="aggregated_score",
+        ),
+        completion_rate=_finite_number(
+            aggregate.get("completion_rate"),
+            field_name="completion_rate",
+        ),
+        failure_rate=_finite_number(
+            aggregate.get("failure_rate"),
+            field_name="failure_rate",
+        ),
+        pass_rate=_finite_number(
+            aggregate.get("pass_rate"),
+            field_name="pass_rate",
+        ),
+    )
+    payload = {
+        "schema_id": CANDIDATE_REPORT_EVIDENCE_SCHEMA,
+        "candidate_outcome_evidence_id": outcome_evidence.evidence_id,
+        "report_trial_evidence_sha256": _sha256_id(
+            list(report_trial_evidence_rows)
+        ),
+        "projection": projection.model_dump(mode="json"),
+    }
+    return CandidateReportEvidenceV1.model_validate(
+        {
+            "evidence_id": _sha256_id(payload),
+            **payload,
+        }
+    )
+
+
+def verify_candidate_report_evidence(
+    value: object,
+) -> CandidateReportEvidenceV1 | None:
+    """Return parsed report evidence only when its content hash verifies."""
+
+    try:
+        evidence = CandidateReportEvidenceV1.model_validate(value)
+    except ValidationError:
+        return None
+    payload = evidence.model_dump(mode="json")
+    evidence_id = payload.pop("evidence_id")
+    if evidence_id != _sha256_id(payload):
+        return None
+    return evidence
+
+
 def verify_candidate_outcome_evidence(
     value: object,
 ) -> CandidateOutcomeEvidenceV1 | None:
@@ -367,6 +511,13 @@ def candidate_outcome_evidence_required(aggregate: object) -> bool:
     return isinstance(aggregate, dict) and (
         "candidate_outcome_evidence" in aggregate
         or aggregate.get("candidate_outcome_evidence_required") is True
+    )
+
+
+def candidate_report_evidence_required(aggregate: object) -> bool:
+    return isinstance(aggregate, dict) and (
+        "candidate_report_evidence" in aggregate
+        or aggregate.get("candidate_report_evidence_required") is True
     )
 
 
@@ -520,18 +671,124 @@ def authoritative_candidate_trial_outcome_projection(
     return projection
 
 
+def authoritative_candidate_report_projection(
+    *,
+    candidate_id: object,
+    generation_index: object,
+    parameter_snapshot: object,
+    trial_evidence_rows: object,
+    report_trial_evidence_rows: object,
+    aggregate: object,
+) -> dict[str, Any]:
+    """Resolve report fields only from a verified Candidate-bound projection."""
+
+    outcome_projection = authoritative_candidate_trial_outcome_projection(
+        candidate_id=candidate_id,
+        generation_index=generation_index,
+        parameter_snapshot=parameter_snapshot,
+        trial_evidence_rows=trial_evidence_rows,
+        aggregate=aggregate,
+    )
+    report_required = candidate_report_evidence_required(aggregate)
+    if not report_required:
+        if candidate_outcome_evidence_required(aggregate) and not outcome_projection:
+            return {}
+        return dict(aggregate) if isinstance(aggregate, Mapping) else {}
+    if not outcome_projection or not isinstance(aggregate, Mapping):
+        return {}
+    if (
+        isinstance(report_trial_evidence_rows, str | bytes)
+        or not isinstance(report_trial_evidence_rows, Sequence)
+        or any(
+            not isinstance(row, Mapping)
+            for row in report_trial_evidence_rows
+        )
+    ):
+        return {}
+    report_evidence = verify_candidate_report_evidence(
+        aggregate.get("candidate_report_evidence")
+    )
+    if (
+        report_evidence is None
+        or report_evidence.candidate_outcome_evidence_id
+        != outcome_projection.get("candidate_outcome_evidence_id")
+    ):
+        return {}
+    try:
+        current_report_trial_sha256 = _sha256_id(
+            list(report_trial_evidence_rows)
+        )
+    except (TypeError, ValueError):
+        return {}
+    if (
+        current_report_trial_sha256
+        != report_evidence.report_trial_evidence_sha256
+    ):
+        return {}
+    projection = report_evidence.projection.model_dump(mode="json")
+    projection["candidate_report_evidence_id"] = report_evidence.evidence_id
+    projection["candidate_outcome_evidence_id"] = (
+        report_evidence.candidate_outcome_evidence_id
+    )
+    if "holdout" in outcome_projection:
+        projection["holdout"] = outcome_projection["holdout"]
+    return projection
+
+
+def require_authoritative_candidate_report_projection(
+    candidate: object,
+    aggregate: object | None = None,
+) -> dict[str, Any]:
+    """Resolve one ORM-like Candidate and reject invalid required evidence."""
+
+    raw_aggregate = (
+        aggregate
+        if aggregate is not None
+        else getattr(candidate, "aggregated_metric_json", None)
+    )
+    projection = authoritative_candidate_report_projection(
+        candidate_id=getattr(candidate, "id", None),
+        generation_index=getattr(candidate, "generation_index", None),
+        parameter_snapshot=getattr(candidate, "parameter_json", None),
+        trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
+        report_trial_evidence_rows=candidate_report_trial_evidence_rows(
+            candidate
+        ),
+        aggregate=raw_aggregate,
+    )
+    if (
+        candidate_outcome_evidence_required(raw_aggregate)
+        or candidate_report_evidence_required(raw_aggregate)
+    ) and not projection:
+        raise CandidateReportEvidenceError(
+            "required Candidate report evidence does not match current "
+            "Candidate or Trial evidence"
+        )
+    return projection
+
+
 __all__ = [
     "CANDIDATE_OUTCOME_EVIDENCE_SCHEMA",
+    "CANDIDATE_REPORT_EVIDENCE_SCHEMA",
     "CandidateAcceptanceProjectionV1",
     "CandidateOutcomeEvidenceV1",
+    "CandidateReportEvidenceError",
+    "CandidateReportEvidenceV1",
+    "CandidateReportProjectionV1",
     "CandidateSelectionKeyV1",
+    "authoritative_candidate_report_projection",
     "authoritative_candidate_outcome_projection",
     "authoritative_candidate_trial_outcome_projection",
     "authoritative_outcome_projection",
+    "candidate_report_trial_evidence_rows",
     "candidate_training_trial_evidence_rows",
     "candidate_outcome_evidence_required",
+    "candidate_report_evidence_required",
     "compile_candidate_outcome_evidence",
+    "compile_candidate_report_evidence",
+    "require_authoritative_candidate_report_projection",
     "trial_is_holdout",
     "trial_outcome_evidence_row",
     "verify_candidate_outcome_evidence",
+    "verify_candidate_report_evidence",
 ]

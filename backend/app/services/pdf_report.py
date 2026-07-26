@@ -11,6 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
 from app import models
+from app.optimization.outcome_evidence import (
+    require_authoritative_candidate_report_projection,
+)
 from app.orchestration.acceptance import criteria_for_job, evaluate_candidate
 
 _SECRET_TOKENS = (
@@ -259,10 +262,16 @@ def build_job_report_lines(job: models.Job) -> list[str]:
 
     baseline = next((c for c in job.candidates if c.id == job.baseline_candidate_id), None)
     baseline_agg = {}
-    if baseline is not None and baseline.aggregated_metric_json is not None:
-        baseline_agg = baseline.aggregated_metric_json
+    if baseline is not None:
+        baseline_agg = require_authoritative_candidate_report_projection(
+            baseline
+        )
     best = next((c for c in job.candidates if c.id == job.best_candidate_id), None)
-    best_agg = (best.aggregated_metric_json or {}) if best is not None else {}
+    best_agg = (
+        require_authoritative_candidate_report_projection(best)
+        if best is not None
+        else {}
+    )
 
     add("")
     add("2) Executive summary")
@@ -398,7 +407,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         key=lambda item: (item.generation_index, item.created_at),
     )
     for candidate in sorted_candidates:
-        agg = candidate.aggregated_metric_json or {}
+        agg = require_authoritative_candidate_report_projection(candidate)
         params = candidate.parameter_json or {}
         is_base = "yes" if candidate.is_baseline else "no"
         header = (

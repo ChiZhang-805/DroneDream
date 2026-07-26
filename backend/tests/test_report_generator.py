@@ -87,7 +87,11 @@ def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     config_module.get_settings.cache_clear()
 
 
-def _run_job_to_completion(ctx: dict[str, object]) -> str:
+def _run_job_to_completion(
+    ctx: dict[str, object],
+    *,
+    optimizer_strategy: str = "heuristic",
+) -> str:
     """Create a job and drain every trial until the runner finalises it."""
 
     schemas = ctx["schemas"]
@@ -96,9 +100,19 @@ def _run_job_to_completion(ctx: dict[str, object]) -> str:
     models = ctx["models"]
     runner = ctx["runner"]
 
+    request_kwargs: dict[str, object] = {}
+    if optimizer_strategy != "heuristic":
+        request_kwargs.update(
+            {
+                "max_iterations": 2,
+                "trials_per_candidate": 1,
+                "max_total_trials": 17,
+            }
+        )
     req = schemas.JobCreateRequest(
-        optimizer_strategy="heuristic",
+        optimizer_strategy=optimizer_strategy,
         simulator_backend="mock",
+        **request_kwargs,
     )
     with db_module.SessionLocal() as db:
         job_id = jobs_service.create_job(db, req).id
@@ -139,6 +153,67 @@ def test_summary_text_covers_baseline_and_optimized(ctx):
         "No failure or instability flags" in text
         or "Watch-outs" in text
     )
+
+
+def test_bound_report_projection_ignores_compatibility_fields_and_fails_closed(
+    ctx,
+):
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    rg = ctx["report_generator"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        best = next(
+            candidate
+            for candidate in job.candidates
+            if candidate.id == job.best_candidate_id
+        )
+        aggregate = json.loads(
+            json.dumps(best.aggregated_metric_json)
+        )
+        expected_rmse = aggregate["candidate_report_evidence"]["projection"][
+            "rmse"
+        ]
+        aggregate["rmse"] = 999.0
+        assert rg._authoritative_report_aggregate(  # noqa: SLF001
+            best,
+            aggregate,
+        )["rmse"] == pytest.approx(expected_rmse)
+
+        aggregate["candidate_report_evidence"]["projection"]["rmse"] = 999.0
+        with pytest.raises(rg.ReportEvidenceError):
+            rg._authoritative_report_aggregate(best, aggregate)  # noqa: SLF001
+
+        baseline = next(
+            candidate
+            for candidate in job.candidates
+            if candidate.id == job.baseline_candidate_id
+        )
+        nonwinner = next(
+            candidate
+            for candidate in job.candidates
+            if candidate.id not in {baseline.id, best.id}
+            and "candidate_report_evidence"
+            in (candidate.aggregated_metric_json or {})
+        )
+        nonwinner_aggregate = json.loads(
+            json.dumps(nonwinner.aggregated_metric_json)
+        )
+        nonwinner_aggregate["candidate_report_evidence"]["projection"][
+            "rmse"
+        ] = 999.0
+        nonwinner.aggregated_metric_json = nonwinner_aggregate
+        with pytest.raises(rg.ReportEvidenceError):
+            rg.generate_and_persist_report(
+                db,
+                job=job,
+                best=best,
+                baseline_agg=baseline.aggregated_metric_json,
+                best_agg=best.aggregated_metric_json,
+            )
 
 
 def test_summary_text_reports_tradeoff_when_optimized_slower(ctx):
@@ -794,7 +869,10 @@ def test_generate_job_pdf_report_excludes_secret_values(ctx, tmp_path):
 
 
 def test_repro_manifest_generated_for_mock_job(ctx):
-    job_id = _run_job_to_completion(ctx)
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         assert job is not None
@@ -819,6 +897,10 @@ def test_repro_manifest_generated_for_mock_job(ctx):
         candidate_summary = payload["optimizer"]["candidate_summaries"][0]
         assert "parameters" in candidate_summary
         assert "aggregated_feedback" in candidate_summary
+        assert (
+            "candidate_report_evidence_id"
+            in candidate_summary["aggregated_feedback"]
+        )
 
 
 def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):

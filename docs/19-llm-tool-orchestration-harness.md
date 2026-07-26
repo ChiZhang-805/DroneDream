@@ -8260,7 +8260,7 @@ publishability, iterative acceptance, and numerical optimizer observations
 prefer this projection and fail closed when its schema/hash or bound holdout
 does not verify. Legacy aggregates without the field remain readable. This is
 explicitly a migration-safe embedded compatibility layer, not yet the target
-append-only relational evidence table or the final unified portfolio/report
+append-only relational evidence table or the final unified portfolio
 projection.
 
 Outcome Contract compiler 1.8 seals reduced-fidelity case coverage. Screening
@@ -8324,13 +8324,28 @@ or execution identity after aggregation therefore fails closed. This embedded
 compatibility layer still does not replace immutable physical-attempt and
 artifact-digest tables.
 
+Outcome Contract compiler 2.4 adds
+`dronedream.candidate-report-evidence/v1` and
+`all_candidate_trial_rows_sha256`. Report-facing RMSE, maximum-error,
+overshoot, completion-time, score, and reliability fields are compiled into a
+content-addressed projection linked to the verified Candidate outcome evidence.
+The report envelope also hashes every current Trial row for that Candidate,
+including holdout rows; holdout evidence remains unavailable to adaptive
+proposal and routing paths. JobReport, real-runtime candidate summaries,
+reproducibility manifests, and PDF reports ignore mutable compatibility values
+and consume this projection. A Candidate/Trial/projection mismatch refuses the
+affected report or artifact instead of silently exporting divergent results.
+Legacy aggregates remain readable. The envelope is still an embedded migration
+layer, not the target append-only physical-attempt, artifact-digest, winner,
+and routing-evidence ledger.
+
 Current focused validation:
 
 ```text
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-815 passed
+816 passed
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 

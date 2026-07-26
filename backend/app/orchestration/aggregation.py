@@ -46,8 +46,10 @@ from app.optimization.outcome_contract import (
 from app.optimization.outcome_evidence import (
     authoritative_candidate_trial_outcome_projection,
     candidate_outcome_evidence_required,
+    candidate_report_trial_evidence_rows,
     candidate_training_trial_evidence_rows,
     compile_candidate_outcome_evidence,
+    compile_candidate_report_evidence,
     trial_is_holdout,
     trial_outcome_evidence_row,
 )
@@ -1151,6 +1153,22 @@ def _aggregate_candidate(
             )
             agg["candidate_outcome_evidence_required"] = True
             agg["candidate_outcome_evidence"] = evidence.model_dump(mode="json")
+            report_trial_rows = candidate_report_trial_evidence_rows(
+                candidate
+            )
+            if report_trial_rows is None:
+                raise ValueError(
+                    "candidate report evidence requires readable Trial rows"
+                )
+            report_evidence = compile_candidate_report_evidence(
+                candidate_outcome_evidence=evidence.model_dump(mode="json"),
+                report_trial_evidence_rows=report_trial_rows,
+                aggregate=agg,
+            )
+            agg["candidate_report_evidence_required"] = True
+            agg["candidate_report_evidence"] = report_evidence.model_dump(
+                mode="json"
+            )
     candidate.aggregated_metric_json = agg
     candidate.aggregated_score = aggregated_score
     return agg
@@ -1333,13 +1351,25 @@ def finalize_job_if_ready(
 
     job.best_candidate_id = best.id
 
-    report_generator.generate_and_persist_report(
-        db,
-        job=job,
-        best=best,
-        baseline_agg=baseline_agg,
-        best_agg=best.aggregated_metric_json,
-    )
+    try:
+        report_generator.generate_and_persist_report(
+            db,
+            job=job,
+            best=best,
+            baseline_agg=baseline_agg,
+            best_agg=best.aggregated_metric_json,
+        )
+    except report_generator.ReportEvidenceError:
+        _fail_job(
+            db,
+            job,
+            code="REPORT_EVIDENCE_INVALID",
+            message=(
+                "One or more Candidate report envelopes no longer match "
+                "current Candidate/Trial evidence; refusing to publish."
+            ),
+        )
+        return True
 
     if _job_is_cancelled(job.id):
         db.rollback()

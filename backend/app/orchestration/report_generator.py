@@ -25,6 +25,11 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.config import get_settings
+from app.optimization.outcome_evidence import (
+    CandidateReportEvidenceError,
+    require_authoritative_candidate_report_projection,
+    trial_is_holdout,
+)
 from app.orchestration.events import record_event
 from app.orchestration.repro_manifest import build_repro_manifest, sanitize_payload
 from app.services.pdf_report import generate_job_pdf_report
@@ -32,6 +37,27 @@ from app.storage import get_artifact_storage
 from app.storage.registration import guard_artifact_registration
 
 logger = logging.getLogger("drone_dream.orchestration.report_generator")
+
+
+class ReportEvidenceError(RuntimeError):
+    """Raised when a required bound report projection does not verify."""
+
+
+def _authoritative_report_aggregate(
+    candidate: models.CandidateParameterSet,
+    aggregate: object,
+) -> dict[str, Any]:
+    try:
+        projection = require_authoritative_candidate_report_projection(
+            candidate,
+            aggregate,
+        )
+    except CandidateReportEvidenceError as exc:
+        raise ReportEvidenceError(str(exc)) from exc
+    if not projection:
+        raise ReportEvidenceError("Candidate report aggregate is missing")
+    return projection
+
 
 # --- Comparison point helpers ---------------------------------------------
 
@@ -419,24 +445,41 @@ def ensure_real_job_artifacts(
         "comparison": report_body["comparison_metric_json"],
         "best_parameters": report_body["best_parameter_json"],
     }
-    candidate_summary = [
-        {
-            "candidate_id": c.id,
-            "label": c.label,
-            "is_baseline": c.is_baseline,
-            "is_best": c.is_best,
-            "source_type": c.source_type,
-            "generation_index": c.generation_index,
-            "aggregated_score": c.aggregated_score,
-            "aggregated_metrics": sanitize_payload(c.aggregated_metric_json),
-            "trial_count": c.trial_count,
-            "completed_trial_count": c.completed_trial_count,
-            "failed_trial_count": c.failed_trial_count,
-            "rank_in_job": c.rank_in_job,
-            "parameter_json": sanitize_payload(dict(c.parameter_json or {})),
-        }
-        for c in job.candidates
-    ]
+    candidate_summary: list[dict[str, Any]] = []
+    for candidate in job.candidates:
+        aggregate = (
+            _authoritative_report_aggregate(
+                candidate,
+                candidate.aggregated_metric_json,
+            )
+            if candidate.aggregated_metric_json is not None
+            else {}
+        )
+        candidate_trials = list(candidate.trials)
+        candidate_summary.append(
+            {
+                "candidate_id": candidate.id,
+                "label": candidate.label,
+                "is_baseline": candidate.is_baseline,
+                "is_best": candidate.is_best,
+                "source_type": candidate.source_type,
+                "generation_index": candidate.generation_index,
+                "aggregated_score": aggregate.get("aggregated_score"),
+                "aggregated_metrics": sanitize_payload(aggregate),
+                "trial_count": len(candidate_trials),
+                "completed_trial_count": sum(
+                    trial.status == "COMPLETED"
+                    for trial in candidate_trials
+                ),
+                "failed_trial_count": sum(
+                    trial.status == "FAILED" for trial in candidate_trials
+                ),
+                "rank_in_job": candidate.rank_in_job,
+                "parameter_json": sanitize_payload(
+                    dict(candidate.parameter_json or {})
+                ),
+            }
+        )
     trial_ids = [t.id for t in job.trials]
     trial_artifact_rows = (
         db.scalars(
@@ -711,8 +754,46 @@ def generate_and_persist_report(
     logic is easy to reason about in isolation.
     """
 
-    baseline_trials = [t for t in job.trials if t.candidate_id == (job.baseline_candidate_id or "")]
-    best_trials = [t for t in job.trials if t.candidate_id == best.id]
+    baseline = next(
+        (
+            candidate
+            for candidate in job.candidates
+            if candidate.id == (job.baseline_candidate_id or "")
+        ),
+        None,
+    )
+    if baseline is None:
+        raise ReportEvidenceError("baseline Candidate is missing")
+    verified_aggregates = {
+        candidate.id: _authoritative_report_aggregate(
+            candidate,
+            candidate.aggregated_metric_json,
+        )
+        for candidate in job.candidates
+        if candidate.aggregated_metric_json is not None
+    }
+    baseline_agg = verified_aggregates.get(
+        baseline.id
+    ) or _authoritative_report_aggregate(baseline, baseline_agg)
+    best_agg = verified_aggregates.get(
+        best.id
+    ) or _authoritative_report_aggregate(best, best_agg)
+    try:
+        baseline_trials = [
+            t
+            for t in job.trials
+            if t.candidate_id == (job.baseline_candidate_id or "")
+            and not trial_is_holdout(t)
+        ]
+        best_trials = [
+            t
+            for t in job.trials
+            if t.candidate_id == best.id and not trial_is_holdout(t)
+        ]
+    except ValueError as exc:
+        raise ReportEvidenceError(
+            "Candidate Trial role is malformed; refusing to publish a report"
+        ) from exc
 
     body = build_report_body(
         best=best,
@@ -753,6 +834,7 @@ def generate_and_persist_report(
 
 
 __all__ = [
+    "ReportEvidenceError",
     "build_report_body",
     "ensure_job_artifacts",
     "ensure_mock_job_artifacts",

@@ -17,11 +17,14 @@ from app.optimization.outcome_contract import (
 )
 from app.optimization.outcome_evidence import (
     authoritative_candidate_outcome_projection,
+    authoritative_candidate_report_projection,
     authoritative_candidate_trial_outcome_projection,
     authoritative_outcome_projection,
     compile_candidate_outcome_evidence,
+    compile_candidate_report_evidence,
     trial_is_holdout,
     verify_candidate_outcome_evidence,
+    verify_candidate_report_evidence,
 )
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import aggregate_metric, evaluate_candidate
@@ -242,7 +245,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "2.3"
+    assert first.compiler_version == "2.4"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -280,6 +283,14 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert (
         first.selection_policy.candidate_outcome_trial_binding_policy
         == "canonical_training_trial_rows_sha256"
+    )
+    assert (
+        first.selection_policy.candidate_report_projection_policy
+        == "content_addressed_candidate_outcome_bound_v1"
+    )
+    assert (
+        first.selection_policy.candidate_report_trial_binding_policy
+        == "all_candidate_trial_rows_sha256"
     )
     assert (
         first.selection_policy.portfolio_source_schema
@@ -389,6 +400,17 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
         "acceptance_max_error": 0.8,
         "acceptance_pass_rate": 1.0,
         "acceptance_completion_rate": 1.0,
+        "rmse": 0.4,
+        "max_error": 0.6,
+        "max_error_mean": 0.6,
+        "max_error_worst": 0.8,
+        "overshoot_count": 0,
+        "completion_time": 3.0,
+        "score": 0.4,
+        "aggregated_score": 0.4,
+        "completion_rate": 1.0,
+        "failure_rate": 0.0,
+        "pass_rate": 1.0,
         "holdout": {
             "validation_status": "passed",
             "feasible": True,
@@ -405,13 +427,26 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
         ],
         aggregate=aggregate,
     )
+    report_evidence = compile_candidate_report_evidence(
+        candidate_outcome_evidence=evidence.model_dump(mode="json"),
+        report_trial_evidence_rows=[
+            {"trial_id": "trial-1", "seed": 101, "rmse": 0.3},
+            {"trial_id": "trial-2", "seed": 102, "rmse": 0.5},
+        ],
+        aggregate=aggregate,
+    )
 
     assert verify_candidate_outcome_evidence(
         evidence.model_dump(mode="json")
     ) == evidence
+    assert verify_candidate_report_evidence(
+        report_evidence.model_dump(mode="json")
+    ) == report_evidence
     wrapped = {
         **aggregate,
         "candidate_outcome_evidence": evidence.model_dump(mode="json"),
+        "candidate_report_evidence_required": True,
+        "candidate_report_evidence": report_evidence.model_dump(mode="json"),
     }
     wrapped["scalar_loss"] = -1_000_000.0
     projection = authoritative_outcome_projection(wrapped)
@@ -465,6 +500,45 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
             generation_index=2,
             parameter_snapshot={"MPC_XY_P": 0.95},
             trial_evidence_rows=changed_trial_rows,
+            aggregate=wrapped,
+        )
+        == {}
+    )
+    wrapped["rmse"] = 999.0
+    report_projection = authoritative_candidate_report_projection(
+        candidate_id="candidate-evidence",
+        generation_index=2,
+        parameter_snapshot={"MPC_XY_P": 0.95},
+        trial_evidence_rows=trial_rows,
+        report_trial_evidence_rows=trial_rows,
+        aggregate=wrapped,
+    )
+    assert report_projection["rmse"] == pytest.approx(0.4)
+    assert report_projection["max_error_worst"] == pytest.approx(0.8)
+    tampered_report_evidence = report_evidence.model_dump(mode="json")
+    tampered_report_evidence["projection"]["rmse"] = 999.0
+    assert verify_candidate_report_evidence(tampered_report_evidence) is None
+    assert (
+        authoritative_candidate_report_projection(
+            candidate_id="candidate-evidence",
+            generation_index=2,
+            parameter_snapshot={"MPC_XY_P": 0.95},
+            trial_evidence_rows=trial_rows,
+            report_trial_evidence_rows=trial_rows,
+            aggregate={
+                **wrapped,
+                "candidate_report_evidence": tampered_report_evidence,
+            },
+        )
+        == {}
+    )
+    assert (
+        authoritative_candidate_report_projection(
+            candidate_id="candidate-evidence",
+            generation_index=2,
+            parameter_snapshot={"MPC_XY_P": 0.95},
+            trial_evidence_rows=trial_rows,
+            report_trial_evidence_rows=changed_trial_rows,
             aggregate=wrapped,
         )
         == {}

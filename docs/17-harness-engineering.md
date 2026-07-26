@@ -279,6 +279,19 @@ metric edit makes the Candidate evidence non-authoritative. Holdout Trial rows
 remain covered by the separately bound holdout projection; artifact bytes and
 physical-attempt lineage still require the future relational evidence ledger.
 
+Outcome Contract compiler 2.4 adds
+`dronedream.candidate-report-evidence/v1`. Final-display RMSE, mean/worst
+maximum error, overshoot count, completion time, score, and reliability rates
+are content-addressed and linked to the verified Candidate outcome-evidence
+ID. A second hash binds every current Candidate Trial row, including holdout
+rows, without exposing holdout results to adaptive optimization. JobReport,
+real-runtime candidate summaries, reproducibility manifests, and PDF reports
+read this verified projection; mutable compatibility fields beside it cannot
+change the report, while a changed Candidate, Trial, projection, or hash fails
+closed. Legacy aggregates remain readable. The evidence is still embedded in
+aggregate JSON, so immutable physical-attempt rows, artifact digests, and a
+relational evidence ledger remain future work.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.
