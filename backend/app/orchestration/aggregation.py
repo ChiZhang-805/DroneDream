@@ -1033,7 +1033,13 @@ def _aggregate_candidate(
                 ],
             }
         )
-        training_failure_rate = float(training_rates["failure_rate"])
+        # Only verified domain/unknown outcomes may shape parameter ranking.
+        # Infrastructure, cancellation, and invalid-evidence outcomes still
+        # block Candidate completeness and acceptance, but must not make an
+        # otherwise identical controller look numerically worse.
+        training_failure_rate = float(
+            training_rates["optimizer_learning_failure_rate"]
+        )
         selection_score = (
             evaluation.scalar_loss + constants.SCORE_WEIGHTS["failed_trial"] * training_failure_rate
         )

@@ -517,6 +517,34 @@ timeout because process/launcher timeouts are terminal failed Trials. The
 desktop adapter-to-bundled-runner dry-run path is covered end to end, and known
 JSON evidence is byte-bounded during the actual read.
 
+Outcome Contract compiler 2.16 closes the bundled PX4 raw-source replay gap.
+The local launch wrapper makes an atomic per-Trial `px4_source.ulg` snapshot
+before extracting normalized telemetry. The runner publishes it as a
+`px4_ulog` Artifact, and the backend streams the retained bytes through SHA-256
+under the 1 GiB limit. A ULog-derived telemetry contract is accepted only when
+exactly one retained origin Artifact has the expected MIME type, nonzero byte
+count, SHA-256, and size.
+
+The artifact must resolve inside the current Trial run directory, not merely
+somewhere under the shared artifact root. This prevents a producer from
+borrowing telemetry or ULog evidence from another Trial. Missing, duplicate,
+empty, oversized, mutated, cross-Trial, or unexpected ULog evidence fails the
+complete Trial before its metrics can enter Candidate evidence.
+
+Outcome Contract compiler 2.17 closes the producer-selected failure-taxonomy
+boundary. An external `trial_result.json` can retain a bounded claimed code and
+reason for diagnostics, but every producer-reported failure is canonically
+stored as `UNVERIFIED_SIMULATOR_FAILURE`. Malformed, missing, identity-mismatched,
+or internally inconsistent results become `INVALID_SIMULATOR_RESULT`, while
+the adapter's own wall-clock kill becomes the infrastructure code
+`SIMULATOR_EXECUTION_TIMEOUT`.
+
+All three classes block completeness and acceptance. They are excluded from
+parameter learning, Candidate ranking penalties, and LLM scenario feedback.
+Only trusted domain failures and conservative unknown canonical codes may shape
+the optimizer. GPT prompt schema 2.1 derives its trial denominator and failure
+rate from this same closed optimizer-learning projection.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

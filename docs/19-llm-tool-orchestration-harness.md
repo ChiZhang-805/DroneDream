@@ -721,15 +721,15 @@ contract. The code audit found the following gaps:
 | `trial_result.v1` may omit all identity fields | a legacy result can be accepted without proving which Trial, Candidate, seed, or attempt produced it |
 | `final_error` defaults to `0.0` and several flags default to `false` when absent | absence can become a deceptively good observation rather than a schema failure |
 | the result supplies already-computed metrics and `pass_flag` | addressed for the bundled PX4 path by Outcome Contract 2.15: evaluation window, core geometry, crash/instability, directed progress, scenario-effect readiness, pass, and composite score are independently compiled from retained evidence |
-| telemetry has `x/y/z/t` but no mandatory unit, coordinate-frame, time-base, source-log digest, or extraction revision | addressed for bundled PX4 results by `dronedream.telemetry.v2`; raw ULog replay still depends on retaining the original log |
+| telemetry has `x/y/z/t` but no mandatory unit, coordinate-frame, time-base, source-log digest, or extraction revision | addressed for bundled PX4 results by `dronedream.telemetry.v2`; Outcome Contract 2.16 additionally retains and re-hashes the exact local-wrapper ULog bytes |
 | RMSE is `sqrt(sum(error²) / sample_count)` | addressed by trapezoidal time-weighted RMSE in the bundled PX4 metric compiler |
 | strictly increasing timestamps have no maximum-gap, expected-duration, or dropout-coverage requirement | addressed by content-addressed sampling evidence, maximum-gap, and minimum-coverage gates |
 | an `all_samples_fallback` evaluation window can still produce ordinary metrics | addressed for physical runs; only explicitly synthetic telemetry may use the labeled synthetic all-samples window |
 | `overshoot_count` counts local peaks in absolute track error over a fixed `0.25 m` prominence | this is a tracking-error peak count, not yet a controller-overshoot measurand |
-| all non-completed Trials count as candidate failures | adapter, port, storage, worker, and database failures can penalize controller parameters |
-| the external simulator can return an arbitrary cleaned failure-code string | an untrusted producer can influence retry/evidence classification |
+| all non-completed Trials count as candidate failures | addressed by Outcome Contract 2.17 for numerical ranking and GPT prompt feedback; nonphysical outcomes still block completeness and acceptance |
+| the external simulator can return an arbitrary cleaned failure-code string | addressed by Outcome Contract 2.17: producer codes are bounded diagnostics under the canonical `UNVERIFIED_SIMULATOR_FAILURE` class |
 | Outcome Contract compiler 2.10 stores append-only physical-attempt claims/outcomes and one immutable accepted-attempt pointer | addressed for current v3 aggregation |
-| Outcome Contract compilers 2.8-2.15 bind retained Artifact bytes, accepted-attempt identity, PX4 telemetry semantics, independently derived evaluation windows, core geometry, outcome verdict, and score through Trial and Candidate evidence | addressed for current v3 aggregation; SQL/object-store atomic publication, raw-source retention, operational WORM controls, and complete infrastructure/domain taxonomy propagation remain separate boundaries |
+| Outcome Contract compilers 2.8-2.17 bind retained Artifact bytes, accepted-attempt identity, PX4 telemetry semantics and raw ULog bytes, independently derived evaluation windows, core geometry, outcome verdict, score, and trusted external-failure classification through Trial and Candidate evidence | addressed for the bundled local PX4 path and current v3 aggregation; SQL/object-store atomic publication and operational WORM controls remain separate boundaries |
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
 | legacy aggregation initially mixes all metrics and only the modern objective path replaces key fields with training values | compatibility paths remain too easy to use as if they had the same isolation guarantees |
 | rate parsing clamps values into `[0, 1]` | corrupted persisted evidence can be silently normalized instead of stopping the decision |
@@ -8173,7 +8173,9 @@ weights, configuration, outcomes, or metrics. Vehicle identity is reduced to
 catalog-backed categories, objective/constraint names are restricted to supported
 Trial metrics or stable `custom_*` aliases, and Candidate IDs/labels, arbitrary
 aggregate mappings, unrecognized scenario keys, and unknown failure-code strings
-are excluded. Capabilities report `prompt_schema_version=2.0` for this path.
+are excluded. Capabilities report `prompt_schema_version=2.1` for this path;
+nonphysical Trial outcomes are also excluded from parameter-learning counts and
+scenario failure feedback.
 
 This hardening does not make the direct proposer equivalent to `llm_harness`: it
 still proposes numeric parameters and therefore retains more model authority. The
@@ -8514,13 +8516,43 @@ atomic SQL/object publication, operational WORM/role separation, and carrying
 the closed domain/infrastructure taxonomy through every adapter and optimizer
 learning path.
 
+Outcome Contract compiler 2.16 retains the raw PX4 source used by the bundled
+local wrapper. It snapshots the selected ULog into the Trial directory before
+extraction, publishes the snapshot as a `px4_ulog` Artifact, and independently
+streams it through SHA-256 at the backend boundary. The retained byte count and
+digest must equal the telemetry origin provenance. Empty, missing, duplicate,
+oversized, mutated, wrong-MIME, unexpected, or cross-Trial origin artifacts
+invalidate the complete Trial. This closes raw-source replay for the bundled
+ULog path; atomic SQL/object publication and operational WORM controls remain
+deployment work.
+
+Outcome Contract compiler 2.17 removes the last producer-selected failure-code
+path from the external CLI adapter. Missing, malformed, identity-mismatched,
+non-boolean, inconsistent-success, or evidence-invalid results become
+`INVALID_SIMULATOR_RESULT`. Any external `success=false` claim becomes
+`UNVERIFIED_SIMULATOR_FAILURE`; its bounded claimed code and reason remain
+diagnostic only. The adapter's own process deadline uses
+`SIMULATOR_EXECUTION_TIMEOUT`, an infrastructure class, rather than the trusted
+domain `TIMEOUT`.
+
+The closed taxonomy now also drives all implemented parameter-learning paths.
+Infrastructure, cancellation, and invalid evidence still block completeness
+and public acceptance, but do not add the failed-Trial ranking penalty and are
+omitted from GPT scenario feedback. Prompt schema 2.1 recomputes its denominator,
+completion/pass rates, and failure codes from optimizer-learning Trial classes,
+so an external producer cannot poison the LLM optimizer through a side channel.
+
 Current focused validation:
 
 ```text
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-877 passed
+893 passed
+
+Focused PX4 evidence, trusted taxonomy, optimizer-learning, and GPT prompt
+regression: 312 passed. Runtime contracts: 48 tests passed with 4 expected
+Windows skips for POSIX/WSL-only secure ULog deletion.
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 

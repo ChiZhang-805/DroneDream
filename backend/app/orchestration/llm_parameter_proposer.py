@@ -27,6 +27,11 @@ from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
 from app.optimization.domain import ParameterDomain, SearchSpace
+from app.optimization.outcome_taxonomy import (
+    classify_trial_outcome,
+    is_optimizer_learning_failure,
+    is_optimizer_learning_outcome,
+)
 from app.orchestration import constants
 from app.orchestration.acceptance import AcceptanceCriteria
 from app.orchestration.events import record_event
@@ -38,12 +43,6 @@ from app.parameters import (
     classify_airframe,
 )
 from app.simulator.base import (
-    FAILURE_ADAPTER_UNAVAILABLE,
-    FAILURE_ARTIFACT_PERSISTENCE,
-    FAILURE_CANCELLED,
-    FAILURE_INVALID_PARAMETERS,
-    FAILURE_RESULT_PERSISTENCE,
-    FAILURE_SIM_ERROR,
     FAILURE_SIMULATION,
     FAILURE_TIMEOUT,
     FAILURE_UNSTABLE,
@@ -58,25 +57,18 @@ _MIN_PROPOSALS = 1
 _MAX_RESPONSE_NODES = 10_000
 _MAX_RESPONSE_DEPTH = 16
 _MAX_PROMPT_CANDIDATES = 8
-LLM_PROPOSER_PROMPT_SCHEMA_VERSION = "2.0"
+LLM_PROPOSER_PROMPT_SCHEMA_VERSION = "2.1"
 _PROMPT_AGGREGATE_KEYS = (
     "rmse",
     "max_error",
     "max_error_worst",
     "overshoot_count",
     "completion_time",
-    "completion_rate",
-    "failure_rate",
-    "pass_rate",
-    "training_completion_rate",
-    "training_failure_rate",
-    "training_pass_rate",
     "aggregated_score",
     "scalar_loss",
     "feasible",
     "total_constraint_violation",
-    "invalid_metric_count",
-    "cancelled_trial_count",
+    "optimizer_learning_failure_rate",
 )
 _SAFE_SCENARIO_CONFIG_KEYS = frozenset(
     {
@@ -87,17 +79,11 @@ _SAFE_SCENARIO_CONFIG_KEYS = frozenset(
         "intensity",
     }
 )
-_SAFE_FAILURE_CODES = frozenset(
+_SAFE_OPTIMIZER_FAILURE_CODES = frozenset(
     {
         FAILURE_TIMEOUT,
         FAILURE_SIMULATION,
         FAILURE_UNSTABLE,
-        FAILURE_SIM_ERROR,
-        FAILURE_ADAPTER_UNAVAILABLE,
-        FAILURE_CANCELLED,
-        FAILURE_ARTIFACT_PERSISTENCE,
-        FAILURE_RESULT_PERSISTENCE,
-        FAILURE_INVALID_PARAMETERS,
     }
 )
 _SAFE_OBJECTIVE_METRICS = frozenset(
@@ -641,64 +627,37 @@ def _build_prompt(
         key=lambda c: (c.generation_index, not c.is_baseline, c.id),
     ):
         agg = cand.aggregated_metric_json or {}
-        trial_count = _safe_nonnegative_int(
-            agg.get("training_trial_count", cand.trial_count or 0)
-        )
-        completed_trial_count = min(
-            trial_count,
-            _safe_nonnegative_int(
-                agg.get(
-                    "training_completed_trial_count",
-                    cand.completed_trial_count or 0,
-                )
-            ),
-        )
-        passing_trial_count = min(
-            completed_trial_count,
-            _safe_nonnegative_int(
-            agg.get(
-                "training_passing_trial_count", agg.get("passing_trial_count", 0)
-            )
-            ),
-        )
-        completion_rate = (
-            (completed_trial_count / trial_count) if trial_count > 0 else 0.0
-        )
-        prompt_aggregate: dict[str, Any] = {}
-        for key in _PROMPT_AGGREGATE_KEYS:
-            if key not in agg:
-                continue
-            safe_value = _safe_prompt_value(agg[key])
-            if safe_value is not _INVALID_PROMPT_VALUE:
-                prompt_aggregate[key] = safe_value
-        prompt_aggregate.update(
-            {
-                "trial_count": trial_count,
-                "completed_trial_count": completed_trial_count,
-                "failed_trial_count": min(
-                    trial_count,
-                    _safe_nonnegative_int(
-                        agg.get(
-                            "training_failed_trial_count",
-                            cand.failed_trial_count or 0,
-                        )
-                    ),
-                ),
-                "passing_trial_count": passing_trial_count,
-            }
-        )
-        for key in (
-            "training_trial_count",
-            "training_completed_trial_count",
-            "training_failed_trial_count",
-            "training_passing_trial_count",
-        ):
-            prompt_aggregate.pop(key, None)
+        trial_count = 0
+        completed_trial_count = 0
+        failed_trial_count = 0
+        passing_trial_count = 0
         scenario_feedback: dict[str, dict[str, Any]] = {}
         for trial in sorted(cand.trials, key=lambda t: (t.created_at, t.id)):
             if bool((trial.scenario_config_json or {}).get("holdout")):
                 continue
             metric = trial.metric
+            rmse = _finite_number(metric.rmse) if metric is not None else None
+            max_error = _finite_number(metric.max_error) if metric is not None else None
+            completion_time = (
+                _finite_number(metric.completion_time)
+                if metric is not None
+                else None
+            )
+            usable_metric = (
+                trial.status == "COMPLETED"
+                and metric is not None
+                and rmse is not None
+                and max_error is not None
+                and completion_time is not None
+            )
+            outcome_class = classify_trial_outcome(
+                status=trial.status,
+                failure_code=trial.failure_code,
+                usable_metric=usable_metric,
+            )
+            if not is_optimizer_learning_outcome(outcome_class):
+                continue
+            trial_count += 1
             bucket = scenario_feedback.setdefault(
                 trial.scenario_type,
                 {
@@ -713,22 +672,23 @@ def _build_prompt(
                 },
             )
             bucket["trial_count"] += 1
-            if metric is not None:
-                rmse = _finite_number(metric.rmse)
-                max_error = _finite_number(metric.max_error)
-                completion_time = _finite_number(metric.completion_time)
-                if rmse is None or max_error is None or completion_time is None:
-                    continue
+            if outcome_class == "success" and metric is not None:
+                completed_trial_count += 1
+                passing_trial_count += int(metric.pass_flag)
                 bucket["completed_count"] += 1
                 bucket["passing_count"] += int(metric.pass_flag)
+                assert rmse is not None
+                assert max_error is not None
+                assert completion_time is not None
                 bucket["rmse_sum"] += rmse
                 bucket["max_error_sum"] += max_error
                 bucket["completion_time_sum"] += completion_time
-            elif trial.failure_code:
+            elif is_optimizer_learning_failure(outcome_class):
+                failed_trial_count += 1
                 codes = bucket["failure_codes"]
                 failure_code = (
                     trial.failure_code
-                    if trial.failure_code in _SAFE_FAILURE_CODES
+                    if trial.failure_code in _SAFE_OPTIMIZER_FAILURE_CODES
                     else "OTHER"
                 )
                 codes[failure_code] = int(codes.get(failure_code, 0)) + 1
@@ -753,6 +713,29 @@ def _build_prompt(
                 else None
             )
             compact_feedback.append(bucket)
+        completion_rate = (
+            completed_trial_count / trial_count if trial_count > 0 else 0.0
+        )
+        prompt_aggregate: dict[str, Any] = {}
+        for key in _PROMPT_AGGREGATE_KEYS:
+            if key not in agg:
+                continue
+            safe_value = _safe_prompt_value(agg[key])
+            if safe_value is not _INVALID_PROMPT_VALUE:
+                prompt_aggregate[key] = safe_value
+        prompt_aggregate.update(
+            {
+                "trial_count": trial_count,
+                "completed_trial_count": completed_trial_count,
+                "failed_trial_count": failed_trial_count,
+                "passing_trial_count": passing_trial_count,
+                "optimizer_learning_failure_rate": (
+                    round(failed_trial_count / trial_count, 8)
+                    if trial_count > 0
+                    else 0.0
+                ),
+            }
+        )
         prior.append(
             {
                 "generation_index": cand.generation_index,

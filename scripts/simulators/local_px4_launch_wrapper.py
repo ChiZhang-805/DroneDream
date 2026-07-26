@@ -20,6 +20,7 @@ import re
 import shlex
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -54,6 +55,7 @@ DEFAULT_TRACK_MARKER_MODE = "line_strip"
 MAX_JSON_BYTES = 16 * 1024 * 1024
 MAX_TELEMETRY_SAMPLES = 50_000
 MAX_ULOG_BYTES = 1024 * 1024 * 1024
+RETAINED_ULOG_NAME = "px4_source.ulg"
 
 REQUIRED_SAMPLE_KEYS = (
     "t",
@@ -869,6 +871,50 @@ def _sha256_file(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+def retain_ulog_snapshot(source_path: Path, run_dir: Path) -> Path:
+    """Copy the exact ULog bytes used for extraction into the Trial run dir."""
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    destination = run_dir / RETAINED_ULOG_NAME
+    temporary = run_dir / f".{RETAINED_ULOG_NAME}.{os.getpid()}.{time.time_ns()}.tmp"
+    copied = 0
+    try:
+        source_info = source_path.lstat()
+        if stat.S_ISLNK(source_info.st_mode) or not stat.S_ISREG(source_info.st_mode):
+            raise ValueError("ULog source must be a regular, non-symlink file")
+        with source_path.open("rb") as source, temporary.open("xb") as target:
+            opened_info = os.fstat(source.fileno())
+            if (
+                not stat.S_ISREG(opened_info.st_mode)
+                or opened_info.st_dev != source_info.st_dev
+                or opened_info.st_ino != source_info.st_ino
+            ):
+                raise ValueError("ULog source changed before its snapshot was opened")
+            while chunk := source.read(1024 * 1024):
+                copied += len(chunk)
+                if copied > MAX_ULOG_BYTES:
+                    raise ValueError(f"ULog exceeds the {MAX_ULOG_BYTES}-byte safety limit")
+                target.write(chunk)
+            final_info = os.fstat(source.fileno())
+            if (
+                copied != opened_info.st_size
+                or final_info.st_size != opened_info.st_size
+                or final_info.st_mtime_ns != opened_info.st_mtime_ns
+            ):
+                raise ValueError("ULog source changed while its snapshot was being copied")
+            target.flush()
+            os.fsync(target.fileno())
+        if copied == 0:
+            raise ValueError("ULog cannot be empty")
+        temporary.replace(destination)
+    except OSError as exc:
+        raise ValueError(f"could not retain ULog snapshot {source_path}: {exc}") from exc
+    finally:
+        with contextlib.suppress(OSError):
+            temporary.unlink()
+    return destination
+
+
 def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, world: str) -> None:
     try:
         from pyulog import ULog
@@ -1506,8 +1552,12 @@ def _finalize_real_telemetry(
                     f"No new or changed ULog files were produced by this PX4 run under: {ulog_root}"
                 ) from exc
 
-        ulog_to_telemetry_json(
+        retained_ulog_path = retain_ulog_snapshot(
             ulog_path,
+            args.run_dir,
+        )
+        ulog_to_telemetry_json(
+            retained_ulog_path,
             args.telemetry,
             vehicle=args.vehicle,
             world=args.world,

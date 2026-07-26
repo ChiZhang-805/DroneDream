@@ -2575,6 +2575,12 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "Trajectory Samples",
             "application/json",
         ),
+        _artifact_record(
+            run_dir / "px4_source.ulg",
+            "px4_ulog",
+            "Retained PX4 ULog",
+            "application/octet-stream",
+        ),
         _artifact_record(run_dir / "runner.log", "worker_log", "Runner Log", "text/plain"),
         _artifact_record(
             run_dir / "stdout.log", "simulator_stdout", "Simulator stdout", "text/plain"

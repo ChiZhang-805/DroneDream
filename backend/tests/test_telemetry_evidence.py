@@ -56,9 +56,7 @@ def test_telemetry_v2_contract_round_trips_and_is_content_addressed() -> None:
     assert verified.velocity_unit == "m/s"
     assert verified.attitude_unit == "rad"
     assert verified.time_unit == "s"
-    assert verified.coordinate_frame == (
-        "dronedream_local_cartesian_z_up"
-    )
+    assert verified.coordinate_frame == ("dronedream_local_cartesian_z_up")
     assert verified.sampling.sample_count == 20
     assert verified.sampling.duration_s == pytest.approx(1.9)
     assert validate_telemetry_payload(payload) == []
@@ -96,8 +94,7 @@ def test_telemetry_v2_rejects_sample_or_contract_mutation(
 
     assert verify_telemetry_semantic_contract(payload) is None
     assert validate_telemetry_payload(payload) == [
-        "telemetry v2 semantic contract is missing or does not match "
-        "the samples"
+        "telemetry v2 semantic contract is missing or does not match the samples"
     ]
 
 
@@ -130,4 +127,25 @@ def test_telemetry_v2_requires_ulog_origin_provenance() -> None:
             source_kind="px4_ulog",
             extraction_revision="test-normalizer-1.0",
             synthetic=False,
+        )
+
+
+def test_telemetry_v2_rejects_empty_ulog_origin() -> None:
+    with pytest.raises(
+        ValueError,
+        match="ULog origin cannot be empty",
+    ):
+        compile_telemetry_semantic_contract(
+            samples=_samples(),
+            source_bytes=b"normalized-ulog",
+            source_kind="px4_ulog",
+            extraction_revision="test-normalizer-1.0",
+            synthetic=False,
+            origin_provenance={
+                "origin_source_sha256": "sha256:" + "0" * 64,
+                "origin_source_byte_count": 0,
+                "origin_extraction_revision": "test-extractor-1.0",
+                "origin_coordinate_frame": "PX4_LOCAL_NED",
+                "coordinate_transform": "x=north;y=east;z=-down",
+            },
         )

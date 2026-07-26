@@ -298,6 +298,42 @@ def test_find_latest_ulog_with_snapshot_accepts_changed_or_new_file(tmp_path: Pa
     assert wrapper.find_latest_ulog(tmp_path, before=before) == changed
 
 
+def test_retain_ulog_snapshot_is_bounded_and_independent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.ulg"
+    source.write_bytes(b"immutable ULog evidence")
+    run_dir = tmp_path / "run"
+
+    retained = wrapper.retain_ulog_snapshot(source, run_dir)
+
+    assert retained == run_dir / wrapper.RETAINED_ULOG_NAME
+    assert retained.read_bytes() == b"immutable ULog evidence"
+    source.write_bytes(b"changed after snapshot")
+    assert retained.read_bytes() == b"immutable ULog evidence"
+
+    oversized = tmp_path / "oversized.ulg"
+    oversized.write_bytes(b"12345")
+    monkeypatch.setattr(wrapper, "MAX_ULOG_BYTES", 4)
+    with pytest.raises(ValueError, match="safety limit"):
+        wrapper.retain_ulog_snapshot(oversized, run_dir)
+    assert retained.read_bytes() == b"immutable ULog evidence"
+
+
+def test_retain_ulog_snapshot_rejects_symlink_source(tmp_path: Path) -> None:
+    target = tmp_path / "target.ulg"
+    target.write_bytes(b"target bytes")
+    source = tmp_path / "source.ulg"
+    try:
+        source.symlink_to(target)
+    except OSError:
+        pytest.skip("symlink creation is unavailable on this Windows host")
+
+    with pytest.raises(ValueError, match="regular, non-symlink"):
+        wrapper.retain_ulog_snapshot(source, tmp_path / "run")
+
+
 def test_ulog_to_telemetry_json_writes_schema_with_attitude_groundtruth_fallback(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
@@ -323,13 +359,9 @@ def test_ulog_to_telemetry_json_writes_schema_with_attitude_groundtruth_fallback
     assert payload["meta"]["vehicle"] == "x500"
     assert payload["meta"]["origin_source_sha256"].startswith("sha256:")
     assert len(payload["meta"]["origin_source_sha256"]) == 71
-    assert payload["meta"]["origin_source_byte_count"] == len(
-        b"test ULog fixture"
-    )
+    assert payload["meta"]["origin_source_byte_count"] == len(b"test ULog fixture")
     assert payload["meta"]["origin_coordinate_frame"] == "PX4_LOCAL_NED"
-    assert payload["meta"]["origin_extraction_revision"] == (
-        "pyulog-vehicle-local-position-1.0"
-    )
+    assert payload["meta"]["origin_extraction_revision"] == ("pyulog-vehicle-local-position-1.0")
     assert payload["samples"][0]["t"] == 0.0
     assert payload["samples"][0]["z"] == 5.0
     assert payload["samples"][0]["vz"] == 0.1
@@ -621,7 +653,9 @@ def test_wrapper_real_mode_ulog_uses_px4_ulog_path(tmp_path: Path):
     )
     assert proc.returncode == 0, proc.stderr
     telemetry = json.loads((tmp_path / "run" / "telemetry.json").read_text(encoding="utf-8"))
-    assert telemetry["meta"]["ulog_path"] == str(ulog_path)
+    retained_ulog = tmp_path / "run" / wrapper.RETAINED_ULOG_NAME
+    assert retained_ulog.read_bytes() == b"placeholder"
+    assert telemetry["meta"]["ulog_path"] == str(retained_ulog)
 
 
 def test_wrapper_real_mode_ulog_missing_log_fails_with_clear_message(tmp_path: Path):

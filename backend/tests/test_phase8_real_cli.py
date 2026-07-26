@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import sys
@@ -20,8 +21,9 @@ from app.simulator.artifact_schema import (
 from app.simulator.base import (
     FAILURE_ADAPTER_UNAVAILABLE,
     FAILURE_CANCELLED,
-    FAILURE_SIMULATION,
-    FAILURE_TIMEOUT,
+    FAILURE_EXECUTION_TIMEOUT,
+    FAILURE_INVALID_RESULT,
+    FAILURE_UNVERIFIED_REPORT,
     ArtifactMetadata,
     JobConfig,
     TrialContext,
@@ -44,6 +46,7 @@ from app.simulator.real_cli import (
     _parse_artifacts,
     _parse_metrics,
     _read_log_tail,
+    _sanitize_artifacts_for_trial,
     _trial_input_payload,
 )
 from app.simulator.real_cli import (
@@ -107,6 +110,7 @@ def _px4_metric_evidence(
     tmp_path: Path,
     *,
     offboard_timing_payload: dict[str, object] | None = None,
+    ulog_bytes: bytes | None = None,
 ) -> tuple[
     dict[str, object],
     TrialMetricsPayload,
@@ -126,12 +130,24 @@ def _px4_metric_evidence(
         }
         for index in range(20)
     ]
+    origin_provenance = (
+        {
+            "origin_source_sha256": ("sha256:" + hashlib.sha256(ulog_bytes).hexdigest()),
+            "origin_source_byte_count": len(ulog_bytes),
+            "origin_extraction_revision": ("pyulog-vehicle-local-position-1.0"),
+            "origin_coordinate_frame": "PX4_LOCAL_NED",
+            "coordinate_transform": ("x=north_m;y=east_m;z=-down_m"),
+        }
+        if ulog_bytes is not None
+        else None
+    )
     contract = compile_telemetry_semantic_contract(
         samples=samples,
         source_bytes=b"original-launcher-telemetry",
-        source_kind="launcher_json",
+        source_kind=("px4_ulog" if ulog_bytes is not None else "launcher_json"),
         extraction_revision="test-normalizer-1.0",
         synthetic=False,
+        origin_provenance=origin_provenance,
     )
     telemetry_path = tmp_path / "telemetry.json"
     telemetry_payload = {
@@ -314,6 +330,17 @@ def _px4_metric_evidence(
                 display_name="offboard timing",
                 storage_path=str(timing_path),
                 mime_type="application/json",
+            )
+        )
+    if ulog_bytes is not None:
+        ulog_path = tmp_path / "px4_source.ulg"
+        ulog_path.write_bytes(ulog_bytes)
+        artifacts.append(
+            ArtifactMetadata(
+                artifact_type="px4_ulog",
+                display_name="retained ULog",
+                storage_path=str(ulog_path),
+                mime_type="application/octet-stream",
             )
         )
     raw = {
@@ -624,10 +651,10 @@ def test_real_cli_maps_timeout(monkeypatch, tmp_path):
     )
     assert result.success is False
     assert result.failure is not None
-    assert result.failure.code == FAILURE_TIMEOUT
+    assert result.failure.code == FAILURE_EXECUTION_TIMEOUT
 
 
-def test_real_cli_malformed_output_is_simulation_failed(monkeypatch, tmp_path):
+def test_real_cli_malformed_output_is_invalid_evidence(monkeypatch, tmp_path):
     # A tiny script that writes a non-object into trial_result.json.
     fake = tmp_path / "fake_sim.py"
     fake.write_text(
@@ -644,7 +671,7 @@ def test_real_cli_malformed_output_is_simulation_failed(monkeypatch, tmp_path):
     result = adapter.run_trial(_ctx())
     assert result.success is False
     assert result.failure is not None
-    assert result.failure.code == FAILURE_SIMULATION
+    assert result.failure.code == FAILURE_INVALID_RESULT
 
 
 def test_real_cli_adapter_unavailable_when_command_missing_binary(monkeypatch, tmp_path):
@@ -657,7 +684,7 @@ def test_real_cli_adapter_unavailable_when_command_missing_binary(monkeypatch, t
     assert result.failure.code == FAILURE_ADAPTER_UNAVAILABLE
 
 
-def test_real_cli_parses_structured_failure(monkeypatch, tmp_path):
+def test_real_cli_quarantines_structured_failure_claim(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "REAL_SIMULATOR_COMMAND",
         f"{sys.executable} {_EXAMPLE_SIM}",
@@ -677,8 +704,46 @@ def test_real_cli_parses_structured_failure(monkeypatch, tmp_path):
     )
     assert result.success is False
     assert result.failure is not None
-    assert result.failure.code == FAILURE_SIMULATION
+    assert result.failure.code == FAILURE_UNVERIFIED_REPORT
+    assert "claimed_code=SIMULATION_FAILED" in result.failure.reason
     assert "injected simulation_failed" in result.failure.reason
+
+
+@pytest.mark.parametrize(
+    "claimed_code",
+    [
+        "TIMEOUT",
+        "ADAPTER_UNAVAILABLE",
+        "UNSTABLE_CANDIDATE",
+        "SOME_NEW_DOMAIN_FAILURE",
+    ],
+)
+def test_real_cli_producer_cannot_choose_canonical_outcome_taxonomy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    claimed_code: str,
+) -> None:
+    fake = tmp_path / f"claimed_{claimed_code.lower()}.py"
+    _write_result_simulator(
+        fake,
+        {
+            "success": False,
+            "failure": {
+                "code": claimed_code,
+                "reason": "producer supplied classification",
+            },
+        },
+    )
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{fake}"')
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path / "runs"))
+
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+
+    assert result.success is False
+    assert result.failure is not None
+    assert result.failure.code == FAILURE_UNVERIFIED_REPORT
+    assert f"claimed_code={claimed_code}" in result.failure.reason
+    assert "producer supplied classification" in result.failure.reason
 
 
 def test_real_cli_parses_v1_artifacts_and_infers_mime(monkeypatch, tmp_path):
@@ -793,6 +858,43 @@ out.write_text(json.dumps({{
     assert result.artifacts == []
     assert "exceeds" in caplog.text
     assert "validation limit" in caplog.text
+
+
+def test_real_cli_drops_cross_trial_artifact_inside_allowed_root(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    run_dir = tmp_path / "jobs" / "job-1" / "trials" / "trial-1"
+    foreign_dir = tmp_path / "jobs" / "job-2" / "trials" / "trial-2"
+    run_dir.mkdir(parents=True)
+    foreign_dir.mkdir(parents=True)
+    foreign_artifact = foreign_dir / "foreign.log"
+    foreign_artifact.write_text(
+        "belongs to another Trial",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+
+    with caplog.at_level(
+        logging.WARNING,
+        logger="drone_dream.simulator.real_cli",
+    ):
+        sanitized = _sanitize_artifacts_for_trial(
+            [
+                ArtifactMetadata(
+                    artifact_type="worker_log",
+                    display_name="foreign",
+                    storage_path=str(foreign_artifact),
+                    mime_type="text/plain",
+                )
+            ],
+            run_dir=run_dir,
+            trial_id="trial-1",
+        )
+
+    assert sanitized == []
+    assert "outside its run directory" in caplog.text
 
 
 def test_build_command_substitutes_paths_after_tokenization() -> None:
@@ -1224,6 +1326,79 @@ def test_px4_outcome_evidence_rejects_scenario_request_mutation(
         )
 
 
+def test_px4_metric_evidence_requires_retained_ulog_origin(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(
+        tmp_path,
+        ulog_bytes=b"original px4 ulog",
+    )
+
+    _require_px4_metric_evidence(
+        raw,
+        metrics=metrics,
+        artifacts=artifacts,
+    )
+
+    without_ulog = [artifact for artifact in artifacts if artifact.artifact_type != "px4_ulog"]
+    with pytest.raises(
+        ValueError,
+        match="exactly one retained origin artifact",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=without_ulog,
+        )
+
+
+def test_px4_metric_evidence_rejects_mutated_retained_ulog(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(
+        tmp_path,
+        ulog_bytes=b"original px4 ulog",
+    )
+    ulog_artifact = next(artifact for artifact in artifacts if artifact.artifact_type == "px4_ulog")
+    Path(ulog_artifact.storage_path).write_bytes(b"mutated px4 ulog")
+
+    with pytest.raises(
+        ValueError,
+        match="do not match telemetry origin provenance",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_metric_evidence_rejects_unexpected_ulog_artifact(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    unexpected = tmp_path / "unexpected.ulg"
+    unexpected.write_bytes(b"not an origin for launcher JSON")
+    artifacts.append(
+        ArtifactMetadata(
+            artifact_type="px4_ulog",
+            display_name="unexpected ULog",
+            storage_path=str(unexpected),
+            mime_type="application/octet-stream",
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="non-ULog telemetry cannot attach",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -1470,7 +1645,7 @@ def test_real_cli_timeout_terminates_descendant_processes(monkeypatch, tmp_path)
 
     assert result.success is False
     assert result.failure is not None
-    assert result.failure.code == FAILURE_TIMEOUT
+    assert result.failure.code == FAILURE_EXECUTION_TIMEOUT
     assert not sentinel.exists(), "timed-out simulator descendant was left running"
 
 

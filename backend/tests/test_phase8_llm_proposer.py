@@ -269,6 +269,77 @@ def test_proposer_records_events_and_clamps_output(llm_ctx):
         assert "failure_reason" not in fake.calls[0]["user"]
 
 
+def test_gpt_prompt_excludes_nonphysical_failures_from_parameter_evidence(
+    llm_ctx,
+) -> None:
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        search_space = ctx["proposer"]._search_space_for_job(job)
+        candidate = ctx["models"].CandidateParameterSet(
+            job_id=job_id,
+            generation_index=0,
+            source_type="baseline",
+            parameter_json=search_space.baseline(),
+            is_baseline=True,
+            trial_count=3,
+            completed_trial_count=0,
+            failed_trial_count=3,
+        )
+        db.add(candidate)
+        db.flush()
+        for index, failure_code in enumerate(
+            [
+                "SIMULATION_FAILED",
+                "ADAPTER_UNAVAILABLE",
+                "UNVERIFIED_SIMULATOR_FAILURE",
+            ],
+            start=1,
+        ):
+            db.add(
+                ctx["models"].Trial(
+                    job_id=job_id,
+                    candidate_id=candidate.id,
+                    seed=index,
+                    scenario_type="nominal",
+                    status="FAILED",
+                    failure_code=failure_code,
+                )
+            )
+        db.flush()
+
+        criteria = ctx["acceptance"].criteria_for_job(job)
+        _, user_prompt, _ = ctx["proposer"]._build_prompt(
+            job,
+            criteria,
+            [candidate],
+            search_space,
+        )
+
+    payload = json.loads(user_prompt)
+    prior = payload["previous_candidates"][0]
+    assert prior["trial_count"] == 1
+    assert prior["completion_rate"] == 0.0
+    assert prior["aggregated_metrics"]["failed_trial_count"] == 1
+    assert prior["aggregated_metrics"]["optimizer_learning_failure_rate"] == 1.0
+    assert prior["scenario_feedback"] == [
+        {
+            "scenario_type": "nominal",
+            "trial_count": 1,
+            "passing_count": 0,
+            "failure_codes": {"SIMULATION_FAILED": 1},
+            "completed_count": 0,
+            "mean_rmse": None,
+            "mean_max_error": None,
+            "mean_completion_time": None,
+        }
+    ]
+    assert "ADAPTER_UNAVAILABLE" not in user_prompt
+    assert "UNVERIFIED_SIMULATOR_FAILURE" not in user_prompt
+
+
 def test_gpt_prompt_seals_holdout_and_compiles_closed_training_contract(
     llm_ctx,
 ):
@@ -349,7 +420,7 @@ def test_gpt_prompt_seals_holdout_and_compiles_closed_training_contract(
         )
 
     payload = json.loads(user)
-    assert payload["prompt_schema_version"] == "2.0"
+    assert payload["prompt_schema_version"] == "2.1"
     assert payload["vehicle_profile"]["px4_version"] == "custom_px4_version"
     assert payload["objective_config"]["objectives"][0]["metric"] == (
         "custom_objective_1"

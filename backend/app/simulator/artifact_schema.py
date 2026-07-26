@@ -26,6 +26,8 @@ def _is_number(value: Any) -> bool:
 def infer_mime_type(artifact_type: str) -> str | None:
     if artifact_type.endswith("_json"):
         return "application/json"
+    if artifact_type == "px4_ulog":
+        return "application/octet-stream"
     if artifact_type in {"worker_log", "simulator_stdout", "simulator_stderr"}:
         return "text/plain"
     return None

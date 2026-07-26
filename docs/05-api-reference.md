@@ -132,8 +132,17 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 | Code | Meaning |
 |---|---|
 | `ADAPTER_UNAVAILABLE` | The requested simulator adapter is unavailable, disabled for the current environment, or missing its executable command. The internal `real_stub` adapter is test-only and is rejected outside `APP_ENV=test`. |
-| `SIMULATION_FAILED` | The adapter raised an error during execution. |
-| `WORKER_TIMEOUT` | The trial exceeded its per-trial budget. |
+| `SIM_ERROR` | A trusted adapter or worker encountered an infrastructure error. |
+| `SIMULATOR_EXECUTION_TIMEOUT` | The external simulator process exceeded its wall-clock budget; this is infrastructure evidence, not proof that the controller timed out in flight. |
+| `INVALID_SIMULATOR_RESULT` | The result file was missing, malformed, identity-mismatched, internally inconsistent, or lacked required verified evidence. |
+| `UNVERIFIED_SIMULATOR_FAILURE` | An external simulator reported failure, but its producer-selected code was quarantined as diagnostic text and did not choose the canonical outcome class. |
+| `ARTIFACT_PERSISTENCE_FAILED` | Trial evidence bytes could not be persisted and verified. |
+| `RESULT_PERSISTENCE_FAILED` | The terminal Trial result could not be persisted safely. |
+| `INVALID_CANDIDATE_PARAMETERS` | The Candidate failed the deterministic parameter contract before a valid simulation observation was produced. |
+| `CANCELLED` | Cancellation won the terminal transition. |
+| `TIMEOUT` | Trusted domain evidence proves the frozen flight-completion deadline was exceeded. |
+| `SIMULATION_FAILED` | Trusted domain evidence proves a candidate-dependent simulation failure. |
+| `UNSTABLE_CANDIDATE` | Trusted domain evidence proves controller instability. |
 
 ---
 

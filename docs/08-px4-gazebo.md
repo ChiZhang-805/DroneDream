@@ -479,6 +479,16 @@ Coordinate assumption for first implementation:
 When `PX4_TELEMETRY_MODE=ulog`, the wrapper converts PX4 `.ulg` output to the
 runner `telemetry.json` schema after the launcher exits:
 
+- Before extraction, the selected ULog is copied atomically to
+  `<run_dir>/px4_source.ulg`. Extraction always reads that retained snapshot,
+  never the mutable PX4 log directory.
+- The runner publishes the snapshot as a `px4_ulog` Trial Artifact. `real_cli`
+  independently re-hashes it and verifies its nonzero byte count and SHA-256
+  against telemetry origin provenance.
+- The snapshot is limited to 1 GiB and must be a regular, non-symlink file
+  inside the current Trial directory. Missing, duplicate, mutated, cross-Trial,
+  or unexpected ULog evidence fails the Trial.
+
 - ULog selection:
   - if `PX4_ULOG_PATH` is set, that exact file is used
   - otherwise newest `*.ulg` is selected recursively under `PX4_ULOG_ROOT`

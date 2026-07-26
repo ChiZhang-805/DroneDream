@@ -23,6 +23,7 @@ Environment variables:
 from __future__ import annotations
 
 import ctypes
+import hashlib
 import json
 import logging
 import math
@@ -49,8 +50,9 @@ from app.simulator.artifact_schema import (
 from app.simulator.base import (
     FAILURE_ADAPTER_UNAVAILABLE,
     FAILURE_CANCELLED,
-    FAILURE_SIMULATION,
-    FAILURE_TIMEOUT,
+    FAILURE_EXECUTION_TIMEOUT,
+    FAILURE_INVALID_RESULT,
+    FAILURE_UNVERIFIED_REPORT,
     ArtifactMetadata,
     SimulatorAdapter,
     TrialContext,
@@ -78,6 +80,7 @@ _DEFAULT_TIMEOUT = 300
 _DEFAULT_ARTIFACT_ROOT = "./artifacts"
 _MAX_RESULT_BYTES = 10 * 1024 * 1024
 _MAX_KNOWN_JSON_ARTIFACT_BYTES = 16 * 1024 * 1024
+_MAX_PX4_ULOG_BYTES = 1024 * 1024 * 1024
 _MAX_RESULT_ARTIFACTS = 256
 _MAX_RAW_METRIC_DEPTH = 20
 _MAX_RAW_METRIC_NODES = 10_000
@@ -327,6 +330,34 @@ def _truncate(text: str, limit: int = 4000) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + f"\n... [truncated, original length {len(text)}]"
+
+
+def _diagnostic_failure_code(value: object) -> str:
+    """Return a bounded, display-only producer claim.
+
+    External result producers are not part of the optimizer's outcome-taxonomy
+    trust boundary. Their code is retained only as a printable diagnostic and
+    must never become the canonical persisted ``Trial.failure_code``.
+    """
+
+    if not isinstance(value, str):
+        return "UNSPECIFIED"
+    normalized = "".join(
+        char if char.isascii() and (char.isalnum() or char in {"-", "_", "."}) else "_"
+        for char in value.strip()
+    )
+    normalized = normalized.strip("_")[:64]
+    return normalized or "UNSPECIFIED"
+
+
+def _diagnostic_failure_reason(value: object) -> str:
+    """Return a bounded, single-line producer failure explanation."""
+
+    if not isinstance(value, str):
+        return "Simulator reported failure without a reason."
+    normalized = "".join(char if char.isprintable() else " " for char in value)
+    normalized = " ".join(normalized.split())
+    return normalized[:1000] or "Simulator reported failure without a reason."
 
 
 def _split_command(command: str) -> list[str]:
@@ -891,8 +922,17 @@ def _sanitize_artifacts_for_trial(
     artifacts: list[ArtifactMetadata], *, run_dir: Path, trial_id: str
 ) -> list[ArtifactMetadata]:
     sanitized: list[ArtifactMetadata] = []
+    resolved_run_dir = run_dir.resolve()
     for artifact in artifacts:
         normalized_path = _normalize_artifact_path(artifact.storage_path, run_dir)
+        if not normalized_path.is_relative_to(resolved_run_dir):
+            logger.warning(
+                "real_cli trial=%s dropped artifact outside its run directory type=%s path=%s",
+                trial_id,
+                artifact.artifact_type,
+                artifact.storage_path,
+            )
+            continue
         if not _is_under_allowed_root(normalized_path):
             logger.warning(
                 "real_cli trial=%s dropped artifact outside allowed roots type=%s path=%s",
@@ -942,6 +982,23 @@ def _load_bounded_json_artifact(
         )
     except RecursionError as exc:
         raise ValueError(f"{artifact.artifact_type} exceeds the JSON nesting limit") from exc
+
+
+def _hash_bounded_artifact(
+    artifact: ArtifactMetadata,
+    *,
+    max_bytes: int,
+) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    byte_count = 0
+    path = Path(artifact.storage_path)
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            byte_count += len(chunk)
+            if byte_count > max_bytes:
+                raise ValueError(f"{artifact.artifact_type} exceeds the retained-byte limit")
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest(), byte_count
 
 
 def _require_px4_metric_evidence(
@@ -1012,6 +1069,24 @@ def _require_px4_metric_evidence(
     contract = verify_telemetry_semantic_contract(telemetry)
     if contract is None:
         raise ValueError("PX4/Gazebo telemetry semantic contract is invalid")
+    ulog_artifacts = [artifact for artifact in artifacts if artifact.artifact_type == "px4_ulog"]
+    if contract.source_kind == "px4_ulog":
+        if len(ulog_artifacts) != 1:
+            raise ValueError("PX4 ULog telemetry requires exactly one retained origin artifact")
+        ulog_artifact = ulog_artifacts[0]
+        if ulog_artifact.mime_type != "application/octet-stream":
+            raise ValueError("retained PX4 ULog must declare application/octet-stream")
+        ulog_sha256, ulog_byte_count = _hash_bounded_artifact(
+            ulog_artifact,
+            max_bytes=_MAX_PX4_ULOG_BYTES,
+        )
+        if (
+            ulog_sha256 != contract.origin_source_sha256
+            or ulog_byte_count != contract.origin_source_byte_count
+        ):
+            raise ValueError("retained PX4 ULog bytes do not match telemetry origin provenance")
+    elif ulog_artifacts:
+        raise ValueError("non-ULog telemetry cannot attach a retained PX4 ULog artifact")
     raw_metric = metrics.raw_metric_json
     if (
         raw_metric.get("rmse_integration") != "time_weighted_trapezoidal"
@@ -1302,7 +1377,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_TIMEOUT,
+                    code=FAILURE_EXECUTION_TIMEOUT,
                     reason=(
                         f"Real simulator exceeded timeout of {timeout:g}s for trial {ctx.trial_id}."
                     ),
@@ -1330,7 +1405,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=(
                         "Simulator exited without producing trial_result.json "
                         f"(exit={proc.returncode})."
@@ -1346,7 +1421,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=f"trial_result.json was malformed: {exc}",
                 ),
                 log_excerpt=combined_log,
@@ -1357,7 +1432,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason="trial_result.json must be a JSON object.",
                 ),
                 log_excerpt=combined_log,
@@ -1370,7 +1445,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=f"Simulator result identity was invalid: {exc}",
                 ),
                 log_excerpt=combined_log,
@@ -1387,7 +1462,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason="trial_result.json field 'success' must be a boolean.",
                 ),
                 log_excerpt=combined_log,
@@ -1397,25 +1472,15 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
             failure_raw = raw.get("failure") if isinstance(raw.get("failure"), dict) else {}
             if not isinstance(failure_raw, dict):
                 failure_raw = {}
-            code_value = failure_raw.get("code")
-            code: str = (
-                code_value.strip()[:64]
-                if isinstance(code_value, str)
-                and code_value.strip()
-                and not any(ord(char) < 32 for char in code_value)
-                else FAILURE_SIMULATION
+            claimed_code = _diagnostic_failure_code(failure_raw.get("code"))
+            claimed_reason = _diagnostic_failure_reason(failure_raw.get("reason"))
+            reason = _truncate(
+                (
+                    "External simulator reported an unverified failure "
+                    f"(claimed_code={claimed_code}): {claimed_reason}"
+                ),
+                1200,
             )
-            reason_value = failure_raw.get("reason")
-            reason: str = (
-                _truncate(
-                    reason_value.replace("\x00", " ").replace("\r", " ").strip(),
-                    1000,
-                )
-                if isinstance(reason_value, str) and reason_value.strip()
-                else "Simulator reported failure without a reason."
-            )
-            if not reason:
-                reason = "Simulator reported failure without a reason."
             try:
                 failure_artifacts = _sanitize_artifacts_for_trial(
                     _parse_artifacts(raw),
@@ -1427,7 +1492,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
             return TrialResult(
                 success=False,
                 backend=self.backend_name,
-                failure=TrialFailure(code=code, reason=reason),
+                failure=TrialFailure(code=FAILURE_UNVERIFIED_REPORT, reason=reason),
                 artifacts=failure_artifacts,
                 log_excerpt=log_text,
             )
@@ -1437,7 +1502,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=(
                         "Simulator reported success but its process exited non-zero "
                         f"(exit={proc.returncode}); result was rejected."
@@ -1464,7 +1529,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=f"Malformed simulator output: {exc}",
                 ),
                 log_excerpt=combined_log,

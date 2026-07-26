@@ -29,6 +29,11 @@ from app.orchestration.optimizer import (
     generate_selected_parameter_candidates,
 )
 from app.parameters import validate_parameter_values
+from app.simulator.base import (
+    FAILURE_EXECUTION_TIMEOUT,
+    FAILURE_INVALID_RESULT,
+    FAILURE_UNVERIFIED_REPORT,
+)
 
 # --- Candidate generation --------------------------------------------------
 
@@ -76,9 +81,7 @@ def test_optimizer_fidelity_prefers_effective_coverage_and_rejects_invalid_value
     ) == pytest.approx(0.25)
     assert job_manager._optimizer_fidelity({"fidelity": float("nan")}) == 0.0
     assert job_manager._optimizer_fidelity({"fidelity": True}) == 0.0
-    assert job_manager._optimizer_requested_fidelity(
-        {"requested_fidelity": "invalid"}
-    ) == 0.0
+    assert job_manager._optimizer_requested_fidelity({"requested_fidelity": "invalid"}) == 0.0
 
 
 def test_generate_candidates_uses_only_whitelisted_keys() -> None:
@@ -146,9 +149,7 @@ def test_generate_candidates_rejects_boolean_count() -> None:
 
 def test_generate_candidates_generation_index_starts_at_one() -> None:
     proposals = generate_candidates(dict(constants.BASELINE_PARAMETERS))
-    assert [p.generation_index for p in proposals] == list(
-        range(1, len(proposals) + 1)
-    )
+    assert [p.generation_index for p in proposals] == list(range(1, len(proposals) + 1))
 
 
 def test_generate_selected_parameter_candidates_uses_declared_domain() -> None:
@@ -181,10 +182,7 @@ def test_generate_selected_parameter_candidates_uses_declared_domain() -> None:
     )
     assert len(proposals) == 4
     assert len({tuple(sorted(item.parameters.items())) for item in proposals}) == 4
-    assert all(
-        set(item.parameters) == {"MPC_XY_P", "MPC_TILTMAX_AIR"}
-        for item in proposals
-    )
+    assert all(set(item.parameters) == {"MPC_XY_P", "MPC_TILTMAX_AIR"} for item in proposals)
     assert all(item.parameters["MPC_TILTMAX_AIR"].is_integer() for item in proposals)
 
 
@@ -215,8 +213,7 @@ def test_selected_parameter_design_skips_catalog_coupling_violations() -> None:
 
     assert len(proposals) == 20
     assert all(
-        proposal.parameters["MPC_ACC_HOR"]
-        <= proposal.parameters["MPC_ACC_HOR_MAX"]
+        proposal.parameters["MPC_ACC_HOR"] <= proposal.parameters["MPC_ACC_HOR_MAX"]
         for proposal in proposals
     )
 
@@ -330,9 +327,7 @@ def test_score_candidate_penalises_failed_trials() -> None:
     with_fail = aggregation._score_candidate(base, trial_count=2, failed=1)
     # failed_rate goes from 0 to 0.5, weighted by 1.5 = +0.75.
     assert with_fail > no_fail
-    assert round(with_fail - no_fail, 4) == round(
-        constants.SCORE_WEIGHTS["failed_trial"] * 0.5, 4
-    )
+    assert round(with_fail - no_fail, 4) == round(constants.SCORE_WEIGHTS["failed_trial"] * 0.5, 4)
 
 
 def test_score_candidate_penalises_crash_timeout_instability() -> None:
@@ -389,6 +384,9 @@ def test_aggregation_rejects_completed_trial_with_missing_required_metric() -> N
             "infrastructure_failure",
         ),
         ("CANCELLED", "CANCELLED", False, "cancelled"),
+        ("FAILED", FAILURE_EXECUTION_TIMEOUT, False, "infrastructure_failure"),
+        ("FAILED", FAILURE_INVALID_RESULT, False, "invalid_evidence"),
+        ("FAILED", FAILURE_UNVERIFIED_REPORT, False, "invalid_evidence"),
         ("COMPLETED", None, False, "invalid_evidence"),
         ("FAILED", "UNRECOGNIZED_FAILURE", False, "unknown_failure"),
     ],
@@ -436,9 +434,7 @@ def test_infrastructure_failures_block_acceptance_without_poisoning_optimizer() 
     result = aggregation._aggregate_candidate(
         candidate,
         [completed, infrastructure],
-        objective_config=schemas.ObjectiveConfig(
-            objectives=[schemas.ObjectiveSpec(metric="rmse")]
-        ),
+        objective_config=schemas.ObjectiveConfig(objectives=[schemas.ObjectiveSpec(metric="rmse")]),
         scenario_suite=schemas.ScenarioSuiteConfig(
             cases=[
                 schemas.ScenarioCaseConfig(
@@ -452,6 +448,7 @@ def test_infrastructure_failures_block_acceptance_without_poisoning_optimizer() 
     assert result is not None
     assert result["training_failure_rate"] == pytest.approx(0.5)
     assert result["optimizer_learning_failure_rate"] == pytest.approx(0.0)
+    assert result["aggregated_score"] == pytest.approx(result["scalar_loss"])
     assert result["training_trial_outcome_counts"] == {
         "success": 1,
         "domain_failure": 0,
@@ -522,18 +519,12 @@ def test_multiobjective_aggregation_uses_robust_score_and_hard_constraints() -> 
     objective_config = schemas.ObjectiveConfig(
         objectives=[schemas.ObjectiveSpec(metric="rmse", direction="minimize")],
         constraints=[
-            schemas.ConstraintSpec(
-                metric="crash_flag", operator="lte", threshold=0, hard=True
-            )
+            schemas.ConstraintSpec(metric="crash_flag", operator="lte", threshold=0, hard=True)
         ],
         robust_aggregation="worst",
     )
     scenario_suite = schemas.ScenarioSuiteConfig(
-        cases=[
-            schemas.ScenarioCaseConfig(
-                id="wind", scenario_type="wind_perturbed", seeds=[1, 2]
-            )
-        ]
+        cases=[schemas.ScenarioCaseConfig(id="wind", scenario_type="wind_perturbed", seeds=[1, 2])]
     )
     result = aggregation._aggregate_candidate(
         candidate,
@@ -582,11 +573,7 @@ def test_raw_adapter_metrics_cannot_override_canonical_safety_metrics() -> None:
         ]
     )
     scenario_suite = schemas.ScenarioSuiteConfig(
-        cases=[
-            schemas.ScenarioCaseConfig(
-                id="nominal", scenario_type="nominal", seeds=[101]
-            )
-        ]
+        cases=[schemas.ScenarioCaseConfig(id="nominal", scenario_type="nominal", seeds=[101])]
     )
 
     result = aggregation._aggregate_candidate(
@@ -740,10 +727,7 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
     assert result["objective_values"]["rmse"] == pytest.approx(3.0)
     assert result["rmse"] == pytest.approx(3.0)
     assert result["acceptance_rmse"] == pytest.approx(3.0)
-    assert (
-        result["objective_estimator"]
-        == "within_case_mean_then_fixed_suite_mean_v1"
-    )
+    assert result["objective_estimator"] == "within_case_mean_then_fixed_suite_mean_v1"
     assert result["constraint_estimator"] == "worst_usable_seed_v1"
     assert result["training_scenario_case_rates"] == [
         {
@@ -795,9 +779,7 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
     )
     acceptance_result = acceptance.evaluate_candidate(
         candidate,
-        acceptance.AcceptanceCriteria(
-            target_rmse=None, target_max_error=None, min_pass_rate=0.2
-        ),
+        acceptance.AcceptanceCriteria(target_rmse=None, target_max_error=None, min_pass_rate=0.2),
     )
     assert acceptance_result.passed is False
     assert acceptance_result.reason == "pass_rate_too_low"
@@ -943,10 +925,7 @@ def test_cvar_is_estimated_within_case_before_fixed_suite_weights() -> None:
     # case weights then produce 7. A flat CVaR over all seeds would return 10.
     assert result["objective_values"]["rmse"] == pytest.approx(7.0)
     assert result["acceptance_rmse"] == pytest.approx(3.5)
-    assert (
-        result["objective_estimator"]
-        == "within_case_cvar_then_fixed_suite_mean_v1"
-    )
+    assert result["objective_estimator"] == "within_case_cvar_then_fixed_suite_mean_v1"
 
 
 def test_dispatched_case_without_any_usable_metric_has_no_scalar_objective() -> None:
@@ -1038,9 +1017,7 @@ def test_acceptance_uses_worst_trial_max_error_and_keeps_legacy_mean() -> None:
     assert result["max_error_worst"] == pytest.approx(10.0)
     target_five = acceptance.evaluate_candidate(
         candidate,
-        acceptance.AcceptanceCriteria(
-            target_rmse=None, target_max_error=5.0, min_pass_rate=0.0
-        ),
+        acceptance.AcceptanceCriteria(target_rmse=None, target_max_error=5.0, min_pass_rate=0.0),
     )
     assert target_five.passed is False
     assert target_five.reason == "max_error_above_target"
@@ -1049,9 +1026,7 @@ def test_acceptance_uses_worst_trial_max_error_and_keeps_legacy_mean() -> None:
     # historical 5.05 mean, which would otherwise have passed.
     assert not acceptance.evaluate_candidate(
         candidate,
-        acceptance.AcceptanceCriteria(
-            target_rmse=None, target_max_error=6.0, min_pass_rate=0.0
-        ),
+        acceptance.AcceptanceCriteria(target_rmse=None, target_max_error=6.0, min_pass_rate=0.0),
     ).passed
 
 
@@ -1091,15 +1066,11 @@ def test_partial_holdout_failure_is_reported_and_never_marked_feasible() -> None
     result = aggregation._aggregate_candidate(
         candidate,
         trials,
-        objective_config=schemas.ObjectiveConfig(
-            objectives=[schemas.ObjectiveSpec(metric="rmse")]
-        ),
+        objective_config=schemas.ObjectiveConfig(objectives=[schemas.ObjectiveSpec(metric="rmse")]),
         scenario_suite=schemas.ScenarioSuiteConfig(
             cases=[
                 schemas.ScenarioCaseConfig(id="training", seeds=[1]),
-                schemas.ScenarioCaseConfig(
-                    id="validation", seeds=[2, 3], holdout=True, weight=2
-                ),
+                schemas.ScenarioCaseConfig(id="validation", seeds=[2, 3], holdout=True, weight=2),
             ]
         ),
     )
@@ -1419,10 +1390,7 @@ def test_acceptance_prefers_verified_candidate_outcome_evidence() -> None:
         candidate_id=candidate.id,
         generation_index=candidate.generation_index,
         parameter_snapshot={"MPC_XY_P": 0.95},
-        trial_evidence_rows=[
-            trial_outcome_evidence_row(trial)
-            for trial in candidate.trials
-        ],
+        trial_evidence_rows=[trial_outcome_evidence_row(trial) for trial in candidate.trials],
         aggregate=aggregate,
     )
     candidate.aggregated_metric_json = {
@@ -1515,9 +1483,7 @@ def test_acceptance_prefers_verified_candidate_outcome_evidence() -> None:
     assert changed_trial_observation.failure_rate == 1.0
     candidate.trials[0].metric.rmse = 0.1
 
-    candidate.aggregated_metric_json["candidate_outcome_evidence"][
-        "scalar_loss"
-    ] = -1.0
+    candidate.aggregated_metric_json["candidate_outcome_evidence"]["scalar_loss"] = -1.0
     invalid = acceptance.evaluate_candidate(
         candidate,
         acceptance.AcceptanceCriteria(

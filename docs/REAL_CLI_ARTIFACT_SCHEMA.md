@@ -42,6 +42,15 @@ A failed run sets `success=false`, omits `metrics`, and supplies
 `failure: {"code": "...", "reason": "..."}`. `log_excerpt` is optional in
 both cases.
 
+The external `failure.code` is a bounded diagnostic claim, not a trusted
+taxonomy decision. The adapter persists the canonical
+`UNVERIFIED_SIMULATOR_FAILURE` code for every producer-reported failure and
+keeps the claimed code only inside its sanitized reason. Missing, malformed,
+identity-mismatched, or inconsistent result envelopes become
+`INVALID_SIMULATOR_RESULT`. A wall-clock process kill observed by the adapter
+becomes `SIMULATOR_EXECUTION_TIMEOUT`. None of these nonphysical outcomes may
+teach either the numerical or GPT parameter optimizer.
+
 `success` and all metric flags are strict JSON booleans, not strings or
 integers. Metric numbers must be finite; error/time metrics are non-negative,
 and `overshoot_count` is a non-negative integer. A successful result is
@@ -174,10 +183,15 @@ limit and nesting failures are rejected rather than escaping the validation
 boundary.
 
 Together these contracts prove the semantics, geometric measurements, and
-current verdict/score of the retained normalized telemetry. They do not yet make
-the original ULog permanently replayable when that raw log is not retained, make
-SQL and object-store publication atomic, or establish an operational WORM
-retention policy.
+current verdict/score of the retained normalized telemetry. When
+`source_kind=px4_ulog`, a successful bundled Trial also requires exactly one
+`px4_ulog` Artifact with `application/octet-stream`. The local wrapper copies
+the source into the Trial run directory before extraction, and `real_cli`
+streams the retained bytes through SHA-256 while enforcing the 1 GiB limit. The
+digest and byte count must match the telemetry origin provenance exactly.
+Cross-Trial artifact paths, missing/duplicate origin artifacts, empty ULogs, and
+mutated bytes fail closed. SQL and object-store publication atomicity plus an
+operational WORM retention policy remain separate deployment boundaries.
 
 ## PX4 parameter evidence
 

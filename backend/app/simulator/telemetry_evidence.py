@@ -12,9 +12,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 TELEMETRY_SCHEMA_V2 = "dronedream.telemetry.v2"
-TELEMETRY_SEMANTIC_CONTRACT_V1 = (
-    "dronedream.telemetry-semantic-contract/v1"
-)
+TELEMETRY_SEMANTIC_CONTRACT_V1 = "dronedream.telemetry-semantic-contract/v1"
 TELEMETRY_VERIFIER_REVISION = "telemetry-semantic-verifier-1.0"
 
 MIN_SAMPLING_COVERAGE = 0.8
@@ -61,13 +59,9 @@ class TelemetrySamplingEvidenceV1(BaseModel):
                     self.max_gap_s,
                 )
             ):
-                raise ValueError(
-                    "single-sample telemetry cannot claim an interval"
-                )
+                raise ValueError("single-sample telemetry cannot claim an interval")
         elif self.duration_s <= 0 or self.median_interval_s <= 0:
-            raise ValueError(
-                "multi-sample telemetry requires positive duration and interval"
-            )
+            raise ValueError("multi-sample telemetry requires positive duration and interval")
         return self
 
 
@@ -78,23 +72,19 @@ class TelemetrySemanticContractV1(BaseModel):
         allow_inf_nan=False,
     )
 
-    schema_id: Literal[
+    schema_id: Literal["dronedream.telemetry-semantic-contract/v1"] = (
         "dronedream.telemetry-semantic-contract/v1"
-    ] = "dronedream.telemetry-semantic-contract/v1"
+    )
     contract_id: Sha256Id
-    verifier_revision: Literal[
+    verifier_revision: Literal["telemetry-semantic-verifier-1.0"] = (
         "telemetry-semantic-verifier-1.0"
-    ] = "telemetry-semantic-verifier-1.0"
+    )
     position_unit: Literal["m"] = "m"
     velocity_unit: Literal["m/s"] = "m/s"
     attitude_unit: Literal["rad"] = "rad"
     time_unit: Literal["s"] = "s"
-    coordinate_frame: Literal[
-        "dronedream_local_cartesian_z_up"
-    ] = "dronedream_local_cartesian_z_up"
-    time_origin: Literal[
-        "relative_to_source_start"
-    ] = "relative_to_source_start"
+    coordinate_frame: Literal["dronedream_local_cartesian_z_up"] = "dronedream_local_cartesian_z_up"
+    time_origin: Literal["relative_to_source_start"] = "relative_to_source_start"
     source_kind: Literal[
         "launcher_json",
         "launcher_csv",
@@ -137,15 +127,11 @@ class TelemetrySemanticContractV1(BaseModel):
         if any(value is not None for value in origin_values) and not all(
             value is not None for value in origin_values
         ):
-            raise ValueError(
-                "origin telemetry provenance must be complete or absent"
-            )
-        if self.source_kind == "px4_ulog" and not all(
-            value is not None for value in origin_values
-        ):
-            raise ValueError(
-                "PX4 ULog telemetry requires complete origin provenance"
-            )
+            raise ValueError("origin telemetry provenance must be complete or absent")
+        if self.source_kind == "px4_ulog" and not all(value is not None for value in origin_values):
+            raise ValueError("PX4 ULog telemetry requires complete origin provenance")
+        if self.source_kind == "px4_ulog" and self.origin_source_byte_count == 0:
+            raise ValueError("PX4 ULog origin cannot be empty")
         return self
 
 
@@ -160,9 +146,7 @@ def _canonical_json(value: object) -> str:
 
 
 def _sha256_id(value: object) -> str:
-    return "sha256:" + hashlib.sha256(
-        _canonical_json(value).encode("utf-8")
-    ).hexdigest()
+    return "sha256:" + hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -171,18 +155,10 @@ def sha256_bytes(value: bytes) -> str:
 
 def _finite_time(sample: object, *, index: int) -> float:
     if not isinstance(sample, Mapping):
-        raise TelemetrySemanticContractError(
-            f"telemetry sample {index} must be an object"
-        )
+        raise TelemetrySemanticContractError(f"telemetry sample {index} must be an object")
     raw = sample.get("t")
-    if (
-        isinstance(raw, bool)
-        or not isinstance(raw, int | float)
-        or not math.isfinite(float(raw))
-    ):
-        raise TelemetrySemanticContractError(
-            f"telemetry sample {index} requires finite time"
-        )
+    if isinstance(raw, bool) or not isinstance(raw, int | float) or not math.isfinite(float(raw)):
+        raise TelemetrySemanticContractError(f"telemetry sample {index} requires finite time")
     return float(raw)
 
 
@@ -190,13 +166,8 @@ def compile_sampling_evidence(
     samples: Sequence[object],
 ) -> TelemetrySamplingEvidenceV1:
     if not samples:
-        raise TelemetrySemanticContractError(
-            "telemetry samples cannot be empty"
-        )
-    times = [
-        _finite_time(sample, index=index)
-        for index, sample in enumerate(samples)
-    ]
+        raise TelemetrySemanticContractError("telemetry samples cannot be empty")
+    times = [_finite_time(sample, index=index) for index, sample in enumerate(samples)]
     gaps: list[float] = []
     for index, (previous, current) in enumerate(
         zip(times, times[1:], strict=False),
@@ -254,14 +225,8 @@ def require_sampling_quality(
             "metric-bearing telemetry requires at least two timed samples"
         )
     if sampling.max_gap_s > sampling.max_gap_limit_s + 1e-12:
-        raise TelemetrySemanticContractError(
-            "telemetry maximum gap exceeds its semantic contract"
-        )
-    if (
-        sampling.sampling_coverage
-        + 1e-12
-        < sampling.minimum_sampling_coverage
-    ):
+        raise TelemetrySemanticContractError("telemetry maximum gap exceeds its semantic contract")
+    if sampling.sampling_coverage + 1e-12 < sampling.minimum_sampling_coverage:
         raise TelemetrySemanticContractError(
             "telemetry sampling coverage is below its semantic contract"
         )
@@ -296,15 +261,9 @@ def compile_telemetry_semantic_contract(
         "synthetic": synthetic,
         "sampling": sampling.model_dump(mode="json"),
         "origin_source_sha256": origin.get("origin_source_sha256"),
-        "origin_source_byte_count": origin.get(
-            "origin_source_byte_count"
-        ),
-        "origin_extraction_revision": origin.get(
-            "origin_extraction_revision"
-        ),
-        "origin_coordinate_frame": origin.get(
-            "origin_coordinate_frame"
-        ),
+        "origin_source_byte_count": origin.get("origin_source_byte_count"),
+        "origin_extraction_revision": origin.get("origin_extraction_revision"),
+        "origin_coordinate_frame": origin.get("origin_coordinate_frame"),
         "coordinate_transform": origin.get("coordinate_transform"),
     }
     return TelemetrySemanticContractV1.model_validate(
@@ -319,10 +278,7 @@ def verify_telemetry_semantic_contract(
         return None
     samples = payload.get("samples")
     raw_contract = payload.get("semantic_contract")
-    if (
-        payload.get("schema_version") != TELEMETRY_SCHEMA_V2
-        or not isinstance(samples, list)
-    ):
+    if payload.get("schema_version") != TELEMETRY_SCHEMA_V2 or not isinstance(samples, list):
         return None
     try:
         contract = TelemetrySemanticContractV1.model_validate(raw_contract)

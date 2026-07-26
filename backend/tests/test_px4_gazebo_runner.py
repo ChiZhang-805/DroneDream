@@ -57,6 +57,22 @@ def test_runner_rejects_non_regular_contract_files(tmp_path: Path) -> None:
         runner_module._require_effect_evidence_file(evidence_directory)
 
 
+def test_runner_collects_retained_px4_ulog_as_trial_artifact(
+    tmp_path: Path,
+) -> None:
+    retained = tmp_path / "px4_source.ulg"
+    retained.write_bytes(b"retained ULog")
+
+    artifacts = runner_module._collect_artifacts(tmp_path)
+    ulog_artifact = next(
+        artifact for artifact in artifacts if artifact["artifact_type"] == "px4_ulog"
+    )
+
+    assert ulog_artifact["storage_path"] == str(retained)
+    assert ulog_artifact["mime_type"] == "application/octet-stream"
+    assert ulog_artifact["file_size_bytes"] == len(b"retained ULog")
+
+
 def test_runner_rejects_oversized_trial_input_before_json_decode(tmp_path: Path) -> None:
     input_path = tmp_path / "trial_input.json"
     with input_path.open("wb") as stream:
