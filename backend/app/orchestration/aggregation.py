@@ -53,7 +53,6 @@ from app.optimization.outcome_evidence import (
     compile_candidate_report_evidence,
     require_authoritative_candidate_report_projection,
     trial_is_holdout,
-    trial_outcome_evidence_row,
 )
 from app.optimization.outcome_taxonomy import (
     TRIAL_OUTCOME_CLASSES,
@@ -1148,26 +1147,34 @@ def _aggregate_candidate(
                     trial.id,
                 ),
             )
+            report_trial_rows = candidate_report_trial_evidence_rows(
+                candidate,
+                bind_artifacts=True,
+                verify_artifact_bytes=True,
+            )
+            if report_trial_rows is None:
+                raise ValueError(
+                    "candidate report evidence requires readable, "
+                    "byte-verified Trial artifact rows"
+                )
+            report_rows_by_trial_id = {
+                str(row["trial_id"]): row for row in report_trial_rows
+            }
+            training_trial_rows = [
+                report_rows_by_trial_id[trial.id]
+                for trial in ordered_training_trials
+            ]
             evidence = compile_candidate_outcome_evidence(
                 outcome_contract_id=outcome_contract.contract_id,
                 candidate_id=candidate.id,
                 generation_index=candidate.generation_index,
                 parameter_snapshot=candidate.parameter_json,
-                trial_evidence_rows=[
-                    trial_outcome_evidence_row(trial)
-                    for trial in ordered_training_trials
-                ],
+                trial_evidence_rows=training_trial_rows,
                 aggregate=agg,
+                bind_trial_artifacts=True,
             )
             agg["candidate_outcome_evidence_required"] = True
             agg["candidate_outcome_evidence"] = evidence.model_dump(mode="json")
-            report_trial_rows = candidate_report_trial_evidence_rows(
-                candidate
-            )
-            if report_trial_rows is None:
-                raise ValueError(
-                    "candidate report evidence requires readable Trial rows"
-                )
             report_evidence = compile_candidate_report_evidence(
                 candidate_outcome_evidence=evidence.model_dump(mode="json"),
                 report_trial_evidence_rows=report_trial_rows,

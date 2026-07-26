@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import cast
 from urllib.parse import urlparse
@@ -75,6 +76,25 @@ class S3ArtifactStorage(ArtifactStorage):
         bucket, key = self._configured_location(storage_uri)
         response = self._client.get_object(Bucket=bucket, Key=key)
         return cast(bytes, response["Body"].read())
+
+    def content_digest(self, storage_uri: str) -> tuple[str, int]:
+        bucket, key = self._configured_location(storage_uri)
+        response = self._client.get_object(Bucket=bucket, Key=key)
+        body = response["Body"]
+        digest = hashlib.sha256()
+        size = 0
+        try:
+            while True:
+                chunk = body.read(1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                size += len(chunk)
+        finally:
+            close = getattr(body, "close", None)
+            if callable(close):
+                close()
+        return digest.hexdigest(), size
 
     def exists(self, storage_uri: str) -> bool:
         bucket, key = self._configured_location(storage_uri)

@@ -356,9 +356,34 @@ transaction. A storage administrator can still delete or replace objects, and
 a database owner can drop the mutation guards; production therefore still
 needs object versioning/retention, least-privilege storage credentials,
 separate migration ownership, and privileged-operation audit. The receipts are
-also not yet summarized into each Trial's canonical Candidate outcome/report
-evidence, so that cross-layer evidence binding remains the next implementation
-step.
+not a substitute for those operational controls.
+
+Outcome Contract compiler 2.9 adds
+`dronedream.trial-artifact-evidence/v1`,
+`dronedream.trial-outcome-evidence/v2`,
+`dronedream.candidate-outcome-evidence/v2`, and
+`dronedream.candidate-report-evidence/v2`. Aggregation now reconstructs the
+complete Artifact set for every Candidate Trial, verifies every real stored
+object against its immutable receipt, and binds a deterministically sorted
+projection of Artifact ID/type, receipt/evidence ID, content SHA-256, byte
+count, MIME type, and storage-path SHA-256 into the Trial row. Local and
+S3-compatible verification streams SHA-256 rather than loading a whole large
+artifact into memory. A real non-mock Artifact without a receipt, changed
+metadata, missing row, extra row, cross-Candidate owner, or changed stored byte
+fails closed. Historical `mock://` rows are labeled
+`mock-metadata-only`—never falsely described as byte evidence—and remain
+hash-bound as metadata.
+
+Search-role Candidate outcome evidence contains only training Trial v2 rows.
+Candidate report evidence independently binds every Candidate Trial v2 row,
+including holdout, and reports sealed versus metadata-only counts. Report
+publication re-verifies the current stored bytes before freezing/exporting the
+winner. Existing v1 Candidate outcome/report envelopes remain readable and are
+verified with their original digest rules; only newly aggregated Jobs opt into
+v2. This closes the retained Artifact-to-Trial-to-Candidate-to-report byte
+binding for the current compatibility layer. Physical execution-attempt
+lineage, an append-only relational Candidate evidence ledger, object-store/SQL
+atomicity, and an operational WORM policy remain separate future boundaries.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic

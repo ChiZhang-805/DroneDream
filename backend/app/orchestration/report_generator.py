@@ -65,11 +65,14 @@ class ReportEvidenceError(RuntimeError):
 def _authoritative_report_aggregate(
     candidate: models.CandidateParameterSet,
     aggregate: object,
+    *,
+    verify_artifact_bytes: bool = False,
 ) -> dict[str, Any]:
     try:
         projection = require_authoritative_candidate_report_projection(
             candidate,
             aggregate,
+            verify_artifact_bytes=verify_artifact_bytes,
         )
     except CandidateReportEvidenceError as exc:
         raise ReportEvidenceError(str(exc)) from exc
@@ -885,6 +888,7 @@ def generate_and_persist_report(
         candidate.id: _authoritative_report_aggregate(
             candidate,
             candidate.aggregated_metric_json,
+            verify_artifact_bytes=True,
         )
         for candidate in job.candidates
         if candidate.aggregated_metric_json is not None

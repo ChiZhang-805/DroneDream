@@ -23,6 +23,10 @@ def test_local_storage_roundtrip(tmp_path: Path, monkeypatch) -> None:
     assert uri == str(f.resolve())
     assert storage.exists(uri)
     assert storage.read_bytes(uri) == b'{"ok":true}'
+    assert storage.content_digest(uri) == (
+        "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        11,
+    )
     with pytest.raises(ValueError, match="outside allowed roots"):
         storage.read_bytes(str(tmp_path.parent / "outside.json"))
     get_settings.cache_clear()
@@ -43,8 +47,21 @@ def test_s3_storage_fake_client(monkeypatch) -> None:
     get_settings.cache_clear()
 
     class _Body:
-        def read(self) -> bytes:
-            return b"payload"
+        def __init__(self) -> None:
+            self._offset = 0
+            self.closed = False
+
+        def read(self, size: int = -1) -> bytes:
+            payload = b"payload"
+            if self._offset >= len(payload):
+                return b""
+            end = len(payload) if size < 0 else self._offset + size
+            chunk = payload[self._offset : end]
+            self._offset += len(chunk)
+            return chunk
+
+        def close(self) -> None:
+            self.closed = True
 
     class _FakeClient:
         def __init__(self) -> None:
@@ -115,6 +132,10 @@ def test_s3_storage_fake_client(monkeypatch) -> None:
     assert uri == "s3://bucket/prefix/jobs/j1/a.txt"
     assert storage.exists(uri) is True
     assert storage.read_bytes(uri) == b"payload"
+    assert storage.content_digest(uri) == (
+        "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5",
+        7,
+    )
     assert storage.presign_download(uri, expires_seconds=120) == (
         "https://objects.example/signed"
     )

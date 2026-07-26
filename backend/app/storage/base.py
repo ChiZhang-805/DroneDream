@@ -11,6 +11,9 @@ class ArtifactStorage(Protocol):
     def read_bytes(self, storage_uri: str) -> bytes:
         """Read an artifact payload from storage."""
 
+    def content_digest(self, storage_uri: str) -> tuple[str, int]:
+        """Stream an artifact and return its SHA-256 hex digest and byte size."""
+
     def exists(self, storage_uri: str) -> bool:
         """Return whether the artifact exists in storage."""
 

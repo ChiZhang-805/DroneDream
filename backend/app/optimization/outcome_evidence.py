@@ -15,20 +15,41 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    ValidationError,
+    model_validator,
+)
 
 from app.optimization.outcome_taxonomy import (
     TRIAL_OUTCOME_TAXONOMY_SCHEMA,
 )
+from app.storage.evidence import (
+    MOCK_METADATA_ARTIFACT_EVIDENCE,
+    SEALED_ARTIFACT_EVIDENCE,
+    TRIAL_ARTIFACT_EVIDENCE_SCHEMA,
+    candidate_trial_artifact_evidence,
+)
 
 CANDIDATE_OUTCOME_EVIDENCE_SCHEMA = "dronedream.candidate-outcome-evidence/v1"
 CANDIDATE_REPORT_EVIDENCE_SCHEMA = "dronedream.candidate-report-evidence/v1"
+CANDIDATE_OUTCOME_EVIDENCE_V2_SCHEMA = (
+    "dronedream.candidate-outcome-evidence/v2"
+)
+CANDIDATE_REPORT_EVIDENCE_V2_SCHEMA = (
+    "dronedream.candidate-report-evidence/v2"
+)
+TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA = "dronedream.trial-outcome-evidence/v2"
 
 FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
 NonnegativeFloat = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
 Rate = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)]
 NonnegativeInt = Annotated[int, Field(ge=0)]
 Sha256Id = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
+Sha256Hex = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
 
 class _FrozenModel(BaseModel):
@@ -37,6 +58,82 @@ class _FrozenModel(BaseModel):
         frozen=True,
         allow_inf_nan=False,
     )
+
+
+class TrialArtifactItemEvidenceV1(_FrozenModel):
+    artifact_id: str = Field(min_length=1, max_length=128)
+    owner_type: Literal["trial"] = "trial"
+    owner_id: str = Field(min_length=1, max_length=128)
+    artifact_type: str = Field(min_length=1, max_length=128)
+    mime_type: str | None = Field(default=None, max_length=128)
+    content_evidence: Literal["sealed-bytes", "mock-metadata-only"]
+    receipt_id: str | None = Field(default=None, min_length=1, max_length=128)
+    receipt_evidence_id: Sha256Id | None
+    content_sha256: Sha256Hex | None
+    content_size_bytes: NonnegativeInt | None
+    storage_path_sha256: Sha256Hex
+
+    @model_validator(mode="after")
+    def _validate_content_boundary(self) -> TrialArtifactItemEvidenceV1:
+        sealed_fields = (
+            self.receipt_id,
+            self.receipt_evidence_id,
+            self.content_sha256,
+            self.content_size_bytes,
+        )
+        if self.content_evidence == SEALED_ARTIFACT_EVIDENCE:
+            if any(value is None for value in sealed_fields):
+                raise ValueError(
+                    "sealed artifact evidence requires a complete byte receipt"
+                )
+        elif any(value is not None for value in sealed_fields):
+            raise ValueError(
+                "mock metadata-only evidence cannot claim sealed bytes"
+            )
+        return self
+
+
+class TrialArtifactEvidenceV1(_FrozenModel):
+    schema_id: Literal["dronedream.trial-artifact-evidence/v1"] = (
+        "dronedream.trial-artifact-evidence/v1"
+    )
+    trial_id: str = Field(min_length=1, max_length=128)
+    artifact_count: NonnegativeInt
+    sealed_artifact_count: NonnegativeInt
+    metadata_only_artifact_count: NonnegativeInt
+    artifacts: tuple[TrialArtifactItemEvidenceV1, ...]
+
+    @model_validator(mode="after")
+    def _validate_set(self) -> TrialArtifactEvidenceV1:
+        if self.artifact_count != len(self.artifacts):
+            raise ValueError("artifact evidence count does not match rows")
+        sealed_count = sum(
+            item.content_evidence == SEALED_ARTIFACT_EVIDENCE
+            for item in self.artifacts
+        )
+        metadata_count = sum(
+            item.content_evidence == MOCK_METADATA_ARTIFACT_EVIDENCE
+            for item in self.artifacts
+        )
+        if (
+            sealed_count != self.sealed_artifact_count
+            or metadata_count != self.metadata_only_artifact_count
+            or sealed_count + metadata_count != self.artifact_count
+        ):
+            raise ValueError("artifact evidence class counts diverged")
+        if any(item.owner_id != self.trial_id for item in self.artifacts):
+            raise ValueError(
+                "artifact evidence contains a different Trial owner"
+            )
+        ordering = [
+            (item.artifact_type, item.artifact_id)
+            for item in self.artifacts
+        ]
+        if ordering != sorted(ordering) or len(set(ordering)) != len(ordering):
+            raise ValueError(
+                "artifact evidence rows must be unique and canonical"
+            )
+        return self
 
 
 class CandidateSelectionKeyV1(_FrozenModel):
@@ -91,6 +188,48 @@ class CandidateOutcomeEvidenceV1(_FrozenModel):
     acceptance_projection: CandidateAcceptanceProjectionV1
 
 
+class CandidateOutcomeEvidenceV2(_FrozenModel):
+    schema_id: Literal["dronedream.candidate-outcome-evidence/v2"] = (
+        "dronedream.candidate-outcome-evidence/v2"
+    )
+    evidence_id: Sha256Id
+    role: Literal["search"] = "search"
+    outcome_contract_id: Sha256Id
+    candidate_id: str = Field(min_length=1, max_length=128)
+    generation_index: NonnegativeInt
+    parameter_sha256: Sha256Id
+    trial_evidence_schema: Literal[
+        "dronedream.trial-outcome-evidence/v2"
+    ] = "dronedream.trial-outcome-evidence/v2"
+    trial_artifact_evidence_schema: Literal[
+        "dronedream.trial-artifact-evidence/v1"
+    ] = "dronedream.trial-artifact-evidence/v1"
+    trial_evidence_sha256: Sha256Id
+    artifact_count: NonnegativeInt
+    sealed_artifact_count: NonnegativeInt
+    metadata_only_artifact_count: NonnegativeInt
+    holdout_projection_sha256: Sha256Id | None
+    trial_count: NonnegativeInt
+    completed_trial_count: NonnegativeInt
+    failed_trial_count: NonnegativeInt
+    passing_trial_count: NonnegativeInt
+    trial_outcome_taxonomy_schema: Literal[
+        "dronedream.trial-outcome-taxonomy/v1"
+    ]
+    trial_outcome_counts: dict[str, NonnegativeInt]
+    trial_outcome_rates: dict[str, Rate]
+    optimizer_learning_failure_rate: Rate
+    objective_values: dict[str, FiniteFloat]
+    constraint_values: dict[str, FiniteFloat]
+    constraint_violations: dict[str, NonnegativeFloat]
+    feasible: StrictBool
+    preference_loss: FiniteFloat
+    soft_constraint_penalty: NonnegativeFloat
+    scalar_loss: FiniteFloat
+    selection_key: CandidateSelectionKeyV1
+    acceptance_projection: CandidateAcceptanceProjectionV1
+
+
 class CandidateReportProjectionV1(_FrozenModel):
     schema_id: Literal["dronedream.candidate-report-projection/v1"] = (
         "dronedream.candidate-report-projection/v1"
@@ -115,6 +254,25 @@ class CandidateReportEvidenceV1(_FrozenModel):
     evidence_id: Sha256Id
     candidate_outcome_evidence_id: Sha256Id
     report_trial_evidence_sha256: Sha256Id
+    projection: CandidateReportProjectionV1
+
+
+class CandidateReportEvidenceV2(_FrozenModel):
+    schema_id: Literal["dronedream.candidate-report-evidence/v2"] = (
+        "dronedream.candidate-report-evidence/v2"
+    )
+    evidence_id: Sha256Id
+    candidate_outcome_evidence_id: Sha256Id
+    report_trial_evidence_schema: Literal[
+        "dronedream.trial-outcome-evidence/v2"
+    ] = "dronedream.trial-outcome-evidence/v2"
+    trial_artifact_evidence_schema: Literal[
+        "dronedream.trial-artifact-evidence/v1"
+    ] = "dronedream.trial-artifact-evidence/v1"
+    report_trial_evidence_sha256: Sha256Id
+    artifact_count: NonnegativeInt
+    sealed_artifact_count: NonnegativeInt
+    metadata_only_artifact_count: NonnegativeInt
     projection: CandidateReportProjectionV1
 
 
@@ -166,7 +324,11 @@ def _finite_mapping(value: object, *, field_name: str) -> dict[str, float]:
     return result
 
 
-def trial_outcome_evidence_row(trial: object) -> dict[str, Any]:
+def trial_outcome_evidence_row(
+    trial: object,
+    *,
+    artifact_evidence: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Compile the canonical Trial snapshot bound into Candidate evidence."""
 
     trial_id = getattr(trial, "id", None)
@@ -220,6 +382,16 @@ def trial_outcome_evidence_row(trial: object) -> dict[str, Any]:
         "failure_code": failure_code,
         "metric": metric_payload,
     }
+    if artifact_evidence is not None:
+        parsed_artifacts = TrialArtifactEvidenceV1.model_validate(
+            artifact_evidence
+        )
+        if parsed_artifacts.trial_id != trial_id:
+            raise ValueError(
+                "Trial artifact evidence belongs to a different Trial"
+            )
+        row["evidence_schema"] = TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA
+        row["artifact_evidence"] = parsed_artifacts.model_dump(mode="json")
     _canonical_json(row)
     return row
 
@@ -238,8 +410,42 @@ def trial_is_holdout(trial: object) -> bool:
     return holdout
 
 
+def _candidate_evidence_binds_artifacts(candidate: object) -> bool:
+    aggregate = getattr(candidate, "aggregated_metric_json", None)
+    if not isinstance(aggregate, Mapping):
+        return False
+    evidence = aggregate.get("candidate_outcome_evidence")
+    return (
+        isinstance(evidence, Mapping)
+        and evidence.get("schema_id")
+        == CANDIDATE_OUTCOME_EVIDENCE_V2_SCHEMA
+    )
+
+
+def _candidate_artifact_evidence_map(
+    candidate: object,
+    trials: Sequence[object],
+    *,
+    bind_artifacts: bool,
+    verify_artifact_bytes: bool,
+) -> dict[str, dict[str, Any]] | None:
+    if not bind_artifacts:
+        return {}
+    try:
+        return candidate_trial_artifact_evidence(
+            candidate,
+            trials,
+            verify_bytes=verify_artifact_bytes,
+        )
+    except Exception:  # pragma: no cover - integrity/read failures fail closed
+        return None
+
+
 def candidate_training_trial_evidence_rows(
     candidate: object,
+    *,
+    bind_artifacts: bool | None = None,
+    verify_artifact_bytes: bool = False,
 ) -> tuple[dict[str, Any], ...] | None:
     """Return current canonical training Trial rows, or ``None`` if unreadable."""
 
@@ -248,10 +454,30 @@ def candidate_training_trial_evidence_rows(
         trials = list(raw_trials)
     except Exception:  # pragma: no cover - detached/lazy ORM state fails closed
         return None
+    artifact_binding = (
+        _candidate_evidence_binds_artifacts(candidate)
+        if bind_artifacts is None
+        else bind_artifacts
+    )
+    artifact_map = _candidate_artifact_evidence_map(
+        candidate,
+        trials,
+        bind_artifacts=artifact_binding,
+        verify_artifact_bytes=verify_artifact_bytes,
+    )
+    if artifact_map is None:
+        return None
     rows: list[dict[str, Any]] = []
     try:
         for trial in trials:
-            row = trial_outcome_evidence_row(trial)
+            row = trial_outcome_evidence_row(
+                trial,
+                artifact_evidence=(
+                    artifact_map.get(str(getattr(trial, "id", "")))
+                    if artifact_binding
+                    else None
+                ),
+            )
             if trial_is_holdout(trial):
                 continue
             rows.append(row)
@@ -271,6 +497,9 @@ def candidate_training_trial_evidence_rows(
 
 def candidate_report_trial_evidence_rows(
     candidate: object,
+    *,
+    bind_artifacts: bool | None = None,
+    verify_artifact_bytes: bool = False,
 ) -> tuple[dict[str, Any], ...] | None:
     """Return every current Trial row used by final report artifacts."""
 
@@ -279,8 +508,31 @@ def candidate_report_trial_evidence_rows(
         trials = list(raw_trials)
     except Exception:  # pragma: no cover - detached/lazy ORM state fails closed
         return None
+    artifact_binding = (
+        _candidate_evidence_binds_artifacts(candidate)
+        if bind_artifacts is None
+        else bind_artifacts
+    )
+    artifact_map = _candidate_artifact_evidence_map(
+        candidate,
+        trials,
+        bind_artifacts=artifact_binding,
+        verify_artifact_bytes=verify_artifact_bytes,
+    )
+    if artifact_map is None:
+        return None
     try:
-        rows = [trial_outcome_evidence_row(trial) for trial in trials]
+        rows = [
+            trial_outcome_evidence_row(
+                trial,
+                artifact_evidence=(
+                    artifact_map.get(str(getattr(trial, "id", "")))
+                    if artifact_binding
+                    else None
+                ),
+            )
+            for trial in trials
+        ]
     except Exception:  # pragma: no cover - malformed ORM evidence fails closed
         return None
     return tuple(
@@ -295,6 +547,52 @@ def candidate_report_trial_evidence_rows(
     )
 
 
+def _artifact_evidence_counts(
+    trial_evidence_rows: Sequence[Mapping[str, Any]],
+) -> tuple[int, int, int]:
+    canonical_order: list[tuple[str, int, str]] = []
+    artifact_count = 0
+    sealed_count = 0
+    metadata_only_count = 0
+    for row in trial_evidence_rows:
+        trial_id = row.get("trial_id")
+        scenario_type = row.get("scenario_type")
+        seed = row.get("seed")
+        if (
+            not isinstance(trial_id, str)
+            or not trial_id
+            or not isinstance(scenario_type, str)
+            or not scenario_type
+            or isinstance(seed, bool)
+            or not isinstance(seed, int)
+            or row.get("evidence_schema")
+            != TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA
+        ):
+            raise ValueError(
+                "artifact-bound Candidate evidence requires canonical Trial v2 rows"
+            )
+        parsed = TrialArtifactEvidenceV1.model_validate(
+            row.get("artifact_evidence")
+        )
+        if parsed.trial_id != trial_id:
+            raise ValueError(
+                "artifact evidence does not belong to its Trial row"
+            )
+        canonical_order.append((scenario_type, seed, trial_id))
+        artifact_count += parsed.artifact_count
+        sealed_count += parsed.sealed_artifact_count
+        metadata_only_count += parsed.metadata_only_artifact_count
+    if (
+        canonical_order != sorted(canonical_order)
+        or len({item[2] for item in canonical_order})
+        != len(canonical_order)
+    ):
+        raise ValueError(
+            "artifact-bound Trial evidence rows must be unique and canonical"
+        )
+    return artifact_count, sealed_count, metadata_only_count
+
+
 def compile_candidate_outcome_evidence(
     *,
     outcome_contract_id: str,
@@ -303,7 +601,8 @@ def compile_candidate_outcome_evidence(
     parameter_snapshot: Mapping[str, Any],
     trial_evidence_rows: Sequence[Mapping[str, Any]],
     aggregate: Mapping[str, Any],
-) -> CandidateOutcomeEvidenceV1:
+    bind_trial_artifacts: bool = False,
+) -> CandidateOutcomeEvidenceV1 | CandidateOutcomeEvidenceV2:
     """Compile one deterministic search-role projection from accepted evidence."""
 
     selection_key = CandidateSelectionKeyV1.model_validate(
@@ -327,8 +626,17 @@ def compile_candidate_outcome_evidence(
             field_name="acceptance_completion_rate",
         ),
     )
-    payload = {
-        "schema_id": CANDIDATE_OUTCOME_EVIDENCE_SCHEMA,
+    artifact_counts = (
+        _artifact_evidence_counts(trial_evidence_rows)
+        if bind_trial_artifacts
+        else None
+    )
+    payload: dict[str, Any] = {
+        "schema_id": (
+            CANDIDATE_OUTCOME_EVIDENCE_V2_SCHEMA
+            if bind_trial_artifacts
+            else CANDIDATE_OUTCOME_EVIDENCE_SCHEMA
+        ),
         "role": "search",
         "outcome_contract_id": outcome_contract_id,
         "candidate_id": candidate_id,
@@ -397,7 +705,31 @@ def compile_candidate_outcome_evidence(
         "selection_key": selection_key.model_dump(mode="json"),
         "acceptance_projection": acceptance_projection.model_dump(mode="json"),
     }
-    return CandidateOutcomeEvidenceV1.model_validate(
+    if artifact_counts is not None:
+        (
+            artifact_count,
+            sealed_artifact_count,
+            metadata_only_artifact_count,
+        ) = artifact_counts
+        payload.update(
+            {
+                "trial_evidence_schema": TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA,
+                "trial_artifact_evidence_schema": (
+                    TRIAL_ARTIFACT_EVIDENCE_SCHEMA
+                ),
+                "artifact_count": artifact_count,
+                "sealed_artifact_count": sealed_artifact_count,
+                "metadata_only_artifact_count": (
+                    metadata_only_artifact_count
+                ),
+            }
+        )
+    model = (
+        CandidateOutcomeEvidenceV2
+        if bind_trial_artifacts
+        else CandidateOutcomeEvidenceV1
+    )
+    return model.model_validate(
         {
             "evidence_id": _sha256_id(payload),
             **payload,
@@ -410,7 +742,7 @@ def compile_candidate_report_evidence(
     candidate_outcome_evidence: object,
     report_trial_evidence_rows: Sequence[Mapping[str, Any]],
     aggregate: Mapping[str, Any],
-) -> CandidateReportEvidenceV1:
+) -> CandidateReportEvidenceV1 | CandidateReportEvidenceV2:
     """Compile immutable report metrics from one verified outcome projection."""
 
     outcome_evidence = verify_candidate_outcome_evidence(
@@ -418,6 +750,15 @@ def compile_candidate_report_evidence(
     )
     if outcome_evidence is None:
         raise ValueError("candidate report evidence requires valid outcome evidence")
+    binds_artifacts = isinstance(
+        outcome_evidence,
+        CandidateOutcomeEvidenceV2,
+    )
+    artifact_counts = (
+        _artifact_evidence_counts(report_trial_evidence_rows)
+        if binds_artifacts
+        else None
+    )
     max_error = _finite_number(
         aggregate.get("max_error"),
         field_name="max_error",
@@ -459,15 +800,45 @@ def compile_candidate_report_evidence(
             field_name="pass_rate",
         ),
     )
-    payload = {
-        "schema_id": CANDIDATE_REPORT_EVIDENCE_SCHEMA,
+    payload: dict[str, Any] = {
+        "schema_id": (
+            CANDIDATE_REPORT_EVIDENCE_V2_SCHEMA
+            if binds_artifacts
+            else CANDIDATE_REPORT_EVIDENCE_SCHEMA
+        ),
         "candidate_outcome_evidence_id": outcome_evidence.evidence_id,
         "report_trial_evidence_sha256": _sha256_id(
             list(report_trial_evidence_rows)
         ),
         "projection": projection.model_dump(mode="json"),
     }
-    return CandidateReportEvidenceV1.model_validate(
+    if artifact_counts is not None:
+        (
+            artifact_count,
+            sealed_artifact_count,
+            metadata_only_artifact_count,
+        ) = artifact_counts
+        payload.update(
+            {
+                "report_trial_evidence_schema": (
+                    TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA
+                ),
+                "trial_artifact_evidence_schema": (
+                    TRIAL_ARTIFACT_EVIDENCE_SCHEMA
+                ),
+                "artifact_count": artifact_count,
+                "sealed_artifact_count": sealed_artifact_count,
+                "metadata_only_artifact_count": (
+                    metadata_only_artifact_count
+                ),
+            }
+        )
+    model = (
+        CandidateReportEvidenceV2
+        if binds_artifacts
+        else CandidateReportEvidenceV1
+    )
+    return model.model_validate(
         {
             "evidence_id": _sha256_id(payload),
             **payload,
@@ -477,11 +848,20 @@ def compile_candidate_report_evidence(
 
 def verify_candidate_report_evidence(
     value: object,
-) -> CandidateReportEvidenceV1 | None:
+) -> CandidateReportEvidenceV1 | CandidateReportEvidenceV2 | None:
     """Return parsed report evidence only when its content hash verifies."""
 
+    if not isinstance(value, Mapping):
+        return None
+    model: type[CandidateReportEvidenceV1] | type[CandidateReportEvidenceV2]
+    if value.get("schema_id") == CANDIDATE_REPORT_EVIDENCE_SCHEMA:
+        model = CandidateReportEvidenceV1
+    elif value.get("schema_id") == CANDIDATE_REPORT_EVIDENCE_V2_SCHEMA:
+        model = CandidateReportEvidenceV2
+    else:
+        return None
     try:
-        evidence = CandidateReportEvidenceV1.model_validate(value)
+        evidence = model.model_validate(value)
     except ValidationError:
         return None
     payload = evidence.model_dump(mode="json")
@@ -493,11 +873,20 @@ def verify_candidate_report_evidence(
 
 def verify_candidate_outcome_evidence(
     value: object,
-) -> CandidateOutcomeEvidenceV1 | None:
+) -> CandidateOutcomeEvidenceV1 | CandidateOutcomeEvidenceV2 | None:
     """Return the parsed projection only when schema and content hash verify."""
 
+    if not isinstance(value, Mapping):
+        return None
+    model: type[CandidateOutcomeEvidenceV1] | type[CandidateOutcomeEvidenceV2]
+    if value.get("schema_id") == CANDIDATE_OUTCOME_EVIDENCE_SCHEMA:
+        model = CandidateOutcomeEvidenceV1
+    elif value.get("schema_id") == CANDIDATE_OUTCOME_EVIDENCE_V2_SCHEMA:
+        model = CandidateOutcomeEvidenceV2
+    else:
+        return None
     try:
-        evidence = CandidateOutcomeEvidenceV1.model_validate(value)
+        evidence = model.model_validate(value)
     except ValidationError:
         return None
     payload = evidence.model_dump(mode="json")
@@ -585,6 +974,20 @@ def authoritative_outcome_projection(aggregate: object) -> dict[str, Any]:
     }
     if evidence.holdout_projection_sha256 is not None:
         projection["holdout"] = holdout
+    if isinstance(evidence, CandidateOutcomeEvidenceV2):
+        projection.update(
+            {
+                "trial_evidence_schema": evidence.trial_evidence_schema,
+                "trial_artifact_evidence_schema": (
+                    evidence.trial_artifact_evidence_schema
+                ),
+                "artifact_count": evidence.artifact_count,
+                "sealed_artifact_count": evidence.sealed_artifact_count,
+                "metadata_only_artifact_count": (
+                    evidence.metadata_only_artifact_count
+                ),
+            }
+        )
     return projection
 
 
@@ -730,6 +1133,24 @@ def authoritative_candidate_report_projection(
     projection["candidate_outcome_evidence_id"] = (
         report_evidence.candidate_outcome_evidence_id
     )
+    if isinstance(report_evidence, CandidateReportEvidenceV2):
+        projection.update(
+            {
+                "report_trial_evidence_schema": (
+                    report_evidence.report_trial_evidence_schema
+                ),
+                "trial_artifact_evidence_schema": (
+                    report_evidence.trial_artifact_evidence_schema
+                ),
+                "artifact_count": report_evidence.artifact_count,
+                "sealed_artifact_count": (
+                    report_evidence.sealed_artifact_count
+                ),
+                "metadata_only_artifact_count": (
+                    report_evidence.metadata_only_artifact_count
+                ),
+            }
+        )
     if "holdout" in outcome_projection:
         projection["holdout"] = outcome_projection["holdout"]
     return projection
@@ -738,6 +1159,8 @@ def authoritative_candidate_report_projection(
 def require_authoritative_candidate_report_projection(
     candidate: object,
     aggregate: object | None = None,
+    *,
+    verify_artifact_bytes: bool = False,
 ) -> dict[str, Any]:
     """Resolve one ORM-like Candidate and reject invalid required evidence."""
 
@@ -750,9 +1173,13 @@ def require_authoritative_candidate_report_projection(
         candidate_id=getattr(candidate, "id", None),
         generation_index=getattr(candidate, "generation_index", None),
         parameter_snapshot=getattr(candidate, "parameter_json", None),
-        trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
+        trial_evidence_rows=candidate_training_trial_evidence_rows(
+            candidate,
+            verify_artifact_bytes=verify_artifact_bytes,
+        ),
         report_trial_evidence_rows=candidate_report_trial_evidence_rows(
-            candidate
+            candidate,
+            verify_artifact_bytes=verify_artifact_bytes,
         ),
         aggregate=raw_aggregate,
     )
@@ -769,13 +1196,20 @@ def require_authoritative_candidate_report_projection(
 
 __all__ = [
     "CANDIDATE_OUTCOME_EVIDENCE_SCHEMA",
+    "CANDIDATE_OUTCOME_EVIDENCE_V2_SCHEMA",
     "CANDIDATE_REPORT_EVIDENCE_SCHEMA",
+    "CANDIDATE_REPORT_EVIDENCE_V2_SCHEMA",
+    "TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA",
     "CandidateAcceptanceProjectionV1",
     "CandidateOutcomeEvidenceV1",
+    "CandidateOutcomeEvidenceV2",
     "CandidateReportEvidenceError",
     "CandidateReportEvidenceV1",
+    "CandidateReportEvidenceV2",
     "CandidateReportProjectionV1",
     "CandidateSelectionKeyV1",
+    "TrialArtifactEvidenceV1",
+    "TrialArtifactItemEvidenceV1",
     "authoritative_candidate_report_projection",
     "authoritative_candidate_outcome_projection",
     "authoritative_candidate_trial_outcome_projection",

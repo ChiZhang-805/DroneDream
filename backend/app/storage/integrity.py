@@ -73,9 +73,14 @@ def require_artifact_integrity(
     artifact: models.Artifact,
     *,
     content: bytes | Path | None = None,
+    content_digest: tuple[str, int] | None = None,
 ) -> models.ArtifactDigestReceipt | None:
     """Verify receipt identity and optionally the currently stored bytes."""
 
+    if content is not None and content_digest is not None:
+        raise ArtifactIntegrityError(
+            "artifact integrity accepts bytes or a digest, not both"
+        )
     receipt = artifact.digest_receipt
     if receipt is None:
         if artifact.integrity_policy is not None:
@@ -105,8 +110,12 @@ def require_artifact_integrity(
         raise ArtifactIntegrityError(
             "artifact digest receipt no longer matches metadata"
         )
-    if content is not None:
-        content_sha256, content_size = artifact_content_digest(content)
+    if content is not None or content_digest is not None:
+        if content is not None:
+            content_sha256, content_size = artifact_content_digest(content)
+        else:
+            assert content_digest is not None
+            content_sha256, content_size = content_digest
         if (
             content_sha256 != receipt.content_sha256
             or content_size != receipt.content_size_bytes
