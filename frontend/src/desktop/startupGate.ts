@@ -24,8 +24,10 @@ const INITIAL_SESSION: DesktopStartupGateSession = {
 let session = INITIAL_SESSION;
 let verificationInFlight: {
   accountId: string;
+  revision: number;
   promise: Promise<DesktopStartupGateSession>;
 } | null = null;
+let verificationRevision = 0;
 const listeners = new Set<DesktopStartupGateListener>();
 
 function publish(next: DesktopStartupGateSession): DesktopStartupGateSession {
@@ -49,6 +51,7 @@ export function setDesktopStartupGateState(
   status: Exclude<DesktopStartupGateStatus, "ready">,
   options: { accountId?: string | null; error?: string | null } = {},
 ): DesktopStartupGateSession {
+  verificationRevision += 1;
   verificationInFlight = null;
   return publish({
     status,
@@ -59,6 +62,7 @@ export function setDesktopStartupGateState(
 }
 
 export function approveDesktopStartupGateWithoutCloudAuth(): DesktopStartupGateSession {
+  verificationRevision += 1;
   verificationInFlight = null;
   return publish({
     status: "ready",
@@ -79,6 +83,7 @@ export async function verifyDesktopStartupGate(
     return verificationInFlight.promise;
   }
 
+  const revision = ++verificationRevision;
   publish({
     status: "checking",
     accountId,
@@ -87,6 +92,13 @@ export async function verifyDesktopStartupGate(
   });
   const operation = verifier()
     .then((result) => {
+      if (
+        verificationRevision !== revision ||
+        session.status !== "checking" ||
+        session.accountId !== accountId
+      ) {
+        return session;
+      }
       if (result.status !== "ready" || result.user_id !== accountId) {
         throw new Error("The local API accepted a different account identity.");
       }
@@ -97,26 +109,37 @@ export async function verifyDesktopStartupGate(
         error: null,
       });
     })
-    .catch((error: unknown) =>
-      publish({
+    .catch((error: unknown) => {
+      if (
+        verificationRevision !== revision ||
+        session.status !== "checking" ||
+        session.accountId !== accountId
+      ) {
+        return session;
+      }
+      return publish({
         status: "blocked",
         accountId,
         checkedAt: null,
         error: error instanceof Error
           ? error.message
           : "The local API did not accept the signed-in account.",
-      })
-    )
+      });
+    })
     .finally(() => {
-      if (verificationInFlight?.promise === operation) {
+      if (
+        verificationInFlight?.revision === revision &&
+        verificationInFlight.promise === operation
+      ) {
         verificationInFlight = null;
       }
     });
-  verificationInFlight = { accountId, promise: operation };
+  verificationInFlight = { accountId, revision, promise: operation };
   return operation;
 }
 
 export function resetDesktopStartupGateSession(): void {
+  verificationRevision += 1;
   verificationInFlight = null;
   publish(INITIAL_SESSION);
 }

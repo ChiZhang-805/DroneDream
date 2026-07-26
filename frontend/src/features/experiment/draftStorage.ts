@@ -215,10 +215,10 @@ export function loadExperimentDraft<TForm, TSelections>(
   const storage = safeDraftStorage();
   if (!storage) return null;
   try {
+    const persistentStorage = safePersistentStorage();
     const currentKey = workspaceDraftKey(workspaceId);
     let currentRaw = storage.getItem(currentKey);
     if (currentRaw === null) {
-      const persistentStorage = safePersistentStorage();
       currentRaw = persistentStorage?.getItem(currentKey) ?? null;
       if (currentRaw !== null) {
         try {
@@ -234,7 +234,10 @@ export function loadExperimentDraft<TForm, TSelections>(
     }
     if (workspaceId) return null;
 
-    const v2Raw = storage.getItem(V2_EXPERIMENT_DRAFT_KEY);
+    const v2Raw =
+      storage.getItem(V2_EXPERIMENT_DRAFT_KEY) ??
+      persistentStorage?.getItem(V2_EXPERIMENT_DRAFT_KEY) ??
+      null;
     if (v2Raw !== null) {
       const v2 = parseDraftEnvelope(v2Raw, 2, schema.maxActiveStep, schema);
       if (!v2) return null;
@@ -243,12 +246,23 @@ export function loadExperimentDraft<TForm, TSelections>(
         ...v2,
         conversation: null,
       };
-      storage.setItem(EXPERIMENT_DRAFT_KEY, JSON.stringify(migrated));
-      storage.removeItem(V2_EXPERIMENT_DRAFT_KEY);
+      const serialized = JSON.stringify(migrated);
+      for (const destination of [storage, persistentStorage]) {
+        if (!destination) continue;
+        try {
+          destination.setItem(EXPERIMENT_DRAFT_KEY, serialized);
+          destination.removeItem(V2_EXPERIMENT_DRAFT_KEY);
+        } catch {
+          // Keep the source draft in that storage when migration cannot commit.
+        }
+      }
       return migrated;
     }
 
-    const legacyRaw = storage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY);
+    const legacyRaw =
+      storage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY) ??
+      persistentStorage?.getItem(LEGACY_EXPERIMENT_DRAFT_KEY) ??
+      null;
     if (legacyRaw === null) return null;
     const legacy = parseDraftEnvelope(
       legacyRaw,
@@ -264,16 +278,15 @@ export function loadExperimentDraft<TForm, TSelections>(
       completed_steps: [],
       conversation: null,
     };
-    try {
-      storage.setItem(EXPERIMENT_DRAFT_KEY, JSON.stringify(migrated));
-    } catch {
-      // Preserve the readable legacy draft if v2 storage is unavailable.
-      return migrated;
-    }
-    try {
-      storage.removeItem(LEGACY_EXPERIMENT_DRAFT_KEY);
-    } catch {
-      // The valid v2 draft takes precedence on the next load.
+    const serialized = JSON.stringify(migrated);
+    for (const destination of [storage, persistentStorage]) {
+      if (!destination) continue;
+      try {
+        destination.setItem(EXPERIMENT_DRAFT_KEY, serialized);
+        destination.removeItem(LEGACY_EXPERIMENT_DRAFT_KEY);
+      } catch {
+        // Preserve the source draft in that storage when migration cannot commit.
+      }
     }
     return migrated;
   } catch {
@@ -464,6 +477,8 @@ export function persistExperimentDraftsForExit(): boolean {
       const key = source.key(index);
       if (
         key === EXPERIMENT_DRAFT_KEY ||
+        key === V2_EXPERIMENT_DRAFT_KEY ||
+        key === LEGACY_EXPERIMENT_DRAFT_KEY ||
         key?.startsWith(EXPERIMENT_WORKSPACE_DRAFT_PREFIX)
       ) {
         keys.push(key);
@@ -475,7 +490,9 @@ export function persistExperimentDraftsForExit(): boolean {
       const parsed = JSON.parse(raw) as unknown;
       if (
         !isRecord(parsed) ||
-        parsed.schema_version !== 3 ||
+        (parsed.schema_version !== 1 &&
+          parsed.schema_version !== 2 &&
+          parsed.schema_version !== 3) ||
         !isRecord(parsed.form)
       ) {
         return false;

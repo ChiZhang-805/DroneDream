@@ -116,6 +116,8 @@ const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
 const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
 const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
+const ACTIVE_JOB_PAGE_SIZE = 100;
+const MAX_ACTIVE_JOB_PAGES_PER_STATUS = 10;
 
 interface ExitPromptState {
   hasDraft: boolean;
@@ -123,6 +125,38 @@ interface ExitPromptState {
   activeJobCount: number;
   activeJobIds: string[];
   activeJobsUnknown: boolean;
+}
+
+async function listActiveJobsForStatus(status: JobStatus): Promise<{
+  count: number;
+  jobIds: string[];
+}> {
+  const first = await apiClient.listJobs({
+    page: 1,
+    page_size: ACTIVE_JOB_PAGE_SIZE,
+    status,
+  });
+  const pageCount = Math.ceil(first.total / ACTIVE_JOB_PAGE_SIZE);
+  if (pageCount > MAX_ACTIVE_JOB_PAGES_PER_STATUS) {
+    throw new Error("Too many active experiments to enumerate safely before exit.");
+  }
+  const remaining = pageCount > 1
+    ? await Promise.all(
+        Array.from({ length: pageCount - 1 }, (_, index) =>
+          apiClient.listJobs({
+            page: index + 2,
+            page_size: ACTIVE_JOB_PAGE_SIZE,
+            status,
+          })
+        ),
+      )
+    : [];
+  return {
+    count: first.total,
+    jobIds: [...new Set(
+      [first, ...remaining].flatMap((page) => page.items.map((job) => job.id)),
+    )],
+  };
 }
 
 async function findActiveJobsBeforeExit(): Promise<{
@@ -137,15 +171,13 @@ async function findActiveJobsBeforeExit(): Promise<{
     );
   });
   try {
-    const pages = await Promise.race([
-      Promise.all(EXIT_GUARD_JOB_STATUSES.map((status) =>
-        apiClient.listJobs({ page: 1, page_size: 100, status })
-      )),
+    const statuses = await Promise.race([
+      Promise.all(EXIT_GUARD_JOB_STATUSES.map(listActiveJobsForStatus)),
       timeout,
     ]);
     return {
-      count: pages.reduce((total, page) => total + page.total, 0),
-      jobIds: [...new Set(pages.flatMap((page) => page.items.map((job) => job.id)))],
+      count: statuses.reduce((total, result) => total + result.count, 0),
+      jobIds: [...new Set(statuses.flatMap((result) => result.jobIds))],
     };
   } finally {
     if (timeoutId !== undefined) window.clearTimeout(timeoutId);
@@ -1453,10 +1485,14 @@ function AppShellContent() {
     runtimeAccess.isChecking ||
     runtimeIsBusy ||
     startupGate.status === "checking";
+  const startupGateIdentityReady =
+    startupGate.status === "ready" &&
+    (!auth.configured ||
+      (Boolean(auth.account) && startupGate.accountId === auth.account?.id));
   const launcherRuntimeChecked =
     runtimeAccess.status === "ready" &&
     !runtimeAccess.isChecking &&
-    startupGate.status === "ready";
+    startupGateIdentityReady;
   const runtimeNavDescription = runtimeAccess.status === "checking"
     ? t("runtimeGate.navChecking")
     : runtimeAccess.status === "starting"

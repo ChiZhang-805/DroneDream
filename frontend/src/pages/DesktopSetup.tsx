@@ -363,7 +363,10 @@ export function DesktopSetup() {
   const accountReady =
     !auth?.configured || (!auth.loading && Boolean(auth.account));
   const startupGateReady =
-    !desktopAvailable || startupGate.status === "ready";
+    !desktopAvailable ||
+    (startupGate.status === "ready" &&
+      (!auth?.configured ||
+        (Boolean(auth.account) && startupGate.accountId === auth.account?.id)));
   const updaterBusy =
     updater.status === "checking" ||
     updater.status === "downloading" ||

@@ -5,6 +5,7 @@ import {
   LEGACY_EXPERIMENT_DRAFT_KEY,
   V2_EXPERIMENT_DRAFT_KEY,
   loadExperimentDraft,
+  persistExperimentDraftsForExit,
   saveExperimentDraft,
 } from "../features/experiment/draftStorage";
 import type { ExperimentDraftSchema } from "../features/experiment/draftStorage";
@@ -175,5 +176,46 @@ describe("experiment draft storage migration", () => {
     });
     expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toBeNull();
     expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toBeNull();
+  });
+
+  it("preserves, redacts, and restores a legacy draft closed before migration", () => {
+    window.sessionStorage.setItem(
+      LEGACY_EXPERIMENT_DRAFT_KEY,
+      envelope(1, 4, "legacy-before-upgrade", "sk-never-persist"),
+    );
+
+    expect(persistExperimentDraftsForExit()).toBe(true);
+    expect(window.localStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY))
+      .toContain("legacy-before-upgrade");
+    expect(window.localStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY))
+      .not.toContain("sk-never-persist");
+
+    window.sessionStorage.clear();
+    expect(loadExperimentDraft(schema)).toMatchObject({
+      schema_version: 3,
+      active_step: 0,
+      form: { name: "legacy-before-upgrade", llm_api_key: "" },
+    });
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .toContain("legacy-before-upgrade");
+    expect(window.localStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).toBeNull();
+  });
+
+  it("restores a redacted v2 draft persisted during exit", () => {
+    window.sessionStorage.setItem(
+      V2_EXPERIMENT_DRAFT_KEY,
+      envelope(2, 3, "v2-before-upgrade", "sk-also-never-persist"),
+    );
+
+    expect(persistExperimentDraftsForExit()).toBe(true);
+    window.sessionStorage.clear();
+    expect(loadExperimentDraft(schema)).toMatchObject({
+      schema_version: 3,
+      active_step: 3,
+      form: { name: "v2-before-upgrade", llm_api_key: "" },
+    });
+    expect(window.localStorage.getItem(V2_EXPERIMENT_DRAFT_KEY)).toBeNull();
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .not.toContain("sk-also-never-persist");
   });
 });

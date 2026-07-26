@@ -176,6 +176,43 @@ describe("desktop close protection", () => {
       .toBeLessThan(vi.mocked(destroyWindow).mock.invocationCallOrder[0]);
   });
 
+  it("enumerates every active-job page before cancelling and exiting", async () => {
+    const activeJobs = Array.from({ length: 101 }, (_, index) => ({
+      id: `job-running-${index + 1}`,
+    } as Job));
+    vi.mocked(apiClient.listJobs).mockImplementation(async (params) => {
+      if (params?.status !== "RUNNING") return emptyJobs();
+      const page = params.page ?? 1;
+      const start = (page - 1) * 100;
+      return {
+        items: activeJobs.slice(start, start + 100),
+        page,
+        page_size: 100,
+        total: activeJobs.length,
+      };
+    });
+    const cancelJob = vi.spyOn(apiClient, "cancelJob").mockImplementation(
+      async (jobId) => ({
+        ...activeJobs.find((job) => job.id === jobId)!,
+        status: "CANCELLED",
+      } as Job),
+    );
+    renderShell("/dashboard");
+
+    await requestWindowClose();
+    expect(screen.getByText(/101 active experiment jobs/i)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Exit anyway" }));
+
+    await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
+    expect(apiClient.listJobs).toHaveBeenCalledWith({
+      page: 2,
+      page_size: 100,
+      status: "RUNNING",
+    });
+    expect(cancelJob).toHaveBeenCalledTimes(101);
+    expect(cancelJob).toHaveBeenCalledWith("job-running-101");
+  });
+
   it("stops the dedicated runtime and closes without prompting when no work is active", async () => {
     renderShell("/dashboard");
 
