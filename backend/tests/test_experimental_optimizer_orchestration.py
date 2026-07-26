@@ -1207,9 +1207,12 @@ def test_history_evaluation_reuses_persisted_aggregate_objectives(
     )
     trial = ctx["models"].Trial(
         job_id="job-evaluation",
-        seed=805,
+        seed=101,
         scenario_type="nominal",
-        scenario_config_json={"scenario_case_id": "nominal"},
+        scenario_config_json={
+            "scenario_case_id": "nominal",
+            "holdout": False,
+        },
         status="COMPLETED",
     )
     trial.metric = ctx["models"].TrialMetric(

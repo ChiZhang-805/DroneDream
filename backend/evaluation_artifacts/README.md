@@ -18,3 +18,17 @@ cd backend
 These artifacts qualify routing discrimination only. They do not establish that
 LLM routing improves final simulation outcomes over a budget-matched
 deterministic optimizer campaign.
+
+`simulation-coverage-mock-v2.json` is a separate deterministic outcome
+campaign. It runs the production optimizer portfolio against all ten mock
+scenario types, evaluates disjoint holdout seeds, and compares the selected
+candidate with an exhaustive 2,430-point finite-grid oracle. The artifact
+explicitly records `physical_fidelity: false`; it validates synthetic search,
+scenario routing, and holdout logic, not PX4/Gazebo physics or sim-to-real
+transfer. Regenerate it with:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe scripts\run_simulation_coverage_campaign.py `
+  --output evaluation_artifacts\simulation-coverage-mock-v2.json
+```

@@ -32,6 +32,7 @@ from app.optimization.outcome_taxonomy import (
     is_optimizer_learning_failure,
     is_optimizer_learning_outcome,
 )
+from app.optimization.scenarios import resolve_scenario_case
 from app.orchestration import constants
 from app.orchestration.acceptance import AcceptanceCriteria
 from app.orchestration.events import record_event
@@ -574,6 +575,7 @@ def _build_prompt(
     candidates: list[models.CandidateParameterSet],
     search_space: SearchSpace,
 ) -> tuple[str, str, dict[str, Any]]:
+    scenario_suite = schemas.ScenarioSuiteConfig(**(job.scenario_suite_json or {}))
     system = (
         "You are an expert drone-control tuning assistant. Your job is to "
         "propose only the user-selected PX4 control parameters that improve "
@@ -633,7 +635,17 @@ def _build_prompt(
         passing_trial_count = 0
         scenario_feedback: dict[str, dict[str, Any]] = {}
         for trial in sorted(cand.trials, key=lambda t: (t.created_at, t.id)):
-            if bool((trial.scenario_config_json or {}).get("holdout")):
+            resolution = resolve_scenario_case(
+                scenario_suite,
+                scenario_type=trial.scenario_type,
+                scenario_config=trial.scenario_config_json,
+                seed=trial.seed,
+            )
+            if (
+                not resolution.matched
+                or resolution.case is None
+                or resolution.case.holdout
+            ):
                 continue
             metric = trial.metric
             rmse = _finite_number(metric.rmse) if metric is not None else None

@@ -74,7 +74,7 @@ from app.optimization.robust import (
 from app.optimization.robust import (
     evaluate_candidate as evaluate_objectives,
 )
-from app.optimization.scenarios import scenario_matrix
+from app.optimization.scenarios import resolve_scenario_case, scenario_matrix
 from app.optimization.winner_evidence import (
     WinnerSelectionEvidenceError,
     WinnerSelectionEvidenceV1,
@@ -203,12 +203,11 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     aggregate = candidate.aggregated_metric_json
     if not isinstance(aggregate, dict):
         return False
-    if (
-        candidate_evidence_receipt_required(candidate)
-        and not candidate_evidence_chain_matches_current(
-            candidate,
-            aggregate,
-        )
+    if candidate_evidence_receipt_required(
+        candidate
+    ) and not candidate_evidence_chain_matches_current(
+        candidate,
+        aggregate,
     ):
         return False
     authoritative_aggregate = authoritative_candidate_trial_outcome_projection(
@@ -445,6 +444,22 @@ def _aggregate_candidate(
     ineligible to win.
     """
 
+    resolved_cases = (
+        {
+            id(trial): resolve_scenario_case(
+                scenario_suite,
+                scenario_type=trial.scenario_type,
+                scenario_config=trial.scenario_config_json,
+                seed=getattr(trial, "seed", None),
+            )
+            for trial in trials
+        }
+        if scenario_suite is not None
+        else {}
+    )
+    if any(not resolution.matched for resolution in resolved_cases.values()):
+        raise ValueError("trial scenario evidence does not match configured suite")
+
     completed_trials = [trial for trial in trials if _trial_has_usable_metric(trial)]
     metrics = [t.metric for t in completed_trials if t.metric is not None]
 
@@ -458,32 +473,12 @@ def _aggregate_candidate(
         candidate.aggregated_score = None
         return None
 
-    cases_by_id = {
-        case.id: case
-        for case in (scenario_suite.cases if scenario_suite is not None else [])
-        if case.enabled
-    }
-    cases_by_type: dict[str, schemas.ScenarioCaseConfig] = {}
-    for case in cases_by_id.values():
-        cases_by_type.setdefault(case.scenario_type, case)
-
     def _resolved_case(
         trial: models.Trial,
     ) -> tuple[str, schemas.ScenarioCaseConfig | None]:
-        scenario_config = trial.scenario_config_json or {}
-        raw_case_id = scenario_config.get("scenario_case_id")
-        if raw_case_id is not None:
-            case_id = str(raw_case_id)
-            case = cases_by_id.get(case_id)
-            if case is not None:
-                return f"id:{case_id}", case
-            fallback_case = cases_by_type.get(trial.scenario_type)
-            if fallback_case is not None:
-                return f"id:{fallback_case.id}", fallback_case
-            return f"id:{case_id}", None
-        case = cases_by_type.get(trial.scenario_type)
-        if case is not None:
-            return f"id:{case.id}", case
+        if scenario_suite is not None:
+            resolution = resolved_cases[id(trial)]
+            return resolution.group_key, resolution.case
         return f"type:{trial.scenario_type}", None
 
     def _rate_summary(rows: list[models.Trial]) -> dict[str, Any]:
@@ -519,16 +514,12 @@ def _aggregate_candidate(
                 "scenario_case_count": 0,
                 "scenario_weight_total": 0.0,
                 "scenario_cases": [],
-                "trial_outcome_taxonomy_schema": (
-                    TRIAL_OUTCOME_TAXONOMY_SCHEMA
-                ),
+                "trial_outcome_taxonomy_schema": (TRIAL_OUTCOME_TAXONOMY_SCHEMA),
                 "trial_outcome_counts": {
-                    outcome_class: 0
-                    for outcome_class in TRIAL_OUTCOME_CLASSES
+                    outcome_class: 0 for outcome_class in TRIAL_OUTCOME_CLASSES
                 },
                 "trial_outcome_rates": {
-                    outcome_class: 0.0
-                    for outcome_class in TRIAL_OUTCOME_CLASSES
+                    outcome_class: 0.0 for outcome_class in TRIAL_OUTCOME_CLASSES
                 },
                 "optimizer_learning_failure_rate": 0.0,
                 "optimizer_learning_case_weight_total": 0.0,
@@ -540,10 +531,7 @@ def _aggregate_candidate(
         weighted_completion = 0.0
         weighted_failure = 0.0
         weighted_pass = 0.0
-        weighted_outcome_rates = {
-            outcome_class: 0.0
-            for outcome_class in TRIAL_OUTCOME_CLASSES
-        }
+        weighted_outcome_rates = {outcome_class: 0.0 for outcome_class in TRIAL_OUTCOME_CLASSES}
         weighted_optimizer_learning_failure = 0.0
         optimizer_learning_weight_total = 0.0
         case_summaries: list[dict[str, Any]] = []
@@ -553,9 +541,7 @@ def _aggregate_candidate(
             case_completed = sum(1 for trial in case_rows if _trial_has_usable_metric(trial))
             case_failed = denominator - case_completed
             case_passing = sum(1 for trial in case_rows if _trial_passed_with_usable_metric(trial))
-            case_outcome_counts = Counter(
-                _trial_outcome_class(trial) for trial in case_rows
-            )
+            case_outcome_counts = Counter(_trial_outcome_class(trial) for trial in case_rows)
             learning_count = sum(
                 count
                 for outcome_class, count in case_outcome_counts.items()
@@ -571,9 +557,7 @@ def _aggregate_candidate(
             weighted_pass += weight * case_passing / denominator
             for outcome_class in TRIAL_OUTCOME_CLASSES:
                 weighted_outcome_rates[outcome_class] += (
-                    weight
-                    * case_outcome_counts[outcome_class]
-                    / denominator
+                    weight * case_outcome_counts[outcome_class] / denominator
                 )
             if learning_count > 0:
                 weighted_optimizer_learning_failure += (
@@ -622,27 +606,21 @@ def _aggregate_candidate(
             "scenario_case_count": len(grouped),
             "scenario_weight_total": round(weight_total, 8),
             "scenario_cases": case_summaries,
-            "trial_outcome_taxonomy_schema": (
-                TRIAL_OUTCOME_TAXONOMY_SCHEMA
-            ),
+            "trial_outcome_taxonomy_schema": (TRIAL_OUTCOME_TAXONOMY_SCHEMA),
             "trial_outcome_counts": {
                 outcome_class: outcome_counts[outcome_class]
                 for outcome_class in TRIAL_OUTCOME_CLASSES
             },
             "trial_outcome_rates": {
-                outcome_class: weighted_outcome_rates[outcome_class]
-                / weight_total
+                outcome_class: weighted_outcome_rates[outcome_class] / weight_total
                 for outcome_class in TRIAL_OUTCOME_CLASSES
             },
             "optimizer_learning_failure_rate": (
-                weighted_optimizer_learning_failure
-                / optimizer_learning_weight_total
+                weighted_optimizer_learning_failure / optimizer_learning_weight_total
                 if optimizer_learning_weight_total > 0.0
                 else 0.0
             ),
-            "optimizer_learning_case_weight_total": (
-                optimizer_learning_weight_total
-            ),
+            "optimizer_learning_case_weight_total": (optimizer_learning_weight_total),
         }
 
     def _case_weighted_metric_mean(
@@ -701,40 +679,26 @@ def _aggregate_candidate(
         trials,
         field_name="max_error",
     )
-    max_error = (
-        round(max_error_decision, 4)
-        if max_error_decision is not None
-        else None
-    )
+    max_error = round(max_error_decision, 4) if max_error_decision is not None else None
     max_error_worst_decision = max(max_error_values)
     max_error_worst = round(max_error_worst_decision, 4)
     overshoot_decision = _case_weighted_metric_mean(
         trials,
         field_name="overshoot_count",
     )
-    overshoot = (
-        int(round(overshoot_decision))
-        if overshoot_decision is not None
-        else None
-    )
+    overshoot = int(round(overshoot_decision)) if overshoot_decision is not None else None
     completion_time_decision = _case_weighted_metric_mean(
         trials,
         field_name="completion_time",
     )
     completion_time = (
-        round(completion_time_decision, 4)
-        if completion_time_decision is not None
-        else None
+        round(completion_time_decision, 4) if completion_time_decision is not None else None
     )
     trial_score_decision = _case_weighted_metric_mean(
         trials,
         field_name="score",
     )
-    trial_score_mean = (
-        round(trial_score_decision, 4)
-        if trial_score_decision is not None
-        else None
-    )
+    trial_score_mean = round(trial_score_decision, 4) if trial_score_decision is not None else None
 
     aggregated_score = _score_candidate(
         metrics, trial_count=len(trials), failed=candidate.failed_trial_count
@@ -771,14 +735,10 @@ def _aggregate_candidate(
         "pass_rate": overall_rates["pass_rate"],
         "rate_aggregation": "scenario_case_weighted_v1",
         "scenario_case_rates": overall_rates["scenario_cases"],
-        "trial_outcome_taxonomy_schema": overall_rates[
-            "trial_outcome_taxonomy_schema"
-        ],
+        "trial_outcome_taxonomy_schema": overall_rates["trial_outcome_taxonomy_schema"],
         "trial_outcome_counts": overall_rates["trial_outcome_counts"],
         "trial_outcome_rates": overall_rates["trial_outcome_rates"],
-        "optimizer_learning_failure_rate": overall_rates[
-            "optimizer_learning_failure_rate"
-        ],
+        "optimizer_learning_failure_rate": overall_rates["optimizer_learning_failure_rate"],
         "optimizer_learning_case_weight_total": overall_rates[
             "optimizer_learning_case_weight_total"
         ],
@@ -787,8 +747,7 @@ def _aggregate_candidate(
         within_case_mode = objective_config.robust_aggregation
         across_case_mode = "worst" if within_case_mode == "worst" else "mean"
         objective_estimator = (
-            f"within_case_{within_case_mode}_then_fixed_suite_"
-            f"{across_case_mode}_v1"
+            f"within_case_{within_case_mode}_then_fixed_suite_{across_case_mode}_v1"
         )
 
         def _evaluate_rows(
@@ -820,9 +779,7 @@ def _aggregate_candidate(
                         metric.max_error,
                         field_name="max_error",
                     ),
-                    "overshoot_count": float(
-                        _required_overshoot_count(metric.overshoot_count)
-                    ),
+                    "overshoot_count": float(_required_overshoot_count(metric.overshoot_count)),
                     "completion_time": _required_metric_number(
                         metric.completion_time,
                         field_name="completion_time",
@@ -860,44 +817,32 @@ def _aggregate_candidate(
             case_weights: list[float] = []
             constraint_samples: list[dict[str, float]] = []
             for group_key, (case, case_rows) in grouped.items():
-                usable_rows = [
-                    trial for trial in case_rows if _trial_has_usable_metric(trial)
-                ]
+                usable_rows = [trial for trial in case_rows if _trial_has_usable_metric(trial)]
                 if not usable_rows:
                     raise ValueError(
-                        "scenario case "
-                        f"{group_key.split(':', 1)[-1]} has no usable metric samples"
+                        f"scenario case {group_key.split(':', 1)[-1]} has no usable metric samples"
                     )
                 seed_samples = [_metric_sample(trial) for trial in usable_rows]
                 common_metrics = set(seed_samples[0]).intersection(
                     *(set(sample) for sample in seed_samples[1:])
                 )
                 case_sample = {
-                    metric_name: sum(
-                        sample[metric_name] for sample in seed_samples
-                    )
+                    metric_name: sum(sample[metric_name] for sample in seed_samples)
                     / len(seed_samples)
                     for metric_name in sorted(common_metrics)
                 }
                 for objective in objective_config.objectives:
                     if objective.metric not in common_metrics:
-                        raise ValueError(
-                            f"missing objective metric: {objective.metric}"
-                        )
+                        raise ValueError(f"missing objective metric: {objective.metric}")
                     case_sample[objective.metric] = aggregate_metric(
-                        [
-                            sample[objective.metric]
-                            for sample in seed_samples
-                        ],
+                        [sample[objective.metric] for sample in seed_samples],
                         direction=objective.direction,
                         mode=within_case_mode,
                         cvar_alpha=objective_config.cvar_alpha,
                         percentile=objective_config.percentile,
                     )
                 case_samples.append(case_sample)
-                case_weights.append(
-                    float(case.weight) if case is not None else 1.0
-                )
+                case_weights.append(float(case.weight) if case is not None else 1.0)
                 constraint_samples.extend(seed_samples)
             return (
                 evaluate_objectives(
@@ -910,9 +855,7 @@ def _aggregate_candidate(
                 rate_summary,
             )
 
-        training_trials = [
-            trial for trial in trials if not trial_is_holdout(trial)
-        ]
+        training_trials = [trial for trial in trials if not trial_is_holdout(trial)]
         try:
             training_result = _evaluate_rows(training_trials)
         except ValueError as exc:
@@ -990,9 +933,7 @@ def _aggregate_candidate(
                     training_max_error_worst_decision,
                     4,
                 ),
-                "overshoot_count": int(
-                    round(float(training_overshoot_decision))
-                ),
+                "overshoot_count": int(round(float(training_overshoot_decision))),
                 "completion_time": round(
                     float(training_completion_time_decision),
                     4,
@@ -1002,9 +943,7 @@ def _aggregate_candidate(
                 "acceptance_rmse": float(training_rmse_decision),
                 "acceptance_max_error": training_max_error_worst_decision,
                 "acceptance_pass_rate": float(training_rates["pass_rate"]),
-                "acceptance_completion_rate": float(
-                    training_rates["completion_rate"]
-                ),
+                "acceptance_completion_rate": float(training_rates["completion_rate"]),
                 "training_completed_trial_count": len(training_completed),
                 "training_failed_trial_count": training_failed,
                 "training_passing_trial_count": training_passing,
@@ -1019,12 +958,8 @@ def _aggregate_candidate(
                 "training_trial_outcome_taxonomy_schema": training_rates[
                     "trial_outcome_taxonomy_schema"
                 ],
-                "training_trial_outcome_counts": training_rates[
-                    "trial_outcome_counts"
-                ],
-                "training_trial_outcome_rates": training_rates[
-                    "trial_outcome_rates"
-                ],
+                "training_trial_outcome_counts": training_rates["trial_outcome_counts"],
+                "training_trial_outcome_rates": training_rates["trial_outcome_rates"],
                 "optimizer_learning_failure_rate": training_rates[
                     "optimizer_learning_failure_rate"
                 ],
@@ -1037,9 +972,7 @@ def _aggregate_candidate(
         # Infrastructure, cancellation, and invalid-evidence outcomes still
         # block Candidate completeness and acceptance, but must not make an
         # otherwise identical controller look numerically worse.
-        training_failure_rate = float(
-            training_rates["optimizer_learning_failure_rate"]
-        )
+        training_failure_rate = float(training_rates["optimizer_learning_failure_rate"])
         selection_score = (
             evaluation.scalar_loss + constants.SCORE_WEIGHTS["failed_trial"] * training_failure_rate
         )
@@ -1075,9 +1008,7 @@ def _aggregate_candidate(
         if outcome_contract is not None:
             agg["outcome_contract_schema"] = outcome_contract.schema_id
             agg["outcome_contract_id"] = outcome_contract.contract_id
-        holdout_trials = [
-            trial for trial in trials if trial_is_holdout(trial)
-        ]
+        holdout_trials = [trial for trial in trials if trial_is_holdout(trial)]
         if holdout_trials:
             holdout_rates = _rate_summary(holdout_trials)
             holdout_payload: dict[str, Any] = {
@@ -1092,15 +1023,9 @@ def _aggregate_candidate(
                 "scenario_case_count": int(holdout_rates["scenario_case_count"]),
                 "scenario_weight_total": float(holdout_rates["scenario_weight_total"]),
                 "scenario_case_rates": holdout_rates["scenario_cases"],
-                "trial_outcome_taxonomy_schema": holdout_rates[
-                    "trial_outcome_taxonomy_schema"
-                ],
-                "trial_outcome_counts": holdout_rates[
-                    "trial_outcome_counts"
-                ],
-                "trial_outcome_rates": holdout_rates[
-                    "trial_outcome_rates"
-                ],
+                "trial_outcome_taxonomy_schema": holdout_rates["trial_outcome_taxonomy_schema"],
+                "trial_outcome_counts": holdout_rates["trial_outcome_counts"],
+                "trial_outcome_rates": holdout_rates["trial_outcome_rates"],
             }
             try:
                 holdout_result = _evaluate_rows(holdout_trials)
@@ -1174,15 +1099,11 @@ def _aggregate_candidate(
             )
             if report_trial_rows is None:
                 raise ValueError(
-                    "candidate report evidence requires readable, "
-                    "byte-verified Trial artifact rows"
+                    "candidate report evidence requires readable, byte-verified Trial artifact rows"
                 )
-            report_rows_by_trial_id = {
-                str(row["trial_id"]): row for row in report_trial_rows
-            }
+            report_rows_by_trial_id = {str(row["trial_id"]): row for row in report_trial_rows}
             training_trial_rows = [
-                report_rows_by_trial_id[trial.id]
-                for trial in ordered_training_trials
+                report_rows_by_trial_id[trial.id] for trial in ordered_training_trials
             ]
             evidence = compile_candidate_outcome_evidence(
                 outcome_contract_id=outcome_contract.contract_id,
@@ -1202,9 +1123,7 @@ def _aggregate_candidate(
                 aggregate=agg,
             )
             agg["candidate_report_evidence_required"] = True
-            agg["candidate_report_evidence"] = report_evidence.model_dump(
-                mode="json"
-            )
+            agg["candidate_report_evidence"] = report_evidence.model_dump(mode="json")
             record_candidate_evidence_receipt(
                 candidate=candidate,
                 aggregate=agg,
@@ -1274,15 +1193,11 @@ def _compile_current_winner_evidence(
             candidate_id=candidate.id,
             generation_index=candidate.generation_index,
             parameter_snapshot=candidate.parameter_json,
-            trial_evidence_rows=candidate_training_trial_evidence_rows(
-                candidate
-            ),
+            trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
             aggregate=candidate.aggregated_metric_json,
         )
         try:
-            report = require_authoritative_candidate_report_projection(
-                candidate
-            )
+            report = require_authoritative_candidate_report_projection(candidate)
         except ValueError as exc:
             raise WinnerSelectionEvidenceError(str(exc)) from exc
         order = selection_order_key(
@@ -1291,19 +1206,13 @@ def _compile_current_winner_evidence(
         )
         if not outcome or not report:
             raise WinnerSelectionEvidenceError(
-                "winner evidence requires authoritative Candidate inputs "
-                f"for {candidate.id}"
+                f"winner evidence requires authoritative Candidate inputs for {candidate.id}"
             )
-        finite_order = (
-            order
-            if all(math.isfinite(float(value)) for value in order)
-            else None
-        )
+        finite_order = order if all(math.isfinite(float(value)) for value in order) else None
         eligible = candidate_is_publishable(candidate)
         if eligible and finite_order is None:
             raise WinnerSelectionEvidenceError(
-                "publishable Candidate has a non-finite Selection Key: "
-                f"{candidate.id} -> {order}"
+                f"publishable Candidate has a non-finite Selection Key: {candidate.id} -> {order}"
             )
         inputs.append(
             {
@@ -1311,12 +1220,8 @@ def _compile_current_winner_evidence(
                 "generation_index": candidate.generation_index,
                 "is_baseline": candidate.is_baseline,
                 "eligible": eligible,
-                "candidate_outcome_evidence_id": report.get(
-                    "candidate_outcome_evidence_id"
-                ),
-                "candidate_report_evidence_id": report.get(
-                    "candidate_report_evidence_id"
-                ),
+                "candidate_outcome_evidence_id": report.get("candidate_outcome_evidence_id"),
+                "candidate_report_evidence_id": report.get("candidate_report_evidence_id"),
                 "selection_order_key": finite_order,
             }
         )
@@ -1482,9 +1387,7 @@ def finalize_job_if_ready(
             )
             if outcome_contract is not None
             and any(
-                candidate_report_evidence_required(
-                    candidate.aggregated_metric_json
-                )
+                candidate_report_evidence_required(candidate.aggregated_metric_json)
                 for candidate in candidates
             )
             else None

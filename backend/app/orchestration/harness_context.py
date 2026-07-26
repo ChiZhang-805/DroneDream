@@ -22,7 +22,7 @@ from app.optimization.outcome_taxonomy import (
     is_optimizer_learning_failure,
     is_optimizer_learning_outcome,
 )
-from app.optimization.scenarios import scenario_matrix
+from app.optimization.scenarios import resolve_scenario_case, scenario_matrix
 from app.parameters import get_parameter
 
 HarnessToolId = Literal[
@@ -380,6 +380,7 @@ def _safe_metric(value: object, *, depth: int = 0) -> JsonMetric | None:
 
 def _candidate_evidence(
     candidate: models.CandidateParameterSet,
+    scenario_suite: schemas.ScenarioSuiteConfig | None,
 ) -> HarnessCandidateEvidence:
     aggregate = (
         candidate.aggregated_metric_json
@@ -394,7 +395,8 @@ def _candidate_evidence(
         if compiled is not None:
             allowed_metrics[key] = compiled
     trial_count, completed_trial_count, failed_trial_count = _candidate_optimizer_learning_counts(
-        candidate
+        candidate,
+        scenario_suite,
     )
     return HarnessCandidateEvidence(
         generation=max(0, int(candidate.generation_index or 0)),
@@ -486,6 +488,7 @@ def _candidate_complete(candidate: models.CandidateParameterSet) -> bool:
 
 def _candidate_optimizer_learning_counts(
     candidate: models.CandidateParameterSet,
+    scenario_suite: schemas.ScenarioSuiteConfig | None,
 ) -> tuple[int, int, int]:
     """Count only training outcomes allowed to shape parameter search.
 
@@ -499,8 +502,26 @@ def _candidate_optimizer_learning_counts(
     completed_count = 0
     failed_count = 0
     for trial in candidate.trials:
-        if bool((trial.scenario_config_json or {}).get("holdout")):
-            continue
+        if scenario_suite is not None:
+            resolution = resolve_scenario_case(
+                scenario_suite,
+                scenario_type=trial.scenario_type,
+                scenario_config=trial.scenario_config_json,
+                seed=trial.seed,
+            )
+            if (
+                not resolution.matched
+                or resolution.case is None
+                or resolution.case.holdout
+            ):
+                continue
+        else:
+            scenario_config = trial.scenario_config_json
+            if not isinstance(scenario_config, dict):
+                continue
+            holdout = scenario_config.get("holdout", False)
+            if not isinstance(holdout, bool) or holdout:
+                continue
         metric = trial.metric
         usable_metric = (
             trial.status == "COMPLETED"
@@ -538,6 +559,7 @@ def _candidate_feasibility(
 
 def _search_summary(
     candidates: list[models.CandidateParameterSet],
+    scenario_suite: schemas.ScenarioSuiteConfig | None,
 ) -> HarnessSearchSummary:
     scored: list[tuple[models.CandidateParameterSet, float]] = []
     for candidate in candidates:
@@ -588,7 +610,10 @@ def _search_summary(
             *best_by_generation[-(MAX_GENERATION_TREND_ITEMS - 1) :],
         )
 
-    learning_counts = [_candidate_optimizer_learning_counts(candidate) for candidate in candidates]
+    learning_counts = [
+        _candidate_optimizer_learning_counts(candidate, scenario_suite)
+        for candidate in candidates
+    ]
     total_trials = sum(counts[0] for counts in learning_counts)
     failed_trials = sum(counts[2] for counts in learning_counts)
     completed_candidates = sum(1 for candidate in candidates if _candidate_complete(candidate))
@@ -641,6 +666,7 @@ def _candidate_tool(
 
 def _tool_history(
     candidates: list[models.CandidateParameterSet],
+    scenario_suite: schemas.ScenarioSuiteConfig | None,
 ) -> tuple[HarnessToolHistory, ...]:
     grouped: dict[HarnessToolId, list[models.CandidateParameterSet]] = defaultdict(list)
     for candidate in candidates:
@@ -676,10 +702,18 @@ def _tool_history(
                     1 for candidate in owned if _candidate_feasibility(candidate) is True
                 ),
                 total_trial_count=sum(
-                    _candidate_optimizer_learning_counts(candidate)[0] for candidate in owned
+                    _candidate_optimizer_learning_counts(
+                        candidate,
+                        scenario_suite,
+                    )[0]
+                    for candidate in owned
                 ),
                 failed_trial_count=sum(
-                    _candidate_optimizer_learning_counts(candidate)[2] for candidate in owned
+                    _candidate_optimizer_learning_counts(
+                        candidate,
+                        scenario_suite,
+                    )[2]
+                    for candidate in owned
                 ),
                 best_score=min(scores, default=None),
                 last_generation=max(
@@ -779,6 +813,7 @@ def _candidate_sort_time(candidate: models.CandidateParameterSet) -> datetime:
 
 def _select_candidates(
     candidates: list[models.CandidateParameterSet],
+    scenario_suite: schemas.ScenarioSuiteConfig | None,
 ) -> tuple[HarnessCandidateEvidence, ...]:
     selected: dict[str, models.CandidateParameterSet] = {}
 
@@ -839,7 +874,9 @@ def _select_candidates(
             item.id,
         ),
     )
-    return tuple(_candidate_evidence(candidate) for candidate in ordered)
+    return tuple(
+        _candidate_evidence(candidate, scenario_suite) for candidate in ordered
+    )
 
 
 def build_harness_evidence(
@@ -861,13 +898,18 @@ def build_harness_evidence(
         robust_aggregation = "unknown"
     used_trials = max(0, int(job.progress_total_trials or 0))
     max_total_trials = max(0, int(job.max_total_trials or 0))
+    scenario_suite = (
+        schemas.ScenarioSuiteConfig(**job.scenario_suite_json)
+        if isinstance(job.scenario_suite_json, dict) and job.scenario_suite_json
+        else None
+    )
     scenarios = _scenario_evidence(job)
     full_trials_per_candidate = max(
         1,
         scenarios.training_replicate_count + scenarios.validation_replicate_count,
     )
     remaining_trials = max(0, max_total_trials - used_trials)
-    compact_candidates = _select_candidates(candidates)
+    compact_candidates = _select_candidates(candidates, scenario_suite)
     objective_profile = cast(
         HarnessObjectiveProfile,
         (
@@ -904,8 +946,8 @@ def build_harness_evidence(
             remaining_full_candidate_capacity=(remaining_trials // full_trials_per_candidate),
         ),
         scenarios=scenarios,
-        search=_search_summary(candidates),
-        tool_history=_tool_history(candidates),
+        search=_search_summary(candidates, scenario_suite),
+        tool_history=_tool_history(candidates, scenario_suite),
         decision_memory=_decision_memory(list(execution_events)),
         candidates=compact_candidates,
         candidate_history_total=len(candidates),

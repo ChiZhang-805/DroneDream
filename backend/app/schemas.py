@@ -316,8 +316,7 @@ class ExperimentAssistantTurnRequest(_Strict):
     @model_validator(mode="after")
     def _validate_turn(self) -> ExperimentAssistantTurnRequest:
         if any(
-            not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", field_id)
-            for field_id in self.current_values
+            not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", field_id) for field_id in self.current_values
         ):
             raise ValueError("current_values contains an invalid field id")
         if any(
@@ -338,12 +337,8 @@ class ExperimentAssistantTurnResponse(_Strict):
     experiment_summary: str = Field(max_length=2_000)
     accepted_patches: list[ExperimentAssistantPatch] = Field(max_length=96)
     rejected_patches: list[ExperimentAssistantRejectedPatch] = Field(max_length=96)
-    accepted_parameter_patches: list[ExperimentAssistantParameterPatch] = Field(
-        max_length=64
-    )
-    rejected_parameter_patches: list[ExperimentAssistantRejectedPatch] = Field(
-        max_length=64
-    )
+    accepted_parameter_patches: list[ExperimentAssistantParameterPatch] = Field(max_length=64)
+    rejected_parameter_patches: list[ExperimentAssistantRejectedPatch] = Field(max_length=64)
     missing_field_ids: list[str] = Field(max_length=32)
     review_field_ids: list[str] = Field(max_length=32)
     questions: list[ExperimentAssistantQuestion] = Field(max_length=4)
@@ -442,9 +437,7 @@ class ParameterSelection(_Strict):
             if any(value < self.minimum or value > self.maximum for value in self.choices):
                 raise ValueError("parameter choices must be inside [minimum, maximum]")
             if self.enabled and not self.locked and len(unique_choices) < 2:
-                raise ValueError(
-                    "enabled unlocked parameter choices require at least two values"
-                )
+                raise ValueError("enabled unlocked parameter choices require at least two values")
         return self
 
 
@@ -543,12 +536,13 @@ def _validate_scenario_json(value: object) -> None:
 def _default_scenario_cases() -> list[ScenarioCaseConfig]:
     return [
         ScenarioCaseConfig(id="nominal", scenario_type="nominal", seeds=[101]),
-        ScenarioCaseConfig(
-            id="sensor-noise", scenario_type="noise_perturbed", seeds=[202]
-        ),
+        ScenarioCaseConfig(id="sensor-noise", scenario_type="noise_perturbed", seeds=[202]),
         ScenarioCaseConfig(id="wind", scenario_type="wind_perturbed", seeds=[303]),
         ScenarioCaseConfig(
-            id="combined", scenario_type="combined_perturbed", seeds=[404]
+            id="combined",
+            scenario_type="combined_perturbed",
+            seeds=[404],
+            holdout=True,
         ),
     ]
 
@@ -566,6 +560,14 @@ class ScenarioSuiteConfig(_Strict):
             raise ValueError("scenario case ids must be unique")
         if not any(case.enabled and not case.holdout for case in self.cases):
             raise ValueError("scenario suite requires at least one enabled training case")
+        training_seeds = {
+            seed for case in self.cases if case.enabled and not case.holdout for seed in case.seeds
+        }
+        holdout_seeds = {
+            seed for case in self.cases if case.enabled and case.holdout for seed in case.seeds
+        }
+        if training_seeds & holdout_seeds:
+            raise ValueError("training and holdout scenario seeds must be disjoint")
         return self
 
 
@@ -668,9 +670,7 @@ class JobCreateRequest(_Strict):
     def _validate_custom_reference_track(self) -> JobCreateRequest:
         if self.display_name == "":
             self.display_name = None
-        if self.display_name is not None and any(
-            ord(char) < 32 for char in self.display_name
-        ):
+        if self.display_name is not None and any(ord(char) < 32 for char in self.display_name):
             raise ValueError("display_name cannot contain control characters")
         points = self.reference_track or []
         if self.track_type == "custom" and len(points) < 2:
@@ -704,14 +704,14 @@ class JobCreateRequest(_Strict):
             raise ValueError(
                 "experimental real_cli optimization requires an explicit PX4 parameter_space"
             )
-        if (
-            self.optimizer_strategy != "none"
-            and self.parameter_space
-            and not enabled
-        ):
+        if self.optimizer_strategy != "none" and self.parameter_space and not enabled:
             raise ValueError("parameter_space requires at least one enabled, unlocked parameter")
         if self.openai is not None and self.llm is not None:
             raise ValueError("provide either openai or llm, not both")
+        if self.optimizer_strategy == "llm_harness" and not any(
+            case.enabled and case.holdout for case in self.scenario_suite.cases
+        ):
+            raise ValueError("llm_harness requires at least one enabled holdout scenario case")
         scenario_trial_count = sum(
             len(case.seeds) for case in self.scenario_suite.cases if case.enabled
         )
@@ -721,11 +721,7 @@ class JobCreateRequest(_Strict):
         if self.max_total_trials < minimum_trials:
             raise ValueError(
                 "max_total_trials is too small for the baseline scenario matrix"
-                + (
-                    " plus one optimizer candidate"
-                    if self.optimizer_strategy != "none"
-                    else ""
-                )
+                + (" plus one optimizer candidate" if self.optimizer_strategy != "none" else "")
                 + f"; requires at least {minimum_trials}"
             )
         return self
@@ -988,8 +984,6 @@ class JobRerunRequest(_Strict):
         return self
 
 
-
-
 class JobUpdateRequest(_Strict):
     display_name: str | None = Field(default=None, max_length=255)
 
@@ -1005,6 +999,7 @@ class JobUpdateRequest(_Strict):
             raise ValueError("display_name cannot contain control characters")
         self.display_name = value
         return self
+
 
 class JobsCompareRequest(_Strict):
     job_ids: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(

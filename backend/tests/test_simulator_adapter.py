@@ -160,13 +160,54 @@ def test_mock_adapter_catalog_parameters_have_explicit_synthetic_effect():
     assert low.metrics is not None and high.metrics is not None
     assert low.metrics.rmse != high.metrics.rmse
     assert low.metrics.raw_metric_json["mock_landscape_schema"] == (
-        "dronedream.mock.synthetic.v1"
+        "dronedream.mock.synthetic.v2"
     )
     assert low.metrics.raw_metric_json["physical_fidelity"] is False
     assert low.metrics.raw_metric_json["catalog_parameter_count"] == 1
     # The score contract is consistent across adapters: lower error => lower score.
     better, worse = sorted((low.metrics, high.metrics), key=lambda metric: metric.rmse)
     assert better.score < worse.score
+
+
+def test_mock_scenario_changes_controller_response_not_only_constant_difficulty() -> None:
+    adapter = MockSimulatorAdapter()
+    weak = {
+        "kp_xy": 1.2,
+        "kd_xy": 0.3,
+        "ki_xy": 0.05,
+        "vel_limit": 6.0,
+        "accel_limit": 4.5,
+        "disturbance_rejection": 0.0,
+    }
+    robust = {**weak, "disturbance_rejection": 1.0}
+
+    nominal_weak = adapter.run_trial(
+        _make_ctx(scenario="nominal", seed=101, parameters=weak)
+    )
+    nominal_robust = adapter.run_trial(
+        _make_ctx(scenario="nominal", seed=101, parameters=robust)
+    )
+    wind_weak = adapter.run_trial(
+        _make_ctx(scenario="wind_perturbed", seed=101, parameters=weak)
+    )
+    wind_robust = adapter.run_trial(
+        _make_ctx(scenario="wind_perturbed", seed=101, parameters=robust)
+    )
+    assert all(
+        result.metrics is not None
+        for result in (nominal_weak, nominal_robust, wind_weak, wind_robust)
+    )
+    assert nominal_weak.metrics is not None
+    assert nominal_robust.metrics is not None
+    assert wind_weak.metrics is not None
+    assert wind_robust.metrics is not None
+    nominal_gain = nominal_weak.metrics.rmse - nominal_robust.metrics.rmse
+    wind_gain = wind_weak.metrics.rmse - wind_robust.metrics.rmse
+
+    assert nominal_gain > 0.0
+    assert wind_gain > nominal_gain
+    assert wind_weak.metrics.raw_metric_json["scenario_control_penalty"] > 0.0
+    assert wind_robust.metrics.raw_metric_json["scenario_control_penalty"] == 0.0
 
 
 @pytest.mark.parametrize(

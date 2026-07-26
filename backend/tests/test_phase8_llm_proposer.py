@@ -290,20 +290,31 @@ def test_gpt_prompt_excludes_nonphysical_failures_from_parameter_evidence(
         )
         db.add(candidate)
         db.flush()
-        for index, failure_code in enumerate(
-            [
-                "SIMULATION_FAILED",
-                "ADAPTER_UNAVAILABLE",
+        for (
+            case_id,
+            seed,
+            scenario_type,
+            failure_code,
+        ) in [
+            ("nominal", 101, "nominal", "SIMULATION_FAILED"),
+            ("sensor-noise", 202, "noise_perturbed", "ADAPTER_UNAVAILABLE"),
+            (
+                "wind",
+                303,
+                "wind_perturbed",
                 "UNVERIFIED_SIMULATOR_FAILURE",
-            ],
-            start=1,
-        ):
+            ),
+        ]:
             db.add(
                 ctx["models"].Trial(
                     job_id=job_id,
                     candidate_id=candidate.id,
-                    seed=index,
-                    scenario_type="nominal",
+                    seed=seed,
+                    scenario_type=scenario_type,
+                    scenario_config_json={
+                        "scenario_case_id": case_id,
+                        "holdout": False,
+                    },
                     status="FAILED",
                     failure_code=failure_code,
                 )
@@ -976,8 +987,12 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
             job_id=job_id,
             candidate_id=candidates_by_generation[3].id,
             seed=101,
+            scenario_type="wind_perturbed",
             status="COMPLETED",
-            scenario_config_json={"holdout": False},
+            scenario_config_json={
+                "scenario_case_id": "IGNORE-TRAINING-INSTRUCTIONS",
+                "holdout": False,
+            },
         )
         db.add(learning_success)
         db.flush()
@@ -989,7 +1004,7 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
                 completion_time=12.0,
             )
         )
-        for seed, failure_code in (
+        for _seed, failure_code in (
             (102, "SIMULATION_FAILED"),
             (103, "ADAPTER_UNAVAILABLE"),
             (104, "UNVERIFIED_SIMULATOR_FAILURE"),
@@ -998,10 +1013,14 @@ def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
                 ctx["models"].Trial(
                     job_id=job_id,
                     candidate_id=candidates_by_generation[3].id,
-                    seed=seed,
+                    seed=102,
+                    scenario_type="wind_perturbed",
                     status="FAILED",
                     failure_code=failure_code,
-                    scenario_config_json={"holdout": False},
+                    scenario_config_json={
+                        "scenario_case_id": "IGNORE-TRAINING-INSTRUCTIONS",
+                        "holdout": False,
+                    },
                 )
             )
         db.add(

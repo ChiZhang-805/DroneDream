@@ -113,10 +113,13 @@ def _scenario_payload(
     generation_index: int,
 ) -> dict[str, Any]:
     base = {
+        **run.persistence_config(),
         "scenario": run.scenario_type,
         "source": source,
         "generation_index": generation_index,
-        **run.persistence_config(),
+        "scenario_case_id": run.case_id,
+        "scenario_weight": run.weight,
+        "holdout": run.holdout,
     }
     return constants.with_advanced_scenario(base, job.advanced_scenario_config_json)
 
@@ -170,9 +173,7 @@ def _baseline_parameters_for_job(job: models.Job) -> dict[str, float]:
     return params
 
 
-def _complete_candidate_parameters(
-    job: models.Job, proposed: dict[str, float]
-) -> dict[str, float]:
+def _complete_candidate_parameters(job: models.Job, proposed: dict[str, float]) -> dict[str, float]:
     """Overlay tuned values onto the invariant job-level controller inputs.
 
     Schedule/controller values that are not selected for tuning must remain
@@ -320,8 +321,7 @@ def _allows_transient_full_verification_retry(
     }:
         return False
     if (
-        _optimizer_requested_fidelity(candidate.optimizer_metadata_json)
-        < 1.0 - 1e-9
+        _optimizer_requested_fidelity(candidate.optimizer_metadata_json) < 1.0 - 1e-9
         or int(candidate.trial_count or 0) <= 0
         or int(candidate.failed_trial_count or 0) <= 0
     ):
@@ -335,8 +335,7 @@ def _allows_transient_full_verification_retry(
     if any(trial.status not in {"COMPLETED", "FAILED"} for trial in trials):
         return False
     return bool(failed_trials) and all(
-        trial.failure_code in _TRANSIENT_FULL_VERIFICATION_FAILURES
-        for trial in failed_trials
+        trial.failure_code in _TRANSIENT_FULL_VERIFICATION_FAILURES for trial in failed_trials
     )
 
 
@@ -365,9 +364,7 @@ def _is_duplicate_proposal(
     # second identical row exists, or if the first row failed for any other
     # reason, the proposal remains a duplicate.
     return not (
-        identity[2]
-        and len(matches) == 1
-        and _allows_transient_full_verification_retry(matches[0])
+        identity[2] and len(matches) == 1 and _allows_transient_full_verification_retry(matches[0])
     )
 
 
@@ -443,9 +440,7 @@ def _dispatch_llm_candidate_trials(
 ) -> list[models.Trial]:
     trials: list[models.Trial] = []
     now = _now()
-    configured_runs = _configured_scenario_runs(
-        job, generation_index=candidate.generation_index
-    )
+    configured_runs = _configured_scenario_runs(job, generation_index=candidate.generation_index)
     if configured_runs is not None:
         for run in configured_runs:
             trial = models.Trial(
@@ -484,9 +479,7 @@ def _dispatch_llm_candidate_trials(
     scenarios = constants.OPTIMIZER_SCENARIOS
     for idx in range(trials_per_candidate):
         scenario = scenarios[idx % len(scenarios)]
-        seed = constants.optimizer_seed_for(
-            candidate.generation_index * 10 + idx, scenario
-        )
+        seed = constants.optimizer_seed_for(candidate.generation_index * 10 + idx, scenario)
         trial = models.Trial(
             job_id=job.id,
             candidate_id=candidate.id,
@@ -688,8 +681,7 @@ def _effective_fidelity_mapping(
             level,
             min(
                 1.0,
-                max(minimum_coverage, math.ceil(matrix_size * level))
-                / matrix_size,
+                max(minimum_coverage, math.ceil(matrix_size * level)) / matrix_size,
             ),
         )
         for level in (0.25, 0.5, 1.0)
@@ -734,17 +726,11 @@ def _dispatch_optimizer_trials(
 
     trials: list[models.Trial] = []
     now = _now()
-    configured_runs = _configured_scenario_runs(
-        job, generation_index=candidate.generation_index
-    )
+    configured_runs = _configured_scenario_runs(job, generation_index=candidate.generation_index)
     if configured_runs is not None:
-        full_training_count = sum(
-            1 for run in configured_runs if not run.holdout
-        )
+        full_training_count = sum(1 for run in configured_runs if not run.holdout)
         fidelity = _optimizer_fidelity(candidate.optimizer_metadata_json)
-        requested_fidelity = _optimizer_requested_fidelity(
-            candidate.optimizer_metadata_json
-        )
+        requested_fidelity = _optimizer_requested_fidelity(candidate.optimizer_metadata_json)
         if requested_fidelity < 1.0:
             configured_runs = _low_fidelity_scenario_runs(
                 configured_runs,
@@ -797,9 +783,7 @@ def _dispatch_optimizer_trials(
         scenario_count if trials_per_candidate is None else max(1, trials_per_candidate)
     )
     fidelity = _optimizer_fidelity(candidate.optimizer_metadata_json)
-    requested_fidelity = _optimizer_requested_fidelity(
-        candidate.optimizer_metadata_json
-    )
+    requested_fidelity = _optimizer_requested_fidelity(candidate.optimizer_metadata_json)
     if requested_fidelity < 1.0:
         dispatch_count = max(
             1,
@@ -922,9 +906,7 @@ def _claim_and_initialize_job(db: Session, job: models.Job) -> bool:
             )
         else:
             proposals = (
-                generate_candidates(
-                    _baseline_parameters_for_job(job), count=budgeted_count
-                )
+                generate_candidates(_baseline_parameters_for_job(job), count=budgeted_count)
                 if budgeted_count > 0
                 else []
             )
@@ -989,9 +971,7 @@ def dispatch_next_llm_generation(
     generation_index = job.current_generation + 1
     configured_runs = _configured_scenario_runs(job, generation_index=generation_index)
     trials_per_candidate = (
-        len(configured_runs)
-        if configured_runs is not None
-        else max(1, job.trials_per_candidate)
+        len(configured_runs) if configured_runs is not None else max(1, job.trials_per_candidate)
     )
     if generation_index > job.max_iterations:
         return LlmDispatchResult(status="max_iterations_reached")
@@ -1054,9 +1034,7 @@ def dispatch_next_cma_es_generation(
     generation_index = job.current_generation + 1
     configured_runs = _configured_scenario_runs(job, generation_index=generation_index)
     trials_per_candidate = (
-        len(configured_runs)
-        if configured_runs is not None
-        else max(1, job.trials_per_candidate)
+        len(configured_runs) if configured_runs is not None else max(1, job.trials_per_candidate)
     )
     if generation_index > job.max_iterations:
         return AdaptiveDispatchResult(status="max_iterations_reached")
@@ -1185,9 +1163,7 @@ def dispatch_next_experimental_generation(
 
     configured_runs = _configured_scenario_runs(job, generation_index=generation_index)
     full_trials_per_candidate = (
-        len(configured_runs)
-        if configured_runs is not None
-        else max(1, job.trials_per_candidate)
+        len(configured_runs) if configured_runs is not None else max(1, job.trials_per_candidate)
     )
     remaining_trials = max(0, job.max_total_trials - job.progress_total_trials)
     capacity = remaining_trials // full_trials_per_candidate
@@ -1202,8 +1178,10 @@ def dispatch_next_experimental_generation(
         "optimizer_portfolio",
     }
     has_full_optimizer_evidence = _has_successful_full_fidelity_optimizer_evidence(job)
-    force_full_fidelity = can_schedule_reduced_fidelity and not has_full_optimizer_evidence and (
-        generation_index >= job.max_iterations or capacity <= 1
+    force_full_fidelity = (
+        can_schedule_reduced_fidelity
+        and not has_full_optimizer_evidence
+        and (generation_index >= job.max_iterations or capacity <= 1)
     )
     allocatable_capacity = capacity
     if (

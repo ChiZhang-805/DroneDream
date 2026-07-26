@@ -22,6 +22,7 @@ from app.optimization.outcome_evidence import (
     trial_outcome_evidence_row,
 )
 from app.optimization.outcome_taxonomy import classify_trial_outcome
+from app.optimization.scenarios import ScenarioRun
 from app.orchestration import acceptance, aggregation, constants, job_manager
 from app.orchestration.experimental_optimizer import observations_for_job
 from app.orchestration.optimizer import (
@@ -370,6 +371,151 @@ def test_aggregation_rejects_completed_trial_with_missing_required_metric() -> N
     assert candidate.completed_trial_count == 0
     assert candidate.failed_trial_count == 1
     assert candidate.aggregated_score is None
+
+
+@pytest.mark.parametrize(
+    ("case_id", "scenario_type", "holdout"),
+    [
+        ("unknown", "nominal", False),
+        ("training", "wind_perturbed", False),
+        ("validation", "nominal", False),
+    ],
+)
+def test_aggregation_rejects_mismatched_scenario_evidence(
+    case_id: str,
+    scenario_type: str,
+    holdout: bool,
+) -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_mismatched_scenario",
+        job_id="job_mismatched_scenario",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trial = _aggregation_trial(
+        candidate=candidate,
+        trial_id="trial_mismatched_scenario",
+        case_id=case_id,
+        seed=1,
+        scenario_type=scenario_type,
+        holdout=holdout,
+    )
+    suite = schemas.ScenarioSuiteConfig(
+        cases=[
+            schemas.ScenarioCaseConfig(
+                id="training",
+                scenario_type="nominal",
+                seeds=[1],
+            ),
+            schemas.ScenarioCaseConfig(
+                id="validation",
+                scenario_type="nominal",
+                seeds=[2],
+                holdout=True,
+            ),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="scenario evidence does not match configured suite"):
+        aggregation._aggregate_candidate(
+            candidate,
+            [trial],
+            scenario_suite=suite,
+        )
+
+
+def test_aggregation_rejects_seed_outside_declared_scenario_case() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_wrong_seed",
+        job_id="job_wrong_seed",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trial = _aggregation_trial(
+        candidate=candidate,
+        trial_id="trial_wrong_seed",
+        case_id="training",
+        seed=999,
+    )
+    suite = schemas.ScenarioSuiteConfig(
+        cases=[schemas.ScenarioCaseConfig(id="training", seeds=[1])]
+    )
+
+    with pytest.raises(
+        ValueError, match="scenario evidence does not match configured suite"
+    ):
+        aggregation._aggregate_candidate(
+            candidate,
+            [trial],
+            scenario_suite=suite,
+        )
+
+
+def test_aggregation_rejects_ambiguous_legacy_scenario_evidence() -> None:
+    candidate = models.CandidateParameterSet(
+        id="candidate_ambiguous_scenario",
+        job_id="job_ambiguous_scenario",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trial = _aggregation_trial(
+        candidate=candidate,
+        trial_id="trial_ambiguous_scenario",
+        case_id="ignored",
+        seed=1,
+    )
+    trial.scenario_config_json = {"holdout": False}
+    suite = schemas.ScenarioSuiteConfig(
+        cases=[
+            schemas.ScenarioCaseConfig(id="nominal-a", seeds=[1]),
+            schemas.ScenarioCaseConfig(id="nominal-b", seeds=[1]),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="scenario evidence does not match configured suite"):
+        aggregation._aggregate_candidate(
+            candidate,
+            [trial],
+            scenario_suite=suite,
+        )
+
+
+def test_scenario_payload_preserves_authoritative_orchestrator_fields() -> None:
+    run = ScenarioRun(
+        case_id="trusted-case",
+        scenario_type="wind_perturbed",
+        seed=101,
+        weight=2.0,
+        holdout=True,
+        config={
+            "scenario": "nominal",
+            "source": "forged",
+            "generation_index": -999,
+            "scenario_case_id": "forged-case",
+            "scenario_weight": 999.0,
+            "holdout": False,
+            "advanced_scenario_config": {"forged": True},
+        },
+    )
+    job = models.Job(advanced_scenario_config_json={"wind_gusts": {"enabled": True}})
+
+    payload = job_manager._scenario_payload(
+        job,
+        run,
+        source="optimizer",
+        generation_index=7,
+    )
+
+    assert payload["scenario"] == "wind_perturbed"
+    assert payload["source"] == "optimizer"
+    assert payload["generation_index"] == 7
+    assert payload["scenario_case_id"] == "trusted-case"
+    assert payload["scenario_weight"] == 2.0
+    assert payload["holdout"] is True
+    assert payload["advanced_scenario_config"] == {"wind_gusts": {"enabled": True}}
 
 
 @pytest.mark.parametrize(

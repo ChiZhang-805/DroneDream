@@ -481,12 +481,14 @@ def test_holdout_results_never_influence_candidate_selection(orchestration_ctx):
                 metric=metric(2.0, passed=True),
                 scenario_config_json={"scenario_case_id": "training", "holdout": False},
                 scenario_type="nominal",
+                seed=1,
             ),
             SimpleNamespace(
                 status="COMPLETED",
                 metric=metric(holdout_rmse, passed=holdout_rmse < 1.0),
                 scenario_config_json={"scenario_case_id": "validation", "holdout": True},
                 scenario_type="nominal",
+                seed=2,
             ),
         ]
         result = ctx["aggregation"]._aggregate_candidate(

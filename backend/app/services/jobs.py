@@ -28,6 +28,7 @@ from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIE
 from app.optimization.outcome_contract import compile_outcome_contract
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import CandidateEvaluation, evaluate_candidate
+from app.optimization.scenarios import resolve_scenario_case
 from app.orchestration import constants
 from app.orchestration.aggregation import candidate_is_publishable
 from app.orchestration.attempt_evidence import (
@@ -166,8 +167,7 @@ def _validate_parameter_space(req: schemas.JobCreateRequest) -> None:
         missing_hard_dependencies = sorted(
             dependency.parameter
             for dependency in definition.dependencies
-            if dependency.kind != "recommended_with"
-            and dependency.parameter not in active_names
+            if dependency.kind != "recommended_with" and dependency.parameter not in active_names
         )
         if missing_hard_dependencies:
             raise JobServiceError(
@@ -230,9 +230,7 @@ def _validate_parameter_space(req: schemas.JobCreateRequest) -> None:
                 f"Unknown PX4 parameter: {selection.name}",
                 http_status=422,
             )
-        selection.value_type = (
-            "integer" if definition.value_type == "int" else "float"
-        )
+        selection.value_type = "integer" if definition.value_type == "int" else "float"
         if definition.choices:
             allowed_choices = {float(choice.value) for choice in definition.choices}
             if selection.choices is not None and not set(selection.choices).issubset(
@@ -313,26 +311,18 @@ def _create_job_from_config(
             "objective_config" in req.model_fields_set or experimental_optimizer
         )
     if persist_scenario_suite is None:
-        persist_scenario_suite = (
-            "scenario_suite" in req.model_fields_set or experimental_optimizer
-        )
+        persist_scenario_suite = "scenario_suite" in req.model_fields_set or experimental_optimizer
     settings = get_settings()
     platform_access = req.llm is not None and req.llm.access_mode == "platform"
     if req.llm is not None:
         llm_provider = req.llm.provider
-        llm_model = (
-            settings.model_gateway_managed_model_alias
-            if platform_access
-            else req.llm.model
-        )
+        llm_model = settings.model_gateway_managed_model_alias if platform_access else req.llm.model
         llm_base_url = (
             settings.model_gateway_base_url.strip().rstrip("/")
             if platform_access
             else req.llm.base_url
         )
-        llm_credential = (
-            req.llm.platform_grant if platform_access else req.llm.api_key
-        )
+        llm_credential = req.llm.platform_grant if platform_access else req.llm.api_key
     elif req.openai is not None:
         llm_provider = "openai"
         llm_model = req.openai.model
@@ -373,14 +363,10 @@ def _create_job_from_config(
             parameter.model_dump(mode="json") for parameter in req.parameter_space
         ],
         objective_config_json=(
-            req.objective_config.model_dump(mode="json")
-            if persist_objective_config
-            else None
+            req.objective_config.model_dump(mode="json") if persist_objective_config else None
         ),
         scenario_suite_json=(
-            req.scenario_suite.model_dump(mode="json")
-            if persist_scenario_suite
-            else None
+            req.scenario_suite.model_dump(mode="json") if persist_scenario_suite else None
         ),
         status="QUEUED",
         current_phase="queued",
@@ -406,20 +392,14 @@ def _create_job_from_config(
     db.add(job)
     db.flush()
     if llm_credential:
-        secret_expires_at = now + timedelta(
-            seconds=get_settings().job_secret_ttl_seconds
-        )
+        secret_expires_at = now + timedelta(seconds=get_settings().job_secret_ttl_seconds)
         db.add(
             models.JobSecret(
                 job_id=job.id,
                 # Both BYOK and the opaque managed grant drive the same
                 # OpenAI-compatible client. The provider tag keeps them
                 # unambiguous and prevents accidentally using a grant as BYOK.
-                provider=(
-                    "dronedream_gateway"
-                    if platform_access
-                    else "openai"
-                ),
+                provider=("dronedream_gateway" if platform_access else "openai"),
                 encrypted_api_key=job_secrets.encrypt_secret(llm_credential),
                 expires_at=secret_expires_at,
             )
@@ -440,9 +420,7 @@ def _create_job_from_config(
                 "parameter_catalog_version": req.parameter_catalog_version,
                 "parameter_names": [item.name for item in req.parameter_space if item.enabled],
                 "scenario_case_count": len(req.scenario_suite.cases),
-                "objective_metrics": [
-                    item.metric for item in req.objective_config.objectives
-                ],
+                "objective_metrics": [item.metric for item in req.objective_config.objectives],
             },
         )
     )
@@ -466,22 +444,18 @@ def _resolve_user(db: Session, user: models.User | None) -> models.User:
     if user is not None and user.id:
         return user
     if user is not None and user.email:
-        existing_email = (
-            db.scalars(select(models.User).where(models.User.email == user.email).limit(1)).first()
-        )
+        existing_email = db.scalars(
+            select(models.User).where(models.User.email == user.email).limit(1)
+        ).first()
         if existing_email is not None:
             return existing_email
         created_email_user = models.User(email=user.email, display_name=user.display_name)
         db.add(created_email_user)
         db.flush()
         return created_email_user
-    existing = (
-        db.scalars(
-            select(models.User)
-            .where(models.User.email == "default@drone-dream.local")
-            .limit(1)
-        ).first()
-    )
+    existing = db.scalars(
+        select(models.User).where(models.User.email == "default@drone-dream.local").limit(1)
+    ).first()
     if existing is not None:
         return existing
     created = models.User(email="default@drone-dream.local", display_name="Default User")
@@ -495,9 +469,7 @@ def create_job(
 ) -> models.Job:
     _validate_parameter_space(req)
     _validate_gpt_request(req)
-    job = _create_job_from_config(
-        db, user=_resolve_user(db, user), req=req, source_job_id=None
-    )
+    job = _create_job_from_config(db, user=_resolve_user(db, user), req=req, source_job_id=None)
     db.commit()
     db.refresh(job)
     return job
@@ -522,9 +494,7 @@ def purge_job_secrets(db: Session, job: models.Job, *, reason: str = "job_termin
     return deleted
 
 
-def purge_expired_job_secrets(
-    db: Session, *, now: datetime | None = None
-) -> int:
+def purge_expired_job_secrets(db: Session, *, now: datetime | None = None) -> int:
     """Wipe expired credentials even when jobs remain queued without a worker.
 
     ``expires_at`` was introduced after the first secret-store revision.  Old
@@ -533,9 +503,7 @@ def purge_expired_job_secrets(
     """
 
     current = now or _now()
-    legacy_cutoff = current - timedelta(
-        seconds=get_settings().job_secret_ttl_seconds
-    )
+    legacy_cutoff = current - timedelta(seconds=get_settings().job_secret_ttl_seconds)
     expired = list(
         db.scalars(
             select(models.JobSecret).where(
@@ -588,9 +556,7 @@ def list_jobs(
 
     total = int(db.scalar(count_stmt) or 0)
     stmt = (
-        stmt.order_by(models.Job.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
+        stmt.order_by(models.Job.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     )
     items = list(db.scalars(stmt))
     return items, total
@@ -751,11 +717,7 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
             status = "CANCELLED"
         else:
             status = "COMPLETED"
-    elif (
-        by_status["RUNNING"] > 0
-        or by_status["AGGREGATING"] > 0
-        or by_status["FINALIZING"] > 0
-    ):
+    elif by_status["RUNNING"] > 0 or by_status["AGGREGATING"] > 0 or by_status["FINALIZING"] > 0:
         status = "RUNNING"
     elif by_status["QUEUED"] > 0:
         status = "QUEUED"
@@ -768,9 +730,7 @@ def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.Batch
             failed_jobs=by_status["FAILED"],
             cancelled_jobs=by_status["CANCELLED"],
             running_jobs=(
-                by_status["RUNNING"]
-                + by_status["AGGREGATING"]
-                + by_status["FINALIZING"]
+                by_status["RUNNING"] + by_status["AGGREGATING"] + by_status["FINALIZING"]
             ),
             queued_jobs=by_status["QUEUED"],
             created_jobs=by_status["CREATED"],
@@ -841,10 +801,7 @@ def list_batches(
     if get_settings().auth_mode == "disabled":
         owner_filter = or_(owner_filter, models.BatchJob.user_id.is_(None))
     total = int(
-        db.scalar(
-            select(func.count()).select_from(models.BatchJob).where(owner_filter)
-        )
-        or 0
+        db.scalar(select(func.count()).select_from(models.BatchJob).where(owner_filter)) or 0
     )
     items = list(
         db.scalars(
@@ -870,10 +827,7 @@ def list_job_trials(
 
     get_job(db, job_id, user=user)
     trial_filter = models.Trial.job_id == job_id
-    total = int(
-        db.scalar(select(func.count()).select_from(models.Trial).where(trial_filter))
-        or 0
-    )
+    total = int(db.scalar(select(func.count()).select_from(models.Trial).where(trial_filter)) or 0)
     items = list(
         db.scalars(
             select(models.Trial)
@@ -894,13 +848,9 @@ def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) ->
     batch = db.get(models.BatchJob, batch_id)
     resolved_user = _resolve_user(db, user)
     auth_disabled_owned_null = (
-        get_settings().auth_mode == "disabled"
-        and batch is not None
-        and batch.user_id is None
+        get_settings().auth_mode == "disabled" and batch is not None and batch.user_id is None
     )
-    if batch is None or (
-        batch.user_id != resolved_user.id and not auth_disabled_owned_null
-    ):
+    if batch is None or (batch.user_id != resolved_user.id and not auth_disabled_owned_null):
         raise JobServiceError(
             "BATCH_NOT_FOUND",
             f"Batch {batch_id} was not found.",
@@ -911,9 +861,7 @@ def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) ->
 
 def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
     batch = get_batch(db, batch_id, user=user)
-    if batch.jobs and all(
-        child.status in schemas.JOB_TERMINAL_STATUSES for child in batch.jobs
-    ):
+    if batch.jobs and all(child.status in schemas.JOB_TERMINAL_STATUSES for child in batch.jobs):
         _, terminal_status = _aggregate_batch_progress(batch.jobs)
         raise JobServiceError(
             "BATCH_ALREADY_TERMINAL",
@@ -973,9 +921,7 @@ def update_job(
 def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> models.Job:
     job = get_job(db, job_id, user=user)
     if job.status in schemas.JOB_TERMINAL_STATUSES:
-        code = (
-            "JOB_ALREADY_CANCELLED" if job.status == "CANCELLED" else "JOB_ALREADY_COMPLETED"
-        )
+        code = "JOB_ALREADY_CANCELLED" if job.status == "CANCELLED" else "JOB_ALREADY_COMPLETED"
         raise JobServiceError(
             code,
             f"Job {job.id} is already in terminal state {job.status}.",
@@ -1002,8 +948,7 @@ def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
         attempt = db.scalar(
             select(models.TrialExecutionAttempt).where(
                 models.TrialExecutionAttempt.trial_id == trial.id,
-                models.TrialExecutionAttempt.attempt_count
-                == trial.attempt_count,
+                models.TrialExecutionAttempt.attempt_count == trial.attempt_count,
             )
         )
         if attempt is not None and attempt.outcome is None:
@@ -1054,9 +999,7 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
         else []
     )
     candidate_evidence_rows = [
-        receipt
-        for candidate in job.candidates
-        for receipt in candidate.evidence_receipts
+        receipt for candidate in job.candidates for receipt in candidate.evidence_receipts
     ]
     artifact_rows = list(
         db.scalars(
@@ -1174,9 +1117,9 @@ def _recent_events(job: models.Job) -> list[schemas.JobEventInfo]:
     and truncate to the limit so callers get a stable, bounded list.
     """
 
-    events = sorted(
-        list(job.events), key=lambda e: (e.created_at, e.id), reverse=True
-    )[:_RECENT_EVENTS_LIMIT]
+    events = sorted(list(job.events), key=lambda e: (e.created_at, e.id), reverse=True)[
+        :_RECENT_EVENTS_LIMIT
+    ]
     return [
         schemas.JobEventInfo(
             id=e.id,
@@ -1302,9 +1245,7 @@ def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
         candidate_optimizer_strategy=candidate_optimizer_strategy,
         candidate_is_baseline=bool(candidate.is_baseline) if candidate is not None else False,
         candidate_is_best=bool(candidate.is_best) if candidate is not None else False,
-        candidate_generation_index=(
-            candidate.generation_index if candidate is not None else 0
-        ),
+        candidate_generation_index=(candidate.generation_index if candidate is not None else 0),
     )
 
 
@@ -1353,14 +1294,10 @@ def to_artifact_schema(artifact: models.Artifact) -> schemas.Artifact:
         file_size_bytes=artifact.file_size_bytes,
         integrity_policy=artifact.integrity_policy,
         digest_evidence_id=(
-            artifact.digest_receipt.evidence_id
-            if artifact.digest_receipt is not None
-            else None
+            artifact.digest_receipt.evidence_id if artifact.digest_receipt is not None else None
         ),
         content_sha256=(
-            artifact.digest_receipt.content_sha256
-            if artifact.digest_receipt is not None
-            else None
+            artifact.digest_receipt.content_sha256 if artifact.digest_receipt is not None else None
         ),
         created_at=artifact.created_at,
     )
@@ -1377,9 +1314,7 @@ def compare_jobs(
     ids = list(dict.fromkeys(req.job_ids))
     stmt = select(models.Job).where(models.Job.id.in_(ids))
     if auth_disabled:
-        stmt = stmt.where(
-            or_(models.Job.user_id == resolved_user.id, models.Job.user_id.is_(None))
-        )
+        stmt = stmt.where(or_(models.Job.user_id == resolved_user.id, models.Job.user_id.is_(None)))
     else:
         stmt = stmt.where(models.Job.user_id == resolved_user.id)
     rows = list(db.scalars(stmt))
@@ -1411,7 +1346,7 @@ def compare_jobs(
                 job_id=job.id,
                 display_name=job.display_name,
                 baseline_parameters=baseline_parameters,
-        status=job.status,  # type: ignore[arg-type]
+                status=job.status,  # type: ignore[arg-type]
                 track_type=job.track_type,  # type: ignore[arg-type]
                 simulator_backend=job.simulator_backend_requested,  # type: ignore[arg-type]
                 optimizer_strategy=job.optimizer_strategy,  # type: ignore[arg-type]
@@ -1462,6 +1397,18 @@ def _candidate_evaluation(
     objective_config: schemas.ObjectiveConfig,
     scenario_suite: schemas.ScenarioSuiteConfig,
 ) -> CandidateEvaluation | None:
+    resolved_cases = {
+        id(trial): resolve_scenario_case(
+            scenario_suite,
+            scenario_type=trial.scenario_type,
+            scenario_config=trial.scenario_config_json,
+            seed=trial.seed,
+        )
+        for trial in candidate.trials
+    }
+    if any(not resolution.matched for resolution in resolved_cases.values()):
+        return None
+
     aggregate = candidate.aggregated_metric_json
     if isinstance(aggregate, dict) and "objective_values" in aggregate:
         raw_objectives = aggregate.get("objective_values")
@@ -1483,12 +1430,8 @@ def _candidate_evaluation(
             return result
 
         persisted_objectives = _finite_mapping(raw_objectives)
-        persisted_constraint_values = _finite_mapping(
-            aggregate.get("constraint_values", {})
-        )
-        persisted_violations = _finite_mapping(
-            aggregate.get("constraint_violations", {})
-        )
+        persisted_constraint_values = _finite_mapping(aggregate.get("constraint_values", {}))
+        persisted_violations = _finite_mapping(aggregate.get("constraint_violations", {}))
         scalar_loss = aggregate.get("scalar_loss")
         total_violation = aggregate.get("total_constraint_violation", 0.0)
         feasible = aggregate.get("feasible")
@@ -1548,42 +1491,27 @@ def _candidate_evaluation(
 
     samples: list[dict[str, float]] = []
     weights: list[float] = []
+
+    def _matched_case(trial: models.Trial) -> schemas.ScenarioCaseConfig:
+        scenario_case = resolved_cases[id(trial)].case
+        if scenario_case is None:
+            raise RuntimeError("validated scenario resolution unexpectedly has no case")
+        return scenario_case
+
     training_trials = [
         trial
         for trial in candidate.trials
-        if not bool((trial.scenario_config_json or {}).get("holdout"))
+        if not _matched_case(trial).holdout
     ]
-    cases_by_id = {case.id: case for case in scenario_suite.cases if case.enabled}
-    cases_by_type: dict[str, schemas.ScenarioCaseConfig] = {}
-    for case in scenario_suite.cases:
-        if case.enabled:
-            cases_by_type.setdefault(case.scenario_type, case)
 
     def _resolved_case(
         trial: models.Trial,
     ) -> tuple[str, schemas.ScenarioCaseConfig | None]:
-        scenario_config = trial.scenario_config_json or {}
-        raw_case_id = scenario_config.get("scenario_case_id")
-        if raw_case_id is not None:
-            case_id = str(raw_case_id)
-            scenario_case = cases_by_id.get(case_id)
-            if scenario_case is not None:
-                return f"id:{case_id}", scenario_case
-            fallback_case = cases_by_type.get(trial.scenario_type)
-            if fallback_case is not None:
-                return f"id:{fallback_case.id}", fallback_case
-            return f"id:{case_id}", None
-        scenario_case = cases_by_type.get(trial.scenario_type)
-        if scenario_case is not None:
-            return f"id:{scenario_case.id}", scenario_case
-        return f"type:{trial.scenario_type}", None
+        resolution = resolved_cases[id(trial)]
+        return resolution.group_key, resolution.case
 
-    dispatched_per_case = Counter(
-        _resolved_case(trial)[0] for trial in training_trials
-    )
-    grouped_trials: dict[
-        str, tuple[schemas.ScenarioCaseConfig | None, list[models.Trial]]
-    ] = {}
+    dispatched_per_case = Counter(_resolved_case(trial)[0] for trial in training_trials)
+    grouped_trials: dict[str, tuple[schemas.ScenarioCaseConfig | None, list[models.Trial]]] = {}
     for trial in training_trials:
         group_key, scenario_case = _resolved_case(trial)
         if group_key not in grouped_trials:
@@ -1592,7 +1520,7 @@ def _candidate_evaluation(
     for trial in candidate.trials:
         if trial.status != "COMPLETED" or trial.metric is None:
             continue
-        if bool((trial.scenario_config_json or {}).get("holdout")):
+        if _matched_case(trial).holdout:
             continue
         samples.append(_metric_sample(trial.metric))
         group_key, scenario_case = _resolved_case(trial)
@@ -1610,23 +1538,24 @@ def _candidate_evaluation(
     weighted_failure = 0.0
     weighted_pass = 0.0
     for scenario_case, case_trials in grouped_trials.values():
-        case_weight = (
-            float(scenario_case.weight) if scenario_case is not None else 1.0
-        )
+        case_weight = float(scenario_case.weight) if scenario_case is not None else 1.0
         denominator = len(case_trials)
-        weighted_completion += case_weight * sum(
-            trial.status == "COMPLETED" and trial.metric is not None
-            for trial in case_trials
-        ) / denominator
-        weighted_failure += case_weight * sum(
-            trial.status == "FAILED" for trial in case_trials
-        ) / denominator
-        weighted_pass += case_weight * sum(
-            trial.status == "COMPLETED"
-            and trial.metric is not None
-            and trial.metric.pass_flag
-            for trial in case_trials
-        ) / denominator
+        weighted_completion += (
+            case_weight
+            * sum(trial.status == "COMPLETED" and trial.metric is not None for trial in case_trials)
+            / denominator
+        )
+        weighted_failure += (
+            case_weight * sum(trial.status == "FAILED" for trial in case_trials) / denominator
+        )
+        weighted_pass += (
+            case_weight
+            * sum(
+                trial.status == "COMPLETED" and trial.metric is not None and trial.metric.pass_flag
+                for trial in case_trials
+            )
+            / denominator
+        )
     completion_rate = weighted_completion / weight_total
     failed_rate = weighted_failure / weight_total
     pass_rate = weighted_pass / weight_total

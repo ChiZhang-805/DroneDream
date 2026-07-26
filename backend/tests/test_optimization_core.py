@@ -37,6 +37,7 @@ from app.optimization.winner_evidence import (
 from app.schemas import (
     AcceptanceCriteria,
     ConstraintSpec,
+    JobCreateRequest,
     ObjectiveConfig,
     ObjectiveSpec,
     ParameterSelection,
@@ -201,10 +202,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert len(first.contract_id) == 71
     assert first.objectives[0].metric.registry_id == "dronedream.metric.rmse.v1"
     assert first.objectives[0].weight_decimal == "2"
-    assert (
-        first.objectives[0].estimator_scope
-        == "within_case_estimator_then_fixed_suite"
-    )
+    assert first.objectives[0].estimator_scope == "within_case_estimator_then_fixed_suite"
     assert first.objectives[0].within_case_estimator == "cvar"
     assert first.objectives[0].across_case_estimator == "mean"
     assert first.objectives[0].sample_weight_policy == (
@@ -233,18 +231,12 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         first.domain_failure_policy.optimizer_learning_outcome_policy
         == "domain_and_unknown_failures_excluding_nonphysical_outcomes"
     )
-    assert (
-        first.domain_failure_policy.unknown_failure_policy
-        == "conservative_optimizer_failure"
-    )
+    assert first.domain_failure_policy.unknown_failure_policy == "conservative_optimizer_failure"
     assert (
         first.domain_failure_policy.acceptance_non_success_policy
         == "all_non_successes_remain_in_denominator"
     )
-    assert (
-        first.domain_failure_policy.optimizer_learning_failure_rate_limit_decimal
-        == "0.5"
-    )
+    assert first.domain_failure_policy.optimizer_learning_failure_rate_limit_decimal == "0.5"
     assert first.selection_policy.precedence[:3] == (
         "evidence_complete",
         "hard_feasible",
@@ -252,10 +244,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     )
     assert first.compiler_version == "2.8"
     assert first.metric_admission_policy == "registered_metrics_only"
-    assert (
-        first.metric_dependency_policy
-        == "reject_known_alias_complement_and_composite_overlap"
-    )
+    assert first.metric_dependency_policy == "reject_known_alias_complement_and_composite_overlap"
     assert (
         first.selection_policy.optimizer_objective_representation_policy
         == "one_representation_per_tool_call"
@@ -269,13 +258,9 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         first.selection_policy.bayesian_objective_scale_policy
         == "fixed_job_objective_normalization"
     )
+    assert first.selection_policy.bayesian_scalarization_policy == "fixed_job_objective_weights"
     assert (
-        first.selection_policy.bayesian_scalarization_policy
-        == "fixed_job_objective_weights"
-    )
-    assert (
-        first.selection_policy.incomplete_objective_vector_policy
-        == "scalar_loss_else_exploration"
+        first.selection_policy.incomplete_objective_vector_policy == "scalar_loss_else_exploration"
     )
     assert (
         first.selection_policy.candidate_outcome_evidence_policy
@@ -306,16 +291,14 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         == "optimizer_before_baseline_then_generation_then_candidate_id"
     )
     assert (
-        first.selection_policy.winner_freeze_receipt_schema
-        == "dronedream.winner-freeze-receipt/v1"
+        first.selection_policy.winner_freeze_receipt_schema == "dronedream.winner-freeze-receipt/v1"
     )
     assert (
         first.selection_policy.winner_freeze_persistence_policy
         == "insert_once_per_job_exact_evidence_v1"
     )
     assert (
-        first.selection_policy.winner_freeze_mutation_policy
-        == "database_reject_update_delete_v1"
+        first.selection_policy.winner_freeze_mutation_policy == "database_reject_update_delete_v1"
     )
     assert (
         first.selection_policy.artifact_digest_receipt_schema
@@ -330,10 +313,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         first.selection_policy.artifact_download_verification_policy
         == "verify_bound_bytes_before_stream_v1"
     )
-    assert (
-        first.selection_policy.portfolio_source_schema
-        == "dronedream.portfolio-sources/v1"
-    )
+    assert first.selection_policy.portfolio_source_schema == "dronedream.portfolio-sources/v1"
     assert (
         first.selection_policy.portfolio_exact_collision_policy
         == "equal_credit_across_unique_child_strategies"
@@ -356,22 +336,10 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         == "best_attributed_reward_once_per_generation"
     )
     assert first.selection_policy.portfolio_reward_bound == "zero_to_one"
-    assert (
-        first.final_promotion_policy.projection_schema
-        == "dronedream.acceptance-projection/v1"
-    )
-    assert (
-        first.final_promotion_policy.rmse_estimator
-        == "within_case_mean_then_fixed_suite_mean"
-    )
-    assert (
-        first.final_promotion_policy.max_error_estimator
-        == "worst_usable_seed"
-    )
-    assert (
-        first.final_promotion_policy.pass_rate_estimator
-        == "case_weighted_dispatched_seed_rate"
-    )
+    assert first.final_promotion_policy.projection_schema == "dronedream.acceptance-projection/v1"
+    assert first.final_promotion_policy.rmse_estimator == "within_case_mean_then_fixed_suite_mean"
+    assert first.final_promotion_policy.max_error_estimator == "worst_usable_seed"
+    assert first.final_promotion_policy.pass_rate_estimator == "case_weighted_dispatched_seed_rate"
 
     changed = compile_outcome_contract(
         objective_config,
@@ -416,12 +384,8 @@ def test_winner_evidence_binds_full_ranking_and_stable_tie_break() -> None:
             "generation_index": 0,
             "is_baseline": True,
             "eligible": True,
-            "candidate_outcome_evidence_id": outcome_ids[
-                "candidate-baseline"
-            ],
-            "candidate_report_evidence_id": report_ids[
-                "candidate-baseline"
-            ],
+            "candidate_outcome_evidence_id": outcome_ids["candidate-baseline"],
+            "candidate_report_evidence_id": report_ids["candidate-baseline"],
             "selection_order_key": tied_order,
         },
         {
@@ -429,12 +393,8 @@ def test_winner_evidence_binds_full_ranking_and_stable_tie_break() -> None:
             "generation_index": 1,
             "is_baseline": False,
             "eligible": True,
-            "candidate_outcome_evidence_id": outcome_ids[
-                "candidate-optimizer"
-            ],
-            "candidate_report_evidence_id": report_ids[
-                "candidate-optimizer"
-            ],
+            "candidate_outcome_evidence_id": outcome_ids["candidate-optimizer"],
+            "candidate_report_evidence_id": report_ids["candidate-optimizer"],
             "selection_order_key": tied_order,
         },
         {
@@ -442,12 +402,8 @@ def test_winner_evidence_binds_full_ranking_and_stable_tie_break() -> None:
             "generation_index": 2,
             "is_baseline": False,
             "eligible": False,
-            "candidate_outcome_evidence_id": outcome_ids[
-                "candidate-ineligible"
-            ],
-            "candidate_report_evidence_id": report_ids[
-                "candidate-ineligible"
-            ],
+            "candidate_outcome_evidence_id": outcome_ids["candidate-ineligible"],
+            "candidate_report_evidence_id": report_ids["candidate-ineligible"],
             "selection_order_key": (1, 1, 10.0, 1.0, 100.0),
         },
     ]
@@ -459,12 +415,8 @@ def test_winner_evidence_binds_full_ranking_and_stable_tie_break() -> None:
         candidates=candidates,
     )
 
-    assert verify_winner_selection_evidence(
-        evidence.model_dump(mode="json")
-    ) == evidence
-    decisions = {
-        item.candidate_id: item for item in evidence.candidates
-    }
+    assert verify_winner_selection_evidence(evidence.model_dump(mode="json")) == evidence
+    decisions = {item.candidate_id: item for item in evidence.candidates}
     assert decisions["candidate-optimizer"].rank == 1
     assert decisions["candidate-baseline"].rank == 2
     assert decisions["candidate-ineligible"].rank is None
@@ -564,12 +516,10 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
         aggregate=aggregate,
     )
 
-    assert verify_candidate_outcome_evidence(
-        evidence.model_dump(mode="json")
-    ) == evidence
-    assert verify_candidate_report_evidence(
-        report_evidence.model_dump(mode="json")
-    ) == report_evidence
+    assert verify_candidate_outcome_evidence(evidence.model_dump(mode="json")) == evidence
+    assert (
+        verify_candidate_report_evidence(report_evidence.model_dump(mode="json")) == report_evidence
+    )
     wrapped = {
         **aggregate,
         "candidate_outcome_evidence": evidence.model_dump(mode="json"),
@@ -700,9 +650,7 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
         "candidate_outcome_evidence_required": True,
     }
     assert authoritative_outcome_projection(required_but_missing) == {}
-    assert selection_order_key(required_but_missing, -1_000_000.0)[-1] == float(
-        "inf"
-    )
+    assert selection_order_key(required_but_missing, -1_000_000.0)[-1] == float("inf")
 
     tampered_evidence = evidence.model_dump(mode="json")
     tampered_evidence["scalar_loss"] = -1_000_000.0
@@ -722,17 +670,11 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
 
 
 def test_trial_holdout_role_requires_a_boolean_marker() -> None:
-    assert trial_is_holdout(
-        SimpleNamespace(scenario_config_json={"holdout": True})
-    )
-    assert not trial_is_holdout(
-        SimpleNamespace(scenario_config_json={"holdout": False})
-    )
+    assert trial_is_holdout(SimpleNamespace(scenario_config_json={"holdout": True}))
+    assert not trial_is_holdout(SimpleNamespace(scenario_config_json={"holdout": False}))
     assert not trial_is_holdout(SimpleNamespace(scenario_config_json={}))
     with pytest.raises(ValueError, match="holdout marker must be a boolean"):
-        trial_is_holdout(
-            SimpleNamespace(scenario_config_json={"holdout": "false"})
-        )
+        trial_is_holdout(SimpleNamespace(scenario_config_json={"holdout": "false"}))
 
 
 def test_outcome_contract_rejects_unregistered_adapter_raw_metrics() -> None:
@@ -839,15 +781,9 @@ def test_outcome_contract_preserves_and_labels_supported_legacy_scenario_shape()
         failed_trial_weight=1.5,
     )
 
-    assert contract.compatibility_normalization == (
-        "legacy_scenario_aliases_v1",
-    )
-    assert contract.scenario_population.cases[0].case_id == (
-        "legacy-1-wind_perturbed"
-    )
-    assert contract.scenario_population.cases[0].scenario_type == (
-        "wind_perturbed"
-    )
+    assert contract.compatibility_normalization == ("legacy_scenario_aliases_v1",)
+    assert contract.scenario_population.cases[0].case_id == ("legacy-1-wind_perturbed")
+    assert contract.scenario_population.cases[0].scenario_type == ("wind_perturbed")
 
 
 def test_selection_key_is_lexicographic_not_magic_penalty_based() -> None:
@@ -992,6 +928,39 @@ def test_scenario_suite_requires_unique_ids_and_seeds() -> None:
                 ScenarioCaseConfig(id="same", seeds=[1]),
                 ScenarioCaseConfig(id="same", seeds=[2]),
             ]
+        )
+
+
+def test_scenario_suite_requires_disjoint_training_and_holdout_seeds() -> None:
+    with pytest.raises(ValidationError, match="seeds must be disjoint"):
+        ScenarioSuiteConfig(
+            cases=[
+                ScenarioCaseConfig(id="training", seeds=[7]),
+                ScenarioCaseConfig(id="validation", seeds=[7], holdout=True),
+            ]
+        )
+
+
+def test_default_scenario_suite_has_independent_combined_holdout() -> None:
+    suite = ScenarioSuiteConfig()
+
+    assert [(case.id, case.holdout) for case in suite.cases] == [
+        ("nominal", False),
+        ("sensor-noise", False),
+        ("wind", False),
+        ("combined", True),
+    ]
+    assert {run.seed for run in training_matrix(suite)} == {101, 202, 303}
+    assert {run.seed for run in holdout_matrix(suite)} == {404}
+
+
+def test_llm_harness_requires_an_enabled_holdout_case() -> None:
+    with pytest.raises(ValidationError, match="requires at least one enabled holdout"):
+        JobCreateRequest(
+            optimizer_strategy="llm_harness",
+            scenario_suite=ScenarioSuiteConfig(
+                cases=[ScenarioCaseConfig(id="training", seeds=[1])]
+            ),
         )
 
 
