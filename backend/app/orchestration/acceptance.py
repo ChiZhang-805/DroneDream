@@ -12,8 +12,9 @@ from dataclasses import dataclass
 
 from app import models
 from app.optimization.outcome_evidence import (
-    authoritative_candidate_outcome_projection,
+    authoritative_candidate_trial_outcome_projection,
     candidate_outcome_evidence_required,
+    candidate_training_trial_evidence_rows,
 )
 
 
@@ -101,10 +102,11 @@ def evaluate_candidate(
 
     raw_aggregate = candidate.aggregated_metric_json
     evidence_required = candidate_outcome_evidence_required(raw_aggregate)
-    agg = authoritative_candidate_outcome_projection(
+    agg = authoritative_candidate_trial_outcome_projection(
         candidate_id=candidate.id,
         generation_index=candidate.generation_index,
         parameter_snapshot=candidate.parameter_json,
+        trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
         aggregate=raw_aggregate,
     )
     trial_count = _safe_nonnegative_int(

@@ -17,8 +17,10 @@ from app.optimization.outcome_contract import (
 )
 from app.optimization.outcome_evidence import (
     authoritative_candidate_outcome_projection,
+    authoritative_candidate_trial_outcome_projection,
     authoritative_outcome_projection,
     compile_candidate_outcome_evidence,
+    trial_is_holdout,
     verify_candidate_outcome_evidence,
 )
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
@@ -240,7 +242,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "2.2"
+    assert first.compiler_version == "2.3"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert (
         first.metric_dependency_policy
@@ -274,6 +276,10 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     assert (
         first.selection_policy.candidate_outcome_context_binding_policy
         == "candidate_id_generation_parameter_sha256"
+    )
+    assert (
+        first.selection_policy.candidate_outcome_trial_binding_policy
+        == "canonical_training_trial_rows_sha256"
     )
     assert (
         first.selection_policy.portfolio_source_schema
@@ -437,6 +443,32 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
         )
         == {}
     )
+    trial_rows = [
+        {"trial_id": "trial-1", "seed": 101, "rmse": 0.3},
+        {"trial_id": "trial-2", "seed": 102, "rmse": 0.5},
+    ]
+    trial_projection = authoritative_candidate_trial_outcome_projection(
+        candidate_id="candidate-evidence",
+        generation_index=2,
+        parameter_snapshot={"MPC_XY_P": 0.95},
+        trial_evidence_rows=trial_rows,
+        aggregate=wrapped,
+    )
+    assert trial_projection["scalar_loss"] == pytest.approx(0.4)
+    changed_trial_rows = [
+        *trial_rows[:1],
+        {"trial_id": "trial-2", "seed": 102, "rmse": 99.0},
+    ]
+    assert (
+        authoritative_candidate_trial_outcome_projection(
+            candidate_id="candidate-evidence",
+            generation_index=2,
+            parameter_snapshot={"MPC_XY_P": 0.95},
+            trial_evidence_rows=changed_trial_rows,
+            aggregate=wrapped,
+        )
+        == {}
+    )
     assert (
         authoritative_candidate_outcome_projection(
             candidate_id="candidate-evidence",
@@ -485,6 +517,20 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
         float("inf"),
         float("inf"),
     )
+
+
+def test_trial_holdout_role_requires_a_boolean_marker() -> None:
+    assert trial_is_holdout(
+        SimpleNamespace(scenario_config_json={"holdout": True})
+    )
+    assert not trial_is_holdout(
+        SimpleNamespace(scenario_config_json={"holdout": False})
+    )
+    assert not trial_is_holdout(SimpleNamespace(scenario_config_json={}))
+    with pytest.raises(ValueError, match="holdout marker must be a boolean"):
+        trial_is_holdout(
+            SimpleNamespace(scenario_config_json={"holdout": "false"})
+        )
 
 
 def test_outcome_contract_rejects_unregistered_adapter_raw_metrics() -> None:

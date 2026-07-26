@@ -44,9 +44,12 @@ from app.optimization.outcome_contract import (
     selection_order_key,
 )
 from app.optimization.outcome_evidence import (
-    authoritative_candidate_outcome_projection,
+    authoritative_candidate_trial_outcome_projection,
     candidate_outcome_evidence_required,
+    candidate_training_trial_evidence_rows,
     compile_candidate_outcome_evidence,
+    trial_is_holdout,
+    trial_outcome_evidence_row,
 )
 from app.optimization.outcome_taxonomy import (
     TRIAL_OUTCOME_CLASSES,
@@ -186,10 +189,11 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     aggregate = candidate.aggregated_metric_json
     if not isinstance(aggregate, dict):
         return False
-    authoritative_aggregate = authoritative_candidate_outcome_projection(
+    authoritative_aggregate = authoritative_candidate_trial_outcome_projection(
         candidate_id=getattr(candidate, "id", None),
         generation_index=getattr(candidate, "generation_index", None),
         parameter_snapshot=getattr(candidate, "parameter_json", None),
+        trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
         aggregate=aggregate,
     )
     if candidate_outcome_evidence_required(aggregate) and not authoritative_aggregate:
@@ -327,35 +331,6 @@ def _trial_has_usable_metric(trial: models.Trial) -> bool:
     return getattr(trial, "status", None) == "COMPLETED" and _metric_is_usable(
         getattr(trial, "metric", None)
     )
-
-
-def _trial_outcome_evidence_row(trial: models.Trial) -> dict[str, Any]:
-    metric = trial.metric
-    metric_payload = (
-        {
-            "rmse": metric.rmse,
-            "max_error": metric.max_error,
-            "overshoot_count": metric.overshoot_count,
-            "completion_time": metric.completion_time,
-            "crash_flag": metric.crash_flag,
-            "timeout_flag": metric.timeout_flag,
-            "score": metric.score,
-            "final_error": metric.final_error,
-            "pass_flag": metric.pass_flag,
-            "instability_flag": metric.instability_flag,
-        }
-        if metric is not None
-        else None
-    )
-    return {
-        "trial_id": trial.id,
-        "status": trial.status,
-        "seed": trial.seed,
-        "scenario_type": trial.scenario_type,
-        "scenario_config": trial.scenario_config_json or {},
-        "failure_code": trial.failure_code,
-        "metric": metric_payload,
-    }
 
 
 def _trial_outcome_class(trial: models.Trial) -> TrialOutcomeClass:
@@ -914,7 +889,7 @@ def _aggregate_candidate(
             )
 
         training_trials = [
-            trial for trial in trials if not bool((trial.scenario_config_json or {}).get("holdout"))
+            trial for trial in trials if not trial_is_holdout(trial)
         ]
         try:
             training_result = _evaluate_rows(training_trials)
@@ -1073,7 +1048,7 @@ def _aggregate_candidate(
             agg["outcome_contract_schema"] = outcome_contract.schema_id
             agg["outcome_contract_id"] = outcome_contract.contract_id
         holdout_trials = [
-            trial for trial in trials if bool((trial.scenario_config_json or {}).get("holdout"))
+            trial for trial in trials if trial_is_holdout(trial)
         ]
         if holdout_trials:
             holdout_rates = _rate_summary(holdout_trials)
@@ -1169,7 +1144,7 @@ def _aggregate_candidate(
                 generation_index=candidate.generation_index,
                 parameter_snapshot=candidate.parameter_json,
                 trial_evidence_rows=[
-                    _trial_outcome_evidence_row(trial)
+                    trial_outcome_evidence_row(trial)
                     for trial in ordered_training_trials
                 ],
                 aggregate=agg,

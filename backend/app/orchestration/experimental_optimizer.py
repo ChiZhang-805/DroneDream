@@ -22,8 +22,9 @@ from app.optimization.outcome_contract import (
     OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
 )
 from app.optimization.outcome_evidence import (
-    authoritative_candidate_outcome_projection,
+    authoritative_candidate_trial_outcome_projection,
     candidate_outcome_evidence_required,
+    candidate_training_trial_evidence_rows,
 )
 from app.orchestration import constants
 from app.orchestration.optimizer import CandidateProposal
@@ -99,10 +100,11 @@ def _candidate_failure_rate(candidate: models.CandidateParameterSet) -> float:
     evidence_required = candidate_outcome_evidence_required(
         candidate.aggregated_metric_json
     )
-    aggregate = authoritative_candidate_outcome_projection(
+    aggregate = authoritative_candidate_trial_outcome_projection(
         candidate_id=candidate.id,
         generation_index=candidate.generation_index,
         parameter_snapshot=candidate.parameter_json,
+        trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
         aggregate=candidate.aggregated_metric_json,
     )
     if evidence_required and not aggregate:
@@ -205,10 +207,13 @@ def observations_for_job(
             continue
         raw_aggregate = candidate.aggregated_metric_json
         evidence_required = candidate_outcome_evidence_required(raw_aggregate)
-        aggregate = authoritative_candidate_outcome_projection(
+        aggregate = authoritative_candidate_trial_outcome_projection(
             candidate_id=candidate.id,
             generation_index=candidate.generation_index,
             parameter_snapshot=parameter_snapshot,
+            trial_evidence_rows=candidate_training_trial_evidence_rows(
+                candidate
+            ),
             aggregate=raw_aggregate,
         )
         raw_objectives = aggregate.get("objective_values", {})

@@ -270,6 +270,15 @@ snapshot, or post-aggregation parameter mutation produces no authoritative
 projection and fails closed. The embedded evidence still needs a future
 append-only relational ledger and current Trial-row re-verification.
 
+Outcome Contract compiler 2.3 closes that remaining Trial-row gap. The canonical
+training Trial snapshot—Trial ID, status, seed, scenario identity/config,
+failure code, and accepted metric fields—is compiled in one shared function,
+sorted deterministically, and re-hashed at acceptance, publishability, and
+optimizer-learning reads. A post-aggregation status, scenario, failure, or
+metric edit makes the Candidate evidence non-authoritative. Holdout Trial rows
+remain covered by the separately bound holdout projection; artifact bytes and
+physical-attempt lineage still require the future relational evidence ledger.
+
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
 cases across eight routing regimes and uses the exact production prompt builder.

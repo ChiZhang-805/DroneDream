@@ -134,6 +134,109 @@ def _finite_mapping(value: object, *, field_name: str) -> dict[str, float]:
     return result
 
 
+def trial_outcome_evidence_row(trial: object) -> dict[str, Any]:
+    """Compile the canonical Trial snapshot bound into Candidate evidence."""
+
+    trial_id = getattr(trial, "id", None)
+    status = getattr(trial, "status", None)
+    seed = getattr(trial, "seed", None)
+    scenario_type = getattr(trial, "scenario_type", None)
+    raw_scenario_config = getattr(trial, "scenario_config_json", None)
+    failure_code = getattr(trial, "failure_code", None)
+    if not isinstance(trial_id, str) or not trial_id:
+        raise ValueError("trial evidence requires a non-empty trial id")
+    if not isinstance(status, str) or not status:
+        raise ValueError("trial evidence requires a non-empty status")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError("trial evidence requires an integer seed")
+    if not isinstance(scenario_type, str) or not scenario_type:
+        raise ValueError("trial evidence requires a non-empty scenario type")
+    if raw_scenario_config is None:
+        scenario_config: dict[str, Any] = {}
+    elif isinstance(raw_scenario_config, Mapping):
+        scenario_config = dict(raw_scenario_config)
+    else:
+        raise ValueError("trial evidence scenario config must be an object")
+    if failure_code is not None and (
+        not isinstance(failure_code, str) or not failure_code
+    ):
+        raise ValueError("trial evidence failure code must be non-empty")
+
+    metric = getattr(trial, "metric", None)
+    metric_payload = (
+        {
+            "rmse": getattr(metric, "rmse", None),
+            "max_error": getattr(metric, "max_error", None),
+            "overshoot_count": getattr(metric, "overshoot_count", None),
+            "completion_time": getattr(metric, "completion_time", None),
+            "crash_flag": getattr(metric, "crash_flag", None),
+            "timeout_flag": getattr(metric, "timeout_flag", None),
+            "score": getattr(metric, "score", None),
+            "final_error": getattr(metric, "final_error", None),
+            "pass_flag": getattr(metric, "pass_flag", None),
+            "instability_flag": getattr(metric, "instability_flag", None),
+        }
+        if metric is not None
+        else None
+    )
+    row = {
+        "trial_id": trial_id,
+        "status": status,
+        "seed": seed,
+        "scenario_type": scenario_type,
+        "scenario_config": scenario_config,
+        "failure_code": failure_code,
+        "metric": metric_payload,
+    }
+    _canonical_json(row)
+    return row
+
+
+def trial_is_holdout(trial: object) -> bool:
+    """Return the strict persisted Trial role used by every evidence path."""
+
+    raw_scenario_config = getattr(trial, "scenario_config_json", None)
+    if raw_scenario_config is None:
+        return False
+    if not isinstance(raw_scenario_config, Mapping):
+        raise ValueError("trial evidence scenario config must be an object")
+    holdout = raw_scenario_config.get("holdout", False)
+    if not isinstance(holdout, bool):
+        raise ValueError("trial evidence holdout marker must be a boolean")
+    return holdout
+
+
+def candidate_training_trial_evidence_rows(
+    candidate: object,
+) -> tuple[dict[str, Any], ...] | None:
+    """Return current canonical training Trial rows, or ``None`` if unreadable."""
+
+    try:
+        raw_trials = candidate.trials  # type: ignore[attr-defined]
+        trials = list(raw_trials)
+    except Exception:  # pragma: no cover - detached/lazy ORM state fails closed
+        return None
+    rows: list[dict[str, Any]] = []
+    try:
+        for trial in trials:
+            row = trial_outcome_evidence_row(trial)
+            if trial_is_holdout(trial):
+                continue
+            rows.append(row)
+    except Exception:  # pragma: no cover - malformed ORM evidence fails closed
+        return None
+    return tuple(
+        sorted(
+            rows,
+            key=lambda row: (
+                str(row["scenario_type"]),
+                int(row["seed"]),
+                str(row["trial_id"]),
+            ),
+        )
+    )
+
+
 def compile_candidate_outcome_evidence(
     *,
     outcome_contract_id: str,
@@ -376,14 +479,59 @@ def authoritative_candidate_outcome_projection(
     return projection
 
 
+def authoritative_candidate_trial_outcome_projection(
+    *,
+    candidate_id: object,
+    generation_index: object,
+    parameter_snapshot: object,
+    trial_evidence_rows: object,
+    aggregate: object,
+) -> dict[str, Any]:
+    """Resolve evidence only when current training Trial rows still match."""
+
+    projection = authoritative_candidate_outcome_projection(
+        candidate_id=candidate_id,
+        generation_index=generation_index,
+        parameter_snapshot=parameter_snapshot,
+        aggregate=aggregate,
+    )
+    if not candidate_outcome_evidence_required(aggregate):
+        return projection
+    if (
+        not projection
+        or not isinstance(aggregate, Mapping)
+        or isinstance(trial_evidence_rows, str | bytes)
+        or not isinstance(trial_evidence_rows, Sequence)
+    ):
+        return {}
+    evidence = verify_candidate_outcome_evidence(
+        aggregate.get("candidate_outcome_evidence")
+    )
+    if evidence is None or any(
+        not isinstance(row, Mapping) for row in trial_evidence_rows
+    ):
+        return {}
+    try:
+        current_trial_sha256 = _sha256_id(list(trial_evidence_rows))
+    except (TypeError, ValueError):
+        return {}
+    if current_trial_sha256 != evidence.trial_evidence_sha256:
+        return {}
+    return projection
+
+
 __all__ = [
     "CANDIDATE_OUTCOME_EVIDENCE_SCHEMA",
     "CandidateAcceptanceProjectionV1",
     "CandidateOutcomeEvidenceV1",
     "CandidateSelectionKeyV1",
     "authoritative_candidate_outcome_projection",
+    "authoritative_candidate_trial_outcome_projection",
     "authoritative_outcome_projection",
+    "candidate_training_trial_evidence_rows",
     "candidate_outcome_evidence_required",
     "compile_candidate_outcome_evidence",
+    "trial_is_holdout",
+    "trial_outcome_evidence_row",
     "verify_candidate_outcome_evidence",
 ]

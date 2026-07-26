@@ -19,6 +19,7 @@ from app.optimization.domain import ParameterDomain, SearchSpace
 from app.optimization.outcome_contract import build_selection_key
 from app.optimization.outcome_evidence import (
     compile_candidate_outcome_evidence,
+    trial_outcome_evidence_row,
 )
 from app.optimization.outcome_taxonomy import classify_trial_outcome
 from app.orchestration import acceptance, aggregation, constants, job_manager
@@ -1390,12 +1391,38 @@ def test_acceptance_prefers_verified_candidate_outcome_evidence() -> None:
         "acceptance_pass_rate": 1.0,
         "acceptance_completion_rate": 1.0,
     }
+    candidate.trials = [
+        SimpleNamespace(
+            id=f"trial-{index}",
+            status="COMPLETED",
+            seed=100 + index,
+            scenario_type="nominal",
+            scenario_config_json={},
+            failure_code=None,
+            metric=SimpleNamespace(
+                rmse=0.1,
+                max_error=0.2,
+                overshoot_count=0,
+                completion_time=1.0,
+                crash_flag=False,
+                timeout_flag=False,
+                score=0.1,
+                final_error=0.05,
+                pass_flag=True,
+                instability_flag=False,
+            ),
+        )
+        for index in range(3)
+    ]
     evidence = compile_candidate_outcome_evidence(
         outcome_contract_id="sha256:" + "b" * 64,
         candidate_id=candidate.id,
         generation_index=candidate.generation_index,
         parameter_snapshot={"MPC_XY_P": 0.95},
-        trial_evidence_rows=[{"trial_id": f"trial-{index}"} for index in range(3)],
+        trial_evidence_rows=[
+            trial_outcome_evidence_row(trial)
+            for trial in candidate.trials
+        ],
         aggregate=aggregate,
     )
     candidate.aggregated_metric_json = {
@@ -1466,6 +1493,27 @@ def test_acceptance_prefers_verified_candidate_outcome_evidence() -> None:
     assert rejected_observation.failure_rate == 1.0
     assert rejected_observation.feasible is False
     candidate.parameter_json = {"MPC_XY_P": 0.95}
+
+    candidate.trials[0].metric.rmse = 99.0
+    changed_trial = acceptance.evaluate_candidate(
+        candidate,
+        acceptance.AcceptanceCriteria(
+            target_rmse=0.2,
+            target_max_error=0.3,
+            min_pass_rate=1.0,
+        ),
+    )
+    assert changed_trial.passed is False
+    assert changed_trial.reason == "invalid_outcome_evidence"
+    assert aggregation.candidate_is_publishable(candidate) is False
+    changed_trial_observation = observations_for_job(
+        optimizer_job,
+        search_space=search_space,
+        candidates=[candidate],
+    )[0]
+    assert changed_trial_observation.loss is None
+    assert changed_trial_observation.failure_rate == 1.0
+    candidate.trials[0].metric.rmse = 0.1
 
     candidate.aggregated_metric_json["candidate_outcome_evidence"][
         "scalar_loss"
