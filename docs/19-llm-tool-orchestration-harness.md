@@ -721,15 +721,15 @@ contract. The code audit found the following gaps:
 | `trial_result.v1` may omit all identity fields | a legacy result can be accepted without proving which Trial, Candidate, seed, or attempt produced it |
 | `final_error` defaults to `0.0` and several flags default to `false` when absent | absence can become a deceptively good observation rather than a schema failure |
 | the result supplies already-computed metrics and `pass_flag` | the external runner is allowed to assert both the measurement and its verdict |
-| telemetry has `x/y/z/t` but no mandatory unit, coordinate-frame, time-base, source-log digest, or extraction revision | finite values can still be semantically incomparable or transformed incorrectly |
-| RMSE is `sqrt(sum(error²) / sample_count)` | irregular or selectively dense sampling changes the weight of a time interval |
-| strictly increasing timestamps have no maximum-gap, expected-duration, or dropout-coverage requirement | a short or sparse trace can remain numerically valid |
-| an `all_samples_fallback` evaluation window can still produce ordinary metrics | failure to identify the intended flight interval is annotation rather than evidence ineligibility |
+| telemetry has `x/y/z/t` but no mandatory unit, coordinate-frame, time-base, source-log digest, or extraction revision | addressed for bundled PX4 results by `dronedream.telemetry.v2`; raw ULog replay still depends on retaining the original log |
+| RMSE is `sqrt(sum(error²) / sample_count)` | addressed by trapezoidal time-weighted RMSE in the bundled PX4 metric compiler |
+| strictly increasing timestamps have no maximum-gap, expected-duration, or dropout-coverage requirement | addressed by content-addressed sampling evidence, maximum-gap, and minimum-coverage gates |
+| an `all_samples_fallback` evaluation window can still produce ordinary metrics | addressed for physical runs; only explicitly synthetic telemetry may use the labeled synthetic all-samples window |
 | `overshoot_count` counts local peaks in absolute track error over a fixed `0.25 m` prominence | this is a tracking-error peak count, not yet a controller-overshoot measurand |
 | all non-completed Trials count as candidate failures | adapter, port, storage, worker, and database failures can penalize controller parameters |
 | the external simulator can return an arbitrary cleaned failure-code string | an untrusted producer can influence retry/evidence classification |
-| Outcome Contract compiler 2.10 stores append-only physical-attempt claims/outcomes and one immutable accepted-attempt pointer | addressed for current v3 aggregation; the independent telemetry semantic verifier remains the next trust boundary |
-| Outcome Contract compilers 2.8-2.10 bind retained Artifact bytes and accepted-attempt identity through Trial and Candidate evidence | addressed for current v3 aggregation; SQL/object-store atomic publication and operational WORM controls remain deployment boundaries |
+| Outcome Contract compiler 2.10 stores append-only physical-attempt claims/outcomes and one immutable accepted-attempt pointer | addressed for current v3 aggregation |
+| Outcome Contract compilers 2.8-2.12 bind retained Artifact bytes, accepted-attempt identity, and PX4 telemetry semantics through Trial and Candidate evidence | addressed for current v3 aggregation; full independent metric recomputation, SQL/object-store atomic publication, raw-source retention, and operational WORM controls remain separate boundaries |
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
 | legacy aggregation initially mixes all metrics and only the modern objective path replaces key fields with training values | compatibility paths remain too easy to use as if they had the same isolation guarantees |
 | rate parsing clamps values into `[0, 1]` | corrupted persisted evidence can be silently normalized instead of stopping the decision |

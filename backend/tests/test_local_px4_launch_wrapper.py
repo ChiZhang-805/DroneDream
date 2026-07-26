@@ -321,6 +321,15 @@ def test_ulog_to_telemetry_json_writes_schema_with_attitude_groundtruth_fallback
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["meta"]["source"] == "ulog"
     assert payload["meta"]["vehicle"] == "x500"
+    assert payload["meta"]["origin_source_sha256"].startswith("sha256:")
+    assert len(payload["meta"]["origin_source_sha256"]) == 71
+    assert payload["meta"]["origin_source_byte_count"] == len(
+        b"test ULog fixture"
+    )
+    assert payload["meta"]["origin_coordinate_frame"] == "PX4_LOCAL_NED"
+    assert payload["meta"]["origin_extraction_revision"] == (
+        "pyulog-vehicle-local-position-1.0"
+    )
     assert payload["samples"][0]["t"] == 0.0
     assert payload["samples"][0]["z"] == 5.0
     assert payload["samples"][0]["vz"] == 0.1

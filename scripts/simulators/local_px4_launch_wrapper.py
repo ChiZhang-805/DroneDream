@@ -861,6 +861,14 @@ def _extract_yaw_values(
     return yaw_values
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest()
+
+
 def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, world: str) -> None:
     try:
         from pyulog import ULog
@@ -924,6 +932,15 @@ def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, wor
             "simulator": "px4_gazebo",
             "source": "ulog",
             "ulog_path": str(ulog_path),
+            "origin_source_sha256": _sha256_file(ulog_path),
+            "origin_source_byte_count": ulog_size,
+            "origin_extraction_revision": "pyulog-vehicle-local-position-1.0",
+            "origin_coordinate_frame": "PX4_LOCAL_NED",
+            "coordinate_transform": (
+                "x=north_m;y=east_m;z=-down_m;"
+                "vx=north_mps;vy=east_mps;vz=-down_mps;"
+                "yaw=px4_ned_rad"
+            ),
             "vehicle": vehicle,
             "world": world,
         },

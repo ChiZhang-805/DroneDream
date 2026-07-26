@@ -22,8 +22,10 @@ from app.simulator.base import (
     FAILURE_CANCELLED,
     FAILURE_SIMULATION,
     FAILURE_TIMEOUT,
+    ArtifactMetadata,
     JobConfig,
     TrialContext,
+    TrialMetricsPayload,
 )
 from app.simulator.real_cli import (
     _MAX_KNOWN_JSON_ARTIFACT_BYTES,
@@ -36,7 +38,12 @@ from app.simulator.real_cli import (
     _parse_artifacts,
     _parse_metrics,
     _read_log_tail,
+    _require_px4_metric_evidence,
     _trial_input_payload,
+)
+from app.simulator.telemetry_evidence import (
+    TELEMETRY_SCHEMA_V2,
+    compile_telemetry_semantic_contract,
 )
 
 _EXAMPLE_SIM = (
@@ -68,6 +75,104 @@ def _write_result_simulator(script: Path, result: dict[str, object], *, exit_cod
         f"raise SystemExit({exit_code})\n",
         encoding="utf-8",
     )
+
+
+def _px4_metric_evidence(
+    tmp_path: Path,
+) -> tuple[
+    dict[str, object],
+    TrialMetricsPayload,
+    list[ArtifactMetadata],
+    Path,
+]:
+    samples = [
+        {
+            "t": round(index * 0.1, 6),
+            "x": round(index * 0.05, 6),
+            "y": 0.0,
+            "z": 3.0,
+            "vx": 0.5,
+            "vy": 0.0,
+            "vz": 0.0,
+            "yaw": 0.0,
+        }
+        for index in range(20)
+    ]
+    contract = compile_telemetry_semantic_contract(
+        samples=samples,
+        source_bytes=b"original-launcher-telemetry",
+        source_kind="launcher_json",
+        extraction_revision="test-normalizer-1.0",
+        synthetic=False,
+    )
+    telemetry_path = tmp_path / "telemetry.json"
+    telemetry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": TELEMETRY_SCHEMA_V2,
+                "samples": samples,
+                "meta": {"source": "test"},
+                "semantic_contract": contract.model_dump(mode="json"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    reference_path = tmp_path / "reference_track.json"
+    reference_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "dronedream.reference_track.v1",
+                "reference_track": [
+                    {"x": 0.0, "y": 0.0, "z": 3.0},
+                    {"x": 1.0, "y": 0.0, "z": 3.0},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    raw_metric_json = {
+        "rmse_integration": "time_weighted_trapezoidal",
+        "telemetry_semantic_contract_id": contract.contract_id,
+        "telemetry_verifier_revision": contract.verifier_revision,
+        "telemetry_source_sha256": contract.source_sha256,
+        "telemetry_coordinate_frame": contract.coordinate_frame,
+        "telemetry_position_unit": contract.position_unit,
+        "telemetry_time_unit": contract.time_unit,
+        "telemetry_sampling": contract.sampling.model_dump(mode="json"),
+    }
+    metrics = TrialMetricsPayload(
+        rmse=0.0,
+        max_error=0.0,
+        overshoot_count=0,
+        completion_time=1.9,
+        crash_flag=False,
+        timeout_flag=False,
+        score=1.0,
+        final_error=0.0,
+        pass_flag=True,
+        instability_flag=False,
+        raw_metric_json=raw_metric_json,
+    )
+    artifacts = [
+        ArtifactMetadata(
+            artifact_type="telemetry_json",
+            display_name="telemetry",
+            storage_path=str(telemetry_path),
+            mime_type="application/json",
+        ),
+        ArtifactMetadata(
+            artifact_type="reference_track_json",
+            display_name="reference track",
+            storage_path=str(reference_path),
+            mime_type="application/json",
+        ),
+    ]
+    raw = {
+        "success": True,
+        "backend": "px4_gazebo",
+        "schema_version": "dronedream.trial_result.v2",
+    }
+    return raw, metrics, artifacts, telemetry_path
 
 
 def _ctx(
@@ -661,6 +766,71 @@ def test_real_cli_requires_identity_for_v2_result(monkeypatch, tmp_path) -> None
     assert result.success is False
     assert result.failure is not None
     assert "v2 requires execution_identity" in result.failure.reason
+
+
+def test_px4_metric_evidence_requires_both_primary_artifacts(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+
+    with pytest.raises(
+        ValueError,
+        match="exactly one telemetry and reference-track artifact",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts[:1],
+        )
+
+
+def test_px4_metric_evidence_rejects_telemetry_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, telemetry_path = _px4_metric_evidence(
+        tmp_path
+    )
+    payload = json.loads(telemetry_path.read_text(encoding="utf-8"))
+    payload["samples"][3]["x"] = 999.0
+    telemetry_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(
+        ValueError,
+        match="telemetry semantic contract is invalid",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("rmse_integration", "sample_count_average"),
+        ("telemetry_semantic_contract_id", "sha256:" + "0" * 64),
+        ("telemetry_source_sha256", "sha256:" + "f" * 64),
+        ("telemetry_position_unit", "cm"),
+    ],
+)
+def test_px4_metric_evidence_rejects_metric_binding_mutation(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    metrics.raw_metric_json[field] = value
+
+    with pytest.raises(
+        ValueError,
+        match="metrics do not bind the verified telemetry contract",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
 
 
 def test_log_excerpt_reads_only_bounded_tail(tmp_path) -> None:

@@ -13,6 +13,10 @@ import pytest
 
 from app.simulator.base import FAILURE_ADAPTER_UNAVAILABLE, FAILURE_TIMEOUT, JobConfig, TrialContext
 from app.simulator.real_cli import RealCliSimulatorAdapter
+from app.simulator.telemetry_evidence import (
+    TELEMETRY_SCHEMA_V2,
+    verify_telemetry_semantic_contract,
+)
 
 RUNNER = Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "px4_gazebo_runner.py"
 RUNNER_SPEC = importlib.util.spec_from_file_location("dronedream_px4_gazebo_runner", RUNNER)
@@ -475,14 +479,14 @@ def test_px4_runner_malformed_telemetry_maps_to_simulation_failed(tmp_path: Path
 def test_px4_runner_parses_false_telemetry_strings_without_truthiness_bug(
     tmp_path: Path,
 ) -> None:
+    telemetry = _track_following_telemetry()
+    samples = telemetry["samples"]
+    assert isinstance(samples, list)
+    samples[0]["crashed"] = "false"
+    samples[1]["crashed"] = "0"
     launcher = _write_launcher_with_payloads(
         tmp_path / "boolean_telemetry.py",
-        {
-            "samples": [
-                {"t": 0.0, "x": 0.0, "y": 0.0, "z": 3.0, "crashed": "false"},
-                {"t": 0.1, "x": 0.1, "y": 0.0, "z": 3.0, "crashed": "0"},
-            ]
-        },
+        telemetry,
     )
     proc, result = _run_runner(
         tmp_path,
@@ -522,6 +526,66 @@ def test_px4_runner_rejects_non_monotonic_telemetry_timestamps(tmp_path: Path) -
     assert "timestamp must be strictly increasing" in result["failure"]["reason"]
 
 
+def test_time_weighted_rmse_cannot_be_diluted_by_dense_zero_error_samples() -> None:
+    coarse_samples = [{"t": 0.0}, {"t": 1.0}, {"t": 2.0}]
+    dense_samples = [
+        {"t": 0.0},
+        {"t": 0.25},
+        {"t": 0.5},
+        {"t": 0.75},
+        {"t": 1.0},
+        {"t": 2.0},
+    ]
+
+    coarse = runner_module._time_weighted_rms(
+        [0.0, 0.0, 10.0],
+        coarse_samples,
+    )
+    dense = runner_module._time_weighted_rms(
+        [0.0, 0.0, 0.0, 0.0, 0.0, 10.0],
+        dense_samples,
+    )
+
+    assert coarse == pytest.approx(5.0)
+    assert dense == pytest.approx(coarse)
+
+
+def test_real_runner_rejects_missing_trusted_evaluation_window(
+    tmp_path: Path,
+) -> None:
+    launcher = _write_launcher_with_payloads(
+        tmp_path / "no_evaluation_window.py",
+        {
+            "samples": [
+                {
+                    "t": round(index * 0.1, 3),
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
+                }
+                for index in range(20)
+            ]
+        },
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f'"{sys.executable}" "{launcher}" '
+                "--telemetry {telemetry_json}"
+            ),
+        },
+    )
+
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert (
+        "trusted evaluation window could not be established"
+        in result["failure"]["reason"]
+    )
+
+
 def test_px4_runner_writes_expected_artifacts_in_dry_run(tmp_path: Path):
     proc, result = _run_runner(tmp_path, env_overrides={"PX4_GAZEBO_DRY_RUN": "true"})
     assert proc.returncode == 0
@@ -538,6 +602,11 @@ def test_px4_runner_writes_expected_artifacts_in_dry_run(tmp_path: Path):
         "trial_result.json",
     ):
         assert (tmp_path / name).exists(), name
+    telemetry = json.loads(
+        (tmp_path / "telemetry.json").read_text(encoding="utf-8")
+    )
+    assert telemetry["schema_version"] == TELEMETRY_SCHEMA_V2
+    assert verify_telemetry_semantic_contract(telemetry) is not None
 
 
 def test_px4_runner_extracts_real_candidate_parameters_and_writes_evidence(
@@ -642,8 +711,8 @@ def test_px4_runner_template_substitutes_env_tokens(tmp_path: Path):
     launcher.write_text(
         "import json, pathlib, sys\n"
         "pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1]).write_text("
-        '\'{"samples": [{"t": 0.0, "x": 0.0, "y": 0.0, "z": 3.0}]}\''
-        ", encoding='utf-8')\n"
+        f"{json.dumps(json.dumps(_track_following_telemetry()))}, "
+        "encoding='utf-8')\n"
         f"pathlib.Path({str(args_dump)!r}).write_text(json.dumps(sys.argv), encoding='utf-8')\n",
         encoding="utf-8",
     )
@@ -682,8 +751,8 @@ def test_px4_runner_uses_per_job_vehicle_profile_instead_of_worker_defaults(
     launcher.write_text(
         "import json, pathlib, sys\n"
         "pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1]).write_text("
-        '\'{"samples": [{"t": 0.0, "x": 0.0, "y": 0.0, "z": 3.0}]}\','
-        " encoding='utf-8')\n"
+        f"{json.dumps(json.dumps(_track_following_telemetry()))}, "
+        "encoding='utf-8')\n"
         f"pathlib.Path({str(args_dump)!r}).write_text(json.dumps(sys.argv), encoding='utf-8')\n",
         encoding="utf-8",
     )
@@ -732,8 +801,8 @@ def test_px4_runner_preserves_spaced_paths_and_exports_runtime_context(
     launcher.write_text(
         "import json, os, pathlib, sys\n"
         "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
-        "telemetry.write_text(json.dumps({'samples': "
-        "[{'t': 0, 'x': 0, 'y': 0, 'z': 3}]}), encoding='utf-8')\n"
+        f"telemetry.write_text({json.dumps(json.dumps(_track_following_telemetry()))}, "
+        "encoding='utf-8')\n"
         "context = {'argv': sys.argv, 'speed': os.environ.get('PX4_SIM_SPEED_FACTOR'), "
         "'seed': os.environ.get('PX4_TRIAL_SEED'), "
         "'instance': os.environ.get('PX4_INSTANCE'), "
@@ -1278,9 +1347,8 @@ def test_px4_runner_collects_track_marker_logs_when_present(tmp_path: Path):
         "import pathlib, sys\n"
         "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
         "run_dir = telemetry.parent\n"
-        "telemetry.write_text("
-        '\'{"samples": [{"t": 0.0, "x": 0.0, "y": 0.0, "z": 3.0}]}\''
-        ", encoding='utf-8')\n"
+        f"telemetry.write_text({json.dumps(json.dumps(_track_following_telemetry()))}, "
+        "encoding='utf-8')\n"
         "(run_dir / 'track_marker_stdout.log').write_text('marker ok\\n', encoding='utf-8')\n"
         "(run_dir / 'track_marker_stderr.log').write_text('', encoding='utf-8')\n",
         encoding="utf-8",

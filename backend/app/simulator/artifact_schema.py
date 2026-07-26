@@ -5,6 +5,11 @@ from __future__ import annotations
 import math
 from typing import Any, cast
 
+from app.simulator.telemetry_evidence import (
+    TELEMETRY_SCHEMA_V2,
+    verify_telemetry_semantic_contract,
+)
+
 _MAX_TELEMETRY_SAMPLES = 200_000
 _MAX_REFERENCE_POINTS = 10_000
 _MAX_SCHEMA_ERRORS = 100
@@ -33,8 +38,15 @@ def validate_telemetry_payload(payload: object) -> list[str]:
     if not isinstance(payload, dict):
         return ["telemetry payload must be a JSON object"]
 
-    if payload.get("schema_version") != "dronedream.telemetry.v1":
-        errors.append("telemetry schema_version must be 'dronedream.telemetry.v1'")
+    schema_version = payload.get("schema_version")
+    if schema_version not in {
+        "dronedream.telemetry.v1",
+        TELEMETRY_SCHEMA_V2,
+    }:
+        errors.append(
+            "telemetry schema_version must be "
+            "'dronedream.telemetry.v1' or 'dronedream.telemetry.v2'"
+        )
 
     samples = payload.get("samples")
     if not isinstance(samples, list):
@@ -81,6 +93,16 @@ def validate_telemetry_payload(payload: object) -> list[str]:
         if len(errors) >= _MAX_SCHEMA_ERRORS:
             errors.append("telemetry validation stopped after too many errors")
             break
+
+    if (
+        not errors
+        and schema_version == TELEMETRY_SCHEMA_V2
+        and verify_telemetry_semantic_contract(payload) is None
+    ):
+        errors.append(
+            "telemetry v2 semantic contract is missing or does not match "
+            "the samples"
+        )
 
     return errors
 

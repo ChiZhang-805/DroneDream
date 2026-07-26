@@ -59,6 +59,9 @@ from app.simulator.base import (
     TrialResult,
 )
 from app.simulator.scenario_effects import build_scenario_effect_request
+from app.simulator.telemetry_evidence import (
+    verify_telemetry_semantic_contract,
+)
 
 logger = logging.getLogger("drone_dream.simulator.real_cli")
 
@@ -915,6 +918,79 @@ def _sanitize_artifacts_for_trial(
     return sanitized
 
 
+def _load_bounded_json_artifact(
+    artifact: ArtifactMetadata,
+) -> object:
+    path = Path(artifact.storage_path)
+    with path.open("rb") as stream:
+        encoded = stream.read(_MAX_KNOWN_JSON_ARTIFACT_BYTES + 1)
+    if len(encoded) > _MAX_KNOWN_JSON_ARTIFACT_BYTES:
+        raise ValueError(
+            f"{artifact.artifact_type} exceeds the JSON evidence limit"
+        )
+    return json.loads(
+        encoded.decode("utf-8"),
+        parse_constant=_reject_nonfinite_json_constant,
+    )
+
+
+def _require_px4_metric_evidence(
+    raw: Mapping[str, Any],
+    *,
+    metrics: TrialMetricsPayload,
+    artifacts: list[ArtifactMetadata],
+) -> None:
+    if raw.get("backend") != "px4_gazebo":
+        return
+    if raw.get("schema_version") != "dronedream.trial_result.v2":
+        raise ValueError(
+            "PX4/Gazebo metric evidence requires trial_result.v2"
+        )
+    telemetry_artifacts = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "telemetry_json"
+    ]
+    reference_artifacts = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "reference_track_json"
+    ]
+    if len(telemetry_artifacts) != 1 or len(reference_artifacts) != 1:
+        raise ValueError(
+            "PX4/Gazebo success requires exactly one telemetry and "
+            "reference-track artifact"
+        )
+    telemetry = _load_bounded_json_artifact(telemetry_artifacts[0])
+    contract = verify_telemetry_semantic_contract(telemetry)
+    if contract is None:
+        raise ValueError(
+            "PX4/Gazebo telemetry semantic contract is invalid"
+        )
+    raw_metric = metrics.raw_metric_json
+    if (
+        raw_metric.get("rmse_integration")
+        != "time_weighted_trapezoidal"
+        or raw_metric.get("telemetry_semantic_contract_id")
+        != contract.contract_id
+        or raw_metric.get("telemetry_verifier_revision")
+        != contract.verifier_revision
+        or raw_metric.get("telemetry_source_sha256")
+        != contract.source_sha256
+        or raw_metric.get("telemetry_coordinate_frame")
+        != contract.coordinate_frame
+        or raw_metric.get("telemetry_position_unit")
+        != contract.position_unit
+        or raw_metric.get("telemetry_time_unit")
+        != contract.time_unit
+        or raw_metric.get("telemetry_sampling")
+        != contract.sampling.model_dump(mode="json")
+    ):
+        raise ValueError(
+            "PX4/Gazebo metrics do not bind the verified telemetry contract"
+        )
+
+
 def _reject_nonfinite_json_constant(value: str) -> None:
     raise ValueError(f"non-standard JSON numeric constant is forbidden: {value}")
 
@@ -1306,7 +1382,12 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 run_dir=run_dir,
                 trial_id=ctx.trial_id,
             )
-        except (ValueError, TypeError) as exc:
+            _require_px4_metric_evidence(
+                raw,
+                metrics=metrics,
+                artifacts=artifacts,
+            )
+        except (OSError, ValueError, TypeError) as exc:
             return TrialResult(
                 success=False,
                 backend=self.backend_name,

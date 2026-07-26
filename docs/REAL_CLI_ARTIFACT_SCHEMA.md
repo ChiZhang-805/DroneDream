@@ -91,7 +91,51 @@ Known JSON artifacts are validated before persistence:
 
 Known telemetry/reference JSON artifacts are read through a 16 MiB validation
 fence. An oversized or malformed known artifact is dropped instead of being
-loaded without bound into worker memory; its Trial metrics may remain valid.
+loaded without bound into worker memory. Legacy custom-runner metrics may
+remain readable without that optional artifact. A successful result declaring
+`backend=px4_gazebo` is stricter: dropping either the telemetry or reference
+track invalidates the complete Trial result.
+
+## PX4 telemetry semantic evidence
+
+Every successful bundled PX4/Gazebo result uses
+`dronedream.telemetry.v2` and exactly one `telemetry_json` plus one
+`reference_track_json`. The telemetry contains a content-addressed
+`dronedream.telemetry-semantic-contract/v1` that freezes:
+
+- metres, metres/second, radians, and seconds as the position, velocity,
+  attitude, and time units;
+- `dronedream_local_cartesian_z_up` as the normalized coordinate frame and
+  `relative_to_source_start` as the time origin;
+- source kind, pre-normalization source SHA-256/byte count, extraction
+  revision, normalized-sample SHA-256, and synthetic/physical status;
+- sample count, start/end/duration, median interval, maximum gap, gap limit,
+  and sampling coverage;
+- for ULog extraction, the original ULog SHA-256/byte count, extractor
+  revision, `PX4_LOCAL_NED` origin frame, and the explicit NED-to-z-up
+  transform.
+
+Physical metric-bearing telemetry needs at least two strictly timed samples,
+must satisfy the frozen maximum-gap and minimum-coverage rules, and cannot use
+the synthetic single-sample exception. The metric evaluation window is checked
+again after takeoff/landing trimming. If a physical run cannot establish its
+trusted flight window, it fails instead of using all samples as an ordinary
+fallback.
+
+RMSE and full-log RMSE use trapezoidal time integration, so inserting dense
+zero-error samples cannot dilute a long error interval. `raw_metric_json`
+binds its integration rule and sampling evidence to the telemetry contract.
+Before accepting a bundled PX4 result, `real_cli` reloads the retained
+telemetry, independently revalidates its contract and samples, and compares
+all of those bindings. Missing, duplicate, mutated, or mismatched evidence
+invalidates the Trial.
+
+This contract proves the semantics and integrity relationships of the retained
+normalized telemetry. It does not yet make the original ULog permanently
+replayable when that raw log is not retained, and the backend does not yet
+independently recompile every trajectory projection, overshoot, pass, or score
+field. Those remain separate stronger-verifier boundaries rather than implied
+guarantees.
 
 ## PX4 parameter evidence
 

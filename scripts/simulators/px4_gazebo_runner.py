@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import csv
+import io
 import json
 import math
 import os
@@ -67,6 +68,14 @@ from app.simulator.scenario_effects import (  # noqa: E402 - see path bootstrap 
 )
 from app.simulator.scenario_effects import (  # noqa: E402 - see path bootstrap above
     write_json_atomic as write_effect_json_atomic,
+)
+from app.simulator.telemetry_evidence import (  # noqa: E402 - see path bootstrap above
+    TELEMETRY_SCHEMA_V2,
+    TelemetrySemanticContractError,
+    compile_sampling_evidence,
+    compile_telemetry_semantic_contract,
+    require_sampling_quality,
+    verify_telemetry_semantic_contract,
 )
 
 FAILURE_ADAPTER_UNAVAILABLE = "ADAPTER_UNAVAILABLE"
@@ -1260,12 +1269,54 @@ def _load_telemetry(path: Path, *, allow_csv: bool) -> dict[str, Any]:
             raise RunnerError(f"telemetry JSON is malformed: {exc}") from None
         if not isinstance(payload, dict) or not isinstance(payload.get("samples"), list):
             raise RunnerError("telemetry.json must contain an object with samples[]")
-        payload["samples"] = _normalize_samples(payload["samples"])
+        samples = _normalize_samples(payload["samples"])
         if payload.get("meta") is None:
-            payload["meta"] = {}
+            meta: dict[str, Any] = {}
         elif not isinstance(payload.get("meta"), dict):
             raise RunnerError("telemetry.meta must be an object when present")
-        return payload
+        else:
+            meta = dict(payload["meta"])
+        source = str(meta.get("source", "")).strip().lower()
+        mode = str(meta.get("mode", "")).strip().lower()
+        source_kind = (
+            "px4_ulog"
+            if source == "ulog"
+            else "runner_dry_run"
+            if mode in {"dry_run", "site_dry_run"}
+            else "launcher_json"
+        )
+        origin_provenance = {
+            key: meta.get(key)
+            for key in (
+                "origin_source_sha256",
+                "origin_source_byte_count",
+                "origin_extraction_revision",
+                "origin_coordinate_frame",
+                "coordinate_transform",
+            )
+            if meta.get(key) is not None
+        }
+        try:
+            contract = compile_telemetry_semantic_contract(
+                samples=samples,
+                source_bytes=encoded,
+                source_kind=source_kind,
+                extraction_revision=(
+                    "px4-gazebo-runner-json-normalization-1.0"
+                ),
+                synthetic=source_kind == "runner_dry_run",
+                origin_provenance=origin_provenance,
+            )
+        except (TelemetrySemanticContractError, ValueError) as exc:
+            raise RunnerError(
+                f"telemetry semantic contract failed: {exc}"
+            ) from exc
+        return {
+            "schema_version": TELEMETRY_SCHEMA_V2,
+            "samples": samples,
+            "meta": meta,
+            "semantic_contract": contract.model_dump(mode="json"),
+        }
 
     csv_path = path.with_suffix(".csv")
     csv_size = (
@@ -1276,30 +1327,61 @@ def _load_telemetry(path: Path, *, allow_csv: bool) -> dict[str, Any]:
             raise RunnerError(
                 f"telemetry CSV exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
             )
-        samples: list[dict[str, Any]] = []
-        with csv_path.open("r", encoding="utf-8", newline="") as f:
-            reader = csv.DictReader(f)
-            for row_index, row in enumerate(reader):
-                if row_index >= _MAX_TELEMETRY_SAMPLES:
-                    raise RunnerError(
-                        f"telemetry exceeds the {_MAX_TELEMETRY_SAMPLES}-sample contract limit"
-                    )
-                samples.append(
-                    {
-                        "t": row.get("t", row.get("timestamp", 0.0)),
-                        "x": row.get("x", 0.0),
-                        "y": row.get("y", 0.0),
-                        "z": row.get("z", 0.0),
-                        "vx": row.get("vx", 0.0),
-                        "vy": row.get("vy", 0.0),
-                        "vz": row.get("vz", 0.0),
-                        "yaw": row.get("yaw", 0.0),
-                        "armed": row.get("armed", True),
-                        "mode": row.get("mode", "unknown"),
-                        "crashed": row.get("crashed", False),
-                    }
+        with csv_path.open("rb") as stream:
+            encoded = stream.read(_MAX_TELEMETRY_BYTES + 1)
+        if len(encoded) > _MAX_TELEMETRY_BYTES:
+            raise RunnerError(
+                f"telemetry CSV exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
+            )
+        try:
+            decoded = encoded.decode("utf-8")
+        except UnicodeError as exc:
+            raise RunnerError(
+                f"telemetry CSV is not UTF-8: {exc}"
+            ) from None
+        samples_raw: list[dict[str, Any]] = []
+        reader = csv.DictReader(io.StringIO(decoded, newline=""))
+        for row_index, row in enumerate(reader):
+            if row_index >= _MAX_TELEMETRY_SAMPLES:
+                raise RunnerError(
+                    f"telemetry exceeds the {_MAX_TELEMETRY_SAMPLES}-sample contract limit"
                 )
-        return {"samples": _normalize_samples(samples), "meta": {"format": "csv"}}
+            samples_raw.append(
+                {
+                    "t": row.get("t", row.get("timestamp", 0.0)),
+                    "x": row.get("x", 0.0),
+                    "y": row.get("y", 0.0),
+                    "z": row.get("z", 0.0),
+                    "vx": row.get("vx", 0.0),
+                    "vy": row.get("vy", 0.0),
+                    "vz": row.get("vz", 0.0),
+                    "yaw": row.get("yaw", 0.0),
+                    "armed": row.get("armed", True),
+                    "mode": row.get("mode", "unknown"),
+                    "crashed": row.get("crashed", False),
+                }
+            )
+        samples = _normalize_samples(samples_raw)
+        try:
+            contract = compile_telemetry_semantic_contract(
+                samples=samples,
+                source_bytes=encoded,
+                source_kind="launcher_csv",
+                extraction_revision=(
+                    "px4-gazebo-runner-csv-normalization-1.0"
+                ),
+                synthetic=False,
+            )
+        except (TelemetrySemanticContractError, ValueError) as exc:
+            raise RunnerError(
+                f"telemetry semantic contract failed: {exc}"
+            ) from exc
+        return {
+            "schema_version": TELEMETRY_SCHEMA_V2,
+            "samples": samples,
+            "meta": {"format": "csv"},
+            "semantic_contract": contract.model_dump(mode="json"),
+        }
 
     raise RunnerError("telemetry output is missing")
 
@@ -1838,6 +1920,38 @@ def _find_altitude_only_window(
     )
 
 
+def _time_weighted_rms(
+    values: list[float],
+    samples: list[dict[str, Any]],
+) -> float:
+    if not values or len(values) != len(samples):
+        raise RunnerError(
+            "time-weighted RMS requires one value per telemetry sample"
+        )
+    if len(values) == 1:
+        return abs(values[0])
+    duration = float(samples[-1]["t"]) - float(samples[0]["t"])
+    if duration <= 0:
+        raise RunnerError(
+            "time-weighted RMS requires a positive time interval"
+        )
+    integral = 0.0
+    for index in range(1, len(values)):
+        dt = float(samples[index]["t"]) - float(
+            samples[index - 1]["t"]
+        )
+        if dt <= 0:
+            raise RunnerError(
+                "time-weighted RMS requires strictly increasing timestamps"
+            )
+        integral += (
+            0.5
+            * (values[index - 1] ** 2 + values[index] ** 2)
+            * dt
+        )
+    return math.sqrt(integral / duration)
+
+
 def _compute_metrics(
     telemetry: dict[str, Any],
     reference_track: list[dict[str, float]],
@@ -1850,6 +1964,12 @@ def _compute_metrics(
     scenario_effect_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     samples = telemetry["samples"]
+    telemetry_contract = verify_telemetry_semantic_contract(telemetry)
+    if telemetry_contract is None:
+        raise RunnerError(
+            "telemetry semantic contract is missing or does not match samples"
+        )
+    synthetic_telemetry = dry_run or telemetry_contract.synthetic
     track_geometry = _build_track_geometry(reference_track)
     projections = _project_samples_to_track(samples, track_geometry)
     altitude_fraction = env.eval_altitude_fraction
@@ -1904,28 +2024,45 @@ def _compute_metrics(
             consecutive_samples=consecutive_samples,
         )
     if eval_window is None:
+        if not synthetic_telemetry:
+            raise RunnerError(
+                "trusted evaluation window could not be established from "
+                "offboard timing or telemetry"
+            )
         eval_window = EvaluationWindow(
             start_idx=0,
             end_idx=len(samples) - 1,
-            source="all_samples_fallback",
-            raw_source="all_samples_fallback",
+            source="synthetic_all_samples",
+            raw_source="synthetic_all_samples",
             raw_start_t=None,
             raw_end_t=None,
-            start_reason="all_samples_fallback",
+            start_reason="synthetic_all_samples",
             trimmed_takeoff_samples=0,
             trimmed_landing_samples=0,
         )
 
     evaluation_samples = samples[eval_window.start_idx : eval_window.end_idx + 1]
     evaluation_projections = projections[eval_window.start_idx : eval_window.end_idx + 1]
+    evaluation_sampling = compile_sampling_evidence(
+        evaluation_samples
+    )
+    try:
+        require_sampling_quality(
+            evaluation_sampling,
+            synthetic=synthetic_telemetry,
+        )
+    except TelemetrySemanticContractError as exc:
+        raise RunnerError(
+            f"evaluation-window sampling failed: {exc}"
+        ) from exc
 
     errors = [projection.error for projection in projections]
     eval_errors = [projection.error for projection in evaluation_projections]
 
-    rmse = math.sqrt(sum(e * e for e in eval_errors) / len(eval_errors))
+    rmse = _time_weighted_rms(eval_errors, evaluation_samples)
     max_error = max(eval_errors)
     max_error_idx = eval_errors.index(max_error)
-    completion_time = max(0.0, evaluation_samples[-1]["t"] - evaluation_samples[0]["t"])
+    completion_time = evaluation_sampling.duration_s
     final_ref = reference_track[-1]
     final_error = math.sqrt(
         (evaluation_samples[-1]["x"] - final_ref["x"]) ** 2
@@ -2127,7 +2264,10 @@ def _compute_metrics(
             "track_projection": "ordered_local_3d_segment_projection",
             "track_projection_comparison_limit": _MAX_PROJECTION_SEGMENT_COMPARISONS,
             "coverage_basis": "union_of_traversed_polyline_arc_length",
-            "full_log_rmse": round(math.sqrt(sum(e * e for e in errors) / len(errors)), 6),
+            "full_log_rmse": round(
+                _time_weighted_rms(errors, samples),
+                6,
+            ),
             "full_log_max_error": round(max(errors), 6),
             "pass_thresholds": {
                 "rmse": env.pass_rmse,
@@ -2150,6 +2290,25 @@ def _compute_metrics(
             "evaluation_end_t": round(float(evaluation_samples[-1]["t"]), 6),
             "evaluation_sample_count": len(evaluation_samples),
             "total_sample_count": total_sample_count,
+            "rmse_integration": "time_weighted_trapezoidal",
+            "telemetry_semantic_contract_id": (
+                telemetry_contract.contract_id
+            ),
+            "telemetry_verifier_revision": (
+                telemetry_contract.verifier_revision
+            ),
+            "telemetry_coordinate_frame": (
+                telemetry_contract.coordinate_frame
+            ),
+            "telemetry_position_unit": telemetry_contract.position_unit,
+            "telemetry_time_unit": telemetry_contract.time_unit,
+            "telemetry_source_sha256": telemetry_contract.source_sha256,
+            "telemetry_sampling": (
+                telemetry_contract.sampling.model_dump(mode="json")
+            ),
+            "evaluation_sampling": evaluation_sampling.model_dump(
+                mode="json"
+            ),
             "evaluation_start_reason": eval_window.start_reason,
             "evaluation_trimmed_takeoff_samples": eval_window.trimmed_takeoff_samples,
             "evaluation_trimmed_landing_samples": eval_window.trimmed_landing_samples,
@@ -2993,7 +3152,10 @@ def run_once(input_path: Path, output_path: Path) -> int:
         )
 
         telemetry = _load_telemetry(telemetry_json, allow_csv=env.allow_csv_telemetry)
-        telemetry.setdefault("schema_version", "dronedream.telemetry.v1")
+        if telemetry.get("schema_version") != TELEMETRY_SCHEMA_V2:
+            raise RunnerError(
+                "normalized telemetry did not produce the v2 semantic contract"
+            )
         telemetry.setdefault("meta", {})
         telemetry["meta"]["offboard_timing_path"] = str(run_dir / "offboard_timing.json")
         # Persist the normalized contract, not the launcher's potentially
@@ -3024,6 +3186,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
 
         result = {
             "success": True,
+            "backend": "px4_gazebo",
             "metrics": metrics,
             "artifacts": _collect_artifacts(run_dir),
             "log_excerpt": (

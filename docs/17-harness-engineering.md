@@ -442,10 +442,34 @@ Candidate-receipt and winner-freeze deletion authorizations, preserving the
 user's right to delete the Job without weakening normal immutability.
 
 This closes the mutable Candidate-envelope fallback at supported application
-and database boundaries. A database owner can still drop the guards, SQL and
-object storage are not one atomic commit, and simulator-authored metrics still
-need the stronger independent telemetry/unit/frame/time verifier described in
-the full Harness design.
+and database boundaries. A database owner can still drop the guards, and SQL
+and object storage are not one atomic commit.
+
+Outcome Contract compiler 2.12 adds
+`dronedream.telemetry.v2` and
+`dronedream.telemetry-semantic-contract/v1`. Every successful bundled
+PX4/Gazebo Trial now freezes the normalized units, coordinate frame, time
+origin, source kind and digest, extraction revision, normalized-sample digest,
+synthetic status, and sampling evidence. ULog-derived telemetry additionally
+binds the original ULog digest/size, PX4 local-NED origin, extractor revision,
+and explicit NED-to-z-up transform. The runner rejects sparse/gapped physical
+telemetry, rechecks the trimmed evaluation window, and no longer turns a
+missing physical flight window into an ordinary all-samples result.
+
+RMSE is now trapezoidally time-weighted rather than sample-count weighted, so
+selectively dense sampling cannot dilute a long error interval. The successful
+PX4 result binds the integration rule and semantic-contract fields into its
+raw metrics. `real_cli` then independently reloads the bounded artifacts,
+revalidates telemetry v2, and fails the complete Trial when the telemetry,
+reference track, sampling evidence, source binding, unit/frame/time contract,
+or metric binding is missing or divergent.
+
+This closes the previously identified telemetry-semantic and sampling-weight
+gaps for the bundled runner. It does not preserve every original ULog byte
+under a WORM policy, independently recompute the full track projection and
+score in the backend, or prove that an origin digest corresponds to a raw log
+that was not retained. Those remain explicit future verifier/deployment
+boundaries.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic
