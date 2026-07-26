@@ -155,11 +155,11 @@ class OutcomeFailurePolicy(_FrozenModel):
     hard_constraint_penalty_in_scalar_loss: Literal[False] = False
     soft_constraint_penalty_in_scalar_loss: Literal[True] = True
     optimizer_learning_outcome_policy: Literal[
-        "domain_and_unknown_failures_excluding_nonphysical_outcomes"
-    ] = "domain_and_unknown_failures_excluding_nonphysical_outcomes"
+        "verified_domain_failures_only_excluding_nonphysical_outcomes"
+    ] = "verified_domain_failures_only_excluding_nonphysical_outcomes"
     unknown_failure_policy: Literal[
-        "conservative_optimizer_failure"
-    ] = "conservative_optimizer_failure"
+        "quarantined_nonlearning_failure"
+    ] = "quarantined_nonlearning_failure"
     acceptance_non_success_policy: Literal[
         "all_non_successes_remain_in_denominator"
     ] = "all_non_successes_remain_in_denominator"

@@ -971,7 +971,15 @@ def eligible_harness_tools(
     eligible: set[HarnessToolId] = {"cma_es", "optimizer_portfolio"}
     if snapshot.job.constraint_count > 0 or snapshot.job.objective_count > 1:
         eligible.add("constrained_mobo")
-    if snapshot.scenarios.training_replicate_count > 1:
+    # Reduced-fidelity execution is allowed to remove replicates, but it must
+    # preserve at least one run from every configured training case. Therefore
+    # a matrix made only of one run per case has no executable lower-fidelity
+    # level even when its total run count is greater than one.
+    if (
+        snapshot.scenarios.training_case_count > 0
+        and snapshot.scenarios.training_replicate_count
+        > snapshot.scenarios.training_case_count
+    ):
         eligible.add("multi_fidelity_mobo")
     if snapshot.search.scored_candidate_count >= 4 and snapshot.search.feasible_candidate_count > 0:
         eligible.add("turbo")

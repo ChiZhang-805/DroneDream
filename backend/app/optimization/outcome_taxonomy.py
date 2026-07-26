@@ -38,6 +38,10 @@ TRIAL_OUTCOME_CLASSES: tuple[TrialOutcomeClass, ...] = (
     "unknown_failure",
 )
 
+_TERMINAL_TRIAL_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
+_OPTIMIZER_LEARNING_OUTCOMES = frozenset({"success", "domain_failure"})
+_OPTIMIZER_LEARNING_FAILURES = frozenset({"domain_failure"})
+
 DOMAIN_FAILURE_CODES = frozenset(
     {
         FAILURE_TIMEOUT,
@@ -69,43 +73,62 @@ def classify_trial_outcome(
     failure_code: object,
     usable_metric: bool,
 ) -> TrialOutcomeClass:
-    """Classify one terminal Trial without forgiving unknown failures.
+    """Classify one Trial through a fail-closed optimizer trust boundary.
 
-    Unknown codes remain an explicit conservative failure class and are
-    included in optimizer-learning failure rates. Infrastructure, cancellation,
-    and invalid-evidence outcomes still block completion and acceptance but do
-    not teach the numerical optimizer that the physical parameter region is
-    unsafe.
+    Only a ``FAILED`` Trial carrying one of the canonical, trusted domain
+    failure codes can teach the numerical optimizer that a physical parameter
+    region is unsafe. Unknown producer claims, malformed records, inconsistent
+    status/metric combinations, infrastructure failures, and cancellations
+    remain non-successes for completion and acceptance, but cannot poison
+    optimizer learning.
+
+    ``status`` and ``failure_code`` intentionally arrive as ``object`` because
+    this function also seals persisted and external evidence. Normalizing them
+    before membership checks makes the taxonomy total: malformed list/dict
+    values classify conservatively instead of raising ``TypeError``.
     """
 
-    if status == "COMPLETED" and usable_metric:
-        return "success"
-    if status == "CANCELLED" or failure_code == FAILURE_CANCELLED:
+    normalized_status = status if isinstance(status, str) else None
+    normalized_failure_code = failure_code if isinstance(failure_code, str) else None
+
+    if normalized_status not in _TERMINAL_TRIAL_STATUSES:
+        return "unknown_failure"
+    if not isinstance(usable_metric, bool):
+        return "invalid_evidence"
+    has_usable_metric = usable_metric
+    if normalized_status == "CANCELLED":
         return "cancelled"
-    if failure_code in INFRASTRUCTURE_FAILURE_CODES:
+    if normalized_status == "COMPLETED":
+        if has_usable_metric and normalized_failure_code is None:
+            return "success"
+        return "invalid_evidence"
+
+    # From here on the only valid terminal status is FAILED. A failed Trial
+    # carrying a supposedly usable metric is internally contradictory, so its
+    # evidence is quarantined regardless of any accompanying producer code.
+    if has_usable_metric:
+        return "invalid_evidence"
+    if normalized_failure_code == FAILURE_CANCELLED:
+        return "cancelled"
+    if normalized_failure_code in INFRASTRUCTURE_FAILURE_CODES:
         return "infrastructure_failure"
-    if failure_code in INVALID_EVIDENCE_FAILURE_CODES:
+    if normalized_failure_code in INVALID_EVIDENCE_FAILURE_CODES:
         return "invalid_evidence"
-    if failure_code in DOMAIN_FAILURE_CODES:
+    if normalized_failure_code in DOMAIN_FAILURE_CODES:
         return "domain_failure"
-    if status == "COMPLETED":
-        return "invalid_evidence"
     return "unknown_failure"
 
 
-def is_optimizer_learning_outcome(value: TrialOutcomeClass) -> bool:
-    return value in {
-        "success",
-        "domain_failure",
-        "unknown_failure",
-    }
+def is_optimizer_learning_outcome(value: object) -> bool:
+    """Return whether an outcome may enter optimizer observations."""
+
+    return isinstance(value, str) and value in _OPTIMIZER_LEARNING_OUTCOMES
 
 
-def is_optimizer_learning_failure(value: TrialOutcomeClass) -> bool:
-    return value in {
-        "domain_failure",
-        "unknown_failure",
-    }
+def is_optimizer_learning_failure(value: object) -> bool:
+    """Return whether a trusted physical failure may teach the optimizer."""
+
+    return isinstance(value, str) and value in _OPTIMIZER_LEARNING_FAILURES
 
 
 __all__ = [

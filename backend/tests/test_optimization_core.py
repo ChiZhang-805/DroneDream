@@ -229,9 +229,12 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
     )
     assert (
         first.domain_failure_policy.optimizer_learning_outcome_policy
-        == "domain_and_unknown_failures_excluding_nonphysical_outcomes"
+        == "verified_domain_failures_only_excluding_nonphysical_outcomes"
     )
-    assert first.domain_failure_policy.unknown_failure_policy == "conservative_optimizer_failure"
+    assert (
+        first.domain_failure_policy.unknown_failure_policy
+        == "quarantined_nonlearning_failure"
+    )
     assert (
         first.domain_failure_policy.acceptance_non_success_policy
         == "all_non_successes_remain_in_denominator"

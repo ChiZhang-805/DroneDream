@@ -124,9 +124,9 @@ def test_advanced_experiment_round_trips_and_reruns(client: TestClient) -> None:
             "dronedream.trial-outcome-taxonomy/v1"
         ),
         "optimizer_learning_outcome_policy": (
-            "domain_and_unknown_failures_excluding_nonphysical_outcomes"
+            "verified_domain_failures_only_excluding_nonphysical_outcomes"
         ),
-        "unknown_failure_policy": "conservative_optimizer_failure",
+        "unknown_failure_policy": "quarantined_nonlearning_failure",
         "acceptance_non_success_policy": (
             "all_non_successes_remain_in_denominator"
         ),

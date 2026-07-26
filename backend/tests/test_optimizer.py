@@ -537,7 +537,7 @@ def test_scenario_payload_preserves_authoritative_orchestrator_fields() -> None:
         ("FAILED", "UNRECOGNIZED_FAILURE", False, "unknown_failure"),
     ],
 )
-def test_trial_outcome_taxonomy_is_closed_and_unknowns_stay_conservative(
+def test_trial_outcome_taxonomy_is_closed_and_unknowns_stay_explicit(
     status: str,
     failure_code: str | None,
     usable_metric: bool,
@@ -865,6 +865,7 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
     assert result["training_completion_rate"] == pytest.approx(0.9375)
     assert result["training_pass_rate"] == pytest.approx(0.1875)
     assert result["training_failure_rate"] == pytest.approx(0.0625)
+    assert result["optimizer_learning_failure_rate"] == pytest.approx(0.0)
     assert result["training_completed_trial_count"] == 4
     assert result["training_failed_trial_count"] == 1
     # Replicates are reduced within each case before the fixed case weights
@@ -895,7 +896,7 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
                 "invalid_evidence": 0,
                 "unknown_failure": 1,
             },
-            "optimizer_learning_failure_rate": 0.25,
+            "optimizer_learning_failure_rate": 0.0,
         },
         {
             "scenario_case_id": "case-b",
@@ -919,10 +920,10 @@ def test_case_weighted_rates_include_failed_seeds_in_each_case_denominator() -> 
             "optimizer_learning_failure_rate": 0.0,
         },
     ]
-    # Failed-seed penalty uses the weighted case failure rate, not raw 1/5.
-    assert result["aggregated_score"] == pytest.approx(
-        3.0 + constants.SCORE_WEIGHTS["failed_trial"] * 0.0625
-    )
+    # The missing failure code remains in completion/acceptance denominators,
+    # but cannot alter the optimizer objective until it is classified as a
+    # trusted physical domain failure.
+    assert result["aggregated_score"] == pytest.approx(3.0)
     acceptance_result = acceptance.evaluate_candidate(
         candidate,
         acceptance.AcceptanceCriteria(target_rmse=None, target_max_error=None, min_pass_rate=0.2),

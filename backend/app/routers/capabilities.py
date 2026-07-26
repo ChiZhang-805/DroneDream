@@ -156,7 +156,7 @@ def _simulator_capabilities() -> dict[str, object]:
                 # operators must serialize real simulations per host.
                 "max_concurrency_per_host_without_instance_allocator": 1,
                 "instance_allocation": "operator_managed",
-                "bundled_runner_advanced_effects": ["obstacles"],
+                "bundled_runner_advanced_effects": ["obstacles", "steady_wind"],
                 "scenario_effect_contract": bundled_launcher_capabilities(),
                 "unverified_effect_passthrough_opt_in": True,
             },
