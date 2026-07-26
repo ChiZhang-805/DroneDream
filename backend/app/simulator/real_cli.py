@@ -60,7 +60,10 @@ from app.simulator.base import (
 )
 from app.simulator.px4_metric_evidence import (
     compile_px4_core_metric_evidence,
+    compile_px4_evaluation_window_evidence,
+    px4_evaluation_policy_from_environment,
     require_px4_core_metric_binding,
+    require_px4_evaluation_window_binding,
 )
 from app.simulator.scenario_effects import build_scenario_effect_request
 from app.simulator.telemetry_evidence import (
@@ -969,6 +972,31 @@ def _require_px4_metric_evidence(
     reference_track = _load_bounded_json_artifact(
         reference_artifacts[0]
     )
+    timing_artifacts = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "offboard_timing_json"
+    ]
+    if len(timing_artifacts) > 1:
+        raise ValueError(
+            "PX4/Gazebo success cannot contain duplicate offboard "
+            "timing artifacts"
+        )
+    offboard_timing: object | None = None
+    if timing_artifacts:
+        try:
+            loaded_timing = _load_bounded_json_artifact(
+                timing_artifacts[0]
+            )
+        except (
+            OSError,
+            UnicodeError,
+            json.JSONDecodeError,
+            ValueError,
+        ):
+            loaded_timing = None
+        if isinstance(loaded_timing, dict):
+            offboard_timing = loaded_timing
     contract = verify_telemetry_semantic_contract(telemetry)
     if contract is None:
         raise ValueError(
@@ -996,13 +1024,31 @@ def _require_px4_metric_evidence(
         raise ValueError(
             "PX4/Gazebo metrics do not bind the verified telemetry contract"
         )
+    evaluation_policy = px4_evaluation_policy_from_environment(
+        os.environ
+    )
+    evaluation_window_evidence = (
+        compile_px4_evaluation_window_evidence(
+            telemetry_payload=telemetry,
+            reference_track_payload=reference_track,
+            offboard_timing_payload=offboard_timing,
+            policy=evaluation_policy,
+        )
+    )
+    require_px4_evaluation_window_binding(
+        raw_metric,
+        policy=evaluation_policy,
+        evidence=evaluation_window_evidence,
+    )
     core_metric_evidence = compile_px4_core_metric_evidence(
         telemetry_payload=telemetry,
         reference_track_payload=reference_track,
-        evaluation_start_index=raw_metric.get(
-            "evaluation_start_index"
+        evaluation_start_index=(
+            evaluation_window_evidence.start_index
         ),
-        evaluation_end_index=raw_metric.get("evaluation_end_index"),
+        evaluation_end_index=(
+            evaluation_window_evidence.end_index
+        ),
     )
     require_px4_core_metric_binding(
         metrics.as_dict(),

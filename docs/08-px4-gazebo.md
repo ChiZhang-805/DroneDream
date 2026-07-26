@@ -251,7 +251,14 @@ Window selection order:
      reference-altitude threshold
 3. Telemetry-derived candidate/refinement with the same rules
 4. Altitude-only fallback (`N` consecutive samples above altitude threshold, then trimmed before landing)
-5. All-samples fallback (conservative behavior)
+5. All-samples fallback only for explicitly synthetic telemetry; a physical
+   run without a trusted window fails closed
+
+The runner records the chosen interval, but it is not authoritative. Before a
+successful bundled PX4 Trial is accepted, `real_cli` reloads the retained
+telemetry, reference track, and optional offboard timing, freezes the evaluation
+policy, and independently repeats the window derivation. The raw interval,
+policy, and content-addressed window evidence must match.
 
 - `rmse`: RMS tracking error over evaluation window
 - `max_error`: max tracking error over evaluation window

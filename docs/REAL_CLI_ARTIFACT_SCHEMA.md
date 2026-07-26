@@ -131,10 +131,23 @@ all of those bindings. Missing, duplicate, mutated, or mismatched evidence
 invalidates the Trial.
 
 Every bundled result also carries
+`dronedream.px4-evaluation-policy/v1` and
+`dronedream.px4-evaluation-window-evidence/v1`. The policy freezes the pass,
+coverage, takeoff-entry, near-track, consecutive-sample, and altitude-collapse
+thresholds under a content address. From the retained telemetry, reference
+track, optional `offboard_timing_json`, and that policy, the backend independently
+repeats the ordered projection and derives the trusted evaluation window. The
+offboard timing file is only a broad candidate; telemetry must still establish
+the consecutive altitude-and-near-track entry and the landing trim. A missing
+physical window fails closed, while the all-samples exception remains explicitly
+synthetic. The runner's raw window fields, frozen policy, and content-addressed
+window evidence must all match the backend result.
+
+Every bundled result also carries
 `dronedream.px4-core-metric-evidence/v1`. From the retained telemetry and
 reference track—not from the runner's reported metric values—the backend
 independently repeats the bounded ordered three-dimensional segment projection,
-selects the declared evaluation sample indices, and recomputes time-weighted
+uses its independently derived evaluation sample indices, and recomputes time-weighted
 evaluation/full-log RMSE, maximum error, completion duration, final endpoint
 error, tracking-error peak count, evaluation sampling, and the maximum-error
 sample. The content-addressed evidence and top-level/raw metric projections
@@ -143,11 +156,9 @@ must all match exactly.
 These contracts prove the semantics and core geometric measurements of the
 retained normalized telemetry. They do not yet make the original ULog
 permanently replayable when that raw log is not retained. The independent
-compiler currently verifies the declared evaluation interval, but does not yet
-re-derive that interval from offboard timing/takeoff policy or independently
-recompile crash, instability, directed-progress pass, and composite-score
-semantics. Those remain separate stronger-verifier boundaries rather than
-implied guarantees.
+compiler still does not independently recompile crash, instability,
+directed-progress pass, and composite-score semantics. Those remain separate
+stronger-verifier boundaries rather than implied guarantees.
 
 ## PX4 parameter evidence
 

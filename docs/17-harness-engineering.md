@@ -481,10 +481,25 @@ must match exactly. A changed reference path, evaluation index, telemetry
 sample, metric value, or nested evidence field fails the complete Trial.
 
 This closes trust in runner-authored core geometry values for the bundled
-PX4 path. The verifier still consumes the declared evaluation indices instead
-of independently deriving them from offboard timing/takeoff policy, and it
-does not yet independently recompile crash, instability, directed-progress
-pass, or composite-score semantics. Those remain the next metric-verifier
+PX4 path.
+
+Outcome Contract compiler 2.14 adds
+`dronedream.px4-evaluation-policy/v1` and
+`dronedream.px4-evaluation-window-evidence/v1`. The policy freezes pass,
+coverage, altitude-entry, near-track, consecutive-sample, and collapse
+thresholds under a content address. A separate backend compiler ignores the
+runner's selected indices and independently re-derives the evaluation window
+from retained telemetry, reference track, optional offboard timing, and the
+frozen policy. Offboard timing is only a broad candidate: the verifier repeats
+ordered three-dimensional projection, consecutive altitude-and-near-track
+entry, and landing trimming. Only explicitly synthetic telemetry can use the
+labeled all-samples exception.
+
+The runner's raw window projection, policy, and content-addressed window
+evidence must match the backend result. Changed thresholds, timing bytes,
+reference geometry, selected indices, or nested evidence fail the complete
+Trial before core metrics are compiled. Crash, instability, directed-progress
+pass, and composite-score semantics remain the next independent-verdict
 boundary.
 
 The development routing corpus lives at

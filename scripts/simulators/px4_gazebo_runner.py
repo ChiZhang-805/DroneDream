@@ -54,7 +54,10 @@ from app.parameters import (  # noqa: E402 - path bootstrap must precede backend
 from app.simulator.px4_metric_evidence import (  # noqa: E402 - see path bootstrap above
     Px4CoreMetricEvidenceError,
     compile_px4_core_metric_evidence,
+    compile_px4_evaluation_policy,
+    compile_px4_evaluation_window_evidence,
     require_px4_core_metric_binding,
+    require_px4_evaluation_window_binding,
 )
 from app.simulator.px4_parameters import (  # noqa: E402 - see path bootstrap above
     APPLIED_EVIDENCE_NAME,
@@ -3149,14 +3152,59 @@ def run_once(input_path: Path, output_path: Path) -> int:
             scenario_effect_contract=scenario_effect_contract,
         )
         try:
+            reference_track_payload = {
+                "schema_version": "dronedream.reference_track.v1",
+                "reference_track": reference_track,
+            }
+            evaluation_policy = compile_px4_evaluation_policy(
+                pass_rmse_m=env.pass_rmse,
+                pass_max_error_m=env.pass_max_error,
+                minimum_track_coverage=env.min_track_coverage,
+                altitude_entry_fraction=env.eval_altitude_fraction,
+                near_track_threshold_m=(env.eval_near_track_threshold_m),
+                consecutive_samples=env.eval_consecutive_samples,
+                collapse_altitude_fraction=(env.eval_collapse_altitude_fraction),
+            )
+            offboard_timing_payload: object | None = None
+            offboard_timing_path = run_dir / "offboard_timing.json"
+            if offboard_timing_path.is_file():
+                try:
+                    if offboard_timing_path.stat().st_size <= _MAX_OFFBOARD_TIMING_BYTES:
+                        loaded_timing = json.loads(
+                            offboard_timing_path.read_text(encoding="utf-8"),
+                            parse_constant=_reject_nonfinite_json,
+                        )
+                        if isinstance(loaded_timing, dict):
+                            offboard_timing_payload = loaded_timing
+                except (
+                    OSError,
+                    UnicodeError,
+                    json.JSONDecodeError,
+                    ValueError,
+                ):
+                    offboard_timing_payload = None
+            evaluation_window_evidence = compile_px4_evaluation_window_evidence(
+                telemetry_payload=telemetry,
+                reference_track_payload=reference_track_payload,
+                offboard_timing_payload=offboard_timing_payload,
+                policy=evaluation_policy,
+            )
+            metrics["raw_metric_json"]["evaluation_policy"] = evaluation_policy.model_dump(
+                mode="json"
+            )
+            metrics["raw_metric_json"]["evaluation_window_evidence"] = (
+                evaluation_window_evidence.model_dump(mode="json")
+            )
+            require_px4_evaluation_window_binding(
+                metrics["raw_metric_json"],
+                policy=evaluation_policy,
+                evidence=evaluation_window_evidence,
+            )
             core_metric_evidence = compile_px4_core_metric_evidence(
                 telemetry_payload=telemetry,
-                reference_track_payload={
-                    "schema_version": "dronedream.reference_track.v1",
-                    "reference_track": reference_track,
-                },
-                evaluation_start_index=metrics["raw_metric_json"].get("evaluation_start_index"),
-                evaluation_end_index=metrics["raw_metric_json"].get("evaluation_end_index"),
+                reference_track_payload=reference_track_payload,
+                evaluation_start_index=(evaluation_window_evidence.start_index),
+                evaluation_end_index=(evaluation_window_evidence.end_index),
             )
             metrics["raw_metric_json"]["px4_core_metric_evidence"] = (
                 core_metric_evidence.model_dump(mode="json")

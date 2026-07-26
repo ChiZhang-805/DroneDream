@@ -29,6 +29,8 @@ from app.simulator.base import (
 )
 from app.simulator.px4_metric_evidence import (
     compile_px4_core_metric_evidence,
+    compile_px4_evaluation_window_evidence,
+    px4_evaluation_policy_from_environment,
 )
 from app.simulator.real_cli import (
     _MAX_KNOWN_JSON_ARTIFACT_BYTES,
@@ -82,6 +84,8 @@ def _write_result_simulator(script: Path, result: dict[str, object], *, exit_cod
 
 def _px4_metric_evidence(
     tmp_path: Path,
+    *,
+    offboard_timing_payload: dict[str, object] | None = None,
 ) -> tuple[
     dict[str, object],
     TrialMetricsPayload,
@@ -131,11 +135,28 @@ def _px4_metric_evidence(
         json.dumps(reference_payload),
         encoding="utf-8",
     )
+    timing_path = tmp_path / "offboard_timing.json"
+    if offboard_timing_payload is not None:
+        timing_path.write_text(
+            json.dumps(offboard_timing_payload),
+            encoding="utf-8",
+        )
+    evaluation_policy = px4_evaluation_policy_from_environment({})
+    evaluation_window_evidence = (
+        compile_px4_evaluation_window_evidence(
+            telemetry_payload=telemetry_payload,
+            reference_track_payload=reference_payload,
+            offboard_timing_payload=offboard_timing_payload,
+            policy=evaluation_policy,
+        )
+    )
     core_metric_evidence = compile_px4_core_metric_evidence(
         telemetry_payload=telemetry_payload,
         reference_track_payload=reference_payload,
-        evaluation_start_index=0,
-        evaluation_end_index=len(samples) - 1,
+        evaluation_start_index=(
+            evaluation_window_evidence.start_index
+        ),
+        evaluation_end_index=evaluation_window_evidence.end_index,
     )
     raw_metric_json = {
         "rmse_integration": "time_weighted_trapezoidal",
@@ -146,6 +167,40 @@ def _px4_metric_evidence(
         "telemetry_position_unit": contract.position_unit,
         "telemetry_time_unit": contract.time_unit,
         "telemetry_sampling": contract.sampling.model_dump(mode="json"),
+        "evaluation_window_source": (
+            evaluation_window_evidence.source
+        ),
+        "evaluation_window_raw_source": (
+            evaluation_window_evidence.raw_source
+        ),
+        "raw_track_start_t": (
+            evaluation_window_evidence.raw_start_time_s
+        ),
+        "raw_track_end_t": (
+            evaluation_window_evidence.raw_end_time_s
+        ),
+        "evaluation_start_reason": (
+            evaluation_window_evidence.start_reason
+        ),
+        "evaluation_trimmed_takeoff_samples": (
+            evaluation_window_evidence.trimmed_takeoff_samples
+        ),
+        "evaluation_trimmed_landing_samples": (
+            evaluation_window_evidence.trimmed_landing_samples
+        ),
+        "pass_thresholds": {
+            "rmse": evaluation_policy.pass_rmse_m,
+            "max_error": evaluation_policy.pass_max_error_m,
+            "min_track_coverage": (
+                evaluation_policy.minimum_track_coverage
+            ),
+        },
+        "evaluation_policy": evaluation_policy.model_dump(
+            mode="json"
+        ),
+        "evaluation_window_evidence": (
+            evaluation_window_evidence.model_dump(mode="json")
+        ),
         "evaluation_start_index": (
             core_metric_evidence.evaluation_start_index
         ),
@@ -205,6 +260,15 @@ def _px4_metric_evidence(
             mime_type="application/json",
         ),
     ]
+    if offboard_timing_payload is not None:
+        artifacts.append(
+            ArtifactMetadata(
+                artifact_type="offboard_timing_json",
+                display_name="offboard timing",
+                storage_path=str(timing_path),
+                mime_type="application/json",
+            )
+        )
     raw = {
         "success": True,
         "backend": "px4_gazebo",
@@ -854,7 +918,7 @@ def test_px4_metric_evidence_rejects_reference_track_mutation(
 
     with pytest.raises(
         ValueError,
-        match="top-level metrics do not match independently compiled",
+        match="evaluation window or policy",
     ):
         _require_px4_metric_evidence(
             raw,
@@ -888,7 +952,78 @@ def test_px4_metric_evidence_rejects_evaluation_window_mutation(
 
     with pytest.raises(
         ValueError,
-        match="independently compiled core evidence",
+        match="evaluation window or policy",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_metric_evidence_rejects_worker_policy_divergence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    monkeypatch.setenv("PX4_GAZEBO_PASS_RMSE", "0.123")
+
+    with pytest.raises(
+        ValueError,
+        match="evaluation window or policy",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_metric_evidence_rejects_window_evidence_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    evidence = metrics.raw_metric_json["evaluation_window_evidence"]
+    assert isinstance(evidence, dict)
+    evidence["start_reason"] = "forged_window"
+
+    with pytest.raises(
+        ValueError,
+        match="evaluation window or policy",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_metric_evidence_rejects_offboard_timing_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(
+        tmp_path,
+        offboard_timing_payload={
+            "track_start_t": 0.1,
+            "track_end_t": 1.8,
+            "time_base": "executor_relative_seconds",
+        },
+    )
+    timing_path = Path(artifacts[-1].storage_path)
+    timing_path.write_text(
+        json.dumps(
+            {
+                "track_start_t": 0.5,
+                "track_end_t": 1.5,
+                "time_base": "executor_relative_seconds",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="evaluation window or policy",
     ):
         _require_px4_metric_evidence(
             raw,
