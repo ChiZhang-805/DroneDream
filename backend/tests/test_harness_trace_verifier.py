@@ -13,8 +13,8 @@ from app.orchestration.decision_harness import (
 )
 from app.orchestration.harness_context import (
     HARNESS_EVIDENCE_SCHEMA_VERSION,
-    HARNESS_TOOL_REGISTRY,
     HARNESS_TOOL_REGISTRY_VERSION,
+    eligible_harness_tools,
     provider_tool_manifest,
 )
 from app.orchestration.harness_evaluation import (
@@ -47,14 +47,15 @@ def _valid_trace() -> dict[str, object]:
     corpus = Path(__file__).parent / "fixtures" / "harness_routing_eval_v1.jsonl"
     snapshot = compile_routing_eval_snapshot(load_routing_eval_cases(corpus)[0])
     evidence = snapshot.model_dump(mode="json", exclude_none=True)
-    manifest = provider_tool_manifest()
+    allowed_tools = eligible_harness_tools(snapshot)
+    manifest = provider_tool_manifest(allowed_tools)
     system, user = build_decision_messages(snapshot, tool_manifest=manifest)
     return {
         "trace_schema_version": HARNESS_DECISION_TRACE_SCHEMA_VERSION,
         "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
         "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
         "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
-        "allowed_tools": list(HARNESS_TOOL_REGISTRY),
+        "allowed_tools": list(allowed_tools),
         "evidence_snapshot": evidence,
         "evidence_sha256": _sha256(_canonical_json(evidence)),
         "tool_manifest": manifest,

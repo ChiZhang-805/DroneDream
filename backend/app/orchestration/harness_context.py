@@ -17,6 +17,11 @@ from typing import Literal, TypeAlias, cast
 from pydantic import BaseModel, ConfigDict, Field
 
 from app import models, schemas
+from app.optimization.outcome_taxonomy import (
+    classify_trial_outcome,
+    is_optimizer_learning_failure,
+    is_optimizer_learning_outcome,
+)
 from app.optimization.scenarios import scenario_matrix
 from app.parameters import get_parameter
 
@@ -34,8 +39,8 @@ HarnessSourceType = Literal["baseline", "optimizer", "llm_optimizer", "unknown"]
 HarnessObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom", "unknown"]
 HarnessTrackType = Literal["circle", "u_turn", "lemniscate", "custom", "unknown"]
 
-HARNESS_EVIDENCE_SCHEMA_VERSION = "2.3"
-HARNESS_TOOL_REGISTRY_VERSION = "2.0"
+HARNESS_EVIDENCE_SCHEMA_VERSION = "2.4"
+HARNESS_TOOL_REGISTRY_VERSION = "2.1"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
 MAX_GENERATION_TREND_ITEMS = 32
@@ -63,18 +68,11 @@ _ALLOWED_METRICS = (
     "max_error",
     "max_error_worst",
     "completion_time",
-    "completion_rate",
-    "failure_rate",
-    "pass_rate",
-    "training_completion_rate",
-    "training_failure_rate",
-    "training_pass_rate",
     "aggregated_score",
     "scalar_loss",
     "feasible",
     "total_constraint_violation",
-    "invalid_metric_count",
-    "cancelled_trial_count",
+    "optimizer_learning_failure_rate",
 )
 _ALLOWED_EXECUTION_STATUSES = frozenset(
     {
@@ -335,7 +333,7 @@ class HarnessJobEvidence(_ClosedModel):
 
 
 class HarnessEvidenceSnapshot(_ClosedModel):
-    schema_version: Literal["2.3"] = "2.3"
+    schema_version: Literal["2.4"] = "2.4"
     job: HarnessJobEvidence
     budget: HarnessBudgetEvidence
     scenarios: HarnessScenarioEvidence
@@ -395,6 +393,9 @@ def _candidate_evidence(
         compiled = _safe_metric(aggregate.get(key))
         if compiled is not None:
             allowed_metrics[key] = compiled
+    trial_count, completed_trial_count, failed_trial_count = _candidate_optimizer_learning_counts(
+        candidate
+    )
     return HarnessCandidateEvidence(
         generation=max(0, int(candidate.generation_index or 0)),
         source_type=cast(
@@ -408,9 +409,9 @@ def _candidate_evidence(
         is_baseline=bool(candidate.is_baseline),
         aggregated_score=_finite(candidate.aggregated_score),
         metrics=allowed_metrics,
-        trial_count=max(0, int(candidate.trial_count or 0)),
-        completed_trial_count=max(0, int(candidate.completed_trial_count or 0)),
-        failed_trial_count=max(0, int(candidate.failed_trial_count or 0)),
+        trial_count=trial_count,
+        completed_trial_count=completed_trial_count,
+        failed_trial_count=failed_trial_count,
     )
 
 
@@ -480,10 +481,47 @@ def _scenario_evidence(job: models.Job) -> HarnessScenarioEvidence:
 
 
 def _candidate_complete(candidate: models.CandidateParameterSet) -> bool:
-    trial_count = max(0, int(candidate.trial_count or 0))
-    completed = max(0, int(candidate.completed_trial_count or 0))
-    failed = max(0, int(candidate.failed_trial_count or 0))
-    return trial_count > 0 and completed + failed == trial_count
+    return _finite(candidate.aggregated_score) is not None
+
+
+def _candidate_optimizer_learning_counts(
+    candidate: models.CandidateParameterSet,
+) -> tuple[int, int, int]:
+    """Count only training outcomes allowed to shape parameter search.
+
+    Holdout, infrastructure, cancellation, and invalid-evidence Trials remain
+    available to deterministic completeness/health gates outside the provider
+    prompt. They cannot make an optimizer family or parameter region look bad
+    to the model router.
+    """
+
+    learning_count = 0
+    completed_count = 0
+    failed_count = 0
+    for trial in candidate.trials:
+        if bool((trial.scenario_config_json or {}).get("holdout")):
+            continue
+        metric = trial.metric
+        usable_metric = (
+            trial.status == "COMPLETED"
+            and metric is not None
+            and _finite(metric.rmse) is not None
+            and _finite(metric.max_error) is not None
+            and _finite(metric.completion_time) is not None
+        )
+        outcome_class = classify_trial_outcome(
+            status=trial.status,
+            failure_code=trial.failure_code,
+            usable_metric=usable_metric,
+        )
+        if not is_optimizer_learning_outcome(outcome_class):
+            continue
+        learning_count += 1
+        if outcome_class == "success":
+            completed_count += 1
+        elif is_optimizer_learning_failure(outcome_class):
+            failed_count += 1
+    return learning_count, completed_count, failed_count
 
 
 def _candidate_feasibility(
@@ -550,8 +588,9 @@ def _search_summary(
             *best_by_generation[-(MAX_GENERATION_TREND_ITEMS - 1) :],
         )
 
-    total_trials = sum(max(0, int(candidate.trial_count or 0)) for candidate in candidates)
-    failed_trials = sum(max(0, int(candidate.failed_trial_count or 0)) for candidate in candidates)
+    learning_counts = [_candidate_optimizer_learning_counts(candidate) for candidate in candidates]
+    total_trials = sum(counts[0] for counts in learning_counts)
+    failed_trials = sum(counts[2] for counts in learning_counts)
     completed_candidates = sum(1 for candidate in candidates if _candidate_complete(candidate))
     feasibility_observations = [
         value
@@ -637,10 +676,10 @@ def _tool_history(
                     1 for candidate in owned if _candidate_feasibility(candidate) is True
                 ),
                 total_trial_count=sum(
-                    max(0, int(candidate.trial_count or 0)) for candidate in owned
+                    _candidate_optimizer_learning_counts(candidate)[0] for candidate in owned
                 ),
                 failed_trial_count=sum(
-                    max(0, int(candidate.failed_trial_count or 0)) for candidate in owned
+                    _candidate_optimizer_learning_counts(candidate)[2] for candidate in owned
                 ),
                 best_score=min(scores, default=None),
                 last_generation=max(
@@ -876,13 +915,53 @@ def build_harness_evidence(
     return snapshot, has_scored_evidence
 
 
-def provider_tool_manifest() -> dict[str, object]:
+def eligible_harness_tools(
+    snapshot: HarnessEvidenceSnapshot,
+) -> tuple[HarnessToolId, ...]:
+    """Derive the context-compatible closed tool subset.
+
+    This is a capability/precondition gate, not a performance heuristic. The
+    model may choose only tools whose minimum evidence and problem-shape
+    requirements are already present; the general CMA-ES and deterministic
+    portfolio remain available in every state.
+    """
+
+    eligible: set[HarnessToolId] = {"cma_es", "optimizer_portfolio"}
+    if snapshot.job.constraint_count > 0 or snapshot.job.objective_count > 1:
+        eligible.add("constrained_mobo")
+    if snapshot.scenarios.training_replicate_count > 1:
+        eligible.add("multi_fidelity_mobo")
+    if snapshot.search.scored_candidate_count >= 4 and snapshot.search.feasible_candidate_count > 0:
+        eligible.add("turbo")
+    if snapshot.job.parameter_count >= 12:
+        eligible.add("saasbo")
+    if snapshot.search.scored_candidate_count >= 6:
+        eligible.add("surrogate_cma_es")
+    if snapshot.budget.current_generation >= 2 and (
+        snapshot.search.scored_candidate_count >= 6
+        or snapshot.search.trailing_stagnant_generations >= 2
+    ):
+        eligible.add("bipop_cma_es")
+    return tuple(tool_id for tool_id in HARNESS_TOOL_DEFINITIONS if tool_id in eligible)
+
+
+def provider_tool_manifest(
+    allowed_tools: Iterable[HarnessToolId] | None = None,
+) -> dict[str, object]:
     """Return the deterministic versioned tool manifest shown to the model."""
+
+    selected = (
+        tuple(HARNESS_TOOL_DEFINITIONS)
+        if allowed_tools is None
+        else tuple(dict.fromkeys(allowed_tools))
+    )
+    if not selected or any(tool_id not in HARNESS_TOOL_DEFINITIONS for tool_id in selected):
+        raise ValueError("provider tool manifest requires known allowed tools")
 
     return {
         "registry_version": HARNESS_TOOL_REGISTRY_VERSION,
         "tools": [
-            definition.model_dump(mode="json") for definition in HARNESS_TOOL_DEFINITIONS.values()
+            HARNESS_TOOL_DEFINITIONS[tool_id].model_dump(mode="json") for tool_id in selected
         ],
     }
 
@@ -897,5 +976,6 @@ __all__ = [
     "HarnessEvidenceSnapshot",
     "HarnessToolId",
     "build_harness_evidence",
+    "eligible_harness_tools",
     "provider_tool_manifest",
 ]

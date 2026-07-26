@@ -12,6 +12,7 @@ from app.orchestration.decision_harness import build_decision_messages
 from app.orchestration.harness_context import (
     HARNESS_TOOL_DEFINITIONS,
     HarnessToolId,
+    eligible_harness_tools,
 )
 from app.orchestration.harness_evaluation import (
     build_routing_eval_report,
@@ -26,6 +27,9 @@ from app.orchestration.harness_evaluation import (
 )
 
 CORPUS = Path(__file__).parent / "fixtures" / "harness_routing_eval_v1.jsonl"
+FROZEN_GPT_4_1 = (
+    Path(__file__).parents[1] / "evaluation_artifacts" / "harness-routing-gpt-4.1-2025-04-14.json"
+)
 
 
 def test_routing_eval_corpus_is_broad_unique_and_schema_valid() -> None:
@@ -45,6 +49,8 @@ def test_routing_eval_corpus_is_broad_unique_and_schema_valid() -> None:
     }
     for case in cases:
         assert set(case.acceptable_tools) <= set(HARNESS_TOOL_DEFINITIONS)
+        eligible = set(eligible_harness_tools(compile_routing_eval_snapshot(case)))
+        assert set(case.acceptable_tools) & eligible
 
 
 def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> None:
@@ -53,15 +59,19 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
     for case in cases:
         snapshot = compile_routing_eval_snapshot(case)
         system, user = build_decision_messages(snapshot)
-        assert snapshot.schema_version == "2.3"
+        assert snapshot.schema_version == "2.4"
         assert case.case_id not in system
         assert case.case_id not in user
         assert case.rationale not in system
         assert case.rationale not in user
         assert "acceptable_tools" not in user
         assert '"case_id"' not in user
-        assert '"registry_version":"2.0"' in user
-        assert '"schema_version":"2.3"' in user
+        assert '"registry_version":"2.1"' in user
+        assert '"schema_version":"2.4"' in user
+        payload = json.loads(user)
+        assert tuple(
+            tool["tool_id"] for tool in payload["tool_manifest"]["tools"]
+        ) == eligible_harness_tools(snapshot)
 
 
 def test_routing_eval_grades_complete_predictions_by_category() -> None:
@@ -106,17 +116,12 @@ def test_routing_eval_reports_non_adaptive_baselines_and_prediction_lift() -> No
     assert report.qualification.failed_requirements == ()
 
     constant_predictions = {
-        case.case_id: cast(HarnessToolId, "optimizer_portfolio")
-        for case in cases
+        case.case_id: cast(HarnessToolId, "optimizer_portfolio") for case in cases
     }
     constant_report = build_routing_eval_report(cases, constant_predictions)
     assert constant_report.qualification.qualified is False
-    assert "overall_pass_rate" in (
-        constant_report.qualification.failed_requirements
-    )
-    assert "lift_over_best_constant" in (
-        constant_report.qualification.failed_requirements
-    )
+    assert "overall_pass_rate" in (constant_report.qualification.failed_requirements)
+    assert "lift_over_best_constant" in (constant_report.qualification.failed_requirements)
     assert any(
         requirement.startswith("category_pass_rate:")
         for requirement in constant_report.qualification.failed_requirements
@@ -142,9 +147,9 @@ def test_prediction_artifact_binds_corpus_prompts_versions_and_model(
         "schema_version": "1.0",
         "corpus_sha256": routing_corpus_sha256(cases),
         "prompt_suite_sha256": routing_prompt_suite_sha256(cases),
-        "evidence_schema_version": "2.3",
-        "tool_registry_version": "2.0",
-        "prompt_template_version": "1.0",
+        "evidence_schema_version": "2.4",
+        "tool_registry_version": "2.1",
+        "prompt_template_version": "1.1",
         "provider": "openai",
         "model_snapshot": "gpt-test-snapshot",
         "generation_config": {
@@ -186,6 +191,20 @@ def test_prediction_artifact_binds_corpus_prompts_versions_and_model(
         load_routing_prediction_artifact(artifact_path, cases)
 
 
+def test_committed_online_provider_freeze_matches_current_contract() -> None:
+    cases = load_routing_eval_cases(CORPUS)
+
+    artifact = load_routing_prediction_artifact(FROZEN_GPT_4_1, cases)
+    report = grade_routing_prediction_artifact(artifact, cases)
+
+    assert artifact.provider == "openai"
+    assert artifact.model_snapshot == "gpt-4.1-2025-04-14"
+    assert report.predictions.passed_count == 24
+    assert report.predictions.pass_rate == 1.0
+    assert report.qualification.qualified is True
+    assert report.qualification.failed_requirements == ()
+
+
 def test_routing_eval_compiler_preserves_decision_signals() -> None:
     cases = {case.case_id: case for case in load_routing_eval_cases(CORPUS)}
     case = cases["tight_budget_multifidelity_history"]
@@ -207,10 +226,100 @@ def test_routing_eval_compiler_preserves_decision_signals() -> None:
     assert reflection.decision_memory[0].status == "search_space_exhausted"
     assert reflection.decision_memory[0].dispatched_candidates == 0
 
-    no_feasible = compile_routing_eval_snapshot(
-        cases["constraint_pressure_no_feasible_points"]
-    )
+    no_feasible = compile_routing_eval_snapshot(cases["constraint_pressure_no_feasible_points"])
     assert no_feasible.search.best_score == pytest.approx(1.0)
     assert no_feasible.search.relative_improvement_from_baseline == pytest.approx(0.0)
     assert no_feasible.search.feasibility_observed_candidate_count == 16
     assert no_feasible.search.feasible_candidate_rate == pytest.approx(0.0)
+
+
+def test_tool_eligibility_changes_only_at_explicit_precondition_boundaries() -> None:
+    cases = load_routing_eval_cases(CORPUS)
+    base = compile_routing_eval_snapshot(cases[0])
+
+    def tools(**updates: object) -> set[HarnessToolId]:
+        snapshot = base.model_copy(
+            update={
+                "job": base.job.model_copy(
+                    update={
+                        "parameter_count": 11,
+                        "objective_count": 1,
+                        "constraint_count": 0,
+                    }
+                ),
+                "budget": base.budget.model_copy(update={"current_generation": 0}),
+                "scenarios": base.scenarios.model_copy(update={"training_replicate_count": 1}),
+                "search": base.search.model_copy(
+                    update={
+                        "scored_candidate_count": 3,
+                        "feasible_candidate_count": 1,
+                        "trailing_stagnant_generations": 0,
+                    }
+                ),
+                **updates,
+            }
+        )
+        return set(eligible_harness_tools(snapshot))
+
+    assert "saasbo" not in tools()
+    assert "saasbo" in tools(
+        job=base.job.model_copy(
+            update={
+                "parameter_count": 12,
+                "objective_count": 1,
+                "constraint_count": 0,
+            }
+        )
+    )
+    assert "constrained_mobo" in tools(
+        job=base.job.model_copy(
+            update={
+                "parameter_count": 11,
+                "objective_count": 1,
+                "constraint_count": 1,
+            }
+        )
+    )
+    assert "multi_fidelity_mobo" in tools(
+        scenarios=base.scenarios.model_copy(update={"training_replicate_count": 2})
+    )
+    assert "turbo" not in tools()
+    assert "turbo" in tools(
+        search=base.search.model_copy(
+            update={
+                "scored_candidate_count": 4,
+                "feasible_candidate_count": 1,
+                "trailing_stagnant_generations": 0,
+            }
+        )
+    )
+    assert "surrogate_cma_es" not in tools()
+    assert "surrogate_cma_es" in tools(
+        search=base.search.model_copy(
+            update={
+                "scored_candidate_count": 6,
+                "feasible_candidate_count": 1,
+                "trailing_stagnant_generations": 0,
+            }
+        )
+    )
+    assert "bipop_cma_es" not in tools(
+        budget=base.budget.model_copy(update={"current_generation": 1}),
+        search=base.search.model_copy(
+            update={
+                "scored_candidate_count": 3,
+                "feasible_candidate_count": 1,
+                "trailing_stagnant_generations": 2,
+            }
+        ),
+    )
+    assert "bipop_cma_es" in tools(
+        budget=base.budget.model_copy(update={"current_generation": 2}),
+        search=base.search.model_copy(
+            update={
+                "scored_candidate_count": 3,
+                "feasible_candidate_count": 1,
+                "trailing_stagnant_generations": 2,
+            }
+        ),
+    )

@@ -1,6 +1,6 @@
 # LLM Tool-Orchestrated Optimization Harness
 
-Status: approved target design; compatibility execution slice and evidence-v2 router diagnostics implemented, hardened target gated<br>
+Status: approved target design; compatibility execution slice, trusted Evidence 2.4 routing gate, and frozen online-provider campaign runner implemented; hardened target gated<br>
 Audience: backend, optimization, simulation, security, evaluation, and course-review stakeholders<br>
 Scope: DroneDream's automated PX4/Gazebo tuning loop<br>
 Last reviewed: 2026-07-26
@@ -8066,7 +8066,7 @@ the decision module. This is an incremental implementation step toward the targe
 control plane, not a claim that the immutable evidence-v3 or decision-ledger design
 is complete.
 
-The implemented evidence-v2 compiler:
+The implemented evidence compiler:
 
 - exposes remaining generations and Trials, per-Candidate Trial cost, parameter
   dimension, objective/constraint counts, and trusted catalog parameter names;
@@ -8075,11 +8075,16 @@ The implemented evidence-v2 compiler:
   used by the dispatcher, including enabled training and holdout seed rows;
 - summarizes training and validation scenario/replicate counts without sending
   scenario IDs, seeds, arbitrary case configuration, or sealed-test material;
-- computes completed/incomplete/feasible Candidate counts, measured failure rate,
-  baseline-relative improvement, per-generation best score, and trailing stagnation;
-- exposes only trusted training-side completion/failure/pass rates, scalar loss,
-  invalid/cancelled Trial counts, feasibility observation coverage, completed
-  Candidate rate, and best-to-runner-up score gaps;
+- computes completed/incomplete/feasible Candidate counts, optimizer-learning
+  failure rate, baseline-relative improvement, per-generation best score, and
+  trailing stagnation;
+- exposes only trusted training-side scalar loss, optimizer-learning failure
+  rate, feasibility observation coverage, completed Candidate rate, and
+  best-to-runner-up score gaps;
+- derives provider-visible Trial counts from the closed outcome taxonomy, so
+  infrastructure, cancellation, invalid evidence, and holdout outcomes remain
+  authoritative completion/acceptance failures without contaminating tool
+  routing or parameter-region learning;
 - never exposes holdout status, feasibility, objective/constraint values, error
   text, or validation metrics to the adaptive router, preserving the validation
   firewall across generations;
@@ -8097,10 +8102,13 @@ The implemented evidence-v2 compiler:
 - rejects mappings, strings, labels, free-form diagnostics, proposal rationale,
   errors, Candidate IDs, parameter values, arbitrary JSON, and mixed numeric/text
   metric arrays at the prompt boundary;
-- uses `evidence_schema_version=2.3` and `tool_registry_version=2.0` in capability
+- uses `evidence_schema_version=2.4` and `tool_registry_version=2.1` in capability
   discovery and decision/tool-execution events; and
-- presents a richer static tool manifest with explicit search roles, applicability
-  signals, and declared constraint, multi-objective, and multi-fidelity support.
+- derives a per-snapshot eligible-tool manifest from explicit minimum
+  preconditions for dimension, constraints/objectives, scenario replication,
+  scored/feasible evidence, generation, and stagnation. The strict response
+  schema contains only that subset, and local validation independently rejects
+  a registered but context-ineligible tool.
 
 The Harness dispatcher now performs a deterministic feasibility preflight before
 contacting a provider. If the next generation exceeds `max_iterations`, or the
@@ -8129,6 +8137,12 @@ prompt-suite SHA-256, Evidence/Tool/Prompt versions, provider, model snapshot,
 sampling configuration, every selected tool, and its bounded rationale. The
 loader rejects stale versions, mismatched hashes, missing/extra cases, or an
 unstructured prediction file before grading.
+`backend/scripts/run_harness_routing_campaign.py` executes all cases against an
+online provider with the exact production messages and per-case eligible-tool
+schema. Credentials are environment-only; provider exception bodies are not
+persisted; any request or validation failure aborts before output. Only a
+complete locally validated Artifact is atomically linked into its final path,
+and an existing frozen output cannot be replaced.
 Tests prove that case IDs, acceptable answers, grader rationale, scenario IDs,
 scenario configuration, seeds, and injected text do not enter those messages.
 Byte-invariance tests additionally prove that changing only untrusted display names,
@@ -8142,11 +8156,12 @@ The execution-memory query deliberately avoids loading the mutable SQLAlchemy
 hiding decision events written later in the turn.
 
 For provider calls, `harness_decision_started` now persists the complete bounded,
-provider-safe Evidence 2.3 snapshot and static Tool Manifest 2.0 alongside their
-SHA-256 values, the production prompt SHA-256, Prompt Template 1.0, and Decision
-Trace 1.0 versions. `verify_harness_decision_trace()` validates the closed evidence
+provider-safe Evidence 2.4 snapshot and context-eligible Tool Manifest 2.1 alongside
+their SHA-256 values, the production prompt SHA-256, Prompt Template 1.1, and Decision
+Trace 1.1 versions. `verify_harness_decision_trace()` validates the closed evidence
 schema, rebuilds the exact production messages from the persisted snapshot and
-manifest, and checks all three hashes. Tests demonstrate that a one-field evidence
+manifest, independently recompiles the eligible tool set, and checks all three
+hashes. Tests demonstrate that a one-field evidence
 mutation invalidates both the evidence and prompt hashes. This supplies
 same-version reproducibility and accidental-corruption detection; it is not a
 signature, append-only log, or proof against an actor who can rewrite the mutable
@@ -8161,7 +8176,7 @@ or current-version-incompatible trace.
 This corpus is deliberately a development diagnostic, not the confirmatory
 simulator campaign in Section 22. It detects prompt/tool discrimination regressions
 and enables matched model comparisons, but it does not prove that an LLM router beats
-the deterministic portfolio. Provider/model evaluation, blocked simulator campaigns,
+the deterministic portfolio. Frozen provider/model artifacts, blocked simulator campaigns,
 the locked test bank, immutable decision/model/tool ledgers, and evidence-v3 remain
 required before that stronger claim.
 
@@ -8548,26 +8563,40 @@ Current focused validation:
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-893 passed
+900 passed
 
 Focused PX4 evidence, trusted taxonomy, optimizer-learning, and GPT prompt
 regression: 312 passed. Runtime contracts: 48 tests passed with 4 expected
 Windows skips for POSIX/WSL-only secure ULog deletion.
+
+Focused Harness context, dynamic eligibility, trace, provider-campaign, and
+capability regression: 55 passed.
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 
 24 cases; 8 categories; 8 registered tools
 uniform-random expectation: 5.625/24 (23.4375%)
 best constant tool: optimizer_portfolio, 14/24 (58.3333%)
-current provider-call traces: Evidence 2.3, Tool Manifest 2.0,
-Prompt Template 1.0, Decision Trace 1.0
+current provider-call traces: Evidence 2.4, Tool Manifest 2.1,
+Prompt Template 1.1, Decision Trace 1.1
 strict offline predictions: Prediction Artifact 1.0 bound to the printed
 corpus_sha256 and prompt_suite_sha256
 current corpus_sha256:
 4968b0a9639d59474c00402dcd261a241377bdb57a6273554f4d6ad0d1172625
 current prompt_suite_sha256:
-38ef54d3a42700bb447fd3708588b008f3340e9170f5e16aa17ef79bf84962e5
+d300d0516378974fb57be896b155ef1a537278594b03c0ecbdceff9ade26dc59
 ```
+
+The first complete online-provider freeze used
+`gpt-4.1-2025-04-14` with native strict JSON Schema and no requested
+temperature, top-p, or seed override. Independent reload and grading produced
+24/24 acceptable decisions, 3/3 in every category, a 41.67-point lift over
+the best constant policy, and `qualified=true`. The 12,829-byte Prediction
+Artifact SHA-256 is
+`8a6531580243f1fa1493f68570b01e965231995f6b754290aca9d6f285d4575b`.
+This proves the current model/prompt/tool gate can discriminate the development
+cases; it does not prove lower final simulation loss or replace a blocked,
+budget-matched simulator campaign.
 
 ## 31. Reference index
 

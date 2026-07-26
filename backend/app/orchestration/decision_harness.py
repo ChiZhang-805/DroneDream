@@ -30,6 +30,7 @@ from app.orchestration.harness_context import (
     HarnessEvidenceSnapshot,
     HarnessToolId,
     build_harness_evidence,
+    eligible_harness_tools,
     provider_tool_manifest,
 )
 from app.orchestration.llm_parameter_proposer import (
@@ -46,32 +47,46 @@ HarnessDecisionSource = Literal["model", "deterministic_fallback"]
 _DEFAULT_MODEL = "gpt-4.1"
 _FALLBACK_TOOL: HarnessToolId = "optimizer_portfolio"
 _MAX_RATIONALE_LENGTH = 400
-HARNESS_PROMPT_TEMPLATE_VERSION = "1.0"
-HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.0"
+HARNESS_PROMPT_TEMPLATE_VERSION = "1.1"
+HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.1"
 
-_DECISION_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": ["decision"],
-    "properties": {
-        "decision": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["tool_id", "rationale"],
-            "properties": {
-                "tool_id": {
-                    "type": "string",
-                    "enum": list(HARNESS_TOOL_REGISTRY),
+
+def _decision_schema(
+    allowed_tools: tuple[HarnessToolId, ...],
+) -> dict[str, Any]:
+    if not allowed_tools:
+        raise ValueError("Harness decision schema requires an allowed tool")
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["decision"],
+        "properties": {
+            "decision": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["tool_id", "rationale"],
+                "properties": {
+                    "tool_id": {
+                        "type": "string",
+                        "enum": list(allowed_tools),
+                    },
+                    "rationale": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": _MAX_RATIONALE_LENGTH,
+                    },
                 },
-                "rationale": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": _MAX_RATIONALE_LENGTH,
-                },
-            },
-        }
-    },
-}
+            }
+        },
+    }
+
+
+def decision_schema_for_snapshot(
+    snapshot: HarnessEvidenceSnapshot,
+) -> dict[str, Any]:
+    """Return the exact closed response schema for one evidence snapshot."""
+
+    return _decision_schema(eligible_harness_tools(snapshot))
 
 
 @dataclass(frozen=True)
@@ -115,7 +130,11 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _validate_response(raw: object) -> tuple[HarnessToolId, str] | None:
+def _validate_response(
+    raw: object,
+    *,
+    allowed_tools: tuple[HarnessToolId, ...],
+) -> tuple[HarnessToolId, str] | None:
     if not isinstance(raw, dict) or set(raw) != {"decision"}:
         return None
     decision = raw.get("decision")
@@ -123,11 +142,23 @@ def _validate_response(raw: object) -> tuple[HarnessToolId, str] | None:
         return None
     tool_id = decision.get("tool_id")
     rationale = decision.get("rationale")
-    if tool_id not in HARNESS_TOOL_REGISTRY:
+    if tool_id not in allowed_tools:
         return None
     if not isinstance(rationale, str) or not 1 <= len(rationale.strip()) <= _MAX_RATIONALE_LENGTH:
         return None
     return tool_id, rationale.strip()
+
+
+def validate_harness_decision_response(
+    raw: object,
+    snapshot: HarnessEvidenceSnapshot,
+) -> tuple[HarnessToolId, str] | None:
+    """Validate a provider response against the snapshot-specific tool gate."""
+
+    return _validate_response(
+        raw,
+        allowed_tools=eligible_harness_tools(snapshot),
+    )
 
 
 def build_decision_messages(
@@ -145,14 +176,17 @@ def build_decision_messages(
         "You are DroneDream's bounded optimization planner. Select exactly one "
         "optimizer tool from the supplied closed, versioned registry for the next "
         "generation. Compare remaining budget, parameter dimension, scenario cost, "
-        "feasibility, failure rate, improvement trend, stagnation, and prior tool "
+        "feasibility, optimizer-learning failure rate, improvement trend, "
+        "stagnation, and prior tool "
         "outcomes. Use only the supplied evidence. You cannot run tools, change "
         "constraints, modify budgets, access credentials, or invent additional "
         "tool IDs. Return only JSON that conforms to the required schema."
     )
     user_payload = {
         "tool_manifest": (
-            provider_tool_manifest() if tool_manifest is None else tool_manifest
+            provider_tool_manifest(eligible_harness_tools(evidence_snapshot))
+            if tool_manifest is None
+            else tool_manifest
         ),
         "evidence": evidence_snapshot.model_dump(mode="json", exclude_none=True),
         "instructions": (
@@ -194,19 +228,16 @@ def verify_harness_decision_trace(
     computed_evidence_sha256: str | None = None
     if snapshot is not None:
         computed_evidence_sha256 = _sha256_text(
-            _canonical_json(
-                snapshot.model_dump(mode="json", exclude_none=True)
-            )
+            _canonical_json(snapshot.model_dump(mode="json", exclude_none=True))
         )
         if payload.get("evidence_schema_version") != snapshot.schema_version:
             failures.append("evidence_schema_version_mismatch")
         if payload.get("evidence_sha256") != computed_evidence_sha256:
             failures.append("evidence_sha256_mismatch")
+    expected_allowed_tools = eligible_harness_tools(snapshot) if snapshot is not None else None
 
     raw_manifest = payload.get("tool_manifest")
-    manifest: dict[str, object] | None = (
-        raw_manifest if isinstance(raw_manifest, dict) else None
-    )
+    manifest: dict[str, object] | None = raw_manifest if isinstance(raw_manifest, dict) else None
     if manifest is None:
         failures.append("invalid_tool_manifest")
     computed_manifest_sha256: str | None = None
@@ -219,11 +250,18 @@ def verify_harness_decision_trace(
         else:
             if payload.get("tool_manifest_sha256") != computed_manifest_sha256:
                 failures.append("tool_manifest_sha256_mismatch")
-            if manifest != provider_tool_manifest():
+            expected_manifest = (
+                provider_tool_manifest(expected_allowed_tools)
+                if expected_allowed_tools is not None
+                else None
+            )
+            if expected_manifest is None or manifest != expected_manifest:
                 failures.append("tool_manifest_version_mismatch")
     if payload.get("tool_registry_version") != HARNESS_TOOL_REGISTRY_VERSION:
         failures.append("tool_registry_version_mismatch")
-    if payload.get("allowed_tools") != list(HARNESS_TOOL_REGISTRY):
+    if expected_allowed_tools is None or payload.get("allowed_tools") != list(
+        expected_allowed_tools
+    ):
         failures.append("allowed_tools_mismatch")
 
     computed_prompt_sha256: str | None = None
@@ -355,7 +393,8 @@ def select_optimizer_tool(
             model=chosen_model,
         )
 
-    tool_manifest = provider_tool_manifest()
+    allowed_tools = eligible_harness_tools(evidence_snapshot)
+    tool_manifest = provider_tool_manifest(allowed_tools)
     system, user = build_decision_messages(
         evidence_snapshot,
         tool_manifest=tool_manifest,
@@ -385,7 +424,7 @@ def select_optimizer_tool(
             )
         effective_client = OpenAIJsonClient(
             api_key,
-            proposal_schema=_DECISION_SCHEMA,
+            proposal_schema=decision_schema_for_snapshot(evidence_snapshot),
             base_url=job.llm_base_url,
             timeout_seconds=settings.llm_request_timeout_seconds,
             max_retries=settings.llm_max_retries,
@@ -402,7 +441,7 @@ def select_optimizer_tool(
             "provider": provider,
             "evidence_sha256": evidence_sha256,
             "prompt_sha256": prompt_sha256,
-            "allowed_tools": list(HARNESS_TOOL_REGISTRY),
+            "allowed_tools": list(allowed_tools),
             "trace_schema_version": HARNESS_DECISION_TRACE_SCHEMA_VERSION,
             "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
             "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
@@ -430,7 +469,7 @@ def select_optimizer_tool(
             model=chosen_model,
         )
 
-    validated = _validate_response(raw)
+    validated = validate_harness_decision_response(raw, evidence_snapshot)
     if validated is None:
         return _fallback(
             db,
@@ -493,7 +532,9 @@ __all__ = [
     "HarnessDispatchStrategy",
     "as_experimental_strategy",
     "build_decision_messages",
+    "decision_schema_for_snapshot",
     "is_experimental_harness_tool",
     "select_optimizer_tool",
+    "validate_harness_decision_response",
     "verify_harness_decision_trace",
 ]

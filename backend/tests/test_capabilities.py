@@ -23,10 +23,10 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert data["features"]["llm_tool_harness"] == {
         "available": True,
         "decision_schema_version": "1.0",
-        "evidence_schema_version": "2.3",
-        "tool_registry_version": "2.0",
-        "prompt_template_version": "1.0",
-        "trace_schema_version": "1.0",
+        "evidence_schema_version": "2.4",
+        "tool_registry_version": "2.1",
+        "prompt_template_version": "1.1",
+        "trace_schema_version": "1.1",
         "tool_registry": "closed",
     }
     assert data["simulators"]["authoritative"] is False
@@ -76,9 +76,7 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     scenario_effects = real_cli["scenario_effect_contract"]
     assert scenario_effects["physically_applied"] == ["obstacles"]
     assert scenario_effects["obstacles"]["mechanism"] == "gazebo_entity_factory"
-    assert "probabilistic GPS dropout" in scenario_effects[
-        "requires_runtime_extension"
-    ]
+    assert "probabilistic GPS dropout" in scenario_effects["requires_runtime_extension"]
     assert real_cli["unverified_effect_passthrough_opt_in"] is True
     assert data["optimizers"]["items"]["gpt"]["ready"] is False
     assert data["optimizers"]["items"]["gpt"]["prompt_schema_version"] == "2.1"
@@ -89,9 +87,7 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
         "requires_user_api_key": True,
         "tool_registry": "closed",
         "fallback_strategy": "optimizer_portfolio",
-        "reason": (
-            "The API secret store is not configured for model-guided Harness jobs."
-        ),
+        "reason": ("The API secret store is not configured for model-guided Harness jobs."),
         "custom_base_url_allowlist_configured": False,
     }
     serialized = response.text
@@ -99,19 +95,14 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert "APP_SECRET_KEY" not in serialized
 
 
-def test_capabilities_treats_blank_secret_key_as_unconfigured(
-    client, monkeypatch
-) -> None:
+def test_capabilities_treats_blank_secret_key_as_unconfigured(client, monkeypatch) -> None:
     monkeypatch.setenv("APP_SECRET_KEY", "   ")
     monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
 
     data = client.get("/api/v1/capabilities").json()["data"]
 
     assert data["optimizers"]["items"]["gpt"]["ready"] is False
-    assert (
-        data["optimizers"]["items"]["gpt"]["status"]
-        == "server_secret_not_configured"
-    )
+    assert data["optimizers"]["items"]["gpt"]["status"] == "server_secret_not_configured"
 
 
 def test_capabilities_honors_global_override_and_configuration(
@@ -165,6 +156,7 @@ def test_capabilities_surfaces_invalid_worker_override(client, monkeypatch) -> N
     assert simulators["items"]["real_cli"]["status"] == "invalid_override"
     assert simulators["items"]["mock"]["ready"] is False
     assert simulators["items"]["real_cli"]["ready"] is False
+
 
 def test_capabilities_rejects_internal_real_stub_override(client, monkeypatch) -> None:
     monkeypatch.setenv("SIMULATOR_BACKEND", "real_stub")

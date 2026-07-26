@@ -558,5 +558,23 @@ Prediction Artifact 1.0 binds every offline result to canonical corpus and exact
 production-prompt hashes plus Evidence/Tool/Prompt versions, provider, model
 snapshot, sampling settings, selections, and rationales. Stale or incomplete
 artifacts are rejected before grading.
+
+Harness Evidence 2.4 and Tool Registry 2.1 add a deterministic precondition
+gate before routing. The model receives only tools compatible with the current
+parameter dimension, objective/constraint shape, scenario replication, scored
+evidence, feasibility coverage, generation, and stagnation state. A globally
+registered but context-ineligible selection fails closed to the deterministic
+portfolio. Provider-visible failure counts now use the same optimizer-learning
+taxonomy as Candidate ranking: infrastructure, cancellation, invalid evidence,
+and holdout outcomes cannot make a parameter region or optimizer family appear
+unsafe.
+
+`backend/scripts/run_harness_routing_campaign.py` runs the entire corpus through
+an online provider using the exact production prompt and per-case response
+schema. It accepts credentials only from the environment, redacts provider
+error bodies, validates every result locally, and publishes no output until all
+cases complete. The final Artifact is created atomically and cannot replace a
+prior freeze.
+
 It is a regression tool, not evidence that model routing outperforms the
 deterministic portfolio; that claim still requires the frozen simulator campaign.

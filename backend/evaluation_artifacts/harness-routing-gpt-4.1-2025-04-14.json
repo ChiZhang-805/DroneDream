@@ -1,0 +1,114 @@
+{
+  "corpus_sha256": "4968b0a9639d59474c00402dcd261a241377bdb57a6273554f4d6ad0d1172625",
+  "evidence_schema_version": "2.4",
+  "generation_config": {
+    "response_format": "json_schema",
+    "seed": null,
+    "temperature": null,
+    "top_p": null
+  },
+  "model_snapshot": "gpt-4.1-2025-04-14",
+  "predictions": {
+    "cold_start_four_parameters": {
+      "rationale": "There is no observed improvement over the baseline after 2 generations, with both candidates scoring 1.0 and zero failed trials out of 8 total. The scenario and budget do not currently indicate that multi-fidelity screening is needed. Since there is little trustworthy evidence favoring a particular specialized optimizer and minimal observed progress, the optimizer_portfolio is preferred for robust",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "cold_start_twelve_parameters": {
+      "rationale": "With only two generations completed and minimal performance history (relative improvement from baseline just 2% and no failed trials), there is insufficient evidence to determine which specialized optimizer would significantly outperform others. The parameter dimension is moderate (12), budget remaining is ample, and feasibility has yet to be consistently achieved (only 0.5 feasible candidate rate",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "cold_start_with_constraint_pressure": {
+      "rationale": "There is insufficient trustworthy candidate history (only 2 candidates, both generations show feasibility failures and mixed improvement), and no prior specialized optimizer outcomes to guide a focused choice. The optimizer_portfolio is preferred in such cases to robustly explore available families while maintaining budget efficiency, as supported by the instructions and tool manifest.",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "constraint_pressure_no_feasible_points": {
+      "rationale": "The evidence shows no feasible candidates identified (feasible_candidate_rate: 0.0) despite 16 completed candidates and a total failure rate of 0.35, with improvements measured only in infeasible solutions. Two candidates across generations 0 and 3 are included, but improvement is not robust and failure/constraint satisfaction remains unsolved. Multiple objectives (2) and 3 constraints must be met",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "constraint_pressure_sparse_feasible_region": {
+      "rationale": "The problem features 8 parameters, 4 constraints, 2 objectives (robust profile), and an observed low feasible candidate rate (8%), indicating that explicit constraint handling is critical. The only optimizer with demonstrated, feasible candidate discovery and improvement over baseline is constrained_mobo (score improved from 1.0 to 0.9 over generations 0 to 4). It completed 8 candidates with 2 of",
+      "selected_tool": "constrained_mobo"
+    },
+    "constraint_pressure_with_progress": {
+      "rationale": "Constrained Mobo is the best choice based on the evidence: There are explicit constraints (2) and multiple objectives (3, robust mean aggregation), and sufficient completed candidate history exists (28 candidates, 44 trials remaining). Constrained Mobo performed well previously (0.58 best score this generation, 8/12 feasible candidates, lowest observed failure rate among available tools), and the",
+      "selected_tool": "constrained_mobo"
+    },
+    "failure_recovery_constraints_improving": {
+      "rationale": "The scenario includes explicit constraints and a feasible (though low) portion of the candidate set (30% feasible). 'constrained_mobo' has already delivered measurable improvement (relative improvement 0.3 from baseline), and is designed for constraint-aware search. Multi-fidelity or surrogate-driven search is not clearly supported by scenario cost or observed tool outcomes, nor has stagnation or",
+      "selected_tool": "constrained_mobo"
+    },
+    "failure_recovery_high_rate": {
+      "rationale": "The available evidence shows only two feasible candidates out of 20 (10% feasibility), a high overall failure rate (70%), and only a modest improvement from baseline (aggregate score from 1.0 to 0.95, approximately 5%). With only two feasible, completed candidates and no sustained improvement or clear progress trend, there is insufficient evidence for confident specialization. No recent stagnation",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "failure_recovery_turbo_failures": {
+      "rationale": "There are two trailing stagnant generations, with no improvement beyond a candidate score of 0.88, while failure rate is high (62%) and observed feasibility remains low (4/26 feasible candidates). \"bipop_cma_es\" is best when escaping local basins or addressing stagnation is needed, as is the case here. The last tool, \"turbo,\" has been marked 'search_space_exhausted' and produced no further gains.",
+      "selected_tool": "bipop_cma_es"
+    },
+    "high_dimension_coldish_history": {
+      "rationale": "With only 2 distinct generations evaluated, a single feasible, non-baseline optimizer tried, and no trial failures or stagnation, there is insufficient trustworthy evidence to support specialization. The parameter dimension (48) is moderately high, but without clear progress trends or area lock-in, the balanced deterministic optimizer_portfolio best ensures continued robust progress across all key",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "high_dimension_sparse_axes_24": {
+      "rationale": "There is little trustworthy optimizer-specific history—only two candidate generations (including only one optimizer-proposed candidate), and all optimizers have zero failure rate so far. The high parameter count (24) and robust (mean) objective profile suggest the problem could benefit from both exploration and exploitation, but there is no direct evidence supporting a specialized method (e.g., no",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "high_dimension_sparse_history_wins": {
+      "rationale": "The problem has high parameter dimension (36), and recent history demonstrates that saasbo achieved a robust improvement (best score 0.49 vs. baseline 1.0, a 51% relative improvement). The feasible candidate rate (0.625) is satisfactory and the failure rate is low. Local exploitation (turbo) achieved only 0.68, worse than saasbo. There is no observed stagnation, trials are well within budget (80/4",
+      "selected_tool": "saasbo"
+    },
+    "local_progress_small_remaining_window": {
+      "rationale": "Turbo is most appropriate based on current evidence: a significant improvement from baseline (aggregated score from 1.0 to 0.42) occurred in the latest generation (gen 6, best_score 0.42), with no trial failures and a feasible candidate ratio of 1.0 for turbo. There is no stagnation (0 trailing stagnant generations), and progression indicates that a promising region is being exploited. Only 2 test",
+      "selected_tool": "turbo"
+    },
+    "local_progress_surrogate_leads": {
+      "rationale": "Surrogate CMA-ES achieved the current best score (0.48) in generation 4, representing a 52% improvement from baseline, with high feasibility (7/8 candidates feasible) and no stagnation (0 trailing stagnant generations). It shows consistent progress (better than turbo's 0.66 from generation 3), low failure rate (1/8), fits well with the ample observation history (18 candidates completed), and is a",
+      "selected_tool": "surrogate_cma_es"
+    },
+    "local_progress_turbo_leads": {
+      "rationale": "turbo should be selected because it has delivered the current best score (0.55, a 45% improvement from baseline) with a 100% feasibility rate and no trial failures in this domain (5 feasible candidates, 20 total trials, last used in generation 3). Budget is moderate (remaining 40/52 trials), and there is no evidence of stagnation—recent improvement supports continued local exploitation. Other tool",
+      "selected_tool": "turbo"
+    },
+    "mixed_history_no_clear_winner": {
+      "rationale": "The recent best score improvement from baseline is 0.38 (from 1.0 to 0.62) within 4 generations, with turbo achieving the current best score (0.62 in generation 4, 5/7 feasible candidates, low failure rate). Stagnation is not observed (0 trailing stagnant generations), and turbo's local exploitation focus fits the scenario since a promising feasible region has already been found and steady, budget",
+      "selected_tool": "turbo"
+    },
+    "mixed_history_surrogate_clear_winner": {
+      "rationale": "Surrogate CMA-ES delivered the best observed result (score 0.39) in the most recent generation and maintains a 91.7% feasibility rate (11/12), with only one failed trial out of 48 trials. This surpasses Turbo (best score 0.58, lower feasibility 75%) and constrained_mobo (best score 0.61 with only 70% feasibility). There is no sign of stagnation (best score kept improving), a substantial remaining,",
+      "selected_tool": "surrogate_cma_es"
+    },
+    "mixed_history_turbo_clear_winner": {
+      "rationale": "The most recent optimizer (turbo) achieved a best score of 0.44—improving significantly over the baseline (1.0) and prior tools (bipop_cma_es: 0.74, saasbo: 0.69)—with 8/8 feasible candidates and 0% failure, indicating strong local progress and reliability. No stagnation is recorded, and 3 budgeted generations remain, with recent local improvement justifying further exploitation. Remaining trial/b",
+      "selected_tool": "turbo"
+    },
+    "stagnation_after_surrogate_plateau": {
+      "rationale": "Recent optimizer (surrogate_cma_es) delivered significant improvement over baseline (relative improvement 0.39, best_score 0.61 vs 1.0) but progress has stagnated for 4 trailing generations. The search space is of moderate dimension (9 parameters), with about half the feasible candidate rate (0.625) and no observed trial failures, indicating search stability but also risk of entrapment in local or",
+      "selected_tool": "bipop_cma_es"
+    },
+    "stagnation_high_dimension": {
+      "rationale": "There has been four generations of stagnation (no improvement past generation 2), a moderate-to-high parameter dimension (24), and mixed feasibility (feasible candidate rate: 0.6). Previous optimization has already covered 30 candidates with no observed failures, but measurable progress has stalled (best score dropped from 1.0 to 0.8, with no recent gains). As evidence for further specialization (",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "stagnation_three_generations": {
+      "rationale": "The recent optimizer (turbo) shows three trailing stagnant generations after an initial improvement (from score 1.0 to 0.72), with no progress nor failures in the last three generations, despite sufficient budget (48 trials left). According to the manifest, bipop_cma_es is recommended when stagnation is observed and escaping a local basin is critical. Its restart strategy increases the chance of a",
+      "selected_tool": "bipop_cma_es"
+    },
+    "tight_budget_expensive_matrix": {
+      "rationale": "There are no signs of stagnation (trailing_stagnant_generations=0) and only two candidate generations are shown: baseline (score=1.0) and one optimizer result (score=0.76, feasible). Relative improvement from the baseline is only 0.24, but there is insufficient evidence of local progress or strong global trends. The scenario has a moderate parameter dimension (8) and a tight remaining budget (only",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "tight_budget_multifidelity_history": {
+      "rationale": "Multi-fidelity MOBO remains the clear optimizer of choice based on the evidence. It achieved the current best score of 0.57 (a 43% improvement from baseline) with no observed failures in the last generation and a strong feasibility rate (7/9 feasible candidates). The scenario matrix is moderate in cost but the remaining budget (20 trials, 2 candidates at full trials/candidate) encourages a tool—MO",
+      "selected_tool": "multi_fidelity_mobo"
+    },
+    "tight_budget_one_full_matrix_left": {
+      "rationale": "There is minimal recent improvement (best score only shifted from 1.0 to 0.64 from baseline to now), and we have little trustworthy evidence to specialization (only two aggregated candidates checked, from widely separated generations). All trial slots remain feasible, and with only 8 trials left, maximizing robust exploration and avoiding overfitting to sparse/fragmentary data is prudent. The low,",
+      "selected_tool": "optimizer_portfolio"
+    }
+  },
+  "prompt_suite_sha256": "d300d0516378974fb57be896b155ef1a537278594b03c0ecbdceff9ade26dc59",
+  "prompt_template_version": "1.1",
+  "provider": "openai",
+  "schema_version": "1.0",
+  "tool_registry_version": "2.1"
+}
