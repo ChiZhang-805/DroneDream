@@ -56,8 +56,10 @@ from app.simulator.px4_metric_evidence import (  # noqa: E402 - see path bootstr
     compile_px4_core_metric_evidence,
     compile_px4_evaluation_policy,
     compile_px4_evaluation_window_evidence,
+    compile_px4_outcome_evidence,
     require_px4_core_metric_binding,
     require_px4_evaluation_window_binding,
+    require_px4_outcome_binding,
 )
 from app.simulator.px4_parameters import (  # noqa: E402 - see path bootstrap above
     APPLIED_EVIDENCE_NAME,
@@ -638,6 +640,23 @@ def _merge_json_object(path: Path, authoritative: dict[str, Any]) -> None:
 
 def _reject_nonfinite_json(value: str) -> None:
     raise ValueError(f"non-standard JSON numeric constant is forbidden: {value}")
+
+
+def _load_bounded_json(path: Path, *, label: str, max_bytes: int) -> object:
+    try:
+        with path.open("rb") as stream:
+            encoded = stream.read(max_bytes + 1)
+    except OSError as exc:
+        raise RunnerError(f"{label} could not be read") from exc
+    if len(encoded) > max_bytes:
+        raise RunnerError(f"{label} exceeds the JSON evidence limit")
+    try:
+        return json.loads(
+            encoded.decode("utf-8"),
+            parse_constant=_reject_nonfinite_json,
+        )
+    except (UnicodeError, json.JSONDecodeError, RecursionError, ValueError) as exc:
+        raise RunnerError(f"{label} is not valid bounded JSON") from exc
 
 
 def _safe_excerpt(text: str, *, limit: int = 1800) -> str:
@@ -1971,11 +1990,12 @@ def _compute_metrics(
                 label="offboard timing evidence",
                 required=False,
             )
-            if timing_size is None or timing_size > _MAX_OFFBOARD_TIMING_BYTES:
+            if timing_size is None:
                 raise RunnerError("offboard timing evidence is missing or too large")
-            loaded = json.loads(
-                offboard_timing_path.read_text(encoding="utf-8"),
-                parse_constant=_reject_nonfinite_json,
+            loaded = _load_bounded_json(
+                offboard_timing_path,
+                label="offboard timing evidence",
+                max_bytes=_MAX_OFFBOARD_TIMING_BYTES,
             )
             if isinstance(loaded, dict):
                 offboard_timing = loaded
@@ -3169,19 +3189,14 @@ def run_once(input_path: Path, output_path: Path) -> int:
             offboard_timing_path = run_dir / "offboard_timing.json"
             if offboard_timing_path.is_file():
                 try:
-                    if offboard_timing_path.stat().st_size <= _MAX_OFFBOARD_TIMING_BYTES:
-                        loaded_timing = json.loads(
-                            offboard_timing_path.read_text(encoding="utf-8"),
-                            parse_constant=_reject_nonfinite_json,
-                        )
-                        if isinstance(loaded_timing, dict):
-                            offboard_timing_payload = loaded_timing
-                except (
-                    OSError,
-                    UnicodeError,
-                    json.JSONDecodeError,
-                    ValueError,
-                ):
+                    loaded_timing = _load_bounded_json(
+                        offboard_timing_path,
+                        label="offboard timing evidence",
+                        max_bytes=_MAX_OFFBOARD_TIMING_BYTES,
+                    )
+                    if isinstance(loaded_timing, dict):
+                        offboard_timing_payload = loaded_timing
+                except RunnerError:
                     offboard_timing_payload = None
             evaluation_window_evidence = compile_px4_evaluation_window_evidence(
                 telemetry_payload=telemetry,
@@ -3212,6 +3227,44 @@ def run_once(input_path: Path, output_path: Path) -> int:
             require_px4_core_metric_binding(
                 metrics,
                 core_metric_evidence,
+            )
+            scenario_effect_evidence_payload: object | None = None
+            if scenario_effect_evidence_json.is_file():
+                try:
+                    scenario_effect_evidence_payload = _load_bounded_json(
+                        scenario_effect_evidence_json,
+                        label="scenario-effect evidence",
+                        max_bytes=MAX_EFFECT_CONTRACT_BYTES,
+                    )
+                except RunnerError:
+                    scenario_effect_evidence_payload = None
+            outcome_policy, outcome_evidence = compile_px4_outcome_evidence(
+                telemetry_payload=telemetry,
+                reference_track_payload=reference_track_payload,
+                evaluation_policy=evaluation_policy,
+                evaluation_window_evidence=(evaluation_window_evidence),
+                core_metric_evidence=core_metric_evidence,
+                scenario_effect_request_payload=(scenario_effect_request),
+                scenario_effect_evidence_payload=(scenario_effect_evidence_payload),
+            )
+            metrics["raw_metric_json"].update(
+                {
+                    "scenario_effects_ready": (outcome_evidence.scenario_effects_ready),
+                    "scenario_effect_status": (outcome_evidence.scenario_effect_status),
+                    "scenario_effect_request_sha256": (
+                        outcome_evidence.scenario_effect_request_sha256
+                    ),
+                    "scenario_effect_evidence_sha256": (
+                        outcome_evidence.scenario_effect_evidence_sha256
+                    ),
+                    "px4_outcome_policy": outcome_policy.model_dump(mode="json"),
+                    "px4_outcome_evidence": (outcome_evidence.model_dump(mode="json")),
+                }
+            )
+            require_px4_outcome_binding(
+                metrics,
+                policy=outcome_policy,
+                evidence=outcome_evidence,
             )
         except Px4CoreMetricEvidenceError as exc:
             raise RunnerError(f"independent PX4 core-metric verification failed: {exc}") from exc

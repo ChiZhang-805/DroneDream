@@ -30,6 +30,7 @@ from app.simulator.base import (
 from app.simulator.px4_metric_evidence import (
     compile_px4_core_metric_evidence,
     compile_px4_evaluation_window_evidence,
+    compile_px4_outcome_evidence,
     px4_evaluation_policy_from_environment,
 )
 from app.simulator.real_cli import (
@@ -43,9 +44,12 @@ from app.simulator.real_cli import (
     _parse_artifacts,
     _parse_metrics,
     _read_log_tail,
-    _require_px4_metric_evidence,
     _trial_input_payload,
 )
+from app.simulator.real_cli import (
+    _require_px4_metric_evidence as _require_px4_metric_evidence_impl,
+)
+from app.simulator.scenario_effects import build_scenario_effect_request
 from app.simulator.telemetry_evidence import (
     TELEMETRY_SCHEMA_V2,
     compile_telemetry_semantic_contract,
@@ -54,6 +58,23 @@ from app.simulator.telemetry_evidence import (
 _EXAMPLE_SIM = (
     Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "example_real_simulator.py"
 )
+_PX4_GAZEBO_RUNNER = (
+    Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "px4_gazebo_runner.py"
+)
+
+
+def _require_px4_metric_evidence(
+    raw: dict[str, object],
+    *,
+    metrics: TrialMetricsPayload,
+    artifacts: list[ArtifactMetadata],
+) -> None:
+    _require_px4_metric_evidence_impl(
+        raw,
+        metrics=metrics,
+        artifacts=artifacts,
+        expected_scenario_effect_request=raw.get("_expected_scenario_effect_request"),
+    )
 
 
 def _valid_result(**overrides: object) -> dict[str, object]:
@@ -142,21 +163,52 @@ def _px4_metric_evidence(
             encoding="utf-8",
         )
     evaluation_policy = px4_evaluation_policy_from_environment({})
-    evaluation_window_evidence = (
-        compile_px4_evaluation_window_evidence(
-            telemetry_payload=telemetry_payload,
-            reference_track_payload=reference_payload,
-            offboard_timing_payload=offboard_timing_payload,
-            policy=evaluation_policy,
-        )
+    evaluation_window_evidence = compile_px4_evaluation_window_evidence(
+        telemetry_payload=telemetry_payload,
+        reference_track_payload=reference_payload,
+        offboard_timing_payload=offboard_timing_payload,
+        policy=evaluation_policy,
     )
     core_metric_evidence = compile_px4_core_metric_evidence(
         telemetry_payload=telemetry_payload,
         reference_track_payload=reference_payload,
-        evaluation_start_index=(
-            evaluation_window_evidence.start_index
-        ),
+        evaluation_start_index=(evaluation_window_evidence.start_index),
         evaluation_end_index=evaluation_window_evidence.end_index,
+    )
+    scenario_effect_request = build_scenario_effect_request(
+        execution_identity={
+            "trial_id": "trial-1",
+            "job_id": "job-1",
+            "candidate_id": "candidate-1",
+            "seed": 42,
+            "attempt_count": 1,
+        },
+        scenario_type="nominal",
+        scenario_config={},
+        job_config={
+            "wind": {
+                "north": 0.0,
+                "east": 0.0,
+                "south": 0.0,
+                "west": 0.0,
+            },
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+    scenario_effect_request_path = tmp_path / "scenario_effects.request.json"
+    scenario_effect_request_path.write_text(
+        json.dumps(scenario_effect_request),
+        encoding="utf-8",
+    )
+    outcome_policy, outcome_evidence = compile_px4_outcome_evidence(
+        telemetry_payload=telemetry_payload,
+        reference_track_payload=reference_payload,
+        evaluation_policy=evaluation_policy,
+        evaluation_window_evidence=evaluation_window_evidence,
+        core_metric_evidence=core_metric_evidence,
+        scenario_effect_request_payload=scenario_effect_request,
+        scenario_effect_evidence_payload=None,
     )
     raw_metric_json = {
         "rmse_integration": "time_weighted_trapezoidal",
@@ -167,83 +219,72 @@ def _px4_metric_evidence(
         "telemetry_position_unit": contract.position_unit,
         "telemetry_time_unit": contract.time_unit,
         "telemetry_sampling": contract.sampling.model_dump(mode="json"),
-        "evaluation_window_source": (
-            evaluation_window_evidence.source
-        ),
-        "evaluation_window_raw_source": (
-            evaluation_window_evidence.raw_source
-        ),
-        "raw_track_start_t": (
-            evaluation_window_evidence.raw_start_time_s
-        ),
-        "raw_track_end_t": (
-            evaluation_window_evidence.raw_end_time_s
-        ),
-        "evaluation_start_reason": (
-            evaluation_window_evidence.start_reason
-        ),
-        "evaluation_trimmed_takeoff_samples": (
-            evaluation_window_evidence.trimmed_takeoff_samples
-        ),
-        "evaluation_trimmed_landing_samples": (
-            evaluation_window_evidence.trimmed_landing_samples
-        ),
+        "evaluation_window_source": (evaluation_window_evidence.source),
+        "evaluation_window_raw_source": (evaluation_window_evidence.raw_source),
+        "raw_track_start_t": (evaluation_window_evidence.raw_start_time_s),
+        "raw_track_end_t": (evaluation_window_evidence.raw_end_time_s),
+        "evaluation_start_reason": (evaluation_window_evidence.start_reason),
+        "evaluation_trimmed_takeoff_samples": (evaluation_window_evidence.trimmed_takeoff_samples),
+        "evaluation_trimmed_landing_samples": (evaluation_window_evidence.trimmed_landing_samples),
         "pass_thresholds": {
             "rmse": evaluation_policy.pass_rmse_m,
             "max_error": evaluation_policy.pass_max_error_m,
-            "min_track_coverage": (
-                evaluation_policy.minimum_track_coverage
-            ),
+            "min_track_coverage": (evaluation_policy.minimum_track_coverage),
         },
-        "evaluation_policy": evaluation_policy.model_dump(
-            mode="json"
-        ),
-        "evaluation_window_evidence": (
-            evaluation_window_evidence.model_dump(mode="json")
-        ),
-        "evaluation_start_index": (
-            core_metric_evidence.evaluation_start_index
-        ),
-        "evaluation_end_index": (
-            core_metric_evidence.evaluation_end_index
-        ),
-        "evaluation_start_t": (
-            core_metric_evidence.evaluation_start_time_s
-        ),
+        "evaluation_policy": evaluation_policy.model_dump(mode="json"),
+        "evaluation_window_evidence": (evaluation_window_evidence.model_dump(mode="json")),
+        "evaluation_start_index": (core_metric_evidence.evaluation_start_index),
+        "evaluation_end_index": (core_metric_evidence.evaluation_end_index),
+        "evaluation_start_t": (core_metric_evidence.evaluation_start_time_s),
         "evaluation_end_t": core_metric_evidence.evaluation_end_time_s,
-        "evaluation_sample_count": (
-            core_metric_evidence.evaluation_sample_count
-        ),
+        "evaluation_sample_count": (core_metric_evidence.evaluation_sample_count),
         "total_sample_count": core_metric_evidence.total_sample_count,
-        "evaluation_sampling": (
-            core_metric_evidence.evaluation_sampling.model_dump(
-                mode="json"
-            )
-        ),
+        "evaluation_sampling": (core_metric_evidence.evaluation_sampling.model_dump(mode="json")),
         "full_log_rmse": core_metric_evidence.full_log_rmse_m,
-        "full_log_max_error": (
-            core_metric_evidence.full_log_max_error_m
-        ),
+        "full_log_max_error": (core_metric_evidence.full_log_max_error_m),
         "evaluation_max_error_sample": (
-            core_metric_evidence.evaluation_max_error_sample.model_dump(
-                mode="json"
-            )
+            core_metric_evidence.evaluation_max_error_sample.model_dump(mode="json")
         ),
-        "px4_core_metric_evidence": (
-            core_metric_evidence.model_dump(mode="json")
+        "px4_core_metric_evidence": (core_metric_evidence.model_dump(mode="json")),
+        "track_coverage": outcome_evidence.full_track_coverage,
+        "evaluation_track_coverage": (outcome_evidence.evaluation_track_coverage),
+        "evaluation_directed_progress_fraction": (
+            outcome_evidence.evaluation_directed_progress_fraction
         ),
+        "evaluation_backward_distance_m": (outcome_evidence.evaluation_backward_distance_m),
+        "evaluation_progress_discontinuity_count": (
+            outcome_evidence.evaluation_progress_discontinuity_count
+        ),
+        "evaluation_direction_valid": (outcome_evidence.evaluation_direction_valid),
+        "evaluation_start_reached": (outcome_evidence.evaluation_start_reached),
+        "evaluation_endpoint_reached": (outcome_evidence.evaluation_endpoint_reached),
+        "evaluation_progress_contract_ok": (outcome_evidence.evaluation_progress_contract_ok),
+        "track_length_3d_m": outcome_evidence.track_length_3d_m,
+        "track_is_closed": outcome_evidence.track_is_closed,
+        "track_projection": "ordered_local_3d_segment_projection",
+        "track_projection_comparison_limit": 10_000_000,
+        "coverage_basis": "union_of_traversed_polyline_arc_length",
+        "evaluation_min_z": outcome_evidence.evaluation_min_z_m,
+        "evaluation_max_z": outcome_evidence.evaluation_max_z_m,
+        "crash_reason": outcome_evidence.crash_reason,
+        "scenario_effects_ready": (outcome_evidence.scenario_effects_ready),
+        "scenario_effect_status": (outcome_evidence.scenario_effect_status),
+        "scenario_effect_request_sha256": (outcome_evidence.scenario_effect_request_sha256),
+        "scenario_effect_evidence_sha256": (outcome_evidence.scenario_effect_evidence_sha256),
+        "px4_outcome_policy": outcome_policy.model_dump(mode="json"),
+        "px4_outcome_evidence": (outcome_evidence.model_dump(mode="json")),
     }
     metrics = TrialMetricsPayload(
         rmse=core_metric_evidence.rmse_m,
         max_error=core_metric_evidence.max_error_m,
         overshoot_count=core_metric_evidence.overshoot_count,
         completion_time=core_metric_evidence.evaluation_duration_s,
-        crash_flag=False,
-        timeout_flag=False,
-        score=1.0,
+        crash_flag=outcome_evidence.crash_flag,
+        timeout_flag=outcome_evidence.timeout_flag,
+        score=outcome_evidence.score,
         final_error=core_metric_evidence.final_error_m,
-        pass_flag=True,
-        instability_flag=False,
+        pass_flag=outcome_evidence.pass_flag,
+        instability_flag=outcome_evidence.instability_flag,
         raw_metric_json=raw_metric_json,
     )
     artifacts = [
@@ -257,6 +298,12 @@ def _px4_metric_evidence(
             artifact_type="reference_track_json",
             display_name="reference track",
             storage_path=str(reference_path),
+            mime_type="application/json",
+        ),
+        ArtifactMetadata(
+            artifact_type="scenario_effect_request_json",
+            display_name="scenario effect request",
+            storage_path=str(scenario_effect_request_path),
             mime_type="application/json",
         ),
     ]
@@ -273,6 +320,7 @@ def _px4_metric_evidence(
         "success": True,
         "backend": "px4_gazebo",
         "schema_version": "dronedream.trial_result.v2",
+        "_expected_scenario_effect_request": (scenario_effect_request),
     }
     return raw, metrics, artifacts, telemetry_path
 
@@ -369,6 +417,42 @@ def test_real_cli_succeeds_against_example_simulator(monkeypatch, tmp_path):
     for a in result.artifacts:
         assert Path(a.storage_path).exists()
         assert a.file_size_bytes is None or a.file_size_bytes > 0
+
+
+def test_real_cli_accepts_independently_verified_bundled_px4_dry_run(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv(
+        "REAL_SIMULATOR_COMMAND",
+        f'"{sys.executable}" "{_PX4_GAZEBO_RUNNER}"',
+    )
+    monkeypatch.setenv(
+        "REAL_SIMULATOR_ARTIFACT_ROOT",
+        str(tmp_path),
+    )
+    monkeypatch.setenv("REAL_SIMULATOR_TIMEOUT_SECONDS", "60")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "true")
+
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+
+    assert result.success is True, result.failure
+    assert result.metrics is not None
+    assert result.metrics.pass_flag is True
+    assert result.metrics.raw_metric_json["mode"] == "dry_run"
+    assert (
+        result.metrics.raw_metric_json["px4_outcome_policy"]["schema_id"]
+        == "dronedream.px4-outcome-policy/v1"
+    )
+    assert (
+        result.metrics.raw_metric_json["px4_outcome_evidence"]["schema_id"]
+        == "dronedream.px4-outcome-evidence/v1"
+    )
+    assert {artifact.artifact_type for artifact in result.artifacts} >= {
+        "telemetry_json",
+        "reference_track_json",
+        "scenario_effect_request_json",
+    }
 
 
 def test_real_cli_child_environment_excludes_control_plane_credentials(
@@ -468,9 +552,7 @@ def test_trial_input_payload_includes_advanced_scenario_config() -> None:
     effect_request = payload["scenario_effect_request"]
     assert effect_request["schema_version"] == "dronedream.scenario_effect_request.v1"
     assert effect_request["execution_identity"] == payload["execution_identity"]
-    assert [item["effect_id"] for item in effect_request["effects"]] == [
-        "wind_gusts"
-    ]
+    assert [item["effect_id"] for item in effect_request["effects"]] == ["wind_gusts"]
     assert effect_request["effects"][0]["requested_value"] == {
         "enabled": True,
         "magnitude_mps": 1.2,
@@ -889,9 +971,7 @@ def test_px4_metric_evidence_requires_both_primary_artifacts(
 def test_px4_metric_evidence_rejects_telemetry_mutation(
     tmp_path: Path,
 ) -> None:
-    raw, metrics, artifacts, telemetry_path = _px4_metric_evidence(
-        tmp_path
-    )
+    raw, metrics, artifacts, telemetry_path = _px4_metric_evidence(tmp_path)
     payload = json.loads(telemetry_path.read_text(encoding="utf-8"))
     payload["samples"][3]["x"] = 999.0
     telemetry_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -1054,6 +1134,99 @@ def test_px4_metric_evidence_rejects_compiled_evidence_mutation(
 @pytest.mark.parametrize(
     ("field", "value"),
     [
+        ("crash_flag", True),
+        ("timeout_flag", True),
+        ("instability_flag", True),
+        ("pass_flag", False),
+        ("score", 0.0),
+    ],
+)
+def test_px4_outcome_evidence_rejects_top_level_verdict_mutation(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    setattr(metrics, field, value)
+
+    with pytest.raises(
+        ValueError,
+        match="top-level verdict",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_outcome_evidence_rejects_progress_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    metrics.raw_metric_json["evaluation_directed_progress_fraction"] = 1.0
+
+    with pytest.raises(
+        ValueError,
+        match="raw verdict",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_outcome_evidence_rejects_nested_evidence_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    evidence = metrics.raw_metric_json["px4_outcome_evidence"]
+    assert isinstance(evidence, dict)
+    evidence["score_penalty"] = 999.0
+
+    with pytest.raises(
+        ValueError,
+        match="raw verdict",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+def test_px4_outcome_evidence_rejects_scenario_request_mutation(
+    tmp_path: Path,
+) -> None:
+    raw, metrics, artifacts, _ = _px4_metric_evidence(tmp_path)
+    request_artifact = next(
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "scenario_effect_request_json"
+    )
+    request_path = Path(request_artifact.storage_path)
+    request_payload = json.loads(request_path.read_text(encoding="utf-8"))
+    request_payload["scenario_type"] = "forged"
+    request_path.write_text(
+        json.dumps(request_payload),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="does not match the trusted Trial input",
+    ):
+        _require_px4_metric_evidence(
+            raw,
+            metrics=metrics,
+            artifacts=artifacts,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
         ("rmse_integration", "sample_count_average"),
         ("telemetry_semantic_contract_id", "sha256:" + "0" * 64),
         ("telemetry_source_sha256", "sha256:" + "f" * 64),
@@ -1205,17 +1378,18 @@ def test_known_artifact_schemas_bound_array_sizes_and_error_counts() -> None:
             "samples": [{}] * (_MAX_TELEMETRY_SAMPLES + 1),
         }
     )
-    assert telemetry_errors == [
-        f"telemetry samples[] cannot exceed {_MAX_TELEMETRY_SAMPLES} items"
-    ]
-    assert len(
-        validate_telemetry_payload(
-            {
-                "schema_version": "dronedream.telemetry.v1",
-                "samples": [None] * 1_000,
-            }
+    assert telemetry_errors == [f"telemetry samples[] cannot exceed {_MAX_TELEMETRY_SAMPLES} items"]
+    assert (
+        len(
+            validate_telemetry_payload(
+                {
+                    "schema_version": "dronedream.telemetry.v1",
+                    "samples": [None] * 1_000,
+                }
+            )
         )
-    ) <= 101
+        <= 101
+    )
     assert validate_reference_track_payload(
         {
             "schema_version": "dronedream.reference_track.v1",
@@ -1228,9 +1402,26 @@ def test_known_artifact_schemas_bound_array_sizes_and_error_counts() -> None:
             "reference_track": [{}] * (_MAX_REFERENCE_POINTS + 1),
         }
     )
-    assert reference_errors == [
-        f"reference_track[] cannot exceed {_MAX_REFERENCE_POINTS} items"
-    ]
+    assert reference_errors == [f"reference_track[] cannot exceed {_MAX_REFERENCE_POINTS} items"]
+
+
+def test_telemetry_schema_rejects_ambiguous_crash_flag() -> None:
+    errors = validate_telemetry_payload(
+        {
+            "schema_version": "dronedream.telemetry.v1",
+            "samples": [
+                {
+                    "t": 0.0,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 1.0,
+                    "crashed": "false",
+                }
+            ],
+        }
+    )
+
+    assert "telemetry sample[0] field 'crashed' must be boolean" in errors
 
 
 @pytest.mark.parametrize("timeout", ["0", "-1", "nan", "invalid", "86401"])

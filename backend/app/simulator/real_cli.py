@@ -61,9 +61,11 @@ from app.simulator.base import (
 from app.simulator.px4_metric_evidence import (
     compile_px4_core_metric_evidence,
     compile_px4_evaluation_window_evidence,
+    compile_px4_outcome_evidence,
     px4_evaluation_policy_from_environment,
     require_px4_core_metric_binding,
     require_px4_evaluation_window_binding,
+    require_px4_outcome_binding,
 )
 from app.simulator.scenario_effects import build_scenario_effect_request
 from app.simulator.telemetry_evidence import (
@@ -932,13 +934,14 @@ def _load_bounded_json_artifact(
     with path.open("rb") as stream:
         encoded = stream.read(_MAX_KNOWN_JSON_ARTIFACT_BYTES + 1)
     if len(encoded) > _MAX_KNOWN_JSON_ARTIFACT_BYTES:
-        raise ValueError(
-            f"{artifact.artifact_type} exceeds the JSON evidence limit"
+        raise ValueError(f"{artifact.artifact_type} exceeds the JSON evidence limit")
+    try:
+        return json.loads(
+            encoded.decode("utf-8"),
+            parse_constant=_reject_nonfinite_json_constant,
         )
-    return json.loads(
-        encoded.decode("utf-8"),
-        parse_constant=_reject_nonfinite_json_constant,
-    )
+    except RecursionError as exc:
+        raise ValueError(f"{artifact.artifact_type} exceeds the JSON nesting limit") from exc
 
 
 def _require_px4_metric_evidence(
@@ -946,48 +949,33 @@ def _require_px4_metric_evidence(
     *,
     metrics: TrialMetricsPayload,
     artifacts: list[ArtifactMetadata],
+    expected_scenario_effect_request: object,
 ) -> None:
     if raw.get("backend") != "px4_gazebo":
         return
     if raw.get("schema_version") != "dronedream.trial_result.v2":
-        raise ValueError(
-            "PX4/Gazebo metric evidence requires trial_result.v2"
-        )
+        raise ValueError("PX4/Gazebo metric evidence requires trial_result.v2")
     telemetry_artifacts = [
-        artifact
-        for artifact in artifacts
-        if artifact.artifact_type == "telemetry_json"
+        artifact for artifact in artifacts if artifact.artifact_type == "telemetry_json"
     ]
     reference_artifacts = [
-        artifact
-        for artifact in artifacts
-        if artifact.artifact_type == "reference_track_json"
+        artifact for artifact in artifacts if artifact.artifact_type == "reference_track_json"
     ]
     if len(telemetry_artifacts) != 1 or len(reference_artifacts) != 1:
         raise ValueError(
-            "PX4/Gazebo success requires exactly one telemetry and "
-            "reference-track artifact"
+            "PX4/Gazebo success requires exactly one telemetry and reference-track artifact"
         )
     telemetry = _load_bounded_json_artifact(telemetry_artifacts[0])
-    reference_track = _load_bounded_json_artifact(
-        reference_artifacts[0]
-    )
+    reference_track = _load_bounded_json_artifact(reference_artifacts[0])
     timing_artifacts = [
-        artifact
-        for artifact in artifacts
-        if artifact.artifact_type == "offboard_timing_json"
+        artifact for artifact in artifacts if artifact.artifact_type == "offboard_timing_json"
     ]
     if len(timing_artifacts) > 1:
-        raise ValueError(
-            "PX4/Gazebo success cannot contain duplicate offboard "
-            "timing artifacts"
-        )
+        raise ValueError("PX4/Gazebo success cannot contain duplicate offboard timing artifacts")
     offboard_timing: object | None = None
     if timing_artifacts:
         try:
-            loaded_timing = _load_bounded_json_artifact(
-                timing_artifacts[0]
-            )
+            loaded_timing = _load_bounded_json_artifact(timing_artifacts[0])
         except (
             OSError,
             UnicodeError,
@@ -997,43 +985,51 @@ def _require_px4_metric_evidence(
             loaded_timing = None
         if isinstance(loaded_timing, dict):
             offboard_timing = loaded_timing
+    effect_request_artifacts = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "scenario_effect_request_json"
+    ]
+    if len(effect_request_artifacts) != 1:
+        raise ValueError("PX4/Gazebo success requires exactly one scenario-effect request artifact")
+    scenario_effect_request = _load_bounded_json_artifact(effect_request_artifacts[0])
+    if scenario_effect_request != expected_scenario_effect_request:
+        raise ValueError(
+            "PX4/Gazebo scenario-effect request does not match the trusted Trial input"
+        )
+    effect_evidence_artifacts = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "scenario_effect_evidence_json"
+    ]
+    if len(effect_evidence_artifacts) > 1:
+        raise ValueError(
+            "PX4/Gazebo success cannot contain duplicate scenario-effect evidence artifacts"
+        )
+    scenario_effect_evidence: object | None = None
+    if effect_evidence_artifacts:
+        scenario_effect_evidence = _load_bounded_json_artifact(effect_evidence_artifacts[0])
     contract = verify_telemetry_semantic_contract(telemetry)
     if contract is None:
-        raise ValueError(
-            "PX4/Gazebo telemetry semantic contract is invalid"
-        )
+        raise ValueError("PX4/Gazebo telemetry semantic contract is invalid")
     raw_metric = metrics.raw_metric_json
     if (
-        raw_metric.get("rmse_integration")
-        != "time_weighted_trapezoidal"
-        or raw_metric.get("telemetry_semantic_contract_id")
-        != contract.contract_id
-        or raw_metric.get("telemetry_verifier_revision")
-        != contract.verifier_revision
-        or raw_metric.get("telemetry_source_sha256")
-        != contract.source_sha256
-        or raw_metric.get("telemetry_coordinate_frame")
-        != contract.coordinate_frame
-        or raw_metric.get("telemetry_position_unit")
-        != contract.position_unit
-        or raw_metric.get("telemetry_time_unit")
-        != contract.time_unit
-        or raw_metric.get("telemetry_sampling")
-        != contract.sampling.model_dump(mode="json")
+        raw_metric.get("rmse_integration") != "time_weighted_trapezoidal"
+        or raw_metric.get("telemetry_semantic_contract_id") != contract.contract_id
+        or raw_metric.get("telemetry_verifier_revision") != contract.verifier_revision
+        or raw_metric.get("telemetry_source_sha256") != contract.source_sha256
+        or raw_metric.get("telemetry_coordinate_frame") != contract.coordinate_frame
+        or raw_metric.get("telemetry_position_unit") != contract.position_unit
+        or raw_metric.get("telemetry_time_unit") != contract.time_unit
+        or raw_metric.get("telemetry_sampling") != contract.sampling.model_dump(mode="json")
     ):
-        raise ValueError(
-            "PX4/Gazebo metrics do not bind the verified telemetry contract"
-        )
-    evaluation_policy = px4_evaluation_policy_from_environment(
-        os.environ
-    )
-    evaluation_window_evidence = (
-        compile_px4_evaluation_window_evidence(
-            telemetry_payload=telemetry,
-            reference_track_payload=reference_track,
-            offboard_timing_payload=offboard_timing,
-            policy=evaluation_policy,
-        )
+        raise ValueError("PX4/Gazebo metrics do not bind the verified telemetry contract")
+    evaluation_policy = px4_evaluation_policy_from_environment(os.environ)
+    evaluation_window_evidence = compile_px4_evaluation_window_evidence(
+        telemetry_payload=telemetry,
+        reference_track_payload=reference_track,
+        offboard_timing_payload=offboard_timing,
+        policy=evaluation_policy,
     )
     require_px4_evaluation_window_binding(
         raw_metric,
@@ -1043,16 +1039,26 @@ def _require_px4_metric_evidence(
     core_metric_evidence = compile_px4_core_metric_evidence(
         telemetry_payload=telemetry,
         reference_track_payload=reference_track,
-        evaluation_start_index=(
-            evaluation_window_evidence.start_index
-        ),
-        evaluation_end_index=(
-            evaluation_window_evidence.end_index
-        ),
+        evaluation_start_index=(evaluation_window_evidence.start_index),
+        evaluation_end_index=(evaluation_window_evidence.end_index),
     )
     require_px4_core_metric_binding(
         metrics.as_dict(),
         core_metric_evidence,
+    )
+    outcome_policy, outcome_evidence = compile_px4_outcome_evidence(
+        telemetry_payload=telemetry,
+        reference_track_payload=reference_track,
+        evaluation_policy=evaluation_policy,
+        evaluation_window_evidence=(evaluation_window_evidence),
+        core_metric_evidence=core_metric_evidence,
+        scenario_effect_request_payload=(scenario_effect_request),
+        scenario_effect_evidence_payload=(scenario_effect_evidence),
+    )
+    require_px4_outcome_binding(
+        metrics.as_dict(),
+        policy=outcome_policy,
+        evidence=outcome_evidence,
     )
 
 
@@ -1451,6 +1457,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 raw,
                 metrics=metrics,
                 artifacts=artifacts,
+                expected_scenario_effect_request=payload.get("scenario_effect_request"),
             )
         except (OSError, ValueError, TypeError) as exc:
             return TrialResult(

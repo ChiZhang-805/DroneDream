@@ -90,6 +90,11 @@ def validate_telemetry_payload(payload: object) -> list[str]:
         ):
             if key in sample and sample[key] is not None and not _is_number(sample[key]):
                 errors.append(f"telemetry sample[{idx}] field '{key}' must be numeric")
+        if "crashed" in sample and not isinstance(
+            sample["crashed"],
+            bool,
+        ):
+            errors.append(f"telemetry sample[{idx}] field 'crashed' must be boolean")
         if len(errors) >= _MAX_SCHEMA_ERRORS:
             errors.append("telemetry validation stopped after too many errors")
             break
@@ -99,10 +104,7 @@ def validate_telemetry_payload(payload: object) -> list[str]:
         and schema_version == TELEMETRY_SCHEMA_V2
         and verify_telemetry_semantic_contract(payload) is None
     ):
-        errors.append(
-            "telemetry v2 semantic contract is missing or does not match "
-            "the samples"
-        )
+        errors.append("telemetry v2 semantic contract is missing or does not match the samples")
 
     return errors
 

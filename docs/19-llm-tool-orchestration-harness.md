@@ -720,7 +720,7 @@ contract. The code audit found the following gaps:
 | --- | --- |
 | `trial_result.v1` may omit all identity fields | a legacy result can be accepted without proving which Trial, Candidate, seed, or attempt produced it |
 | `final_error` defaults to `0.0` and several flags default to `false` when absent | absence can become a deceptively good observation rather than a schema failure |
-| the result supplies already-computed metrics and `pass_flag` | core trajectory geometry and the policy-bound evaluation window are independently recompiled by Outcome Contract 2.14; crash/instability, directed-progress verdict, and composite score still need the same treatment |
+| the result supplies already-computed metrics and `pass_flag` | addressed for the bundled PX4 path by Outcome Contract 2.15: evaluation window, core geometry, crash/instability, directed progress, scenario-effect readiness, pass, and composite score are independently compiled from retained evidence |
 | telemetry has `x/y/z/t` but no mandatory unit, coordinate-frame, time-base, source-log digest, or extraction revision | addressed for bundled PX4 results by `dronedream.telemetry.v2`; raw ULog replay still depends on retaining the original log |
 | RMSE is `sqrt(sum(error²) / sample_count)` | addressed by trapezoidal time-weighted RMSE in the bundled PX4 metric compiler |
 | strictly increasing timestamps have no maximum-gap, expected-duration, or dropout-coverage requirement | addressed by content-addressed sampling evidence, maximum-gap, and minimum-coverage gates |
@@ -729,7 +729,7 @@ contract. The code audit found the following gaps:
 | all non-completed Trials count as candidate failures | adapter, port, storage, worker, and database failures can penalize controller parameters |
 | the external simulator can return an arbitrary cleaned failure-code string | an untrusted producer can influence retry/evidence classification |
 | Outcome Contract compiler 2.10 stores append-only physical-attempt claims/outcomes and one immutable accepted-attempt pointer | addressed for current v3 aggregation |
-| Outcome Contract compilers 2.8-2.14 bind retained Artifact bytes, accepted-attempt identity, PX4 telemetry semantics, independently derived evaluation windows, and independently recompiled core geometry through Trial and Candidate evidence | addressed for current v3 aggregation; verdict/score recompilation, SQL/object-store atomic publication, raw-source retention, and operational WORM controls remain separate boundaries |
+| Outcome Contract compilers 2.8-2.15 bind retained Artifact bytes, accepted-attempt identity, PX4 telemetry semantics, independently derived evaluation windows, core geometry, outcome verdict, and score through Trial and Candidate evidence | addressed for current v3 aggregation; SQL/object-store atomic publication, raw-source retention, operational WORM controls, and complete infrastructure/domain taxonomy propagation remain separate boundaries |
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
 | legacy aggregation initially mixes all metrics and only the modern objective path replaces key fields with training values | compatibility paths remain too easy to use as if they had the same isolation guarantees |
 | rate parsing clamps values into `[0, 1]` | corrupted persisted evidence can be silently normalized instead of stopping the decision |
@@ -8498,9 +8498,21 @@ derives the evaluation window from retained telemetry, reference track, and
 optional offboard timing. Offboard timing is only a broad candidate; the
 backend repeats consecutive altitude-and-near-track entry plus landing trim.
 Policy drift, timing/reference mutation, favorable index substitution, or
-nested evidence mutation invalidates the complete Trial. Independent
-crash/instability/progress/pass/score compilation remains the next verifier
-boundary.
+nested evidence mutation invalidates the complete Trial.
+
+Outcome Contract compiler 2.15 adds content-addressed PX4 outcome policy and
+evidence. The backend independently recompiles crash and altitude collapse,
+position-speed and track-error instability, continuous directed arc coverage,
+backward travel, projection discontinuities, start/endpoint reachability,
+scenario-effect readiness, pass, and the frozen score components. It binds the
+trusted Trial scenario-effect request to the single retained request artifact
+and validates optional executor evidence. Runner-authored flags, progress,
+scenario hashes, score, policy, or nested evidence cannot override the backend
+result. A complete desktop adapter-to-bundled-runner dry-run regression covers
+the production handoff. Remaining evidence boundaries are raw-source retention,
+atomic SQL/object publication, operational WORM/role separation, and carrying
+the closed domain/infrastructure taxonomy through every adapter and optimizer
+learning path.
 
 Current focused validation:
 
@@ -8508,7 +8520,7 @@ Current focused validation:
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-867 passed
+877 passed
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 

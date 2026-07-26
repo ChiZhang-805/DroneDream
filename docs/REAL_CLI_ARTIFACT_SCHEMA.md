@@ -153,12 +153,31 @@ error, tracking-error peak count, evaluation sampling, and the maximum-error
 sample. The content-addressed evidence and top-level/raw metric projections
 must all match exactly.
 
-These contracts prove the semantics and core geometric measurements of the
-retained normalized telemetry. They do not yet make the original ULog
-permanently replayable when that raw log is not retained. The independent
-compiler still does not independently recompile crash, instability,
-directed-progress pass, and composite-score semantics. Those remain separate
-stronger-verifier boundaries rather than implied guarantees.
+Every bundled result also carries `dronedream.px4-outcome-policy/v1` and
+`dronedream.px4-outcome-evidence/v1`. The backend independently derives:
+
+- telemetry crash flags and in-window altitude collapse;
+- position-speed and track-error instability;
+- continuous directed arc coverage, backward travel, projection
+  discontinuities, and start/endpoint reachability;
+- scenario-effect readiness from the retained request and optional executor
+  evidence;
+- the final pass verdict and the frozen RMSE, maximum-error, duration, and
+  penalty score components.
+
+A successful metric-bearing result cannot claim a timeout: launcher or adapter
+timeouts are terminal failed Trials before metric acceptance. The outcome
+policy, evidence, raw projections, top-level flags, and score must all match the
+backend compilation. The trusted scenario-effect request must also match the
+single retained request artifact. Known JSON evidence is read with a strict byte
+limit and nesting failures are rejected rather than escaping the validation
+boundary.
+
+Together these contracts prove the semantics, geometric measurements, and
+current verdict/score of the retained normalized telemetry. They do not yet make
+the original ULog permanently replayable when that raw log is not retained, make
+SQL and object-store publication atomic, or establish an operational WORM
+retention policy.
 
 ## PX4 parameter evidence
 

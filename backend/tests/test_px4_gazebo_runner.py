@@ -333,6 +333,10 @@ def test_px4_runner_dry_run_is_deterministic(tmp_path: Path):
     assert result1["metrics"] != result3["metrics"]
     assert result1["schema_version"] == "dronedream.trial_result.v2"
     assert result1["execution_identity"]["trial_id"] == "trial-1"
+    raw = result1["metrics"]["raw_metric_json"]
+    assert raw["px4_outcome_policy"]["schema_id"] == "dronedream.px4-outcome-policy/v1"
+    assert raw["px4_outcome_evidence"]["schema_id"] == "dronedream.px4-outcome-evidence/v1"
+    assert raw["scenario_effects_ready"] is True
 
 
 def test_px4_runner_timeout_maps_to_timeout(tmp_path: Path):
@@ -572,18 +576,14 @@ def test_real_runner_rejects_missing_trusted_evaluation_window(
         env_overrides={
             "PX4_GAZEBO_DRY_RUN": "false",
             "PX4_GAZEBO_LAUNCH_COMMAND": (
-                f'"{sys.executable}" "{launcher}" '
-                "--telemetry {telemetry_json}"
+                f'"{sys.executable}" "{launcher}" --telemetry {{telemetry_json}}'
             ),
         },
     )
 
     assert proc.returncode == 0
     assert result["success"] is False
-    assert (
-        "trusted evaluation window could not be established"
-        in result["failure"]["reason"]
-    )
+    assert "trusted evaluation window could not be established" in result["failure"]["reason"]
 
 
 def test_px4_runner_writes_expected_artifacts_in_dry_run(tmp_path: Path):
@@ -602,9 +602,7 @@ def test_px4_runner_writes_expected_artifacts_in_dry_run(tmp_path: Path):
         "trial_result.json",
     ):
         assert (tmp_path / name).exists(), name
-    telemetry = json.loads(
-        (tmp_path / "telemetry.json").read_text(encoding="utf-8")
-    )
+    telemetry = json.loads((tmp_path / "telemetry.json").read_text(encoding="utf-8"))
     assert telemetry["schema_version"] == TELEMETRY_SCHEMA_V2
     assert verify_telemetry_semantic_contract(telemetry) is not None
 
@@ -1806,13 +1804,9 @@ def test_real_cli_integration_with_px4_runner_dry_run(
     assert result.success is True, result.failure
     assert result.metrics is not None
     assert result.metrics.raw_metric_json.get("mode") == "dry_run"
-    core_evidence = result.metrics.raw_metric_json.get(
-        "px4_core_metric_evidence"
-    )
+    core_evidence = result.metrics.raw_metric_json.get("px4_core_metric_evidence")
     assert isinstance(core_evidence, dict)
-    assert core_evidence["schema_id"] == (
-        "dronedream.px4-core-metric-evidence/v1"
-    )
+    assert core_evidence["schema_id"] == ("dronedream.px4-core-metric-evidence/v1")
     assert core_evidence["rmse_m"] == result.metrics.rmse
     run_dir = tmp_path / "jobs" / "job-1" / "trials" / "trial-1"
     assert (run_dir / "telemetry.json").exists()

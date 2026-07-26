@@ -295,6 +295,16 @@ policy, and content-addressed window evidence must match.
   - full-log diagnostic fields (`full_log_rmse`, `full_log_max_error`)
   - `track_length_3d_m`, `track_projection`, and `coverage_basis`
 
+The runner computes these values for immediate execution feedback, but its
+verdict is not authoritative. Before acceptance, `real_cli` independently
+recomputes crash/collapse, instability, continuous directed progress, backward
+travel, projection discontinuities, start/endpoint reachability,
+scenario-effect readiness, pass, and each score component. The frozen
+`dronedream.px4-outcome-policy/v1`, content-addressed
+`dronedream.px4-outcome-evidence/v1`, raw fields, and top-level flags/score must
+all agree. Process or launcher timeouts remain failed Trials rather than
+successful metric-bearing outcomes.
+
 Coverage is the union of continuous, forward traversed polyline arc-length
 intervals, not the count of nearest waypoint indices. Subdividing the same
 geometric path into more points does not alter coverage. Reverse motion,

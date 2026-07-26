@@ -498,9 +498,24 @@ labeled all-samples exception.
 The runner's raw window projection, policy, and content-addressed window
 evidence must match the backend result. Changed thresholds, timing bytes,
 reference geometry, selected indices, or nested evidence fail the complete
-Trial before core metrics are compiled. Crash, instability, directed-progress
-pass, and composite-score semantics remain the next independent-verdict
-boundary.
+Trial before core metrics are compiled.
+
+Outcome Contract compiler 2.15 adds
+`dronedream.px4-outcome-policy/v1` and
+`dronedream.px4-outcome-evidence/v1`. From the retained telemetry, reference
+track, independently selected window and core metrics, trusted scenario-effect
+request, and optional executor evidence, the backend independently recomputes
+crash/collapse, position-speed and track-error instability, continuous directed
+arc coverage, backward travel, projection discontinuities, start/endpoint
+reachability, scenario-effect readiness, pass, and every score component.
+
+The runner's flags, progress fields, scenario-effect hashes, score, policy, and
+content-addressed evidence must match. A mutated crash flag, favorable progress
+claim, substituted scenario request, changed score, or nested evidence change
+fails the complete Trial. Successful metric-bearing results cannot claim a
+timeout because process/launcher timeouts are terminal failed Trials. The
+desktop adapter-to-bundled-runner dry-run path is covered end to end, and known
+JSON evidence is byte-bounded during the actual read.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic

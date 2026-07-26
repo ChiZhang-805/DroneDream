@@ -11,6 +11,11 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.simulator.scenario_effects import (
+    ScenarioEffectContractError,
+    validate_scenario_effect_evidence,
+    validate_scenario_effect_request,
+)
 from app.simulator.telemetry_evidence import (
     TelemetrySamplingEvidenceV1,
     compile_sampling_evidence,
@@ -24,6 +29,11 @@ PX4_RMSE_INTEGRATION_REVISION = "time_weighted_trapezoidal"
 PX4_EVALUATION_POLICY_V1 = "dronedream.px4-evaluation-policy/v1"
 PX4_EVALUATION_WINDOW_EVIDENCE_V1 = "dronedream.px4-evaluation-window-evidence/v1"
 PX4_EVALUATION_WINDOW_VERIFIER_REVISION = "px4-evaluation-window-verifier-1.0"
+PX4_OUTCOME_POLICY_V1 = "dronedream.px4-outcome-policy/v1"
+PX4_OUTCOME_EVIDENCE_V1 = "dronedream.px4-outcome-evidence/v1"
+PX4_OUTCOME_VERIFIER_REVISION = "px4-outcome-verifier-1.0"
+PX4_PROGRESS_REVISION = "directed-continuous-arc-coverage-1.0"
+PX4_SCORE_REVISION = "rmse-plus-half-max-plus-duration-and-fixed-penalties-1.0"
 
 _PROJECTION_BACKTRACK_SEGMENTS = 16
 _PROJECTION_FORWARD_SEGMENTS = 64
@@ -31,6 +41,24 @@ _PROJECTION_GLOBAL_RESCAN_INTERVAL = 256
 _PROJECTION_GLOBAL_RESCAN_DISTANCE_M = 2.0
 _PROJECTION_LOCAL_ERROR_FALLBACK_M = 5.0
 _MAX_PROJECTION_SEGMENT_COMPARISONS = 10_000_000
+_MAX_COVERAGE_PROGRESS_STEP_FRACTION = 0.2
+_MIN_CONTINUOUS_PROGRESS_STEP_M = 0.25
+_CONTINUOUS_PROGRESS_POSITION_MULTIPLIER = 4.0
+_CONTINUOUS_PROGRESS_OFFSET_M = 0.1
+_MAX_STABLE_POSITION_SPEED_MPS = 25.0
+_MAX_STABLE_TRACK_ERROR_M = 30.0
+_MIN_AIRBORNE_REFERENCE_ALTITUDE_M = 0.5
+_MIN_COLLAPSE_ALTITUDE_M = 0.2
+_BACKWARD_TOLERANCE_M = 0.1
+_BACKWARD_TOLERANCE_TRACK_FRACTION = 0.02
+_ENDPOINT_TOLERANCE_M = 0.25
+_ENDPOINT_TOLERANCE_TRACK_FRACTION = 0.01
+_CRASH_PENALTY = 100.0
+_TIMEOUT_PENALTY = 120.0
+_INSTABILITY_PENALTY = 80.0
+_PROGRESS_PENALTY = 20.0
+_MAX_ERROR_SCORE_WEIGHT = 0.5
+_DURATION_SCORE_WEIGHT = 0.05
 
 Sha256Id = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 NonnegativeInt = Annotated[int, Field(ge=0)]
@@ -127,6 +155,155 @@ class Px4EvaluationWindowEvidenceV1(BaseModel):
         evidence_id = payload.pop("evidence_id")
         if evidence_id != _sha256_id(payload):
             raise ValueError("evaluation-window evidence ID does not match its content")
+        return self
+
+
+class Px4OutcomePolicyV1(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        allow_inf_nan=False,
+    )
+
+    schema_id: Literal["dronedream.px4-outcome-policy/v1"] = "dronedream.px4-outcome-policy/v1"
+    policy_id: Sha256Id
+    evaluation_policy_id: Sha256Id
+    progress_revision: Literal["directed-continuous-arc-coverage-1.0"] = (
+        "directed-continuous-arc-coverage-1.0"
+    )
+    score_revision: Literal["rmse-plus-half-max-plus-duration-and-fixed-penalties-1.0"] = (
+        "rmse-plus-half-max-plus-duration-and-fixed-penalties-1.0"
+    )
+    maximum_progress_step_fraction: Annotated[float, Field(gt=0.0, le=1.0)]
+    minimum_progress_step_m: Annotated[float, Field(gt=0.0)]
+    progress_position_multiplier: Annotated[float, Field(gt=0.0)]
+    progress_offset_m: NonnegativeFloat
+    maximum_position_speed_mps: Annotated[float, Field(gt=0.0)]
+    maximum_stable_track_error_m: Annotated[float, Field(gt=0.0)]
+    minimum_airborne_reference_altitude_m: NonnegativeFloat
+    minimum_collapse_altitude_m: NonnegativeFloat
+    backward_tolerance_m: NonnegativeFloat
+    backward_tolerance_track_fraction: UnitInterval
+    endpoint_tolerance_m: NonnegativeFloat
+    endpoint_tolerance_track_fraction: UnitInterval
+    crash_penalty: NonnegativeFloat
+    timeout_penalty: NonnegativeFloat
+    instability_penalty: NonnegativeFloat
+    progress_penalty: NonnegativeFloat
+    max_error_score_weight: NonnegativeFloat
+    duration_score_weight: NonnegativeFloat
+
+    @model_validator(mode="after")
+    def _validate_policy_id(self) -> Px4OutcomePolicyV1:
+        payload = self.model_dump(mode="json")
+        policy_id = payload.pop("policy_id")
+        if policy_id != _sha256_id(payload):
+            raise ValueError("PX4 outcome policy ID does not match its content")
+        return self
+
+
+class Px4OutcomeEvidenceV1(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        allow_inf_nan=False,
+    )
+
+    schema_id: Literal["dronedream.px4-outcome-evidence/v1"] = "dronedream.px4-outcome-evidence/v1"
+    evidence_id: Sha256Id
+    verifier_revision: Literal["px4-outcome-verifier-1.0"] = "px4-outcome-verifier-1.0"
+    outcome_policy_id: Sha256Id
+    evaluation_policy_id: Sha256Id
+    evaluation_window_evidence_id: Sha256Id
+    core_metric_evidence_id: Sha256Id
+    telemetry_contract_id: Sha256Id
+    reference_track_sha256: Sha256Id
+    scenario_effect_request_sha256: Sha256Id
+    scenario_effect_evidence_sha256: Sha256Id | None = None
+    synthetic: bool
+    requested_effects: tuple[str, ...]
+    applied_effects: tuple[str, ...]
+    scenario_effect_status: Literal[
+        "not_requested",
+        "verified_applied",
+        "unsupported",
+        "failed",
+        "missing_evidence",
+        "invalid_evidence",
+    ]
+    scenario_effects_ready: bool
+    crash_flag: bool
+    crash_reason: Literal[
+        "none",
+        "telemetry_crashed_flag",
+        "altitude_collapse_in_evaluation_window",
+    ]
+    crash_sample_index: NonnegativeInt | None = None
+    timeout_flag: bool
+    instability_flag: bool
+    instability_reasons: tuple[
+        Literal[
+            "position_speed_exceeded",
+            "track_error_exceeded",
+        ],
+        ...,
+    ]
+    instability_first_sample_index: NonnegativeInt | None = None
+    maximum_observed_position_speed_mps: NonnegativeFloat
+    full_track_coverage: UnitInterval
+    evaluation_track_coverage: UnitInterval
+    evaluation_directed_progress_fraction: UnitInterval
+    evaluation_backward_distance_m: NonnegativeFloat
+    evaluation_progress_discontinuity_count: NonnegativeInt
+    evaluation_direction_valid: bool
+    evaluation_start_reached: bool
+    evaluation_endpoint_reached: bool
+    evaluation_progress_contract_ok: bool
+    track_length_3d_m: Annotated[float, Field(gt=0.0)]
+    track_is_closed: bool
+    evaluation_min_z_m: float
+    evaluation_max_z_m: float
+    pass_flag: bool
+    score_rmse_component: NonnegativeFloat
+    score_max_error_component: NonnegativeFloat
+    score_duration_component: NonnegativeFloat
+    score_penalty: NonnegativeFloat
+    score: float
+
+    @model_validator(mode="after")
+    def _validate_outcome(self) -> Px4OutcomeEvidenceV1:
+        if self.crash_flag != (self.crash_reason != "none"):
+            raise ValueError("PX4 crash flag and reason are inconsistent")
+        if self.crash_flag != (self.crash_sample_index is not None):
+            raise ValueError("PX4 crash flag and sample index are inconsistent")
+        if self.instability_flag != bool(self.instability_reasons):
+            raise ValueError("PX4 instability flag and reasons are inconsistent")
+        if self.scenario_effects_ready != (
+            self.requested_effects == self.applied_effects
+            and self.scenario_effect_status in {"not_requested", "verified_applied"}
+        ):
+            raise ValueError("PX4 scenario-effect readiness is inconsistent")
+        if self.pass_flag and (
+            self.crash_flag
+            or self.timeout_flag
+            or self.instability_flag
+            or not self.scenario_effects_ready
+            or not self.evaluation_progress_contract_ok
+        ):
+            raise ValueError("PX4 passing outcome violates a mandatory gate")
+        expected_score = round(
+            self.score_rmse_component
+            + self.score_max_error_component
+            + self.score_duration_component
+            + self.score_penalty,
+            6,
+        )
+        if self.score != expected_score:
+            raise ValueError("PX4 outcome score does not match its components")
+        payload = self.model_dump(mode="json")
+        evidence_id = payload.pop("evidence_id")
+        if evidence_id != _sha256_id(payload):
+            raise ValueError("PX4 outcome evidence ID does not match its content")
         return self
 
 
@@ -246,6 +423,26 @@ class _EvaluationWindow:
     trimmed_landing_samples: int
 
 
+@dataclass(frozen=True)
+class _TrackProgress:
+    coverage: float
+    directed_progress_fraction: float
+    backward_distance: float
+    discontinuity_count: int
+    start_progress: float | None
+    end_progress: float | None
+
+
+@dataclass(frozen=True)
+class _ScenarioEffectState:
+    request_sha256: str
+    evidence_sha256: str | None
+    requested_effects: tuple[str, ...]
+    applied_effects: tuple[str, ...]
+    status: str
+    ready: bool
+
+
 def _canonical_json(value: object) -> str:
     return json.dumps(
         value,
@@ -258,6 +455,36 @@ def _canonical_json(value: object) -> str:
 
 def _sha256_id(value: object) -> str:
     return "sha256:" + hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def compile_px4_outcome_policy(
+    evaluation_policy: Px4EvaluationPolicyV1,
+) -> Px4OutcomePolicyV1:
+    payload = {
+        "schema_id": PX4_OUTCOME_POLICY_V1,
+        "evaluation_policy_id": evaluation_policy.policy_id,
+        "progress_revision": PX4_PROGRESS_REVISION,
+        "score_revision": PX4_SCORE_REVISION,
+        "maximum_progress_step_fraction": (_MAX_COVERAGE_PROGRESS_STEP_FRACTION),
+        "minimum_progress_step_m": _MIN_CONTINUOUS_PROGRESS_STEP_M,
+        "progress_position_multiplier": (_CONTINUOUS_PROGRESS_POSITION_MULTIPLIER),
+        "progress_offset_m": _CONTINUOUS_PROGRESS_OFFSET_M,
+        "maximum_position_speed_mps": _MAX_STABLE_POSITION_SPEED_MPS,
+        "maximum_stable_track_error_m": _MAX_STABLE_TRACK_ERROR_M,
+        "minimum_airborne_reference_altitude_m": (_MIN_AIRBORNE_REFERENCE_ALTITUDE_M),
+        "minimum_collapse_altitude_m": _MIN_COLLAPSE_ALTITUDE_M,
+        "backward_tolerance_m": _BACKWARD_TOLERANCE_M,
+        "backward_tolerance_track_fraction": (_BACKWARD_TOLERANCE_TRACK_FRACTION),
+        "endpoint_tolerance_m": _ENDPOINT_TOLERANCE_M,
+        "endpoint_tolerance_track_fraction": (_ENDPOINT_TOLERANCE_TRACK_FRACTION),
+        "crash_penalty": _CRASH_PENALTY,
+        "timeout_penalty": _TIMEOUT_PENALTY,
+        "instability_penalty": _INSTABILITY_PENALTY,
+        "progress_penalty": _PROGRESS_PENALTY,
+        "max_error_score_weight": _MAX_ERROR_SCORE_WEIGHT,
+        "duration_score_weight": _DURATION_SCORE_WEIGHT,
+    }
+    return Px4OutcomePolicyV1.model_validate({"policy_id": _sha256_id(payload), **payload})
 
 
 def compile_px4_evaluation_policy(
@@ -413,6 +640,11 @@ def _telemetry_samples(
                 raw_sample.get(field),
                 label=f"telemetry sample {index}.{field}",
             )
+        if "crashed" in raw_sample and not isinstance(
+            raw_sample["crashed"],
+            bool,
+        ):
+            raise Px4CoreMetricEvidenceError(f"telemetry sample {index}.crashed must be boolean")
         samples.append(sample)
     return samples, contract.contract_id, contract.synthetic
 
@@ -1143,14 +1375,582 @@ def require_px4_core_metric_binding(
         )
 
 
+def _merged_interval_length(
+    intervals: list[tuple[float, float]],
+) -> float:
+    if not intervals:
+        return 0.0
+    ordered = sorted(intervals)
+    total = 0.0
+    start, end = ordered[0]
+    for next_start, next_end in ordered[1:]:
+        if next_start <= end:
+            end = max(end, next_end)
+        else:
+            total += end - start
+            start, end = next_start, next_end
+    return total + (end - start)
+
+
+def _evaluate_track_progress(
+    samples: list[dict[str, Any]],
+    projections: list[_TrackProjection],
+    geometry: _TrackGeometry,
+    *,
+    max_track_error: float,
+    policy: Px4OutcomePolicyV1,
+) -> _TrackProgress:
+    intervals: list[tuple[float, float]] = []
+    previous: tuple[dict[str, Any], _TrackProjection] | None = None
+    first_progress: float | None = None
+    last_progress: float | None = None
+    forward_distance = 0.0
+    backward_distance = 0.0
+    discontinuity_count = 0
+    for sample, projection in zip(
+        samples,
+        projections,
+        strict=True,
+    ):
+        if projection.error > max_track_error:
+            previous = None
+            continue
+        if first_progress is None:
+            first_progress = projection.progress
+        last_progress = projection.progress
+        if previous is not None:
+            previous_sample, previous_projection = previous
+            delta = projection.progress - previous_projection.progress
+            if geometry.closed:
+                half_length = geometry.total_length / 2.0
+                if delta > half_length:
+                    delta -= geometry.total_length
+                elif delta < -half_length:
+                    delta += geometry.total_length
+            sample_distance = math.dist(
+                (
+                    float(sample["x"]),
+                    float(sample["y"]),
+                    float(sample["z"]),
+                ),
+                (
+                    float(previous_sample["x"]),
+                    float(previous_sample["y"]),
+                    float(previous_sample["z"]),
+                ),
+            )
+            maximum_continuous_step = min(
+                geometry.total_length * policy.maximum_progress_step_fraction,
+                max(
+                    policy.minimum_progress_step_m,
+                    sample_distance * policy.progress_position_multiplier
+                    + policy.progress_offset_m,
+                ),
+            )
+            if abs(delta) > maximum_continuous_step + 1e-9:
+                discontinuity_count += 1
+                previous = (sample, projection)
+                continue
+            if delta < -1e-12:
+                backward_distance += -delta
+                previous = (sample, projection)
+                continue
+            if delta > 1e-12:
+                forward_distance += delta
+                if geometry.closed:
+                    start = previous_projection.progress
+                    normalized_start = start % geometry.total_length
+                    normalized_end = normalized_start + delta
+                    if normalized_end <= geometry.total_length:
+                        intervals.append((normalized_start, normalized_end))
+                    else:
+                        intervals.append(
+                            (
+                                normalized_start,
+                                geometry.total_length,
+                            )
+                        )
+                        intervals.append(
+                            (
+                                0.0,
+                                normalized_end - geometry.total_length,
+                            )
+                        )
+                else:
+                    intervals.append(
+                        (
+                            previous_projection.progress,
+                            projection.progress,
+                        )
+                    )
+        previous = (sample, projection)
+    return _TrackProgress(
+        coverage=min(
+            1.0,
+            _merged_interval_length(intervals) / geometry.total_length,
+        ),
+        directed_progress_fraction=min(
+            1.0,
+            max(
+                0.0,
+                (forward_distance - backward_distance) / geometry.total_length,
+            ),
+        ),
+        backward_distance=backward_distance,
+        discontinuity_count=discontinuity_count,
+        start_progress=first_progress,
+        end_progress=last_progress,
+    )
+
+
+def _scenario_effect_state(
+    request_payload: object,
+    evidence_payload: object | None,
+) -> _ScenarioEffectState:
+    if not isinstance(request_payload, Mapping):
+        raise Px4CoreMetricEvidenceError("scenario-effect request evidence must be an object")
+    request = dict(request_payload)
+    try:
+        validate_scenario_effect_request(request)
+    except ScenarioEffectContractError as exc:
+        raise Px4CoreMetricEvidenceError(f"scenario-effect request is invalid: {exc}") from exc
+    raw_effects = request.get("effects")
+    if not isinstance(raw_effects, list):
+        raise Px4CoreMetricEvidenceError("scenario-effect request effects must be an array")
+    requested_effects = tuple(
+        sorted(str(effect["effect_id"]) for effect in raw_effects if isinstance(effect, Mapping))
+    )
+    request_sha256 = _sha256_id(request)
+    evidence_sha256 = (
+        _sha256_id(dict(evidence_payload)) if isinstance(evidence_payload, Mapping) else None
+    )
+    if evidence_payload is None:
+        status = "not_requested" if not requested_effects else "missing_evidence"
+        return _ScenarioEffectState(
+            request_sha256=request_sha256,
+            evidence_sha256=None,
+            requested_effects=requested_effects,
+            applied_effects=(),
+            status=status,
+            ready=not requested_effects,
+        )
+    try:
+        validated = validate_scenario_effect_evidence(
+            request,
+            evidence_payload,
+        )
+    except ScenarioEffectContractError:
+        return _ScenarioEffectState(
+            request_sha256=request_sha256,
+            evidence_sha256=evidence_sha256,
+            requested_effects=requested_effects,
+            applied_effects=(),
+            status="invalid_evidence",
+            ready=False,
+        )
+    applied_effects = tuple(str(value) for value in validated.get("applied_effects", []))
+    failed_effects = tuple(str(value) for value in validated.get("failed_effects", []))
+    unsupported_effects = tuple(str(value) for value in validated.get("unsupported_effects", []))
+    if failed_effects:
+        status = "failed"
+    elif unsupported_effects:
+        status = "unsupported"
+    elif requested_effects == applied_effects:
+        status = "not_requested" if not requested_effects else "verified_applied"
+    else:
+        status = "invalid_evidence"
+    ready = requested_effects == applied_effects and status in {"not_requested", "verified_applied"}
+    return _ScenarioEffectState(
+        request_sha256=request_sha256,
+        evidence_sha256=evidence_sha256,
+        requested_effects=requested_effects,
+        applied_effects=applied_effects,
+        status=status,
+        ready=ready,
+    )
+
+
+def compile_px4_outcome_evidence(
+    *,
+    telemetry_payload: object,
+    reference_track_payload: object,
+    evaluation_policy: Px4EvaluationPolicyV1,
+    evaluation_window_evidence: Px4EvaluationWindowEvidenceV1,
+    core_metric_evidence: Px4CoreMetricEvidenceV1,
+    scenario_effect_request_payload: object,
+    scenario_effect_evidence_payload: object | None,
+) -> tuple[Px4OutcomePolicyV1, Px4OutcomeEvidenceV1]:
+    samples, telemetry_contract_id, synthetic = _telemetry_samples(telemetry_payload)
+    reference_points = _reference_points(reference_track_payload)
+    reference_track_sha256 = _sha256_id(reference_points)
+    if (
+        evaluation_window_evidence.telemetry_contract_id != telemetry_contract_id
+        or evaluation_window_evidence.reference_track_sha256 != reference_track_sha256
+        or evaluation_window_evidence.policy_id != evaluation_policy.policy_id
+    ):
+        raise Px4CoreMetricEvidenceError(
+            "evaluation-window evidence is not bound to outcome inputs"
+        )
+    if (
+        core_metric_evidence.telemetry_contract_id != telemetry_contract_id
+        or core_metric_evidence.reference_track_sha256 != reference_track_sha256
+        or core_metric_evidence.evaluation_start_index != evaluation_window_evidence.start_index
+        or core_metric_evidence.evaluation_end_index != evaluation_window_evidence.end_index
+    ):
+        raise Px4CoreMetricEvidenceError("core-metric evidence is not bound to outcome inputs")
+    outcome_policy = compile_px4_outcome_policy(evaluation_policy)
+    geometry = _build_track_geometry(reference_points)
+    projections = _project_samples_to_track(samples, geometry)
+    start_index = evaluation_window_evidence.start_index
+    end_index = evaluation_window_evidence.end_index
+    evaluation_samples = samples[start_index : end_index + 1]
+    evaluation_projections = projections[start_index : end_index + 1]
+    if not evaluation_samples:
+        raise Px4CoreMetricEvidenceError("outcome compilation requires evaluation samples")
+    evaluation_errors = [projection.error for projection in evaluation_projections]
+    raw_rmse = _time_weighted_rms(
+        evaluation_errors,
+        evaluation_samples,
+    )
+    raw_max_error = max(evaluation_errors)
+    evaluation_duration = float(evaluation_samples[-1]["t"]) - float(evaluation_samples[0]["t"])
+
+    crash_flag = False
+    crash_reason = "none"
+    crash_sample_index: int | None = None
+    for relative_index, sample in enumerate(evaluation_samples):
+        if sample.get("crashed", False) is True:
+            crash_flag = True
+            crash_reason = "telemetry_crashed_flag"
+            crash_sample_index = start_index + relative_index
+            break
+    stable_altitude_seen = any(
+        projection.reference_z > outcome_policy.minimum_airborne_reference_altitude_m
+        and float(sample["z"]) >= evaluation_policy.altitude_entry_fraction * projection.reference_z
+        for sample, projection in zip(
+            evaluation_samples,
+            evaluation_projections,
+            strict=True,
+        )
+    )
+    if (
+        not crash_flag
+        and stable_altitude_seen
+        and len(evaluation_samples) > evaluation_policy.consecutive_samples
+    ):
+        collapse_run = 0
+        for relative_index in range(
+            evaluation_policy.consecutive_samples,
+            len(evaluation_samples),
+        ):
+            reference_z = evaluation_projections[relative_index].reference_z
+            collapse_threshold = max(
+                outcome_policy.minimum_collapse_altitude_m,
+                evaluation_policy.collapse_altitude_fraction * reference_z,
+            )
+            if (
+                reference_z > outcome_policy.minimum_airborne_reference_altitude_m
+                and float(evaluation_samples[relative_index]["z"]) < collapse_threshold
+            ):
+                collapse_run += 1
+                if collapse_run >= evaluation_policy.consecutive_samples:
+                    crash_flag = True
+                    crash_reason = "altitude_collapse_in_evaluation_window"
+                    crash_sample_index = start_index + relative_index
+                    break
+            else:
+                collapse_run = 0
+
+    maximum_position_speed = 0.0
+    speed_instability_index: int | None = None
+    for relative_index in range(1, len(evaluation_samples)):
+        previous = evaluation_samples[relative_index - 1]
+        current = evaluation_samples[relative_index]
+        delta_t = float(current["t"]) - float(previous["t"])
+        position_speed = (
+            math.dist(
+                (
+                    float(current["x"]),
+                    float(current["y"]),
+                    float(current["z"]),
+                ),
+                (
+                    float(previous["x"]),
+                    float(previous["y"]),
+                    float(previous["z"]),
+                ),
+            )
+            / delta_t
+        )
+        maximum_position_speed = max(
+            maximum_position_speed,
+            position_speed,
+        )
+        if (
+            speed_instability_index is None
+            and position_speed > outcome_policy.maximum_position_speed_mps
+        ):
+            speed_instability_index = start_index + relative_index
+    instability_reasons: list[str] = []
+    instability_indices: list[int] = []
+    if speed_instability_index is not None:
+        instability_reasons.append("position_speed_exceeded")
+        instability_indices.append(speed_instability_index)
+    if raw_max_error > outcome_policy.maximum_stable_track_error_m:
+        instability_reasons.append("track_error_exceeded")
+        instability_indices.append(start_index + evaluation_errors.index(raw_max_error))
+    instability_flag = bool(instability_reasons)
+    instability_first_sample_index = min(instability_indices) if instability_indices else None
+
+    full_progress = _evaluate_track_progress(
+        samples,
+        projections,
+        geometry,
+        max_track_error=evaluation_policy.near_track_threshold_m,
+        policy=outcome_policy,
+    )
+    evaluation_progress = _evaluate_track_progress(
+        evaluation_samples,
+        evaluation_projections,
+        geometry,
+        max_track_error=evaluation_policy.near_track_threshold_m,
+        policy=outcome_policy,
+    )
+    backward_tolerance = max(
+        outcome_policy.backward_tolerance_m,
+        geometry.total_length * outcome_policy.backward_tolerance_track_fraction,
+    )
+    endpoint_tolerance = max(
+        outcome_policy.endpoint_tolerance_m,
+        geometry.total_length * outcome_policy.endpoint_tolerance_track_fraction,
+    )
+    start_progress = evaluation_progress.start_progress
+    end_progress = evaluation_progress.end_progress
+    final_reference = reference_points[-1]
+    final_sample = evaluation_samples[-1]
+    final_error = math.dist(
+        (
+            float(final_sample["x"]),
+            float(final_sample["y"]),
+            float(final_sample["z"]),
+        ),
+        (
+            final_reference["x"],
+            final_reference["y"],
+            final_reference["z"],
+        ),
+    )
+    if geometry.closed:
+        start_reached = (
+            start_progress is not None
+            and min(
+                start_progress,
+                abs(geometry.total_length - start_progress),
+            )
+            <= endpoint_tolerance
+        )
+        endpoint_reached = final_error <= evaluation_policy.pass_max_error_m
+    else:
+        start_reached = start_progress is not None and start_progress <= endpoint_tolerance
+        endpoint_reached = (
+            end_progress is not None
+            and end_progress >= geometry.total_length - endpoint_tolerance
+            and final_error <= evaluation_policy.pass_max_error_m
+        )
+    direction_valid = evaluation_progress.backward_distance <= backward_tolerance
+    progress_contract_ok = (
+        direction_valid
+        and evaluation_progress.discontinuity_count == 0
+        and evaluation_progress.directed_progress_fraction
+        >= evaluation_policy.minimum_track_coverage
+        and start_reached
+        and endpoint_reached
+    )
+    scenario_state = _scenario_effect_state(
+        scenario_effect_request_payload,
+        scenario_effect_evidence_payload,
+    )
+    timeout_flag = False
+    pass_flag = (
+        not crash_flag
+        and not timeout_flag
+        and not instability_flag
+        and raw_rmse <= evaluation_policy.pass_rmse_m
+        and raw_max_error <= evaluation_policy.pass_max_error_m
+        and evaluation_progress.coverage >= evaluation_policy.minimum_track_coverage
+        and progress_contract_ok
+        and scenario_state.ready
+    )
+    penalty = 0.0
+    if crash_flag:
+        penalty += outcome_policy.crash_penalty
+    if timeout_flag:
+        penalty += outcome_policy.timeout_penalty
+    if instability_flag:
+        penalty += outcome_policy.instability_penalty
+    if (
+        evaluation_progress.coverage < evaluation_policy.minimum_track_coverage
+        or not progress_contract_ok
+    ):
+        penalty += outcome_policy.progress_penalty
+    rmse_component = round(raw_rmse, 12)
+    max_error_component = round(
+        outcome_policy.max_error_score_weight * raw_max_error,
+        12,
+    )
+    duration_component = round(
+        outcome_policy.duration_score_weight * evaluation_duration,
+        12,
+    )
+    payload: dict[str, Any] = {
+        "schema_id": PX4_OUTCOME_EVIDENCE_V1,
+        "verifier_revision": PX4_OUTCOME_VERIFIER_REVISION,
+        "outcome_policy_id": outcome_policy.policy_id,
+        "evaluation_policy_id": evaluation_policy.policy_id,
+        "evaluation_window_evidence_id": (evaluation_window_evidence.evidence_id),
+        "core_metric_evidence_id": (core_metric_evidence.evidence_id),
+        "telemetry_contract_id": telemetry_contract_id,
+        "reference_track_sha256": reference_track_sha256,
+        "scenario_effect_request_sha256": (scenario_state.request_sha256),
+        "scenario_effect_evidence_sha256": (scenario_state.evidence_sha256),
+        "synthetic": synthetic,
+        "requested_effects": scenario_state.requested_effects,
+        "applied_effects": scenario_state.applied_effects,
+        "scenario_effect_status": scenario_state.status,
+        "scenario_effects_ready": scenario_state.ready,
+        "crash_flag": crash_flag,
+        "crash_reason": crash_reason,
+        "crash_sample_index": crash_sample_index,
+        "timeout_flag": timeout_flag,
+        "instability_flag": instability_flag,
+        "instability_reasons": tuple(instability_reasons),
+        "instability_first_sample_index": (instability_first_sample_index),
+        "maximum_observed_position_speed_mps": round(
+            maximum_position_speed,
+            6,
+        ),
+        "full_track_coverage": round(full_progress.coverage, 6),
+        "evaluation_track_coverage": round(
+            evaluation_progress.coverage,
+            6,
+        ),
+        "evaluation_directed_progress_fraction": round(
+            evaluation_progress.directed_progress_fraction,
+            6,
+        ),
+        "evaluation_backward_distance_m": round(
+            evaluation_progress.backward_distance,
+            6,
+        ),
+        "evaluation_progress_discontinuity_count": (evaluation_progress.discontinuity_count),
+        "evaluation_direction_valid": direction_valid,
+        "evaluation_start_reached": start_reached,
+        "evaluation_endpoint_reached": endpoint_reached,
+        "evaluation_progress_contract_ok": progress_contract_ok,
+        "track_length_3d_m": round(geometry.total_length, 6),
+        "track_is_closed": geometry.closed,
+        "evaluation_min_z_m": round(
+            min(float(sample["z"]) for sample in evaluation_samples),
+            6,
+        ),
+        "evaluation_max_z_m": round(
+            max(float(sample["z"]) for sample in evaluation_samples),
+            6,
+        ),
+        "pass_flag": pass_flag,
+        "score_rmse_component": rmse_component,
+        "score_max_error_component": max_error_component,
+        "score_duration_component": duration_component,
+        "score_penalty": penalty,
+        "score": round(
+            rmse_component + max_error_component + duration_component + penalty,
+            6,
+        ),
+    }
+    evidence = Px4OutcomeEvidenceV1.model_validate({"evidence_id": _sha256_id(payload), **payload})
+    return outcome_policy, evidence
+
+
+def require_px4_outcome_binding(
+    metrics: Mapping[str, object],
+    *,
+    policy: Px4OutcomePolicyV1,
+    evidence: Px4OutcomeEvidenceV1,
+) -> None:
+    raw_metrics = metrics.get("raw_metric_json")
+    if not isinstance(raw_metrics, Mapping):
+        raise Px4CoreMetricEvidenceError("PX4 raw metrics must be an object")
+    expected_top_level = {
+        "crash_flag": evidence.crash_flag,
+        "timeout_flag": evidence.timeout_flag,
+        "instability_flag": evidence.instability_flag,
+        "pass_flag": evidence.pass_flag,
+        "score": evidence.score,
+    }
+    if any(metrics.get(field) != value for field, value in expected_top_level.items()):
+        raise Px4CoreMetricEvidenceError(
+            "PX4 top-level verdict does not match independent evidence"
+        )
+    expected_raw = {
+        "track_coverage": evidence.full_track_coverage,
+        "evaluation_track_coverage": (evidence.evaluation_track_coverage),
+        "evaluation_directed_progress_fraction": (evidence.evaluation_directed_progress_fraction),
+        "evaluation_backward_distance_m": (evidence.evaluation_backward_distance_m),
+        "evaluation_progress_discontinuity_count": (
+            evidence.evaluation_progress_discontinuity_count
+        ),
+        "evaluation_direction_valid": (evidence.evaluation_direction_valid),
+        "evaluation_start_reached": (evidence.evaluation_start_reached),
+        "evaluation_endpoint_reached": (evidence.evaluation_endpoint_reached),
+        "evaluation_progress_contract_ok": (evidence.evaluation_progress_contract_ok),
+        "track_length_3d_m": evidence.track_length_3d_m,
+        "track_is_closed": evidence.track_is_closed,
+        "track_projection": ("ordered_local_3d_segment_projection"),
+        "track_projection_comparison_limit": (_MAX_PROJECTION_SEGMENT_COMPARISONS),
+        "coverage_basis": ("union_of_traversed_polyline_arc_length"),
+        "evaluation_min_z": evidence.evaluation_min_z_m,
+        "evaluation_max_z": evidence.evaluation_max_z_m,
+        "crash_reason": evidence.crash_reason,
+        "scenario_effects_ready": evidence.scenario_effects_ready,
+        "scenario_effect_status": evidence.scenario_effect_status,
+        "scenario_effect_request_sha256": (evidence.scenario_effect_request_sha256),
+        "scenario_effect_evidence_sha256": (evidence.scenario_effect_evidence_sha256),
+        "px4_outcome_policy": policy.model_dump(mode="json"),
+        "px4_outcome_evidence": evidence.model_dump(mode="json"),
+    }
+    if any(raw_metrics.get(field) != value for field, value in expected_raw.items()):
+        raise Px4CoreMetricEvidenceError(
+            "PX4 raw verdict does not match independent outcome evidence"
+        )
+
+
 __all__ = [
     "PX4_CORE_METRIC_EVIDENCE_V1",
     "PX4_CORE_METRIC_VERIFIER_REVISION",
+    "PX4_EVALUATION_POLICY_V1",
+    "PX4_EVALUATION_WINDOW_EVIDENCE_V1",
+    "PX4_EVALUATION_WINDOW_VERIFIER_REVISION",
+    "PX4_OUTCOME_EVIDENCE_V1",
+    "PX4_OUTCOME_POLICY_V1",
+    "PX4_OUTCOME_VERIFIER_REVISION",
+    "PX4_PROGRESS_REVISION",
     "PX4_RMSE_INTEGRATION_REVISION",
+    "PX4_SCORE_REVISION",
     "PX4_TRACK_PROJECTION_REVISION",
     "Px4CoreMetricEvidenceError",
     "Px4CoreMetricEvidenceV1",
+    "Px4EvaluationPolicyV1",
+    "Px4EvaluationWindowEvidenceV1",
     "Px4MaxErrorSampleV1",
+    "Px4OutcomeEvidenceV1",
+    "Px4OutcomePolicyV1",
     "compile_px4_core_metric_evidence",
+    "compile_px4_evaluation_policy",
+    "compile_px4_evaluation_window_evidence",
+    "compile_px4_outcome_evidence",
+    "compile_px4_outcome_policy",
+    "px4_evaluation_policy_from_environment",
     "require_px4_core_metric_binding",
+    "require_px4_evaluation_window_binding",
+    "require_px4_outcome_binding",
 ]
