@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -214,6 +215,12 @@ class CandidateParameterSet(Base):
     optimizer_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
         JSON, nullable=True
     )
+    evidence_ledger_required: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
     parent_candidate_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     llm_response_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     trial_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -231,6 +238,11 @@ class CandidateParameterSet(Base):
 
     job: Mapped[Job] = relationship(back_populates="candidates")
     trials: Mapped[list[Trial]] = relationship(back_populates="candidate")
+    evidence_receipts: Mapped[list[CandidateEvidenceReceipt]] = relationship(
+        back_populates="candidate",
+        cascade="all, delete-orphan",
+        order_by="CandidateEvidenceReceipt.revision",
+    )
 
 
 class Trial(Base):
@@ -379,6 +391,22 @@ class JobReport(Base):
     job: Mapped[Job] = relationship(back_populates="report")
     winner_freeze_receipt: Mapped[WinnerFreezeReceipt | None] = relationship(
         back_populates="report"
+    )
+
+
+class WinnerFreezeDeleteAuthorization(Base):
+    """Transaction-scoped authorization for winner-freeze lifecycle deletion."""
+
+    __tablename__ = "winner_freeze_delete_authorizations"
+
+    receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("winner_freeze_receipts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
     )
 
 
@@ -555,6 +583,73 @@ class TrialExecutionAttemptDeleteAuthorization(Base):
     )
 
 
+class CandidateEvidenceReceipt(Base):
+    """Append-only Candidate outcome/report evidence-chain revision."""
+
+    __tablename__ = "candidate_evidence_receipts"
+    __table_args__ = (
+        UniqueConstraint(
+            "candidate_id",
+            "revision",
+            name="uq_candidate_evidence_receipts_candidate_revision",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    candidate_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("candidate_parameter_sets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    job_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    previous_evidence_id: Mapped[str | None] = mapped_column(
+        String(71), nullable=True
+    )
+    receipt_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    evidence_id: Mapped[str] = mapped_column(
+        String(71), nullable=False, unique=True, index=True
+    )
+    aggregate_sha256: Mapped[str] = mapped_column(String(71), nullable=False)
+    outcome_evidence_id: Mapped[str] = mapped_column(
+        String(71), nullable=False
+    )
+    report_evidence_id: Mapped[str] = mapped_column(
+        String(71), nullable=False
+    )
+    outcome_evidence_json: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False
+    )
+    report_evidence_json: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False
+    )
+    evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    candidate: Mapped[CandidateParameterSet] = relationship(
+        back_populates="evidence_receipts"
+    )
+
+
+class CandidateEvidenceDeleteAuthorization(Base):
+    """Transaction-scoped authorization for Candidate evidence deletion."""
+
+    __tablename__ = "candidate_evidence_delete_authorizations"
+
+    receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("candidate_evidence_receipts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+
 class JobEvent(Base):
     __tablename__ = "job_events"
 
@@ -594,6 +689,8 @@ class JobSecret(Base):
 __all__ = [
     "Artifact",
     "BatchJob",
+    "CandidateEvidenceDeleteAuthorization",
+    "CandidateEvidenceReceipt",
     "CandidateParameterSet",
     "Job",
     "JobEvent",
@@ -605,4 +702,5 @@ __all__ = [
     "TrialExecutionAttemptOutcome",
     "TrialMetric",
     "User",
+    "WinnerFreezeDeleteAuthorization",
 ]

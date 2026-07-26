@@ -414,8 +414,35 @@ envelopes retain their original verification rules.
 
 This closes the logical-Trial-to-physical-attempt-to-artifact-to-Candidate
 lineage at current aggregation, winner, report, and replay readers. Candidate
-evidence is still embedded in mutable compatibility JSON rather than its own
-append-only relational table. A database owner can drop the guards, SQL and
+evidence was still embedded in mutable compatibility JSON rather than its own
+append-only relational table at this revision.
+
+Outcome Contract compiler 2.11 adds
+`dronedream.candidate-evidence-receipt/v1`. Every new Candidate v3 aggregate
+receives a relational, content-addressed receipt binding Candidate/Job identity,
+generation and parameter hashes, the complete aggregate hash, the linked
+outcome/report evidence IDs and schemas, both Trial-evidence hashes, accepted
+physical-attempt counts, revision number, and predecessor receipt. Readers
+verify the complete contiguous revision chain and require the latest receipt to
+match the current aggregate byte-for-byte at the canonical-JSON boundary.
+Publishability, acceptance, optimizer history, CMA-family selection, and report
+publication all fail closed when that chain is missing, malformed, stale, or
+divergent.
+
+The Candidate row also carries an irreversible
+`evidence_ledger_required` gate. Aggregation turns it on before recording a
+receipt; SQLite and PostgreSQL reject any later true-to-false transition. The
+migration turns the gate on for pre-ledger rows that already contain v3
+evidence. Consequently, deleting both the mutable JSON
+envelopes and their compatibility markers cannot revive a legacy permissive
+path. Such an upgraded legacy Candidate remains unavailable until trustworthy
+reaggregation creates its relational receipt. Receipt updates and ordinary
+deletes are rejected. Explicit terminal Job deletion writes transaction-scoped
+Candidate-receipt and winner-freeze deletion authorizations, preserving the
+user's right to delete the Job without weakening normal immutability.
+
+This closes the mutable Candidate-envelope fallback at supported application
+and database boundaries. A database owner can still drop the guards, SQL and
 object storage are not one atomic commit, and simulator-authored metrics still
 need the stronger independent telemetry/unit/frame/time verifier described in
 the full Harness design.

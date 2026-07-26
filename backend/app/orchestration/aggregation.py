@@ -37,6 +37,11 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.config import get_settings
 from app.db import SessionLocal
+from app.optimization.candidate_evidence_ledger import (
+    candidate_evidence_chain_matches_current,
+    candidate_evidence_receipt_required,
+    record_candidate_evidence_receipt,
+)
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
 from app.optimization.outcome_contract import (
     OptimizationOutcomeContractV1,
@@ -197,6 +202,14 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
         return False
     aggregate = candidate.aggregated_metric_json
     if not isinstance(aggregate, dict):
+        return False
+    if (
+        candidate_evidence_receipt_required(candidate)
+        and not candidate_evidence_chain_matches_current(
+            candidate,
+            aggregate,
+        )
+    ):
         return False
     authoritative_aggregate = authoritative_candidate_trial_outcome_projection(
         candidate_id=getattr(candidate, "id", None),
@@ -1185,6 +1198,10 @@ def _aggregate_candidate(
             agg["candidate_report_evidence_required"] = True
             agg["candidate_report_evidence"] = report_evidence.model_dump(
                 mode="json"
+            )
+            record_candidate_evidence_receipt(
+                candidate=candidate,
+                aggregate=agg,
             )
     candidate.aggregated_metric_json = agg
     candidate.aggregated_score = aggregated_score

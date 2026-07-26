@@ -10,6 +10,10 @@ from typing import Any, cast
 
 from app import models, schemas
 from app.optimization.bayesian_optimizers import propose_bayesian_candidates
+from app.optimization.candidate_evidence_ledger import (
+    candidate_evidence_chain_matches_current,
+    candidate_evidence_receipt_required,
+)
 from app.optimization.cma_optimizers import propose_evolutionary_candidates
 from app.optimization.domain import ParameterDomain, SearchSpace
 from app.optimization.experimental_types import (
@@ -97,15 +101,23 @@ def _objective_directions(job: models.Job) -> dict[str, str]:
 
 
 def _candidate_failure_rate(candidate: models.CandidateParameterSet) -> float:
-    evidence_required = candidate_outcome_evidence_required(
-        candidate.aggregated_metric_json
+    raw_aggregate = candidate.aggregated_metric_json
+    ledger_required = candidate_evidence_receipt_required(candidate)
+    evidence_required = (
+        candidate_outcome_evidence_required(raw_aggregate)
+        or ledger_required
     )
+    if ledger_required and not candidate_evidence_chain_matches_current(
+        candidate,
+        raw_aggregate,
+    ):
+        raw_aggregate = {}
     aggregate = authoritative_candidate_trial_outcome_projection(
         candidate_id=candidate.id,
         generation_index=candidate.generation_index,
         parameter_snapshot=candidate.parameter_json,
         trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
-        aggregate=candidate.aggregated_metric_json,
+        aggregate=raw_aggregate,
     )
     if evidence_required and not aggregate:
         return 1.0
@@ -206,7 +218,16 @@ def observations_for_job(
             # user, but an invalid point cannot train the current search space.
             continue
         raw_aggregate = candidate.aggregated_metric_json
-        evidence_required = candidate_outcome_evidence_required(raw_aggregate)
+        ledger_required = candidate_evidence_receipt_required(candidate)
+        evidence_required = (
+            candidate_outcome_evidence_required(raw_aggregate)
+            or ledger_required
+        )
+        if ledger_required and not candidate_evidence_chain_matches_current(
+            candidate,
+            raw_aggregate,
+        ):
+            raw_aggregate = {}
         aggregate = authoritative_candidate_trial_outcome_projection(
             candidate_id=candidate.id,
             generation_index=candidate.generation_index,

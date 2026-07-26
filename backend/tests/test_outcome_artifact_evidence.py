@@ -324,6 +324,7 @@ def test_candidate_v2_binds_verified_trial_artifact_bytes_and_roles(
             "candidate_report_evidence_required": True,
             "candidate_report_evidence": report.model_dump(mode="json"),
         }
+        assert candidate.evidence_ledger_required is False
         projection = require_authoritative_candidate_report_projection(
             candidate,
             verify_artifact_bytes=True,

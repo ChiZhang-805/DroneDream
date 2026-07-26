@@ -164,6 +164,49 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         "ADD COLUMN optimizer_metadata_json JSON"
                     )
                 )
+            if "evidence_ledger_required" not in candidate_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE candidate_parameter_sets "
+                        "ADD COLUMN evidence_ledger_required BOOLEAN "
+                        "NOT NULL DEFAULT 0"
+                    )
+                )
+            if "aggregated_metric_json" in candidate_columns:
+                conn.execute(
+                    text(
+                        "UPDATE candidate_parameter_sets "
+                        "SET evidence_ledger_required = 1 "
+                        "WHERE evidence_ledger_required = 0 "
+                        "AND aggregated_metric_json IS NOT NULL "
+                        "AND ("
+                        "json_extract(aggregated_metric_json, "
+                        "'$.candidate_outcome_evidence.schema_id') = "
+                        "'dronedream.candidate-outcome-evidence/v3' "
+                        "OR json_extract(aggregated_metric_json, "
+                        "'$.candidate_report_evidence.schema_id') = "
+                        "'dronedream.candidate-report-evidence/v3'"
+                        ")"
+                    )
+                )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_candidate_evidence_required_no_downgrade
+                    BEFORE UPDATE OF evidence_ledger_required
+                    ON candidate_parameter_sets
+                    WHEN OLD.evidence_ledger_required = 1
+                     AND NEW.evidence_ledger_required IS NOT 1
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'Candidate evidence requirement is irreversible'
+                        );
+                    END
+                    """
+                )
+            )
         if "job_reports" in table_names:
             report_columns = {
                 row[1]
@@ -189,6 +232,21 @@ def _apply_sqlite_lightweight_migrations() -> None:
             conn.execute(
                 text(
                     """
+                    CREATE TABLE IF NOT EXISTS
+                    winner_freeze_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES winner_freeze_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
                     CREATE TRIGGER IF NOT EXISTS
                     trg_winner_freeze_receipts_no_update
                     BEFORE UPDATE ON winner_freeze_receipts
@@ -203,10 +261,21 @@ def _apply_sqlite_lightweight_migrations() -> None:
             )
             conn.execute(
                 text(
+                    "DROP TRIGGER IF EXISTS "
+                    "trg_winner_freeze_receipts_no_delete"
+                )
+            )
+            conn.execute(
+                text(
                     """
                     CREATE TRIGGER IF NOT EXISTS
                     trg_winner_freeze_receipts_no_delete
                     BEFORE DELETE ON winner_freeze_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM winner_freeze_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
                     BEGIN
                         SELECT RAISE(
                             ABORT,
@@ -420,6 +489,57 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         SELECT RAISE(
                             ABORT,
                             'accepted Trial execution attempt is immutable or mismatched'
+                        );
+                    END
+                    """
+                )
+            )
+        if "candidate_evidence_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    candidate_evidence_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES candidate_evidence_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_candidate_evidence_receipts_no_update
+                    BEFORE UPDATE ON candidate_evidence_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'Candidate evidence receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_candidate_evidence_receipts_no_delete
+                    BEFORE DELETE ON candidate_evidence_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM candidate_evidence_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'Candidate evidence receipts are append-only'
                         );
                     END
                     """

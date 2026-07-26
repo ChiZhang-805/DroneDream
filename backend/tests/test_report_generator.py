@@ -157,7 +157,7 @@ def test_summary_text_covers_baseline_and_optimized(ctx):
     )
 
 
-def test_bound_report_projection_ignores_compatibility_fields_and_fails_closed(
+def test_bound_report_projection_seals_compatibility_and_evidence_fields(
     ctx,
 ):
     job_id = _run_job_to_completion(
@@ -176,15 +176,13 @@ def test_bound_report_projection_ignores_compatibility_fields_and_fails_closed(
         aggregate = json.loads(
             json.dumps(best.aggregated_metric_json)
         )
-        expected_rmse = aggregate["candidate_report_evidence"]["projection"][
-            "rmse"
-        ]
         aggregate["rmse"] = 999.0
-        assert rg._authoritative_report_aggregate(  # noqa: SLF001
-            best,
-            aggregate,
-        )["rmse"] == pytest.approx(expected_rmse)
+        with pytest.raises(rg.ReportEvidenceError):
+            rg._authoritative_report_aggregate(best, aggregate)  # noqa: SLF001
 
+        aggregate = json.loads(
+            json.dumps(best.aggregated_metric_json)
+        )
         aggregate["candidate_report_evidence"]["projection"]["rmse"] = 999.0
         with pytest.raises(rg.ReportEvidenceError):
             rg._authoritative_report_aggregate(best, aggregate)  # noqa: SLF001

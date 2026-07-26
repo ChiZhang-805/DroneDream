@@ -11,6 +11,10 @@ import math
 from dataclasses import dataclass
 
 from app import models
+from app.optimization.candidate_evidence_ledger import (
+    candidate_evidence_chain_matches_current,
+    candidate_evidence_receipt_required,
+)
 from app.optimization.outcome_evidence import (
     authoritative_candidate_trial_outcome_projection,
     candidate_outcome_evidence_required,
@@ -101,7 +105,16 @@ def evaluate_candidate(
     """
 
     raw_aggregate = candidate.aggregated_metric_json
-    evidence_required = candidate_outcome_evidence_required(raw_aggregate)
+    ledger_required = candidate_evidence_receipt_required(candidate)
+    evidence_required = (
+        candidate_outcome_evidence_required(raw_aggregate)
+        or ledger_required
+    )
+    if ledger_required and not candidate_evidence_chain_matches_current(
+        candidate,
+        raw_aggregate,
+    ):
+        raw_aggregate = {}
     agg = authoritative_candidate_trial_outcome_projection(
         candidate_id=candidate.id,
         generation_index=candidate.generation_index,

@@ -728,8 +728,8 @@ contract. The code audit found the following gaps:
 | `overshoot_count` counts local peaks in absolute track error over a fixed `0.25 m` prominence | this is a tracking-error peak count, not yet a controller-overshoot measurand |
 | all non-completed Trials count as candidate failures | adapter, port, storage, worker, and database failures can penalize controller parameters |
 | the external simulator can return an arbitrary cleaned failure-code string | an untrusted producer can influence retry/evidence classification |
-| only the latest Trial state and one `trial_metrics` row are relationally retained | retries, rejected outputs, verifier failures, and accepted-attempt provenance are not an immutable attempt ledger |
-| artifact storage metadata records path and size but not a mandatory content digest or attempt identity | replay cannot prove which bytes a metric used |
+| Outcome Contract compiler 2.10 stores append-only physical-attempt claims/outcomes and one immutable accepted-attempt pointer | addressed for current v3 aggregation; the independent telemetry semantic verifier remains the next trust boundary |
+| Outcome Contract compilers 2.8-2.10 bind retained Artifact bytes and accepted-attempt identity through Trial and Candidate evidence | addressed for current v3 aggregation; SQL/object-store atomic publication and operational WORM controls remain deployment boundaries |
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
 | legacy aggregation initially mixes all metrics and only the modern objective path replaces key fields with training values | compatibility paths remain too easy to use as if they had the same isolation guarantees |
 | rate parsing clamps values into `[0, 1]` | corrupted persisted evidence can be silently normalized instead of stopping the decision |
@@ -8456,13 +8456,37 @@ make SQL/object storage atomic, prevent a database owner from dropping guards,
 or independently verify simulator-authored telemetry semantics. Those remain
 the next evidence and operational boundaries.
 
+Outcome Contract compiler 2.11 makes the current Candidate envelope
+relationally append-only with
+`dronedream.candidate-evidence-receipt/v1`. Each receipt binds the full
+canonical aggregate hash, Candidate/Job/generation/parameter identity, linked
+v3 outcome and report evidence, both Trial-evidence hashes, accepted-attempt
+counts, a monotonic revision, and the previous receipt ID. Critical readers
+recompute and verify the complete chain and require the current mutable
+compatibility aggregate to equal the newest sealed receipt.
+
+An irreversible `evidence_ledger_required` Candidate flag prevents a caller
+from deleting both JSON evidence and the JSON “required” markers to recover a
+legacy permissive path. Aggregation turns the flag on, migration backfills it
+for existing v3 evidence, and SQLite/PostgreSQL reject true-to-false updates.
+Upgraded v3 evidence without a relational receipt therefore fails closed until
+trusted reaggregation creates one. Receipt updates and ordinary deletes fail.
+Explicit terminal Job deletion creates transaction-scoped authorizations for
+Candidate receipts and the winner-freeze receipt, so evidence immutability does
+not make user data undeletable.
+
+The remaining boundary is narrower: a database owner can still disable
+database guards, SQL/object storage publication is not atomic, operational
+WORM/role-separation policy is external, and simulator telemetry still needs
+independent unit/frame/time/source-log semantic verification.
+
 Current focused validation:
 
 ```text
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-843 passed
+845 passed
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 

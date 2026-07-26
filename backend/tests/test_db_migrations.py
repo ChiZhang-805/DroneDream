@@ -42,8 +42,36 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 CREATE TABLE candidate_parameter_sets (
                     id VARCHAR(64) PRIMARY KEY,
                     job_id VARCHAR(64) NOT NULL,
+                    aggregated_metric_json JSON,
                     created_at DATETIME NOT NULL,
                     updated_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO candidate_parameter_sets (
+                    id,
+                    job_id,
+                    aggregated_metric_json,
+                    created_at,
+                    updated_at
+                ) VALUES
+                (
+                    'candidate-v3',
+                    'job-v3',
+                    '{"candidate_outcome_evidence":{"schema_id":"dronedream.candidate-outcome-evidence/v3"}}',
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                ),
+                (
+                    'candidate-v2',
+                    'job-v2',
+                    '{"candidate_outcome_evidence":{"schema_id":"dronedream.candidate-outcome-evidence/v2"}}',
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
                 )
                 """
             )
@@ -168,6 +196,14 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 text("PRAGMA table_info('candidate_parameter_sets')")
             ).fetchall()
         }
+        candidate_evidence_requirements = dict(
+            conn.execute(
+                text(
+                    "SELECT id, evidence_ledger_required "
+                    "FROM candidate_parameter_sets"
+                )
+            ).fetchall()
+        )
         report_columns = {
             row[1]
             for row in conn.execute(
@@ -181,6 +217,16 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                     "SELECT name FROM sqlite_master "
                     "WHERE type='trigger' "
                     "AND tbl_name='winner_freeze_receipts'"
+                )
+            ).fetchall()
+        }
+        winner_freeze_delete_authorization_columns = {
+            row[1]
+            for row in conn.execute(
+                text(
+                    "PRAGMA table_info("
+                    "'winner_freeze_delete_authorizations'"
+                    ")"
                 )
             ).fetchall()
         }
@@ -217,11 +263,21 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     assert "cancelled_at" in batch_columns
     assert "expires_at" in secret_columns
     assert "optimizer_metadata_json" in candidate_columns
+    assert "evidence_ledger_required" in candidate_columns
+    assert candidate_evidence_requirements == {
+        "candidate-v2": 0,
+        "candidate-v3": 1,
+    }
     assert "winner_evidence_json" in report_columns
     assert "winner_freeze_receipt_id" in report_columns
     assert winner_freeze_triggers == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
+    }
+    assert winner_freeze_delete_authorization_columns == {
+        "receipt_id",
+        "reason",
+        "created_at",
     }
     assert "integrity_policy" in artifact_columns
     assert artifact_digest_triggers == {
@@ -289,6 +345,8 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "'artifact_digest_receipts', "
                 "'trial_execution_attempts', "
                 "'trial_execution_attempt_outcomes', "
+                "'candidate_evidence_receipts', "
+                "'candidate_parameter_sets', "
                 "'trials'"
                 ")"
             ).fetchall()
@@ -301,6 +359,28 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "AND name LIKE 'trial_execution_attempt%'"
             ).fetchall()
         }
+        candidate_evidence_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' "
+                "AND name LIKE 'candidate_evidence%'"
+            ).fetchall()
+        }
+        winner_freeze_authorization_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' "
+                "AND name='winner_freeze_delete_authorizations'"
+            ).fetchall()
+        }
+        candidate_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info('candidate_parameter_sets')"
+            ).fetchall()
+        }
     assert trigger_names == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
@@ -311,12 +391,23 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "trg_trial_execution_attempt_outcomes_no_update",
         "trg_trial_execution_attempt_outcomes_no_delete",
         "trg_trials_accepted_attempt_immutable",
+        "trg_candidate_evidence_receipts_no_update",
+        "trg_candidate_evidence_receipts_no_delete",
+        "trg_candidate_evidence_required_no_downgrade",
     }
     assert attempt_tables == {
         "trial_execution_attempts",
         "trial_execution_attempt_outcomes",
         "trial_execution_attempt_delete_authorizations",
     }
+    assert candidate_evidence_tables == {
+        "candidate_evidence_receipts",
+        "candidate_evidence_delete_authorizations",
+    }
+    assert winner_freeze_authorization_tables == {
+        "winner_freeze_delete_authorizations",
+    }
+    assert "evidence_ledger_required" in candidate_columns
 
 
 def test_postgresql_winner_freeze_migration_emits_immutable_trigger(
@@ -486,7 +577,7 @@ def test_postgresql_trial_attempt_migration_emits_immutable_guards(
     assert "belongs to another Trial" in sql
 
 
-def test_alembic_has_one_trial_attempt_head() -> None:
+def test_alembic_has_one_candidate_evidence_head() -> None:
     backend_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "heads"],
@@ -502,4 +593,49 @@ def test_alembic_has_one_trial_attempt_head() -> None:
         for line in result.stdout.splitlines()
         if line.strip()
     ]
-    assert heads == ["20260726_0008 (head)"]
+    assert heads == ["20260726_0009 (head)"]
+
+
+def test_postgresql_candidate_evidence_migration_emits_immutable_guard(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260726_0009_candidate_evidence_ledger.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "candidate_evidence_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _PostgresOp:
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration._install_postgres_guards()
+
+    sql = "\n".join(emitted)
+    assert (
+        "CREATE FUNCTION dronedream_reject_candidate_evidence_mutation()"
+        in sql
+    )
+    assert (
+        "BEFORE UPDATE OR DELETE ON candidate_evidence_receipts"
+        in sql
+    )
+    assert "candidate_evidence_delete_authorizations" in sql
+    assert "Candidate evidence receipts are append-only" in sql
+    assert "winner_freeze_delete_authorizations" in sql
+    assert "winner freeze receipts are append-only" in sql
+    assert "dronedream_reject_candidate_evidence_downgrade" in sql
+    assert "BEFORE UPDATE OF evidence_ledger_required" in sql

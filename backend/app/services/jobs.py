@@ -21,6 +21,9 @@ from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
 from app.llm_provider_policy import llm_base_url_is_allowed
+from app.optimization.candidate_evidence_ledger import (
+    authorize_candidate_evidence_deletion,
+)
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
 from app.optimization.outcome_contract import compile_outcome_contract
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
@@ -1050,6 +1053,11 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
         if trial_ids
         else []
     )
+    candidate_evidence_rows = [
+        receipt
+        for candidate in job.candidates
+        for receipt in candidate.evidence_receipts
+    ]
     artifact_rows = list(
         db.scalars(
             select(models.Artifact).where(
@@ -1076,6 +1084,30 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
                 attempt=attempt,
                 reason="job_delete",
             )
+        for receipt in candidate_evidence_rows:
+            authorize_candidate_evidence_deletion(
+                db,
+                receipt=receipt,
+                reason="job_delete",
+            )
+        if job.winner_freeze is not None:
+            winner_authorization = db.get(
+                models.WinnerFreezeDeleteAuthorization,
+                job.winner_freeze.id,
+            )
+            if winner_authorization is None:
+                db.add(
+                    models.WinnerFreezeDeleteAuthorization(
+                        receipt_id=job.winner_freeze.id,
+                        reason="job_delete",
+                    )
+                )
+            elif winner_authorization.reason != "job_delete":
+                raise JobServiceError(
+                    "WINNER_FREEZE_DELETE_NOT_AUTHORIZED",
+                    "Winner freeze deletion has a conflicting authorization.",
+                    http_status=500,
+                )
         for artifact in real_artifacts:
             if storage is None:
                 continue

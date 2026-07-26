@@ -541,6 +541,11 @@ def _candidate_evidence_binds_artifacts(candidate: object) -> bool:
 
 
 def _candidate_evidence_binds_attempts(candidate: object) -> bool:
+    try:
+        if list(candidate.evidence_receipts):  # type: ignore[attr-defined]
+            return True
+    except Exception:
+        pass
     aggregate = getattr(candidate, "aggregated_metric_json", None)
     if not isinstance(aggregate, Mapping):
         return False
@@ -1500,6 +1505,22 @@ def require_authoritative_candidate_report_projection(
         if aggregate is not None
         else getattr(candidate, "aggregated_metric_json", None)
     )
+    from app.optimization.candidate_evidence_ledger import (
+        candidate_evidence_chain_matches_current,
+        candidate_evidence_receipt_required,
+    )
+
+    if (
+        candidate_evidence_receipt_required(candidate)
+        and not candidate_evidence_chain_matches_current(
+            candidate,  # type: ignore[arg-type]
+            raw_aggregate,
+        )
+    ):
+        raise CandidateReportEvidenceError(
+            "required relational Candidate evidence does not match the "
+            "current aggregate"
+        )
     projection = authoritative_candidate_report_projection(
         candidate_id=getattr(candidate, "id", None),
         generation_index=getattr(candidate, "generation_index", None),

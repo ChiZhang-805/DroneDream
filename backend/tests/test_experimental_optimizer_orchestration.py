@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import DatabaseError
 
 STRATEGIES = (
     "constrained_mobo",
@@ -116,6 +117,10 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
 ) -> None:
     ctx = experimental_ctx
     job_id = _create_job(ctx, strategy)
+    from app.optimization.candidate_evidence_ledger import (
+        candidate_evidence_chain_matches_current,
+        current_candidate_evidence_receipt,
+    )
     from app.optimization.outcome_evidence import (
         CandidateOutcomeEvidenceV3,
         CandidateReportEvidenceV3,
@@ -276,6 +281,15 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
                     and "accepted_attempt_evidence" in row
                     for row in report_rows
                 )
+                receipt = current_candidate_evidence_receipt(candidate)
+                assert receipt is not None
+                assert receipt.candidate_id == candidate.id
+                assert receipt.outcome_evidence_id == evidence.evidence_id
+                assert (
+                    receipt.report_evidence_id
+                    == report_evidence.evidence_id
+                )
+                assert candidate_evidence_chain_matches_current(candidate)
 
         if strategy == "multi_fidelity_mobo":
             earlier_candidates = [
@@ -306,20 +320,113 @@ def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
                 for candidate in final_candidates
             )
             assert all(
-                candidate.optimizer_metadata_json["forced_full_fidelity_verification"] is True
+                candidate.optimizer_metadata_json[
+                    "forced_full_fidelity_verification"
+                ]
+                is True
                 for candidate in final_candidates
             )
             reduced_candidates = [
                 candidate
                 for candidate in earlier_candidates
-                if float(candidate.optimizer_metadata_json["requested_fidelity"]) < 1.0
+                if float(
+                    candidate.optimizer_metadata_json["requested_fidelity"]
+                )
+                < 1.0
             ]
             assert reduced_candidates
-            assert all(candidate.rank_in_job is None for candidate in reduced_candidates)
-            assert all(not candidate.is_best for candidate in reduced_candidates)
-            excluded_ids = {candidate.id for candidate in reduced_candidates}
+            assert all(
+                candidate.rank_in_job is None
+                for candidate in reduced_candidates
+            )
+            assert all(
+                not candidate.is_best for candidate in reduced_candidates
+            )
+            excluded_ids = {
+                candidate.id for candidate in reduced_candidates
+            }
             assert excluded_ids.isdisjoint(history.pareto_candidate_ids)
             assert excluded_ids.isdisjoint(history.recommendations.values())
+
+
+def test_candidate_evidence_ledger_blocks_legacy_fallback_and_allows_job_delete(
+    experimental_ctx: dict[str, Any],
+) -> None:
+    ctx = experimental_ctx
+    job_id = _create_job(ctx, "constrained_mobo")
+    assert _drive_to_terminal(ctx, job_id) == "COMPLETED"
+
+    from app.optimization.candidate_evidence_ledger import (
+        candidate_evidence_chain_matches_current,
+        candidate_evidence_receipt_required,
+    )
+    from app.optimization.outcome_evidence import (
+        CandidateReportEvidenceError,
+        require_authoritative_candidate_report_projection,
+    )
+    from app.orchestration.aggregation import candidate_is_publishable
+
+    models = ctx["models"]
+    with ctx["db"].SessionLocal() as db:
+        job = db.get(models.Job, job_id)
+        assert job is not None
+        candidate = next(
+            item
+            for item in job.candidates
+            if item.aggregated_metric_json
+            and item.evidence_receipts
+        )
+        assert candidate_evidence_receipt_required(candidate)
+        assert candidate_evidence_chain_matches_current(candidate)
+        assert candidate_is_publishable(candidate)
+        aggregate = dict(candidate.aggregated_metric_json or {})
+        aggregate.pop("candidate_outcome_evidence", None)
+        aggregate.pop("candidate_outcome_evidence_required", None)
+        aggregate.pop("candidate_report_evidence", None)
+        aggregate.pop("candidate_report_evidence_required", None)
+        candidate.aggregated_metric_json = aggregate
+        db.commit()
+        candidate_id = candidate.id
+        receipt_id = candidate.evidence_receipts[-1].id
+
+    with ctx["db"].SessionLocal() as db:
+        candidate = db.get(models.CandidateParameterSet, candidate_id)
+        assert candidate is not None
+        assert candidate.evidence_ledger_required is True
+        assert candidate_evidence_receipt_required(candidate)
+        assert not candidate_evidence_chain_matches_current(candidate)
+        assert not candidate_is_publishable(candidate)
+        with pytest.raises(
+            CandidateReportEvidenceError,
+            match="relational Candidate evidence",
+        ):
+            require_authoritative_candidate_report_projection(candidate)
+
+        with pytest.raises(DatabaseError):
+            db.execute(
+                update(models.CandidateEvidenceReceipt)
+                .where(models.CandidateEvidenceReceipt.id == receipt_id)
+                .values(aggregate_sha256="sha256:" + "0" * 64)
+            )
+            db.commit()
+        db.rollback()
+
+        with pytest.raises(DatabaseError):
+            db.execute(
+                update(models.CandidateParameterSet)
+                .where(models.CandidateParameterSet.id == candidate_id)
+                .values(evidence_ledger_required=False)
+            )
+            db.commit()
+        db.rollback()
+
+        assert ctx["jobs"].delete_job(db, job_id) == {
+            "id": job_id,
+            "deleted": True,
+        }
+
+    with ctx["db"].SessionLocal() as db:
+        assert db.get(models.CandidateEvidenceReceipt, receipt_id) is None
 
 
 def test_real_scenario_matrix_controls_iterative_budget_not_legacy_trial_count(

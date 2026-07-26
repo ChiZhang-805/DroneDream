@@ -15,6 +15,10 @@ import random
 from typing import Any
 
 from app import models, schemas
+from app.optimization.candidate_evidence_ledger import (
+    candidate_evidence_chain_matches_current,
+    candidate_evidence_receipt_required,
+)
 from app.optimization.domain import SearchSpace
 from app.optimization.outcome_contract import selection_order_key
 from app.orchestration.optimizer import CandidateProposal
@@ -71,6 +75,10 @@ def _best_scored_center(
         if candidate.aggregated_score is not None
         and not isinstance(candidate.aggregated_score, bool)
         and math.isfinite(float(candidate.aggregated_score))
+        and (
+            not candidate_evidence_receipt_required(candidate)
+            or candidate_evidence_chain_matches_current(candidate)
+        )
         and (safe_ranges is None or _parameters_from(candidate, safe_ranges) is not None)
     ]
     if not scored:
@@ -304,6 +312,10 @@ def _propose_selected_parameter_generation(
         if candidate.aggregated_score is not None
         and not isinstance(candidate.aggregated_score, bool)
         and math.isfinite(float(candidate.aggregated_score))
+        and (
+            not candidate_evidence_receipt_required(candidate)
+            or candidate_evidence_chain_matches_current(candidate)
+        )
     ]
     scored_history.sort(
         key=lambda item: (
