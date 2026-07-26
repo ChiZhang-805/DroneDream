@@ -22,7 +22,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.optimization.cma_optimizers import propose_evolutionary_candidates
 from app.optimization.design import halton_design
 from app.optimization.domain import ParameterDomain, SearchSpace
-from app.optimization.experimental_types import OptimizerObservation, OptimizerRequest
+from app.optimization.experimental_types import (
+    OptimizerObservation,
+    OptimizerRequest,
+    canonical_optimizer_seed_value,
+)
 from app.schemas import ScenarioCaseConfig, ScenarioSuiteConfig
 from app.simulator import JobConfig, MockSimulatorAdapter, TrialContext
 
@@ -128,7 +132,7 @@ class SimulationCoverageArtifact(_FrozenModel):
 
 def _canonical_sha256(value: object) -> str:
     payload = json.dumps(
-        value,
+        canonical_optimizer_seed_value(value),
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=True,

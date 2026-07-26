@@ -7,6 +7,7 @@ import pytest
 
 from app.optimization.simulation_coverage_campaign import (
     SimulationCoverageArtifact,
+    _canonical_sha256,
     run_simulation_coverage_campaign,
     write_frozen_simulation_coverage_artifact,
 )
@@ -42,6 +43,15 @@ def test_committed_simulation_coverage_freeze_matches_current_campaign(
     assert campaign.baseline_to_selected_improvement_rate >= 0.20
     assert campaign.all_scenarios_improved is True
     assert campaign.selected.holdout_all_pass is True
+
+
+def test_campaign_transcript_hash_ignores_cross_runtime_ulp_noise() -> None:
+    lower_ulp = [{"metadata": {"mean": 0.5823333333333333}}]
+    upper_ulp = [{"metadata": {"mean": 0.5823333333333334}}]
+    material_change = [{"metadata": {"mean": 0.5824333333333333}}]
+
+    assert _canonical_sha256(lower_ulp) == _canonical_sha256(upper_ulp)
+    assert _canonical_sha256(lower_ulp) != _canonical_sha256(material_change)
 
 
 def test_simulation_coverage_freeze_refuses_overwrite(
