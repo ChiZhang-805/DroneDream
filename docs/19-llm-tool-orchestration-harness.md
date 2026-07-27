@@ -5212,73 +5212,54 @@ zero-retention or training opt-out mode is verified, unsupported, or unknown.
 
 #### 17.3.4 Desktop API caller authentication
 
-The current packaged-desktop path has a security boundary that CORS does not close:
+The packaged-desktop path now has two independent authentication layers:
 
-- `runtime/config/runtime.env.default` sets `APP_ENV=desktop` and
-  `AUTH_MODE=disabled`;
-- `get_current_user()` consequently provisions/returns the same
-  `default@drone-dream.local` identity for every request;
-- Uvicorn listens on `127.0.0.1:8000`, and the WebView calls that address directly;
-- the production CSP and CORS configuration use explicit local origins, which is good
-  browser hardening, but a non-browser client can omit/forge `Origin`; moreover, a
-  browser can send some "simple" state-changing requests even when it cannot read the
-  CORS response;
-- `/api/v1/capabilities` currently has no user dependency, while Job, Trial, Batch, and
-  Artifact routes do call `get_current_user`; in disabled mode that distinction does
-  not authenticate the caller.
+- `runtime/config/runtime.env.default` sets `APP_ENV=desktop`,
+  `AUTH_MODE=oidc_jwt`, and `DESKTOP_BRIDGE_REQUIRED=true`;
+- OIDC authenticates the Supabase account by issuer and subject; desktop configuration
+  validation rejects anonymous auth and refuses to start without a canonical Runtime
+  identity and the bridge requirement;
+- the WebView no longer calls `127.0.0.1:8000` for JSON, Artifact, or CSV traffic.
+  `frontend/src/api/client.ts` routes those calls through the finite
+  `desktop_api_request` Tauri command, while browser development retains its ordinary
+  authenticated HTTP client;
+- Rust accepts only `GET`, `POST`, `PATCH`, or `DELETE`, a relative `/api/v1/` path, an
+  optional JSON body, one access token, and one of three response media types. It
+  rejects arbitrary URLs, headers, methods, traversal, control characters, request
+  bodies above 2 MiB, and responses above 64 MiB;
+- the production CSP has no local API HTTP `connect-src` or image source. Exact local
+  viewer WebSocket/frame permissions remain separate from private API authority.
 
 OWASP explicitly warns that `Origin` can be spoofed outside a browser and that CORS
 does not replace application access control. Tauri likewise describes CSP as impact
 reduction for WebView vulnerabilities and capabilities as the IPC authority boundary,
 not as authentication for a separate loopback HTTP service. Therefore
-`AUTH_MODE=disabled + bind(127.0.0.1)` is a development convenience, not a production
-desktop authentication design.
+`AUTH_MODE=disabled + bind(127.0.0.1)` remains a development convenience, not a
+production desktop design. Bridge v1 preserves OIDC as the user identity and adds
+proof of desktop possession instead of inventing a second user. Rust reads neither the
+stored application secret nor a reusable bridge token into JavaScript. A fixed
+shell-free WSL command derives a domain-separated HMAC key inside the signed Runtime
+from `APP_SECRET_KEY`, verifies that the environment Runtime ID matches the signed
+manifest, and returns only the derived key to the native process.
 
-The packaged target is **not** "put a long-lived bearer token in JavaScript." It is:
+Each application launch owns a random UUID session ID. Every request receives a fresh
+UUID nonce and integer timestamp; the HMAC covers protocol version, Runtime ID, session
+ID, timestamp, nonce, method, exact raw path/query, SHA-256 of the body, and SHA-256 of
+the Authorization header. The API verifies the signature in constant time, enforces a
+30-second clock window, recomputes both digests, compares the Runtime ID, and inserts
+the nonce into `desktop_bridge_nonces` before route execution. The primary key makes
+parallel or later reuse a durable `409 DESKTOP_BRIDGE_REPLAY`, including across API
+process restarts until bounded expiry cleanup.
 
-1. `AUTH_MODE=desktop_bridge` is mandatory whenever `APP_ENV=desktop`; configuration
-   validation rejects `desktop + disabled`, `desktop + demo_token`, and any direct
-   WebView credential mode. `disabled` remains available only in explicitly named,
-   isolated test/development profiles.
-2. The state-changing and private `/api/v1` application surface does not listen on a
-   Windows-visible TCP port. Uvicorn or a small internal ASGI broker listens on a
-   pathname Unix-domain socket owned by the API service, with mode, owner, type, and
-   peer-credential checks.
-3. Tauri Rust launches one fixed, long-lived
-   `dronedream-desktop-api-bridge` process in the dedicated distribution without a
-   shell. Rust and the bridge exchange bounded canonical frames over inherited
-   anonymous stdin/stdout; the bridge alone connects to the API socket under a
-   dedicated client UID/cgroup.
-4. The WebView calls narrow typed Tauri commands. It never receives the API session
-   key, an Authorization header, an arbitrary backend URL, a generic header map, a
-   filesystem path, or a generic "fetch this" capability. Rust maps a finite
-   `route_id` plus typed DTO to the canonical bridge frame and performs the request.
-5. Artifact/CSV downloads use separate bounded Tauri commands that stream a
-   user-authorized artifact to an application-owned temporary file or save dialog.
-   They do not hand an unauthenticated download URL or bearer token to an `<a>` element.
-6. Direct `connect-src http://127.0.0.1:8000` and API image sources are removed from
-   the packaged production CSP after migration. Development web builds retain a
-   separately configured bearer/OIDC HTTP client; the noVNC/Gazebo viewer, if enabled,
-   receives an exact Runtime-derived origin and a sandboxed frame policy rather than
-   inheriting a wildcard local-port API exception.
-
-Rust creates a random 256-bit launch key and 128-bit session ID only after the signed
-Runtime, API socket, bridge executable, and Harness manifest have passed readiness.
-The bridge registers the session over a separate fixed registration operation. The API
-keeps the key only in a bounded in-memory registry containing:
-
-- protocol and key version;
-- session ID and Runtime installation-owner principal;
-- Tauri launch ID, Runtime ID, Harness manifest digest, and bridge service identity;
-- creation, last-use, idle-expiry, and absolute-expiry times;
-- revocation state and bounded replay/idempotency-cache accounting.
-
-The Runtime installation has one stable random `desktop_owner_id`; it becomes
-`(identity_provider=urn:dronedream:desktop, external_subject=desktop_owner_id)` in the
-existing user model. It is not a secret, email, Runtime build ID, provider session
-reference, or authorization token. Session authentication proves the launch; the
-installation owner provides stable local data ownership across launches. Neither value
-is accepted from a WebView body.
+The current bridge still forwards from native Rust to an authenticated loopback
+listener and returns bounded bytes through IPC. Moving that last hop to a
+permission-restricted Runtime UDS, adding response MACs, per-mutation durable
+idempotency/result coalescing, expected-state versions, and native streaming save
+dialogs remain target work. The implemented claim is therefore protection against
+direct WebView HTTP, hostile web origins, accidental arbitrary clients, stale proofs,
+changed bodies/tokens, wrong Runtime services, and request replay. It does not claim to
+isolate DroneDream from malware already controlling the same Windows account, WSL
+root, or the Tauri process.
 
 The desktop API launch key is distinct from the provider-gateway launch key. Separate
 HKDF context labels, protocol versions, sockets, service identities, and revocation
@@ -5288,7 +5269,8 @@ gateway; the orchestration service still uses Section 17.3.2's provider-call bou
 
 #### 17.3.5 Request proof, replay, and response binding
 
-Every desktop bridge request uses a closed frame rather than raw HTTP:
+Bridge v1 implements the request-side subset above. The remaining UDS/response-binding
+target uses the following closed frame rather than exposing raw HTTP:
 
 ```text
 DesktopApiRequestV1 {
@@ -6893,8 +6875,8 @@ check; Runtime checks occur only in the launcher or after the explicit Settings
 | --- | --- | --- |
 | `backend/app/schemas.py` | parameter, scenario, acceptance, and provider validation | split orchestration mode from fixed algorithm; add plan/evidence/tool schemas plus a closed `OptimizationOutcomeContractV1` whose metric IDs, estimators, risk measures, constraints, transforms, scalarizations, references, missingness, and selection policies are registry enums rather than executable client expressions |
 | `backend/app/services/jobs.py` and `backend/app/routers/jobs.py` | strict create/rerun validation, user-scoped nested routes, bounded Job serialization, compatibility aliases | add versioned orchestration object, legacy conflict detection, redacted summaries, cursor-paginated decision/provenance/event reads, transport-injected one-time session-reference exchange, expected-state/idempotency requirements, and non-secret Job-binding rules |
-| `backend/app/auth.py`, `backend/app/main.py`, `runtime/config/runtime.env.default`, and API routers | OIDC issuer/subject identity, asymmetric algorithm allowlist, required `exp`/`iss`/`sub`/`aud`, exact CORS origins, and route-level user dependencies | replace packaged `AUTH_MODE=disabled` with mandatory `desktop_bridge`; move private `/api/v1` off loopback TCP; add launch/session request-proof verification, durable mutation idempotency, operation/state authorization, authenticated capabilities/readiness, hosted token profiles, and tenant/role policy before multi-tenant use |
-| `desktop/src-tauri/src/lib.rs`, `desktop/src-tauri/capabilities/default.json`, `desktop/src-tauri/tauri.conf.json`, and `frontend/src/api/client.ts` | fixed Rust commands, main-window capability, restrictive script CSP, and typed frontend API surface | add a long-lived fixed desktop API bridge and typed Rust API/download commands; keep keys/references outside JavaScript; remove generic direct WebView fetch/download URLs and production API `connect-src`; narrow global Tauri exposure and noVNC frame origin |
+| `backend/app/auth.py`, `backend/app/desktop_bridge.py`, `backend/app/main.py`, `runtime/config/runtime.env.default`, and API routers | OIDC issuer/subject identity, asymmetric algorithm allowlist, required `exp`/`iss`/`sub`/`aud`, mandatory desktop bridge, Runtime/session/body/token-bound request HMAC, durable nonce consumption, exact CORS origins, and route-level user dependencies | move the native-to-API hop from authenticated loopback to Runtime UDS; add response binding, durable mutation idempotency/result coalescing, expected-state authorization, authenticated capabilities/readiness, hosted token profiles, and tenant/role policy before multi-tenant use |
+| `desktop/src-tauri/src/desktop_api_bridge.rs`, `desktop/src-tauri/src/lib.rs`, `desktop/src-tauri/tauri.conf.json`, and `frontend/src/api/client.ts` | finite native API bridge, shell-free Runtime key derivation, bounded method/path/body/media contract, JSON/Artifact/CSV routing outside WebView fetch, and production CSP without local API HTTP sources | replace generic relative paths with generated route DTOs; stream large downloads through native save dialogs; add response MAC and restart-safe exact-response coalescing; narrow global Tauri exposure and noVNC frame origin |
 | `backend/app/orchestration/aggregation.py` and `acceptance.py` | generation completion, case-weighted reliability denominators, hierarchical usable-replicate means before fixed case weights, seed-level worst constraints, training-field preference, continuation boundary, and a content-addressed search-role Candidate outcome compatibility projection consumed by ranking/acceptance/optimizer learning | replace exclusive GPT/CMA/experimental continuation branches with one dispatcher; migrate the embedded projection into an append-only `CandidateOutcomeEvidenceV1` ledger; finish one shared projection for validation promotion, portfolio reward, winner freeze, and reports; remove pre-ranking rounding and alternate acceptance arithmetic |
 | `backend/app/orchestration/job_manager.py` | candidate/trial creation and generation dispatch | add atomic decision-linked batch dispatch and idempotency; replace duplicate-Candidate infrastructure retry with an exact logical-Trial retry that creates an immutable physical-attempt row |
 | `backend/app/orchestration/runner.py` | short-lived per-stage sessions and polling lifecycle | split bounded lane pollers; add admission, per-user/Job fair scheduling, queue deadlines/backoff, capacity-before-running claims, drain/recovery, and paused/cancelled/unresolved fences |
@@ -7097,7 +7079,8 @@ verifier.
 
 ### Phase 3: provider gateway and shadow mode
 
-- replace packaged `AUTH_MODE=disabled` before enabling any Harness endpoint;
+- retain the implemented packaged OIDC plus mandatory launch-bound desktop request
+  proof; anonymous desktop auth and direct WebView API HTTP are already rejected;
 - extract `ExperimentFieldRegistryV1` from the five-step builder and generate the
   provider schema, draft normalizer, localized field catalog, and request compiler
   from it; add a draft migration that preserves current session drafts without
@@ -7109,13 +7092,13 @@ verifier.
 - remove the current API-key `sessionStorage` path before enabling conversation
   provider calls; use process-memory credentials only for an explicitly development
   profile and the desktop credential bridge for packaged production;
-- implement the fixed long-lived Tauri Rust -> stdio bridge -> Runtime UDS path,
-  in-memory launch session registry, canonical request/response proof, typed route
-  commands, durable mutation idempotency, expected-state checks, and per-operation
+- migrate the implemented finite Tauri Rust bridge from authenticated loopback to a
+  fixed stdio/Runtime UDS path; add response proof, generated route DTOs, durable
+  mutation idempotency/result coalescing, expected-state checks, and per-operation
   ownership authorization;
-- remove packaged WebView direct `/api/v1` fetch/download paths and production API
-  `connect-src`; preserve only a minimal rate-limited liveness probe or move readiness
-  behind the bridge;
+- keep the implemented removal of packaged WebView `/api/v1` fetch/download traffic
+  and production API HTTP `connect-src`; move any remaining readiness transport behind
+  the native boundary;
 - prove hostile-origin/simple-request/DNS-rebinding/browser, missing/wrong MAC,
   replay/changed-body, stale-state, lost-response/restart, foreign-user/child-ID, wrong
   worker-token, bridge death, Runtime change, and CSP/capability negative cases;
@@ -7612,12 +7595,14 @@ execution.
 
 ### 27.11 Desktop bridge authentication is not a Windows sandbox
 
-Removing the private loopback API and keeping launch keys out of JavaScript closes a
-real browser/accidental-client/replay class. It does not turn the current full-trust
-NSIS process and user-owned WSL distribution into mutually isolated security
-principals. The same Windows account can launch the distribution as `root`; malware in
-that account may also inspect/inject Tauri, replace the bridge/Runtime, or drive
-authorized WebView commands.
+Removing direct WebView API HTTP, keeping bridge keys out of JavaScript, and requiring
+a launch-bound HMAC plus durable one-use nonce closes a real
+browser/accidental-client/replay class even while bridge v1's native last hop remains
+loopback. Replacing that hop with a Runtime UDS will further narrow exposure; neither
+design turns the current full-trust NSIS process and user-owned WSL distribution into
+mutually isolated security principals. The same Windows account can launch the
+distribution as `root`; malware in that account may also inspect/inject Tauri, replace
+the bridge/Runtime, or drive authorized WebView commands.
 
 The initial product is therefore a single-user local engineering application, not a
 hostile-code execution boundary. AppContainer/package identity plus a separately
@@ -7971,7 +7956,7 @@ so later edits do not reintroduce them:
 | provider-gateway authorization audit | a non-secret “credential reference” and “authenticated worker” did not define registration versus call identities, replay behavior, or whether the database-free gateway could truly know reservation/cancellation state | split registration and call sockets, add Tauri-held launch MAC and kernel peer checks, exchange session references into Job-bound IDs, consume request-bound attempt tuples once, keep keys and egress isolated, and explicitly leave database-state truth with worker transactions unless an independent hosted grant service is added |
 | Harness supply-chain audit | release signatures and source-commit fields did not prove which registry, prompt, compiler, policy, adapter, gateway, executor, dependency, and tool bytes each Job actually executed; a mutable updater could also replace code beneath an active Job or replay old metadata | add a CI-produced signed closed-file Harness runtime manifest, independent build/SBOM provenance, startup integrity and cross-process digest agreement, content-addressed side-by-side slots, Job pinning, historical retention, and TUF-grade rollback/freeze/mix-and-match/revocation handling before unattended Runtime updates |
 | queue/backpressure audit | Execution Scheduling Gate 1.0 replaces global oldest-Trial FIFO with deterministic least-served Job selection plus per-Job Trial FIFO, while Execution Claim Gate 1.1 supplies `SKIP LOCKED`, bounded collision recovery, and attempt fencing; the same DB-polling loop can still materialize up to ten Jobs and combines simulation with finalization, while Valkey remains presence only | current desktop-scale inter-Job starvation is addressed; retain SQL as the only durable queue, then split bounded work lanes and add load-tested admission, per-user weights/priority classes, queue deadlines, transient capacity leases, one real-SITL slot until allocator proof, delayed retry without held leases, typed terminal work, fixed lock order, and overload/drain/Valkey-loss tests before hosted-scale claims |
-| desktop API/auth audit | the packaged Runtime sets `AUTH_MODE=disabled`; direct WebView fetches reach a loopback API where every caller becomes the same default user, while CORS/CSP were being mistaken for caller authentication | remove private desktop `/api/v1` from loopback TCP; add a typed Tauri Rust/stdio/UDS bridge, launch-bound request proof, durable mutation idempotency, state/owner/action authorization, hosted token profiles, and explicit negative tests |
+| desktop API/auth audit | the packaged Runtime now uses Supabase OIDC plus mandatory desktop bridge proof; JSON/Artifact/CSV calls leave the WebView through a finite Tauri command, production CSP blocks API HTTP, request HMAC binds Runtime/session/time/nonce/method/raw path/body/token, and a durable nonce ledger rejects replay; direct native-to-API loopback, response binding, mutation result idempotency, expected-state policy, and a real installed-Runtime hostile-client campaign remain open | move the native hop to fixed stdio/Runtime UDS, generate closed route DTOs, add response MAC plus durable mutation result coalescing and state/action authorization, then run the installed Windows/WSL hostile-origin/arbitrary-client/restart corpus before claiming the full target boundary |
 | Windows/WSL trust-boundary audit | the earlier gateway/bridge wording implied Linux UIDs, socket ACLs, and a Tauri-held launch MAC could distinguish every local process, but the same Windows account can launch the distribution as `root` and can potentially control Tauri | narrow the V1 claim to web-origin/accidental-client/replay/wrong-Runtime-service protection; group hostile same-user/WSL-root/Tauri/host compromise as residual risk; require package identity/AppContainer plus a separately signed broker before claiming that stronger isolation |
 | Trial-evidence integrity audit | current v1 results can omit execution identity; missing metrics/flags gain favorable defaults; the runner authors metrics/pass; telemetry lacks mandatory unit/frame/time/extractor binding; sample-count RMSE is sampling-density sensitive; infrastructure failures penalize parameters; retries lack immutable attempt lineage/artifact digests; and per-Candidate “holdout” use leaks it into selection | require v3 attempt envelopes, content-addressed source artifacts, an immutable physical-attempt ledger, explicit NEU/SI/monotonic-time/coverage contracts, a signed secretless time-weighted metric verifier, closed outcome taxonomy, exact logical-Trial retry with infrastructure exclusion, registered metrics without defaults/clamping, and disjoint search/validation/sealed-final-test materialization |
 | optimizer-observation audit | the current frozen `OptimizerObservation` separates optional objective loss from feasibility, and compiler 1.9 now computes a closed Trial taxonomy plus an optimizer-learning rate that excludes infrastructure, cancellation, and invalid evidence while treating unknowns conservatively; the adapter still compresses domain/unknown outcomes into one rate, and `completed`, optional `loss`, pending reservations, and all six numerical cores lack explicit tagged/right-censored learning | carry the verified taxonomy into signed per-tool adapters as objective/constraint/right-censored tags plus separate pending reservations; declare accepted tags and state-update behavior per adapter; initially mark right-censoring unsupported rather than fabricating a finite loss |

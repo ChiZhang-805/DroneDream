@@ -13,12 +13,13 @@ from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
 from app.config import get_settings
 from app.db import SessionLocal, init_db
+from app.desktop_bridge import enforce_desktop_bridge
 from app.response import err
 from app.routers import artifacts as artifacts_router
 from app.routers import batches as batches_router
@@ -127,6 +128,14 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         expose_headers=["X-Total-Count", "X-Page", "X-Page-Size"],
     )
+
+    @app.middleware("http")
+    async def desktop_bridge_middleware(request: Request, call_next: object) -> Response:
+        return await enforce_desktop_bridge(
+            request,
+            call_next,  # type: ignore[arg-type]
+            get_settings(),
+        )
 
     # Health endpoint lives outside /api/v1 by design.
     app.include_router(health.router)

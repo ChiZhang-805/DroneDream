@@ -118,6 +118,9 @@ class Settings(BaseSettings):
     oidc_email_claim: str = Field(default="email")
     oidc_name_claim: str = Field(default="name")
     oidc_clock_skew_seconds: int = Field(default=30, ge=0, le=300)
+    desktop_bridge_required: bool = Field(default=False)
+    desktop_bridge_clock_skew_seconds: int = Field(default=30, ge=5, le=300)
+    desktop_bridge_nonce_retention_seconds: int = Field(default=600, ge=60, le=86400)
 
     @field_validator("dronedream_runtime_id", mode="before")
     @classmethod
@@ -307,6 +310,23 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "DEMO_AUTH_TOKENS must contain at least one email:token pair "
                     "when AUTH_MODE=demo_token in desktop or production"
+                )
+        if self.app_env.strip().lower() == "desktop" and not self.desktop_bridge_required:
+            raise ValueError(
+                "DESKTOP_BRIDGE_REQUIRED=true is mandatory when APP_ENV=desktop"
+            )
+        if self.app_env.strip().lower() == "desktop" and self.auth_mode != "oidc_jwt":
+            raise ValueError(
+                "Packaged APP_ENV=desktop requires AUTH_MODE=oidc_jwt"
+            )
+        if self.desktop_bridge_required:
+            if self.app_env.strip().lower() != "desktop":
+                raise ValueError(
+                    "DESKTOP_BRIDGE_REQUIRED may be enabled only when APP_ENV=desktop"
+                )
+            if self.dronedream_runtime_id is None:
+                raise ValueError(
+                    "DESKTOP_BRIDGE_REQUIRED requires DRONEDREAM_RUNTIME_ID"
                 )
         return self
 

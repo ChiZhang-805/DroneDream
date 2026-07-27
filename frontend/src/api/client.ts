@@ -1,7 +1,7 @@
 // HTTP client for the DroneDream /api/v1 backend. It owns envelope parsing,
 // desktop-runtime liveness checks, and the typed call surface used by pages.
 
-import { isDesktopRuntime } from "../desktop/bridge";
+import { desktopApiRequest, isDesktopRuntime } from "../desktop/bridge";
 import {
   ensureDesktopRuntimeLiveness,
   getDesktopReadinessSession,
@@ -62,11 +62,15 @@ const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
 
 function authHeaders(): Record<string, string> {
-  const accessToken = getAuthAccessToken() ?? DEMO_AUTH_TOKEN;
+  const accessToken = currentAccessToken();
   if (!accessToken) {
     return {};
   }
   return { Authorization: `Bearer ${accessToken}` };
+}
+
+function currentAccessToken(): string | null {
+  return getAuthAccessToken() ?? DEMO_AUTH_TOKEN ?? null;
 }
 
 export function artifactDownloadUrl(artifactId: string): string {
@@ -131,15 +135,7 @@ async function request<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        ...authHeaders(),
-        ...(init?.headers ?? {}),
-      },
-    });
+    response = await transportRequest(path, init, "application/json");
   } catch (networkError) {
     throw new ApiClientError(
       "NETWORK_ERROR",
@@ -176,6 +172,57 @@ async function request<T>(
     error?.details ?? null,
     response.status,
   );
+}
+
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function transportRequest(
+  path: string,
+  init?: RequestInit,
+  accept: "application/json" | "application/octet-stream" | "text/csv" =
+    "application/json",
+): Promise<Response> {
+  if (!isDesktopRuntime()) {
+    return fetch(`${API_BASE_URL}/api/v1${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: accept,
+        ...authHeaders(),
+        ...(init?.headers ?? {}),
+      },
+    });
+  }
+
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (!["GET", "POST", "PATCH", "DELETE"].includes(method)) {
+    throw new Error(`Unsupported desktop API method: ${method}`);
+  }
+  if (init?.body != null && typeof init.body !== "string") {
+    throw new Error("Desktop API request bodies must be JSON strings.");
+  }
+  const bridged = await desktopApiRequest({
+    method: method as "GET" | "POST" | "PATCH" | "DELETE",
+    path: `/api/v1${path}`,
+    body: (init?.body as string | undefined) ?? null,
+    accessToken: currentAccessToken(),
+    accept,
+  });
+  const decoded = decodeBase64(bridged.bodyBase64);
+  const bodyBuffer = Uint8Array.from(decoded).buffer;
+  return new Response(bodyBuffer, {
+    status: bridged.status,
+    headers: bridged.contentType
+      ? { "Content-Type": bridged.contentType }
+      : undefined,
+  });
 }
 
 function buildQuery(params: Record<string, string | number | undefined>): string {
@@ -311,14 +358,13 @@ export const apiClient = {
   },
 
   async downloadArtifact(artifactId: string, filename?: string): Promise<void> {
-    const url = artifactDownloadUrl(artifactId);
     let response: Response;
     try {
-      response = await fetch(url, {
-        headers: {
-          ...authHeaders(),
-        },
-      });
+      response = await transportRequest(
+        `/artifacts/${encodeURIComponent(artifactId)}/download`,
+        undefined,
+        "application/octet-stream",
+      );
     } catch (networkError) {
       throw new ApiClientError(
         "NETWORK_ERROR",
@@ -346,15 +392,13 @@ export const apiClient = {
   },
 
   async fetchArtifactJson<T>(artifactId: string): Promise<T> {
-    const url = artifactDownloadUrl(artifactId);
     let response: Response;
     try {
-      response = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          ...authHeaders(),
-        },
-      });
+      response = await transportRequest(
+        `/artifacts/${encodeURIComponent(artifactId)}/download`,
+        undefined,
+        "application/json",
+      );
     } catch (networkError) {
       throw new ApiClientError(
         "NETWORK_ERROR",
@@ -416,9 +460,12 @@ export const apiClient = {
   async downloadCompareJobsCsv(jobIds: string[]): Promise<void> {
     let response: Response;
     try {
-      response = await fetch(this.compareJobsCsvUrl(jobIds), {
-        headers: { ...authHeaders() },
-      });
+      const joined = encodeURIComponent(jobIds.join(","));
+      response = await transportRequest(
+        `/jobs/compare.csv?job_ids=${joined}`,
+        undefined,
+        "text/csv",
+      );
     } catch (networkError) {
       throw new ApiClientError(
         "NETWORK_ERROR",

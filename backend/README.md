@@ -143,6 +143,12 @@ python3 -m venv .venv
     `user1@example.com:token1,user2@example.com:token2`
   - OIDC mode requires `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL`, and
     asymmetric `OIDC_ALGORITHMS`
+  - packaged desktop also requires `DESKTOP_BRIDGE_REQUIRED=true` and
+    `DRONEDREAM_RUNTIME_ID`; each `/api/v1` request must carry the native
+    Runtime/session/body/token-bound proof, and its nonce is durably one-use
+  - `DESKTOP_BRIDGE_CLOCK_SKEW_SECONDS` bounds proof age (packaged default
+    `30`); `DESKTOP_BRIDGE_NONCE_RETENTION_SECONDS` bounds replay-receipt
+    retention (packaged default `600`)
 - LLM safety and cleanup:
   - `JOB_SECRET_TTL_SECONDS`, `JOB_SECRET_CLEANUP_INTERVAL_SECONDS`
   - `LLM_REQUEST_TIMEOUT_SECONDS`, `LLM_MAX_RETRIES`,

@@ -809,3 +809,28 @@ simulation outcomes. The hand-authored labels are repository-visible after the
 freeze, so this is also not a permanently blind generalization benchmark. Those
 claims still require a separately frozen provider campaign and locked simulator
 comparisons.
+
+### Desktop Request Proof Gate 1.0
+
+The packaged desktop API now combines Supabase OIDC user identity with a second
+native-caller proof. Desktop configuration fails closed unless OIDC, a canonical
+signed Runtime ID, and `DESKTOP_BRIDGE_REQUIRED=true` are all present. JSON,
+Artifact, and CSV traffic leaves the WebView only through a finite Tauri command;
+the production CSP no longer permits direct WebView HTTP access to the local API.
+
+Rust derives a domain-separated bridge key inside the dedicated WSL Runtime and
+signs every request over the Runtime ID, per-launch session, timestamp, one-use
+nonce, method, exact raw path/query, body hash, and Authorization-header hash.
+FastAPI recomputes and verifies those fields before OIDC or route logic and
+durably consumes the nonce in `desktop_bridge_nonces`. Missing, expired,
+wrong-Runtime, altered-body/token, invalid-MAC, or repeated proofs fail closed.
+The regression suite also proves that a valid bridge proof does not weaken
+existing foreign-user object isolation.
+
+This gate removes the former direct WebView-to-loopback trust shortcut. The
+native last hop still uses authenticated loopback rather than a Runtime UDS, and
+mutation-result idempotency, response MACs, generated finite route DTOs, and a
+real installed Windows/WSL hostile-client campaign remain open. It therefore
+claims protection against web-origin, accidental-client, changed-request,
+wrong-Runtime, expiry, and replay classes—not isolation from compromise of the
+same Windows account, WSL root, or Tauri process.

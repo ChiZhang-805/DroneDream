@@ -67,6 +67,23 @@ class User(Base):
     batch_jobs: Mapped[list[BatchJob]] = relationship(back_populates="user")
 
 
+class DesktopBridgeNonce(Base):
+    """Durable one-use receipt for a verified desktop bridge request."""
+
+    __tablename__ = "desktop_bridge_nonces"
+
+    nonce: Mapped[str] = mapped_column(String(36), primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    runtime_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+
 class BatchJob(Base):
     __tablename__ = "batch_jobs"
 

@@ -1,3 +1,4 @@
+mod desktop_api_bridge;
 mod installer_handoff;
 mod preferences;
 mod prerequisites;
@@ -50,6 +51,7 @@ pub fn run() {
         }))
         .manage(runtime_installer::RuntimeInstaller::default())
         .manage(runtime_keepalive::RuntimeKeepalive::default())
+        .manage(desktop_api_bridge::DesktopApiBridge::default())
         .invoke_handler(tauri::generate_handler![
             prerequisites::probe_system_prerequisites,
             preferences::get_installer_locale,
@@ -63,6 +65,7 @@ pub fn run() {
             runtime_installer::cancel_runtime_install,
             runtime_installer::start_runtime,
             runtime_installer::repair_runtime,
+            desktop_api_bridge::desktop_api_request,
             runtime_keepalive::stop_runtime_for_exit
         ])
         .run(tauri::generate_context!())

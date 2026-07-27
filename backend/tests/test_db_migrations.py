@@ -573,7 +573,7 @@ def test_alembic_has_one_candidate_evidence_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260727_0011 (head)"]
+    assert heads == ["20260727_0012 (head)"]
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

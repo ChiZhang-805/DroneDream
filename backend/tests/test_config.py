@@ -102,6 +102,40 @@ def test_desktop_rejects_disabled_auth() -> None:
         Settings(app_env="desktop", auth_mode="disabled")
 
 
+def test_desktop_requires_launch_bound_bridge_and_runtime_identity() -> None:
+    oidc = {
+        "auth_mode": "oidc_jwt",
+        "oidc_issuer": "https://identity.example.com/",
+        "oidc_audience": "dronedream-api",
+        "oidc_jwks_url": "https://identity.example.com/.well-known/jwks.json",
+        "oidc_algorithms": "ES256",
+    }
+    with pytest.raises(ValidationError, match="DESKTOP_BRIDGE_REQUIRED=true"):
+        Settings(app_env="desktop", **oidc)
+    with pytest.raises(ValidationError, match="DRONEDREAM_RUNTIME_ID"):
+        Settings(app_env="desktop", desktop_bridge_required=True, **oidc)
+
+    settings = Settings(
+        app_env="desktop",
+        desktop_bridge_required=True,
+        dronedream_runtime_id="123e4567-e89b-12d3-a456-426614174000",
+        **oidc,
+    )
+    assert settings.desktop_bridge_required is True
+
+    with pytest.raises(ValidationError, match="AUTH_MODE=oidc_jwt"):
+        Settings(
+            app_env="desktop",
+            auth_mode="demo_token",
+            demo_auth_tokens=(
+                "operator@example.com:"
+                "desktop-demo-token-0123456789-ABCDEFGH"
+            ),
+            desktop_bridge_required=True,
+            dronedream_runtime_id="123e4567-e89b-12d3-a456-426614174000",
+        )
+
+
 def test_production_demo_auth_requires_at_least_one_token() -> None:
     with pytest.raises(ValidationError, match="DEMO_AUTH_TOKENS"):
         Settings(app_env="production", auth_mode="demo_token", demo_auth_tokens="")

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   autoStartInstallerRuntime,
   cancelRuntimeInstall,
+  desktopApiRequest,
   DesktopCommandContractError,
   DesktopRuntimeUnavailableError,
   discardInstallerRuntimeIntent,
@@ -153,6 +154,41 @@ describe("desktop bridge", () => {
       "get_runtime_install_plan",
       { targetRoot: "E:\\DroneDream" },
     );
+  });
+
+  it("validates the bounded native API response contract", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      status: 200,
+      contentType: "application/json",
+      bodyBase64: btoa('{"success":true}'),
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(desktopApiRequest({
+      method: "GET",
+      path: "/api/v1/session",
+      accessToken: "account-token",
+    })).resolves.toMatchObject({ status: 200 });
+    expect(invoke).toHaveBeenCalledWith("desktop_api_request", {
+      request: {
+        method: "GET",
+        path: "/api/v1/session",
+        accessToken: "account-token",
+      },
+    });
+
+    invoke.mockResolvedValueOnce({
+      status: 200,
+      contentType: "application/json",
+      bodyBase64: "not base64",
+    });
+    await expect(desktopApiRequest({
+      method: "GET",
+      path: "/api/v1/session",
+    })).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "desktop_api_request",
+    });
   });
 
   it("accepts only the native unit response for runtime exit termination", async () => {

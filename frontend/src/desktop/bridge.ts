@@ -72,6 +72,20 @@ export interface RuntimeStatusReport {
   diagnostics: string[];
 }
 
+export interface DesktopApiRequest {
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  path: string;
+  body?: string | null;
+  accessToken?: string | null;
+  accept?: "application/json" | "application/octet-stream" | "text/csv";
+}
+
+export interface DesktopApiResponse {
+  status: number;
+  contentType: string | null;
+  bodyBase64: string;
+}
+
 export interface RuntimeInstallStep {
   id: string;
   title: string;
@@ -413,6 +427,46 @@ export function stopRuntimeForExit(): Promise<void> {
       throw new Error("stop_runtime_for_exit must return null");
     }
   });
+}
+
+export function desktopApiRequest(
+  request: DesktopApiRequest,
+): Promise<DesktopApiResponse> {
+  if (!request.path.startsWith("/api/v1/")) {
+    return Promise.reject(
+      new Error("Desktop API paths must remain inside /api/v1/."),
+    );
+  }
+  return invokeDesktop(
+    "desktop_api_request",
+    parseDesktopApiResponse,
+    { request },
+  );
+}
+
+function parseDesktopApiResponse(value: unknown): DesktopApiResponse {
+  const record = expectRecord(value, "response");
+  const status = expectNonNegativeInteger(record.status, "response.status");
+  if (status < 100 || status > 599) {
+    throw new Error("response.status must be an HTTP status");
+  }
+  const bodyBase64 = expectString(record.bodyBase64, "response.bodyBase64");
+  if (
+    bodyBase64.length % 4 !== 0 ||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+      bodyBase64,
+    )
+  ) {
+    throw new Error("response.bodyBase64 must be canonical base64");
+  }
+  return {
+    status,
+    contentType: expectNullableString(
+      record.contentType,
+      "response.contentType",
+    ),
+    bodyBase64,
+  };
 }
 
 function parsePrerequisiteReport(value: unknown): SystemPrerequisiteReport {

@@ -485,6 +485,11 @@ def test_assistant_honors_explicit_base_url_allowlist_before_provider_call(
         "https://identity.example.test/auth/v1/.well-known/jwks.json",
     )
     monkeypatch.setenv("OIDC_ALGORITHMS", "ES256")
+    monkeypatch.setenv(
+        "DRONEDREAM_RUNTIME_ID",
+        "123e4567-e89b-12d3-a456-426614174000",
+    )
+    monkeypatch.setenv("DESKTOP_BRIDGE_REQUIRED", "true")
     monkeypatch.setenv("LLM_ALLOWED_BASE_URLS", "https://approved.example/v1")
     from app.config import get_settings
 

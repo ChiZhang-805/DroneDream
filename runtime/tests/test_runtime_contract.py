@@ -201,6 +201,9 @@ class RuntimeManifestContractTests(unittest.TestCase):
         self.assertEqual(values["AUTH_MODE"], "oidc_jwt")
         self.assertEqual(values["OIDC_AUDIENCE"], "authenticated")
         self.assertEqual(values["OIDC_ALGORITHMS"], "ES256")
+        self.assertEqual(values["DESKTOP_BRIDGE_REQUIRED"], "true")
+        self.assertEqual(values["DESKTOP_BRIDGE_CLOCK_SKEW_SECONDS"], "30")
+        self.assertEqual(values["DESKTOP_BRIDGE_NONCE_RETENTION_SECONDS"], "600")
         self.assertRegex(
             values["OIDC_ISSUER"],
             r"^https://[a-z0-9]+\.supabase\.co/auth/v1$",
