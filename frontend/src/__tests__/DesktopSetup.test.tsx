@@ -460,7 +460,7 @@ describe("DesktopSetup", () => {
     expect(screen.queryByText("Validate Windows, virtualization, memory, and disk"))
       .not.toBeInTheDocument();
     expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open tuning workspace" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "Open tuning workspace" })).toHaveAttribute(
       "href",
       "/assistant",
     );
