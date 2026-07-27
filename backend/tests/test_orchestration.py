@@ -16,7 +16,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import event, select, update
 from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import Session
 
@@ -588,6 +588,373 @@ def test_claim_and_run_one_pending_trial_completes(orchestration_ctx):
         assert job.progress_completed_trials == 1
         event_types = [e.event_type for e in job.events]
         assert event_types.count("trial_completed") == 1
+
+
+def test_claim_time_input_snapshot_fails_closed_before_simulator_on_drift(
+    orchestration_ctx,
+    monkeypatch,
+) -> None:
+    """A post-claim row change cannot alter or launch the frozen execution."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    original_record_event = ctx["trial_executor"].record_event
+    mutated = False
+
+    def mutate_after_claim(db, job_id, event_type, payload):
+        nonlocal mutated
+        if event_type == "trial_claimed" and not mutated:
+            mutated = True
+            with ctx["db_module"].SessionLocal() as other_db:
+                other_trial = other_db.get(models.Trial, trial_id)
+                assert other_trial is not None
+                other_trial.scenario_config_json = {
+                    "scenario_case_id": "mutated-after-claim",
+                    "scenario_weight": 9.0,
+                    "advanced": {"gust_m_s": 40.0},
+                }
+                other_trial.candidate.parameter_json = {
+                    "kp_xy": 9.0,
+                    "nested": {"mutated": True},
+                }
+                other_trial.job.vehicle_profile_json = {
+                    "vehicle_type": "mutated-after-claim"
+                }
+                other_db.commit()
+        return original_record_event(db, job_id, event_type, payload)
+
+    class NeverStartedAdapter:
+        backend_name = "claim-drift-probe"
+
+        def __init__(self) -> None:
+            self.prepare_calls = 0
+            self.run_calls = 0
+            self.cleanup_calls = 0
+
+        def prepare(self, _ctx) -> None:
+            self.prepare_calls += 1
+
+        def run_trial(self, _ctx):
+            self.run_calls += 1
+            raise AssertionError("drifted claim must not reach the simulator")
+
+        def cleanup(self, _ctx) -> None:
+            self.cleanup_calls += 1
+
+    adapter = NeverStartedAdapter()
+    monkeypatch.setattr(
+        ctx["trial_executor"],
+        "record_event",
+        mutate_after_claim,
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-input-receipt",
+                adapter=adapter,
+            )
+            == trial_id
+        )
+
+    assert mutated is True
+    assert adapter.prepare_calls == 0
+    assert adapter.run_calls == 0
+    assert adapter.cleanup_calls == 0
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "FAILED"
+        assert trial.failure_code == "INPUT_EVIDENCE_DRIFT"
+        assert trial.metric is None
+        attempt = trial.accepted_attempt
+        assert attempt is not None
+        claim = ctx["attempt_evidence"].verify_trial_attempt_claim(
+            attempt.claim_evidence_json
+        )
+        assert claim is not None
+        assert claim.schema_id == (
+            "dronedream.trial-execution-attempt-claim/v2"
+        )
+        assert claim.execution_input_sha256 is not None
+        assert attempt.outcome is not None
+        assert attempt.outcome.outcome_class == "invalid_evidence"
+        assert adapter.backend_name == attempt.simulator_backend
+
+
+def test_frozen_trial_context_detaches_nested_json(orchestration_ctx) -> None:
+    """Nested ORM JSON mutations cannot rewrite an already-frozen context."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        trial.scenario_config_json = {
+            "advanced": {"gust": [1.0, 2.0]},
+            "scenario_weight": 2.0,
+        }
+        trial.candidate.parameter_json = {
+            "kp_xy": 1.0,
+            "schedule": {"points": [0.1, 0.2]},
+        }
+        trial.job.vehicle_profile_json = {
+            "vehicle_type": "multicopter",
+            "nested": {"motors": [1, 2, 3, 4]},
+        }
+        trial.attempt_count = 1
+        db.flush()
+        snapshot = ctx["attempt_evidence"].snapshot_trial_attempt_inputs(
+            trial=trial,
+            job=trial.job,
+            candidate=trial.candidate,
+        )
+        frozen = ctx["trial_executor"]._build_trial_context(
+            trial,
+            trial.job,
+            trial.candidate,
+            input_snapshot=snapshot,
+        )
+
+        trial.scenario_config_json["advanced"]["gust"][0] = 99.0
+        trial.candidate.parameter_json["schedule"]["points"][0] = 99.0
+        trial.job.vehicle_profile_json["nested"]["motors"][0] = 99
+
+        assert frozen.scenario_config == {
+            "advanced": {"gust": [1.0, 2.0]},
+            "scenario_weight": 2.0,
+        }
+        assert frozen.parameters["schedule"]["points"] == [0.1, 0.2]
+        assert frozen.job_config.vehicle_profile["nested"]["motors"] == [
+            1,
+            2,
+            3,
+            4,
+        ]
+
+
+def test_simulator_result_is_rejected_when_inputs_drift_during_run(
+    orchestration_ctx,
+) -> None:
+    """The terminal transaction re-locks claim inputs after external work."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+
+    class MidRunMutationAdapter(MockSimulatorAdapter):
+        backend_name = "mid-run-input-drift"
+
+        def run_trial(self, trial_ctx):
+            with ctx["db_module"].SessionLocal() as other_db:
+                other_trial = other_db.get(models.Trial, trial_id)
+                assert other_trial is not None
+                other_trial.job.wind_north = 12.5
+                other_db.commit()
+            return super().run_trial(trial_ctx)
+
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-mid-run-drift",
+                adapter=MidRunMutationAdapter(),
+            )
+            == trial_id
+        )
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "FAILED"
+        assert trial.failure_code == "INPUT_EVIDENCE_DRIFT"
+        assert trial.metric is None
+        assert trial.accepted_attempt is not None
+        assert trial.accepted_attempt.outcome is not None
+        assert trial.accepted_attempt.outcome.outcome_class == "invalid_evidence"
+
+
+def test_legacy_attempt_claim_without_combined_input_hash_still_verifies(
+    orchestration_ctx,
+) -> None:
+    """The additive claim field preserves existing v1 content addresses."""
+
+    module = orchestration_ctx["attempt_evidence"]
+    payload = {
+        "schema_id": "dronedream.trial-execution-attempt-claim/v1",
+        "trial_id": "trial_legacy",
+        "job_id": "job_legacy",
+        "candidate_id": "candidate_legacy",
+        "attempt_count": 1,
+        "claim_kind": "initial",
+        "worker_id_sha256": "1" * 64,
+        "lease_token_sha256": "sha256:" + "2" * 64,
+        "simulator_backend": "mock",
+        "parameter_sha256": "sha256:" + "3" * 64,
+        "scenario_sha256": "sha256:" + "4" * 64,
+        "job_config_sha256": "sha256:" + "5" * 64,
+        "claimed_at": "2026-07-27T00:00:00Z",
+    }
+    evidence = {
+        "evidence_id": module._sha256_id(payload),
+        **payload,
+    }
+    verified = module.verify_trial_attempt_claim(evidence)
+    assert verified is not None
+    assert verified.schema_id == (
+        "dronedream.trial-execution-attempt-claim/v1"
+    )
+    assert not hasattr(verified, "execution_input_sha256")
+
+
+def test_legacy_v1_claim_remains_accepted_end_to_end(
+    orchestration_ctx,
+) -> None:
+    """A historical v1 receipt still authorizes its accepted Trial evidence."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-v1-compatibility",
+            )
+            == trial_id
+        )
+
+    from app.storage.evidence import candidate_trial_artifact_evidence
+
+    module = ctx["attempt_evidence"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        assert trial.finished_at is not None
+        attempt = trial.accepted_attempt
+        assert attempt is not None
+        outcome = attempt.outcome
+        assert outcome is not None
+        current_claim = module.verify_trial_attempt_claim(
+            attempt.claim_evidence_json
+        )
+        assert current_claim is not None
+        claim_payload = current_claim.model_dump(mode="json")
+        claim_payload.pop("evidence_id")
+        claim_payload.pop("execution_input_sha256")
+        claim_payload["schema_id"] = (
+            "dronedream.trial-execution-attempt-claim/v1"
+        )
+        legacy_claim_id = module._sha256_id(claim_payload)
+        attempt.claim_evidence_id = legacy_claim_id
+        attempt.claim_evidence_json = {
+            "evidence_id": legacy_claim_id,
+            **claim_payload,
+        }
+
+        artifact_mapping = candidate_trial_artifact_evidence(
+            trial.candidate,
+            [trial],
+            verify_bytes=True,
+        )
+        assert artifact_mapping is not None
+        artifact_evidence = artifact_mapping[trial.id]
+        legacy_outcome = module._compile_attempt_outcome(
+            attempt=attempt,
+            terminal_status=trial.status,
+            outcome_class=outcome.outcome_class,
+            accepted=True,
+            failure_code=trial.failure_code,
+            metric_snapshot=module._metric_snapshot(trial),
+            artifact_evidence=artifact_evidence,
+            finished_at=trial.finished_at,
+            superseded_by_attempt_count=None,
+        )
+        outcome.evidence_id = legacy_outcome.evidence_id
+        outcome.evidence_json = legacy_outcome.model_dump(mode="json")
+
+        assert module.trial_attempt_claim_matches_current_inputs(
+            trial,
+            attempt=attempt,
+        )
+        accepted = module.accepted_trial_attempt_evidence(
+            trial,
+            artifact_evidence=artifact_evidence,
+        )
+        assert accepted is not None
+        assert accepted.claim_evidence_id == legacy_claim_id
+        assert accepted.outcome_evidence_id == legacy_outcome.evidence_id
+
+
+def test_completion_fence_locks_job_before_updating_trial(
+    orchestration_ctx,
+) -> None:
+    """Completion follows cancellation's Job-before-Trial lock order."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        trial.status = "RUNNING"
+        trial.worker_id = "worker-lock-order"
+        trial.lease_owner = "worker-lock-order"
+        trial.lease_expires_at = datetime.now(timezone.utc) + timedelta(
+            minutes=5
+        )
+        trial.attempt_count = 1
+        db.commit()
+
+        statements: list[str] = []
+
+        def capture_statement(
+            _connection,
+            _cursor,
+            statement,
+            _parameters,
+            _context,
+            _executemany,
+        ) -> None:
+            statements.append(" ".join(statement.lower().split()))
+
+        event.listen(
+            db.get_bind(),
+            "before_cursor_execute",
+            capture_statement,
+        )
+        try:
+            acquired = ctx[
+                "trial_executor"
+            ]._acquire_completion_fence(
+                db,
+                ctx["trial_executor"]._TrialLeaseToken(
+                    trial_id=trial_id,
+                    worker_id="worker-lock-order",
+                    attempt_count=1,
+                ),
+                lease_seconds=300,
+            )
+        finally:
+            event.remove(
+                db.get_bind(),
+                "before_cursor_execute",
+                capture_statement,
+            )
+
+        assert acquired is True
+        job_lock_index = next(
+            index
+            for index, statement in enumerate(statements)
+            if statement.startswith("select")
+            and " from jobs " in f" {statement} "
+        )
+        trial_update_index = next(
+            index
+            for index, statement in enumerate(statements)
+            if statement.startswith("update trials ")
+        )
+        assert job_lock_index < trial_update_index
 
 
 def test_claim_returns_none_when_no_pending(orchestration_ctx):

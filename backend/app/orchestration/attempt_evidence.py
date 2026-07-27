@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from collections.abc import Mapping
@@ -24,10 +25,13 @@ from app.storage.evidence import TRIAL_ARTIFACT_EVIDENCE_SCHEMA
 from app.time_utils import canonical_utc_iso
 
 TRIAL_ATTEMPT_CLAIM_EVIDENCE_SCHEMA: Literal[
-    "dronedream.trial-execution-attempt-claim/v1"
+    "dronedream.trial-execution-attempt-claim/v2"
 ] = (
-    "dronedream.trial-execution-attempt-claim/v1"
+    "dronedream.trial-execution-attempt-claim/v2"
 )
+TRIAL_ATTEMPT_CLAIM_EVIDENCE_V1_SCHEMA: Literal[
+    "dronedream.trial-execution-attempt-claim/v1"
+] = "dronedream.trial-execution-attempt-claim/v1"
 TRIAL_ATTEMPT_OUTCOME_EVIDENCE_SCHEMA: Literal[
     "dronedream.trial-execution-attempt-outcome/v1"
 ] = (
@@ -68,10 +72,7 @@ class _FrozenModel(BaseModel):
     )
 
 
-class TrialAttemptClaimEvidenceV1(_FrozenModel):
-    schema_id: Literal[
-        "dronedream.trial-execution-attempt-claim/v1"
-    ] = TRIAL_ATTEMPT_CLAIM_EVIDENCE_SCHEMA
+class _TrialAttemptClaimEvidenceBase(_FrozenModel):
     evidence_id: Sha256Id
     trial_id: str = Field(min_length=1, max_length=128)
     job_id: str = Field(min_length=1, max_length=128)
@@ -85,6 +86,28 @@ class TrialAttemptClaimEvidenceV1(_FrozenModel):
     scenario_sha256: Sha256Id
     job_config_sha256: Sha256Id
     claimed_at: str = Field(min_length=20, max_length=64)
+
+
+class TrialAttemptClaimEvidenceV1(_TrialAttemptClaimEvidenceBase):
+    """Legacy three-hash claim receipt retained exactly as originally frozen."""
+
+    schema_id: Literal[
+        "dronedream.trial-execution-attempt-claim/v1"
+    ] = TRIAL_ATTEMPT_CLAIM_EVIDENCE_V1_SCHEMA
+
+
+class TrialAttemptClaimEvidenceV2(_TrialAttemptClaimEvidenceBase):
+    """Claim receipt binding one combined snapshot used by the simulator."""
+
+    schema_id: Literal[
+        "dronedream.trial-execution-attempt-claim/v2"
+    ] = TRIAL_ATTEMPT_CLAIM_EVIDENCE_SCHEMA
+    execution_input_sha256: Sha256Id
+
+
+TrialAttemptClaimEvidence = (
+    TrialAttemptClaimEvidenceV1 | TrialAttemptClaimEvidenceV2
+)
 
 
 class TrialAttemptOutcomeEvidenceV1(_FrozenModel):
@@ -242,6 +265,43 @@ def _job_input_snapshot(job: models.Job) -> dict[str, Any]:
     }
 
 
+def snapshot_trial_attempt_inputs(
+    *,
+    trial: models.Trial,
+    job: models.Job,
+    candidate: models.CandidateParameterSet,
+) -> dict[str, Any]:
+    """Deep-copy the exact claim-time inputs shared by execution and evidence."""
+
+    parameters = candidate.parameter_json
+    if parameters is None:
+        parameters = {}
+    scenario_config = trial.scenario_config_json
+    snapshot = {
+        "trial": {
+            "trial_id": trial.id,
+            "job_id": trial.job_id,
+            "candidate_id": trial.candidate_id,
+            "attempt_count": trial.attempt_count,
+            "seed": trial.seed,
+            "scenario_type": trial.scenario_type,
+            "scenario_config": scenario_config,
+        },
+        "candidate_parameters": parameters,
+        "job_config": _job_input_snapshot(job),
+    }
+    # Detach nested JSON containers from SQLAlchemy mutable values before the
+    # claim transaction is committed and those ORM rows can be changed.
+    frozen = copy.deepcopy(snapshot)
+    try:
+        _canonical_json(frozen)
+    except (TypeError, ValueError) as exc:
+        raise TrialAttemptEvidenceError(
+            "trial execution inputs must be finite JSON"
+        ) from exc
+    return frozen
+
+
 def compile_trial_attempt_claim(
     *,
     trial: models.Trial,
@@ -251,9 +311,38 @@ def compile_trial_attempt_claim(
     simulator_backend: str,
     claim_kind: Literal["initial", "stale-reclaim"],
     claimed_at: datetime,
-) -> TrialAttemptClaimEvidenceV1:
+    input_snapshot: Mapping[str, Any] | None = None,
+) -> TrialAttemptClaimEvidenceV2:
     """Compile one content-addressed claim without retaining the worker ID."""
 
+    frozen_inputs = (
+        copy.deepcopy(dict(input_snapshot))
+        if input_snapshot is not None
+        else snapshot_trial_attempt_inputs(
+            trial=trial,
+            job=job,
+            candidate=candidate,
+        )
+    )
+    raw_trial = frozen_inputs.get("trial")
+    raw_parameters = frozen_inputs.get("candidate_parameters")
+    raw_job_config = frozen_inputs.get("job_config")
+    if (
+        not isinstance(raw_trial, dict)
+        or not isinstance(raw_job_config, dict)
+    ):
+        raise TrialAttemptEvidenceError(
+            "trial execution input snapshot has an invalid shape"
+        )
+    if (
+        raw_trial.get("trial_id") != trial.id
+        or raw_trial.get("job_id") != trial.job_id
+        or raw_trial.get("candidate_id") != trial.candidate_id
+        or raw_trial.get("attempt_count") != trial.attempt_count
+    ):
+        raise TrialAttemptEvidenceError(
+            "trial execution input snapshot belongs to another claim"
+        )
     lease_token = {
         "trial_id": trial.id,
         "worker_id_sha256": _sha256_text(worker_id),
@@ -269,27 +358,41 @@ def compile_trial_attempt_claim(
         "worker_id_sha256": lease_token["worker_id_sha256"],
         "lease_token_sha256": _sha256_id(lease_token),
         "simulator_backend": simulator_backend,
-        "parameter_sha256": _sha256_id(candidate.parameter_json),
+        "parameter_sha256": _sha256_id(raw_parameters),
         "scenario_sha256": _sha256_id(
             {
-                "seed": trial.seed,
-                "scenario_type": trial.scenario_type,
-                "scenario_config": trial.scenario_config_json,
+                "seed": raw_trial.get("seed"),
+                "scenario_type": raw_trial.get("scenario_type"),
+                "scenario_config": raw_trial.get("scenario_config"),
             }
         ),
-        "job_config_sha256": _sha256_id(_job_input_snapshot(job)),
+        "job_config_sha256": _sha256_id(raw_job_config),
+        "execution_input_sha256": _sha256_id(frozen_inputs),
         "claimed_at": _timestamp(claimed_at),
     }
-    return TrialAttemptClaimEvidenceV1.model_validate(
+    return TrialAttemptClaimEvidenceV2.model_validate(
         {"evidence_id": _sha256_id(payload), **payload}
     )
 
 
 def verify_trial_attempt_claim(
     value: object,
-) -> TrialAttemptClaimEvidenceV1 | None:
+) -> TrialAttemptClaimEvidence | None:
+    if not isinstance(value, Mapping):
+        return None
+    schema_id = value.get("schema_id")
+    model_type: (
+        type[TrialAttemptClaimEvidenceV1]
+        | type[TrialAttemptClaimEvidenceV2]
+    )
+    if schema_id == TRIAL_ATTEMPT_CLAIM_EVIDENCE_V1_SCHEMA:
+        model_type = TrialAttemptClaimEvidenceV1
+    elif schema_id == TRIAL_ATTEMPT_CLAIM_EVIDENCE_SCHEMA:
+        model_type = TrialAttemptClaimEvidenceV2
+    else:
+        return None
     try:
-        evidence = TrialAttemptClaimEvidenceV1.model_validate(value)
+        evidence = model_type.model_validate(value)
     except ValidationError:
         return None
     payload = evidence.model_dump(mode="json")
@@ -307,6 +410,7 @@ def record_trial_attempt_claim(
     simulator_backend: str,
     claim_kind: Literal["initial", "stale-reclaim"],
     claimed_at: datetime,
+    input_snapshot: Mapping[str, Any] | None = None,
 ) -> models.TrialExecutionAttempt:
     evidence = compile_trial_attempt_claim(
         trial=trial,
@@ -316,6 +420,7 @@ def record_trial_attempt_claim(
         simulator_backend=simulator_backend,
         claim_kind=claim_kind,
         claimed_at=claimed_at,
+        input_snapshot=input_snapshot,
     )
     existing = db.scalar(
         select(models.TrialExecutionAttempt).where(
@@ -587,6 +692,65 @@ def record_superseded_trial_attempt_outcome(
     )
 
 
+def trial_attempt_claim_matches_current_inputs(
+    trial: models.Trial,
+    *,
+    attempt: models.TrialExecutionAttempt,
+) -> bool:
+    """Fail closed when mutable source rows diverge from a claim-time snapshot."""
+
+    claim = verify_trial_attempt_claim(attempt.claim_evidence_json)
+    if claim is None:
+        return False
+    try:
+        current_inputs = snapshot_trial_attempt_inputs(
+            trial=trial,
+            job=trial.job,
+            candidate=trial.candidate,
+        )
+        raw_trial = current_inputs["trial"]
+        raw_parameters = current_inputs["candidate_parameters"]
+        raw_job_config = current_inputs["job_config"]
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return False
+    if not isinstance(raw_trial, dict):
+        return False
+    execution_input_sha256 = (
+        claim.execution_input_sha256
+        if isinstance(claim, TrialAttemptClaimEvidenceV2)
+        else None
+    )
+    return not (
+        attempt.trial_id != trial.id
+        or attempt.job_id != trial.job_id
+        or attempt.candidate_id != trial.candidate_id
+        or attempt.attempt_count != trial.attempt_count
+        or claim.trial_id != trial.id
+        or claim.job_id != trial.job_id
+        or claim.candidate_id != trial.candidate_id
+        or claim.attempt_count != trial.attempt_count
+        or claim.parameter_sha256
+        != _sha256_id(
+            raw_parameters
+            if execution_input_sha256 is not None
+            else trial.candidate.parameter_json
+        )
+        or claim.scenario_sha256
+        != _sha256_id(
+            {
+                "seed": raw_trial.get("seed"),
+                "scenario_type": raw_trial.get("scenario_type"),
+                "scenario_config": raw_trial.get("scenario_config"),
+            }
+        )
+        or claim.job_config_sha256 != _sha256_id(raw_job_config)
+        or (
+            execution_input_sha256 is not None
+            and execution_input_sha256 != _sha256_id(current_inputs)
+        )
+    )
+
+
 def accepted_trial_attempt_evidence(
     trial: models.Trial,
     *,
@@ -600,6 +764,10 @@ def accepted_trial_attempt_evidence(
     if (
         claim is None
         or outcome is None
+        or not trial_attempt_claim_matches_current_inputs(
+            trial,
+            attempt=attempt,
+        )
         or not outcome.accepted
         or outcome.terminal_status == "SUPERSEDED"
         or outcome.outcome_class == "superseded"
@@ -610,16 +778,6 @@ def accepted_trial_attempt_evidence(
         or claim.attempt_count != trial.attempt_count
         or claim.worker_id_sha256 != attempt.worker_id_sha256
         or claim.simulator_backend != attempt.simulator_backend
-        or claim.parameter_sha256 != _sha256_id(trial.candidate.parameter_json)
-        or claim.scenario_sha256
-        != _sha256_id(
-            {
-                "seed": trial.seed,
-                "scenario_type": trial.scenario_type,
-                "scenario_config": trial.scenario_config_json,
-            }
-        )
-        or claim.job_config_sha256 != _sha256_id(_job_input_snapshot(trial.job))
         or claim.claimed_at != _timestamp(attempt.claimed_at)
         or claim.lease_token_sha256
         != _sha256_id(
@@ -706,9 +864,11 @@ def authorize_trial_attempt_deletion(
 __all__ = [
     "TRIAL_ACCEPTED_ATTEMPT_EVIDENCE_SCHEMA",
     "TRIAL_ATTEMPT_CLAIM_EVIDENCE_SCHEMA",
+    "TRIAL_ATTEMPT_CLAIM_EVIDENCE_V1_SCHEMA",
     "TRIAL_ATTEMPT_OUTCOME_EVIDENCE_SCHEMA",
     "TrialAcceptedAttemptEvidenceV1",
     "TrialAttemptClaimEvidenceV1",
+    "TrialAttemptClaimEvidenceV2",
     "TrialAttemptEvidenceError",
     "TrialAttemptOutcomeEvidenceV1",
     "accepted_trial_attempt_evidence",
@@ -717,6 +877,8 @@ __all__ = [
     "record_accepted_trial_attempt_outcome",
     "record_superseded_trial_attempt_outcome",
     "record_trial_attempt_claim",
+    "snapshot_trial_attempt_inputs",
+    "trial_attempt_claim_matches_current_inputs",
     "verify_trial_attempt_claim",
     "verify_trial_attempt_outcome",
 ]

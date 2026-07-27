@@ -474,10 +474,10 @@ Outcome Contract compiler 2.10 adds
 execution now receives an immutable relational claim receipt binding the
 logical Trial/Candidate/Job IDs, attempt count, backend, worker-ID hash,
 lease-token hash, Candidate parameters, scenario/seed, Job configuration, and
-claim timestamp. Its insert-once outcome is either the accepted terminal
-result or an explicit `SUPERSEDED` result. Accepted outcomes bind the closed
-failure taxonomy, metric snapshot hash, and the exact Trial artifact-evidence
-hash. Each logical Trial has a one-time accepted-attempt pointer; a stale
+claim timestamp. Its insert-once outcome is either the accepted terminal result
+or an explicit `SUPERSEDED` result. Accepted outcomes bind the closed failure
+taxonomy, metric snapshot hash, and the exact Trial artifact-evidence hash. Each
+logical Trial has a one-time accepted-attempt pointer; a stale
 worker can neither replace it nor publish metrics after a newer fencing token
 wins.
 
@@ -657,6 +657,25 @@ explicit `legacy_unsealed` feedback for migration compatibility. The direct
 proposer exposes this closed status through Prompt Schema 2.2; the Harness keeps
 its existing Evidence 2.4 shape while replacing the data source behind that
 shape.
+
+Outcome Contract compiler 2.19 closes the claim-to-simulator race. The worker
+deep-copies one canonical claim-time snapshot before its first claim commit and
+stores it through `dronedream.trial-execution-attempt-claim/v2`. It builds
+`TrialContext` from that same snapshot, including nested Candidate parameters,
+case weight and advanced scenario configuration, reference track, vehicle
+profile, and Job configuration. A pre-launch check rejects source drift already
+committed when that gate runs as `INPUT_EVIDENCE_DRIFT`; the terminal fence
+remains authoritative for any change racing or following that check.
+
+Because a simulator may run outside the database transaction for minutes, the
+terminal path reacquires the Trial completion CAS, row-locks the Job and
+Candidate sources on PostgreSQL, and recomputes the combined receipt before any
+metric, Artifact, or outcome is admitted. Drift during the external run
+therefore rejects the result as invalid evidence instead of allowing it to
+train the optimizer. Completion takes the same Job-before-Trial lock order as
+cancellation so their race cannot form a reverse-order row-lock cycle. Legacy
+v1 claims retain their original three-hash verification rules and are never
+silently reinterpreted as v2.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic

@@ -20,11 +20,13 @@ obsolete attempt's metrics or artifacts.
 
 from __future__ import annotations
 
+import copy
 import logging
 import math
 import os
 import shutil
 import threading
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,6 +44,8 @@ from app.orchestration.attempt_evidence import (
     record_accepted_trial_attempt_outcome,
     record_superseded_trial_attempt_outcome,
     record_trial_attempt_claim,
+    snapshot_trial_attempt_inputs,
+    trial_attempt_claim_matches_current_inputs,
 )
 from app.orchestration.events import record_event
 from app.parameters import get_parameter, validate_parameter_values
@@ -56,6 +60,7 @@ from app.simulator import (
 )
 from app.simulator.base import (
     FAILURE_ARTIFACT_PERSISTENCE,
+    FAILURE_INPUT_EVIDENCE_DRIFT,
     FAILURE_INVALID_PARAMETERS,
     FAILURE_RESULT_PERSISTENCE,
     FAILURE_SIM_ERROR,
@@ -290,8 +295,27 @@ def _acquire_completion_fence(
     *,
     lease_seconds: int,
 ) -> bool:
-    """Fence result persistence against a newer reclaimed attempt."""
+    """Fence result persistence using the global Job-before-Trial lock order."""
 
+    job_id = db.scalar(
+        select(models.Trial.job_id).where(
+            models.Trial.id == token.trial_id
+        )
+    )
+    if not isinstance(job_id, str) or not job_id:
+        db.rollback()
+        return False
+    # Cancellation acquires the Job row before it updates child Trials. Taking
+    # the same first lock here prevents a PostgreSQL Job<->Trial deadlock when
+    # cancellation races simulator completion.
+    locked_job = db.scalar(
+        select(models.Job)
+        .where(models.Job.id == job_id)
+        .with_for_update()
+    )
+    if locked_job is None:
+        db.rollback()
+        return False
     if not _renew_owned_lease(db, token, lease_seconds=lease_seconds):
         db.rollback()
         current = db.get(models.Trial, token.trial_id)
@@ -320,6 +344,50 @@ def _acquire_completion_fence(
     return True
 
 
+def _claim_inputs_still_match(
+    db: Session,
+    trial: models.Trial,
+    *,
+    attempt_id: str | None,
+    lock_sources: bool,
+) -> bool:
+    """Verify the claim receipt, optionally row-locking every mutable source."""
+
+    if attempt_id is None:
+        return False
+    # Never let a caller's identity-map state stand in for current database
+    # evidence. This helper is used across transaction boundaries around a
+    # potentially long simulator run, so refresh its sources itself.
+    db.expire_all()
+    if lock_sources:
+        locked_job = db.scalar(
+            select(models.Job)
+            .where(models.Job.id == trial.job_id)
+            .with_for_update()
+        )
+        locked_candidate = db.scalar(
+            select(models.CandidateParameterSet)
+            .where(models.CandidateParameterSet.id == trial.candidate_id)
+            .with_for_update()
+        )
+        if locked_job is None or locked_candidate is None:
+            return False
+        current_attempt = db.scalar(
+            select(models.TrialExecutionAttempt)
+            .where(models.TrialExecutionAttempt.id == attempt_id)
+            .with_for_update()
+        )
+    else:
+        current_attempt = db.get(models.TrialExecutionAttempt, attempt_id)
+    return (
+        current_attempt is not None
+        and trial_attempt_claim_matches_current_inputs(
+            trial,
+            attempt=current_attempt,
+        )
+    )
+
+
 def _refresh_progress_counters(db: Session, job: models.Job) -> None:
     """Recompute ``progress_completed_trials`` from terminal trial rows.
 
@@ -332,13 +400,14 @@ def _refresh_progress_counters(db: Session, job: models.Job) -> None:
     job.progress_completed_trials = completed
 
 
-def _job_config_from(job: models.Job) -> JobConfig:
+def _job_config_from_snapshot(snapshot: Mapping[str, Any]) -> JobConfig:
     reference_track: list[dict[str, float]] | None = None
-    if job.reference_track_json:
-        if not isinstance(job.reference_track_json, list):
+    raw_reference_track = snapshot.get("reference_track")
+    if raw_reference_track:
+        if not isinstance(raw_reference_track, list):
             raise ValueError("reference_track_json must be an array")
         normalized: list[dict[str, float]] = []
-        for index, point in enumerate(job.reference_track_json):
+        for index, point in enumerate(raw_reference_track):
             if not isinstance(point, dict):
                 raise ValueError(f"reference track point {index} must be an object")
             x = point.get("x")
@@ -351,14 +420,14 @@ def _job_config_from(job: models.Job) -> JobConfig:
                     "x": _finite_job_number(x, field_name=f"track[{index}].x"),
                     "y": _finite_job_number(y, field_name=f"track[{index}].y"),
                     "z": _finite_job_number(
-                        job.altitude_m if z_raw is None else z_raw,
+                        snapshot.get("altitude_m") if z_raw is None else z_raw,
                         field_name=f"track[{index}].z",
                     ),
                 }
             )
         reference_track = normalized
 
-    parameter_space = job.parameter_space_json or []
+    parameter_space = snapshot.get("parameter_space") or []
     if not isinstance(parameter_space, list) or any(
         not isinstance(item, dict) for item in parameter_space
     ):
@@ -378,24 +447,81 @@ def _job_config_from(job: models.Job) -> JobConfig:
             raise ValueError(f"duplicate selected parameter {normalized_name}")
         selected_parameter_names.append(normalized_name)
 
-    vehicle_profile = job.vehicle_profile_json or {}
+    vehicle_profile = snapshot.get("vehicle_profile") or {}
     if not isinstance(vehicle_profile, dict):
         raise ValueError("vehicle_profile_json must be an object")
+    track_type = snapshot.get("track_type")
+    sensor_noise_level = snapshot.get("sensor_noise_level")
+    objective_profile = snapshot.get("objective_profile")
+    if not isinstance(track_type, str):
+        raise ValueError("track_type must be a string")
+    if not isinstance(sensor_noise_level, str):
+        raise ValueError("sensor_noise_level must be a string")
+    if not isinstance(objective_profile, str):
+        raise ValueError("objective_profile must be a string")
+    parameter_catalog_version = snapshot.get("parameter_catalog_version")
+    if parameter_catalog_version is not None and not isinstance(
+        parameter_catalog_version,
+        str,
+    ):
+        raise ValueError("parameter_catalog_version must be a string")
     return JobConfig(
-        track_type=job.track_type,
-        start_point_x=_finite_job_number(job.start_point_x, field_name="start_point_x"),
-        start_point_y=_finite_job_number(job.start_point_y, field_name="start_point_y"),
-        altitude_m=_finite_job_number(job.altitude_m, field_name="altitude_m"),
-        wind_north=_finite_job_number(job.wind_north, field_name="wind_north"),
-        wind_east=_finite_job_number(job.wind_east, field_name="wind_east"),
-        wind_south=_finite_job_number(job.wind_south, field_name="wind_south"),
-        wind_west=_finite_job_number(job.wind_west, field_name="wind_west"),
-        sensor_noise_level=job.sensor_noise_level,
-        objective_profile=job.objective_profile,
+        track_type=track_type,
+        start_point_x=_finite_job_number(
+            snapshot.get("start_point_x"),
+            field_name="start_point_x",
+        ),
+        start_point_y=_finite_job_number(
+            snapshot.get("start_point_y"),
+            field_name="start_point_y",
+        ),
+        altitude_m=_finite_job_number(
+            snapshot.get("altitude_m"),
+            field_name="altitude_m",
+        ),
+        wind_north=_finite_job_number(
+            snapshot.get("wind_north"),
+            field_name="wind_north",
+        ),
+        wind_east=_finite_job_number(
+            snapshot.get("wind_east"),
+            field_name="wind_east",
+        ),
+        wind_south=_finite_job_number(
+            snapshot.get("wind_south"),
+            field_name="wind_south",
+        ),
+        wind_west=_finite_job_number(
+            snapshot.get("wind_west"),
+            field_name="wind_west",
+        ),
+        sensor_noise_level=sensor_noise_level,
+        objective_profile=objective_profile,
         reference_track=reference_track,
-        vehicle_profile=dict(vehicle_profile),
-        parameter_catalog_version=job.parameter_catalog_version,
+        vehicle_profile=copy.deepcopy(vehicle_profile),
+        parameter_catalog_version=parameter_catalog_version,
         selected_parameter_names=tuple(selected_parameter_names),
+    )
+
+
+def _job_config_from(job: models.Job) -> JobConfig:
+    return _job_config_from_snapshot(
+        {
+            "track_type": job.track_type,
+            "start_point_x": job.start_point_x,
+            "start_point_y": job.start_point_y,
+            "altitude_m": job.altitude_m,
+            "wind_north": job.wind_north,
+            "wind_east": job.wind_east,
+            "wind_south": job.wind_south,
+            "wind_west": job.wind_west,
+            "sensor_noise_level": job.sensor_noise_level,
+            "objective_profile": job.objective_profile,
+            "reference_track": job.reference_track_json,
+            "vehicle_profile": job.vehicle_profile_json,
+            "parameter_catalog_version": job.parameter_catalog_version,
+            "parameter_space": job.parameter_space_json,
+        }
     )
 
 
@@ -405,25 +531,77 @@ def _build_trial_context(
     candidate: models.CandidateParameterSet,
     *,
     cancellation_event: threading.Event | None = None,
+    input_snapshot: Mapping[str, Any] | None = None,
 ) -> TrialContext:
-    parameters = candidate.parameter_json or {}
+    parameters: object
+    if input_snapshot is None:
+        parameters = candidate.parameter_json or {}
+        scenario_config = trial.scenario_config_json
+        raw_trial: Mapping[str, Any] = {
+            "trial_id": trial.id,
+            "job_id": trial.job_id,
+            "candidate_id": trial.candidate_id,
+            "attempt_count": trial.attempt_count,
+            "seed": trial.seed,
+            "scenario_type": trial.scenario_type,
+            "scenario_config": scenario_config,
+        }
+        job_config = _job_config_from(job)
+    else:
+        raw_trial_value = input_snapshot.get("trial")
+        parameters = input_snapshot.get("candidate_parameters")
+        raw_job_config = input_snapshot.get("job_config")
+        if (
+            not isinstance(raw_trial_value, Mapping)
+            or not isinstance(raw_job_config, Mapping)
+        ):
+            raise ValueError("trial execution input snapshot has an invalid shape")
+        raw_trial = raw_trial_value
+        scenario_config = raw_trial.get("scenario_config")
+        job_config = _job_config_from_snapshot(raw_job_config)
     if not isinstance(parameters, dict):
         raise ValueError("candidate parameter_json must be an object")
-    scenario_config = trial.scenario_config_json
     if scenario_config is not None and not isinstance(scenario_config, dict):
         raise ValueError("trial scenario_config_json must be an object")
-    if isinstance(trial.seed, bool) or not isinstance(trial.seed, int):
+    seed = raw_trial.get("seed")
+    if isinstance(seed, bool) or not isinstance(seed, int):
         raise ValueError("trial seed must be an integer")
+    trial_id = raw_trial.get("trial_id")
+    job_id = raw_trial.get("job_id")
+    candidate_id = raw_trial.get("candidate_id")
+    scenario_type = raw_trial.get("scenario_type")
+    attempt_count = raw_trial.get("attempt_count")
+    if (
+        not isinstance(trial_id, str)
+        or not trial_id
+        or not isinstance(job_id, str)
+        or not job_id
+        or not isinstance(candidate_id, str)
+        or not candidate_id
+        or not isinstance(scenario_type, str)
+        or not scenario_type
+    ):
+        raise ValueError("trial execution input identity is invalid")
+    if (
+        isinstance(attempt_count, bool)
+        or not isinstance(attempt_count, int)
+        or attempt_count < 1
+    ):
+        raise ValueError("trial attempt_count must be a positive integer")
     return TrialContext(
-        trial_id=trial.id,
-        job_id=trial.job_id,
-        job_config=_job_config_from(job),
-        candidate_id=trial.candidate_id,
-        parameters=dict(parameters),
-        seed=trial.seed,
-        scenario_type=trial.scenario_type,
-        scenario_config=(dict(scenario_config) if scenario_config is not None else None),
-        attempt_count=trial.attempt_count,
+        trial_id=trial_id,
+        job_id=job_id,
+        job_config=job_config,
+        candidate_id=candidate_id,
+        parameters=copy.deepcopy(parameters),
+        seed=seed,
+        scenario_type=scenario_type,
+        scenario_config=(
+            copy.deepcopy(scenario_config)
+            if scenario_config is not None
+            else None
+        ),
+        attempt_count=attempt_count,
         cancellation_event=cancellation_event,
     )
 
@@ -771,7 +949,25 @@ def claim_and_run_one_pending_trial(
     sim = adapter or get_simulator_adapter(backend_override)
     trial.simulator_backend = sim.backend_name
     attempt_id: str | None = None
+    cancellation_event = threading.Event()
+    ctx: TrialContext | None = None
+    context_error: TypeError | ValueError | None = None
     if candidate is not None and job is not None:
+        input_snapshot = snapshot_trial_attempt_inputs(
+            trial=trial,
+            job=job,
+            candidate=candidate,
+        )
+        try:
+            ctx = _build_trial_context(
+                trial,
+                job,
+                candidate,
+                cancellation_event=cancellation_event,
+                input_snapshot=input_snapshot,
+            )
+        except (TypeError, ValueError) as exc:
+            context_error = exc
         if not was_pending:
             previous_open_attempts = list(
                 db.scalars(
@@ -806,6 +1002,7 @@ def claim_and_run_one_pending_trial(
                 "initial" if was_pending else "stale-reclaim"
             ),
             claimed_at=now,
+            input_snapshot=input_snapshot,
         )
         attempt_id = attempt.id
     db.commit()
@@ -872,19 +1069,44 @@ def claim_and_run_one_pending_trial(
         )
         return trial_id
 
-    cancellation_event = threading.Event()
-    try:
-        ctx = _build_trial_context(
-            trial,
-            job,
-            candidate,
-            cancellation_event=cancellation_event,
+    if not _claim_inputs_still_match(
+        db,
+        trial,
+        attempt_id=attempt_id,
+        lock_sources=False,
+    ):
+        logger.warning(
+            "trial inputs diverged from claim-time evidence trial=%s attempt=%s",
+            trial_id,
+            attempt_id,
         )
-    except (TypeError, ValueError) as exc:
+        if not _acquire_completion_fence(
+            db,
+            lease_token,
+            lease_seconds=lease_seconds,
+        ):
+            return trial_id
+        trial = db.get(models.Trial, trial_id)
+        if trial is None:  # pragma: no cover - defensive only.
+            db.rollback()
+            return trial_id
+        _mark_trial_failed(
+            db,
+            trial,
+            code=FAILURE_INPUT_EVIDENCE_DRIFT,
+            reason=(
+                "Trial, Candidate, or Job execution inputs changed after the "
+                "attempt was claimed; the simulator was not started."
+            ),
+            attempt_id=attempt_id,
+        )
+        return trial_id
+
+    if context_error is not None:
         logger.warning(
             "rejected invalid trial configuration trial=%s: %s",
             trial_id,
-            exc,
+            context_error,
         )
         if not _acquire_completion_fence(db, lease_token, lease_seconds=lease_seconds):
             return trial_id
@@ -896,10 +1118,12 @@ def claim_and_run_one_pending_trial(
             db,
             trial,
             code=FAILURE_INVALID_PARAMETERS,
-            reason=str(exc)[:1000],
+            reason=str(context_error)[:1000],
             attempt_id=attempt_id,
         )
         return trial_id
+    if ctx is None:  # pragma: no cover - candidate/job guards above are exhaustive.
+        raise RuntimeError("trial context was not frozen at claim time")
     # Do not hold the main session's read transaction open while PX4/Gazebo
     # runs. Lease heartbeats use independent short-lived sessions.
     db.commit()
@@ -982,6 +1206,29 @@ def claim_and_run_one_pending_trial(
             trial,
             code="JOB_NOT_FOUND",
             reason="Job row disappeared.",
+            attempt_id=attempt_id,
+        )
+        _finalize_adapter_run(sim, ctx, result)
+        return trial_id
+
+    # The simulator ran outside the transaction. Re-lock and re-verify the Job
+    # and Candidate sources before any metric, artifact, or terminal outcome is
+    # admitted. PostgreSQL updates now serialize behind these row locks; the
+    # SQLite completion CAS already holds the database write fence.
+    if not _claim_inputs_still_match(
+        db,
+        trial,
+        attempt_id=attempt_id,
+        lock_sources=True,
+    ):
+        _mark_trial_failed(
+            db,
+            trial,
+            code=FAILURE_INPUT_EVIDENCE_DRIFT,
+            reason=(
+                "Trial, Candidate, or Job execution inputs changed while the "
+                "simulator was running; its result and artifacts were rejected."
+            ),
             attempt_id=attempt_id,
         )
         _finalize_adapter_run(sim, ctx, result)
