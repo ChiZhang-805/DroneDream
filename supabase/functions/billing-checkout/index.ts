@@ -6,6 +6,7 @@ type PaymentMethod = "alipay" | "wechat" | "card";
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://getdronedream.com",
   "https://www.getdronedream.com",
+  "http://47.93.180.216",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://tauri.localhost",
