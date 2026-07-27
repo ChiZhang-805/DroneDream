@@ -1814,8 +1814,8 @@ is an engineering heuristic:
 
 | Current behavior | Harness risk |
 | --- | --- |
-| ownership is inferred from `optimizer_strategy` string equality/suffix/substrings and the first matching child wins | renamed/composite strategies can be misattributed; relational multi-source provenance is not the reward identity |
-| reward eligibility defaults from optimizer metadata and excludes only named Halton fallback | a stale/mutated metadata envelope can change credit; seeded-random fallback and future fallbacks need a closed source-role policy |
+| modern ownership is verified from `dronedream.optimizer-source-evidence/v2`, bound to strategy, generation, parameter and ordered-search-space SHA-256, requested/effective fidelity, closed source roles, one child-local `learning_owner`, and exact-source shares; optimizer history independently derives fidelity from the dispatched training Trial rows | the implemented content-addressed envelope plus Trial/Candidate/source agreement closes mutable string/boolean attribution, search-space/fidelity double ledgers, fallback learning, and ambiguous multi-source state ownership; a future relational action ledger is still needed to retain rejected and cross-batch routing opportunities |
+| modern reward eligibility is derived from the closed roles `native_optimizer`, `emergency_fallback`, `projected_baseline`, and `unsupported_generator` | emergency and unknown generators now fail closed; legacy unsealed rows retain compatibility inference and remain explicitly distinguishable |
 | “comparable” means completed, requested and effective full fidelity, metadata-eligible, with finite feasible loss | validation role, incurred work, and a relationally immutable application/verifier identity are not part of comparability |
 | feasibility requires `feasible` and `failure_rate < 0.5` | the compatibility boundary is now one named constant sealed into Outcome Contract V1; calibration and cost-sensitive replacement remain future work |
 | each child receives at most its best attributed reward once per generation | removes additive batch-size credit, but still discards batch cost, uncertainty, failures, and non-best contributions; larger batches retain more chances to produce the one winner |
@@ -1980,7 +1980,10 @@ source_share = 1 / count(eligible_exact_sources)
 ```
 
 The deterministic primary source remains useful for display and foreign-key
-compatibility, but does not receive all reward. If two calls from the same tool emit the
+compatibility and is sealed as the one `learning_owner` permitted to update
+child-local CMA/TuRBO state, but it does not receive all reward. Other exact
+native sources keep their fractional attribution without consuming metadata
+that belongs to a different child. If two calls from the same tool emit the
 same Candidate, its duplicate calls do not multiply the tool's total share. A future
 causal or Shapley-style scheme would require counterfactual evidence and is not claimed.
 
@@ -2426,11 +2429,17 @@ attached to downstream reports.
 
 Each adapter receives both global observations and tool-owned state observations.
 Global observations may train a surrogate or feasibility model. Trust-region,
-cohort, restart, and child-reward state uses relational proposal provenance, not
-substring matching on a legacy `optimizer_strategy` string. During migration, the
-adapter can verify the old string against the new relation, but disagreement is an
-integrity error. Fallback candidates and projected-baseline candidates remain visible
-as evidence while being ineligible for optimizer reward or state updates.
+cohort, restart, and child-reward state uses verified content-addressed proposal
+provenance, not substring matching on a legacy `optimizer_strategy` string.
+The current `dronedream.optimizer-source-evidence/v2` envelope binds strategy,
+generation, projected parameters, the ordered parameter-domain contract,
+requested/effective fidelity, closed source roles, and reward shares. Its
+single `learning_owner` separates child-local state updates from multi-source
+reward; its hash is in turn frozen by Candidate receipt v2. During migration, legacy
+unsealed rows retain the compatibility normalizer, while any modern missing or
+divergent envelope is quarantined. Fallback candidates and projected-baseline
+candidates remain visible as evidence while being ineligible for optimizer
+reward or state updates.
 
 The plan validator permits at most one call per tool ID in a generation. Repeated
 entries are rejected rather than executed with overlapping seeds or CMA cohort
@@ -8320,16 +8329,31 @@ outcomes are excluded only from the parameter-safety learning rate. They still
 remain in dispatched denominators, block evidence completeness and public
 promotion, preserve cost, and are bound into Candidate outcome evidence.
 
-Outcome Contract compiler 2.0 introduces
-`dronedream.portfolio-sources/v1`. Exact same-batch actions retain every unique
+Outcome Contract compiler 2.0 introduced same-batch source attribution. The
+current implementation upgrades it to `dronedream.portfolio-sources/v2` and
+seals the projection in `dronedream.optimizer-source-evidence/v2`. Exact
+same-batch actions retain every unique
 child optimizer that independently proposed the parameter/fidelity identity,
 with equal reward shares summing to one; repeated proposals from one child
 collapse to one source. Lower-fidelity or superseded sources remain auditable
-but receive no reward, as do emergency fallback points. Portfolio statistics
-consume those fractional shares. The current implementation remains an
-explicit deterministic heuristic: it does not yet persist rejected historical
-collisions, complete incurred cost/delay, randomized action propensities, or
-an append-only routing/reward ledger.
+but receive no reward, as do emergency fallbacks, projected baselines, and
+unsupported generators. If a fallback arrives before an exact native
+collision, the native proposal becomes the state-carrying envelope so
+`learning_owner` and the child-local CMA/TuRBO reconstruction state remain
+coherent. Source roles, strategy, generation, projected parameter SHA-256, and
+reward shares are content-addressed. The search-space digest additionally binds
+PX4 version, catalog version, vehicle type, airframe, and safe-bound policy.
+Modern history recomputes the generation-specific configured training
+case/seed matrix and the deterministic requested-fidelity subset, then requires
+the exact Trial set and actual coverage to match Trial labels, Candidate
+metadata, and the source envelope. Missing, duplicated, or divergent evidence
+fails closed before portfolio state reconstruction; Candidate receipt v2
+freezes source identity, provenance-required state, and the complete optimizer
+metadata hash. Portfolio statistics consume those fractional shares. The
+current implementation
+remains an explicit deterministic heuristic: it does not yet persist rejected
+historical collisions, complete incurred cost/delay, randomized action
+propensities, or an append-only routing/reward ledger.
 
 Outcome Contract compiler 2.1 adds
 `fixed_scale_pre_generation_incumbent_v1`. Every full-fidelity child reward is
@@ -8496,18 +8520,24 @@ or independently verify simulator-authored telemetry semantics. Those remain
 the next evidence and operational boundaries.
 
 Outcome Contract compiler 2.11 makes the current Candidate envelope
-relationally append-only with
-`dronedream.candidate-evidence-receipt/v1`. Each receipt binds the full
-canonical aggregate hash, Candidate/Job/generation/parameter identity, linked
+relationally append-only. The current writer emits
+`dronedream.candidate-evidence-receipt/v2`, while v1 remains readable for
+migration but cannot be appended to or automatically upgraded without a
+controlled migration. Each v2 receipt binds the full canonical aggregate and
+optimizer metadata hashes, Candidate/Job/generation/parameter identity,
+`source_type`, the optimizer-source-evidence-required state, linked
 v3 outcome and report evidence, both Trial-evidence hashes, accepted-attempt
 counts, a monotonic revision, and the previous receipt ID. Critical readers
 recompute and verify the complete chain and require the current mutable
-compatibility aggregate to equal the newest sealed receipt.
+compatibility aggregate, source identity, provenance-required state, and
+optimizer metadata to equal the newest sealed receipt.
 
 An irreversible `evidence_ledger_required` Candidate flag prevents a caller
 from deleting both JSON evidence and the JSON “required” markers to recover a
 legacy permissive path. Aggregation turns the flag on, migration backfills it
 for existing v3 evidence, and SQLite/PostgreSQL reject true-to-false updates.
+The same database boundary rejects changes to `source_type` or
+`optimizer_metadata_json` after the gate turns on.
 Upgraded v3 evidence without a relational receipt therefore fails closed until
 trusted reaggregation creates one. Receipt updates and ordinary deletes fail.
 Explicit terminal Job deletion creates transaction-scoped authorizations for

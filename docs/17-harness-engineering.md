@@ -252,16 +252,38 @@ acceptance/completion denominators, blocks complete evidence, and retains its
 incurred work; this quarantine isolates optimizer learning only and never turns
 a failed run into a passing or completed result.
 
-Outcome Contract compiler 2.0 adds
-`dronedream.portfolio-sources/v1` for same-batch proposal attribution. An exact
+Outcome Contract compiler 2.0 originally added same-batch proposal
+attribution. The current contract upgrades that projection to
+`dronedream.portfolio-sources/v2` and seals it inside
+`dronedream.optimizer-source-evidence/v2`. An exact
 parameter/fidelity action proposed by multiple child optimizers retains every
 unique child source and divides reward credit so shares sum to one. Same-tool
-duplicates cannot multiply credit. A lower-fidelity collision or a source
-superseded by a higher-fidelity action remains visible but becomes reward
-ineligible; emergency fallbacks remain ineligible. Portfolio statistics use
-fractional credit rather than awarding one full reward to every source. This
-does not yet replace the need for an append-only routing-opportunity/action
-ledger capable of preserving collisions against historical Candidates.
+duplicates cannot multiply credit. Reward attribution and child-local optimizer
+state are separate: one content-addressed `learning_owner` identifies the
+native source whose unchanged metadata can update CMA/TuRBO state, while all
+verified exact native sources retain their equal reward shares. When an
+emergency fallback arrives before an exact native collision, the native
+proposal becomes the state-carrying envelope so a valid learning owner and its
+child-local reconstruction fields cannot be lost. A lower-fidelity collision or
+a source superseded by a higher-fidelity action remains visible but becomes
+reward ineligible; emergency fallbacks, projected baselines, and unknown
+generators remain ineligible under a closed source-role policy. The evidence
+envelope binds strategy, generation, projected-parameter SHA-256, ordered
+search-space contract SHA-256, requested/effective fidelity, source roles, and
+equal reward shares. The search-space hash includes PX4 version, parameter
+catalog version, vehicle type, airframe, and safe-bound enforcement, rather than
+hashing rectangular domains alone. Optimizer history independently rebuilds the
+generation-specific configured training case/seed matrix, deterministically
+selects the subset implied by requested fidelity, and requires that exact set
+and its recomputed coverage to match every Trial label, Candidate metadata, and
+source envelope; missing, duplicated, mixed, or divergent coverage is
+quarantined. Modern
+observations fail closed when that envelope is
+missing or divergent; legacy unsealed observations retain the old compatibility
+normalizer. Portfolio statistics use fractional credit rather than awarding
+one full reward to every source. This does not yet replace the need for an
+append-only routing-opportunity/action ledger capable of preserving rejected
+and historical collisions.
 
 Outcome Contract compiler 2.1 freezes the online portfolio reward definition.
 Each child is credited only for reducing the globally comparable full-fidelity
@@ -429,17 +451,28 @@ lineage at current aggregation, winner, report, and replay readers. Candidate
 evidence was still embedded in mutable compatibility JSON rather than its own
 append-only relational table at this revision.
 
-Outcome Contract compiler 2.11 adds
-`dronedream.candidate-evidence-receipt/v1`. Every new Candidate v3 aggregate
+Outcome Contract compiler 2.11 adds the relational Candidate ledger. The
+current writer emits `dronedream.candidate-evidence-receipt/v2`; v1 receipts
+remain readable for migration, but cannot be appended to or automatically
+upgraded because they do not bind source identity or optimizer metadata. An
+optimizer Candidate therefore cannot use v1 as modern training or publication
+evidence without a controlled migration. Every new Candidate v3 aggregate
 receives a relational, content-addressed receipt binding Candidate/Job identity,
-generation and parameter hashes, the complete aggregate hash, the linked
+generation and parameter hashes, `source_type`, the irreversible optimizer
+source-evidence requirement state, the exact optimizer-metadata hash, the
+complete aggregate hash, the linked
 outcome/report evidence IDs and schemas, both Trial-evidence hashes, accepted
 physical-attempt counts, revision number, and predecessor receipt. Readers
 verify the complete contiguous revision chain and require the latest receipt to
-match the current aggregate byte-for-byte at the canonical-JSON boundary.
+match the current aggregate, source identity, provenance-required state, and
+optimizer metadata byte-for-byte at the canonical-JSON boundary.
 Publishability, acceptance, optimizer history, CMA-family selection, and report
 publication all fail closed when that chain is missing, malformed, stale, or
-divergent.
+divergent. Once any v2 receipt exists, ordinary reaggregation may append only
+while the latest source identity, provenance-required state, and
+optimizer-metadata hash still match the Candidate; it cannot reseal changed
+source, strategy, credit, fidelity, or search-space provenance into a new
+apparently valid revision.
 
 The Candidate row also carries an irreversible
 `evidence_ledger_required` gate. Aggregation turns it on before recording a
@@ -451,7 +484,9 @@ path. Such an upgraded legacy Candidate remains unavailable until trustworthy
 reaggregation creates its relational receipt. Receipt updates and ordinary
 deletes are rejected. Explicit terminal Job deletion writes transaction-scoped
 Candidate-receipt and winner-freeze deletion authorizations, preserving the
-user's right to delete the Job without weakening normal immutability.
+user's right to delete the Job without weakening normal immutability. A
+separate SQLite/PostgreSQL provenance guard rejects changes to `source_type` or
+`optimizer_metadata_json` after the ledger gate turns on.
 
 This closes the mutable Candidate-envelope fallback at supported application
 and database boundaries. A database owner can still drop the guards, and SQL

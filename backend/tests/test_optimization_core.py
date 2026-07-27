@@ -231,10 +231,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         first.domain_failure_policy.optimizer_learning_outcome_policy
         == "verified_domain_failures_only_excluding_nonphysical_outcomes"
     )
-    assert (
-        first.domain_failure_policy.unknown_failure_policy
-        == "quarantined_nonlearning_failure"
-    )
+    assert first.domain_failure_policy.unknown_failure_policy == "quarantined_nonlearning_failure"
     assert (
         first.domain_failure_policy.acceptance_non_success_policy
         == "all_non_successes_remain_in_denominator"
@@ -245,7 +242,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "2.8"
+    assert first.compiler_version == "2.9"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert first.metric_dependency_policy == "reject_known_alias_complement_and_composite_overlap"
     assert (
@@ -316,7 +313,31 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         first.selection_policy.artifact_download_verification_policy
         == "verify_bound_bytes_before_stream_v1"
     )
-    assert first.selection_policy.portfolio_source_schema == "dronedream.portfolio-sources/v1"
+    assert (
+        first.selection_policy.optimizer_source_evidence_schema
+        == "dronedream.optimizer-source-evidence/v2"
+    )
+    assert (
+        first.selection_policy.optimizer_source_context_binding_policy
+        == "strategy_generation_parameter_search_space_fidelity_sha256"
+    )
+    assert (
+        first.selection_policy.optimizer_source_validator_context_policy
+        == "px4_catalog_vehicle_airframe_safe_bounds_bound_v1"
+    )
+    assert (
+        first.selection_policy.optimizer_source_role_policy
+        == "closed_role_derived_reward_eligibility_v1"
+    )
+    assert (
+        first.selection_policy.optimizer_source_learning_owner_policy
+        == "single_native_child_local_state_owner_v1"
+    )
+    assert (
+        first.selection_policy.optimizer_source_trial_fidelity_policy
+        == "configured_case_seed_subset_recomputed_then_candidate_source_exact_match"
+    )
+    assert first.selection_policy.portfolio_source_schema == "dronedream.portfolio-sources/v2"
     assert (
         first.selection_policy.portfolio_exact_collision_policy
         == "equal_credit_across_unique_child_strategies"

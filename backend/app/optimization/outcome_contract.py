@@ -17,7 +17,7 @@ from app.optimization.outcome_evidence import (
 )
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "2.8"
+OUTCOME_CONTRACT_COMPILER_VERSION = "2.9"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 PORTFOLIO_REWARD_SCALE = 1.0
@@ -57,9 +57,7 @@ _METRIC_REGISTRY = {
     "known_dependency_groups": [
         sorted(_KNOWN_RELIABILITY_DEPENDENCY_GROUP),
     ],
-    "exclusive_composite_objectives": sorted(
-        _EXCLUSIVE_COMPOSITE_OBJECTIVES
-    ),
+    "exclusive_composite_objectives": sorted(_EXCLUSIVE_COMPOSITE_OBJECTIVES),
 }
 _SCENARIO_TYPES = frozenset(
     {
@@ -100,9 +98,7 @@ class OutcomeObjective(_FrozenModel):
     robust_estimator: str
     within_case_estimator: str
     across_case_estimator: Literal["mean", "worst"]
-    sample_weight_policy: Literal[
-        "full_case_weight_after_within_case_estimator"
-    ]
+    sample_weight_policy: Literal["full_case_weight_after_within_case_estimator"]
     missing_policy: str
 
 
@@ -129,9 +125,7 @@ class OutcomeScenarioCase(_FrozenModel):
 class OutcomeScenarioPopulation(_FrozenModel):
     case_semantics: Literal["fixed_suite"] = "fixed_suite"
     case_weight_semantics: Literal["decision_priority"] = "decision_priority"
-    replicate_semantics: Literal[
-        "declared_within_case_estimator_with_failure_rate_separate"
-    ] = (
+    replicate_semantics: Literal["declared_within_case_estimator_with_failure_rate_separate"] = (
         "declared_within_case_estimator_with_failure_rate_separate"
     )
     common_random_numbers: bool
@@ -145,9 +139,9 @@ class OutcomeScenarioPopulation(_FrozenModel):
 
 
 class OutcomeFailurePolicy(_FrozenModel):
-    trial_outcome_taxonomy_schema: Literal[
+    trial_outcome_taxonomy_schema: Literal["dronedream.trial-outcome-taxonomy/v1"] = (
         "dronedream.trial-outcome-taxonomy/v1"
-    ] = "dronedream.trial-outcome-taxonomy/v1"
+    )
     failed_trial_treatment: Literal["separate_rate_penalty"] = "separate_rate_penalty"
     failed_trial_weight_decimal: str
     optimizer_learning_failure_rate_operator: Literal["lt"] = "lt"
@@ -157,91 +151,109 @@ class OutcomeFailurePolicy(_FrozenModel):
     optimizer_learning_outcome_policy: Literal[
         "verified_domain_failures_only_excluding_nonphysical_outcomes"
     ] = "verified_domain_failures_only_excluding_nonphysical_outcomes"
-    unknown_failure_policy: Literal[
+    unknown_failure_policy: Literal["quarantined_nonlearning_failure"] = (
         "quarantined_nonlearning_failure"
-    ] = "quarantined_nonlearning_failure"
-    acceptance_non_success_policy: Literal[
+    )
+    acceptance_non_success_policy: Literal["all_non_successes_remain_in_denominator"] = (
         "all_non_successes_remain_in_denominator"
-    ] = "all_non_successes_remain_in_denominator"
+    )
 
 
 class OutcomeSelectionPolicy(_FrozenModel):
     schema_version: Literal["1.0"] = "1.0"
-    optimizer_objective_representation_policy: Literal[
+    optimizer_objective_representation_policy: Literal["one_representation_per_tool_call"] = (
         "one_representation_per_tool_call"
-    ] = "one_representation_per_tool_call"
-    bayesian_multiobjective_policy: Literal[
+    )
+    bayesian_multiobjective_policy: Literal["joint_objective_vector_else_scalar_loss"] = (
         "joint_objective_vector_else_scalar_loss"
-    ] = "joint_objective_vector_else_scalar_loss"
+    )
     scalar_optimizer_policy: Literal["scalar_loss_only"] = "scalar_loss_only"
-    bayesian_objective_scale_policy: Literal[
+    bayesian_objective_scale_policy: Literal["fixed_job_objective_normalization"] = (
         "fixed_job_objective_normalization"
-    ] = "fixed_job_objective_normalization"
-    bayesian_scalarization_policy: Literal[
+    )
+    bayesian_scalarization_policy: Literal["fixed_job_objective_weights"] = (
         "fixed_job_objective_weights"
-    ] = "fixed_job_objective_weights"
-    incomplete_objective_vector_policy: Literal[
+    )
+    incomplete_objective_vector_policy: Literal["scalar_loss_else_exploration"] = (
         "scalar_loss_else_exploration"
-    ] = "scalar_loss_else_exploration"
-    candidate_outcome_evidence_policy: Literal[
+    )
+    candidate_outcome_evidence_policy: Literal["content_addressed_search_projection"] = (
         "content_addressed_search_projection"
-    ] = "content_addressed_search_projection"
+    )
     candidate_outcome_context_binding_policy: Literal[
         "candidate_id_generation_parameter_sha256"
     ] = "candidate_id_generation_parameter_sha256"
-    candidate_outcome_trial_binding_policy: Literal[
+    candidate_outcome_trial_binding_policy: Literal["canonical_training_trial_rows_sha256"] = (
         "canonical_training_trial_rows_sha256"
-    ] = "canonical_training_trial_rows_sha256"
-    candidate_report_projection_policy: Literal[
+    )
+    candidate_report_projection_policy: Literal["content_addressed_candidate_outcome_bound_v1"] = (
         "content_addressed_candidate_outcome_bound_v1"
-    ] = "content_addressed_candidate_outcome_bound_v1"
-    candidate_report_trial_binding_policy: Literal[
+    )
+    candidate_report_trial_binding_policy: Literal["all_candidate_trial_rows_sha256"] = (
         "all_candidate_trial_rows_sha256"
-    ] = "all_candidate_trial_rows_sha256"
-    winner_selection_evidence_policy: Literal[
+    )
+    winner_selection_evidence_policy: Literal["content_addressed_full_candidate_set_v1"] = (
         "content_addressed_full_candidate_set_v1"
-    ] = "content_addressed_full_candidate_set_v1"
+    )
     winner_selection_tiebreak_policy: Literal[
         "optimizer_before_baseline_then_generation_then_candidate_id"
     ] = "optimizer_before_baseline_then_generation_then_candidate_id"
-    winner_freeze_receipt_schema: Literal[
+    winner_freeze_receipt_schema: Literal["dronedream.winner-freeze-receipt/v1"] = (
         "dronedream.winner-freeze-receipt/v1"
-    ] = "dronedream.winner-freeze-receipt/v1"
-    winner_freeze_persistence_policy: Literal[
+    )
+    winner_freeze_persistence_policy: Literal["insert_once_per_job_exact_evidence_v1"] = (
         "insert_once_per_job_exact_evidence_v1"
-    ] = "insert_once_per_job_exact_evidence_v1"
-    winner_freeze_mutation_policy: Literal[
+    )
+    winner_freeze_mutation_policy: Literal["database_reject_update_delete_v1"] = (
         "database_reject_update_delete_v1"
-    ] = "database_reject_update_delete_v1"
-    artifact_digest_receipt_schema: Literal[
+    )
+    artifact_digest_receipt_schema: Literal["dronedream.artifact-digest-receipt/v1"] = (
         "dronedream.artifact-digest-receipt/v1"
-    ] = "dronedream.artifact-digest-receipt/v1"
+    )
     artifact_integrity_policy: Literal["sha256-v1"] = "sha256-v1"
-    artifact_digest_mutation_policy: Literal[
+    artifact_digest_mutation_policy: Literal["database_reject_update_unauthorized_delete_v1"] = (
         "database_reject_update_unauthorized_delete_v1"
-    ] = "database_reject_update_unauthorized_delete_v1"
-    artifact_download_verification_policy: Literal[
+    )
+    artifact_download_verification_policy: Literal["verify_bound_bytes_before_stream_v1"] = (
         "verify_bound_bytes_before_stream_v1"
-    ] = "verify_bound_bytes_before_stream_v1"
-    portfolio_source_schema: Literal[
-        "dronedream.portfolio-sources/v1"
-    ] = "dronedream.portfolio-sources/v1"
-    portfolio_exact_collision_policy: Literal[
+    )
+    optimizer_source_evidence_schema: Literal["dronedream.optimizer-source-evidence/v2"] = (
+        "dronedream.optimizer-source-evidence/v2"
+    )
+    optimizer_source_context_binding_policy: Literal[
+        "strategy_generation_parameter_search_space_fidelity_sha256"
+    ] = "strategy_generation_parameter_search_space_fidelity_sha256"
+    optimizer_source_validator_context_policy: Literal[
+        "px4_catalog_vehicle_airframe_safe_bounds_bound_v1"
+    ] = "px4_catalog_vehicle_airframe_safe_bounds_bound_v1"
+    optimizer_source_role_policy: Literal["closed_role_derived_reward_eligibility_v1"] = (
+        "closed_role_derived_reward_eligibility_v1"
+    )
+    optimizer_source_learning_owner_policy: Literal["single_native_child_local_state_owner_v1"] = (
+        "single_native_child_local_state_owner_v1"
+    )
+    optimizer_source_trial_fidelity_policy: Literal[
+        "configured_case_seed_subset_recomputed_then_candidate_source_exact_match"
+    ] = "configured_case_seed_subset_recomputed_then_candidate_source_exact_match"
+    portfolio_source_schema: Literal["dronedream.portfolio-sources/v2"] = (
+        "dronedream.portfolio-sources/v2"
+    )
+    portfolio_exact_collision_policy: Literal["equal_credit_across_unique_child_strategies"] = (
         "equal_credit_across_unique_child_strategies"
-    ] = "equal_credit_across_unique_child_strategies"
-    portfolio_material_change_policy: Literal[
+    )
+    portfolio_material_change_policy: Literal["superseded_source_ineligible_for_reward"] = (
         "superseded_source_ineligible_for_reward"
-    ] = "superseded_source_ineligible_for_reward"
-    portfolio_reward_contract: Literal[
+    )
+    portfolio_reward_contract: Literal["fixed_scale_pre_generation_incumbent_v1"] = (
         "fixed_scale_pre_generation_incumbent_v1"
-    ] = "fixed_scale_pre_generation_incumbent_v1"
+    )
     portfolio_reward_scale_decimal: Literal["1"] = "1"
-    portfolio_incumbent_scope: Literal[
+    portfolio_incumbent_scope: Literal["global_comparable_full_fidelity_before_generation"] = (
         "global_comparable_full_fidelity_before_generation"
-    ] = "global_comparable_full_fidelity_before_generation"
-    portfolio_generation_credit_policy: Literal[
+    )
+    portfolio_generation_credit_policy: Literal["best_attributed_reward_once_per_generation"] = (
         "best_attributed_reward_once_per_generation"
-    ] = "best_attributed_reward_once_per_generation"
+    )
     portfolio_reward_bound: Literal["zero_to_one"] = "zero_to_one"
     precedence: tuple[str, ...] = (
         "evidence_complete",
@@ -251,9 +263,7 @@ class OutcomeSelectionPolicy(_FrozenModel):
         "preference_and_soft_constraint_loss",
         "stable_tiebreak",
     )
-    compatibility_score: str = (
-        "preference_and_soft_constraint_loss_plus_failed_trial_rate_penalty"
-    )
+    compatibility_score: str = "preference_and_soft_constraint_loss_plus_failed_trial_rate_penalty"
 
 
 class OutcomePromotionPolicy(_FrozenModel):
@@ -278,14 +288,12 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["2.8"] = "2.8"
+    compiler_version: Literal["2.9"] = "2.9"
     contract_id: str
-    metric_admission_policy: Literal["registered_metrics_only"] = (
-        "registered_metrics_only"
-    )
-    metric_dependency_policy: Literal[
+    metric_admission_policy: Literal["registered_metrics_only"] = "registered_metrics_only"
+    metric_dependency_policy: Literal["reject_known_alias_complement_and_composite_overlap"] = (
         "reject_known_alias_complement_and_composite_overlap"
-    ] = "reject_known_alias_complement_and_composite_overlap"
+    )
     metric_registry_sha256: str
     objective_config_sha256: str
     scenario_suite_sha256: str
@@ -325,8 +333,7 @@ def _metric_reference(metric: str) -> OutcomeMetricReference:
     if registered is None:
         allowed = ", ".join(sorted(_CANONICAL_METRICS))
         raise ValueError(
-            f"unregistered optimization metric: {metric}; "
-            f"registered metrics are: {allowed}"
+            f"unregistered optimization metric: {metric}; registered metrics are: {allowed}"
         )
     source, unit, value_kind = registered
     return OutcomeMetricReference(
@@ -341,9 +348,7 @@ def _metric_reference(metric: str) -> OutcomeMetricReference:
 def _validate_metric_dependencies(
     objective_config: schemas.ObjectiveConfig,
 ) -> None:
-    objective_metrics = {
-        objective.metric for objective in objective_config.objectives
-    }
+    objective_metrics = {objective.metric for objective in objective_config.objectives}
     composite_overlap = objective_metrics & _EXCLUSIVE_COMPOSITE_OBJECTIVES
     if composite_overlap and len(objective_metrics) > 1:
         composite = sorted(composite_overlap)[0]
@@ -352,21 +357,15 @@ def _validate_metric_dependencies(
             "with another objective until its dependency graph is registered"
         )
 
-    objective_reliability = sorted(
-        objective_metrics & _KNOWN_RELIABILITY_DEPENDENCY_GROUP
-    )
+    objective_reliability = sorted(objective_metrics & _KNOWN_RELIABILITY_DEPENDENCY_GROUP)
     if len(objective_reliability) > 1:
         raise ValueError(
             "dependent reliability objective metrics cannot be combined: "
             + ", ".join(objective_reliability)
         )
 
-    constraint_metrics = {
-        constraint.metric for constraint in objective_config.constraints
-    }
-    constraint_reliability = sorted(
-        constraint_metrics & _KNOWN_RELIABILITY_DEPENDENCY_GROUP
-    )
+    constraint_metrics = {constraint.metric for constraint in objective_config.constraints}
+    constraint_reliability = sorted(constraint_metrics & _KNOWN_RELIABILITY_DEPENDENCY_GROUP)
     if len(constraint_reliability) > 1:
         raise ValueError(
             "dependent reliability constraint metrics cannot be combined: "
@@ -409,22 +408,16 @@ def compile_outcome_contract(
             robust_estimator=objective_config.robust_aggregation,
             within_case_estimator=objective_config.robust_aggregation,
             across_case_estimator=(
-                "worst"
-                if objective_config.robust_aggregation == "worst"
-                else "mean"
+                "worst" if objective_config.robust_aggregation == "worst" else "mean"
             ),
-            sample_weight_policy=(
-                "full_case_weight_after_within_case_estimator"
-            ),
+            sample_weight_policy=("full_case_weight_after_within_case_estimator"),
             missing_policy="fail_dispatched_case_without_usable_metric",
         )
         for index, item in enumerate(objective_config.objectives)
     )
     constraints = tuple(
         OutcomeConstraint(
-            constraint_id=(
-                f"{item.metric}:{item.operator}:{_decimal(item.threshold)}"
-            ),
+            constraint_id=(f"{item.metric}:{item.operator}:{_decimal(item.threshold)}"),
             metric=_metric_reference(item.metric),
             operator=item.operator,
             threshold_decimal=_decimal(item.threshold),
@@ -458,9 +451,7 @@ def compile_outcome_contract(
         "schema_id": OUTCOME_CONTRACT_SCHEMA,
         "compiler_version": OUTCOME_CONTRACT_COMPILER_VERSION,
         "metric_admission_policy": "registered_metrics_only",
-        "metric_dependency_policy": (
-            "reject_known_alias_complement_and_composite_overlap"
-        ),
+        "metric_dependency_policy": ("reject_known_alias_complement_and_composite_overlap"),
         "metric_registry_sha256": _sha256(_METRIC_REGISTRY),
         "objective_config_sha256": _sha256(objective_json),
         "scenario_suite_sha256": _sha256(scenario_json),
@@ -603,10 +594,8 @@ def compile_job_outcome_contract(
     objective_config = schemas.ObjectiveConfig(
         **(getattr(job, "objective_config_json", None) or {})
     )
-    scenario_suite, source_scenario_suite, compatibility_normalization = (
-        _persisted_scenario_suite(
-            getattr(job, "scenario_suite_json", None),
-        )
+    scenario_suite, source_scenario_suite, compatibility_normalization = _persisted_scenario_suite(
+        getattr(job, "scenario_suite_json", None),
     )
     acceptance = schemas.AcceptanceCriteria(
         target_rmse=getattr(job, "target_rmse", None),

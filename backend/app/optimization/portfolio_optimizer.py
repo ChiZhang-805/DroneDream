@@ -23,6 +23,12 @@ from app.optimization.outcome_contract import (
     OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
     PORTFOLIO_REWARD_SCALE,
 )
+from app.optimization.proposal_provenance import (
+    OPTIMIZER_SOURCE_EVIDENCE_REQUIRED_FIELD,
+    PORTFOLIO_SOURCES_V2_SCHEMA,
+    classify_optimizer_source_role,
+    verified_observation_source_evidence,
+)
 
 _CHILD_STRATEGIES: tuple[ExperimentalOptimizerStrategy, ...] = (
     "constrained_mobo",
@@ -33,7 +39,7 @@ _CHILD_STRATEGIES: tuple[ExperimentalOptimizerStrategy, ...] = (
     "bipop_cma_es",
 )
 _BAYESIAN_STRATEGIES = frozenset(_CHILD_STRATEGIES[:4])
-_PORTFOLIO_SOURCES_SCHEMA = "dronedream.portfolio-sources/v1"
+_PORTFOLIO_SOURCES_SCHEMA = PORTFOLIO_SOURCES_V2_SCHEMA
 
 
 def _child_strategy_from_metadata(
@@ -82,11 +88,14 @@ def _portfolio_source_strategies(
     observation: OptimizerObservation,
 ) -> tuple[ExperimentalOptimizerStrategy, ...]:
     metadata = _optimizer_metadata(observation)
+    verified = verified_observation_source_evidence(observation)
+    if verified is not None:
+        return tuple(source.child_strategy for source in verified.sources if source.materialized)
+    if metadata.get(OPTIMIZER_SOURCE_EVIDENCE_REQUIRED_FIELD) is True:
+        return ()
     if "portfolio_sources" not in metadata:
         return tuple(
-            strategy
-            for strategy in _CHILD_STRATEGIES
-            if _strategy_matches(observation, strategy)
+            strategy for strategy in _CHILD_STRATEGIES if _strategy_matches(observation, strategy)
         )[:1]
     if metadata.get("portfolio_sources_schema") != _PORTFOLIO_SOURCES_SCHEMA:
         return ()
@@ -110,6 +119,11 @@ def _portfolio_source_credits(
     observation: OptimizerObservation,
 ) -> tuple[tuple[ExperimentalOptimizerStrategy, float], ...]:
     metadata = _optimizer_metadata(observation)
+    verified = verified_observation_source_evidence(observation)
+    if verified is not None:
+        return tuple((credit.child_strategy, credit.share) for credit in verified.reward_credits)
+    if metadata.get(OPTIMIZER_SOURCE_EVIDENCE_REQUIRED_FIELD) is True:
+        return ()
     if "portfolio_source_credits" not in metadata:
         if not _reward_eligible(observation):
             return ()
@@ -161,6 +175,11 @@ def _optimizer_metadata(observation: OptimizerObservation) -> Mapping[str, Any]:
 
 def _reward_eligible(observation: OptimizerObservation) -> bool:
     metadata = _optimizer_metadata(observation)
+    verified = verified_observation_source_evidence(observation)
+    if verified is not None:
+        return bool(verified.reward_credits)
+    if metadata.get(OPTIMIZER_SOURCE_EVIDENCE_REQUIRED_FIELD) is True:
+        return False
     explicit = metadata.get("portfolio_reward_eligible")
     if isinstance(explicit, bool):
         return explicit
@@ -177,16 +196,13 @@ def _full_fidelity_observation(observation: OptimizerObservation) -> bool:
 
 
 def _full_fidelity_reward_observation(observation: OptimizerObservation) -> bool:
-    return _full_fidelity_observation(observation) and _reward_eligible(
-        observation
-    )
+    return _full_fidelity_observation(observation) and _reward_eligible(observation)
 
 
 def _comparable_loss(observation: OptimizerObservation) -> float | None:
     if (
         not observation.feasible
-        or observation.failure_rate
-        >= OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
+        or observation.failure_rate >= OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
         or observation.loss is None
         or not math.isfinite(observation.loss)
     ):
@@ -213,11 +229,7 @@ def _pre_generation_incumbents(
         ]
         if generation_losses:
             generation_best = min(generation_losses)
-            incumbent = (
-                generation_best
-                if incumbent is None
-                else min(incumbent, generation_best)
-            )
+            incumbent = generation_best if incumbent is None else min(incumbent, generation_best)
     return result
 
 
@@ -230,17 +242,18 @@ def _attributed_improvement_statistics(
 
     generation_rewards: dict[int, float] = {}
     for observation, share in entries:
-        incumbent = pre_generation_incumbents.get(
-            observation.generation_index
-        )
+        incumbent = pre_generation_incumbents.get(observation.generation_index)
         loss = _comparable_loss(observation)
         if incumbent is None or loss is None:
             reward = 0.0
         else:
-            reward = min(
-                1.0,
-                max(0.0, incumbent - loss) / PORTFOLIO_REWARD_SCALE,
-            ) * share
+            reward = (
+                min(
+                    1.0,
+                    max(0.0, incumbent - loss) / PORTFOLIO_REWARD_SCALE,
+                )
+                * share
+            )
         generation_rewards[observation.generation_index] = max(
             reward,
             generation_rewards.get(observation.generation_index, 0.0),
@@ -278,20 +291,14 @@ def portfolio_statistics(request: OptimizerRequest) -> tuple[PortfolioStatistic,
         ]
         for strategy in _CHILD_STRATEGIES
     }
-    global_comparable = [
-        item for item in request.observations if _full_fidelity_observation(item)
-    ]
-    pre_generation_incumbents = _pre_generation_incumbents(
-        global_comparable
-    )
+    global_comparable = [item for item in request.observations if _full_fidelity_observation(item)]
+    pre_generation_incumbents = _pre_generation_incumbents(global_comparable)
     # Only completed full-fidelity evaluations are comparable enough to award
     # improvement credit. Lower-fidelity results still inform each child model
     # and the safety signal below, but cannot win portfolio budget by appearing
     # artificially better on a smaller scenario matrix.
     total_credit = sum(
-        share
-        for strategy in _CHILD_STRATEGIES
-        for _item, share in reward_history[strategy]
+        share for strategy in _CHILD_STRATEGIES for _item, share in reward_history[strategy]
     )
     statistics: list[PortfolioStatistic] = []
     for strategy in _CHILD_STRATEGIES:
@@ -306,11 +313,7 @@ def portfolio_statistics(request: OptimizerRequest) -> tuple[PortfolioStatistic,
         feasibility_rate = (
             sum(
                 share
-                * (
-                    item.feasible
-                    and item.failure_rate
-                    < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
-                )
+                * (item.feasible and item.failure_rate < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT)
                 for item, share in comparable_entries
             )
             / reward_credit
@@ -320,8 +323,7 @@ def portfolio_statistics(request: OptimizerRequest) -> tuple[PortfolioStatistic,
         # Improvement dominates.  The exploration bonus prevents an initially
         # unlucky algorithm from being permanently starved.
         exploration = math.sqrt(
-            math.log(total_credit + len(_CHILD_STRATEGIES) + 1.0)
-            / (reward_credit + 1.0)
+            math.log(total_credit + len(_CHILD_STRATEGIES) + 1.0) / (reward_credit + 1.0)
         )
         cold_start = 0.35 if reward_credit <= 0.0 else 0.0
         score = (
@@ -339,8 +341,7 @@ def portfolio_statistics(request: OptimizerRequest) -> tuple[PortfolioStatistic,
                 reward_credit=reward_credit,
                 feasible_observations=sum(
                     item.feasible
-                    and item.failure_rate
-                    < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
+                    and item.failure_rate < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
                     and item.loss is not None
                     and math.isfinite(item.loss)
                     for item in comparable_history
@@ -600,18 +601,17 @@ def _source_entry(
     effective_fidelity: float,
     requested_fidelity: float,
 ) -> dict[str, Any]:
+    generated_by = str(metadata.get("optimizer_generated_by", strategy))
+    source_role = classify_optimizer_source_role(strategy, generated_by)
     return {
         "child_strategy": strategy,
-        "generated_by": str(
-            metadata.get("optimizer_generated_by", strategy)
-        ),
+        "source_role": source_role,
+        "generated_by": generated_by,
         "planned_slot_role": planned_role,
         "effective_fidelity": effective_fidelity,
         "requested_fidelity": requested_fidelity,
         "materialized": True,
-        "reward_eligible": bool(
-            metadata.get("portfolio_reward_eligible", True)
-        ),
+        "reward_eligible": source_role == "native_optimizer",
         "exclusion_reason": None,
     }
 
@@ -635,17 +635,17 @@ def _with_portfolio_sources(
             source.get("exclusion_reason") is None,
         )
         current_priority = (
-            current.get("materialized") is True,
-            current.get("reward_eligible") is True,
-            current.get("exclusion_reason") is None,
-        ) if current is not None else (False, False, False)
+            (
+                current.get("materialized") is True,
+                current.get("reward_eligible") is True,
+                current.get("exclusion_reason") is None,
+            )
+            if current is not None
+            else (False, False, False)
+        )
         if current is None or candidate_priority > current_priority:
             by_strategy[strategy_key] = dict(source)
-    ordered = [
-        by_strategy[strategy]
-        for strategy in _CHILD_STRATEGIES
-        if strategy in by_strategy
-    ]
+    ordered = [by_strategy[strategy] for strategy in _CHILD_STRATEGIES if strategy in by_strategy]
     credited_strategies = [
         cast(ExperimentalOptimizerStrategy, source["child_strategy"])
         for source in ordered
@@ -733,9 +733,10 @@ def propose_optimizer_portfolio(
         )
         requested_fidelity = float(metadata.get("requested_fidelity", effective_fidelity))
         generated_by = str(metadata.get("optimizer_generated_by", strategy))
+        source_role = classify_optimizer_source_role(strategy, generated_by)
         actual_role = (
             "fallback"
-            if generated_by == "halton_fallback"
+            if source_role == "emergency_fallback"
             else str(metadata.get("portfolio_slot_role", planned_role))
         )
         metadata.update(
@@ -743,8 +744,9 @@ def propose_optimizer_portfolio(
                 "strategy": "optimizer_portfolio",
                 "child_strategy": strategy,
                 "optimizer_generated_by": generated_by,
-                "optimizer_update_eligible": bool(metadata.get("optimizer_update_eligible", True)),
-                "portfolio_reward_eligible": bool(metadata.get("portfolio_reward_eligible", True)),
+                "optimizer_source_role": source_role,
+                "optimizer_update_eligible": source_role == "native_optimizer",
+                "portfolio_reward_eligible": source_role == "native_optimizer",
                 "portfolio_slot_role": actual_role,
                 "portfolio_planned_slot_role": planned_role,
                 "fidelity": effective_fidelity,
@@ -792,9 +794,7 @@ def propose_optimizer_portfolio(
         existing_index = batch_proposal_index.get(vector_key)
         if existing_index is not None:
             existing = proposals[existing_index]
-            existing_effective = float(
-                existing.metadata.get("effective_fidelity", 1.0)
-            )
+            existing_effective = float(existing.metadata.get("effective_fidelity", 1.0))
             existing_requested = float(
                 existing.metadata.get(
                     "requested_fidelity",
@@ -822,15 +822,41 @@ def propose_optimizer_portfolio(
                 round(existing_requested, 12),
             )
             if new_priority == existing_priority:
+                existing_strategy = _child_strategy_from_metadata(existing.metadata)
+                existing_is_native = any(
+                    source.get("child_strategy") == existing_strategy
+                    and source.get("source_role") == "native_optimizer"
+                    and source.get("materialized") is True
+                    for source in existing_sources
+                )
+                proposal_is_native = any(
+                    source.get("child_strategy") == strategy
+                    and source.get("source_role") == "native_optimizer"
+                    and source.get("materialized") is True
+                    for source in proposal_sources
+                )
+                # Exact action collisions retain every source for reward
+                # attribution, but child-local state must come from a native
+                # optimizer whenever one exists.  Keeping a fallback envelope
+                # merely because it arrived first can leave an eligible native
+                # source without a learning owner and abort the generation.
+                if proposal_is_native and not existing_is_native:
+                    merged_base = proposal
+                    merged_sources = [*existing_sources, *proposal_sources]
+                    if existing_strategy != strategy:
+                        realized[existing_strategy] -= 1
+                        realized[strategy] += 1
+                else:
+                    merged_base = existing
+                    merged_sources = [*existing_sources, *proposal_sources]
                 proposals[existing_index] = replace(
-                    existing,
+                    merged_base,
                     rationale=(
-                        f"{existing.rationale} Exact action independently "
-                        f"proposed by {strategy}."
+                        f"{existing.rationale} Exact action independently proposed by {strategy}."
                     ),
                     metadata=_with_portfolio_sources(
-                        existing.metadata,
-                        [*existing_sources, *proposal_sources],
+                        merged_base.metadata,
+                        merged_sources,
                     ),
                 )
                 return False

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -151,6 +152,67 @@ def scenario_matrix(suite: ScenarioSuiteConfig) -> list[ScenarioRun]:
     return runs
 
 
+def scenario_matrix_for_generation(
+    suite: ScenarioSuiteConfig,
+    *,
+    generation_index: int,
+) -> list[ScenarioRun]:
+    """Return the exact deterministic matrix dispatched for one generation."""
+
+    if generation_index < 0:
+        raise ValueError("generation_index must be non-negative")
+    runs = scenario_matrix(suite)
+    if suite.common_random_numbers or generation_index == 0:
+        return runs
+    offset = generation_index * 1_000_003
+    seed_modulus = 2_147_483_648
+    return [
+        ScenarioRun(
+            case_id=run.case_id,
+            scenario_type=run.scenario_type,
+            seed=(run.seed + offset) % seed_modulus,
+            weight=run.weight,
+            holdout=run.holdout,
+            config=run.config,
+        )
+        for run in runs
+    ]
+
+
+def training_matrix_for_fidelity(
+    configured_runs: list[ScenarioRun],
+    requested_fidelity: float,
+) -> list[ScenarioRun]:
+    """Select the deterministic case-stratified training coverage."""
+
+    if not math.isfinite(requested_fidelity) or not 0.0 < requested_fidelity <= 1.0:
+        raise ValueError("requested_fidelity must be finite and inside (0, 1]")
+    training_runs = [run for run in configured_runs if not run.holdout]
+    if not training_runs:
+        return []
+    grouped: dict[str, list[ScenarioRun]] = {}
+    for run in training_runs:
+        grouped.setdefault(run.case_id, []).append(run)
+    target = min(
+        len(training_runs),
+        max(len(grouped), math.ceil(len(training_runs) * requested_fidelity)),
+    )
+    selected: list[ScenarioRun] = []
+    seed_index = 0
+    while len(selected) < target:
+        added = False
+        for case_runs in grouped.values():
+            if seed_index < len(case_runs):
+                selected.append(case_runs[seed_index])
+                added = True
+                if len(selected) >= target:
+                    break
+        if not added:
+            break
+        seed_index += 1
+    return selected
+
+
 def training_matrix(suite: ScenarioSuiteConfig) -> list[ScenarioRun]:
     return [run for run in scenario_matrix(suite) if not run.holdout]
 
@@ -165,5 +227,7 @@ __all__ = [
     "holdout_matrix",
     "resolve_scenario_case",
     "scenario_matrix",
+    "scenario_matrix_for_generation",
+    "training_matrix_for_fidelity",
     "training_matrix",
 ]

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, cast
 
@@ -19,7 +19,11 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.optimization.experimental_types import ExperimentalOptimizerStrategy
-from app.optimization.scenarios import ScenarioRun, scenario_matrix
+from app.optimization.scenarios import (
+    ScenarioRun,
+    scenario_matrix_for_generation,
+    training_matrix_for_fidelity,
+)
 from app.orchestration import constants
 from app.orchestration.aggregation import candidate_is_publishable
 from app.orchestration.cma_es_optimizer import propose_next_generation
@@ -83,26 +87,10 @@ def _configured_scenario_runs(
     if not job.scenario_suite_json:
         return None
     suite = schemas.ScenarioSuiteConfig(**job.scenario_suite_json)
-    runs = scenario_matrix(suite)
-    if suite.common_random_numbers or generation_index == 0:
-        return runs
-    # Users may explicitly disable common random numbers. Keep that mode
-    # deterministic while giving each generation a disjoint seed range.
-    offset = generation_index * 1_000_003
-    # Keep derived seeds inside the portable signed 32-bit range accepted by
-    # the request schema and common simulator/SDK interfaces.
-    seed_modulus = 2_147_483_648
-    return [
-        ScenarioRun(
-            case_id=run.case_id,
-            scenario_type=run.scenario_type,
-            seed=(run.seed + offset) % seed_modulus,
-            weight=run.weight,
-            holdout=run.holdout,
-            config=run.config,
-        )
-        for run in runs
-    ]
+    return scenario_matrix_for_generation(
+        suite,
+        generation_index=generation_index,
+    )
 
 
 def _scenario_payload(
@@ -626,40 +614,9 @@ def _create_optimizer_candidate(
 def _low_fidelity_scenario_runs(
     configured_runs: list[ScenarioRun], fidelity: float
 ) -> list[ScenarioRun]:
-    """Choose a deterministic, case-stratified fraction of training runs.
+    """Compatibility wrapper for the shared deterministic coverage selector."""
 
-    Fidelity represents executed scenario/seed coverage. Holdout cases remain
-    reserved for full-fidelity verification. Round-robin selection prevents a
-    case with many seeds from consuming the entire reduced budget.
-    """
-
-    training_runs = [run for run in configured_runs if not run.holdout]
-    if not training_runs:
-        return []
-    grouped: dict[str, list[ScenarioRun]] = {}
-    for run in training_runs:
-        grouped.setdefault(run.case_id, []).append(run)
-    # Every configured training case is part of the declared population. A
-    # reduced matrix may remove replicates, but it must not remove a whole
-    # case and silently optimize a different scenario suite.
-    target = min(
-        len(training_runs),
-        max(len(grouped), math.ceil(len(training_runs) * fidelity)),
-    )
-    reduced: list[ScenarioRun] = []
-    seed_index = 0
-    while len(reduced) < target:
-        added = False
-        for case_runs in grouped.values():
-            if seed_index < len(case_runs):
-                reduced.append(case_runs[seed_index])
-                added = True
-                if len(reduced) >= target:
-                    break
-        if not added:
-            break
-        seed_index += 1
-    return reduced
+    return training_matrix_for_fidelity(configured_runs, fidelity)
 
 
 def _effective_fidelity_mapping(
@@ -692,11 +649,12 @@ def _resolve_proposal_fidelity(
     proposal: CandidateProposal,
     fidelity_mapping: tuple[tuple[float, float], ...],
 ) -> CandidateProposal:
+    """Verify that the proposal was sealed after final fidelity resolution."""
+
     if not _uses_multi_fidelity(proposal.metadata):
         return proposal
-    metadata = dict(proposal.metadata)
-    requested = _optimizer_requested_fidelity(metadata)
-    effective = next(
+    requested = _optimizer_requested_fidelity(proposal.metadata)
+    expected_effective = next(
         (
             mapped
             for level, mapped in fidelity_mapping
@@ -704,15 +662,15 @@ def _resolve_proposal_fidelity(
         ),
         requested,
     )
-    metadata.update(
-        {
-            "requested_fidelity": requested,
-            "effective_fidelity": effective,
-            # Numerical optimizers consume the actual training coverage.
-            "fidelity": effective,
-        }
-    )
-    return replace(proposal, metadata=metadata)
+    sealed_effective = _optimizer_fidelity(proposal.metadata)
+    if not math.isclose(
+        sealed_effective,
+        expected_effective,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    ):
+        raise RuntimeError("optimizer proposal fidelity changed after source evidence sealing")
+    return proposal
 
 
 def _dispatch_optimizer_trials(
@@ -737,11 +695,16 @@ def _dispatch_optimizer_trials(
                 requested_fidelity,
             )
             if full_training_count > 0:
-                fidelity = len(configured_runs) / full_training_count
-                metadata = dict(candidate.optimizer_metadata_json or {})
-                metadata["effective_fidelity"] = fidelity
-                metadata["fidelity"] = fidelity
-                candidate.optimizer_metadata_json = metadata
+                actual_fidelity = len(configured_runs) / full_training_count
+                if not math.isclose(
+                    fidelity,
+                    actual_fidelity,
+                    rel_tol=0.0,
+                    abs_tol=1e-12,
+                ):
+                    raise RuntimeError(
+                        "dispatched Trial coverage diverged from sealed optimizer fidelity"
+                    )
         for run in configured_runs:
             payload = _scenario_payload(
                 job,
@@ -953,6 +916,19 @@ def start_job(db: Session, job: models.Job) -> models.Job:
     return job
 
 
+def _require_current_outcome_contract(
+    db: Session,
+    job: models.Job,
+) -> None:
+    """Refuse generation dispatch after the frozen semantics have drifted."""
+
+    if not check_job_outcome_contract(db, job).valid:
+        raise OutcomeContractDriftError(
+            "the persisted optimization outcome contract no longer matches "
+            "the Job configuration"
+        )
+
+
 def dispatch_next_llm_generation(
     db: Session,
     job: models.Job,
@@ -968,6 +944,7 @@ def dispatch_next_llm_generation(
 
     from app.orchestration.acceptance import criteria_for_job
 
+    _require_current_outcome_contract(db, job)
     generation_index = job.current_generation + 1
     configured_runs = _configured_scenario_runs(job, generation_index=generation_index)
     trials_per_candidate = (
@@ -1031,6 +1008,7 @@ def dispatch_next_cma_es_generation(
 ) -> AdaptiveDispatchResult:
     """Generate and dispatch the next dependency-free CMA-ES-style candidate."""
 
+    _require_current_outcome_contract(db, job)
     generation_index = job.current_generation + 1
     configured_runs = _configured_scenario_runs(job, generation_index=generation_index)
     trials_per_candidate = (
@@ -1153,6 +1131,7 @@ def dispatch_next_experimental_generation(
 ) -> AdaptiveDispatchResult:
     """Generate and dispatch one batch from an accuracy-first optimizer."""
 
+    _require_current_outcome_contract(db, job)
     strategy_value = strategy_override or job.optimizer_strategy
     if not is_experimental_strategy(strategy_value):
         raise ValueError(f"unsupported experimental strategy: {strategy_value}")
@@ -1333,6 +1312,7 @@ def dispatch_next_harness_generation(
     optimizer code without mutating the job's persisted ``llm_harness`` mode.
     """
 
+    _require_current_outcome_contract(db, job)
     generation_index = job.current_generation + 1
     if generation_index > job.max_iterations:
         record_event(

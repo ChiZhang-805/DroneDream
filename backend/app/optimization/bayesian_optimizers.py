@@ -38,6 +38,9 @@ from app.optimization.gaussian_process import (
     Matern52ARDGaussianProcess,
     infer_ard_length_scales,
 )
+from app.optimization.proposal_provenance import (
+    verified_observation_source_membership,
+)
 
 _STRATEGY_OFFSETS = {
     "constrained_mobo": 101,
@@ -1393,6 +1396,12 @@ def _multi_fidelity_mobo(
 
 
 def _is_turbo_observation(observation: OptimizerObservation) -> bool:
+    verified_membership = verified_observation_source_membership(
+        observation,
+        "turbo",
+    )
+    if verified_membership is not None:
+        return verified_membership
     strategy = observation.optimizer_strategy or ""
     return strategy == "turbo" or strategy.endswith(":turbo") or "turbo" in strategy.split("/")
 

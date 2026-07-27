@@ -178,17 +178,12 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     db_module._apply_sqlite_lightweight_migrations()
 
     with db_module.engine.begin() as conn:
-        columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()
-        }
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()}
         batch_columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
+            row[1] for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
         }
         secret_columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info('job_secrets')")).fetchall()
+            row[1] for row in conn.execute(text("PRAGMA table_info('job_secrets')")).fetchall()
         }
         candidate_columns = {
             row[1]
@@ -198,17 +193,11 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         }
         candidate_evidence_requirements = dict(
             conn.execute(
-                text(
-                    "SELECT id, evidence_ledger_required "
-                    "FROM candidate_parameter_sets"
-                )
+                text("SELECT id, evidence_ledger_required FROM candidate_parameter_sets")
             ).fetchall()
         )
         report_columns = {
-            row[1]
-            for row in conn.execute(
-                text("PRAGMA table_info('job_reports')")
-            ).fetchall()
+            row[1] for row in conn.execute(text("PRAGMA table_info('job_reports')")).fetchall()
         }
         winner_freeze_triggers = {
             row[0]
@@ -223,18 +212,11 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         winner_freeze_delete_authorization_columns = {
             row[1]
             for row in conn.execute(
-                text(
-                    "PRAGMA table_info("
-                    "'winner_freeze_delete_authorizations'"
-                    ")"
-                )
+                text("PRAGMA table_info('winner_freeze_delete_authorizations')")
             ).fetchall()
         }
         artifact_columns = {
-            row[1]
-            for row in conn.execute(
-                text("PRAGMA table_info('artifacts')")
-            ).fetchall()
+            row[1] for row in conn.execute(text("PRAGMA table_info('artifacts')")).fetchall()
         }
         artifact_digest_triggers = {
             row[0]
@@ -249,11 +231,7 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         artifact_digest_delete_authorization_columns = {
             row[1]
             for row in conn.execute(
-                text(
-                    "PRAGMA table_info("
-                    "'artifact_digest_delete_authorizations'"
-                    ")"
-                )
+                text("PRAGMA table_info('artifact_digest_delete_authorizations')")
             ).fetchall()
         }
     assert "lease_owner" in columns
@@ -394,6 +372,7 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "trg_candidate_evidence_receipts_no_update",
         "trg_candidate_evidence_receipts_no_delete",
         "trg_candidate_evidence_required_no_downgrade",
+        "trg_candidate_provenance_no_mutation",
     }
     assert attempt_tables == {
         "trial_execution_attempts",
@@ -448,9 +427,7 @@ def test_postgresql_winner_freeze_migration_emits_immutable_trigger(
 
     sql = "\n".join(emitted)
     assert "CREATE FUNCTION dronedream_reject_winner_freeze_mutation()" in sql
-    assert (
-        "CREATE TRIGGER trg_winner_freeze_receipts_immutable" in sql
-    )
+    assert "CREATE TRIGGER trg_winner_freeze_receipts_immutable" in sql
     assert "BEFORE UPDATE OR DELETE ON winner_freeze_receipts" in sql
     assert "winner freeze receipts are append-only" in sql
 
@@ -517,10 +494,7 @@ def test_postgresql_artifact_digest_migration_emits_immutable_trigger(
     migration.upgrade()
 
     sql = "\n".join(emitted)
-    assert (
-        "CREATE FUNCTION dronedream_reject_artifact_digest_mutation()"
-        in sql
-    )
+    assert "CREATE FUNCTION dronedream_reject_artifact_digest_mutation()" in sql
     assert "CREATE TRIGGER trg_artifact_digest_receipts_immutable" in sql
     assert "BEFORE UPDATE OR DELETE ON artifact_digest_receipts" in sql
     assert "artifact_digest_delete_authorizations" in sql
@@ -556,23 +530,11 @@ def test_postgresql_trial_attempt_migration_emits_immutable_guards(
     migration._install_postgres_guards()
 
     sql = "\n".join(emitted)
-    assert (
-        "CREATE FUNCTION "
-        "dronedream_reject_trial_execution_attempt_mutation()"
-    ) in sql
-    assert (
-        "BEFORE UPDATE OR DELETE ON trial_execution_attempts"
-        in sql
-    )
-    assert (
-        "BEFORE UPDATE OR DELETE ON trial_execution_attempt_outcomes"
-        in sql
-    )
+    assert ("CREATE FUNCTION dronedream_reject_trial_execution_attempt_mutation()") in sql
+    assert "BEFORE UPDATE OR DELETE ON trial_execution_attempts" in sql
+    assert "BEFORE UPDATE OR DELETE ON trial_execution_attempt_outcomes" in sql
     assert "trial_execution_attempt_delete_authorizations" in sql
-    assert (
-        "CREATE FUNCTION dronedream_guard_trial_accepted_attempt()"
-        in sql
-    )
+    assert "CREATE FUNCTION dronedream_guard_trial_accepted_attempt()" in sql
     assert "BEFORE UPDATE OF accepted_attempt_id ON trials" in sql
     assert "belongs to another Trial" in sql
 
@@ -588,12 +550,8 @@ def test_alembic_has_one_candidate_evidence_head() -> None:
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    heads = [
-        line.strip()
-        for line in result.stdout.splitlines()
-        if line.strip()
-    ]
-    assert heads == ["20260726_0009 (head)"]
+    heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    assert heads == ["20260727_0010 (head)"]
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(
@@ -625,17 +583,57 @@ def test_postgresql_candidate_evidence_migration_emits_immutable_guard(
     migration._install_postgres_guards()
 
     sql = "\n".join(emitted)
-    assert (
-        "CREATE FUNCTION dronedream_reject_candidate_evidence_mutation()"
-        in sql
-    )
-    assert (
-        "BEFORE UPDATE OR DELETE ON candidate_evidence_receipts"
-        in sql
-    )
+    assert "CREATE FUNCTION dronedream_reject_candidate_evidence_mutation()" in sql
+    assert "BEFORE UPDATE OR DELETE ON candidate_evidence_receipts" in sql
     assert "candidate_evidence_delete_authorizations" in sql
     assert "Candidate evidence receipts are append-only" in sql
     assert "winner_freeze_delete_authorizations" in sql
     assert "winner freeze receipts are append-only" in sql
     assert "dronedream_reject_candidate_evidence_downgrade" in sql
     assert "BEFORE UPDATE OF evidence_ledger_required" in sql
+
+
+def test_postgresql_candidate_provenance_migration_freezes_source_and_metadata(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260727_0010_candidate_provenance_guards.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "candidate_provenance_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _Dialect:
+        name = "postgresql"
+
+    class _Bind:
+        dialect = _Dialect()
+
+    class _PostgresOp:
+        @staticmethod
+        def get_bind() -> _Bind:
+            return _Bind()
+
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration.upgrade()
+
+    sql = "\n".join(emitted)
+    assert "dronedream_reject_candidate_provenance_mutation" in sql
+    assert "BEFORE UPDATE OF source_type, optimizer_metadata_json" in sql
+    assert "NEW.source_type IS DISTINCT FROM OLD.source_type" in sql
+    assert "NEW.optimizer_metadata_json" in sql
+    assert "Candidate provenance is immutable after evidence sealing" in sql

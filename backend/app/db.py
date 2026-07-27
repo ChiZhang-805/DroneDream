@@ -81,17 +81,12 @@ def _apply_sqlite_lightweight_migrations() -> None:
         }
         if "users" in table_names:
             user_columns = {
-                row[1]
-                for row in conn.execute(text("PRAGMA table_info('users')")).fetchall()
+                row[1] for row in conn.execute(text("PRAGMA table_info('users')")).fetchall()
             }
             if "identity_provider" not in user_columns:
-                conn.execute(
-                    text("ALTER TABLE users ADD COLUMN identity_provider VARCHAR(255)")
-                )
+                conn.execute(text("ALTER TABLE users ADD COLUMN identity_provider VARCHAR(255)"))
             if "external_subject" not in user_columns:
-                conn.execute(
-                    text("ALTER TABLE users ADD COLUMN external_subject VARCHAR(255)")
-                )
+                conn.execute(text("ALTER TABLE users ADD COLUMN external_subject VARCHAR(255)"))
             conn.execute(
                 text(
                     "CREATE UNIQUE INDEX IF NOT EXISTS "
@@ -100,10 +95,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     "WHERE external_subject IS NOT NULL"
                 )
             )
-        job_columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info('jobs')")).fetchall()
-        }
+        job_columns = {row[1] for row in conn.execute(text("PRAGMA table_info('jobs')")).fetchall()}
         if "advanced_scenario_config_json" not in job_columns:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN advanced_scenario_config_json JSON"))
         if "baseline_parameter_json" not in job_columns:
@@ -122,9 +114,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
         }
         for column_name, column_type in experiment_columns.items():
             if column_name not in job_columns:
-                conn.execute(
-                    text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}")
-                )
+                conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
         if "parameter_catalog_version" not in job_columns:
             conn.execute(
                 text(
@@ -134,22 +124,16 @@ def _apply_sqlite_lightweight_migrations() -> None:
             )
         if "batch_jobs" in table_names:
             batch_columns = {
-                row[1]
-                for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
+                row[1] for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
             }
             if "cancelled_at" not in batch_columns:
                 conn.execute(text("ALTER TABLE batch_jobs ADD COLUMN cancelled_at DATETIME"))
         if "job_secrets" in table_names:
             secret_columns = {
-                row[1]
-                for row in conn.execute(
-                    text("PRAGMA table_info('job_secrets')")
-                ).fetchall()
+                row[1] for row in conn.execute(text("PRAGMA table_info('job_secrets')")).fetchall()
             }
             if "expires_at" not in secret_columns:
-                conn.execute(
-                    text("ALTER TABLE job_secrets ADD COLUMN expires_at DATETIME")
-                )
+                conn.execute(text("ALTER TABLE job_secrets ADD COLUMN expires_at DATETIME"))
         if "candidate_parameter_sets" in table_names:
             candidate_columns = {
                 row[1]
@@ -209,24 +193,13 @@ def _apply_sqlite_lightweight_migrations() -> None:
             )
         if "job_reports" in table_names:
             report_columns = {
-                row[1]
-                for row in conn.execute(
-                    text("PRAGMA table_info('job_reports')")
-                ).fetchall()
+                row[1] for row in conn.execute(text("PRAGMA table_info('job_reports')")).fetchall()
             }
             if "winner_evidence_json" not in report_columns:
-                conn.execute(
-                    text(
-                        "ALTER TABLE job_reports "
-                        "ADD COLUMN winner_evidence_json JSON"
-                    )
-                )
+                conn.execute(text("ALTER TABLE job_reports ADD COLUMN winner_evidence_json JSON"))
             if "winner_freeze_receipt_id" not in report_columns:
                 conn.execute(
-                    text(
-                        "ALTER TABLE job_reports "
-                        "ADD COLUMN winner_freeze_receipt_id VARCHAR(64)"
-                    )
+                    text("ALTER TABLE job_reports ADD COLUMN winner_freeze_receipt_id VARCHAR(64)")
                 )
         if "winner_freeze_receipts" in table_names:
             conn.execute(
@@ -259,12 +232,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
-            conn.execute(
-                text(
-                    "DROP TRIGGER IF EXISTS "
-                    "trg_winner_freeze_receipts_no_delete"
-                )
-            )
+            conn.execute(text("DROP TRIGGER IF EXISTS trg_winner_freeze_receipts_no_delete"))
             conn.execute(
                 text(
                     """
@@ -287,18 +255,10 @@ def _apply_sqlite_lightweight_migrations() -> None:
             )
         if "artifacts" in table_names:
             artifact_columns = {
-                row[1]
-                for row in conn.execute(
-                    text("PRAGMA table_info('artifacts')")
-                ).fetchall()
+                row[1] for row in conn.execute(text("PRAGMA table_info('artifacts')")).fetchall()
             }
             if "integrity_policy" not in artifact_columns:
-                conn.execute(
-                    text(
-                        "ALTER TABLE artifacts "
-                        "ADD COLUMN integrity_policy VARCHAR(32)"
-                    )
-                )
+                conn.execute(text("ALTER TABLE artifacts ADD COLUMN integrity_policy VARCHAR(32)"))
         if "artifact_digest_receipts" in table_names:
             conn.execute(
                 text(
@@ -350,10 +310,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
-        columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()
-        }
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()}
         add_sql: list[str] = []
         if "lease_owner" not in columns:
             add_sql.append("ALTER TABLE trials ADD COLUMN lease_owner VARCHAR(64)")
@@ -362,9 +319,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
         if "claimed_at" not in columns:
             add_sql.append("ALTER TABLE trials ADD COLUMN claimed_at DATETIME")
         if "accepted_attempt_id" not in columns:
-            add_sql.append(
-                "ALTER TABLE trials ADD COLUMN accepted_attempt_id VARCHAR(64)"
-            )
+            add_sql.append("ALTER TABLE trials ADD COLUMN accepted_attempt_id VARCHAR(64)")
         for stmt in add_sql:
             conn.execute(text(stmt))
         if "trial_execution_attempts" in table_names:
@@ -540,6 +495,28 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         SELECT RAISE(
                             ABORT,
                             'Candidate evidence receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_candidate_provenance_no_mutation
+                    BEFORE UPDATE OF source_type, optimizer_metadata_json
+                    ON candidate_parameter_sets
+                    WHEN OLD.evidence_ledger_required = 1
+                     AND (
+                            NEW.source_type IS NOT OLD.source_type
+                         OR NEW.optimizer_metadata_json
+                            IS NOT OLD.optimizer_metadata_json
+                     )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'Candidate provenance is immutable after evidence sealing'
                         );
                     END
                     """

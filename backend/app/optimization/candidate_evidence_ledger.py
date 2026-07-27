@@ -20,9 +20,12 @@ from app.optimization.outcome_evidence import (
     verify_candidate_report_evidence,
 )
 
-CANDIDATE_EVIDENCE_RECEIPT_SCHEMA: Literal[
+CANDIDATE_EVIDENCE_RECEIPT_V1_SCHEMA: Literal["dronedream.candidate-evidence-receipt/v1"] = (
     "dronedream.candidate-evidence-receipt/v1"
-] = "dronedream.candidate-evidence-receipt/v1"
+)
+CANDIDATE_EVIDENCE_RECEIPT_SCHEMA: Literal["dronedream.candidate-evidence-receipt/v2"] = (
+    "dronedream.candidate-evidence-receipt/v2"
+)
 
 Sha256Id = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 PositiveInt = Annotated[int, Field(ge=1)]
@@ -33,16 +36,13 @@ class CandidateEvidenceLedgerError(ValueError):
     """Raised when an append-only Candidate evidence chain diverges."""
 
 
-class CandidateEvidenceReceiptV1(BaseModel):
+class _CandidateEvidenceReceiptBase(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         frozen=True,
         allow_inf_nan=False,
     )
 
-    schema_id: Literal["dronedream.candidate-evidence-receipt/v1"] = (
-        "dronedream.candidate-evidence-receipt/v1"
-    )
     evidence_id: Sha256Id
     candidate_id: str = Field(min_length=1, max_length=128)
     job_id: str = Field(min_length=1, max_length=128)
@@ -51,26 +51,44 @@ class CandidateEvidenceReceiptV1(BaseModel):
     generation_index: NonnegativeInt
     parameter_sha256: Sha256Id
     aggregate_sha256: Sha256Id
-    outcome_evidence_schema: Literal[
+    outcome_evidence_schema: Literal["dronedream.candidate-outcome-evidence/v3"] = (
         "dronedream.candidate-outcome-evidence/v3"
-    ] = "dronedream.candidate-outcome-evidence/v3"
+    )
     outcome_evidence_id: Sha256Id
     training_trial_evidence_sha256: Sha256Id
     training_accepted_attempt_count: NonnegativeInt
-    report_evidence_schema: Literal[
+    report_evidence_schema: Literal["dronedream.candidate-report-evidence/v3"] = (
         "dronedream.candidate-report-evidence/v3"
-    ] = "dronedream.candidate-report-evidence/v3"
+    )
     report_evidence_id: Sha256Id
     report_trial_evidence_sha256: Sha256Id
     report_accepted_attempt_count: NonnegativeInt
 
     @model_validator(mode="after")
-    def _validate_chain_position(self) -> CandidateEvidenceReceiptV1:
+    def _validate_chain_position(self) -> _CandidateEvidenceReceiptBase:
         if (self.revision == 1) != (self.previous_evidence_id is None):
-            raise ValueError(
-                "Candidate evidence revision one alone has no predecessor"
-            )
+            raise ValueError("Candidate evidence revision one alone has no predecessor")
         return self
+
+
+class CandidateEvidenceReceiptV1(_CandidateEvidenceReceiptBase):
+    schema_id: Literal["dronedream.candidate-evidence-receipt/v1"] = (
+        "dronedream.candidate-evidence-receipt/v1"
+    )
+
+
+class CandidateEvidenceReceiptV2(_CandidateEvidenceReceiptBase):
+    """Receipt revision that also freezes optimizer proposal metadata."""
+
+    schema_id: Literal["dronedream.candidate-evidence-receipt/v2"] = (
+        "dronedream.candidate-evidence-receipt/v2"
+    )
+    source_type: str = Field(min_length=1, max_length=32)
+    optimizer_source_evidence_required: bool
+    optimizer_metadata_sha256: Sha256Id
+
+
+CandidateEvidenceReceipt = CandidateEvidenceReceiptV1 | CandidateEvidenceReceiptV2
 
 
 def _canonical_json(value: object) -> str:
@@ -84,9 +102,7 @@ def _canonical_json(value: object) -> str:
 
 
 def _sha256_id(value: object) -> str:
-    return "sha256:" + hashlib.sha256(
-        _canonical_json(value).encode("utf-8")
-    ).hexdigest()
+    return "sha256:" + hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
 
 
 def _validated_v3_evidence(
@@ -94,12 +110,8 @@ def _validated_v3_evidence(
     candidate: models.CandidateParameterSet,
     aggregate: Mapping[str, Any],
 ) -> tuple[CandidateOutcomeEvidenceV3, CandidateReportEvidenceV3]:
-    outcome = verify_candidate_outcome_evidence(
-        aggregate.get("candidate_outcome_evidence")
-    )
-    report = verify_candidate_report_evidence(
-        aggregate.get("candidate_report_evidence")
-    )
+    outcome = verify_candidate_outcome_evidence(aggregate.get("candidate_outcome_evidence"))
+    report = verify_candidate_report_evidence(aggregate.get("candidate_report_evidence"))
     if (
         not isinstance(outcome, CandidateOutcomeEvidenceV3)
         or not isinstance(report, CandidateReportEvidenceV3)
@@ -124,10 +136,15 @@ def compile_candidate_evidence_receipt(
     aggregate: Mapping[str, Any],
     revision: int,
     previous_evidence_id: str | None,
-) -> CandidateEvidenceReceiptV1:
+) -> CandidateEvidenceReceiptV2:
     outcome, report = _validated_v3_evidence(
         candidate=candidate,
         aggregate=aggregate,
+    )
+    optimizer_metadata = (
+        candidate.optimizer_metadata_json
+        if isinstance(candidate.optimizer_metadata_json, Mapping)
+        else {}
     )
     payload: dict[str, Any] = {
         "schema_id": CANDIDATE_EVIDENCE_RECEIPT_SCHEMA,
@@ -137,6 +154,11 @@ def compile_candidate_evidence_receipt(
         "previous_evidence_id": previous_evidence_id,
         "generation_index": candidate.generation_index,
         "parameter_sha256": outcome.parameter_sha256,
+        "source_type": candidate.source_type,
+        "optimizer_source_evidence_required": (
+            optimizer_metadata.get("optimizer_source_evidence_required") is True
+        ),
+        "optimizer_metadata_sha256": _sha256_id(candidate.optimizer_metadata_json),
         "aggregate_sha256": _sha256_id(aggregate),
         "outcome_evidence_schema": outcome.schema_id,
         "outcome_evidence_id": outcome.evidence_id,
@@ -147,16 +169,26 @@ def compile_candidate_evidence_receipt(
         "report_trial_evidence_sha256": report.report_trial_evidence_sha256,
         "report_accepted_attempt_count": report.accepted_attempt_count,
     }
-    return CandidateEvidenceReceiptV1.model_validate(
+    return CandidateEvidenceReceiptV2.model_validate(
         {"evidence_id": _sha256_id(payload), **payload}
     )
 
 
 def verify_candidate_evidence_receipt(
     value: object,
-) -> CandidateEvidenceReceiptV1 | None:
+) -> CandidateEvidenceReceipt | None:
+    if not isinstance(value, Mapping):
+        return None
+    schema_id = value.get("schema_id")
+    model: type[CandidateEvidenceReceiptV1] | type[CandidateEvidenceReceiptV2]
+    if schema_id == CANDIDATE_EVIDENCE_RECEIPT_SCHEMA:
+        model = CandidateEvidenceReceiptV2
+    elif schema_id == CANDIDATE_EVIDENCE_RECEIPT_V1_SCHEMA:
+        model = CandidateEvidenceReceiptV1
+    else:
+        return None
     try:
-        receipt = CandidateEvidenceReceiptV1.model_validate(value)
+        receipt = model.model_validate(value)
     except ValidationError:
         return None
     payload = receipt.model_dump(mode="json")
@@ -166,7 +198,7 @@ def verify_candidate_evidence_receipt(
 
 def _verified_receipt_row(
     row: models.CandidateEvidenceReceipt,
-) -> CandidateEvidenceReceiptV1 | None:
+) -> CandidateEvidenceReceipt | None:
     receipt = verify_candidate_evidence_receipt(row.evidence_json)
     outcome = verify_candidate_outcome_evidence(row.outcome_evidence_json)
     report = verify_candidate_report_evidence(row.report_evidence_json)
@@ -186,14 +218,10 @@ def _verified_receipt_row(
         or outcome.evidence_id != receipt.outcome_evidence_id
         or report.evidence_id != receipt.report_evidence_id
         or report.candidate_outcome_evidence_id != outcome.evidence_id
-        or outcome.trial_evidence_sha256
-        != receipt.training_trial_evidence_sha256
-        or outcome.accepted_attempt_count
-        != receipt.training_accepted_attempt_count
-        or report.report_trial_evidence_sha256
-        != receipt.report_trial_evidence_sha256
-        or report.accepted_attempt_count
-        != receipt.report_accepted_attempt_count
+        or outcome.trial_evidence_sha256 != receipt.training_trial_evidence_sha256
+        or outcome.accepted_attempt_count != receipt.training_accepted_attempt_count
+        or report.report_trial_evidence_sha256 != receipt.report_trial_evidence_sha256
+        or report.accepted_attempt_count != receipt.report_accepted_attempt_count
     ):
         return None
     return receipt
@@ -205,6 +233,34 @@ def _ordered_receipts(
     return sorted(
         list(candidate.evidence_receipts),
         key=lambda row: (row.revision, row.id),
+    )
+
+
+def candidate_optimizer_metadata_receipt_required(candidate: object) -> bool:
+    """Require metadata sealing for every optimizer-produced Candidate."""
+
+    if getattr(candidate, "source_type", None) == "optimizer":
+        return True
+    metadata = getattr(candidate, "optimizer_metadata_json", None)
+    return isinstance(metadata, Mapping) and (
+        metadata.get("optimizer_source_evidence_required") is True
+    )
+
+
+def _v2_candidate_identity_matches(
+    receipt: CandidateEvidenceReceiptV2,
+    candidate: models.CandidateParameterSet,
+) -> bool:
+    metadata = (
+        candidate.optimizer_metadata_json
+        if isinstance(candidate.optimizer_metadata_json, Mapping)
+        else {}
+    )
+    return (
+        receipt.source_type == candidate.source_type
+        and receipt.optimizer_source_evidence_required
+        == (metadata.get("optimizer_source_evidence_required") is True)
+        and receipt.optimizer_metadata_sha256 == _sha256_id(candidate.optimizer_metadata_json)
     )
 
 
@@ -223,10 +279,20 @@ def record_candidate_evidence_receipt(
             or receipt.revision != expected_revision
             or receipt.previous_evidence_id != previous_id
         ):
-            raise CandidateEvidenceLedgerError(
-                "existing Candidate evidence chain is invalid"
-            )
+            raise CandidateEvidenceLedgerError("existing Candidate evidence chain is invalid")
         previous_id = receipt.evidence_id
+
+    latest = _verified_receipt_row(rows[-1]) if rows else None
+    if rows:
+        if not isinstance(latest, CandidateEvidenceReceiptV2):
+            raise CandidateEvidenceLedgerError(
+                "legacy Candidate evidence requires a controlled v2 migration"
+            )
+        if not _v2_candidate_identity_matches(latest, candidate):
+            raise CandidateEvidenceLedgerError(
+                "Candidate source identity or optimizer metadata diverged from "
+                "its append-only receipt"
+            )
 
     revision = len(rows) + 1
     compiled = compile_candidate_evidence_receipt(
@@ -235,24 +301,21 @@ def record_candidate_evidence_receipt(
         revision=revision,
         previous_evidence_id=previous_id,
     )
-    if rows:
-        latest = _verified_receipt_row(rows[-1])
-        if latest is not None and latest.aggregate_sha256 == compiled.aggregate_sha256:
-            return rows[-1]
+    if (
+        rows
+        and isinstance(latest, CandidateEvidenceReceiptV2)
+        and latest.aggregate_sha256 == compiled.aggregate_sha256
+        and _v2_candidate_identity_matches(latest, candidate)
+    ):
+        return rows[-1]
 
-    outcome = verify_candidate_outcome_evidence(
-        aggregate.get("candidate_outcome_evidence")
-    )
-    report = verify_candidate_report_evidence(
-        aggregate.get("candidate_report_evidence")
-    )
+    outcome = verify_candidate_outcome_evidence(aggregate.get("candidate_outcome_evidence"))
+    report = verify_candidate_report_evidence(aggregate.get("candidate_report_evidence"))
     if not isinstance(outcome, CandidateOutcomeEvidenceV3) or not isinstance(
         report,
         CandidateReportEvidenceV3,
     ):
-        raise CandidateEvidenceLedgerError(
-            "Candidate receipt lost its verified v3 evidence"
-        )
+        raise CandidateEvidenceLedgerError("Candidate receipt lost its verified v3 evidence")
     row = models.CandidateEvidenceReceipt(
         id="cer_" + compiled.evidence_id.removeprefix("sha256:")[:32],
         candidate_id=candidate.id,
@@ -288,14 +351,11 @@ def candidate_evidence_receipt_required(
     outcome = aggregate.get("candidate_outcome_evidence")
     report = aggregate.get("candidate_report_evidence")
     return (
-        (
-            isinstance(outcome, Mapping)
-            and outcome.get("schema_id") == CANDIDATE_OUTCOME_EVIDENCE_V3_SCHEMA
-        )
-        or (
-            isinstance(report, Mapping)
-            and report.get("schema_id") == CANDIDATE_REPORT_EVIDENCE_V3_SCHEMA
-        )
+        isinstance(outcome, Mapping)
+        and outcome.get("schema_id") == CANDIDATE_OUTCOME_EVIDENCE_V3_SCHEMA
+    ) or (
+        isinstance(report, Mapping)
+        and report.get("schema_id") == CANDIDATE_REPORT_EVIDENCE_V3_SCHEMA
     )
 
 
@@ -303,11 +363,7 @@ def candidate_evidence_chain_matches_current(
     candidate: models.CandidateParameterSet,
     aggregate: object | None = None,
 ) -> bool:
-    raw_aggregate = (
-        candidate.aggregated_metric_json
-        if aggregate is None
-        else aggregate
-    )
+    raw_aggregate = candidate.aggregated_metric_json if aggregate is None else aggregate
     if not isinstance(raw_aggregate, Mapping):
         return False
     try:
@@ -315,7 +371,7 @@ def candidate_evidence_chain_matches_current(
         if not rows:
             return False
         previous_id: str | None = None
-        latest: CandidateEvidenceReceiptV1 | None = None
+        latest: CandidateEvidenceReceipt | None = None
         for expected_revision, row in enumerate(rows, start=1):
             receipt = _verified_receipt_row(row)
             if (
@@ -325,25 +381,31 @@ def candidate_evidence_chain_matches_current(
                 or receipt.candidate_id != candidate.id
                 or receipt.job_id != candidate.job_id
                 or receipt.generation_index != candidate.generation_index
-                or receipt.parameter_sha256
-                != _sha256_id(candidate.parameter_json)
+                or receipt.parameter_sha256 != _sha256_id(candidate.parameter_json)
             ):
                 return False
             previous_id = receipt.evidence_id
             latest = receipt
         assert latest is not None
+        if candidate_optimizer_metadata_receipt_required(candidate) and not isinstance(
+            latest,
+            CandidateEvidenceReceiptV2,
+        ):
+            return False
         outcome, report = _validated_v3_evidence(
             candidate=candidate,
             aggregate=raw_aggregate,
         )
         return (
             latest.aggregate_sha256 == _sha256_id(raw_aggregate)
+            and (
+                not isinstance(latest, CandidateEvidenceReceiptV2)
+                or _v2_candidate_identity_matches(latest, candidate)
+            )
             and latest.outcome_evidence_id == outcome.evidence_id
             and latest.report_evidence_id == report.evidence_id
-            and rows[-1].outcome_evidence_json
-            == outcome.model_dump(mode="json")
-            and rows[-1].report_evidence_json
-            == report.model_dump(mode="json")
+            and rows[-1].outcome_evidence_json == outcome.model_dump(mode="json")
+            and rows[-1].report_evidence_json == report.model_dump(mode="json")
         )
     except (TypeError, ValueError):
         return False
@@ -357,9 +419,7 @@ def authorize_candidate_evidence_deletion(
 ) -> None:
     normalized_reason = reason.strip()
     if not normalized_reason or len(normalized_reason) > 64:
-        raise CandidateEvidenceLedgerError(
-            "Candidate evidence deletion requires a bounded reason"
-        )
+        raise CandidateEvidenceLedgerError("Candidate evidence deletion requires a bounded reason")
     existing = db.get(models.CandidateEvidenceDeleteAuthorization, receipt.id)
     if existing is not None:
         if existing.reason != normalized_reason:
@@ -377,7 +437,7 @@ def authorize_candidate_evidence_deletion(
 
 def current_candidate_evidence_receipt(
     candidate: models.CandidateParameterSet,
-) -> CandidateEvidenceReceiptV1 | None:
+) -> CandidateEvidenceReceipt | None:
     rows = _ordered_receipts(candidate)
     if not rows:
         return None
@@ -386,13 +446,30 @@ def current_candidate_evidence_receipt(
     return _verified_receipt_row(rows[-1])
 
 
+def candidate_optimizer_metadata_receipt_matches_current(
+    candidate: models.CandidateParameterSet,
+) -> bool:
+    """Return true only for a current v2 receipt that freezes optimizer metadata."""
+
+    receipt = current_candidate_evidence_receipt(candidate)
+    return isinstance(receipt, CandidateEvidenceReceiptV2) and _v2_candidate_identity_matches(
+        receipt,
+        candidate,
+    )
+
+
 __all__ = [
     "CANDIDATE_EVIDENCE_RECEIPT_SCHEMA",
+    "CANDIDATE_EVIDENCE_RECEIPT_V1_SCHEMA",
+    "CandidateEvidenceReceipt",
     "CandidateEvidenceLedgerError",
     "CandidateEvidenceReceiptV1",
+    "CandidateEvidenceReceiptV2",
     "authorize_candidate_evidence_deletion",
     "candidate_evidence_chain_matches_current",
     "candidate_evidence_receipt_required",
+    "candidate_optimizer_metadata_receipt_matches_current",
+    "candidate_optimizer_metadata_receipt_required",
     "compile_candidate_evidence_receipt",
     "current_candidate_evidence_receipt",
     "record_candidate_evidence_receipt",

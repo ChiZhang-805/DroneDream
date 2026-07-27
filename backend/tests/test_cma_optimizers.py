@@ -175,9 +175,7 @@ def _observation_from_proposal(
         feasible=loss is not None,
         failure_rate=0.0 if loss is not None else 1.0,
         fidelity=float(metadata.get("effective_fidelity", metadata.get("fidelity", 1.0))),
-        requested_fidelity=float(
-            metadata.get("requested_fidelity", metadata.get("fidelity", 1.0))
-        ),
+        requested_fidelity=float(metadata.get("requested_fidelity", metadata.get("fidelity", 1.0))),
         optimizer_strategy=child_strategy,
         optimizer_metadata=metadata,
         completed=completed,
@@ -329,9 +327,7 @@ def test_cma_explicit_cohort_caps_tail_and_never_mixes_distributions() -> None:
         1,
         2,
     }
-    assert {str(item.metadata["cma_cohort_id"]) for item in next_proposals} != {
-        cohort_ids[0]
-    }
+    assert {str(item.metadata["cma_cohort_id"]) for item in next_proposals} != {cohort_ids[0]}
 
 
 @pytest.mark.parametrize(
@@ -513,8 +509,9 @@ def test_cma_reissues_a_quarantined_cohort_position_without_updating_state() -> 
     assert len(retried) == 1
     assert retried[0].metadata["cma_cohort_index"] == 0
     assert retried[0].metadata["cma_cohort_position"] == 7
-    assert retried[0].metadata["cma_distribution_sha256"] == (
-        proposals[-1].metadata["cma_distribution_sha256"]
+    assert (
+        retried[0].metadata["cma_distribution_sha256"]
+        == (proposals[-1].metadata["cma_distribution_sha256"])
     )
 
 
@@ -529,9 +526,7 @@ def test_covariance_repair_preserves_regular_scale_and_bounds_condition() -> Non
     assert np.all(np.isfinite(stable))
     assert stable == pytest.approx(stable.T)
     assert np.all(eigenvalues > 0.0)
-    assert float(np.max(eigenvalues) / np.min(eigenvalues)) <= _MAX_CONDITION_NUMBER * (
-        1.0 + 1e-8
-    )
+    assert float(np.max(eigenvalues) / np.min(eigenvalues)) <= _MAX_CONDITION_NUMBER * (1.0 + 1e-8)
 
 
 def test_symmetric_covariance_root_is_invariant_to_degenerate_eigenbasis(
@@ -935,9 +930,7 @@ def test_portfolio_rejects_nominal_full_fidelity_with_partial_effective_coverage
 
     statistic = {
         item.strategy: item
-        for item in portfolio_statistics(
-            _request("optimizer_portfolio", (partial,), generation=2)
-        )
+        for item in portfolio_statistics(_request("optimizer_portfolio", (partial,), generation=2))
     }["multi_fidelity_mobo"]
 
     assert statistic.observations == 1
@@ -992,9 +985,7 @@ def test_portfolio_uses_a_common_baseline_instead_of_each_childs_bad_start() -> 
     )
     statistics = {
         item.strategy: item
-        for item in portfolio_statistics(
-            _request("optimizer_portfolio", history, generation=3)
-        )
+        for item in portfolio_statistics(_request("optimizer_portfolio", history, generation=3))
     }
 
     assert statistics["surrogate_cma_es"].normalized_improvement == 0.0
@@ -1031,9 +1022,7 @@ def test_portfolio_only_rewards_improvement_over_the_pre_generation_incumbent() 
     )
     statistics = {
         item.strategy: item
-        for item in portfolio_statistics(
-            _request("optimizer_portfolio", history, generation=3)
-        )
+        for item in portfolio_statistics(_request("optimizer_portfolio", history, generation=3))
     }
 
     assert statistics["surrogate_cma_es"].normalized_improvement == pytest.approx(0.6)
@@ -1071,9 +1060,7 @@ def test_portfolio_incumbent_includes_reward_ineligible_valid_candidates() -> No
     )
     statistics = {
         item.strategy: item
-        for item in portfolio_statistics(
-            _request("optimizer_portfolio", history, generation=3)
-        )
+        for item in portfolio_statistics(_request("optimizer_portfolio", history, generation=3))
     }
 
     assert statistics["surrogate_cma_es"].normalized_improvement == 0.0
@@ -1104,9 +1091,7 @@ def test_portfolio_reward_uses_a_fixed_loss_scale() -> None:
         )
         return {
             item.strategy: item
-            for item in portfolio_statistics(
-                _request("optimizer_portfolio", history, generation=2)
-            )
+            for item in portfolio_statistics(_request("optimizer_portfolio", history, generation=2))
         }["turbo"].normalized_improvement
 
     assert reward(baseline_loss=1.0, improved_loss=0.75) == pytest.approx(0.25)
@@ -1144,9 +1129,7 @@ def test_portfolio_counts_at_most_one_best_reward_per_tool_generation() -> None:
     )
     statistic = {
         item.strategy: item
-        for item in portfolio_statistics(
-            _request("optimizer_portfolio", history, generation=2)
-        )
+        for item in portfolio_statistics(_request("optimizer_portfolio", history, generation=2))
     }["surrogate_cma_es"]
 
     assert statistic.normalized_improvement == pytest.approx(0.3)
@@ -1177,9 +1160,7 @@ def test_portfolio_full_fidelity_feasibility_ignores_easy_low_fidelity_rows() ->
     )
     statistic = {
         item.strategy: item
-        for item in portfolio_statistics(
-            _request("optimizer_portfolio", history, generation=3)
-        )
+        for item in portfolio_statistics(_request("optimizer_portfolio", history, generation=3))
     }["multi_fidelity_mobo"]
 
     assert statistic.full_fidelity_observations == 1
@@ -1318,9 +1299,7 @@ def test_portfolio_improvement_is_generation_and_candidate_id_invariant() -> Non
 
     first = {
         item.strategy: item
-        for item in portfolio_statistics(
-            _request("optimizer_portfolio", history, generation=3)
-        )
+        for item in portfolio_statistics(_request("optimizer_portfolio", history, generation=3))
     }["surrogate_cma_es"]
     second = {
         item.strategy: item
@@ -1425,15 +1404,9 @@ def test_portfolio_replaces_a_same_batch_low_fidelity_collision_with_full_fideli
     assert len(shared) == 1
     assert shared[0].metadata["child_strategy"] == "turbo"
     assert shared[0].metadata["requested_fidelity"] == pytest.approx(1.0)
-    sources = {
-        item["child_strategy"]: item
-        for item in shared[0].metadata["portfolio_sources"]
-    }
+    sources = {item["child_strategy"]: item for item in shared[0].metadata["portfolio_sources"]}
     assert sources["multi_fidelity_mobo"]["materialized"] is False
-    assert (
-        sources["multi_fidelity_mobo"]["exclusion_reason"]
-        == "superseded_by_higher_fidelity"
-    )
+    assert sources["multi_fidelity_mobo"]["exclusion_reason"] == "superseded_by_higher_fidelity"
     assert sources["turbo"]["materialized"] is True
     assert shared[0].metadata["portfolio_source_credits"] == [
         {"child_strategy": "turbo", "share": 1.0}
@@ -1477,9 +1450,7 @@ def test_portfolio_exact_collision_preserves_equal_cross_tool_credit(
         space,
         _request("optimizer_portfolio", generation=1, batch_size=2),
     )
-    shared = next(
-        item for item in proposals if item.parameters == shared_parameters
-    )
+    shared = next(item for item in proposals if item.parameters == shared_parameters)
 
     assert len(proposals) == 2
     assert {
@@ -1521,10 +1492,80 @@ def test_portfolio_exact_collision_preserves_equal_cross_tool_credit(
     assert statistics["turbo"].full_fidelity_observations == 1
     assert statistics["constrained_mobo"].reward_credit == pytest.approx(0.5)
     assert statistics["turbo"].reward_credit == pytest.approx(0.5)
-    assert statistics["constrained_mobo"].normalized_improvement == pytest.approx(
-        0.25
-    )
+    assert statistics["constrained_mobo"].normalized_improvement == pytest.approx(0.25)
     assert statistics["turbo"].normalized_improvement == pytest.approx(0.25)
+
+
+def test_portfolio_fallback_first_collision_promotes_native_learning_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.optimization.proposal_provenance import (
+        compile_optimizer_source_evidence,
+        optimizer_search_space_sha256,
+    )
+
+    space = _space()
+    shared_parameters = space.from_unit_vector((0.4, 0.4, 0.5, 0.5))
+    monkeypatch.setattr(
+        portfolio_optimizer,
+        "portfolio_allocation",
+        lambda request: {"constrained_mobo": 1, "surrogate_cma_es": 1},
+    )
+
+    def delegate(
+        search_space: SearchSpace,
+        request: OptimizerRequest,
+        strategy: ExperimentalOptimizerStrategy,
+        count: int,
+    ) -> list[ExperimentalProposal]:
+        metadata: dict[str, object] = {
+            "strategy": strategy,
+            "fidelity": 1.0,
+            "requested_fidelity": 1.0,
+            "backend": "test",
+        }
+        if strategy == "constrained_mobo":
+            metadata["optimizer_generated_by"] = "halton_fallback"
+        else:
+            metadata.update(
+                {
+                    "optimizer_generated_by": "surrogate_cma_es",
+                    "cma_cohort_id": "cohort-native-second",
+                    "cma_cohort_position": 2,
+                    "cma_update_vector": [0.1, -0.2, 0.3, -0.4],
+                    "cma_state": {"updates": 3},
+                }
+            )
+        return [
+            ExperimentalProposal(
+                label=f"fallback-first-{strategy}",
+                parameters=shared_parameters,
+                rationale="deliberate fallback-first exact collision",
+                metadata=metadata,
+            )
+        ]
+
+    monkeypatch.setattr(portfolio_optimizer, "_delegate", delegate)
+
+    proposals = propose_optimizer_portfolio(
+        space,
+        _request("optimizer_portfolio", generation=1, batch_size=2),
+    )
+    shared = next(item for item in proposals if item.parameters == shared_parameters)
+    assert shared.metadata["child_strategy"] == "surrogate_cma_es"
+    assert shared.metadata["cma_cohort_id"] == "cohort-native-second"
+    assert shared.metadata["cma_cohort_position"] == 2
+    assert shared.metadata["cma_update_vector"] == [0.1, -0.2, 0.3, -0.4]
+
+    evidence = compile_optimizer_source_evidence(
+        strategy="optimizer_portfolio",
+        generation_index=1,
+        parameters=shared.parameters,
+        search_space_sha256=optimizer_search_space_sha256(space),
+        metadata=shared.metadata,
+    )
+    assert evidence.learning_owner == "surrogate_cma_es"
+    assert [credit.child_strategy for credit in evidence.reward_credits] == ["surrogate_cma_es"]
 
 
 def test_portfolio_same_child_fidelity_upgrade_keeps_one_materialized_source(
@@ -1560,14 +1601,13 @@ def test_portfolio_same_child_fidelity_upgrade_keeps_one_materialized_source(
         space,
         _request("optimizer_portfolio", generation=1, batch_size=2),
     )
-    upgraded = next(
-        item for item in proposals if item.parameters == shared_parameters
-    )
+    upgraded = next(item for item in proposals if item.parameters == shared_parameters)
 
     assert upgraded.metadata["requested_fidelity"] == pytest.approx(1.0)
     assert upgraded.metadata["portfolio_sources"] == [
         {
             "child_strategy": "multi_fidelity_mobo",
+            "source_role": "native_optimizer",
             "generated_by": "multi_fidelity_mobo",
             "planned_slot_role": "externally_planned",
             "effective_fidelity": 1.0,
@@ -1778,9 +1818,7 @@ def test_portfolio_delegates_exactly_each_childs_awarded_budget(
         return [
             ExperimentalProposal(
                 label=f"delegated-{strategy}",
-                parameters=search_space.from_unit_vector(
-                    (0.08 + index * 0.14, 0.2, 0.25, 0.0)
-                ),
+                parameters=search_space.from_unit_vector((0.08 + index * 0.14, 0.2, 0.25, 0.0)),
                 rationale="capture the child budget",
                 metadata={"strategy": strategy, "fidelity": 1.0, "backend": "test"},
             )

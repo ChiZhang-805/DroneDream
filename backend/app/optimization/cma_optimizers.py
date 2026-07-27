@@ -34,6 +34,9 @@ from app.optimization.experimental_types import (
 from app.optimization.outcome_contract import (
     OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
 )
+from app.optimization.proposal_provenance import (
+    verified_observation_source_membership,
+)
 
 FloatArray = NDArray[np.float64]
 
@@ -433,6 +436,12 @@ def _rank_key(point: _TrainingPoint) -> tuple[float, float, float, tuple[float, 
 
 
 def _strategy_matches(observation: OptimizerObservation, strategy: str) -> bool:
+    verified_membership = verified_observation_source_membership(
+        observation,
+        strategy,
+    )
+    if verified_membership is not None:
+        return verified_membership
     value = observation.optimizer_strategy or ""
     return value == strategy or value.endswith(f":{strategy}") or strategy in value.split("/")
 
