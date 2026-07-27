@@ -11,6 +11,7 @@ import {
   Search,
   Send,
   Tag,
+  Trash2,
   Upload,
   UserRound,
   X,
@@ -19,7 +20,6 @@ import {
   type FormEvent,
   type KeyboardEvent,
   useCallback,
-  useDeferredValue,
   useEffect,
   useState,
 } from "react";
@@ -97,19 +97,13 @@ const communityContent = {
     more: "More topics",
     back: "Back to recent topics",
     empty: "No topic matches this view. Start the first evidence-backed discussion.",
-    starterTitle: "Start with a reproducible engineering question.",
-    starterItems: [
-      ["Describe the flight", "Name the vehicle, route, controller parameters, and the result you expected."],
-      ["Attach the evidence", "Add screenshots, logs, plots, seeds, or exact settings that make the result inspectable."],
-      ["Ask for a decision", "State the comparison, diagnosis, or next experiment you want the community to examine."],
-    ],
     loading: "Loading community topics…",
     unavailable: "The community connection is temporarily unavailable.",
     titleLabel: "Topic title",
     titlePlaceholder: "What should the community help you understand?",
     bodyLabel: "Evidence and context",
     bodyPlaceholder:
-      "Describe the aircraft, route, parameters, observed result, and the evidence already checked.",
+      "Describe the aircraft, route, parameters, observed result, evidence already checked, and the exact comparison you want the community to review.",
     tagsLabel: "Tags",
     customTag: "Add a custom tag",
     mediaLabel: "Images",
@@ -137,6 +131,9 @@ const communityContent = {
     noComments: "No comments yet. Add the first evidence-based response.",
     signInAction: "Sign in to join the discussion",
     removeImage: "Remove image",
+    deleteTopic: "Delete topic",
+    deletingTopic: "Deleting topic…",
+    deleteTopicConfirm: "Delete this topic and all of its comments? This cannot be undone.",
     close: "Close",
   },
   "zh-CN": {
@@ -152,18 +149,12 @@ const communityContent = {
     more: "查看更多",
     back: "返回近期话题",
     empty: "当前视图没有匹配的话题；你可以发起第一场有证据的讨论。",
-    starterTitle: "从一个可复现的工程问题开始。",
-    starterItems: [
-      ["说明飞行任务", "写明飞行器、轨迹、控制参数，以及原本希望得到的结果。"],
-      ["附上实验依据", "添加截图、日志、曲线、随机种子或完整设置，方便他人核对。"],
-      ["提出判断问题", "明确希望社区比较、诊断或继续验证的下一项实验。"],
-    ],
     loading: "正在加载社区话题……",
     unavailable: "社区连接暂时不可用。",
     titleLabel: "话题标题",
     titlePlaceholder: "你希望社区帮助理解什么问题？",
     bodyLabel: "证据与背景",
-    bodyPlaceholder: "请描述飞行器、轨迹、参数、观察结果，以及已经核对过的证据。",
+    bodyPlaceholder: "请描述飞行器、轨迹、参数、观察结果、已经核对过的证据，以及希望社区进一步比较或判断的具体问题。",
     tagsLabel: "标签",
     customTag: "添加自定义标签",
     mediaLabel: "图片",
@@ -191,6 +182,9 @@ const communityContent = {
     noComments: "还没有评论；你可以补充第一条基于证据的回复。",
     signInAction: "登录后参与讨论",
     removeImage: "移除图片",
+    deleteTopic: "删除话题",
+    deletingTopic: "正在删除话题……",
+    deleteTopicConfirm: "确定删除这个话题及其全部评论吗？此操作无法撤销。",
     close: "关闭",
   },
 } as const;
@@ -219,7 +213,7 @@ export function CommunityPage({
   const [hasMoreComments, setHasMoreComments] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const deferredQuery = useDeferredValue(query);
+  const [settledQuery, setSettledQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<CommunityTopic | null>(null);
@@ -230,6 +224,7 @@ export function CommunityPage({
   const [files, setFiles] = useState<File[]>([]);
   const [preparingMedia, setPreparingMedia] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [deletingTopicId, setDeletingTopicId] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
 
@@ -247,7 +242,7 @@ export function CommunityPage({
     try {
       const { data, error: requestError } = await supabaseClient
         .rpc("community_list_topics", {
-          p_search: deferredQuery.trim() || null,
+          p_search: settledQuery.trim() || null,
           p_tag: activeTag,
           p_offset: offset,
           p_limit: TOPIC_PAGE_SIZE + 1,
@@ -269,7 +264,14 @@ export function CommunityPage({
       if (append) setLoadingMoreTopics(false);
       else setLoading(false);
     }
-  }, [activeTag, copy.unavailable, deferredQuery]);
+  }, [activeTag, copy.unavailable, settledQuery]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setSettledQuery(query);
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [query]);
 
   useEffect(() => {
     void loadTopics();
@@ -336,10 +338,16 @@ export function CommunityPage({
   };
 
   const addCustomTag = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter" && event.key !== ",") return;
+    if (event.nativeEvent.isComposing || (event.key !== "Enter" && event.key !== ",")) return;
     event.preventDefault();
     const value = customTag.trim().replace(/^#/u, "").slice(0, 24);
-    if (value && !tags.includes(value) && tags.length < 5) setTags([...tags, value]);
+    if (value) {
+      setTags((current) =>
+        !current.includes(value) && current.length < 5
+          ? [...current, value]
+          : current
+      );
+    }
     setCustomTag("");
   };
 
@@ -436,6 +444,53 @@ export function CommunityPage({
       setError(requestError instanceof Error ? requestError.message : copy.unavailable);
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const deleteTopic = async (topic: CommunityTopic) => {
+    if (
+      !account ||
+      account.id !== topic.author_id ||
+      !supabaseClient ||
+      deletingTopicId
+    ) {
+      return;
+    }
+    if (!window.confirm(copy.deleteTopicConfirm)) return;
+
+    setDeletingTopicId(topic.id);
+    setError(null);
+    try {
+      const { error: requestError } = await supabaseClient
+        .from("community_topics")
+        .delete()
+        .eq("id", topic.id)
+        .eq("author_id", account.id);
+      if (requestError) throw requestError;
+
+      setTopics((current) =>
+        current.filter((candidate) => candidate.id !== topic.id)
+      );
+      setSelectedTopic((current) =>
+        current?.id === topic.id ? null : current
+      );
+
+      const mediaPrefix = "/storage/v1/object/public/community-media/";
+      const mediaPaths = topic.image_urls.flatMap((url) => {
+        const marker = url.indexOf(mediaPrefix);
+        if (marker < 0) return [];
+        const path = decodeURIComponent(url.slice(marker + mediaPrefix.length));
+        return path.startsWith(`${account.id}/`) ? [path] : [];
+      });
+      await removeUploadedImages(mediaPaths);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : copy.unavailable
+      );
+    } finally {
+      setDeletingTopicId(null);
     }
   };
 
@@ -569,10 +624,6 @@ export function CommunityPage({
               placeholder={copy.search}
             />
           </label>
-          <button type="button" className="community-create-compact" onClick={startTopic}>
-            <PenLine aria-hidden="true" />
-            {copy.newTopic}
-          </button>
         </header>
 
         <div className="community-tag-filter" aria-label={copy.tagsLabel}>
@@ -590,21 +641,8 @@ export function CommunityPage({
 
         {loading ? <p role="status">{copy.loading}</p> : null}
 
-        {!loading && visibleTopics.length === 0 ? (
-          <div className={`community-starter${error ? " is-error" : ""}`}>
-            <header>
-              <h3>{copy.starterTitle}</h3>
-              {error ? <p role="status">{error}</p> : null}
-            </header>
-            <ol>
-              {copy.starterItems.map(([title, body], index) => (
-                <li key={title}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <div><strong>{title}</strong><p>{body}</p></div>
-                </li>
-              ))}
-            </ol>
-          </div>
+        {!loading && error ? (
+          <p className="community-state is-error" role="status">{error}</p>
         ) : null}
 
         <div className="community-topic-grid">
@@ -661,6 +699,18 @@ export function CommunityPage({
                       <MessageCircle aria-hidden="true" />
                       {topic.comment_count}
                     </button>
+                    {account?.id === topic.author_id ? (
+                      <button
+                        type="button"
+                        className="community-topic-delete"
+                        disabled={deletingTopicId === topic.id}
+                        onClick={() => void deleteTopic(topic)}
+                        aria-label={copy.deleteTopic}
+                        title={copy.deleteTopic}
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </button>
+                    ) : null}
                     <button type="button" onClick={() => openTopic(topic)}>
                       {copy.open}
                       <ArrowUpRight aria-hidden="true" />
@@ -752,6 +802,24 @@ export function CommunityPage({
                     #{tagName}
                   </button>
                 ))}
+                {tags
+                  .filter((tagName) =>
+                    !presets.some((preset) => preset === tagName)
+                  )
+                  .map((tagName) => (
+                    <button
+                      key={tagName}
+                      type="button"
+                      className="is-active"
+                      onClick={() =>
+                        setTags((current) =>
+                          current.filter((value) => value !== tagName)
+                        )
+                      }
+                    >
+                      #{tagName}
+                    </button>
+                  ))}
                 <input
                   value={customTag}
                   onChange={(event) => setCustomTag(event.target.value)}
@@ -796,7 +864,11 @@ export function CommunityPage({
             </fieldset>
             {error ? <p className="community-form-error">{error}</p> : null}
             <footer>
-              <button type="button" onClick={() => setComposerOpen(false)}>
+              <button
+                type="button"
+                className="community-composer-cancel"
+                onClick={() => setComposerOpen(false)}
+              >
                 {copy.cancel}
               </button>
               <button
@@ -866,16 +938,31 @@ export function CommunityPage({
                     <span key={tagName}>#{tagName}</span>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  className={
-                    account && selectedTopic.liked_by_viewer ? "is-liked" : ""
-                  }
-                  onClick={() => void toggleTopicLike(selectedTopic.id)}
-                >
-                  <Heart aria-hidden="true" />
-                  {selectedTopic.like_count} {copy.likes}
-                </button>
+                <div className="community-topic-dialog-actions">
+                  <button
+                    type="button"
+                    className={
+                      account && selectedTopic.liked_by_viewer ? "is-liked" : ""
+                    }
+                    onClick={() => void toggleTopicLike(selectedTopic.id)}
+                  >
+                    <Heart aria-hidden="true" />
+                    {selectedTopic.like_count} {copy.likes}
+                  </button>
+                  {account?.id === selectedTopic.author_id ? (
+                    <button
+                      type="button"
+                      className="community-topic-delete"
+                      disabled={deletingTopicId === selectedTopic.id}
+                      onClick={() => void deleteTopic(selectedTopic)}
+                    >
+                      <Trash2 aria-hidden="true" />
+                      {deletingTopicId === selectedTopic.id
+                        ? copy.deletingTopic
+                        : copy.deleteTopic}
+                    </button>
+                  ) : null}
+                </div>
               </header>
               <div className="community-comment-list">
                 <h3>{copy.comments}</h3>

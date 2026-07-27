@@ -389,12 +389,12 @@ export function History() {
         </div>
       </SectionCard>
 
-      <SectionCard title={t("history.jobs")}>
-        {saveError ? <ErrorState description={saveError} /> : null}
-        <div className="history-jobs-toolbar">
+      <SectionCard
+        title={t("history.jobs")}
+        actions={(
           <button
             type="button"
-            className="btn"
+            className="btn history-compare-button"
             disabled={!canCompare}
             onClick={() =>
               navigate(`/compare?job_ids=${encodeURIComponent(selectedIds.join(","))}`)
@@ -402,7 +402,9 @@ export function History() {
           >
             {t("history.compareSelected", { count: selectedIds.length })}
           </button>
-        </div>
+        )}
+      >
+        {saveError ? <ErrorState description={saveError} /> : null}
         {query.isLoading ? (
           <Loading label={t("history.loading")} />
         ) : query.isError ? (

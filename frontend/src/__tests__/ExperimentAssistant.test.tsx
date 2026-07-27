@@ -218,7 +218,7 @@ describe("conversational experiment drafting", () => {
     expect(screen.getByRole("menuitem", { name: "Create manually" }))
       .toHaveAttribute("href", "/jobs/new");
     expect(
-      screen.getByRole("menuitem", { name: "Import reference files" }),
+      screen.getByRole("menuitem", { name: "Import files" }),
     ).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Model" }))
       .toHaveValue("default");

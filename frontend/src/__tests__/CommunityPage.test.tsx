@@ -3,13 +3,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const supabaseMock = vi.hoisted(() => {
   const rpc = vi.fn();
+  const deleteAuthorEq = vi.fn();
+  const deleteTopicEq = vi.fn(() => ({ eq: deleteAuthorEq }));
+  const deleteTopic = vi.fn(() => ({ eq: deleteTopicEq }));
+  const from = vi.fn(() => ({ delete: deleteTopic }));
   return {
     client: {
       rpc,
-      from: vi.fn(),
+      from,
       storage: { from: vi.fn() },
     },
     rpc,
+    from,
+    deleteTopic,
+    deleteTopicEq,
+    deleteAuthorEq,
   };
 });
 
@@ -29,6 +37,11 @@ describe("CommunityPage public data loading", () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/community/?view=all");
     supabaseMock.rpc.mockReset();
+    supabaseMock.from.mockClear();
+    supabaseMock.deleteTopic.mockClear();
+    supabaseMock.deleteTopicEq.mockClear();
+    supabaseMock.deleteAuthorEq.mockReset();
+    supabaseMock.deleteAuthorEq.mockResolvedValue({ error: null });
     supabaseMock.rpc.mockImplementation((name: string) => {
       if (name === "community_list_comments") return rpcResult([]);
       return rpcResult([
@@ -84,5 +97,72 @@ describe("CommunityPage public data loading", () => {
         }),
       )
     );
+  });
+
+  it("shows the cancel action and commits a custom tag with Enter", async () => {
+    render(
+      <CommunityPage
+        locale="en"
+        account={{
+          id: "00000000-0000-0000-0000-000000000003",
+          email: "pilot@example.com",
+          displayName: "Pilot",
+          avatarUrl: null,
+        }}
+        onRequireAccount={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole("heading", { name: "Stable hover evidence" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Create a topic" })[0]);
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible();
+    expect(screen.getByPlaceholderText(
+      "Describe the aircraft, route, parameters, observed result, evidence already checked, and the exact comparison you want the community to review.",
+    )).toBeVisible();
+
+    const customTag = screen.getByPlaceholderText("Add a custom tag");
+    fireEvent.change(customTag, { target: { value: "Wind tunnel" } });
+    fireEvent.keyDown(customTag, { key: "Enter" });
+
+    expect(screen.getByRole("button", { name: "#Wind tunnel" })).toHaveClass("is-active");
+    expect(customTag).toHaveValue("");
+  });
+
+  it("lets only the topic owner delete a topic", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(
+      <CommunityPage
+        locale="en"
+        account={{
+          id: "00000000-0000-0000-0000-000000000002",
+          email: "pilot@example.com",
+          displayName: "Pilot",
+          avatarUrl: null,
+        }}
+        onRequireAccount={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", {
+      name: "Stable hover evidence",
+    })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Delete topic" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", {
+        name: "Stable hover evidence",
+      })).not.toBeInTheDocument()
+    );
+    expect(supabaseMock.from).toHaveBeenCalledWith("community_topics");
+    expect(supabaseMock.deleteTopicEq).toHaveBeenCalledWith(
+      "id",
+      "00000000-0000-0000-0000-000000000001",
+    );
+    expect(supabaseMock.deleteAuthorEq).toHaveBeenCalledWith(
+      "author_id",
+      "00000000-0000-0000-0000-000000000002",
+    );
+    confirm.mockRestore();
   });
 });

@@ -19,6 +19,7 @@ import {
   LogIn,
   MailCheck,
   MoreHorizontal,
+  Save,
   Settings,
   X,
   type LucideIcon,
@@ -817,6 +818,15 @@ const ACCOUNT_COPY = {
     cancelCamera: "Cancel camera",
     invalidPhoto: "Choose a JPEG, PNG, or WebP image.",
     photoTooLarge: "Choose an image smaller than 8 MB.",
+    cameraRequiresHttps:
+      "Camera access requires HTTPS. Open the secure GitHub Pages site, or use the DroneDream desktop app.",
+    cameraDenied:
+      "Camera permission is blocked. Allow camera access in the browser site settings or Windows privacy settings, then try again.",
+    cameraMissing: "No available camera was found on this device.",
+    cameraBusy:
+      "The camera could not be started. Close other apps using it, then try again.",
+    cameraConstraint:
+      "The camera cannot provide a compatible video stream on this device.",
     cameraUnavailable: "The camera is unavailable or permission was not granted.",
     cameraNotReady: "Wait for the camera preview before taking the photo.",
     signOut: "Sign out",
@@ -864,6 +874,13 @@ const ACCOUNT_COPY = {
     cancelCamera: "关闭摄像头",
     invalidPhoto: "请选择 JPEG、PNG 或 WebP 图片。",
     photoTooLarge: "请选择小于 8 MB 的图片。",
+    cameraRequiresHttps:
+      "摄像头只能在 HTTPS 安全页面中使用。请打开 GitHub Pages 正式站点，或使用 DroneDream 桌面软件。",
+    cameraDenied:
+      "摄像头权限已被阻止。请在浏览器网站设置或 Windows 隐私设置中允许摄像头，然后重试。",
+    cameraMissing: "当前设备没有检测到可用摄像头。",
+    cameraBusy: "摄像头无法启动。请关闭其他正在使用摄像头的软件，然后重试。",
+    cameraConstraint: "当前摄像头无法提供兼容的视频画面。",
     cameraUnavailable: "摄像头不可用，或未获得摄像头权限。",
     cameraNotReady: "请等待摄像头画面出现后再拍摄。",
     signOut: "退出登录",
@@ -1041,6 +1058,10 @@ function AccountDialog({
   };
 
   const startCamera = async () => {
+    if (!window.isSecureContext && !isDesktopRuntime()) {
+      setError(copy.cameraRequiresHttps);
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia) {
       setError(copy.cameraUnavailable);
       return;
@@ -1063,8 +1084,21 @@ function AccountDialog({
       stopCamera();
       cameraStreamRef.current = stream;
       setCameraStream(stream);
-    } catch {
-      setError(copy.cameraUnavailable);
+    } catch (reason) {
+      const errorName = reason instanceof DOMException ? reason.name : "";
+      if (["NotAllowedError", "PermissionDeniedError", "SecurityError"].includes(errorName)) {
+        setError(copy.cameraDenied);
+      } else if (["NotFoundError", "DevicesNotFoundError"].includes(errorName)) {
+        setError(copy.cameraMissing);
+      } else if (["NotReadableError", "TrackStartError", "AbortError"].includes(errorName)) {
+        setError(copy.cameraBusy);
+      } else if (
+        ["OverconstrainedError", "ConstraintNotSatisfiedError"].includes(errorName)
+      ) {
+        setError(copy.cameraConstraint);
+      } else {
+        setError(copy.cameraUnavailable);
+      }
     } finally {
       if (mountedRef.current) setPending(false);
     }
@@ -1145,6 +1179,14 @@ function AccountDialog({
               <strong>{auth.account.displayName}</strong>
               <span>{auth.account.email}</span>
             </div>
+            <button
+              type="button"
+              className="btn account-sign-out"
+              disabled={pending}
+              onClick={() => void run(auth.signOut)}
+            >
+              {copy.signOut}
+            </button>
           </div>
           <section className="account-avatar-editor">
             <strong>{copy.profilePhoto}</strong>
@@ -1228,25 +1270,19 @@ function AccountDialog({
               />
               <button
                 type="submit"
-                className="btn btn-primary"
+                className="btn btn-primary account-save-username"
+                aria-label={copy.saveUsername}
+                title={copy.saveUsername}
                 disabled={
                   pending ||
                   !displayName.trim() ||
                   displayName.trim() === auth.account.displayName
                 }
               >
-                {copy.saveUsername}
+                <Save aria-hidden="true" strokeWidth={1.9} />
               </button>
             </div>
           </form>
-          <button
-            type="button"
-            className="btn account-sign-out"
-            disabled={pending}
-            onClick={() => void run(auth.signOut)}
-          >
-            {copy.signOut}
-          </button>
         </div>
       ) : (
         <>
@@ -1951,9 +1987,15 @@ function AppShellContent() {
         {t("app.skipToContent")}
       </a>
       <aside className="app-sidebar">
-        <Link to="/assistant" className="app-title" aria-label="DroneDream">
-          <BrandLockup variant="compact" />
-        </Link>
+        {desktopRuntime ? (
+          <Link to="/assistant" className="app-title" aria-label="DroneDream">
+            <BrandLockup variant="compact" />
+          </Link>
+        ) : (
+          <a href="/" className="app-title" aria-label="DroneDream">
+            <BrandLockup variant="compact" />
+          </a>
+        )}
         <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">
             {runtimeNavDescription}

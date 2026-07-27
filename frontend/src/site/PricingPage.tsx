@@ -1,6 +1,20 @@
-import { Check, CreditCard, ShieldCheck, X } from "lucide-react";
+import {
+  BrainCircuit,
+  CreditCard,
+  FileOutput,
+  Gauge,
+  KeyRound,
+  ShieldCheck,
+  Sparkles,
+  Stamp,
+  Users,
+  Workflow,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { PaymentBrandMark } from "../components/PaymentBrandMark";
 import {
   CloudModelAccessError,
   createBillingCheckout,
@@ -11,6 +25,14 @@ import {
 
 type SiteLocale = "en" | "zh-CN";
 type PaidPlanId = "plus" | "pro";
+type Audience = "individual" | "business";
+type FeatureKey =
+  | "workflow"
+  | "harness"
+  | "allowance"
+  | "byok"
+  | "reports"
+  | "watermarkFree";
 
 interface PricingPageProps {
   locale: SiteLocale;
@@ -32,38 +54,52 @@ const PLANS: readonly Plan[] = [
   { id: "pro", name: "Pro", price: 129, includedCredits: 15_000_000 },
 ];
 
+const FEATURE_KEYS: readonly FeatureKey[] = [
+  "workflow",
+  "harness",
+  "allowance",
+  "byok",
+  "reports",
+  "watermarkFree",
+];
+
+const FEATURE_ICONS: Record<FeatureKey, LucideIcon> = {
+  workflow: Workflow,
+  harness: BrainCircuit,
+  allowance: Gauge,
+  byok: KeyRound,
+  reports: FileOutput,
+  watermarkFree: Stamp,
+};
+
 const pricingContent = {
   en: {
-    eyebrow: "DRONEDREAM PLANS",
     title: "The same complete product. More included AI.",
     mobileTitle: "Choose your allowance.",
-    intro:
-      "Free, Plus, and Pro unlock exactly the same DroneDream software and tuning Harness. Only the included managed-model allowance changes.",
+    audienceLabel: "Workspace type",
+    individual: "Individual",
+    business: "Business",
     month: "/ month",
     current: "Free plan",
     start: "Start free",
     upgrade: "Choose",
     recommended: "Recommended",
-    included: "included AI credits each month",
-    creditsDefinition:
-      "Credits are settled from provider-reported input and output tokens under a versioned policy.",
-    sharedFeatures: [
-      "Complete DroneDream desktop tuning workflow",
-      "The same Harness, optimizers, simulation, and reports",
-      "Experiment assistant, community, manual, and updates",
-      "Use your own API key after the included allowance ends",
-      "No platform API key is stored on your computer",
-    ],
+    includedStatus: "Included",
+    unavailableStatus: "Not included",
+    features: {
+      workflow: "Complete DroneDream tuning workflow",
+      harness: "Full AURORA optimization Harness",
+      byok: "BYOK fallback after the included allowance",
+      reports: "Experiment and comparison report export",
+      watermarkFree: "Watermark-free PDF report export",
+    },
+    allowanceFeature: (credits: string) => `${credits} managed AI credits each month`,
     close: "Close payment dialog",
-    paymentTitle: "Choose a payment method",
-    paymentIntro:
-      "This purchases one month of the selected allowance. Renewal is manual until wallet auto-renewal is separately activated.",
+    paymentTitle: "Payment",
     wechat: "WeChat Pay",
     alipay: "Alipay",
     card: "Credit or debit card",
     continue: "Continue to payment",
-    checking: "Checking payment availability…",
-    unavailable: "Merchant payment activation is still required.",
     paymentFailed: "The payment order could not be created.",
     qrTitle: "Scan with WeChat to pay",
     qrAlt: "WeChat Pay QR code",
@@ -71,36 +107,32 @@ const pricingContent = {
       "The plan activates only after DroneDream verifies the payment provider callback.",
   },
   "zh-CN": {
-    eyebrow: "DRONEDREAM 套餐",
     title: "完整能力完全相同，只增加赠送 AI 额度。",
     mobileTitle: "选择赠送额度。",
-    intro:
-      "Free、Plus、Pro 使用完全相同的 DroneDream 软件与调优 Harness；三个级别唯一的能力差异，是每月赠送的托管模型额度。",
+    audienceLabel: "工作空间类型",
+    individual: "个人",
+    business: "商业",
     month: "/ 月",
     current: "免费套餐",
     start: "免费开始",
     upgrade: "选择",
     recommended: "推荐",
-    included: "每月赠送 AI 额度",
-    creditsDefinition:
-      "额度依据模型服务商返回的输入、输出 token，并按版本化规则精确结算。",
-    sharedFeatures: [
-      "完整的 DroneDream 桌面调优工作流",
-      "相同的 Harness、优化器、仿真与报告能力",
-      "相同的实验助手、社区、说明书与更新",
-      "赠送额度耗尽后可切换到自己的 API Key",
-      "DroneDream 平台密钥不会保存到用户电脑",
-    ],
+    includedStatus: "已包含",
+    unavailableStatus: "未包含",
+    features: {
+      workflow: "完整的 DroneDream 调优工作流",
+      harness: "完整的 AURORA 优化 Harness",
+      byok: "赠送额度用尽后切换到自己的 API Key",
+      reports: "导出实验与对比报告",
+      watermarkFree: "导出无水印 PDF 报告",
+    },
+    allowanceFeature: (credits: string) => `每月 ${credits} 托管模型 AI 额度`,
     close: "关闭支付弹窗",
-    paymentTitle: "选择付款方式",
-    paymentIntro:
-      "本次购买一个月的对应额度；在钱包自动续费能力另行签约前，到期后由用户手动续费。",
+    paymentTitle: "支付",
     wechat: "微信支付",
     alipay: "支付宝",
     card: "信用卡或借记卡",
     continue: "继续付款",
-    checking: "正在检查支付渠道…",
-    unavailable: "仍需完成商户支付能力开通。",
     paymentFailed: "暂时无法创建支付订单。",
     qrTitle: "请使用微信扫码支付",
     qrAlt: "微信支付二维码",
@@ -119,6 +151,7 @@ export function PricingPage({
   onRequireAccount,
 }: PricingPageProps) {
   const copy = pricingContent[locale];
+  const [audience, setAudience] = useState<Audience>("individual");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("wechat");
   const [availability, setAvailability] = useState<BillingAvailability | null>(null);
@@ -163,12 +196,12 @@ export function PricingPage({
         void error;
         setAvailability(null);
         setPaymentState("error");
-        setPaymentMessage(copy.unavailable);
+        setPaymentMessage(null);
       });
     return () => {
       active = false;
     };
-  }, [copy.unavailable]);
+  }, []);
 
   const plans: readonly Plan[] = availability?.plans.length === 3
     ? availability.plans.map((plan) => ({
@@ -220,22 +253,53 @@ export function PricingPage({
   const selectedMethodAvailable = Boolean(
     availability?.enabled && availability.methods[paymentMethod],
   );
+  const cardMethodAvailable = Boolean(availability?.methods.card);
+
+  const featureLabel = (feature: FeatureKey, plan: Plan): string => {
+    if (feature === "allowance") {
+      return copy.allowanceFeature(formatCredits(locale, plan.includedCredits));
+    }
+    return copy.features[feature];
+  };
+
+  const featureIncluded = (feature: FeatureKey, plan: Plan): boolean =>
+    feature !== "watermarkFree" || plan.id !== "free";
 
   return (
     <div className="site-portal pricing-page">
       <header className="portal-page-heading">
-        <p className="site-eyebrow">{copy.eyebrow}</p>
         <h1 aria-label={copy.title}>
           <span aria-hidden="true" className="portal-title-desktop">{copy.title}</span>
           <span aria-hidden="true" className="portal-title-mobile">{copy.mobileTitle}</span>
         </h1>
-        <p>{copy.intro}</p>
       </header>
 
-      <div className="pricing-grid">
+      <div className="pricing-audience" role="tablist" aria-label={copy.audienceLabel}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={audience === "individual"}
+          onClick={() => setAudience("individual")}
+        >
+          <Sparkles aria-hidden="true" />
+          {copy.individual}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={audience === "business"}
+          onClick={() => setAudience("business")}
+        >
+          <Users aria-hidden="true" />
+          {copy.business}
+        </button>
+      </div>
+
+      <div className="pricing-grid" data-audience={audience}>
         {plans.map((plan) => (
           <article
             key={plan.id}
+            data-plan={plan.id}
             className={`pricing-card${plan.featured ? " is-featured" : ""}`}
           >
             {plan.featured ? <span className="pricing-badge">{copy.recommended}</span> : null}
@@ -246,10 +310,6 @@ export function PricingPage({
                 <span>{copy.month}</span>
               </p>
             </header>
-            <div className="pricing-allowance">
-              <strong>{formatCredits(locale, plan.includedCredits)}</strong>
-              <span>{copy.included}</span>
-            </div>
             <button
               type="button"
               className={plan.featured ? "is-primary" : ""}
@@ -258,14 +318,33 @@ export function PricingPage({
               {plan.id === "free" ? copy.start : `${copy.upgrade} ${plan.name}`}
             </button>
             <ul>
-              {copy.sharedFeatures.map((feature) => (
-                <li key={feature}><Check aria-hidden="true" /><span>{feature}</span></li>
-              ))}
+              {FEATURE_KEYS.map((feature) => {
+                const Icon = FEATURE_ICONS[feature];
+                const included = featureIncluded(feature, plan);
+                const label = featureLabel(feature, plan);
+                return (
+                  <li
+                    key={feature}
+                    aria-label={`${label} — ${
+                      included ? copy.includedStatus : copy.unavailableStatus
+                    }`}
+                    className={`pricing-feature ${
+                      included ? "is-included" : "is-unavailable"
+                    }`}
+                    data-available={included}
+                    data-feature={feature}
+                  >
+                    <span className="pricing-feature-icon">
+                      <Icon aria-hidden="true" />
+                    </span>
+                    <span>{label}</span>
+                  </li>
+                );
+              })}
             </ul>
           </article>
         ))}
       </div>
-      <p className="pricing-credit-definition">{copy.creditsDefinition}</p>
 
       {selectedPlan ? (
         <div className="payment-backdrop" onMouseDown={(event) => {
@@ -281,12 +360,11 @@ export function PricingPage({
                 <X aria-hidden="true" />
               </button>
             </header>
-            <p>{copy.paymentIntro}</p>
             <div className="payment-plan-summary">
               <strong>{selectedPlan.name}</strong>
               <span>¥{selectedPlan.price} {copy.month}</span>
             </div>
-            <div className="payment-methods">
+            <div className={`payment-methods${cardMethodAvailable ? " has-card" : ""}`}>
               <button
                 type="button"
                 aria-label={copy.wechat}
@@ -294,7 +372,9 @@ export function PricingPage({
                 disabled={availability ? !availability.methods.wechat : false}
                 onClick={() => setPaymentMethod("wechat")}
               >
-                <span className="payment-method-logo is-wechat">微</span>
+                <span className="payment-method-logo is-wechat">
+                  <PaymentBrandMark brand="wechat-pay" />
+                </span>
                 {copy.wechat}
               </button>
               <button
@@ -304,21 +384,24 @@ export function PricingPage({
                 disabled={availability ? !availability.methods.alipay : false}
                 onClick={() => setPaymentMethod("alipay")}
               >
-                <span className="payment-method-logo is-alipay">支</span>
+                <span className="payment-method-logo is-alipay">
+                  <PaymentBrandMark brand="alipay" />
+                </span>
                 {copy.alipay}
               </button>
-              <button
-                type="button"
-                aria-label={copy.card}
-                aria-pressed={paymentMethod === "card"}
-                disabled={availability ? !availability.methods.card : false}
-                onClick={() => setPaymentMethod("card")}
-              >
-                <span className="payment-method-logo is-card">
-                  <CreditCard aria-hidden="true" />
-                </span>
-                {copy.card}
-              </button>
+              {cardMethodAvailable ? (
+                <button
+                  type="button"
+                  aria-label={copy.card}
+                  aria-pressed={paymentMethod === "card"}
+                  onClick={() => setPaymentMethod("card")}
+                >
+                  <span className="payment-method-logo is-card">
+                    <CreditCard aria-hidden="true" />
+                  </span>
+                  {copy.card}
+                </button>
+              ) : null}
             </div>
             {wechatQr ? (
               <div className="payment-qr" role="status">
@@ -339,12 +422,11 @@ export function PricingPage({
                 {copy.continue}
               </button>
             )}
-            <p className="payment-state">
-              {paymentState === "checking"
-                ? copy.checking
-                : paymentMessage
-                  ?? (!selectedMethodAvailable ? copy.unavailable : copy.callbackNote)}
-            </p>
+            {paymentMessage ? (
+              <p className="payment-state" role="alert">{paymentMessage}</p>
+            ) : wechatQr ? (
+              <p className="payment-state">{copy.callbackNote}</p>
+            ) : null}
           </section>
         </div>
       ) : null}

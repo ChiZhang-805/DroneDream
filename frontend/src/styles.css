@@ -263,7 +263,10 @@ code {
 }
 
 .account-dialog {
-  width: min(100%, 34rem);
+  width: min(100%, 36rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.35rem;
   border: 1px solid #e1d6e4;
   border-radius: 1.35rem;
@@ -428,7 +431,7 @@ code {
 
 .account-profile {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
 }
@@ -534,7 +537,7 @@ code {
 
 .account-username-form > div {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 2.8rem;
   gap: 0.65rem;
 }
 
@@ -560,8 +563,22 @@ code {
   white-space: nowrap;
 }
 
+.account-save-username {
+  display: inline-grid;
+  width: 2.8rem;
+  min-width: 2.8rem;
+  place-items: center;
+  padding: 0;
+}
+
+.account-save-username svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 .account-sign-out {
   justify-self: end;
+  white-space: nowrap;
 }
 
 .account-archived-experiments {
@@ -637,9 +654,17 @@ code {
 
 @media (max-width: 520px) {
   .account-avatar-actions,
-  .account-camera-panel > div,
-  .account-username-form > div {
+  .account-camera-panel > div {
     grid-template-columns: 1fr;
+  }
+
+  .account-profile {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .account-profile .account-sign-out {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 
@@ -7662,11 +7687,13 @@ a {
   white-space: nowrap;
 }
 
-.history-jobs-toolbar {
-  display: flex;
-  flex: 0 0 auto;
+.history-body > .section-card:last-child .section-card-header {
   align-items: center;
-  justify-content: flex-start;
+}
+
+.history-compare-button {
+  min-height: 2.35rem;
+  white-space: nowrap;
 }
 
 .history-results {

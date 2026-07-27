@@ -59,7 +59,7 @@ const COPY = {
       "Describe the flight, model, constraints, and trial budget; DroneDream will turn your intent into a reviewable experiment draft.",
     manual: "Create manually",
     moreActions: "More ways to start",
-    importFiles: "Import reference files",
+    importFiles: "Import files",
     removeFile: "Remove file",
     unsupportedFile: "Use JSON, text, Markdown, CSV, YAML, TOML, XML, or log files.",
     fileTooLarge: "Each imported file must be 1 MB or smaller.",

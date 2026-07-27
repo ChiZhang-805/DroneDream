@@ -66,7 +66,7 @@ describe("PricingPage payment channels", () => {
       />,
     );
 
-    expect(await screen.findByText("3,000,000")).toBeVisible();
+    expect(await screen.findByText(/3,000,000 managed AI credits/i)).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Choose Plus" }));
 
     const card = screen.getByRole("button", { name: "Credit or debit card" });

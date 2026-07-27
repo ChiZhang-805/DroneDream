@@ -8,6 +8,8 @@ import { I18nProvider } from "../i18n/I18nProvider";
 
 const authMock = vi.hoisted(() => ({
   updateAvatar: vi.fn(async () => undefined),
+  updateDisplayName: vi.fn(async () => undefined),
+  signOut: vi.fn(async () => undefined),
 }));
 
 vi.mock("../features/auth/AuthContext", () => ({
@@ -27,9 +29,9 @@ vi.mock("../features/auth/AuthContext", () => ({
     sendRegistrationCode: vi.fn(),
     verifyRegistrationCode: vi.fn(),
     signInWithProvider: vi.fn(),
-    updateDisplayName: vi.fn(),
+    updateDisplayName: authMock.updateDisplayName,
     updateAvatar: authMock.updateAvatar,
-    signOut: vi.fn(),
+    signOut: authMock.signOut,
   }),
 }));
 
@@ -55,10 +57,16 @@ function renderWorkspace() {
 describe("workspace profile photo editor", () => {
   afterEach(() => {
     authMock.updateAvatar.mockClear();
+    authMock.updateDisplayName.mockClear();
+    authMock.signOut.mockClear();
     vi.restoreAllMocks();
     window.localStorage.clear();
     Object.defineProperty(navigator, "mediaDevices", {
       value: undefined,
+      configurable: true,
+    });
+    Object.defineProperty(window, "isSecureContext", {
+      value: true,
       configurable: true,
     });
   });
@@ -72,10 +80,16 @@ describe("workspace profile photo editor", () => {
       value: { getUserMedia },
       configurable: true,
     });
+    Object.defineProperty(window, "isSecureContext", {
+      value: true,
+      configurable: true,
+    });
     vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     window.localStorage.setItem("drone-dream:locale", "en");
     const { container, router } = renderWorkspace();
 
+    expect(screen.getByRole("link", { name: "DroneDream" }))
+      .toHaveAttribute("href", "/");
     expect(getUserMedia).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
     const dialog = screen.getByRole("dialog", { name: "DroneDream account" });
@@ -95,6 +109,56 @@ describe("workspace profile photo editor", () => {
       within(dialog).getByRole("button", { name: "Close account" }),
     );
     await waitFor(() => expect(stop).toHaveBeenCalledTimes(1));
+
+    router.dispose();
+  });
+
+  it("uses icon-only username save and keeps sign out in the profile row", async () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    const { router } = renderWorkspace();
+
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    const dialog = screen.getByRole("dialog", { name: "DroneDream account" });
+    const save = within(dialog).getByRole("button", { name: "Save username" });
+    const signOut = within(dialog).getByRole("button", { name: "Sign out" });
+
+    expect(save).toBeDisabled();
+    expect(save).toHaveTextContent("");
+    expect(save.querySelector("svg")).not.toBeNull();
+    expect(signOut.closest(".account-profile")).not.toBeNull();
+
+    fireEvent.change(within(dialog).getByLabelText("Username"), {
+      target: { value: "pilot-two" },
+    });
+    fireEvent.click(save);
+    await waitFor(() => {
+      expect(authMock.updateDisplayName).toHaveBeenCalledWith("pilot-two");
+    });
+
+    router.dispose();
+  });
+
+  it("explains that an insecure HTTP origin cannot request the camera", async () => {
+    const getUserMedia = vi.fn();
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getUserMedia },
+      configurable: true,
+    });
+    Object.defineProperty(window, "isSecureContext", {
+      value: false,
+      configurable: true,
+    });
+    window.localStorage.setItem("drone-dream:locale", "en");
+    const { router } = renderWorkspace();
+
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    const dialog = screen.getByRole("dialog", { name: "DroneDream account" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Use camera" }));
+
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "Camera access requires HTTPS.",
+    );
 
     router.dispose();
   });
