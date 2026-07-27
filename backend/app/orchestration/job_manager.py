@@ -924,8 +924,7 @@ def _require_current_outcome_contract(
 
     if not check_job_outcome_contract(db, job).valid:
         raise OutcomeContractDriftError(
-            "the persisted optimization outcome contract no longer matches "
-            "the Job configuration"
+            "the persisted optimization outcome contract no longer matches the Job configuration"
         )
 
 
@@ -1361,6 +1360,8 @@ def dispatch_next_harness_generation(
     )
 
     decision = select_optimizer_tool(db, job, client=client)
+    if decision.generation != generation_index:
+        raise RuntimeError("Harness decision generation drifted before trusted dispatch")
     if decision.tool_id == "cma_es":
         result = dispatch_next_cma_es_generation(db, job)
     else:
@@ -1374,7 +1375,10 @@ def dispatch_next_harness_generation(
         job.id,
         "harness_tool_execution_result",
         {
-            "generation": job.current_generation,
+            "decision_id": decision.decision_id,
+            # Preserve the intended generation even when a bounded optimizer
+            # returns search_space_exhausted without incrementing Job state.
+            "generation": generation_index,
             "tool_id": decision.tool_id,
             "decision_source": decision.source,
             "status": result.status,

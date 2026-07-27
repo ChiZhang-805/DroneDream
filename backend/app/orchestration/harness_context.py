@@ -9,6 +9,7 @@ seeds, and arbitrary JSON never cross this boundary.
 from __future__ import annotations
 
 import math
+import string
 from collections import defaultdict
 from collections.abc import Iterable
 from datetime import datetime, timezone
@@ -46,6 +47,8 @@ HarnessTrackType = Literal["circle", "u_turn", "lemniscate", "custom", "unknown"
 HARNESS_EVIDENCE_SCHEMA_VERSION = "2.4"
 HARNESS_TOOL_REGISTRY_VERSION = "2.1"
 HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION = "1.1"
+HARNESS_PROMPT_TEMPLATE_VERSION = "1.1"
+HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.1"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
 MAX_GENERATION_TREND_ITEMS = 32
@@ -688,9 +691,7 @@ def _tool_history(
                 tool_id=tool_id,
                 candidate_count=len(owned),
                 completed_candidate_count=sum(
-                    1
-                    for candidate in owned
-                    if _candidate_complete(feedback_by_id[candidate.id])
+                    1 for candidate in owned if _candidate_complete(feedback_by_id[candidate.id])
                 ),
                 feasible_candidate_count=sum(
                     1
@@ -698,12 +699,10 @@ def _tool_history(
                     if _candidate_feasibility(feedback_by_id[candidate.id]) is True
                 ),
                 total_trial_count=sum(
-                    feedback_by_id[candidate.id].learning_trial_count
-                    for candidate in owned
+                    feedback_by_id[candidate.id].learning_trial_count for candidate in owned
                 ),
                 failed_trial_count=sum(
-                    feedback_by_id[candidate.id].failed_trial_count
-                    for candidate in owned
+                    feedback_by_id[candidate.id].failed_trial_count for candidate in owned
                 ),
                 best_score=min(scores, default=None),
                 last_generation=max(
@@ -721,76 +720,238 @@ def _event_sort_time(event: models.JobEvent) -> datetime:
     return datetime.min.replace(tzinfo=timezone.utc)
 
 
+def _bounded_int(value: object, *, minimum: int = 0) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        return None
+    return value
+
+
+def _hex_id(value: object, *, length: int) -> str | None:
+    if (
+        not isinstance(value, str)
+        or len(value) != length
+        or any(char not in string.hexdigits for char in value)
+    ):
+        return None
+    return value.lower()
+
+
+def _common_decision_binding(
+    payload: dict[str, object],
+) -> tuple[str, int, str, str | None] | None:
+    decision_id = _hex_id(payload.get("decision_id"), length=32)
+    generation = _bounded_int(payload.get("generation"), minimum=1)
+    evidence_sha256 = _hex_id(payload.get("evidence_sha256"), length=64)
+    raw_prompt_sha256 = payload.get("prompt_sha256")
+    prompt_sha256 = None if raw_prompt_sha256 is None else _hex_id(raw_prompt_sha256, length=64)
+    if (
+        decision_id is None
+        or generation is None
+        or evidence_sha256 is None
+        or (raw_prompt_sha256 is not None and prompt_sha256 is None)
+        or payload.get("evidence_schema_version") != HARNESS_EVIDENCE_SCHEMA_VERSION
+        or payload.get("tool_registry_version") != HARNESS_TOOL_REGISTRY_VERSION
+        or payload.get("prompt_template_version") != HARNESS_PROMPT_TEMPLATE_VERSION
+    ):
+        return None
+    return decision_id, generation, evidence_sha256, prompt_sha256
+
+
 def _decision_memory(
     events: list[models.JobEvent],
+    *,
+    current_generation: int,
+    verified_started_decision_ids: frozenset[str],
 ) -> tuple[HarnessExecutionMemory, ...]:
-    """Compile recent execution feedback without replaying provider/model text."""
+    """Compile only decision/result pairs with a complete provenance binding.
 
-    memory: list[HarnessExecutionMemory] = []
-    for event in sorted(events, key=lambda item: (_event_sort_time(item), item.id)):
-        if event.event_type != "harness_tool_execution_result" or not isinstance(
-            event.payload_json, dict
+    JobEvent is an operator-facing audit stream rather than an authority ledger.
+    Runtime memory fails closed unless one execution result has exactly one
+    matching accepted/fallback decision, the model path has its preceding
+    started trace, every content/version binding agrees, and the generation is
+    reachable from current Job state.
+    """
+
+    ordered = sorted(events, key=lambda item: (_event_sort_time(item), item.id))
+    started: dict[str, tuple[models.JobEvent, dict[str, object]]] = {}
+    rejected: dict[str, tuple[models.JobEvent, dict[str, object]]] = {}
+    decisions: dict[
+        str,
+        tuple[models.JobEvent, dict[str, object], str],
+    ] = {}
+    results: dict[
+        str,
+        list[tuple[models.JobEvent, dict[str, object]]],
+    ] = defaultdict(list)
+    invalid_decision_ids: set[str] = set()
+
+    for event in ordered:
+        if not isinstance(event.payload_json, dict):
+            continue
+        payload = cast(dict[str, object], event.payload_json)
+        binding = _common_decision_binding(payload)
+        if binding is None:
+            continue
+        decision_id, generation, _, _ = binding
+        if generation > max(0, current_generation) + 1:
+            continue
+        if event.event_type == "harness_decision_started":
+            if decision_id in started:
+                invalid_decision_ids.add(decision_id)
+            else:
+                started[decision_id] = (event, payload)
+        elif event.event_type == "harness_decision_rejected":
+            if decision_id in rejected:
+                invalid_decision_ids.add(decision_id)
+            else:
+                rejected[decision_id] = (event, payload)
+        elif event.event_type in {
+            "harness_decision_accepted",
+            "harness_decision_fallback",
+        }:
+            if decision_id in decisions:
+                invalid_decision_ids.add(decision_id)
+            else:
+                decisions[decision_id] = (
+                    event,
+                    payload,
+                    event.event_type,
+                )
+        elif event.event_type == "harness_tool_execution_result":
+            results[decision_id].append((event, payload))
+
+    verified: list[tuple[models.JobEvent, HarnessExecutionMemory]] = []
+    for decision_id, result_rows in results.items():
+        if (
+            decision_id in invalid_decision_ids
+            or len(result_rows) != 1
+            or decision_id not in decisions
         ):
             continue
-        payload = event.payload_json
-        tool_id = payload.get("tool_id")
-        if tool_id not in HARNESS_TOOL_DEFINITIONS:
+        decision_event, decision_payload, decision_type = decisions[decision_id]
+        result_event, result_payload = result_rows[0]
+        decision_binding = _common_decision_binding(decision_payload)
+        result_binding = _common_decision_binding(result_payload)
+        if decision_binding is None or result_binding is None or decision_binding != result_binding:
             continue
-        raw_generation = payload.get("generation")
-        generation = (
-            raw_generation
-            if isinstance(raw_generation, int)
-            and not isinstance(raw_generation, bool)
-            and raw_generation >= 0
-            else 0
-        )
-        raw_count = payload.get("dispatched_candidates")
-        dispatched_candidates = (
-            raw_count
-            if isinstance(raw_count, int) and not isinstance(raw_count, bool) and raw_count >= 0
-            else 0
-        )
-        raw_source = payload.get("decision_source")
-        decision_source = (
-            raw_source if raw_source in {"model", "deterministic_fallback"} else "unknown"
-        )
-        raw_status = payload.get("status")
-        status = raw_status if raw_status in _ALLOWED_EXECUTION_STATUSES else "unknown"
-        raw_reason = payload.get("fallback_reason")
-        fallback_reason = raw_reason if raw_reason in _ALLOWED_FALLBACK_REASONS else None
-        memory.append(
-            HarnessExecutionMemory(
-                generation=generation,
-                tool_id=cast(HarnessToolId, tool_id),
-                decision_source=cast(
-                    Literal["model", "deterministic_fallback", "unknown"],
-                    decision_source,
-                ),
-                status=cast(
-                    Literal[
-                        "dispatched",
-                        "max_iterations_reached",
-                        "budget_exhausted",
-                        "search_space_exhausted",
-                        "unknown",
-                    ],
-                    status,
-                ),
-                dispatched_candidates=dispatched_candidates,
-                fallback_reason=cast(
-                    Literal[
-                        "missing_model",
-                        "insufficient_evidence",
-                        "prompt_too_large",
-                        "missing_api_key",
-                        "client_error",
-                        "invalid_response",
-                    ]
-                    | None,
-                    fallback_reason,
+        _, generation, _, prompt_sha256 = decision_binding
+        if _event_sort_time(decision_event) > _event_sort_time(result_event):
+            continue
+
+        tool_id = decision_payload.get("tool_id")
+        if tool_id not in HARNESS_TOOL_DEFINITIONS or result_payload.get("tool_id") != tool_id:
+            continue
+        raw_source = result_payload.get("decision_source")
+        raw_reason = decision_payload.get("reason")
+        if decision_type == "harness_decision_accepted":
+            started_row = started.get(decision_id)
+            if (
+                started_row is None
+                or prompt_sha256 is None
+                or decision_id not in verified_started_decision_ids
+                or decision_id in rejected
+            ):
+                continue
+            started_event, started_payload = started_row
+            started_binding = _common_decision_binding(started_payload)
+            allowed_tools = started_payload.get("allowed_tools")
+            if (
+                started_binding != decision_binding
+                or _event_sort_time(started_event) > _event_sort_time(decision_event)
+                or started_payload.get("trace_schema_version")
+                != HARNESS_DECISION_TRACE_SCHEMA_VERSION
+                or not isinstance(allowed_tools, list)
+                or not allowed_tools
+                or any(
+                    not isinstance(item, str) or item not in HARNESS_TOOL_DEFINITIONS
+                    for item in allowed_tools
+                )
+                or tool_id not in allowed_tools
+                or raw_source != "model"
+                or result_payload.get("fallback_reason") is not None
+            ):
+                continue
+            decision_source = "model"
+            fallback_reason = None
+        else:
+            rejected_row = rejected.get(decision_id)
+            if rejected_row is None:
+                continue
+            rejected_event, rejected_payload = rejected_row
+            rejected_binding = _common_decision_binding(rejected_payload)
+            if (
+                rejected_binding != decision_binding
+                or _event_sort_time(rejected_event) > _event_sort_time(decision_event)
+                or rejected_payload.get("reason") != raw_reason
+                or tool_id != "optimizer_portfolio"
+                or raw_reason not in _ALLOWED_FALLBACK_REASONS
+                or raw_source != "deterministic_fallback"
+                or result_payload.get("fallback_reason") != raw_reason
+            ):
+                continue
+            decision_source = "deterministic_fallback"
+            fallback_reason = raw_reason
+
+        raw_status = result_payload.get("status")
+        dispatched_candidates = _bounded_int(result_payload.get("dispatched_candidates"))
+        if (
+            raw_status not in _ALLOWED_EXECUTION_STATUSES
+            or dispatched_candidates is None
+            or (raw_status == "dispatched" and dispatched_candidates == 0)
+            or (raw_status != "dispatched" and dispatched_candidates != 0)
+            or (raw_status == "dispatched" and generation > max(0, current_generation))
+        ):
+            continue
+        verified.append(
+            (
+                result_event,
+                HarnessExecutionMemory(
+                    generation=generation,
+                    tool_id=tool_id,
+                    decision_source=cast(
+                        Literal["model", "deterministic_fallback"],
+                        decision_source,
+                    ),
+                    status=cast(
+                        Literal[
+                            "dispatched",
+                            "max_iterations_reached",
+                            "budget_exhausted",
+                            "search_space_exhausted",
+                        ],
+                        raw_status,
+                    ),
+                    dispatched_candidates=dispatched_candidates,
+                    fallback_reason=cast(
+                        Literal[
+                            "missing_model",
+                            "insufficient_evidence",
+                            "prompt_too_large",
+                            "missing_api_key",
+                            "client_error",
+                            "invalid_response",
+                        ]
+                        | None,
+                        fallback_reason,
+                    ),
                 ),
             )
         )
+
+    # Multiple otherwise-valid receipts for one generation indicate a replay or
+    # concurrent duplicate dispatch. Exclude that generation entirely rather
+    # than letting event ordering choose an authoritative history.
+    generation_counts: dict[int, int] = defaultdict(int)
+    for _, item in verified:
+        generation_counts[item.generation] += 1
+    memory = [
+        item
+        for _, item in sorted(
+            verified,
+            key=lambda pair: (_event_sort_time(pair[0]), pair[0].id),
+        )
+        if generation_counts[item.generation] == 1
+    ]
     return tuple(memory[-MAX_DECISION_MEMORY_ITEMS:])
 
 
@@ -865,8 +1026,7 @@ def _select_candidates(
         ),
     )
     return tuple(
-        _candidate_evidence(candidate, feedback_by_id[candidate.id])
-        for candidate in ordered
+        _candidate_evidence(candidate, feedback_by_id[candidate.id]) for candidate in ordered
     )
 
 
@@ -874,6 +1034,7 @@ def build_harness_evidence(
     job: models.Job,
     *,
     execution_events: Iterable[models.JobEvent] = (),
+    verified_started_decision_ids: Iterable[str] = (),
 ) -> tuple[HarnessEvidenceSnapshot, bool]:
     """Compile one deterministic provider-safe decision snapshot."""
 
@@ -946,7 +1107,11 @@ def build_harness_evidence(
         scenarios=scenarios,
         search=_search_summary(candidates, feedback_by_id),
         tool_history=_tool_history(candidates, feedback_by_id),
-        decision_memory=_decision_memory(list(execution_events)),
+        decision_memory=_decision_memory(
+            list(execution_events),
+            current_generation=max(0, int(job.current_generation or 0)),
+            verified_started_decision_ids=frozenset(verified_started_decision_ids),
+        ),
         candidates=compact_candidates,
         candidate_history_total=len(candidates),
         candidate_history_included=len(compact_candidates),
@@ -1014,7 +1179,9 @@ def provider_tool_manifest(
 
 
 __all__ = [
+    "HARNESS_DECISION_TRACE_SCHEMA_VERSION",
     "HARNESS_EVIDENCE_SCHEMA_VERSION",
+    "HARNESS_PROMPT_TEMPLATE_VERSION",
     "HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION",
     "HARNESS_TOOL_DEFINITIONS",
     "HARNESS_TOOL_REGISTRY",

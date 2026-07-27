@@ -109,6 +109,31 @@ static tool manifest with evidence, manifest, and full-prompt SHA-256 values plu
 explicit prompt/trace versions. A pure verifier rebuilds the production messages
 and detects snapshot, manifest, or prompt drift. This is a reproducibility check,
 not a cryptographic signature or an immutable audit ledger.
+
+Decision memory applies a stricter runtime provenance gate than the
+operator-facing JobEvent view. Each model decision carries a fresh
+`decision_id` through its started trace, accepted decision, and execution
+result; deterministic fallbacks carry the same binding through the fallback
+decision and result. A generation enters later routing evidence only when there
+is exactly one complete pair, all generation/tool/source/hash/version fields
+agree, the model-selected tool was in the started allowlist, and the generation
+is reachable from current Job state. Orphan, duplicate, future, reordered, or
+mismatched rows fail closed instead of steering a later optimizer choice.
+Model-sourced memory additionally requires the persisted started trace to pass
+the same full snapshot/manifest/prompt verifier used by offline audits.
+Fallback memory requires its matching rejected decision. Pairing happens before
+the recent-eight-memory bound is applied, so orphan or duplicate rows cannot
+crowd one half of a valid pair out of the SQL window.
+
+This provenance contract is deliberately not inferred for pre-contract events:
+JobEvent rows written before `decision_id` and the binding hashes existed are
+ignored. Deployments upgrading an actively used installation must complete,
+cancel, or otherwise drain every in-flight `llm_harness` Job before rollout;
+pausing alone is insufficient because a resumed legacy Job still lacks these
+bindings. The release gate must verify that the non-terminal `llm_harness` Job
+count is zero. Completed historical Jobs remain readable, but their legacy
+routing events are not reused as model memory.
+
 Exported decision-start events can be checked without database or provider access:
 
 ```powershell

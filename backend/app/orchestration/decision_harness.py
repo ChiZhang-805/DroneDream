@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import uuid
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -23,10 +24,11 @@ from app.config import get_settings
 from app.optimization.experimental_types import ExperimentalOptimizerStrategy
 from app.orchestration.events import record_event
 from app.orchestration.harness_context import (
+    HARNESS_DECISION_TRACE_SCHEMA_VERSION,
     HARNESS_EVIDENCE_SCHEMA_VERSION,
+    HARNESS_PROMPT_TEMPLATE_VERSION,
     HARNESS_TOOL_REGISTRY,
     HARNESS_TOOL_REGISTRY_VERSION,
-    MAX_DECISION_MEMORY_ITEMS,
     HarnessEvidenceSnapshot,
     HarnessToolId,
     build_harness_evidence,
@@ -47,8 +49,9 @@ HarnessDecisionSource = Literal["model", "deterministic_fallback"]
 _DEFAULT_MODEL = "gpt-4.1"
 HARNESS_FALLBACK_TOOL: HarnessToolId = "optimizer_portfolio"
 _MAX_RATIONALE_LENGTH = 400
-HARNESS_PROMPT_TEMPLATE_VERSION = "1.1"
-HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.1"
+_DECISION_MEMORY_LOOKBACK_GENERATIONS = 32
+_DECISION_MEMORY_RESULT_SCAN_LIMIT = 512
+_DECISION_MEMORY_COMPANION_SCAN_LIMIT = 4096
 
 
 def _decision_schema(
@@ -93,6 +96,8 @@ def decision_schema_for_snapshot(
 class HarnessDecision:
     """One locally validated optimizer-tool decision."""
 
+    decision_id: str
+    generation: int
     tool_id: HarnessDispatchStrategy
     rationale: str
     source: HarnessDecisionSource
@@ -283,10 +288,135 @@ def verify_harness_decision_trace(
     )
 
 
+def _verified_started_decision_id(event: models.JobEvent) -> str | None:
+    if event.event_type != "harness_decision_started" or not isinstance(event.payload_json, dict):
+        return None
+    decision_id = event.payload_json.get("decision_id")
+    if not isinstance(decision_id, str):
+        return None
+    verification = verify_harness_decision_trace(event.payload_json)
+    return decision_id.lower() if verification.valid else None
+
+
+def _event_decision_id(event: models.JobEvent) -> str | None:
+    if not isinstance(event.payload_json, dict):
+        return None
+    decision_id = event.payload_json.get("decision_id")
+    if (
+        not isinstance(decision_id, str)
+        or len(decision_id) != 32
+        or any(char not in "0123456789abcdefABCDEF" for char in decision_id)
+    ):
+        return None
+    return decision_id.lower()
+
+
+def _event_generation(event: models.JobEvent) -> int | None:
+    """Return an exact positive integer generation from an untrusted event.
+
+    JobEvent payloads are intentionally schema-flexible.  Filtering with a
+    database-side JSON integer cast is therefore unsafe on PostgreSQL because
+    one historical string value can make the whole query raise.  Keep the SQL
+    query type-agnostic and validate the bounded result window in Python.
+    """
+
+    if not isinstance(event.payload_json, dict):
+        return None
+    generation = event.payload_json.get("generation")
+    if isinstance(generation, bool) or not isinstance(generation, int):
+        return None
+    return generation if generation >= 1 else None
+
+
+def _recent_harness_decision_events(
+    db: Session,
+    job: models.Job,
+) -> list[models.JobEvent]:
+    """Load bounded companions for recent execution-result decision IDs.
+
+    A bounded newest-first result scan avoids an O(generations^2) replay of
+    historical started traces.  Generation filtering happens in Python because
+    JobEvent JSON is untrusted and a PostgreSQL JSON-to-integer cast would let
+    one malformed historical value break every future routing decision.  The
+    second query still fetches every companion and duplicate for the selected
+    IDs so provenance validation can fail closed rather than trusting event
+    adjacency.
+    """
+
+    upper_generation = max(0, int(job.current_generation or 0)) + 1
+    lower_generation = max(
+        1,
+        upper_generation - _DECISION_MEMORY_LOOKBACK_GENERATIONS,
+    )
+    scanned_results = list(
+        db.scalars(
+            select(models.JobEvent)
+            .where(
+                models.JobEvent.job_id == job.id,
+                models.JobEvent.event_type == "harness_tool_execution_result",
+            )
+            .order_by(
+                models.JobEvent.created_at.desc(),
+                models.JobEvent.id.desc(),
+            )
+            .limit(_DECISION_MEMORY_RESULT_SCAN_LIMIT + 1)
+        )
+    )
+    if len(scanned_results) > _DECISION_MEMORY_RESULT_SCAN_LIMIT:
+        return []
+    recent_results = [
+        event
+        for event in scanned_results
+        if (
+            (event_generation := _event_generation(event)) is not None
+            and lower_generation <= event_generation <= upper_generation
+        )
+    ]
+    decision_ids = tuple(
+        dict.fromkeys(
+            decision_id
+            for event in recent_results
+            if (decision_id := _event_decision_id(event)) is not None
+        )
+    )
+    if not decision_ids:
+        return []
+
+    decision_id_json = models.JobEvent.payload_json["decision_id"].as_string()
+    companions = list(
+        db.scalars(
+            select(models.JobEvent)
+            .where(
+                models.JobEvent.job_id == job.id,
+                models.JobEvent.event_type.in_(
+                    (
+                        "harness_decision_started",
+                        "harness_decision_rejected",
+                        "harness_decision_accepted",
+                        "harness_decision_fallback",
+                        "harness_tool_execution_result",
+                    )
+                ),
+                decision_id_json.in_(decision_ids),
+            )
+            .order_by(
+                models.JobEvent.created_at.asc(),
+                models.JobEvent.id.asc(),
+            )
+            .limit(_DECISION_MEMORY_COMPANION_SCAN_LIMIT + 1)
+        )
+    )
+    if len(companions) > _DECISION_MEMORY_COMPANION_SCAN_LIMIT:
+        return []
+    return companions
+
+
 def _fallback(
     db: Session,
     job: models.Job,
     *,
+    decision_id: str,
+    generation: int,
     reason: str,
     evidence_sha256: str,
     model: str | None,
@@ -294,6 +424,8 @@ def _fallback(
     error_type: str | None = None,
 ) -> HarnessDecision:
     rejected_payload: dict[str, Any] = {
+        "decision_id": decision_id,
+        "generation": generation,
         "reason": reason,
         "model": model,
         "evidence_sha256": evidence_sha256,
@@ -311,15 +443,20 @@ def _fallback(
         job.id,
         "harness_decision_fallback",
         {
+            "decision_id": decision_id,
+            "generation": generation,
             "reason": reason,
             "tool_id": HARNESS_FALLBACK_TOOL,
             "evidence_sha256": evidence_sha256,
             "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
             "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
             "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
+            **({"prompt_sha256": prompt_sha256} if prompt_sha256 is not None else {}),
         },
     )
     return HarnessDecision(
+        decision_id=decision_id,
+        generation=generation,
         tool_id=HARNESS_FALLBACK_TOOL,
         rationale=(
             "The model decision was unavailable or invalid, so the bounded "
@@ -348,27 +485,21 @@ def select_optimizer_tool(
     deterministic optimizer portfolio and records that fallback explicitly.
     """
 
-    recent_execution_events = list(
-        reversed(
-            list(
-                db.scalars(
-                    select(models.JobEvent)
-                    .where(
-                        models.JobEvent.job_id == job.id,
-                        models.JobEvent.event_type == "harness_tool_execution_result",
-                    )
-                    .order_by(
-                        models.JobEvent.created_at.desc(),
-                        models.JobEvent.id.desc(),
-                    )
-                    .limit(MAX_DECISION_MEMORY_ITEMS)
-                )
-            )
-        )
+    # One opaque identifier binds the provider trace or deterministic fallback
+    # to the later execution receipt. It is created before any provider call so
+    # every fail-closed path can be paired without trusting event adjacency.
+    decision_id = uuid.uuid4().hex
+    generation = job.current_generation + 1
+    recent_decision_events = _recent_harness_decision_events(db, job)
+    verified_started_decision_ids = frozenset(
+        verified_id
+        for event in recent_decision_events
+        if (verified_id := _verified_started_decision_id(event)) is not None
     )
     evidence_snapshot, has_scored_evidence = build_harness_evidence(
         job,
-        execution_events=recent_execution_events,
+        execution_events=recent_decision_events,
+        verified_started_decision_ids=verified_started_decision_ids,
     )
     evidence = evidence_snapshot.model_dump(mode="json", exclude_none=True)
     evidence_json = _canonical_json(evidence)
@@ -379,6 +510,8 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            decision_id=decision_id,
+            generation=generation,
             reason="missing_model",
             evidence_sha256=evidence_sha256,
             model=None,
@@ -388,6 +521,8 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            decision_id=decision_id,
+            generation=generation,
             reason="insufficient_evidence",
             evidence_sha256=evidence_sha256,
             model=chosen_model,
@@ -404,6 +539,8 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            decision_id=decision_id,
+            generation=generation,
             reason="prompt_too_large",
             evidence_sha256=evidence_sha256,
             model=chosen_model,
@@ -417,6 +554,8 @@ def select_optimizer_tool(
             return _fallback(
                 db,
                 job,
+                decision_id=decision_id,
+                generation=generation,
                 reason="missing_api_key",
                 evidence_sha256=evidence_sha256,
                 prompt_sha256=prompt_sha256,
@@ -436,7 +575,8 @@ def select_optimizer_tool(
         job.id,
         "harness_decision_started",
         {
-            "generation": job.current_generation + 1,
+            "decision_id": decision_id,
+            "generation": generation,
             "model": chosen_model,
             "provider": provider,
             "evidence_sha256": evidence_sha256,
@@ -462,6 +602,8 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            decision_id=decision_id,
+            generation=generation,
             reason="client_error",
             error_type=type(exc).__name__,
             evidence_sha256=evidence_sha256,
@@ -474,6 +616,8 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            decision_id=decision_id,
+            generation=generation,
             reason="invalid_response",
             evidence_sha256=evidence_sha256,
             prompt_sha256=prompt_sha256,
@@ -485,7 +629,8 @@ def select_optimizer_tool(
         job.id,
         "harness_decision_accepted",
         {
-            "generation": job.current_generation + 1,
+            "decision_id": decision_id,
+            "generation": generation,
             "tool_id": tool_id,
             "rationale": rationale,
             "model": chosen_model,
@@ -497,6 +642,8 @@ def select_optimizer_tool(
         },
     )
     return HarnessDecision(
+        decision_id=decision_id,
+        generation=generation,
         tool_id=tool_id,
         rationale=rationale,
         source="model",
