@@ -67,6 +67,27 @@ in-process test override that is absent from `JobCreateRequest` and cannot be
 submitted through the production API. Its `--check` mode reruns all 15 arms
 before comparing the deterministic JSON, CSV, and SHA-256 manifest.
 
+`backend/scripts/evaluate_harness_component_ablations.py` runs the separate
+four-arm **AURORA component outcome ablation**. It uses the same production
+Job/Candidate/Trial orchestration, a shared service baseline, five fixed seed
+blocks, one common train/holdout scenario matrix, the same two-generation and
+40-Trial ceilings, and the same terminal accounting in every arm. The arms are
+full AURORA, no decision memory, no observed-outcome reflection, and the fixed
+deterministic optimizer portfolio. No online model is involved: a
+preregistered local router consumes the exact production provider payload and
+selects only from the current eligible-tool manifest.
+
+The component intervention is measured before each local routing call. The
+no-memory arm empties `decision_memory`; the no-reflection arm preserves the
+decision receipt while replacing verified reflection with `unavailable` and
+removing `observed_outcome`. The result artifact records how many provider
+inputs changed, the actual tool sequence, holdout loss, optimizer feasibility,
+Trials to a preregistered five-percent training-loss target or its
+right-censoring count, total Trials, terminal failures, recovered Trials, and
+evidence completeness. JSON, CSV, a separate preregistration manifest, and a
+SHA-256 file manifest are frozen together. `--check` reruns all 20 Jobs before
+independently recomputing metrics, comparisons, and hashes.
+
 ## Report modules
 
 1. **Executive abstract and claim ledger** — product scope, strongest verified
@@ -207,7 +228,25 @@ This is `SYNTHETIC_MOCK` fallback-equivalence evidence only. It is not LLM
 superiority, causal Harness benefit, PX4/Gazebo performance, or flight
 evidence.
 
-The real PX4/Gazebo main table, broader component-level outcome ablations,
+The AURORA component outcome ablation contains 20 complete synthetic Jobs and
+764 persisted Trials: five common seed blocks multiplied by four arms. In
+every block, full AURORA routed `constrained_mobo` then `turbo`; removing all
+decision memory or only verified observed outcomes routed
+`constrained_mobo` then `optimizer_portfolio`; the fixed arm routed the
+portfolio twice. All 20 runs made zero network calls and reached 100% evidence
+completeness. The frozen landscape produced no terminal failure or retry
+recovery, so those metrics remain explicit zeros rather than being dropped.
+
+All 15 full-arm comparisons show at least one preregistered protocol-level
+metric difference, but this is not a general superiority result: holdout
+direction varies by seed, and the report permits no LLM, PX4/Gazebo, physical,
+or generalized causal claim. Moreover, the no-memory and no-reflection arms
+are behaviorally identical in all five blocks. Because the scripted router
+does not use receipt-only memory after reflection is removed, the incremental
+effect of that receipt-only component is explicitly marked **inconclusive**
+rather than credited with a benefit.
+
+The real PX4/Gazebo main table, broader physical component-level outcome ablations,
 multi-seed physical confidence intervals, latency/token/cost results, and UX
 measurements remain unfilled until their locked experiments run.
 
@@ -228,6 +267,13 @@ backend\.venv\Scripts\python.exe `
 
 backend\.venv\Scripts\python.exe `
   backend\scripts\evaluate_harness_outcome_campaign.py `
+  --check
+
+backend\.venv\Scripts\python.exe `
+  backend\scripts\evaluate_harness_component_ablations.py
+
+backend\.venv\Scripts\python.exe `
+  backend\scripts\evaluate_harness_component_ablations.py `
   --check
 
 backend\.venv\Scripts\python.exe `

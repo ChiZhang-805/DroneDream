@@ -815,6 +815,47 @@ prior freeze.
 It is a regression tool, not evidence that model routing outperforms the
 deterministic portfolio; that claim still requires the frozen simulator campaign.
 
+### Frozen offline component outcome ablation
+
+`backend/scripts/evaluate_harness_component_ablations.py` provides the first
+outcome-level intervention on current AURORA decision memory and reflection
+without using an online provider. Five hash-locked seed blocks run four matched
+arms through the production Job/Candidate/Trial orchestration and
+`MockSimulatorAdapter`: full AURORA, no decision memory, no observed-outcome
+reflection, and a fixed deterministic optimizer portfolio. All arms share the
+same service baseline, scenario matrix, seed offsets, two-generation ceiling,
+40-Trial ceiling, terminal accounting, and preregistered local routing policy.
+Socket connection attempts are blocked and counted, and no real credential is
+used.
+
+The local router is not a surrogate claim about LLM intelligence. It is an
+exact, inspectable policy for testing whether the production evidence packet
+can change a trusted tool decision. Its first generation selects
+`constrained_mobo`; a later complete, feasible, failure-free verified
+reflection permits `turbo`; otherwise it selects the deterministic portfolio.
+The no-memory arm empties the provider-visible tuple, while the no-reflection
+arm retains the decision receipt but removes only the observational result.
+The artifact measures the intervention count and actual tool sequence before
+interpreting any outcome.
+
+The committed v1 campaign contains 20 synthetic Jobs and 764 persisted Trials.
+Every arm has complete evidence and zero network calls. Full AURORA selects
+`constrained_mobo > turbo` in all five blocks; both memory ablations select
+`constrained_mobo > optimizer_portfolio`; the fixed arm selects the portfolio
+twice. Holdout direction varies by seed, so no superiority claim is permitted.
+The frozen landscape has zero terminal failures and zero retry recoveries;
+these remain explicit denominators rather than being omitted.
+
+The two memory ablations are themselves behaviorally identical. Comparing the
+no-reflection arm with the no-memory arm retains versus removes receipt-only
+memory after both have removed observed outcomes. Because the preregistered
+policy never makes that receipt-only field decision-relevant, all five
+isolating rows are marked `inconclusive_component_not_decision_relevant_under_policy`.
+The experiment therefore verifies that current reflection can alter routing
+under its frozen protocol, but it does not assign a separate benefit to
+receipt-only memory and does not establish general AURORA, LLM, PX4/Gazebo, or
+real-flight performance.
+
 ### Locked deterministic router-policy holdout
 
 The separate
