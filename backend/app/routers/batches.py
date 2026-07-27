@@ -109,18 +109,28 @@ def cancel_batch(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
 ) -> dict[str, object]:
     gate = begin_mutation(
         db,
         user=user,
         operation="batches.cancel",
         idempotency_key=idempotency_key,
-        payload={"batch_id": batch_id},
+        payload={"batch_id": batch_id, "control_version": control_version},
     )
     if gate.replay is not None:
         return gate.replay
     try:
-        batch = job_service.cancel_batch(db, batch_id, user=user, commit=False)
+        batch = job_service.cancel_batch(
+            db,
+            batch_id,
+            user=user,
+            commit=False,
+            expected_control_version=control_version,
+        )
     except job_service.JobServiceError as err:
         db.rollback()
         _raise(err)

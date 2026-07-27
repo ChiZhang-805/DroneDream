@@ -188,18 +188,33 @@ def update_job(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
 ) -> dict[str, object]:
     gate = begin_mutation(
         db,
         user=user,
         operation="jobs.update",
         idempotency_key=idempotency_key,
-        payload={"job_id": job_id, "request": req.model_dump(mode="json")},
+        payload={
+            "job_id": job_id,
+            "control_version": control_version,
+            "request": req.model_dump(mode="json"),
+        },
     )
     if gate.replay is not None:
         return gate.replay
     try:
-        job = job_service.update_job(db, job_id, req, user=user, commit=False)
+        job = job_service.update_job(
+            db,
+            job_id,
+            req,
+            user=user,
+            commit=False,
+            expected_control_version=control_version,
+        )
     except job_service.JobServiceError as err:
         db.rollback()
         _raise(err)
@@ -249,18 +264,28 @@ def cancel_job(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
 ) -> dict[str, object]:
     gate = begin_mutation(
         db,
         user=user,
         operation="jobs.cancel",
         idempotency_key=idempotency_key,
-        payload={"job_id": job_id},
+        payload={"job_id": job_id, "control_version": control_version},
     )
     if gate.replay is not None:
         return gate.replay
     try:
-        job = job_service.cancel_job(db, job_id, user=user, commit=False)
+        job = job_service.cancel_job(
+            db,
+            job_id,
+            user=user,
+            commit=False,
+            expected_control_version=control_version,
+        )
     except job_service.JobServiceError as err:
         db.rollback()
         _raise(err)
@@ -274,18 +299,28 @@ def delete_job(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
 ) -> dict[str, object]:
     gate = begin_mutation(
         db,
         user=user,
         operation="jobs.delete",
         idempotency_key=idempotency_key,
-        payload={"job_id": job_id},
+        payload={"job_id": job_id, "control_version": control_version},
     )
     if gate.replay is not None:
         return gate.replay
     try:
-        payload = job_service.delete_job(db, job_id, user=user, commit=False)
+        payload = job_service.delete_job(
+            db,
+            job_id,
+            user=user,
+            commit=False,
+            expected_control_version=control_version,
+        )
     except job_service.JobServiceError as err:
         db.rollback()
         _raise(err)

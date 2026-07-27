@@ -121,7 +121,7 @@ describe("History compare selection", () => {
 
   it("shows confirm modal and cancels deletion", async () => {
     const listSpy = vi.spyOn(apiClient, "listJobs").mockResolvedValue({
-      items: [{ id: "job_1", track_type: "circle", objective_profile: "robust", status: "COMPLETED", created_at: "2026-01-01", updated_at: "2026-01-01" }],
+      items: [{ id: "job_1", control_version: 4, track_type: "circle", objective_profile: "robust", status: "COMPLETED", created_at: "2026-01-01", updated_at: "2026-01-01" }],
       page: 1, page_size: 100, total: 1,
     } as never);
     const deleteSpy = vi.spyOn(apiClient, "deleteJob").mockResolvedValue({ id: "job_1", deleted: true });
@@ -140,14 +140,14 @@ describe("History compare selection", () => {
 
   it("confirms deletion and refetches jobs", async () => {
     const listSpy = vi.spyOn(apiClient, "listJobs")
-      .mockResolvedValueOnce({ items: [{ id: "job_1", track_type: "circle", objective_profile: "robust", status: "COMPLETED", created_at: "2026-01-01", updated_at: "2026-01-01" }], page: 1, page_size: 100, total: 1 } as never)
+      .mockResolvedValueOnce({ items: [{ id: "job_1", control_version: 4, track_type: "circle", objective_profile: "robust", status: "COMPLETED", created_at: "2026-01-01", updated_at: "2026-01-01" }], page: 1, page_size: 100, total: 1 } as never)
       .mockResolvedValueOnce({ items: [], page: 1, page_size: 100, total: 0 } as never);
     const deleteSpy = vi.spyOn(apiClient, "deleteJob").mockResolvedValue({ id: "job_1", deleted: true });
     renderPage();
     expect(await screen.findByText("job_1")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete job" }));
-    expect(deleteSpy).toHaveBeenCalledWith("job_1");
+    expect(deleteSpy).toHaveBeenCalledWith("job_1", 4);
     await waitFor(() => expect(listSpy).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText("job_1")).not.toBeInTheDocument());
     listSpy.mockRestore();

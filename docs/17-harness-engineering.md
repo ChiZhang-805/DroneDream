@@ -840,10 +840,57 @@ The domain mutation and exact safe response commit in one transaction, so an
 exact concurrent, restarted, or lost-response retry returns the original result;
 changed payload or operation reuse fails `409 IDEMPOTENCY_CONFLICT`.
 
+User-authored commands also carry an optimistic state fence. Every Job and
+Batch exposes a positive `control_version`; Job rename/cancel/delete and Batch
+cancel compare the view's version in the same atomic write that applies the
+command and increments the counter. Protected desktop/production deployments
+fail closed with `428 CONTROL_VERSION_REQUIRED` when it is absent and
+`409 CONTROL_VERSION_CONFLICT` when another command has already advanced the
+resource. Batch cancellation claims the Batch version first, then retries each
+active child Job against its own current version; repeated child drift raises
+`BATCH_CHILD_CONTROL_CONFLICT` and rolls the transaction back instead of
+publishing a half-cancelled Batch.
+
+The two gates deliberately compose in this order. An exact idempotent replay
+returns its original committed response before version validation, so a client
+that lost the response does not turn a successful command into a false stale
+conflict. A genuinely new intent uses a new idempotency key and the latest
+`control_version`. Regression tests cover missing, stale, and successful
+versions, exact replay after the version advances, and rollback on an
+unstable Batch child.
+
 This removes the former direct WebView-to-loopback trust shortcut and the
 duplicate-business-effect gap for the covered Job/Batch routes. The native last
 hop still uses authenticated loopback rather than a Runtime UDS; response MACs,
-expected-state versions, generated finite route DTOs, native artifact streaming,
+generated finite route DTOs, native artifact streaming,
 and a real installed Windows/WSL hostile-client campaign remain open. The gate
 therefore does not claim isolation from compromise of the same Windows account,
 WSL root, or Tauri process.
+
+### Tier-aware experiment report export 1.0
+
+A completed Job's PDF report now preserves the full optimization trace rather
+than only the winner. Candidates are ordered by generation and record their
+declared parent, the exact stored parameter differences, resulting parameter
+snapshot, RMSE, worst error, completion time, aggregate score, completed and
+failed Trial counts, and the proposal rationale stored at the time. A missing
+parent does not trigger heuristic lineage reconstruction: the report states
+that the causal link is unavailable.
+
+The download route treats the export plan as server authority. It forwards the
+authenticated bearer token to the existing model-gateway usage snapshot, whose
+Edge Function verifies the user and reads the effective subscription with its
+service role. No client-supplied tier is accepted. Invalid, missing, oversized,
+timed-out, or unknown responses resolve to Free. Free reports are regenerated
+from the authorized Job and draw an 18-percent-opacity purple/magenta
+DroneDream brand seal on every page; Plus and Pro return the verified stored
+report without a seal.
+
+The seal is deliberately a product watermark rather than a legal stamp: it
+uses a double ring, abstract bat, `DRONE DREAM`, and `FREE EXPORT`, and avoids
+red official-seal conventions, stars, registration numbers, and organization
+claims. S3 report downloads cannot take the presigned redirect path, which
+would otherwise expose unwatermarked bytes before the tier decision. Tests
+cover one watermark per page, paid omission, client-tier spoof resistance,
+gateway failure closure, S3 redirect resistance, and the iteration lineage,
+feedback, and rationale fields.

@@ -104,6 +104,13 @@ def _apply_sqlite_lightweight_migrations() -> None:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN display_name VARCHAR(255)"))
         if "batch_id" not in job_columns:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN batch_id VARCHAR(64)"))
+        if "control_version" not in job_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE jobs ADD COLUMN control_version "
+                    "INTEGER NOT NULL DEFAULT 1"
+                )
+            )
         experiment_columns = {
             "vehicle_profile_json": "JSON",
             "parameter_space_json": "JSON",
@@ -155,6 +162,13 @@ def _apply_sqlite_lightweight_migrations() -> None:
             }
             if "cancelled_at" not in batch_columns:
                 conn.execute(text("ALTER TABLE batch_jobs ADD COLUMN cancelled_at DATETIME"))
+            if "control_version" not in batch_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE batch_jobs ADD COLUMN control_version "
+                        "INTEGER NOT NULL DEFAULT 1"
+                    )
+                )
         if "job_secrets" in table_names:
             secret_columns = {
                 row[1] for row in conn.execute(text("PRAGMA table_info('job_secrets')")).fetchall()

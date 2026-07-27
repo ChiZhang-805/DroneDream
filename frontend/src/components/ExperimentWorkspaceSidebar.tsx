@@ -193,7 +193,12 @@ export function ExperimentWorkspaceSidebar({
     }
     if (workspace.jobId) {
       try {
-        await apiClient.updateJob(workspace.jobId, { display_name: nextName });
+        const job = await apiClient.getJob(workspace.jobId);
+        await apiClient.updateJob(
+          workspace.jobId,
+          { display_name: nextName },
+          job.control_version,
+        );
       } catch {
         return;
       }

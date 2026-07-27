@@ -485,7 +485,11 @@ describe("apiClient envelope handling", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
-    await apiClient.updateJob("job_1", { display_name: "safe write" });
+    await apiClient.updateJob(
+      "job_1",
+      { display_name: "safe write" },
+      7,
+    );
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(invoke).toHaveBeenCalledOnce();
@@ -494,7 +498,7 @@ describe("apiClient envelope handling", () => {
       expect.objectContaining({
         request: expect.objectContaining({
           method: "PATCH",
-          path: "/api/v1/jobs/job_1",
+          path: "/api/v1/jobs/job_1?control_version=7",
         }),
       }),
     );
@@ -515,7 +519,7 @@ describe("apiClient envelope handling", () => {
     window.__TAURI__ = { core: { invoke } };
 
     await expect(
-      apiClient.updateJob("job_1", { display_name: "safe retry" }),
+      apiClient.updateJob("job_1", { display_name: "safe retry" }, 7),
     ).resolves.toMatchObject({ id: "job_1", display_name: "safe retry" });
 
     expect(invoke).toHaveBeenCalledTimes(2);
@@ -534,7 +538,7 @@ describe("apiClient envelope handling", () => {
     window.__TAURI__ = { core: { invoke: failedInvoke } };
 
     await expect(
-      apiClient.updateJob("job_1", { display_name: "recover me" }),
+      apiClient.updateJob("job_1", { display_name: "recover me" }, 7),
     ).rejects.toMatchObject({ code: "NETWORK_ERROR" });
     expect(failedInvoke).toHaveBeenCalledTimes(2);
     const unresolvedRequest = failedInvoke.mock.calls[0]?.[1]?.request;
@@ -553,7 +557,7 @@ describe("apiClient envelope handling", () => {
     window.__TAURI__ = { core: { invoke: recoveredInvoke } };
 
     await expect(
-      apiClient.updateJob("job_1", { display_name: "recover me" }),
+      apiClient.updateJob("job_1", { display_name: "recover me" }, 7),
     ).resolves.toMatchObject({ id: "job_1", display_name: "recover me" });
 
     const recoveredRequest = recoveredInvoke.mock.calls[0]?.[1]?.request;

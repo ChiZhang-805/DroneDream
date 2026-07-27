@@ -144,6 +144,10 @@ class BatchJob(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="CREATED", index=True)
+    # Monotonic fence for user-authored control commands. Worker progress does
+    # not advance it; current status guards continue to serialize lifecycle
+    # transitions without making normal polling invalidate a pending command.
+    control_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
@@ -197,6 +201,9 @@ class Job(Base):
 
     # State.
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="CREATED", index=True)
+    # Monotonic fence for user-authored control commands such as rename,
+    # cancel, and delete. It is intentionally separate from worker progress.
+    control_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     current_phase: Mapped[str | None] = mapped_column(String(64), nullable=True)
     progress_completed_trials: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     progress_total_trials: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

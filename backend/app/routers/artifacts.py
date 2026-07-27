@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,11 @@ from app import models
 from app.auth import get_current_user
 from app.config import get_settings
 from app.db import get_db
+from app.services.pdf_report import render_job_pdf_report
+from app.services.report_entitlements import (
+    ReportExportTier,
+    resolve_report_export_tier,
+)
 from app.storage import get_artifact_storage
 from app.storage.integrity import (
     ArtifactIntegrityError,
@@ -48,9 +53,25 @@ def _attachment_header(filename: str) -> str:
     return f'attachment; filename="{escaped}"'
 
 
+def _report_headers(
+    *,
+    artifact: models.Artifact,
+    tier: ReportExportTier,
+) -> dict[str, str]:
+    return {
+        "Cache-Control": "private, no-store",
+        "Content-Disposition": _attachment_header(
+            _safe_download_name(artifact.display_name, artifact.storage_path)
+        ),
+        "X-DroneDream-Report-Tier": tier,
+        "X-DroneDream-Report-Watermark": "applied" if tier == "free" else "none",
+    }
+
+
 @router.get("/artifacts/{artifact_id}/download")
 def download_artifact(
     artifact_id: str,
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> Response:
@@ -70,6 +91,7 @@ def download_artifact(
             },
         )
 
+    job: models.Job | None = None
     if artifact.owner_type == "job":
         job = db.get(models.Job, artifact.owner_id)
         auth_disabled_owned_null = (
@@ -111,6 +133,17 @@ def download_artifact(
             },
         ) from exc
 
+    report_tier: ReportExportTier | None = None
+    if artifact.artifact_type == "pdf_report":
+        if job is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "ARTIFACT_NOT_FOUND", "message": "Artifact not found."},
+            )
+        report_tier = resolve_report_export_tier(
+            authorization_header=request.headers.get("Authorization")
+        )
+
     if artifact.storage_path.startswith("s3://"):
         try:
             storage = get_artifact_storage()
@@ -123,7 +156,15 @@ def download_artifact(
                     },
                 )
             presign = getattr(storage, "presign_download", None)
-            if digest_receipt is None and callable(presign):
+            # Tiered PDF exports must always traverse the application so the
+            # trusted entitlement decision and Free watermark cannot be
+            # bypassed by a direct object-store URL. Non-report artifacts may
+            # retain the presigned-download fast path.
+            if (
+                report_tier is None
+                and digest_receipt is None
+                and callable(presign)
+            ):
                 signed_url = presign(
                     artifact.storage_path,
                     expires_seconds=get_settings().artifact_presign_expiry_seconds,
@@ -151,6 +192,18 @@ def download_artifact(
             ) from exc
 
         filename = _safe_download_name(artifact.display_name, artifact.storage_path)
+        if report_tier is not None:
+            if report_tier == "free":
+                assert job is not None
+                content = render_job_pdf_report(
+                    job,
+                    free_tier_watermark=True,
+                )
+            return Response(
+                content=content,
+                media_type="application/pdf",
+                headers=_report_headers(artifact=artifact, tier=report_tier),
+            )
         return Response(
             content=content,
             media_type=artifact.mime_type or "application/octet-stream",
@@ -196,8 +249,24 @@ def download_artifact(
             },
         ) from exc
 
+    if report_tier == "free":
+        assert job is not None
+        return Response(
+            content=render_job_pdf_report(
+                job,
+                free_tier_watermark=True,
+            ),
+            media_type="application/pdf",
+            headers=_report_headers(artifact=artifact, tier=report_tier),
+        )
+
     return FileResponse(
         path=path,
         media_type=artifact.mime_type or "application/octet-stream",
         filename=_safe_download_name(artifact.display_name, artifact.storage_path),
+        headers=(
+            _report_headers(artifact=artifact, tier=report_tier)
+            if report_tier is not None
+            else None
+        ),
     )

@@ -151,6 +151,14 @@ python3 -m venv .venv
     canonical UUID `Idempotency-Key` in packaged desktop mode. The key hash,
     request hash, domain change, and exact safe response commit atomically;
     exact retries replay and changed reuse returns `409`
+  - every Job and Batch response includes a positive `control_version`.
+    User-authored Job update/cancel/delete and Batch cancel requests send the
+    version from the view as `?control_version=<n>`. Packaged desktop and
+    production reject a missing version with `428 CONTROL_VERSION_REQUIRED`;
+    a stale command returns `409 CONTROL_VERSION_CONFLICT`. A successful
+    command increments the version. Exact idempotent retries replay before
+    this fence, so a lost success response remains recoverable without
+    allowing a different stale command to overwrite newer state
   - `DESKTOP_BRIDGE_CLOCK_SKEW_SECONDS` bounds proof age (packaged default
     `30`); `DESKTOP_BRIDGE_NONCE_RETENTION_SECONDS` bounds replay-receipt
     retention (packaged default `600`)

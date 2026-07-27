@@ -182,7 +182,11 @@ export function History() {
     const nextName = rawName.trim();
     setSaveError(null);
     try {
-      await apiClient.updateJob(job.id, { display_name: nextName === "" ? null : nextName });
+      await apiClient.updateJob(
+        job.id,
+        { display_name: nextName === "" ? null : nextName },
+        job.control_version,
+      );
       setEditingId(null);
       await query.refetch();
     } catch (e) {
@@ -217,7 +221,10 @@ export function History() {
     setDeleteError(null);
     setIsDeleting(true);
     try {
-      await apiClient.deleteJob(deleteTarget.id);
+      await apiClient.deleteJob(
+        deleteTarget.id,
+        deleteTarget.control_version,
+      );
       setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       if (editingId === deleteTarget.id) setEditingId(null);
       setEditingNames((prev) => {

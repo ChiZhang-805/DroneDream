@@ -111,6 +111,10 @@ status codes are advisory — clients should branch on `error.code`.
 | `JOB_FAILED` | 409 | Report was requested for a job in the terminal `FAILED` state. `error.details.failure_code` gives the job-level cause (see §5.2). |
 | `JOB_CANCELLED` | 409 | Report was requested for a job in the terminal `CANCELLED` state. |
 | `REPORT_NOT_READY` | 409 | Report was requested while the job is still `CREATED / QUEUED / RUNNING / AGGREGATING / FINALIZING`. |
+| `CONTROL_VERSION_REQUIRED` | 428 | A protected deployment received a user-authored Job/Batch command without the current `control_version`. |
+| `CONTROL_VERSION_INVALID` | 422 | `control_version` is not a positive integer. |
+| `CONTROL_VERSION_CONFLICT` | 409 | The Job/Batch changed after the client's view loaded; refresh before issuing a new command. |
+| `BATCH_CHILD_CONTROL_CONFLICT` | 409 | A child Job changed repeatedly during Batch cancellation; the Batch transaction rolls back instead of returning a partial cancellation. |
 | `INTERNAL_ERROR` | 500 | Unhandled server error. Always includes a request-scoped message; `details` may be `null`. |
 
 ### 5.2 Job-level failure codes
@@ -164,7 +168,7 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 | `GET` | `/api/v1/trials/{trial_id}` | Trial detail (metrics, failure reason, artifacts). |
 | `GET` | `/api/v1/jobs/{job_id}/report` | Job report (requires job in `COMPLETED`). |
 | `GET` | `/api/v1/jobs/{job_id}/artifacts` | Artifact metadata list. |
-| `GET` | `/api/v1/artifacts/{artifact_id}/download` | Authorized local/S3 artifact download. |
+| `GET` | `/api/v1/artifacts/{artifact_id}/download` | Authorized local/S3 artifact download; completed experiment PDFs apply the trusted export-tier policy. |
 | `POST/GET` | `/api/v1/batches` | Create or list batches. |
 | `GET` | `/api/v1/batches/{batch_id}` | Batch detail. |
 | `GET` | `/api/v1/batches/{batch_id}/jobs` | Jobs in a batch. |
@@ -173,6 +177,46 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 | `GET` | `/api/v1/capabilities` | Advisory runtime/optimizer capability discovery. |
 
 `GET /health`, `/health/live`, and `/health/ready` live **outside** `/api/v1`.
+
+### 6.1 Mutation version fence
+
+Every Job and Batch representation includes `control_version`, starting at
+`1`. The user-authored mutation routes below accept the current value as the
+query parameter `control_version`:
+
+- `PATCH /api/v1/jobs/{job_id}`
+- `POST /api/v1/jobs/{job_id}/cancel`
+- `DELETE /api/v1/jobs/{job_id}`
+- `POST /api/v1/batches/{batch_id}/cancel`
+
+Packaged desktop and production deployments require the parameter. Each
+successful command compares and increments the value atomically; a stale value
+returns `CONTROL_VERSION_CONFLICT` without applying the command. Development
+and test deployments temporarily infer the current value when it is omitted
+for source compatibility, but clients must not depend on that exception.
+
+`Idempotency-Key` and `control_version` protect different boundaries. An exact
+retry with the same idempotency key replays its committed response before the
+version check, recovering a lost response safely. A new command uses a new
+idempotency key and the latest version, preventing a stale tab or delayed UI
+action from overwriting a newer decision.
+
+### 6.2 Experiment PDF export tiers
+
+Downloading an Artifact with `artifact_type="pdf_report"` resolves the current
+subscription from the authenticated model-gateway usage snapshot. Client query
+parameters and request bodies cannot select a tier. Missing configuration,
+invalid or unavailable snapshots, unknown plans, and expired authentication
+all fail closed to `free`.
+
+Free exports are rendered from the authorized completed Job state and receive a
+low-opacity DroneDream `FREE EXPORT` brand seal on every page. Plus and Pro
+receive the verified stored PDF bytes without that seal. S3-backed report
+Artifacts never use the presigned-redirect shortcut, because a direct object
+URL would bypass the trusted entitlement and transformation boundary. Responses
+set `Cache-Control: private, no-store`,
+`X-DroneDream-Report-Tier`, and
+`X-DroneDream-Report-Watermark`.
 
 List endpoints are bounded. `GET /api/v1/batches` accepts `page` (default 1)
 and `page_size` (default 100, maximum 200), and returns `items`, `page`,
@@ -327,7 +371,9 @@ LLM reruns remain LLM-based; the previously stored encrypted job key is not reus
 
 Transitions a non-terminal job to `CANCELLED`. Rejects terminal jobs with
 `JOB_ALREADY_COMPLETED` / `JOB_ALREADY_CANCELLED` / `JOB_FAILED` as
-appropriate. Returns the updated `Job` object in the success envelope.
+appropriate. Send the `control_version` returned by the current Job view as a
+query parameter. Returns the updated `Job` object, including the incremented
+version, in the success envelope.
 
 ### 7.6 `POST /api/v1/experiment-assistant/turn`
 

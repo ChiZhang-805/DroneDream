@@ -144,7 +144,7 @@ describe("desktop close protection", () => {
   });
 
   it("cancels known jobs and stops the dedicated runtime before destroying the window", async () => {
-    const activeJob = { id: "job-running" } as Job;
+    const activeJob = { id: "job-running", control_version: 7 } as Job;
     vi.mocked(apiClient.listJobs).mockImplementation(async (params) => (
       params?.status === "RUNNING"
         ? {
@@ -166,7 +166,7 @@ describe("desktop close protection", () => {
     fireEvent.click(exitButton);
     fireEvent.click(exitButton);
 
-    await waitFor(() => expect(cancelJob).toHaveBeenCalledWith("job-running"));
+    await waitFor(() => expect(cancelJob).toHaveBeenCalledWith("job-running", 7));
     await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
     expect(cancelJob).toHaveBeenCalledTimes(1);
     expect(invokeDesktop).toHaveBeenCalledWith("stop_runtime_for_exit", undefined);
@@ -179,6 +179,7 @@ describe("desktop close protection", () => {
   it("enumerates every active-job page before cancelling and exiting", async () => {
     const activeJobs = Array.from({ length: 101 }, (_, index) => ({
       id: `job-running-${index + 1}`,
+      control_version: index + 1,
     } as Job));
     vi.mocked(apiClient.listJobs).mockImplementation(async (params) => {
       if (params?.status !== "RUNNING") return emptyJobs();
@@ -210,7 +211,7 @@ describe("desktop close protection", () => {
       status: "RUNNING",
     });
     expect(cancelJob).toHaveBeenCalledTimes(101);
-    expect(cancelJob).toHaveBeenCalledWith("job-running-101");
+    expect(cancelJob).toHaveBeenCalledWith("job-running-101", 101);
   });
 
   it("stops the dedicated runtime and closes without prompting when no work is active", async () => {

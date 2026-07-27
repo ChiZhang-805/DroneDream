@@ -116,6 +116,26 @@ def _pct_change(old: Any, new: Any) -> str:
     return f"{((new - old) / old) * 100.0:+.1f}%"
 
 
+def _parameter_changes(
+    parent: models.CandidateParameterSet | None,
+    candidate: models.CandidateParameterSet,
+) -> list[str]:
+    """Describe only parameter changes that are explicitly bound to a parent."""
+
+    if parent is None:
+        return []
+    parent_values = dict(_safe_pairs(parent.parameter_json))
+    candidate_values = dict(_safe_pairs(candidate.parameter_json))
+    changes: list[str] = []
+    for key in sorted(set(parent_values) | set(candidate_values)):
+        old = parent_values.get(key, "—")
+        new = candidate_values.get(key, "—")
+        if old == new:
+            continue
+        changes.append(f"{key}: {old} -> {new}")
+    return changes
+
+
 def _collect_artifacts(job: models.Job) -> tuple[list[models.Artifact], list[models.Artifact]]:
     session = object_session(job)
     if session is None:
@@ -166,7 +186,71 @@ def _pdf_text_operand(text: str) -> bytes:
     return f"<{text.encode('utf-16-be').hex().upper()}> Tj".encode("ascii")
 
 
-def _build_page_stream(page_lines: list[str], page_number: int, page_count: int) -> bytes:
+def _free_report_watermark_stream() -> list[bytes]:
+    """Draw a non-official, semi-transparent DroneDream brand seal.
+
+    The purple/magenta rings and stylized bat deliberately avoid the red,
+    star-shaped, organization-name, and registration-number conventions of a
+    government or legal seal. The mark overlaps the lower-right body region at
+    low opacity so it remains visible without obscuring the report.
+    """
+
+    return [
+        b"% DD-FREE-REPORT-WATERMARK-V1",
+        b"q",
+        b"/GSW gs",
+        b"2.4 w",
+        b"0.45 0.16 0.88 RG",
+        # Outer circle, centered at (492, 118), radius 64.
+        b"492 182 m",
+        b"527.35 182 556 153.35 556 118 c",
+        b"556 82.65 527.35 54 492 54 c",
+        b"456.65 54 428 82.65 428 118 c",
+        b"428 153.35 456.65 182 492 182 c S",
+        b"1.3 w",
+        b"0.92 0.17 0.57 RG",
+        # Inner circle.
+        b"492 174 m",
+        b"522.93 174 548 148.93 548 118 c",
+        b"548 87.07 522.93 62 492 62 c",
+        b"461.07 62 436 87.07 436 118 c",
+        b"436 148.93 461.07 174 492 174 c S",
+        # Minimal bat silhouette: two wings, a compact body, and pointed ears.
+        b"0.48 0.18 0.90 rg",
+        b"492 129 m",
+        b"480 143 463 148 447 143 c",
+        b"455 134 458 123 455 111 c",
+        b"469 116 479 111 486 101 c",
+        b"489 96 490 91 492 84 c",
+        b"494 91 495 96 498 101 c",
+        b"505 111 515 116 529 111 c",
+        b"526 123 529 134 537 143 c",
+        b"521 148 504 143 492 129 c f",
+        # Ears and head.
+        b"486 132 m 487 142 l 492 137 l 497 142 l 498 132 l h f",
+        b"BT",
+        b"/F1 7 Tf",
+        b"0.45 0.16 0.88 rg",
+        b"455 159 Td",
+        _pdf_text_operand("DRONE DREAM"),
+        b"ET",
+        b"BT",
+        b"/F1 7 Tf",
+        b"0.92 0.17 0.57 rg",
+        b"458 71 Td",
+        _pdf_text_operand("FREE EXPORT"),
+        b"ET",
+        b"Q",
+    ]
+
+
+def _build_page_stream(
+    page_lines: list[str],
+    page_number: int,
+    page_count: int,
+    *,
+    free_tier_watermark: bool,
+) -> bytes:
     stream_lines = [b"BT", b"/F1 10 Tf", b"50 800 Td", b"14 TL"]
     for line in page_lines:
         stream_lines.append(_pdf_text_operand(line))
@@ -181,6 +265,8 @@ def _build_page_stream(page_lines: list[str], page_number: int, page_count: int)
             b"ET",
         ]
     )
+    if free_tier_watermark:
+        stream_lines.extend(_free_report_watermark_stream())
     stream = b"\n".join(stream_lines)
     return (
         f"<< /Length {len(stream)} >>\nstream\n".encode()
@@ -189,7 +275,7 @@ def _build_page_stream(page_lines: list[str], page_number: int, page_count: int)
     )
 
 
-def _build_pdf(lines: list[str]) -> bytes:
+def _build_pdf(lines: list[str], *, free_tier_watermark: bool = False) -> bytes:
     out = bytearray()
     out.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
 
@@ -199,7 +285,7 @@ def _build_pdf(lines: list[str]) -> bytes:
 
     objects: list[bytes] = []
     objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
-    page_kids = " ".join(f"{6 + i * 2} 0 R" for i in range(page_count))
+    page_kids = " ".join(f"{7 + i * 2} 0 R" for i in range(page_count))
     objects.append(f"<< /Type /Pages /Kids [{page_kids}] /Count {page_count} >>".encode())
     objects.append(
         b"<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light "
@@ -209,19 +295,22 @@ def _build_pdf(lines: list[str]) -> bytes:
         b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light "
         b"/CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 4 >> >>"
     )
+    objects.append(b"<< /Type /ExtGState /CA 0.18 /ca 0.18 >>")
 
     for idx, page_lines in enumerate(pages):
         stream_obj = _build_page_stream(
             page_lines,
             page_number=idx + 1,
             page_count=page_count,
+            free_tier_watermark=free_tier_watermark,
         )
         objects.append(stream_obj)
         page_obj = (
             "<< /Type /Page /Parent 2 0 R "
             "/MediaBox [0 0 595 842] "
-            "/Resources << /Font << /F1 3 0 R >> >> "
-            f"/Contents {5 + idx * 2} 0 R >>"
+            "/Resources << /Font << /F1 3 0 R >> "
+            "/ExtGState << /GSW 5 0 R >> >> "
+            f"/Contents {6 + idx * 2} 0 R >>"
         ).encode()
         objects.append(page_obj)
 
@@ -440,7 +529,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- Trial count: {done}/{total}")
 
     add("")
-    add("6) Candidate summary")
+    add("6) Iteration-by-iteration optimization trace")
     sorted_candidates = sorted(
         job.candidates,
         key=lambda item: (
@@ -449,9 +538,9 @@ def build_job_report_lines(job: models.Job) -> list[str]:
             item.id,
         ),
     )
+    candidate_by_id = {candidate.id: candidate for candidate in sorted_candidates}
     for candidate in sorted_candidates:
         agg = require_authoritative_candidate_report_projection(candidate)
-        params = candidate.parameter_json or {}
         is_base = "yes" if candidate.is_baseline else "no"
         header = (
             f"- {candidate.id} | label={candidate.label or '—'} | "
@@ -459,30 +548,56 @@ def build_job_report_lines(job: models.Job) -> list[str]:
             f"baseline={is_base} | best={'yes' if candidate.is_best else 'no'}"
         )
         add(header)
-        focus_params = {
-            "kp_xy": params.get("kp_xy"),
-            "kd_xy": params.get("kd_xy"),
-            "ki_xy": params.get("ki_xy"),
-            "vel_limit": params.get("vel_limit"),
-            "accel_limit": params.get("accel_limit"),
-            "disturbance_rejection": params.get("disturbance_rejection"),
-        }
-        add(f"  params {_truncate(json.dumps(focus_params, ensure_ascii=False), limit=220)}")
+        if candidate.is_baseline:
+            add("  declared parent: baseline has no parent")
+            changes: list[str] = []
+        else:
+            parent = (
+                candidate_by_id.get(candidate.parent_candidate_id)
+                if candidate.parent_candidate_id
+                else None
+            )
+            if parent is None:
+                add(
+                    "  declared parent: unavailable; this report does not infer a causal "
+                    "parameter lineage"
+                )
+                changes = []
+            else:
+                add(
+                    f"  declared parent: {parent.id} / {parent.label or '—'} "
+                    f"(generation {parent.generation_index})"
+                )
+                changes = _parameter_changes(parent, candidate)
+        if changes:
+            add(f"  recorded parameter changes ({len(changes)}):")
+            for change in changes:
+                add(f"    - {_truncate(change, limit=220)}")
+        elif candidate.is_baseline:
+            add("  recorded parameter changes: baseline snapshot")
+        else:
+            add("  recorded parameter changes: none attributable from stored parent evidence")
+        parameter_snapshot = dict(_safe_pairs(candidate.parameter_json))
+        add(
+            "  resulting parameter snapshot: "
+            f"{_truncate(json.dumps(parameter_snapshot, ensure_ascii=False), limit=260)}"
+        )
         aggregate_score = agg.get("aggregated_score")
         if aggregate_score is None:
             aggregate_score = candidate.aggregated_score
-        metrics_text = (
-            f"  metrics rmse={_fmt_num(agg.get('rmse'), digits=3)} "
+        add(
+            "  observed simulation feedback: "
+            f"rmse={_fmt_num(agg.get('rmse'), digits=3)} "
             f"worst_max_error={_fmt_num(_worst_max_error(agg), digits=3)} "
             f"completion={_fmt_num(agg.get('completion_time'), digits=2)}s "
-            f"score={_fmt_num(aggregate_score, digits=4)}"
+            f"score={_fmt_num(aggregate_score, digits=4)} "
+            f"completed={candidate.completed_trial_count}/{candidate.trial_count} "
+            f"failed={candidate.failed_trial_count}"
         )
-        add(metrics_text)
         rationale = _truncate(candidate.proposal_reason, limit=200)
         add(
-            "  trials "
-            f"{candidate.completed_trial_count}/{candidate.trial_count} "
-            f"rationale={rationale or '—'}"
+            "  recorded proposal rationale (not inferred by the report): "
+            f"{rationale or '—'}"
         )
 
     add("")
@@ -616,10 +731,17 @@ def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -
     return output_path
 
 
-def render_job_pdf_report(job: models.Job) -> bytes:
+def render_job_pdf_report(
+    job: models.Job,
+    *,
+    free_tier_watermark: bool = False,
+) -> bytes:
     """Render deterministic PDF bytes without mutating artifact storage."""
 
-    return _build_pdf(build_job_report_lines(job))
+    return _build_pdf(
+        build_job_report_lines(job),
+        free_tier_watermark=free_tier_watermark,
+    )
 
 
 __all__ = [

@@ -222,6 +222,7 @@ export interface DeleteJobResponse {
 
 export interface Job {
   id: string;
+  control_version: number;
   track_type: TrackType;
   reference_track: TrackPoint[] | null;
   start_point: StartPoint;
@@ -884,6 +885,7 @@ export interface BatchProgress {
 
 export interface BatchJob {
   id: string;
+  control_version: number;
   name: string;
   description: string | null;
   status: BatchStatus;

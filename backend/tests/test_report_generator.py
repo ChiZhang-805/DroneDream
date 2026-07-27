@@ -782,6 +782,114 @@ def test_pdf_renderer_uses_unicode_cid_font_for_chinese_text() -> None:
     assert "蝶 梦 水 云 乡".encode("utf-16-be").hex().upper().encode("ascii") in pdf
 
 
+def test_free_pdf_renderer_draws_brand_watermark_on_every_page() -> None:
+    from app.services.pdf_report import _build_pdf
+
+    pdf = _build_pdf(
+        [f"report evidence line {index}" for index in range(120)],
+        free_tier_watermark=True,
+    )
+
+    assert b"/Count 3" in pdf
+    assert pdf.count(b"% DD-FREE-REPORT-WATERMARK-V1") == 3
+    assert b"/CA 0.18 /ca 0.18" in pdf
+    assert b"0.45 0.16 0.88 RG" in pdf
+    assert b"0.92 0.17 0.57 RG" in pdf
+
+    paid_pdf = _build_pdf(
+        [f"report evidence line {index}" for index in range(120)],
+        free_tier_watermark=False,
+    )
+    assert b"/Count 3" in paid_pdf
+    assert b"DD-FREE-REPORT-WATERMARK" not in paid_pdf
+
+
+def test_job_report_records_parameter_lineage_feedback_and_rationale(ctx):
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    pdf_service = __import__("app.services.pdf_report", fromlist=["*"])
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+        )
+        db.add(job)
+        db.flush()
+        baseline = models.CandidateParameterSet(
+            id="cand_trace_baseline",
+            job_id=job.id,
+            generation_index=0,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0, "kd_xy": 0.2},
+            aggregated_score=1.4,
+            aggregated_metric_json={
+                "rmse": 1.2,
+                "max_error": 1.7,
+                "completion_time": 9.5,
+                "aggregated_score": 1.4,
+                "trial_count": 1,
+                "completed_trial_count": 1,
+            },
+            trial_count=1,
+            completed_trial_count=1,
+            is_baseline=True,
+        )
+        improved = models.CandidateParameterSet(
+            id="cand_trace_improved",
+            job_id=job.id,
+            generation_index=1,
+            source_type="llm_optimizer",
+            label="feedback-step",
+            parent_candidate_id=baseline.id,
+            parameter_json={"kp_xy": 1.25, "kd_xy": 0.2},
+            aggregated_score=0.9,
+            aggregated_metric_json={
+                "rmse": 0.7,
+                "max_error": 1.0,
+                "completion_time": 8.5,
+                "aggregated_score": 0.9,
+                "trial_count": 1,
+                "completed_trial_count": 1,
+            },
+            proposal_reason=(
+                "Increase lateral proportional gain after the recorded tracking error."
+            ),
+            trial_count=1,
+            completed_trial_count=1,
+            is_best=True,
+        )
+        db.add_all([baseline, improved])
+        db.flush()
+        job.baseline_candidate_id = baseline.id
+        job.best_candidate_id = improved.id
+        db.add(
+            models.JobReport(
+                job_id=job.id,
+                best_candidate_id=improved.id,
+                report_status="READY",
+                summary_text="Traceable optimization completed.",
+            )
+        )
+        db.commit()
+        db.refresh(job)
+
+        report_text = "\n".join(pdf_service.build_job_report_lines(job))
+
+    assert "6) Iteration-by-iteration optimization trace" in report_text
+    assert "declared parent: cand_trace_baseline / baseline (generation 0)" in report_text
+    assert "kp_xy: 1.0000 -> 1.2500" in report_text
+    assert "observed simulation feedback: rmse=0.700" in report_text
+    assert "completed=1/1 failed=0" in report_text
+    assert "recorded proposal rationale (not inferred by the report)" in report_text
+    assert "Increase lateral proportional gain after the recorded tracking error." in report_text
+
+
 def test_generate_job_pdf_report_creates_expected_file(ctx, tmp_path):
     models = ctx["models"]
     db_module = ctx["db_module"]

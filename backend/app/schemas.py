@@ -738,6 +738,7 @@ class BatchCreateRequest(_Strict):
 
 class Job(BaseModel):
     id: str
+    control_version: int = Field(ge=1)
     track_type: TrackType
     start_point: StartPoint
     altitude_m: float
@@ -805,6 +806,7 @@ class BatchProgress(BaseModel):
 
 class BatchJob(BaseModel):
     id: str
+    control_version: int = Field(ge=1)
     name: str
     description: str | None = None
     status: BatchStatus

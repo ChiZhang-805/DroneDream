@@ -25,6 +25,7 @@ const PHASE8_DEFAULTS = {
 function makeJob(overrides: Partial<Job>): Job {
   const base: Job = {
     id: "job_test_1",
+    control_version: 1,
     track_type: "circle",
     reference_track: null,
     start_point: { x: 0, y: 0 },

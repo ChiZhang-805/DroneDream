@@ -78,7 +78,7 @@ import {
 } from "./features/experiment/draftStorage";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
-import type { JobStatus } from "./types/api";
+import type { Job, JobStatus } from "./types/api";
 
 const NAV_ITEMS: {
   to: string;
@@ -123,13 +123,13 @@ interface ExitPromptState {
   hasDraft: boolean;
   draftPreserved: boolean;
   activeJobCount: number;
-  activeJobIds: string[];
+  activeJobs: Pick<Job, "id" | "control_version">[];
   activeJobsUnknown: boolean;
 }
 
 async function listActiveJobsForStatus(status: JobStatus): Promise<{
   count: number;
-  jobIds: string[];
+  jobs: Pick<Job, "id" | "control_version">[];
 }> {
   const first = await apiClient.listJobs({
     page: 1,
@@ -153,15 +153,22 @@ async function listActiveJobsForStatus(status: JobStatus): Promise<{
     : [];
   return {
     count: first.total,
-    jobIds: [...new Set(
-      [first, ...remaining].flatMap((page) => page.items.map((job) => job.id)),
-    )],
+    jobs: Array.from(
+      new Map(
+        [first, ...remaining]
+          .flatMap((page) => page.items)
+          .map((job) => [job.id, {
+            id: job.id,
+            control_version: job.control_version,
+          }] as const),
+      ).values(),
+    ),
   };
 }
 
 async function findActiveJobsBeforeExit(): Promise<{
   count: number;
-  jobIds: string[];
+  jobs: Pick<Job, "id" | "control_version">[];
 }> {
   let timeoutId: number | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
@@ -177,24 +184,32 @@ async function findActiveJobsBeforeExit(): Promise<{
     ]);
     return {
       count: statuses.reduce((total, result) => total + result.count, 0),
-      jobIds: [...new Set(statuses.flatMap((result) => result.jobIds))],
+      jobs: Array.from(
+        new Map(
+          statuses
+            .flatMap((result) => result.jobs)
+            .map((job) => [job.id, job] as const),
+        ).values(),
+      ),
     };
   } finally {
     if (timeoutId !== undefined) window.clearTimeout(timeoutId);
   }
 }
 
-async function stopKnownActiveJobsBeforeExit(jobIds: string[]): Promise<void> {
-  if (jobIds.length === 0) return;
+async function stopKnownActiveJobsBeforeExit(
+  jobs: Pick<Job, "id" | "control_version">[],
+): Promise<void> {
+  if (jobs.length === 0) return;
   let timeoutId: number | undefined;
   const timeout = new Promise<void>((resolve) => {
     timeoutId = window.setTimeout(resolve, ACTIVE_JOB_CANCEL_TIMEOUT_MS);
   });
   try {
     await Promise.race([
-      Promise.allSettled(jobIds.map((jobId) => apiClient.cancelJob(jobId))).then(
-        () => undefined,
-      ),
+      Promise.allSettled(
+        jobs.map((job) => apiClient.cancelJob(job.id, job.control_version)),
+      ).then(() => undefined),
       timeout,
     ]);
   } finally {
@@ -1608,8 +1623,8 @@ function AppShellContent() {
     if (!desktopWindow || exitApprovedRef.current) return;
     persistExperimentDraftsForExit();
     exitApprovedRef.current = true;
-    const activeJobIds = exitPromptRef.current?.activeJobIds ?? [];
-    await stopKnownActiveJobsBeforeExit(activeJobIds);
+    const activeJobs = exitPromptRef.current?.activeJobs ?? [];
+    await stopKnownActiveJobsBeforeExit(activeJobs);
     await stopDesktopRuntimeBeforeExit();
     try {
       await desktopWindow.destroy();
@@ -1646,13 +1661,13 @@ function AppShellContent() {
         ? persistExperimentDraftsForExit()
         : true;
       let activeJobCount = 0;
-      let activeJobIds: string[] = [];
+      let activeJobs: Pick<Job, "id" | "control_version">[] = [];
       let activeJobsUnknown = false;
       if (path !== "/desktop/setup") {
         try {
-          const activeJobs = await findActiveJobsBeforeExit();
-          activeJobCount = activeJobs.count;
-          activeJobIds = activeJobs.jobIds;
+          const activeJobResult = await findActiveJobsBeforeExit();
+          activeJobCount = activeJobResult.count;
+          activeJobs = activeJobResult.jobs;
         } catch {
           activeJobsUnknown = true;
         }
@@ -1662,7 +1677,7 @@ function AppShellContent() {
         hasDraft,
         draftPreserved,
         activeJobCount,
-        activeJobIds,
+        activeJobs,
         activeJobsUnknown,
       };
       const mustConfirm = hasDraft || activeJobCount > 0 || activeJobsUnknown;

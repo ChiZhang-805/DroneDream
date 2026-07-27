@@ -245,11 +245,13 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         "finalization_claim_generation",
         "finalization_lease_expires_at",
     }.issubset(job_columns)
+    assert "control_version" in job_columns
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
     assert "accepted_attempt_id" in columns
     assert "cancelled_at" in batch_columns
+    assert "control_version" in batch_columns
     assert "expires_at" in secret_columns
     assert "optimizer_metadata_json" in candidate_columns
     assert "evidence_ledger_required" in candidate_columns
@@ -390,6 +392,12 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "PRAGMA table_info('jobs')"
             ).fetchall()
         }
+        batch_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info('batch_jobs')"
+            ).fetchall()
+        }
     assert trigger_names == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
@@ -434,6 +442,8 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "finalization_claim_generation",
         "finalization_lease_expires_at",
     }.issubset(job_columns)
+    assert "control_version" in job_columns
+    assert "control_version" in batch_columns
 
 
 def test_postgresql_winner_freeze_migration_emits_immutable_trigger(
@@ -598,7 +608,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260727_0013 (head)"]
+    assert heads == ["20260727_0014 (head)"]
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

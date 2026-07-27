@@ -187,7 +187,13 @@ export function JobDetail() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => apiClient.cancelJob(id),
+    mutationFn: ({
+      id,
+      controlVersion,
+    }: {
+      id: string;
+      controlVersion: number;
+    }) => apiClient.cancelJob(id, controlVersion),
     onSuccess: (updated) => {
       queryClient.setQueryData(["job", updated.id], updated);
       queryClient.invalidateQueries({ queryKey: ["jobs", "dashboard"] });
@@ -302,7 +308,10 @@ export function JobDetail() {
       <JobHeader
         job={job}
         onRerun={handleRerun}
-        onCancel={() => cancelMutation.mutate(job.id)}
+        onCancel={() => cancelMutation.mutate({
+          id: job.id,
+          controlVersion: job.control_version,
+        })}
         rerunPending={rerunMutation.isPending}
         cancelPending={cancelMutation.isPending}
         canCancel={!isTerminal}

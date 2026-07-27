@@ -66,6 +66,56 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _expected_control_version(
+    *,
+    resource_kind: str,
+    resource_id: str,
+    current_version: int,
+    supplied_version: int | None,
+) -> int:
+    """Resolve the optimistic fence for one user-authored command."""
+
+    if supplied_version is None:
+        if get_settings().app_env.strip().lower() in {"desktop", "prod", "production"}:
+            raise JobServiceError(
+                "CONTROL_VERSION_REQUIRED",
+                (
+                    f"A current control_version is required to modify "
+                    f"{resource_kind} {resource_id}."
+                ),
+                http_status=428,
+            )
+        # Preserve source/API compatibility for non-packaged development while
+        # still using a compare-and-swap against the version just observed.
+        return current_version
+    if supplied_version < 1:
+        raise JobServiceError(
+            "CONTROL_VERSION_INVALID",
+            "control_version must be a positive integer.",
+            http_status=422,
+        )
+    return supplied_version
+
+
+def _raise_control_version_conflict(
+    *,
+    resource_kind: str,
+    resource_id: str,
+    expected_version: int,
+    current_version: int | None,
+) -> None:
+    current = "no longer exists" if current_version is None else f"is now {current_version}"
+    raise JobServiceError(
+        "CONTROL_VERSION_CONFLICT",
+        (
+            f"{resource_kind} {resource_id} changed after this view was loaded "
+            f"(expected {expected_version}; current version {current}). Refresh "
+            "before applying the command again."
+        ),
+        http_status=409,
+    )
+
+
 def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
     if req.optimizer_strategy not in {"gpt", "llm_harness"}:
         return
@@ -773,6 +823,7 @@ def to_batch_schema(batch: models.BatchJob) -> schemas.BatchJob:
         completed_at = max(terminal_times) if terminal_times else None
     return schemas.BatchJob(
         id=batch.id,
+        control_version=batch.control_version,
         name=batch.name,
         description=batch.description,
         status=computed_status,  # type: ignore[arg-type]
@@ -888,6 +939,7 @@ def _claim_job_cancellation(
     job: models.Job,
     *,
     cancelled_at: datetime,
+    expected_control_version: int,
 ) -> bool:
     """Serialize cancellation against finalization's Job-row write fence."""
 
@@ -896,9 +948,11 @@ def _claim_job_cancellation(
         .where(
             models.Job.id == job.id,
             models.Job.status.in_(schemas.JOB_CANCELLABLE_STATUSES),
+            models.Job.control_version == expected_control_version,
         )
         .values(
             status="CANCELLED",
+            control_version=models.Job.control_version + 1,
             cancelled_at=cancelled_at,
             current_phase=None,
             finalization_claim_token=None,
@@ -919,8 +973,15 @@ def cancel_batch(
     *,
     user: models.User | None = None,
     commit: bool = True,
+    expected_control_version: int | None = None,
 ) -> models.BatchJob:
     batch = get_batch(db, batch_id, user=user)
+    expected_version = _expected_control_version(
+        resource_kind="Batch",
+        resource_id=batch.id,
+        current_version=batch.control_version,
+        supplied_version=expected_control_version,
+    )
     if batch.jobs and all(child.status in schemas.JOB_TERMINAL_STATUSES for child in batch.jobs):
         _, terminal_status = _aggregate_batch_progress(batch.jobs)
         raise JobServiceError(
@@ -929,6 +990,26 @@ def cancel_batch(
             http_status=409,
         )
     now = _now()
+    claimed = db.execute(
+        update(models.BatchJob)
+        .where(
+            models.BatchJob.id == batch.id,
+            models.BatchJob.control_version == expected_version,
+        )
+        .values(control_version=models.BatchJob.control_version + 1)
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(claimed, "rowcount", None) != 1:
+        db.expire_all()
+        current = db.get(models.BatchJob, batch.id)
+        _raise_control_version_conflict(
+            resource_kind="Batch",
+            resource_id=batch.id,
+            expected_version=expected_version,
+            current_version=current.control_version if current is not None else None,
+        )
+    db.expire(batch)
+    db.refresh(batch)
     terminal_trials = {"COMPLETED", "FAILED", "CANCELLED"}
     for child in batch.jobs:
         if child.status in schemas.JOB_TERMINAL_STATUSES:
@@ -936,10 +1017,31 @@ def cancel_batch(
             # terminalized this child without performing the invariant cleanup.
             purge_job_secrets(db, child, reason="batch_cancel_terminal_sweep")
             continue
-        if not _claim_job_cancellation(db, child, cancelled_at=now):
+        child_cancelled = False
+        for _attempt in range(2):
+            child_expected_version = child.control_version
+            if _claim_job_cancellation(
+                db,
+                child,
+                cancelled_at=now,
+                expected_control_version=child_expected_version,
+            ):
+                child_cancelled = True
+                break
             if child.status in schemas.JOB_TERMINAL_STATUSES:
                 purge_job_secrets(db, child, reason="batch_cancel_terminal_sweep")
+                break
+        if child.status in schemas.JOB_TERMINAL_STATUSES and not child_cancelled:
             continue
+        if not child_cancelled:
+            raise JobServiceError(
+                "BATCH_CHILD_CONTROL_CONFLICT",
+                (
+                    f"Job {child.id} changed repeatedly while batch {batch.id} "
+                    "was being cancelled. Refresh the batch and retry."
+                ),
+                http_status=409,
+            )
         for trial in child.trials:
             if trial.status in terminal_trials:
                 continue
@@ -972,9 +1074,38 @@ def update_job(
     *,
     user: models.User | None = None,
     commit: bool = True,
+    expected_control_version: int | None = None,
 ) -> models.Job:
     job = get_job(db, job_id, user=user)
-    job.display_name = req.display_name
+    expected_version = _expected_control_version(
+        resource_kind="Job",
+        resource_id=job.id,
+        current_version=job.control_version,
+        supplied_version=expected_control_version,
+    )
+    claimed = db.execute(
+        update(models.Job)
+        .where(
+            models.Job.id == job.id,
+            models.Job.control_version == expected_version,
+        )
+        .values(
+            display_name=req.display_name,
+            control_version=models.Job.control_version + 1,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(claimed, "rowcount", None) != 1:
+        db.expire_all()
+        current = db.get(models.Job, job.id)
+        _raise_control_version_conflict(
+            resource_kind="Job",
+            resource_id=job.id,
+            expected_version=expected_version,
+            current_version=current.control_version if current is not None else None,
+        )
+    db.expire(job)
+    db.refresh(job)
     db.add(
         models.JobEvent(
             job_id=job.id,
@@ -996,8 +1127,15 @@ def cancel_job(
     *,
     user: models.User | None = None,
     commit: bool = True,
+    expected_control_version: int | None = None,
 ) -> models.Job:
     job = get_job(db, job_id, user=user)
+    expected_version = _expected_control_version(
+        resource_kind="Job",
+        resource_id=job.id,
+        current_version=job.control_version,
+        supplied_version=expected_control_version,
+    )
     if job.status in schemas.JOB_TERMINAL_STATUSES:
         code = "JOB_ALREADY_CANCELLED" if job.status == "CANCELLED" else "JOB_ALREADY_COMPLETED"
         raise JobServiceError(
@@ -1013,7 +1151,19 @@ def cancel_job(
         )
     now = _now()
     terminal_trials = {"COMPLETED", "FAILED", "CANCELLED"}
-    if not _claim_job_cancellation(db, job, cancelled_at=now):
+    if not _claim_job_cancellation(
+        db,
+        job,
+        cancelled_at=now,
+        expected_control_version=expected_version,
+    ):
+        if job.control_version != expected_version:
+            _raise_control_version_conflict(
+                resource_kind="Job",
+                resource_id=job.id,
+                expected_version=expected_version,
+                current_version=job.control_version,
+            )
         if job.status in schemas.JOB_TERMINAL_STATUSES:
             code = (
                 "JOB_ALREADY_CANCELLED"
@@ -1079,14 +1229,41 @@ def delete_job(
     *,
     user: models.User | None = None,
     commit: bool = True,
+    expected_control_version: int | None = None,
 ) -> dict[str, object]:
     job = get_job(db, job_id, user=user)
+    expected_version = _expected_control_version(
+        resource_kind="Job",
+        resource_id=job.id,
+        current_version=job.control_version,
+        supplied_version=expected_control_version,
+    )
     if job.status not in schemas.JOB_TERMINAL_STATUSES:
         raise JobServiceError(
             "JOB_NOT_DELETABLE",
             f"Active job {job.id} cannot be deleted.",
             http_status=409,
         )
+    claimed = db.execute(
+        update(models.Job)
+        .where(
+            models.Job.id == job.id,
+            models.Job.control_version == expected_version,
+        )
+        .values(control_version=models.Job.control_version + 1)
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(claimed, "rowcount", None) != 1:
+        db.expire_all()
+        current = db.get(models.Job, job.id)
+        _raise_control_version_conflict(
+            resource_kind="Job",
+            resource_id=job.id,
+            expected_version=expected_version,
+            current_version=current.control_version if current is not None else None,
+        )
+    db.expire(job)
+    db.refresh(job)
     trial_ids = [t.id for t in job.trials]
     attempt_rows = (
         list(
@@ -1245,6 +1422,7 @@ def to_job_schema(job: models.Job) -> schemas.Job:
     baseline_parameters = schemas.BaselineParameters(**(job.baseline_parameter_json or {}))
     return schemas.Job(
         id=job.id,
+        control_version=job.control_version,
         track_type=job.track_type,  # type: ignore[arg-type]
         start_point=schemas.StartPoint(x=job.start_point_x, y=job.start_point_y),
         altitude_m=job.altitude_m,

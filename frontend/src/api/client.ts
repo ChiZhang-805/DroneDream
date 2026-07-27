@@ -436,14 +436,23 @@ export const apiClient = {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}`);
   },
 
-  async updateJob(jobId: string, req: JobUpdateRequest): Promise<Job> {
-    return request<Job>(`/jobs/${encodeURIComponent(jobId)}`, {
+  async updateJob(
+    jobId: string,
+    req: JobUpdateRequest,
+    controlVersion: number,
+  ): Promise<Job> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<Job>(`/jobs/${encodeURIComponent(jobId)}${qs}`, {
       method: "PATCH",
       body: JSON.stringify(req),
     }, { idempotentMutation: true });
   },
-  async deleteJob(jobId: string): Promise<DeleteJobResponse> {
-    return request<DeleteJobResponse>(`/jobs/${encodeURIComponent(jobId)}`, {
+  async deleteJob(
+    jobId: string,
+    controlVersion: number,
+  ): Promise<DeleteJobResponse> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<DeleteJobResponse>(`/jobs/${encodeURIComponent(jobId)}${qs}`, {
       method: "DELETE",
     }, { idempotentMutation: true });
   },
@@ -578,8 +587,9 @@ export const apiClient = {
     }
   },
 
-  async cancelJob(jobId: string): Promise<Job> {
-    return request<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel`, {
+  async cancelJob(jobId: string, controlVersion: number): Promise<Job> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel${qs}`, {
       method: "POST",
     }, { idempotentMutation: true });
   },
@@ -668,8 +678,12 @@ export const apiClient = {
     return request<Job[]>(`/batches/${encodeURIComponent(batchId)}/jobs`);
   },
 
-  async cancelBatch(batchId: string): Promise<BatchJob> {
-    return request<BatchJob>(`/batches/${encodeURIComponent(batchId)}/cancel`, {
+  async cancelBatch(
+    batchId: string,
+    controlVersion: number,
+  ): Promise<BatchJob> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<BatchJob>(`/batches/${encodeURIComponent(batchId)}/cancel${qs}`, {
       method: "POST",
     }, { idempotentMutation: true });
   },
