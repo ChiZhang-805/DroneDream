@@ -182,8 +182,9 @@ def build_decision_messages(
         "optimizer tool from the supplied closed, versioned registry for the next "
         "generation. Compare remaining budget, parameter dimension, scenario cost, "
         "feasibility, optimizer-learning failure rate, improvement trend, "
-        "stagnation, and prior tool "
-        "outcomes. Use only the supplied evidence. You cannot run tools, change "
+        "stagnation, and prior tool outcomes. Treat observed decision outcomes as "
+        "bounded associations, not causal rewards or child-tool credit. Use only "
+        "the supplied evidence. You cannot run tools, change "
         "constraints, modify budgets, access credentials, or invent additional "
         "tool IDs. Return only JSON that conforms to the required schema."
     )
@@ -196,9 +197,11 @@ def build_decision_messages(
         "evidence": evidence_snapshot.model_dump(mode="json", exclude_none=True),
         "instructions": (
             "Choose one tool for the next bounded generation. Prefer measured "
-            "progress and budget efficiency, use the deterministic portfolio when "
-            "specialization is not supported by the evidence, and explain the "
-            "numeric evidence behind the choice briefly in rationale."
+            "progress and budget efficiency. Reflect on verified prior cohort "
+            "results when present, but do not infer causality from observational "
+            "improvement. Use the deterministic portfolio when specialization is "
+            "not supported by the evidence, and explain the numeric evidence "
+            "behind the choice briefly in rationale."
         ),
     }
     return system, _canonical_json(user_payload)

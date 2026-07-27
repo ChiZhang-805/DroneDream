@@ -11,6 +11,8 @@ import pytest
 from app.orchestration.decision_harness import build_decision_messages
 from app.orchestration.harness_context import (
     HARNESS_TOOL_DEFINITIONS,
+    HarnessExecutionMemory,
+    HarnessObservedDecisionOutcome,
     HarnessToolId,
     eligible_harness_tools,
 )
@@ -59,7 +61,7 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
     for case in cases:
         snapshot = compile_routing_eval_snapshot(case)
         system, user = build_decision_messages(snapshot)
-        assert snapshot.schema_version == "2.4"
+        assert snapshot.schema_version == "2.5"
         assert case.case_id not in system
         assert case.case_id not in user
         assert case.rationale not in system
@@ -67,7 +69,7 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
         assert "acceptable_tools" not in user
         assert '"case_id"' not in user
         assert '"registry_version":"2.1"' in user
-        assert '"schema_version":"2.4"' in user
+        assert '"schema_version":"2.5"' in user
         payload = json.loads(user)
         assert tuple(
             tool["tool_id"] for tool in payload["tool_manifest"]["tools"]
@@ -147,9 +149,9 @@ def test_prediction_artifact_binds_corpus_prompts_versions_and_model(
         "schema_version": "1.0",
         "corpus_sha256": routing_corpus_sha256(cases),
         "prompt_suite_sha256": routing_prompt_suite_sha256(cases),
-        "evidence_schema_version": "2.4",
+        "evidence_schema_version": "2.5",
         "tool_registry_version": "2.1",
-        "prompt_template_version": "1.1",
+        "prompt_template_version": "1.2",
         "provider": "openai",
         "model_snapshot": "gpt-test-snapshot",
         "generation_config": {
@@ -191,18 +193,11 @@ def test_prediction_artifact_binds_corpus_prompts_versions_and_model(
         load_routing_prediction_artifact(artifact_path, cases)
 
 
-def test_committed_online_provider_freeze_matches_current_contract() -> None:
+def test_previous_online_provider_freeze_is_rejected_after_contract_upgrade() -> None:
     cases = load_routing_eval_cases(CORPUS)
 
-    artifact = load_routing_prediction_artifact(FROZEN_GPT_4_1, cases)
-    report = grade_routing_prediction_artifact(artifact, cases)
-
-    assert artifact.provider == "openai"
-    assert artifact.model_snapshot == "gpt-4.1-2025-04-14"
-    assert report.predictions.passed_count == 24
-    assert report.predictions.pass_rate == 1.0
-    assert report.qualification.qualified is True
-    assert report.qualification.failed_requirements == ()
+    with pytest.raises(ValueError, match="invalid Harness routing prediction artifact"):
+        load_routing_prediction_artifact(FROZEN_GPT_4_1, cases)
 
 
 def test_routing_eval_compiler_preserves_decision_signals() -> None:
@@ -231,6 +226,94 @@ def test_routing_eval_compiler_preserves_decision_signals() -> None:
     assert no_feasible.search.relative_improvement_from_baseline == pytest.approx(0.0)
     assert no_feasible.search.feasibility_observed_candidate_count == 16
     assert no_feasible.search.feasible_candidate_rate == pytest.approx(0.0)
+
+
+def test_routing_eval_prompt_preserves_verified_observational_reflection() -> None:
+    case = load_routing_eval_cases(CORPUS)[0]
+    outcome = HarnessObservedDecisionOutcome(
+        cohort_candidate_count=4,
+        accepted_attempt_count=16,
+        optimizer_learning_trial_count=12,
+        domain_failure_trial_count=1,
+        feasible_candidate_count=3,
+        completed_candidate_rate=1.0,
+        incumbent_score_before=1.0,
+        cohort_best_score=0.6,
+        incumbent_score_after=0.6,
+        observed_absolute_improvement=0.4,
+        observed_relative_improvement=0.4,
+    )
+    execution = HarnessExecutionMemory(
+        generation=1,
+        tool_id="optimizer_portfolio",
+        decision_source="model",
+        status="dispatched",
+        dispatched_candidates=4,
+        reflection_status="verified_complete",
+        observed_outcome=outcome,
+    )
+    snapshot = compile_routing_eval_snapshot(
+        case.model_copy(
+            update={
+                "stimulus": case.stimulus.model_copy(
+                    update={
+                        "current_generation": 1,
+                        "last_execution": execution,
+                    }
+                )
+            }
+        )
+    )
+
+    system, user = build_decision_messages(snapshot)
+    payload = json.loads(user)
+    reflected = payload["evidence"]["decision_memory"][0]
+
+    assert reflected["reflection_status"] == "verified_complete"
+    assert reflected["observed_outcome"] == outcome.model_dump(mode="json")
+    assert "not causal rewards" in system
+    assert "do not infer causality" in payload["instructions"]
+    assert "candidate_id" not in user
+    assert "decision_id" not in user
+    assert '"seed"' not in user
+    assert "holdout" not in user
+
+
+def test_eight_verified_reflections_remain_bounded() -> None:
+    case = load_routing_eval_cases(CORPUS)[0]
+    snapshot = compile_routing_eval_snapshot(case)
+    memory = tuple(
+        HarnessExecutionMemory(
+            generation=generation,
+            tool_id="optimizer_portfolio",
+            decision_source="deterministic_fallback",
+            status="dispatched",
+            dispatched_candidates=4,
+            fallback_reason="missing_api_key",
+            reflection_status="verified_complete",
+            observed_outcome=HarnessObservedDecisionOutcome(
+                cohort_candidate_count=4,
+                accepted_attempt_count=16,
+                optimizer_learning_trial_count=12,
+                domain_failure_trial_count=generation % 3,
+                feasible_candidate_count=3,
+                completed_candidate_rate=1.0,
+                incumbent_score_before=1.0,
+                cohort_best_score=0.9,
+                incumbent_score_after=0.9,
+                observed_absolute_improvement=0.1,
+                observed_relative_improvement=0.1,
+            ),
+        )
+        for generation in range(1, 9)
+    )
+
+    system, user = build_decision_messages(
+        snapshot.model_copy(update={"decision_memory": memory})
+    )
+
+    assert len((system + user).encode("utf-8")) < 32_768
+    assert user.count("dronedream.harness-decision-observed-outcome/v1") == 8
 
 
 def test_tool_eligibility_changes_only_at_explicit_precondition_boundaries() -> None:

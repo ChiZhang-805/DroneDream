@@ -15,9 +15,13 @@ from collections.abc import Iterable
 from datetime import datetime, timezone
 from typing import Literal, TypeAlias, cast
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app import models, schemas
+from app.optimization.candidate_evidence_ledger import (
+    CandidateEvidenceReceiptV2,
+    current_candidate_evidence_receipt,
+)
 from app.optimization.outcome_taxonomy import (
     TrialOutcomeClass,
     classify_trial_outcome,
@@ -44,10 +48,10 @@ HarnessSourceType = Literal["baseline", "optimizer", "llm_optimizer", "unknown"]
 HarnessObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom", "unknown"]
 HarnessTrackType = Literal["circle", "u_turn", "lemniscate", "custom", "unknown"]
 
-HARNESS_EVIDENCE_SCHEMA_VERSION = "2.4"
+HARNESS_EVIDENCE_SCHEMA_VERSION = "2.5"
 HARNESS_TOOL_REGISTRY_VERSION = "2.1"
 HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION = "1.1"
-HARNESS_PROMPT_TEMPLATE_VERSION = "1.1"
+HARNESS_PROMPT_TEMPLATE_VERSION = "1.2"
 HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.1"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
@@ -305,6 +309,47 @@ class HarnessToolHistory(_ClosedModel):
     last_generation: int = Field(ge=0)
 
 
+class HarnessObservedDecisionOutcome(_ClosedModel):
+    """Provider-safe, observational result for one dispatched generation.
+
+    This is a verified association between a decision receipt and the
+    generation cohort that followed it. It is deliberately not a causal reward
+    or child-tool credit assignment.
+    """
+
+    schema_id: Literal["dronedream.harness-decision-observed-outcome/v1"] = (
+        "dronedream.harness-decision-observed-outcome/v1"
+    )
+    cohort_candidate_count: int = Field(ge=1)
+    accepted_attempt_count: int = Field(ge=0)
+    optimizer_learning_trial_count: int = Field(ge=0)
+    domain_failure_trial_count: int = Field(ge=0)
+    feasible_candidate_count: int = Field(ge=0)
+    completed_candidate_rate: float = Field(ge=0.0, le=1.0)
+    incumbent_score_before: float | None = None
+    cohort_best_score: float
+    incumbent_score_after: float
+    observed_absolute_improvement: float | None = Field(default=None, ge=0.0)
+    observed_relative_improvement: float | None = Field(default=None, ge=0.0)
+
+    @model_validator(mode="after")
+    def _validate_counts_and_incumbent(self) -> HarnessObservedDecisionOutcome:
+        if self.domain_failure_trial_count > self.optimizer_learning_trial_count:
+            raise ValueError("domain failures cannot exceed optimizer-learning trials")
+        if self.feasible_candidate_count > self.cohort_candidate_count:
+            raise ValueError("feasible candidates cannot exceed the cohort")
+        if self.incumbent_score_before is None:
+            if (
+                self.observed_absolute_improvement is not None
+                or self.observed_relative_improvement is not None
+                or self.incumbent_score_after != self.cohort_best_score
+            ):
+                raise ValueError("first observed cohort cannot claim prior-incumbent improvement")
+        elif self.incumbent_score_after > self.incumbent_score_before:
+            raise ValueError("incumbent score cannot regress")
+        return self
+
+
 class HarnessExecutionMemory(_ClosedModel):
     generation: int = Field(ge=0)
     tool_id: HarnessToolId
@@ -317,6 +362,12 @@ class HarnessExecutionMemory(_ClosedModel):
         "unknown",
     ]
     dispatched_candidates: int = Field(ge=0)
+    reflection_status: Literal[
+        "verified_complete",
+        "not_applicable",
+        "unavailable",
+    ] = "unavailable"
+    observed_outcome: HarnessObservedDecisionOutcome | None = None
     fallback_reason: (
         Literal[
             "missing_model",
@@ -328,6 +379,29 @@ class HarnessExecutionMemory(_ClosedModel):
         ]
         | None
     ) = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_reflection_status(cls, value: object) -> object:
+        if isinstance(value, dict) and "reflection_status" not in value:
+            value = dict(value)
+            value["reflection_status"] = (
+                "unavailable" if value.get("status") == "dispatched" else "not_applicable"
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _validate_reflection_state(self) -> HarnessExecutionMemory:
+        if self.reflection_status == "verified_complete":
+            if self.status != "dispatched" or self.observed_outcome is None:
+                raise ValueError("verified reflection requires a dispatched observed outcome")
+        elif self.observed_outcome is not None:
+            raise ValueError("only verified reflection may carry an observed outcome")
+        elif self.reflection_status == "not_applicable" and self.status == "dispatched":
+            raise ValueError("a dispatched generation requires reflection or unavailable status")
+        elif self.reflection_status == "unavailable" and self.status != "dispatched":
+            raise ValueError("non-dispatched execution has no applicable cohort")
+        return self
 
 
 class HarnessJobEvidence(_ClosedModel):
@@ -341,7 +415,7 @@ class HarnessJobEvidence(_ClosedModel):
 
 
 class HarnessEvidenceSnapshot(_ClosedModel):
-    schema_version: Literal["2.4"] = "2.4"
+    schema_version: Literal["2.5"] = "2.5"
     job: HarnessJobEvidence
     budget: HarnessBudgetEvidence
     scenarios: HarnessScenarioEvidence
@@ -757,11 +831,143 @@ def _common_decision_binding(
     return decision_id, generation, evidence_sha256, prompt_sha256
 
 
+def _trusted_incumbent_score(
+    candidates: Iterable[models.CandidateParameterSet],
+    feedback_by_id: dict[str, CandidateFeedbackView],
+) -> float | None:
+    verified: list[tuple[float, bool | None]] = []
+    for candidate in candidates:
+        feedback = feedback_by_id[candidate.id]
+        receipt = current_candidate_evidence_receipt(candidate)
+        if (
+            not isinstance(receipt, CandidateEvidenceReceiptV2)
+            or feedback.feedback_status != "verified"
+            or feedback.score is None
+        ):
+            continue
+        verified.append((feedback.score, feedback.feasible))
+    feasible_or_unknown = [score for score, feasible in verified if feasible is not False]
+    scores = feasible_or_unknown or [score for score, _ in verified]
+    return min(scores, default=None)
+
+
+def _observed_outcome_for_execution(
+    execution: HarnessExecutionMemory,
+    *,
+    candidates: list[models.CandidateParameterSet],
+    feedback_by_id: dict[str, CandidateFeedbackView],
+) -> HarnessExecutionMemory:
+    """Attach one fail-closed, training-only observational cohort result."""
+
+    if execution.status != "dispatched":
+        return execution.model_copy(
+            update={
+                "reflection_status": "not_applicable",
+                "observed_outcome": None,
+            }
+        )
+
+    cohort = [
+        candidate
+        for candidate in candidates
+        if candidate.source_type == "optimizer"
+        and max(0, int(candidate.generation_index or 0)) == execution.generation
+    ]
+    if len(cohort) != execution.dispatched_candidates:
+        return execution.model_copy(
+            update={
+                "reflection_status": "unavailable",
+                "observed_outcome": None,
+            }
+        )
+
+    accepted_attempt_count = 0
+    learning_trial_count = 0
+    domain_failure_trial_count = 0
+    completed_candidate_count = 0
+    feasible_candidate_count = 0
+    for candidate in cohort:
+        feedback = feedback_by_id[candidate.id]
+        receipt = current_candidate_evidence_receipt(candidate)
+        if (
+            not isinstance(receipt, CandidateEvidenceReceiptV2)
+            or receipt.source_type != "optimizer"
+            or feedback.feedback_status != "verified"
+            or feedback.score is None
+            or feedback.learning_trial_count
+            != feedback.completed_trial_count + feedback.failed_trial_count
+        ):
+            return execution.model_copy(
+                update={
+                    "reflection_status": "unavailable",
+                    "observed_outcome": None,
+                }
+            )
+        accepted_attempt_count += receipt.report_accepted_attempt_count
+        learning_trial_count += feedback.learning_trial_count
+        domain_failure_trial_count += feedback.failed_trial_count
+        completed_candidate_count += int(feedback.completed_trial_count > 0)
+        feasible_candidate_count += int(feedback.feasible is True)
+
+    prior = [
+        candidate
+        for candidate in candidates
+        if max(0, int(candidate.generation_index or 0)) < execution.generation
+    ]
+    incumbent_before = _trusted_incumbent_score(prior, feedback_by_id)
+    cohort_best = _trusted_incumbent_score(cohort, feedback_by_id)
+    if cohort_best is None:
+        return execution.model_copy(
+            update={
+                "reflection_status": "unavailable",
+                "observed_outcome": None,
+            }
+        )
+
+    incumbent_after = (
+        cohort_best if incumbent_before is None else min(incumbent_before, cohort_best)
+    )
+    absolute_improvement = (
+        None
+        if incumbent_before is None
+        else round(max(0.0, incumbent_before - incumbent_after), 12)
+    )
+    relative_improvement = (
+        None
+        if incumbent_before is None or abs(incumbent_before) <= 1e-12
+        else round(
+            max(0.0, incumbent_before - incumbent_after) / abs(incumbent_before),
+            12,
+        )
+    )
+    outcome = HarnessObservedDecisionOutcome(
+        cohort_candidate_count=len(cohort),
+        accepted_attempt_count=accepted_attempt_count,
+        optimizer_learning_trial_count=learning_trial_count,
+        domain_failure_trial_count=domain_failure_trial_count,
+        feasible_candidate_count=feasible_candidate_count,
+        completed_candidate_rate=completed_candidate_count / len(cohort),
+        incumbent_score_before=incumbent_before,
+        cohort_best_score=cohort_best,
+        incumbent_score_after=incumbent_after,
+        observed_absolute_improvement=absolute_improvement,
+        observed_relative_improvement=relative_improvement,
+    )
+    return execution.model_copy(
+        update={
+            "reflection_status": "verified_complete",
+            "observed_outcome": outcome,
+        }
+    )
+
+
 def _decision_memory(
     events: list[models.JobEvent],
     *,
     current_generation: int,
     verified_started_decision_ids: frozenset[str],
+    candidates: list[models.CandidateParameterSet],
+    feedback_by_id: dict[str, CandidateFeedbackView],
 ) -> tuple[HarnessExecutionMemory, ...]:
     """Compile only decision/result pairs with a complete provenance binding.
 
@@ -945,7 +1151,11 @@ def _decision_memory(
     for _, item in verified:
         generation_counts[item.generation] += 1
     memory = [
-        item
+        _observed_outcome_for_execution(
+            item,
+            candidates=candidates,
+            feedback_by_id=feedback_by_id,
+        )
         for _, item in sorted(
             verified,
             key=lambda pair: (_event_sort_time(pair[0]), pair[0].id),
@@ -1111,6 +1321,8 @@ def build_harness_evidence(
             list(execution_events),
             current_generation=max(0, int(job.current_generation or 0)),
             verified_started_decision_ids=frozenset(verified_started_decision_ids),
+            candidates=candidates,
+            feedback_by_id=feedback_by_id,
         ),
         candidates=compact_candidates,
         candidate_history_total=len(candidates),
@@ -1189,6 +1401,7 @@ __all__ = [
     "MAX_DECISION_MEMORY_ITEMS",
     "MAX_GENERATION_TREND_ITEMS",
     "HarnessEvidenceSnapshot",
+    "HarnessObservedDecisionOutcome",
     "HarnessToolId",
     "build_harness_evidence",
     "compile_provider_safe_metric",

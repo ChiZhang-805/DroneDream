@@ -654,9 +654,9 @@ changed Trial metric, incomplete relationship, or malformed evidence produces
 an empty `quarantined` feedback view: it is neither treated as progress nor
 converted into a parameter penalty. Legacy Candidates remain readable as
 explicit `legacy_unsealed` feedback for migration compatibility. The direct
-proposer exposes this closed status through Prompt Schema 2.3; AURORA keeps
-its existing Evidence 2.4 shape while replacing the data source behind that
-shape.
+proposer exposes this closed status through Prompt Schema 2.3; AURORA Evidence
+2.5 uses the same verified feedback source for search context and
+decision-outcome reflection.
 
 Outcome Contract compiler 2.19 closes the claim-to-simulator race. The worker
 deep-copies one canonical claim-time snapshot before its first claim commit and
@@ -765,7 +765,7 @@ production-prompt hashes plus Evidence/Tool/Prompt versions, provider, model
 snapshot, sampling settings, selections, and rationales. Stale or incomplete
 artifacts are rejected before grading.
 
-Harness Evidence 2.4 and Tool Registry 2.1 add a deterministic precondition
+Harness Evidence 2.5 and Tool Registry 2.1 add a deterministic precondition
 gate before routing. The model receives only tools compatible with the current
 parameter dimension, objective/constraint shape, scenario replication, scored
 evidence, feasibility coverage, generation, and stagnation state. A globally
@@ -774,6 +774,36 @@ portfolio. Provider-visible failure counts now use the same optimizer-learning
 taxonomy as Candidate ranking: infrastructure, cancellation, invalid evidence,
 and holdout outcomes cannot make a parameter region or optimizer family appear
 unsafe.
+
+Evidence 2.5 also closes the first bounded reflection loop. For each recent
+decision/result pair that already passes the started/accepted/result provenance
+checks, the compiler locates only `source_type="optimizer"` Candidates from the
+same dispatched generation. The cohort must exactly match the dispatch receipt,
+every Candidate must have a current v2 evidence-ledger receipt, and every
+training feedback projection must verify. Otherwise reflection is marked
+`unavailable` as a whole; legacy sibling fields are never used to fill gaps.
+
+A complete reflection exposes only aggregate counts and finite training-side
+scores: accepted physical attempts, optimizer-learning Trials, trusted domain
+failures, feasible Candidates, completion rate, the incumbent before the
+cohort, cohort best, incumbent after the cohort, and observed improvement. Raw
+Candidate/decision/scenario IDs, seeds, evidence hashes, failure prose, and
+holdout measurements remain outside the provider boundary. Holdout work may
+contribute only to the accepted-attempt cost count. Zero-dispatch outcomes are
+`not_applicable` and never become a manufactured zero reward.
+
+The contract is explicitly observational. It records what was seen after one
+bounded generation; it does not claim that the model or selected optimizer
+caused the improvement, and an optimizer portfolio cohort is not re-attributed
+to a child strategy. Prompt Template 1.2 instructs the router to reflect on
+these verified cohort results while prohibiting causal reward or child-tool
+credit language. Any mutation of the reflected block changes the prompt and
+evidence hashes and fails current trace verification.
+
+The prior 24/24 online-provider Artifact was generated under Evidence 2.4 and
+Prompt Template 1.1. It remains an archived historical result, but current
+loaders reject it as stale; a fresh online provider freeze is required before
+claiming current-version model-routing qualification.
 
 `backend/scripts/run_harness_routing_campaign.py` runs the entire corpus through
 an online provider using the exact production prompt and per-case response
@@ -789,7 +819,10 @@ deterministic portfolio; that claim still requires the frozen simulator campaign
 
 The separate
 `backend/tests/fixtures/harness_routing_policy_holdout_v1.jsonl` corpus is a
-16-case, hash-locked **deterministic tool-eligibility policy holdout**. It is
+16-case, hash-locked **deterministic tool-eligibility policy holdout**. Its
+Evidence 2.5 input binding is frozen separately in
+`harness_routing_policy_holdout_v2.manifest.json`; the Evidence 2.4 manifest
+and result remain archived rather than being rewritten. It is
 not the 24-case development corpus, not a provider/model benchmark, and not
 PX4/Gazebo evidence. Its strict manifest binds the canonical corpus, case IDs,
 compiled policy inputs, and current development-corpus hash; all case IDs are

@@ -1,9 +1,9 @@
 # LLM Tool-Orchestrated Optimization Harness
 
-Status: approved target design; compatibility execution slice, trusted Evidence 2.4 routing gate, and frozen online-provider campaign runner implemented; hardened target gated<br>
+Status: approved target design; trusted Evidence 2.5 observational reflection gate and frozen campaign runner implemented; current-version online provider rerun gated<br>
 Audience: backend, optimization, simulation, security, evaluation, and course-review stakeholders<br>
 Scope: DroneDream's automated PX4/Gazebo tuning loop<br>
-Last reviewed: 2026-07-26
+Last reviewed: 2026-07-27
 
 ## 1. Executive decision
 
@@ -8654,7 +8654,7 @@ capability regression: 55 passed.
 24 cases; 8 categories; 8 registered tools
 uniform-random expectation: 5.625/24 (23.4375%)
 best constant tool: optimizer_portfolio, 14/24 (58.3333%)
-current provider-call traces: Evidence 2.4, Tool Manifest 2.1,
+archived provider-call traces: Evidence 2.4, Tool Manifest 2.1,
 Prompt Template 1.1, Decision Trace 1.1
 strict offline predictions: Prediction Artifact 1.0 bound to the printed
 corpus_sha256 and prompt_suite_sha256
@@ -8671,9 +8671,28 @@ temperature, top-p, or seed override. Independent reload and grading produced
 the best constant policy, and `qualified=true`. The 12,829-byte Prediction
 Artifact SHA-256 is
 `8a6531580243f1fa1493f68570b01e965231995f6b754290aca9d6f285d4575b`.
-This proves the current model/prompt/tool gate can discriminate the development
-cases; it does not prove lower final simulation loss or replace a blocked,
-budget-matched simulator campaign.
+This proves the archived Evidence 2.4 / Prompt Template 1.1 model and tool gate
+could discriminate the development cases; it does not qualify the current
+Evidence 2.5 / Prompt Template 1.2 contract, prove lower final simulation loss,
+or replace a blocked, budget-matched simulator campaign. Current loaders reject
+that Artifact as stale until a fresh online provider freeze is run.
+
+### 30.15 Evidence 2.5 observed-outcome reflection
+
+The implemented reflection slice binds each recent, already-verified Harness
+decision/result chain to its exact optimizer Candidate generation. A cohort is
+accepted only when its size matches the dispatch receipt and every Candidate
+has a current v2 evidence-ledger receipt plus verified training feedback. The
+provider receives bounded counts, training-side scores, the pre/post incumbent,
+and observed improvement. It never receives private identifiers, seeds,
+failure prose, evidence hashes, or holdout measurements.
+
+This memory is an observation, not a reward. It does not claim that the LLM or
+selected optimizer caused a change, and portfolio outcomes are not reassigned
+to child tools. Missing, legacy, incomplete, count-mismatched, or drifted
+evidence makes the entire outcome `unavailable`; zero-dispatch results are
+`not_applicable`. Prompt Template 1.2 requires reflection on verified numeric
+cohorts while explicitly forbidding causal or child-credit inference.
 
 ## 31. Reference index
 

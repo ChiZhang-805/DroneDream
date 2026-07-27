@@ -1,6 +1,6 @@
 {
   "ablation_comparator": "Constructed non-production comparator that removes exactly the named guard for contract diagnostics.",
-  "artifact_sha256": "5c8bb0e881b0dfc17ad7720476085af31124365f7fa1678ed7fa0b70cc60554c",
+  "artifact_sha256": "f6831a281e0647281dca2293aceb7d36031f294bac8ba8ae6b72d575a2915d3d",
   "causal_claim_permitted": false,
   "claim_boundary": "Paired deterministic software-contract probes under constructed inputs. They measure guard behavior only; they do not measure optimizer quality, simulator performance, user outcomes, causal component contribution, or real-flight safety.",
   "component_rows": [
@@ -42,8 +42,8 @@
     }
   ],
   "contract_versions": {
-    "harness_evidence_schema": "2.4",
-    "prompt_template": "1.1",
+    "harness_evidence_schema": "2.5",
+    "prompt_template": "1.2",
     "tool_eligibility_policy": "1.1",
     "tool_registry": "2.1",
     "trial_outcome_taxonomy": "dronedream.trial-outcome-taxonomy/v1"

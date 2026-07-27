@@ -18,10 +18,15 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     second = build_report_evidence_bundle()
 
     assert first == second
+    assert first["schema_version"] == "dronedream.technical-report-evidence.v4"
     assert len(first["bundle_sha256"]) == 64
 
     routing = first["routing"]
     assert routing["evidence_class"] == "development_routing_corpus"
+    assert routing["contract_current"] is False
+    assert routing["qualification_scope"] == "archived_evidence_2_4_prompt_1_1"
+    assert routing["current_evidence_schema_version"] == "2.5"
+    assert routing["current_prompt_template_version"] == "1.2"
     assert routing["case_count"] == 24
     assert routing["passed_count"] == 24
     assert routing["pass_rate"] == 1.0

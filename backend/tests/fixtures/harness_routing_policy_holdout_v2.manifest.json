@@ -1,0 +1,19 @@
+{
+  "case_count": 16,
+  "case_ids_sha256": "943dfc29d847a91f93740f7ee4d1b968fa54145af7440c07328c5853fdb126cb",
+  "corpus_filename": "harness_routing_policy_holdout_v1.jsonl",
+  "corpus_role": "locked_holdout",
+  "corpus_sha256": "b62e03a1623cdef3c22ac48e083806675036d25ac3b2fadec2d4a61e98c48aaf",
+  "development_corpus_sha256": "a8df3ed785d1a9dc81a6df8ef62c7ad565622c81be8868df4d326008c6326e3d",
+  "evidence_class": "deterministic_router_policy_holdout",
+  "forbidden_consumers": [
+    "development_case_generation",
+    "model_prompt_examples",
+    "router_training",
+    "runtime_feedback"
+  ],
+  "immutable": true,
+  "policy_input_suite_sha256": "ffd764f59d551040af047487aa7d0ef2c7cd47c7fa5d3c8e5a94580eeada5109",
+  "result_policy": "artifact_only_no_writeback",
+  "schema_version": "1.0"
+}
