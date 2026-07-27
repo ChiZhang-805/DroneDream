@@ -730,6 +730,7 @@ contract. The code audit found the following gaps:
 | the external simulator can return an arbitrary cleaned failure-code string | addressed by Outcome Contract 2.17: producer codes are bounded diagnostics under the canonical `UNVERIFIED_SIMULATOR_FAILURE` class |
 | Outcome Contract compiler 2.10 stores append-only physical-attempt claims/outcomes and one immutable accepted-attempt pointer | addressed for current v3 aggregation |
 | Trial context was reconstructed after the claim commit from mutable Candidate, scenario, and Job rows | addressed by Outcome Contract 2.19 and claim receipt v2: one deep claim-time snapshot builds the simulator context and a combined receipt; pre-launch and terminal row-locked checks reject `INPUT_EVIDENCE_DRIFT` |
+| direct-GPT feedback grouped matched Trials only by `scenario_type` | addressed by Prompt Schema 2.3: same-type configured cases receive stable provider-safe aliases and retain separate weight, allowlisted configuration, metric, and failure summaries in frozen suite order; raw case IDs and holdout cases remain sealed |
 | Outcome Contract compilers 2.8-2.19 bind retained Artifact bytes, accepted-attempt identity and frozen input, PX4 telemetry semantics and raw ULog bytes, independently derived evaluation windows, core geometry, outcome verdict, score, trusted external-failure classification, and verified model-feedback reads through Trial and Candidate evidence | addressed for the bundled local PX4 path and current v3 aggregation; SQL/object-store atomic publication and operational WORM controls remain separate boundaries |
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
 | legacy aggregation initially mixes all metrics and only the modern objective path replaces key fields with training values | compatibility paths remain too easy to use as if they had the same isolation guarantees |
@@ -8201,19 +8202,22 @@ the deterministic portfolio. Frozen provider/model artifacts, blocked simulator 
 the locked test bank, immutable decision/model/tool ledgers, and evidence-v3 remain
 required before that stronger claim.
 
-The older direct `gpt` parameter proposer now uses Prompt Schema 2.2. Its
+The older direct `gpt` parameter proposer now uses Prompt Schema 2.3. Its
 feedback path already excluded holdout Trial rows; it now also compiles the scenario
 suite so that only training scenario enums, counts, weights, and allowlisted numeric
-Runtime inputs are visible. Holdout cases expose counts only—not types, IDs, seeds,
+Runtime inputs are visible. Stable `training_case_N` aliases keep same-type
+cases with different configurations or weights separate in the scenario
+contract and verified feedback, while raw case IDs remain sealed. Holdout cases
+expose counts only—not types, IDs, seeds,
 weights, configuration, outcomes, or metrics. Vehicle identity is reduced to
 catalog-backed categories, objective/constraint names are restricted to supported
 Trial metrics or stable `custom_*` aliases, and Candidate IDs/labels, arbitrary
 aggregate mappings, unrecognized scenario keys, and unknown failure-code strings
-are excluded. Capabilities report `prompt_schema_version=2.2` for this path;
+are excluded. Capabilities report `prompt_schema_version=2.3` for this path;
 nonphysical Trial outcomes are also excluded from parameter-learning counts and
 scenario failure feedback.
 
-Prompt Schema 2.2 and the Harness Evidence 2.4 compiler now share
+Prompt Schema 2.3 and the Harness Evidence 2.4 compiler now share
 `compile_candidate_feedback()`. Modern Candidate feedback is admitted only
 after the current Candidate identity, generation, parameters, and canonical
 training Trial rows reproduce its content-addressed outcome evidence. Scores,

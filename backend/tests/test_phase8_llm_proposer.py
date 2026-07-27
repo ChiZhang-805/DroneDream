@@ -339,7 +339,11 @@ def test_gpt_prompt_excludes_nonphysical_failures_from_parameter_evidence(
     assert prior["aggregated_metrics"]["optimizer_learning_failure_rate"] == 1.0
     assert prior["scenario_feedback"] == [
         {
+            "case_alias": "training_case_1",
             "scenario_type": "nominal",
+            "weight": 1.0,
+            "configured_seed_count": 1,
+            "config": {},
             "trial_count": 1,
             "passing_count": 0,
             "failure_codes": {"SIMULATION_FAILED": 1},
@@ -351,6 +355,117 @@ def test_gpt_prompt_excludes_nonphysical_failures_from_parameter_evidence(
     ]
     assert "ADAPTER_UNAVAILABLE" not in user_prompt
     assert "UNVERIFIED_SIMULATOR_FAILURE" not in user_prompt
+
+
+def test_gpt_prompt_keeps_same_type_scenario_cases_separate(
+    llm_ctx,
+) -> None:
+    """Different configured cases never collapse into one type-level mean."""
+
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        job.scenario_suite_json = {
+            "cases": [
+                {
+                    "id": "gentle-wind-private",
+                    "scenario_type": "wind_perturbed",
+                    "seeds": [111],
+                    "weight": 1.0,
+                    "enabled": True,
+                    "holdout": False,
+                    "config": {"wind_mps": 2.0},
+                },
+                {
+                    "id": "strong-wind-private",
+                    "scenario_type": "wind_perturbed",
+                    "seeds": [222],
+                    "weight": 3.0,
+                    "enabled": True,
+                    "holdout": False,
+                    "config": {"wind_mps": 8.0},
+                },
+            ],
+            "common_random_numbers": True,
+        }
+        search_space = ctx["proposer"]._search_space_for_job(job)
+        candidate = ctx["models"].CandidateParameterSet(
+            job_id=job_id,
+            generation_index=0,
+            source_type="baseline",
+            parameter_json=search_space.baseline(),
+            is_baseline=True,
+            trial_count=2,
+            completed_trial_count=2,
+            failed_trial_count=0,
+            aggregated_metric_json={"rmse": 0.6},
+            aggregated_score=0.6,
+        )
+        db.add(candidate)
+        db.flush()
+        for case_id, seed, weight, rmse, max_error in [
+            ("strong-wind-private", 222, 3.0, 0.9, 1.8),
+            ("gentle-wind-private", 111, 1.0, 0.3, 0.6),
+        ]:
+            trial = ctx["models"].Trial(
+                job_id=job_id,
+                candidate_id=candidate.id,
+                seed=seed,
+                scenario_type="wind_perturbed",
+                scenario_config_json={
+                    "scenario_case_id": case_id,
+                    "scenario_weight": weight,
+                    "holdout": False,
+                },
+                status="COMPLETED",
+            )
+            db.add(trial)
+            db.flush()
+            db.add(
+                ctx["models"].TrialMetric(
+                    trial_id=trial.id,
+                    score=rmse,
+                    rmse=rmse,
+                    max_error=max_error,
+                    overshoot_count=0,
+                    completion_time=10.0 + rmse,
+                    crash_flag=False,
+                    timeout_flag=False,
+                    final_error=rmse / 2,
+                    pass_flag=True,
+                    instability_flag=False,
+                )
+            )
+        db.flush()
+        criteria = ctx["acceptance"].criteria_for_job(job)
+        system_prompt, user_prompt, _ = ctx["proposer"]._build_prompt(
+            job,
+            criteria,
+            [candidate],
+            search_space,
+        )
+
+    payload = json.loads(user_prompt)
+    feedback = payload["previous_candidates"][0]["scenario_feedback"]
+    assert [item["case_alias"] for item in feedback] == [
+        "training_case_1",
+        "training_case_2",
+    ]
+    assert [item["scenario_type"] for item in feedback] == [
+        "wind_perturbed",
+        "wind_perturbed",
+    ]
+    assert [item["weight"] for item in feedback] == [1.0, 3.0]
+    assert [item["config"] for item in feedback] == [
+        {"wind_mps": 2.0},
+        {"wind_mps": 8.0},
+    ]
+    assert [item["mean_rmse"] for item in feedback] == [0.3, 0.9]
+    assert "never merge cases solely" in system_prompt
+    assert "gentle-wind-private" not in user_prompt
+    assert "strong-wind-private" not in user_prompt
 
 
 def test_model_paths_share_verified_feedback_and_quarantine_divergence(
@@ -605,7 +720,7 @@ def test_gpt_prompt_seals_holdout_and_compiles_closed_training_contract(
         )
 
     payload = json.loads(user)
-    assert payload["prompt_schema_version"] == "2.2"
+    assert payload["prompt_schema_version"] == "2.3"
     assert payload["vehicle_profile"]["px4_version"] == "custom_px4_version"
     assert payload["objective_config"]["objectives"][0]["metric"] == ("custom_objective_1")
     scenario = payload["scenario_suite"]
@@ -619,6 +734,7 @@ def test_gpt_prompt_seals_holdout_and_compiles_closed_training_contract(
         "holdout_replicate_count": 1,
         "training_cases": [
             {
+                "case_alias": "training_case_1",
                 "scenario_type": "wind_perturbed",
                 "seed_count": 2,
                 "weight": 2.0,

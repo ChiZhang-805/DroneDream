@@ -1,14 +1,14 @@
-# DroneDream Harness Engineering
+# AURORA Harness Engineering
 
-The DroneDream Harness is an evidence-gated agentic optimization framework.
-DroneDream is not a replacement flight simulator: PX4 SITL and Gazebo remain
-the flight-control and physics engines. The Harness adds a reproducible layer
-around them so a user can define an experiment once and let the system propose,
-execute, verify, compare, and learn from many bounded trials. Here, evidence
-means provenance-bound software evidence; it does not claim formal proof,
-airworthiness certification, or safety assurance for a real aircraft. The
-framework's public name will be applied consistently after the naming decision
-is finalized.
+**AURORA** expands to **Agentic UAV Refinement through Optimization,
+Reflection, and Assurance**. It is DroneDream's evidence-gated agentic
+optimization Harness. DroneDream is not a replacement flight simulator: PX4
+SITL and Gazebo remain the flight-control and physics engines. AURORA adds a
+reproducible layer around them so a user can define an experiment once and let
+the system propose, execute, verify, compare, and learn from many bounded
+trials. Here, assurance means provenance-bound software evidence and fail-closed
+authority boundaries; it does not claim formal proof, airworthiness
+certification, or safety assurance for a real aircraft.
 
 ```mermaid
 flowchart LR
@@ -654,7 +654,7 @@ changed Trial metric, incomplete relationship, or malformed evidence produces
 an empty `quarantined` feedback view: it is neither treated as progress nor
 converted into a parameter penalty. Legacy Candidates remain readable as
 explicit `legacy_unsealed` feedback for migration compatibility. The direct
-proposer exposes this closed status through Prompt Schema 2.2; the Harness keeps
+proposer exposes this closed status through Prompt Schema 2.3; AURORA keeps
 its existing Evidence 2.4 shape while replacing the data source behind that
 shape.
 
@@ -676,6 +676,18 @@ train the optimizer. Completion takes the same Job-before-Trial lock order as
 cancellation so their race cannot form a reverse-order row-lock cycle. Legacy
 v1 claims retain their original three-hash verification rules and are never
 silently reinterpreted as v2.
+
+Prompt Schema 2.3 closes a separate model-feedback ambiguity. Earlier direct-GPT
+feedback grouped Trials only by `scenario_type`, so two configured cases with
+the same type but different weight or physical configuration could collapse
+into one misleading mean. The compiler now assigns provider-safe
+`training_case_N` aliases in frozen suite order and reports each matched case
+separately with its declared weight, configured seed count, allowlisted numeric
+configuration, metrics, and closed failure counts. Raw case IDs and unsupported
+configuration text remain outside the prompt boundary; holdout cases remain
+sealed. A regression deliberately inserts same-type wind cases in reverse Trial
+order and proves that their evidence remains distinct and returns in canonical
+case order.
 
 The development routing corpus lives at
 `backend/tests/fixtures/harness_routing_eval_v1.jsonl`. It contains 24 diagnostic

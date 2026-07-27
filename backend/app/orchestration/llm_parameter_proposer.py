@@ -59,7 +59,7 @@ _MIN_PROPOSALS = 1
 _MAX_RESPONSE_NODES = 10_000
 _MAX_RESPONSE_DEPTH = 16
 _MAX_PROMPT_CANDIDATES = 8
-LLM_PROPOSER_PROMPT_SCHEMA_VERSION = "2.2"
+LLM_PROPOSER_PROMPT_SCHEMA_VERSION = "2.3"
 _PROMPT_AGGREGATE_KEYS = (
     "rmse",
     "max_error",
@@ -538,6 +538,10 @@ def _compile_scenario_contract(
     suite = schemas.ScenarioSuiteConfig(**(job.scenario_suite_json or {}))
     training_cases = [case for case in suite.cases if case.enabled and not case.holdout]
     holdout_cases = [case for case in suite.cases if case.enabled and case.holdout]
+    training_aliases = {
+        case.id: f"training_case_{index + 1}"
+        for index, case in enumerate(training_cases)
+    }
     training_type_counts: dict[str, int] = {}
     for case in training_cases:
         training_type_counts[case.scenario_type] = (
@@ -556,6 +560,7 @@ def _compile_scenario_contract(
         return payload
     payload["training_cases"] = [
         {
+            "case_alias": training_aliases[case.id],
             "scenario_type": case.scenario_type,
             "seed_count": len(case.seeds),
             "weight": case.weight,
@@ -577,10 +582,21 @@ def _build_prompt(
     search_space: SearchSpace,
 ) -> tuple[str, str, dict[str, Any]]:
     scenario_suite = schemas.ScenarioSuiteConfig(**(job.scenario_suite_json or {}))
+    training_cases = [
+        case
+        for case in scenario_suite.cases
+        if case.enabled and not case.holdout
+    ]
+    training_case_aliases = {
+        case.id: f"training_case_{index + 1}"
+        for index, case in enumerate(training_cases)
+    }
     system = (
         "You are an expert drone-control tuning assistant. Your job is to "
         "propose only the user-selected PX4 control parameters that improve "
         "simulator metrics under the configured scenario matrix and constraints. "
+        "Treat each scenario case alias as a distinct experimental condition; "
+        "never merge cases solely because they share a scenario_type. "
         "You must return only structured JSON conforming to the "
         "provided schema — no free-form text."
     )
@@ -648,7 +664,14 @@ def _build_prompt(
         passing_trial_count = 0
         scenario_feedback: dict[str, dict[str, Any]] = {}
         trusted_trials = (
-            sorted(cand.trials, key=lambda t: (t.created_at, t.id))
+            sorted(
+                cand.trials,
+                key=lambda trial: (
+                    trial.scenario_type,
+                    trial.seed,
+                    trial.id,
+                ),
+            )
             if feedback.usable
             else ()
         )
@@ -664,6 +687,10 @@ def _build_prompt(
                 or resolution.case is None
                 or resolution.case.holdout
             ):
+                continue
+            scenario_case = resolution.case
+            case_alias = training_case_aliases.get(scenario_case.id)
+            if case_alias is None:
                 continue
             metric = trial.metric
             rmse = _finite_number(metric.rmse) if metric is not None else None
@@ -689,9 +716,22 @@ def _build_prompt(
                 continue
             trial_count += 1
             bucket = scenario_feedback.setdefault(
-                trial.scenario_type,
+                scenario_case.id,
                 {
-                    "scenario_type": trial.scenario_type,
+                    "case_alias": case_alias,
+                    "scenario_type": scenario_case.scenario_type,
+                    "weight": scenario_case.weight,
+                    "configured_seed_count": len(scenario_case.seeds),
+                    "config": {
+                        key: numeric
+                        for key in sorted(_SAFE_SCENARIO_CONFIG_KEYS)
+                        if (
+                            numeric := _finite_number(
+                                scenario_case.config.get(key)
+                            )
+                        )
+                        is not None
+                    },
                     "trial_count": 0,
                     "completed_count": 0,
                     "passing_count": 0,
@@ -723,26 +763,34 @@ def _build_prompt(
                 )
                 codes[failure_code] = int(codes.get(failure_code, 0)) + 1
         compact_feedback: list[dict[str, Any]] = []
-        for bucket in scenario_feedback.values():
-            completed_count = int(bucket.pop("completed_count"))
-            rmse_sum = float(bucket.pop("rmse_sum"))
-            max_error_sum = float(bucket.pop("max_error_sum"))
-            completion_sum = float(bucket.pop("completion_time_sum"))
-            bucket["completed_count"] = completed_count
-            bucket["mean_rmse"] = (
+        for scenario_case in training_cases:
+            case_bucket = scenario_feedback.get(scenario_case.id)
+            if case_bucket is None:
+                continue
+            completed_count = int(case_bucket.pop("completed_count"))
+            rmse_sum = float(case_bucket.pop("rmse_sum"))
+            max_error_sum = float(case_bucket.pop("max_error_sum"))
+            completion_sum = float(
+                case_bucket.pop("completion_time_sum")
+            )
+            case_bucket["failure_codes"] = dict(
+                sorted(case_bucket["failure_codes"].items())
+            )
+            case_bucket["completed_count"] = completed_count
+            case_bucket["mean_rmse"] = (
                 round(rmse_sum / completed_count, 6) if completed_count else None
             )
-            bucket["mean_max_error"] = (
+            case_bucket["mean_max_error"] = (
                 round(max_error_sum / completed_count, 6)
                 if completed_count
                 else None
             )
-            bucket["mean_completion_time"] = (
+            case_bucket["mean_completion_time"] = (
                 round(completion_sum / completed_count, 6)
                 if completed_count
                 else None
             )
-            compact_feedback.append(bucket)
+            compact_feedback.append(case_bucket)
         completion_rate = (
             completed_trial_count / trial_count if trial_count > 0 else 0.0
         )
