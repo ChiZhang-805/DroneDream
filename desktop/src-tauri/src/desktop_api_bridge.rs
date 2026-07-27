@@ -86,6 +86,17 @@ struct CachedCredential {
     key: [u8; 32],
 }
 
+struct CanonicalRequest<'a> {
+    runtime_id: &'a str,
+    session_id: &'a str,
+    timestamp: &'a str,
+    nonce: &'a str,
+    method: &'a str,
+    path: &'a str,
+    body_sha256: &'a str,
+    authorization_sha256: &'a str,
+}
+
 pub struct DesktopApiBridge {
     session_id: String,
     credential: Mutex<Option<CachedCredential>>,
@@ -213,16 +224,16 @@ fn forward_request(
     let nonce = Uuid::new_v4().to_string();
     let body_sha256 = sha256_hex(body.as_bytes());
     let authorization_sha256 = sha256_hex(authorization.as_bytes());
-    let canonical = canonical_request(
-        &credential.runtime_id,
+    let canonical = canonical_request(&CanonicalRequest {
+        runtime_id: &credential.runtime_id,
         session_id,
-        &timestamp,
-        &nonce,
-        &method,
-        &request.path,
-        &body_sha256,
-        &authorization_sha256,
-    );
+        timestamp: &timestamp,
+        nonce: &nonce,
+        method: &method,
+        path: &request.path,
+        body_sha256: &body_sha256,
+        authorization_sha256: &authorization_sha256,
+    });
     let signature = hex::encode(hmac_sha256(&credential.key, canonical.as_bytes()));
 
     let client = Client::builder()
@@ -322,16 +333,17 @@ fn sha256_hex(value: &[u8]) -> String {
     hex::encode(Sha256::digest(value))
 }
 
-fn canonical_request(
-    runtime_id: &str,
-    session_id: &str,
-    timestamp: &str,
-    nonce: &str,
-    method: &str,
-    path: &str,
-    body_sha256: &str,
-    authorization_sha256: &str,
-) -> String {
+fn canonical_request(request: &CanonicalRequest<'_>) -> String {
+    let CanonicalRequest {
+        runtime_id,
+        session_id,
+        timestamp,
+        nonce,
+        method,
+        path,
+        body_sha256,
+        authorization_sha256,
+    } = request;
     format!(
         "{BRIDGE_VERSION}\n{runtime_id}\n{session_id}\n{timestamp}\n{nonce}\n{method}\n{path}\n{body_sha256}\n{authorization_sha256}\n"
     )
