@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, cast
@@ -1303,6 +1304,7 @@ def dispatch_next_harness_generation(
     job: models.Job,
     *,
     client: OpenAIClientLike | None = None,
+    before_dispatch: Callable[[], None] | None = None,
 ) -> AdaptiveDispatchResult:
     """Let the bounded planner select and dispatch one registered optimizer.
 
@@ -1360,6 +1362,11 @@ def dispatch_next_harness_generation(
     )
 
     decision = select_optimizer_tool(db, job, client=client)
+    # Provider I/O happens outside a long write transaction. The caller's
+    # compare-and-swap hook converts the still-live persistent finalization
+    # claim into a commit fence before any Candidate/Trial rows are created.
+    if before_dispatch is not None:
+        before_dispatch()
     if decision.generation != generation_index:
         raise RuntimeError("Harness decision generation drifted before trusted dispatch")
     if decision.tool_id == "cma_es":

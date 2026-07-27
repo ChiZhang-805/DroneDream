@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 from collections.abc import Iterator
+from datetime import timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from sqlalchemy import select
 
 
 class FakeOpenAIClient:
@@ -280,6 +284,645 @@ def test_cancelling_during_llm_call_rolls_back_new_generation(gpt_ctx) -> None:
         assert "job_cancelled" in event_types
         assert "generation_dispatched" not in event_types
         assert "llm_proposal_completed" not in event_types
+
+
+def test_llm_harness_concurrent_finalizers_dispatch_one_generation(gpt_ctx) -> None:
+    """Two processes racing the first claim still produce one dispatch."""
+
+    ctx = gpt_ctx
+    job_id = _create_job(
+        ctx,
+        strategy="llm_harness",
+        target_rmse=0.001,
+        max_iterations=2,
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+    while True:
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "concurrent-finalizer-worker",
+            )
+        if trial_id is None:
+            break
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingClient:
+        def __init__(self) -> None:
+            self._lock = threading.Lock()
+            self.calls = 0
+
+        def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
+            with self._lock:
+                self.calls += 1
+            entered.set()
+            if not release.wait(timeout=10):
+                raise TimeoutError("test did not release provider call")
+            return {
+                "decision": {
+                    "tool_id": "cma_es",
+                    "rationale": "Use bounded evolutionary search.",
+                }
+            }
+
+    client = BlockingClient()
+    errors: list[BaseException] = []
+    start_barrier = threading.Barrier(3)
+
+    def finalize_in_thread() -> None:
+        try:
+            start_barrier.wait(timeout=10)
+            with ctx["db_module"].SessionLocal() as db:
+                ctx["aggregation"].finalize_ready_jobs(db, limit=1)
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    ctx["aggregation"].set_llm_client_override(client)
+    workers = [
+        threading.Thread(target=finalize_in_thread, daemon=True)
+        for _ in range(2)
+    ]
+    for worker in workers:
+        worker.start()
+    try:
+        start_barrier.wait(timeout=10)
+        assert entered.wait(timeout=10), "winning finalizer never reached provider"
+        time.sleep(0.1)
+        assert client.calls == 1
+        release.set()
+        for worker in workers:
+            worker.join(timeout=10)
+            assert not worker.is_alive(), "concurrent finalizer did not finish"
+    finally:
+        release.set()
+        ctx["aggregation"].set_llm_client_override(None)
+        for worker in workers:
+            worker.join(timeout=10)
+
+    assert errors == []
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.status == "RUNNING"
+        assert job.current_generation == 1
+        assert job.finalization_claim_token is None
+        event_types = [event.event_type for event in job.events]
+        assert event_types.count("generation_dispatched") == 1
+        assert event_types.count("harness_decision_accepted") == 1
+        assert event_types.count("harness_tool_execution_result") == 1
+
+
+def test_llm_harness_expired_claim_cannot_duplicate_generation(
+    gpt_ctx,
+    monkeypatch,
+) -> None:
+    """A reclaimed provider response must roll back without dispatching."""
+
+    ctx = gpt_ctx
+    job_id = _create_job(
+        ctx,
+        strategy="llm_harness",
+        target_rmse=0.001,
+        max_iterations=2,
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+    while True:
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "expired-claim-worker",
+            )
+        if trial_id is None:
+            break
+
+    first_call_entered = threading.Event()
+    release_first_call = threading.Event()
+
+    class RacingClient:
+        def __init__(self) -> None:
+            self._lock = threading.Lock()
+            self.calls = 0
+
+        def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
+            with self._lock:
+                self.calls += 1
+                call_number = self.calls
+            if call_number == 1:
+                first_call_entered.set()
+                if not release_first_call.wait(timeout=10):
+                    raise TimeoutError("test did not release stale provider call")
+            return {
+                "decision": {
+                    "tool_id": "cma_es",
+                    "rationale": "Use bounded evolutionary search.",
+                }
+            }
+
+    class DisabledHeartbeat:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def start(self) -> None:
+            pass
+
+        def stop(self) -> None:
+            pass
+
+    client = RacingClient()
+    errors: list[BaseException] = []
+
+    def finalize_in_thread() -> None:
+        try:
+            with ctx["db_module"].SessionLocal() as db:
+                ctx["aggregation"].finalize_ready_jobs(db, limit=1)
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    monkeypatch.setattr(
+        ctx["aggregation"],
+        "_FinalizationLeaseHeartbeat",
+        DisabledHeartbeat,
+    )
+    ctx["aggregation"].set_llm_client_override(client)
+    stale_worker = threading.Thread(target=finalize_in_thread, daemon=True)
+    stale_worker.start()
+    try:
+        assert first_call_entered.wait(timeout=10), "first finalizer never reached provider"
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            stale_token = job.finalization_claim_token
+            assert stale_token is not None
+            job.finalization_lease_expires_at = (
+                ctx["aggregation"]._now() - timedelta(seconds=1)
+            )
+            db.commit()
+
+        with ctx["db_module"].SessionLocal() as db:
+            assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == []
+        assert client.calls == 2
+
+        release_first_call.set()
+        stale_worker.join(timeout=10)
+        assert not stale_worker.is_alive(), "stale finalizer did not exit"
+    finally:
+        release_first_call.set()
+        ctx["aggregation"].set_llm_client_override(None)
+        stale_worker.join(timeout=10)
+
+    assert errors == []
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.status == "RUNNING"
+        assert job.current_generation == 1
+        assert job.finalization_claim_token is None
+        assert job.finalization_claim_generation is None
+        assert job.finalization_lease_expires_at is None
+        generation_one_candidates = [
+            candidate
+            for candidate in job.candidates
+            if candidate.generation_index == 1
+        ]
+        assert generation_one_candidates
+        assert len({candidate.id for candidate in generation_one_candidates}) == len(
+            generation_one_candidates
+        )
+        event_types = [event.event_type for event in job.events]
+        assert event_types.count("generation_dispatched") == 1
+        assert event_types.count("harness_decision_accepted") == 1
+        assert event_types.count("harness_tool_execution_result") == 1
+        assert "job_failed" not in event_types
+
+
+def test_llm_harness_heartbeat_prevents_live_claim_takeover(
+    gpt_ctx,
+    monkeypatch,
+) -> None:
+    """A live provider call renews its explicit lease across DB sessions."""
+
+    ctx = gpt_ctx
+    job_id = _create_job(
+        ctx,
+        strategy="llm_harness",
+        target_rmse=0.001,
+        max_iterations=2,
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+    while True:
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "heartbeat-worker",
+            )
+        if trial_id is None:
+            break
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
+            self.calls += 1
+            entered.set()
+            if not release.wait(timeout=10):
+                raise TimeoutError("test did not release provider call")
+            return {
+                "decision": {
+                    "tool_id": "cma_es",
+                    "rationale": "Use bounded evolutionary search.",
+                }
+            }
+
+    client = BlockingClient()
+    errors: list[BaseException] = []
+
+    def finalize_in_thread() -> None:
+        try:
+            with ctx["db_module"].SessionLocal() as db:
+                ctx["aggregation"].finalize_ready_jobs(db, limit=1)
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    monkeypatch.setattr(
+        ctx["aggregation"],
+        "get_settings",
+        lambda: SimpleNamespace(
+            finalization_lease_seconds=1,
+            finalization_lease_heartbeat_seconds=0.05,
+        ),
+    )
+    ctx["aggregation"].set_llm_client_override(client)
+    worker = threading.Thread(target=finalize_in_thread, daemon=True)
+    worker.start()
+    try:
+        assert entered.wait(timeout=10), "finalizer never reached provider"
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            initial_token = job.finalization_claim_token
+            initial_expiry = job.finalization_lease_expires_at
+        assert initial_token is not None
+        assert initial_expiry is not None
+
+        time.sleep(0.2)
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            assert job.finalization_claim_token == initial_token
+            assert job.finalization_lease_expires_at > initial_expiry
+            assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == []
+        assert client.calls == 1
+
+        release.set()
+        worker.join(timeout=10)
+        assert not worker.is_alive(), "live finalizer did not finish"
+    finally:
+        release.set()
+        ctx["aggregation"].set_llm_client_override(None)
+        worker.join(timeout=10)
+
+    assert errors == []
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.status == "RUNNING"
+        assert job.current_generation == 1
+        assert job.finalization_claim_token is None
+        event_types = [event.event_type for event in job.events]
+        assert event_types.count("generation_dispatched") == 1
+        assert event_types.count("harness_tool_execution_result") == 1
+
+
+def test_stale_terminal_finalizer_cannot_publish_report_or_events(
+    gpt_ctx,
+    monkeypatch,
+) -> None:
+    """A reclaimed non-iterative finalizer is fenced before report storage."""
+
+    ctx = gpt_ctx
+    job_id = _create_job(ctx, strategy="heuristic", target_rmse=None)
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+    while True:
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "stale-terminal-worker",
+            )
+        if trial_id is None:
+            break
+
+    class DisabledHeartbeat:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def start(self) -> None:
+            pass
+
+        def stop(self) -> None:
+            pass
+
+    first_rank_entered = threading.Event()
+    release_first_rank = threading.Event()
+    call_lock = threading.Lock()
+    rank_calls = 0
+    report_calls = 0
+    original_rank = ctx["aggregation"]._rank_and_select_best
+    original_report = ctx["aggregation"].report_generator.generate_and_persist_report
+
+    def blocking_rank(candidates):
+        nonlocal rank_calls
+        with call_lock:
+            rank_calls += 1
+            call_number = rank_calls
+        if call_number == 1:
+            first_rank_entered.set()
+            if not release_first_rank.wait(timeout=10):
+                raise TimeoutError("test did not release stale terminal finalizer")
+        return original_rank(candidates)
+
+    def counted_report(*args, **kwargs):
+        nonlocal report_calls
+        with call_lock:
+            report_calls += 1
+        return original_report(*args, **kwargs)
+
+    errors: list[BaseException] = []
+
+    def finalize_in_thread() -> None:
+        try:
+            with ctx["db_module"].SessionLocal() as db:
+                ctx["aggregation"].finalize_ready_jobs(db, limit=1)
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    monkeypatch.setattr(
+        ctx["aggregation"],
+        "_FinalizationLeaseHeartbeat",
+        DisabledHeartbeat,
+    )
+    monkeypatch.setattr(ctx["aggregation"], "_rank_and_select_best", blocking_rank)
+    monkeypatch.setattr(
+        ctx["aggregation"].report_generator,
+        "generate_and_persist_report",
+        counted_report,
+    )
+    stale_worker = threading.Thread(target=finalize_in_thread, daemon=True)
+    stale_worker.start()
+    try:
+        assert first_rank_entered.wait(timeout=10), "finalizer never reached terminal ranking"
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            job.finalization_lease_expires_at = (
+                ctx["aggregation"]._now() - timedelta(seconds=1)
+            )
+            db.commit()
+        with ctx["db_module"].SessionLocal() as db:
+            assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == [job_id]
+
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            before_release_event_ids = [event.id for event in job.events]
+            before_release_artifact_ids = list(
+                db.scalars(
+                    select(ctx["models"].Artifact.id).where(
+                        ctx["models"].Artifact.owner_type == "job",
+                        ctx["models"].Artifact.owner_id == job_id,
+                    )
+                )
+            )
+            assert job.report is not None
+        assert report_calls == 1
+
+        release_first_rank.set()
+        stale_worker.join(timeout=10)
+        assert not stale_worker.is_alive(), "stale terminal finalizer did not exit"
+    finally:
+        release_first_rank.set()
+        stale_worker.join(timeout=10)
+
+    assert errors == []
+    assert report_calls == 1
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.status == "COMPLETED"
+        assert job.finalization_claim_token is None
+        assert [event.id for event in job.events] == before_release_event_ids
+        assert list(
+            db.scalars(
+                select(ctx["models"].Artifact.id).where(
+                    ctx["models"].Artifact.owner_type == "job",
+                    ctx["models"].Artifact.owner_id == job_id,
+                )
+            )
+        ) == before_release_artifact_ids
+        event_types = [event.event_type for event in job.events]
+        assert event_types.count("best_candidate_selected") == 1
+        assert event_types.count("job_completed") == 1
+
+
+def test_cancellation_fences_finalizer_before_report_publication(
+    gpt_ctx,
+    monkeypatch,
+) -> None:
+    """A committed cancellation clears the claim before a report can publish."""
+
+    ctx = gpt_ctx
+    job_id = _create_job(ctx, strategy="heuristic", target_rmse=None)
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+    while True:
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "cancel-race-worker",
+            )
+        if trial_id is None:
+            break
+
+    class DisabledHeartbeat:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def start(self) -> None:
+            pass
+
+        def stop(self) -> None:
+            pass
+
+    rank_entered = threading.Event()
+    release_rank = threading.Event()
+    report_calls = 0
+    original_rank = ctx["aggregation"]._rank_and_select_best
+    original_report = ctx["aggregation"].report_generator.generate_and_persist_report
+
+    def blocking_rank(candidates):
+        rank_entered.set()
+        if not release_rank.wait(timeout=10):
+            raise TimeoutError("test did not release cancelled finalizer")
+        return original_rank(candidates)
+
+    def counted_report(*args, **kwargs):
+        nonlocal report_calls
+        report_calls += 1
+        return original_report(*args, **kwargs)
+
+    errors: list[BaseException] = []
+    finalized: list[str] = []
+
+    def finalize_in_thread() -> None:
+        try:
+            with ctx["db_module"].SessionLocal() as db:
+                finalized.extend(ctx["aggregation"].finalize_ready_jobs(db, limit=1))
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    monkeypatch.setattr(
+        ctx["aggregation"],
+        "_FinalizationLeaseHeartbeat",
+        DisabledHeartbeat,
+    )
+    monkeypatch.setattr(ctx["aggregation"], "_rank_and_select_best", blocking_rank)
+    monkeypatch.setattr(
+        ctx["aggregation"].report_generator,
+        "generate_and_persist_report",
+        counted_report,
+    )
+    finalizer = threading.Thread(target=finalize_in_thread, daemon=True)
+    finalizer.start()
+    try:
+        assert rank_entered.wait(timeout=10), "finalizer never reached terminal ranking"
+        with ctx["db_module"].SessionLocal() as db:
+            cancelled = ctx["jobs_service"].cancel_job(db, job_id)
+            assert cancelled.status == "CANCELLED"
+            assert cancelled.finalization_claim_token is None
+
+        release_rank.set()
+        finalizer.join(timeout=10)
+        assert not finalizer.is_alive(), "cancelled finalizer did not exit"
+    finally:
+        release_rank.set()
+        finalizer.join(timeout=10)
+
+    assert errors == []
+    assert finalized == []
+    assert report_calls == 0
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.status == "CANCELLED"
+        assert job.report is None
+        assert job.finalization_claim_token is None
+        assert job.finalization_claim_generation is None
+        assert job.finalization_lease_expires_at is None
+        event_types = [event.event_type for event in job.events]
+        assert event_types.count("job_cancelled") == 1
+        assert "best_candidate_selected" not in event_types
+        assert "job_completed" not in event_types
+        assert "job_failed" not in event_types
+
+
+def test_stale_failure_finalizer_cannot_commit_failure_event(
+    gpt_ctx,
+    monkeypatch,
+) -> None:
+    """A reclaimed failure path cannot overwrite the current finalizer."""
+
+    ctx = gpt_ctx
+    job_id = _create_job(ctx, strategy="heuristic", target_rmse=None)
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+    while True:
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "stale-failure-worker",
+            )
+        if trial_id is None:
+            break
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        job.baseline_candidate_id = None
+        db.commit()
+
+    class DisabledHeartbeat:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def start(self) -> None:
+            pass
+
+        def stop(self) -> None:
+            pass
+
+    first_failure_entered = threading.Event()
+    release_first_failure = threading.Event()
+    call_lock = threading.Lock()
+    failure_calls = 0
+    original_fail = ctx["aggregation"]._fail_job
+
+    def blocking_fail(*args, **kwargs):
+        nonlocal failure_calls
+        with call_lock:
+            failure_calls += 1
+            call_number = failure_calls
+        if call_number == 1:
+            first_failure_entered.set()
+            if not release_first_failure.wait(timeout=10):
+                raise TimeoutError("test did not release stale failure finalizer")
+        return original_fail(*args, **kwargs)
+
+    errors: list[BaseException] = []
+
+    def finalize_in_thread() -> None:
+        try:
+            with ctx["db_module"].SessionLocal() as db:
+                ctx["aggregation"].finalize_ready_jobs(db, limit=1)
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            errors.append(exc)
+
+    monkeypatch.setattr(
+        ctx["aggregation"],
+        "_FinalizationLeaseHeartbeat",
+        DisabledHeartbeat,
+    )
+    monkeypatch.setattr(ctx["aggregation"], "_fail_job", blocking_fail)
+    stale_worker = threading.Thread(target=finalize_in_thread, daemon=True)
+    stale_worker.start()
+    try:
+        assert first_failure_entered.wait(timeout=10), "finalizer never reached failure path"
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            job.finalization_lease_expires_at = (
+                ctx["aggregation"]._now() - timedelta(seconds=1)
+            )
+            db.commit()
+        with ctx["db_module"].SessionLocal() as db:
+            assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == [job_id]
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            before_release_event_ids = [event.id for event in job.events]
+            assert job.status == "FAILED"
+            assert job.report is None
+
+        release_first_failure.set()
+        stale_worker.join(timeout=10)
+        assert not stale_worker.is_alive(), "stale failure finalizer did not exit"
+    finally:
+        release_first_failure.set()
+        stale_worker.join(timeout=10)
+
+    assert errors == []
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job.status == "FAILED"
+        assert job.latest_error_code == "BASELINE_MISSING"
+        assert job.finalization_claim_token is None
+        assert [event.id for event in job.events] == before_release_event_ids
+        event_types = [event.event_type for event in job.events]
+        assert event_types.count("job_failed") == 1
 
 
 def test_heuristic_mode_still_finalizes_and_purges_secrets(gpt_ctx):

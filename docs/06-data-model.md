@@ -66,8 +66,18 @@ CREATED | QUEUED | RUNNING | AGGREGATING | FINALIZING |
 COMPLETED | FAILED | CANCELLED
 ```
 
-`FINALIZING` is a committed, cancellable, time-bounded lease used while reports
-or LLM summaries are produced outside a long database transaction.
+`FINALIZING` is a committed, cancellable, renewable lease used while reports or
+LLM decisions are produced outside a long database transaction. The Job stores
+an opaque `finalization_claim_token`, the exact
+`finalization_claim_generation`, and `finalization_lease_expires_at`. A
+heartbeat may extend only the same unexpired token and generation. Before an
+aggregation, failure, next-generation dispatch, report, or terminal-state
+transaction can commit, the worker must atomically renew that exact claim. This
+compare-and-swap update is the write fence on both SQLite and PostgreSQL. Report
+generation acquires the fence before writing immutable filesystem or object
+storage and holds the Job-row lock through the terminal commit. An expired or
+replaced worker rolls back its pending state/events and exits without
+dispatching or publishing a report.
 
 ## JobSecret
 

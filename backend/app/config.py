@@ -104,6 +104,10 @@ class Settings(BaseSettings):
     job_secret_ttl_seconds: int = Field(default=86400, ge=300, le=604800)
     job_secret_cleanup_interval_seconds: int = Field(default=60, ge=10, le=3600)
     finalization_lease_seconds: int = Field(default=900, ge=60, le=7200)
+    finalization_lease_heartbeat_seconds: float = Field(
+        default=30.0,
+        gt=0,
+    )
     sqlite_busy_timeout_seconds: int = Field(default=30, ge=1, le=300)
     auth_mode: Literal["disabled", "demo_token", "oidc_jwt"] = Field(default="disabled")
     demo_auth_tokens: str = Field(default="")
@@ -144,6 +148,14 @@ class Settings(BaseSettings):
         if self.worker_lease_heartbeat_seconds >= self.worker_lease_seconds:
             raise ValueError(
                 "WORKER_LEASE_HEARTBEAT_SECONDS must be less than WORKER_LEASE_SECONDS"
+            )
+        if (
+            self.finalization_lease_heartbeat_seconds
+            >= self.finalization_lease_seconds
+        ):
+            raise ValueError(
+                "FINALIZATION_LEASE_HEARTBEAT_SECONDS must be less than "
+                "FINALIZATION_LEASE_SECONDS"
             )
         if self.worker_presence_interval_seconds >= self.worker_presence_ttl_seconds:
             raise ValueError(

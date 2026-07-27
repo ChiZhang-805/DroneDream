@@ -168,6 +168,14 @@ def test_worker_heartbeat_intervals_must_fit_inside_their_leases() -> None:
         Settings(worker_lease_seconds=30, worker_lease_heartbeat_seconds=30)
     with pytest.raises(ValidationError, match="PRESENCE_INTERVAL_SECONDS"):
         Settings(worker_presence_interval_seconds=45, worker_presence_ttl_seconds=45)
+    with pytest.raises(
+        ValidationError,
+        match="FINALIZATION_LEASE_HEARTBEAT_SECONDS",
+    ):
+        Settings(
+            finalization_lease_seconds=60,
+            finalization_lease_heartbeat_seconds=60,
+        )
 
 
 def test_cors_origins_reject_paths_and_insecure_production_web_origins() -> None:

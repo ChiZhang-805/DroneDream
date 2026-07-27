@@ -105,8 +105,11 @@ python3 -m venv .venv
 - Worker lease / reclaim:
   - `WORKER_LEASE_SECONDS` (default `900`)
   - `WORKER_STALE_RUNNING_RECLAIM_ENABLED` (default `true`)
-  - `FINALIZATION_LEASE_SECONDS` (must cover the configured LLM timeout and
-    retry window; default `900`)
+  - `FINALIZATION_LEASE_SECONDS` (renewable finalizer claim lifetime; default
+    `900`)
+  - `FINALIZATION_LEASE_HEARTBEAT_SECONDS` (independent renewal cadence; default
+    `30`, must be shorter than the finalization lease, and is runtime-clamped
+    to no more than one third of the lease)
 - Real simulator execution:
   - `SIMULATOR_BACKEND=real_cli`
   - `REAL_SIMULATOR_COMMAND` (PX4/Gazebo runner executable plus arguments)

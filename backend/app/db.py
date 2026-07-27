@@ -115,6 +115,33 @@ def _apply_sqlite_lightweight_migrations() -> None:
         for column_name, column_type in experiment_columns.items():
             if column_name not in job_columns:
                 conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
+        finalization_claim_columns = {
+            "finalization_claim_token": "VARCHAR(64)",
+            "finalization_claim_generation": "INTEGER",
+            "finalization_lease_expires_at": "DATETIME",
+        }
+        for column_name, column_type in finalization_claim_columns.items():
+            if column_name not in job_columns:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE jobs ADD COLUMN {column_name} "
+                        f"{column_type}"
+                    )
+                )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_finalization_claim_token "
+                "ON jobs(finalization_claim_token)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_finalization_lease_expires_at "
+                "ON jobs(finalization_lease_expires_at)"
+            )
+        )
         if "parameter_catalog_version" not in job_columns:
             conn.execute(
                 text(

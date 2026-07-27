@@ -14,7 +14,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
@@ -868,6 +868,36 @@ def get_batch(db: Session, batch_id: str, *, user: models.User | None = None) ->
     return batch
 
 
+def _claim_job_cancellation(
+    db: Session,
+    job: models.Job,
+    *,
+    cancelled_at: datetime,
+) -> bool:
+    """Serialize cancellation against finalization's Job-row write fence."""
+
+    result = db.execute(
+        update(models.Job)
+        .where(
+            models.Job.id == job.id,
+            models.Job.status.in_(schemas.JOB_CANCELLABLE_STATUSES),
+        )
+        .values(
+            status="CANCELLED",
+            cancelled_at=cancelled_at,
+            current_phase=None,
+            finalization_claim_token=None,
+            finalization_claim_generation=None,
+            finalization_lease_expires_at=None,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    db.expire(job)
+    db.refresh(job)
+    rowcount = getattr(result, "rowcount", None)
+    return isinstance(rowcount, int) and rowcount == 1
+
+
 def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
     batch = get_batch(db, batch_id, user=user)
     if batch.jobs and all(child.status in schemas.JOB_TERMINAL_STATUSES for child in batch.jobs):
@@ -885,9 +915,10 @@ def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None)
             # terminalized this child without performing the invariant cleanup.
             purge_job_secrets(db, child, reason="batch_cancel_terminal_sweep")
             continue
-        child.status = "CANCELLED"
-        child.cancelled_at = now
-        child.current_phase = None
+        if not _claim_job_cancellation(db, child, cancelled_at=now):
+            if child.status in schemas.JOB_TERMINAL_STATUSES:
+                purge_job_secrets(db, child, reason="batch_cancel_terminal_sweep")
+            continue
         for trial in child.trials:
             if trial.status in terminal_trials:
                 continue
@@ -944,9 +975,23 @@ def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
         )
     now = _now()
     terminal_trials = {"COMPLETED", "FAILED", "CANCELLED"}
-    job.status = "CANCELLED"
-    job.cancelled_at = now
-    job.current_phase = None
+    if not _claim_job_cancellation(db, job, cancelled_at=now):
+        if job.status in schemas.JOB_TERMINAL_STATUSES:
+            code = (
+                "JOB_ALREADY_CANCELLED"
+                if job.status == "CANCELLED"
+                else "JOB_ALREADY_COMPLETED"
+            )
+            raise JobServiceError(
+                code,
+                f"Job {job.id} is already in terminal state {job.status}.",
+                http_status=409,
+            )
+        raise JobServiceError(
+            "JOB_NOT_RUNNABLE",
+            f"Job {job.id} in status {job.status} cannot be cancelled.",
+            http_status=409,
+        )
     for trial in job.trials:
         if trial.status in terminal_trials:
             continue

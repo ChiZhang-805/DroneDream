@@ -178,6 +178,12 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     db_module._apply_sqlite_lightweight_migrations()
 
     with db_module.engine.begin() as conn:
+        job_columns = {
+            row[1]
+            for row in conn.execute(
+                text("PRAGMA table_info('jobs')")
+            ).fetchall()
+        }
         columns = {row[1] for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()}
         batch_columns = {
             row[1] for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
@@ -234,6 +240,11 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 text("PRAGMA table_info('artifact_digest_delete_authorizations')")
             ).fetchall()
         }
+    assert {
+        "finalization_claim_token",
+        "finalization_claim_generation",
+        "finalization_lease_expires_at",
+    }.issubset(job_columns)
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
@@ -359,6 +370,12 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "PRAGMA table_info('candidate_parameter_sets')"
             ).fetchall()
         }
+        job_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info('jobs')"
+            ).fetchall()
+        }
     assert trigger_names == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
@@ -387,6 +404,11 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "winner_freeze_delete_authorizations",
     }
     assert "evidence_ledger_required" in candidate_columns
+    assert {
+        "finalization_claim_token",
+        "finalization_claim_generation",
+        "finalization_lease_expires_at",
+    }.issubset(job_columns)
 
 
 def test_postgresql_winner_freeze_migration_emits_immutable_trigger(
@@ -551,7 +573,7 @@ def test_alembic_has_one_candidate_evidence_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260727_0010 (head)"]
+    assert heads == ["20260727_0011 (head)"]
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

@@ -1,9 +1,14 @@
 # DroneDream Harness Engineering
 
-DroneDream is not a replacement flight simulator. PX4 SITL and Gazebo remain
-the flight-control and physics engines. DroneDream adds a reproducible harness
+The DroneDream Harness is an evidence-gated agentic optimization framework.
+DroneDream is not a replacement flight simulator: PX4 SITL and Gazebo remain
+the flight-control and physics engines. The Harness adds a reproducible layer
 around them so a user can define an experiment once and let the system propose,
-execute, verify, compare, and learn from many bounded trials.
+execute, verify, compare, and learn from many bounded trials. Here, evidence
+means provenance-bound software evidence; it does not claim formal proof,
+airworthiness certification, or safety assurance for a real aircraft. The
+framework's public name will be applied consistently after the naming decision
+is finalized.
 
 ```mermaid
 flowchart LR
@@ -103,6 +108,21 @@ provider quota before deterministic rejection.
 The displayed full-Candidate Trial cost and remaining full-Candidate capacity
 come from the same validated scenario-matrix compiler used by dispatch, including
 enabled training and holdout seed rows rather than the legacy Job default.
+
+Provider calls are protected by a persistent finalization claim rather than an
+in-memory mutex or `updated_at` heuristic. Each claim binds an opaque token to
+the Job's current generation and an explicit expiry; an independent database
+session renews it while the provider is running. After the provider returns,
+the server executes a conditional Job update for the same status, token,
+generation, and still-live expiry before deterministic dispatch. The same fence
+guards the aggregation-result commit and every failure, no-usable-candidate,
+report, and terminal commit under SQLite and PostgreSQL. Report generation
+acquires it before filesystem or object-storage writes and holds the Job row
+through terminal commit. If another worker replaced the expired token, the old
+worker rolls back its pending started/accepted/fallback events and every
+Candidate/Trial mutation, and does not mark the Job failed or publish a report.
+Cancellation first acquires the same Job-row serialization point and every
+RUNNING or terminal transition clears all claim fields.
 
 Every provider-call start event stores the bounded safe evidence snapshot and
 static tool manifest with evidence, manifest, and full-prompt SHA-256 values plus

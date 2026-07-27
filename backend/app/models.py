@@ -151,6 +151,24 @@ class Job(Base):
     max_total_trials: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     current_generation: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     optimization_outcome: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Cross-process finalization fencing. The opaque token identifies one
+    # exact claim; generation prevents a stale claim from crossing a dispatch
+    # boundary, and the explicit expiry is renewable without overloading
+    # ``updated_at`` with lease semantics.
+    finalization_claim_token: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        index=True,
+    )
+    finalization_claim_generation: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    finalization_lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
     openai_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     llm_provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
     llm_base_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)

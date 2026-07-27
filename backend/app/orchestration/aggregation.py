@@ -27,11 +27,15 @@ from __future__ import annotations
 
 import logging
 import math
+import secrets
+import threading
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import and_, or_, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -100,6 +104,137 @@ _ITERATIVE_OPTIMIZERS = {
     "cma_es",
     *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
 }
+
+
+class FinalizationClaimLost(RuntimeError):
+    """Raised when a reclaimed finalizer reaches a persistence boundary."""
+
+
+@dataclass(frozen=True)
+class _FinalizationClaimToken:
+    """Persistent fencing identity for one Job generation finalization."""
+
+    job_id: str
+    token: str
+    generation: int
+
+
+def _clear_finalization_claim(job: models.Job) -> None:
+    job.finalization_claim_token = None
+    job.finalization_claim_generation = None
+    job.finalization_lease_expires_at = None
+
+
+def _renew_finalization_claim(
+    db: Session,
+    claim: _FinalizationClaimToken,
+    *,
+    lease_seconds: int,
+) -> bool:
+    """Renew/fence only a still-live exact claim; expired tokens never revive."""
+
+    now = _now()
+    # Do not flush pending events, Candidate rows, or report metadata before
+    # ownership has been fenced. A failed CAS must be a pure rollback path.
+    with db.no_autoflush:
+        result = cast(
+            CursorResult[Any],
+            db.execute(
+                update(models.Job)
+                .where(
+                    models.Job.id == claim.job_id,
+                    models.Job.status == "FINALIZING",
+                    models.Job.current_generation == claim.generation,
+                    models.Job.finalization_claim_token == claim.token,
+                    models.Job.finalization_claim_generation == claim.generation,
+                    models.Job.finalization_lease_expires_at.is_not(None),
+                    models.Job.finalization_lease_expires_at > now,
+                )
+                .values(
+                    finalization_lease_expires_at=now
+                    + timedelta(seconds=lease_seconds),
+                )
+                .execution_options(synchronize_session=False)
+            ),
+        )
+    return result.rowcount == 1
+
+
+class _FinalizationLeaseHeartbeat:
+    """Renew a finalization claim from independent short-lived DB sessions."""
+
+    def __init__(
+        self,
+        claim: _FinalizationClaimToken,
+        *,
+        lease_seconds: int,
+        interval_seconds: float,
+    ) -> None:
+        self._claim = claim
+        self._lease_seconds = lease_seconds
+        self._interval_seconds = interval_seconds
+        self._stop = threading.Event()
+        self.lost = threading.Event()
+        self._started = False
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"finalization-lease-{claim.job_id}",
+            daemon=True,
+        )
+
+    def start(self) -> None:
+        if self._started:
+            return
+        self._started = True
+        self._thread.start()
+
+    def stop(self) -> None:
+        if not self._started:
+            return
+        self._stop.set()
+        self._thread.join(
+            timeout=max(1.0, self._interval_seconds + 1.0),
+        )
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval_seconds):
+            try:
+                with SessionLocal() as heartbeat_db:
+                    if not _renew_finalization_claim(
+                        heartbeat_db,
+                        self._claim,
+                        lease_seconds=self._lease_seconds,
+                    ):
+                        heartbeat_db.rollback()
+                        self.lost.set()
+                        return
+                    heartbeat_db.commit()
+            except Exception:
+                # A transient database error does not itself prove ownership
+                # loss. The expiry-aware CAS at each persistence boundary is
+                # still authoritative.
+                logger.warning(
+                    "failed to renew finalization claim for job %s",
+                    self._claim.job_id,
+                    exc_info=True,
+                )
+
+
+def _acquire_finalization_commit_fence(
+    db: Session,
+    claim: _FinalizationClaimToken,
+) -> None:
+    """Acquire the Job-row write fence before any finalizer persistence."""
+
+    if not _renew_finalization_claim(
+        db,
+        claim,
+        lease_seconds=get_settings().finalization_lease_seconds,
+    ):
+        db.rollback()
+        raise FinalizationClaimLost(
+            f"finalization claim for {claim.job_id} was reclaimed"
+        )
 
 
 def _candidate_fidelity(candidate: object) -> float:
@@ -1252,6 +1387,7 @@ def finalize_job_if_ready(
     db: Session,
     job: models.Job,
     *,
+    finalization_claim: _FinalizationClaimToken,
     llm_client: object | None = None,
 ) -> bool:
     """If every trial is terminal, aggregate candidates and finalize the job.
@@ -1264,8 +1400,17 @@ def finalize_job_if_ready(
     iteration/trial budget is exhausted.
     """
 
-    if job.status not in {"RUNNING", "AGGREGATING", "FINALIZING"}:
+    if job.status != "FINALIZING":
         return False
+    if (
+        job.finalization_claim_token != finalization_claim.token
+        or job.finalization_claim_generation
+        != finalization_claim.generation
+        or job.current_generation != finalization_claim.generation
+    ):
+        raise FinalizationClaimLost(
+            f"finalization claim for {job.id} no longer matches the Job"
+        )
 
     trials = list(job.trials)
     if not trials:
@@ -1273,22 +1418,25 @@ def finalize_job_if_ready(
     if not all(t.status in _TERMINAL_TRIAL for t in trials):
         return False
 
-    # RUNNING -> AGGREGATING transition so the frontend can display the phase.
-    if job.status == "RUNNING":
-        job.status = "AGGREGATING"
-        job.current_phase = "aggregating"
-        record_event(db, job.id, "aggregation_started", None)
-        db.commit()
-        db.refresh(job)
-        trials = list(job.trials)
-
     baseline_id = job.baseline_candidate_id
     if baseline_id is None:
-        _fail_job(db, job, code="BASELINE_MISSING", message="No baseline candidate was created.")
+        _fail_job(
+            db,
+            job,
+            finalization_claim=finalization_claim,
+            code="BASELINE_MISSING",
+            message="No baseline candidate was created.",
+        )
         return True
     baseline = db.get(models.CandidateParameterSet, baseline_id)
     if baseline is None:
-        _fail_job(db, job, code="BASELINE_MISSING", message="Baseline candidate row missing.")
+        _fail_job(
+            db,
+            job,
+            finalization_claim=finalization_claim,
+            code="BASELINE_MISSING",
+            message="Baseline candidate row missing.",
+        )
         return True
 
     # Aggregate every candidate (baseline first so the baseline_agg variable
@@ -1314,6 +1462,7 @@ def finalize_job_if_ready(
         _fail_job(
             db,
             job,
+            finalization_claim=finalization_claim,
             code="OUTCOME_CONTRACT_DRIFT",
             message=(
                 "The persisted optimization outcome contract no longer "
@@ -1341,7 +1490,9 @@ def finalize_job_if_ready(
 
     # Persist aggregation results before any report storage or LLM network I/O.
     # This releases SQLite's write lock while a provider or filesystem is slow.
+    _acquire_finalization_commit_fence(db, finalization_claim)
     db.commit()
+    db.refresh(job)
     if _job_is_cancelled(job.id):
         db.rollback()
         return True
@@ -1350,6 +1501,7 @@ def finalize_job_if_ready(
         _fail_job(
             db,
             job,
+            finalization_claim=finalization_claim,
             code="ALL_TRIALS_FAILED",
             message=(
                 "All baseline trials failed; cannot produce a report. "
@@ -1364,7 +1516,13 @@ def finalize_job_if_ready(
     # generation instead of finalizing.
     if job.optimizer_strategy in _ITERATIVE_OPTIMIZERS:
         if _try_continue_iterative_optimizer(
-            db, job, baseline, candidates, criteria, llm_client=llm_client
+            db,
+            job,
+            baseline,
+            candidates,
+            criteria,
+            finalization_claim=finalization_claim,
+            llm_client=llm_client,
         ):
             return False
         if job.status in {"FAILED", "COMPLETED", "CANCELLED"}:
@@ -1372,9 +1530,19 @@ def finalize_job_if_ready(
 
     best = _rank_and_select_best(candidates)
     if best is None or best.aggregated_metric_json is None:
-        _finalize_without_usable_candidate(db, job, baseline_agg=baseline_agg, baseline=baseline)
+        _finalize_without_usable_candidate(
+            db,
+            job,
+            baseline_agg=baseline_agg,
+            baseline=baseline,
+            finalization_claim=finalization_claim,
+        )
         return True
 
+    # Report generation writes immutable filesystem/object-storage artifacts.
+    # Fence first and hold the Job write lock through the terminal commit so an
+    # expired/reclaimed worker can never publish report side effects.
+    _acquire_finalization_commit_fence(db, finalization_claim)
     job.best_candidate_id = best.id
 
     try:
@@ -1413,6 +1581,7 @@ def finalize_job_if_ready(
         _fail_job(
             db,
             job,
+            finalization_claim=finalization_claim,
             code="REPORT_EVIDENCE_INVALID",
             message=(
                 "Candidate report or winner-selection evidence no longer "
@@ -1434,6 +1603,7 @@ def finalize_job_if_ready(
     outcome, terminal_status, terminal_error = _determine_terminal_state(job, best, criteria)
     now = _now()
     job.status = terminal_status
+    _clear_finalization_claim(job)
     job.current_phase = "completed" if terminal_status == "COMPLETED" else None
     job.optimization_outcome = outcome
     if terminal_status == "COMPLETED":
@@ -1532,6 +1702,7 @@ def _try_continue_iterative_optimizer(
     candidates: list[models.CandidateParameterSet],
     criteria: AcceptanceCriteria,
     *,
+    finalization_claim: _FinalizationClaimToken,
     llm_client: object | None,
 ) -> bool:
     """If an iterative optimizer should run another generation, dispatch it.
@@ -1578,6 +1749,7 @@ def _try_continue_iterative_optimizer(
             _fail_job(
                 db,
                 job,
+                finalization_claim=finalization_claim,
                 code="LLM_FAILED",
                 message=llm_dispatch.error or "LLM proposer failed.",
                 outcome="llm_failed",
@@ -1594,6 +1766,10 @@ def _try_continue_iterative_optimizer(
             db,
             job,
             client=client_cast,
+            before_dispatch=lambda: _acquire_finalization_commit_fence(
+                db,
+                finalization_claim,
+            ),
         )
         if harness_dispatch.status in {
             "budget_exhausted",
@@ -1625,8 +1801,12 @@ def _try_continue_iterative_optimizer(
     if _job_is_cancelled(job.id):
         db.rollback()
         return False
+    # Every dispatcher stages Candidate/Trial/event mutations in this Session.
+    # The exact claim must still win before any strategy can commit them.
+    _acquire_finalization_commit_fence(db, finalization_claim)
     # Return to RUNNING so the worker keeps draining trials.
     job.status = "RUNNING"
+    _clear_finalization_claim(job)
     db.commit()
     db.refresh(job)
     return True
@@ -1638,13 +1818,12 @@ def _finalize_without_usable_candidate(
     *,
     baseline_agg: dict[str, Any] | None,
     baseline: models.CandidateParameterSet,
+    finalization_claim: _FinalizationClaimToken,
 ) -> None:
     """Terminal state when no candidate produced a usable aggregate."""
 
     db.refresh(job)
-    if job.status == "CANCELLED":
-        db.rollback()
-        return
+    _acquire_finalization_commit_fence(db, finalization_claim)
 
     if baseline_agg is not None:
         # Preserve a diagnostic baseline comparison without publishing a
@@ -1663,6 +1842,7 @@ def _finalize_without_usable_candidate(
             return
     now = _now()
     job.status = "COMPLETED"
+    _clear_finalization_claim(job)
     job.completed_at = now
     job.current_phase = "completed"
     job.optimization_outcome = "no_usable_candidate"
@@ -1691,15 +1871,15 @@ def _fail_job(
     db: Session,
     job: models.Job,
     *,
+    finalization_claim: _FinalizationClaimToken,
     code: str,
     message: str,
     outcome: str | None = None,
 ) -> None:
-    if _job_is_cancelled(job.id):
-        db.rollback()
-        return
+    _acquire_finalization_commit_fence(db, finalization_claim)
     now = _now()
     job.status = "FAILED"
+    _clear_finalization_claim(job)
     job.failed_at = now
     job.current_phase = None
     job.latest_error_code = code
@@ -1728,9 +1908,10 @@ def set_llm_client_override(client: object | None) -> None:
 def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
     """Claim and finalize ready jobs without holding a DB lock over external I/O.
 
-    ``FINALIZING`` plus ``updated_at`` acts as a bounded lease. The claim is
-    committed before report/LLM work; a crashed worker's stale claim becomes
-    reclaimable after ``FINALIZATION_LEASE_SECONDS``.
+    Each claim persists an opaque token, generation, and explicit renewable
+    expiry. The claim is committed before report/LLM work; a crashed worker's
+    expired token is atomically replaced. A provider response can dispatch
+    only after a token-and-generation compare-and-swap fence succeeds.
     """
 
     finalized: list[str] = []
@@ -1740,12 +1921,27 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
         # spend minutes in an LLM call, so reusing the function-entry timestamp
         # could make a later claim stale the instant it is committed.
         claim_time = _now()
-        stale_before = claim_time - timedelta(seconds=get_settings().finalization_lease_seconds)
+        settings = get_settings()
+        stale_before = claim_time - timedelta(
+            seconds=settings.finalization_lease_seconds
+        )
+        legacy_or_malformed_stale_claim = and_(
+            models.Job.updated_at <= stale_before,
+            or_(
+                models.Job.finalization_claim_token.is_(None),
+                models.Job.finalization_claim_generation.is_(None),
+                models.Job.finalization_lease_expires_at.is_(None),
+            ),
+        )
         claimable = or_(
             models.Job.status.in_(["RUNNING", "AGGREGATING"]),
             and_(
                 models.Job.status == "FINALIZING",
-                models.Job.updated_at <= stale_before,
+                or_(
+                    models.Job.finalization_lease_expires_at
+                    <= claim_time,
+                    legacy_or_malformed_stale_claim,
+                ),
             ),
         )
         stmt = select(models.Job).where(claimable)
@@ -1758,15 +1954,25 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
         trials = list(job.trials)
         if not trials or not all(t.status in _TERMINAL_TRIAL for t in trials):
             continue
+        claim = _FinalizationClaimToken(
+            job_id=job.id,
+            token=secrets.token_hex(32),
+            generation=job.current_generation,
+        )
         claimed = db.execute(
             update(models.Job)
             .where(
                 models.Job.id == job.id,
+                models.Job.current_generation == claim.generation,
                 claimable,
             )
             .values(
                 status="FINALIZING",
                 current_phase="aggregating",
+                finalization_claim_token=claim.token,
+                finalization_claim_generation=claim.generation,
+                finalization_lease_expires_at=claim_time
+                + timedelta(seconds=settings.finalization_lease_seconds),
                 updated_at=claim_time,
             )
             .execution_options(synchronize_session=False)
@@ -1779,12 +1985,36 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
         record_event(db, job.id, "aggregation_started", None)
         db.commit()
         db.refresh(job)
+        heartbeat_interval = min(
+            settings.finalization_lease_heartbeat_seconds,
+            max(0.1, settings.finalization_lease_seconds / 3),
+        )
+        heartbeat = _FinalizationLeaseHeartbeat(
+            claim,
+            lease_seconds=settings.finalization_lease_seconds,
+            interval_seconds=heartbeat_interval,
+        )
+        heartbeat.start()
         try:
-            if finalize_job_if_ready(db, job, llm_client=_llm_client_override):
+            if finalize_job_if_ready(
+                db,
+                job,
+                finalization_claim=claim,
+                llm_client=_llm_client_override,
+            ):
                 finalized.append(job.id)
+        except FinalizationClaimLost:
+            # A newer worker owns this Job. Roll back every pending event and
+            # Candidate/Trial mutation produced from the stale provider result.
+            db.rollback()
+            logger.info(
+                "job %s finalization claim was reclaimed; stale worker exited",
+                job.id,
+            )
         except Exception as exc:
             logger.exception("job %s finalization crashed", job.id)
             db.rollback()
+            db.expire_all()
             failed_job = db.get(models.Job, job.id)
             if failed_job is None or failed_job.status == "CANCELLED":
                 continue
@@ -1792,6 +2022,7 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
                 _fail_job(
                     db,
                     failed_job,
+                    finalization_claim=claim,
                     code="FINALIZATION_FAILED",
                     message=(
                         "Finalization failed while producing optimizer output or "
@@ -1800,7 +2031,15 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
                     outcome="no_usable_candidate",
                 )
                 finalized.append(job.id)
+            except FinalizationClaimLost:
+                db.rollback()
+                logger.info(
+                    "job %s failure handling lost its finalization claim",
+                    job.id,
+                )
             except Exception:
                 db.rollback()
                 logger.exception("job %s could not be marked failed", job.id)
+        finally:
+            heartbeat.stop()
     return finalized
