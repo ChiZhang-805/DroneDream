@@ -145,7 +145,12 @@ python3 -m venv .venv
     asymmetric `OIDC_ALGORITHMS`
   - packaged desktop also requires `DESKTOP_BRIDGE_REQUIRED=true` and
     `DRONEDREAM_RUNTIME_ID`; each `/api/v1` request must carry the native
-    Runtime/session/body/token-bound proof, and its nonce is durably one-use
+    Runtime/session/body/token/idempotency-bound Bridge v2 proof, and its nonce
+    is durably one-use
+  - Job/Batch create, update, rerun, cancel, and delete actions require a
+    canonical UUID `Idempotency-Key` in packaged desktop mode. The key hash,
+    request hash, domain change, and exact safe response commit atomically;
+    exact retries replay and changed reuse returns `409`
   - `DESKTOP_BRIDGE_CLOCK_SKEW_SECONDS` bounds proof age (packaged default
     `30`); `DESKTOP_BRIDGE_NONCE_RETENTION_SECONDS` bounds replay-receipt
     retention (packaged default `600`)

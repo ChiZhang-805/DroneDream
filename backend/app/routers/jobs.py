@@ -7,11 +7,12 @@ import io
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app import models, schemas
+from app.api_idempotency import begin_mutation
 from app.auth import get_current_user
 from app.db import get_db
 from app.orchestration.winner_freeze import (
@@ -55,12 +56,24 @@ def create_job(
     req: schemas.JobCreateRequest,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.create",
+        idempotency_key=idempotency_key,
+        payload=req.model_dump(mode="json"),
+    )
+    if gate.replay is not None:
+        return gate.replay
     try:
-        job = job_service.create_job(db, req, user=user)
+        job = job_service.create_job(db, req, user=user, commit=False)
     except job_service.JobServiceError as err:
+        db.rollback()
         _raise(err)
-    return ok(_job_payload_with_alias(job_service.to_job_schema(job)))
+    response = ok(_job_payload_with_alias(job_service.to_job_schema(job)))
+    return gate.complete(response, resource_type="job", resource_id=job.id)
 
 
 @router.get("/jobs")
@@ -174,12 +187,24 @@ def update_job(
     req: schemas.JobUpdateRequest,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.update",
+        idempotency_key=idempotency_key,
+        payload={"job_id": job_id, "request": req.model_dump(mode="json")},
+    )
+    if gate.replay is not None:
+        return gate.replay
     try:
-        job = job_service.update_job(db, job_id, req, user=user)
+        job = job_service.update_job(db, job_id, req, user=user, commit=False)
     except job_service.JobServiceError as err:
+        db.rollback()
         _raise(err)
-    return ok(job_service.to_job_schema(job).model_dump(mode="json"))
+    response = ok(job_service.to_job_schema(job).model_dump(mode="json"))
+    return gate.complete(response, resource_type="job", resource_id=job.id)
 
 
 @router.post("/jobs/{job_id}/rerun")
@@ -188,7 +213,20 @@ def rerun_job(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
     req: schemas.JobRerunRequest | None = None,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.rerun",
+        idempotency_key=idempotency_key,
+        payload={
+            "job_id": job_id,
+            "request": req.model_dump(mode="json") if req is not None else None,
+        },
+    )
+    if gate.replay is not None:
+        return gate.replay
     try:
         job = job_service.rerun_job(
             db,
@@ -196,10 +234,13 @@ def rerun_job(
             user=user,
             openai=(req.openai if req else None),
             llm=(req.llm if req else None),
+            commit=False,
         )
     except job_service.JobServiceError as err:
+        db.rollback()
         _raise(err)
-    return ok(_job_payload_with_alias(job_service.to_job_schema(job)))
+    response = ok(_job_payload_with_alias(job_service.to_job_schema(job)))
+    return gate.complete(response, resource_type="job", resource_id=job.id)
 
 
 @router.post("/jobs/{job_id}/cancel")
@@ -207,12 +248,24 @@ def cancel_job(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.cancel",
+        idempotency_key=idempotency_key,
+        payload={"job_id": job_id},
+    )
+    if gate.replay is not None:
+        return gate.replay
     try:
-        job = job_service.cancel_job(db, job_id, user=user)
+        job = job_service.cancel_job(db, job_id, user=user, commit=False)
     except job_service.JobServiceError as err:
+        db.rollback()
         _raise(err)
-    return ok(job_service.to_job_schema(job).model_dump(mode="json"))
+    response = ok(job_service.to_job_schema(job).model_dump(mode="json"))
+    return gate.complete(response, resource_type="job", resource_id=job.id)
 
 
 @router.delete("/jobs/{job_id}")
@@ -220,12 +273,24 @@ def delete_job(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.delete",
+        idempotency_key=idempotency_key,
+        payload={"job_id": job_id},
+    )
+    if gate.replay is not None:
+        return gate.replay
     try:
-        payload = job_service.delete_job(db, job_id, user=user)
+        payload = job_service.delete_job(db, job_id, user=user, commit=False)
     except job_service.JobServiceError as err:
+        db.rollback()
         _raise(err)
-    return ok(payload)
+    response = ok(payload)
+    return gate.complete(response, resource_type="job", resource_id=job_id)
 
 
 @router.get("/jobs/{job_id}/trials")

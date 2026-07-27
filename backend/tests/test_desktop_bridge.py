@@ -55,6 +55,7 @@ def _proof(
     nonce: str | None = None,
     session_id: str | None = None,
     timestamp: int | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, str]:
     timestamp_text = str(int(time.time()) if timestamp is None else timestamp)
     nonce = nonce or str(uuid4())
@@ -64,7 +65,7 @@ def _proof(
     authorization_sha256 = hashlib.sha256(authorization.encode()).hexdigest()
     canonical = "\n".join(
         (
-            "DD-BRIDGE-V1",
+            "DD-BRIDGE-V2",
             runtime_id,
             session_id,
             timestamp_text,
@@ -73,18 +74,19 @@ def _proof(
             path_query,
             body_sha256,
             authorization_sha256,
+            idempotency_key or "",
             "",
         )
     ).encode()
     key = hmac.new(
         APP_SECRET.encode(),
-        b"dronedream-desktop-bridge-v1",
+        b"dronedream-desktop-bridge-v2",
         hashlib.sha256,
     ).digest()
     signature = hmac.new(key, canonical, hashlib.sha256).hexdigest()
-    return {
+    headers = {
         "Authorization": authorization,
-        "X-DroneDream-Bridge-Version": "DD-BRIDGE-V1",
+        "X-DroneDream-Bridge-Version": "DD-BRIDGE-V2",
         "X-DroneDream-Runtime-Id": runtime_id,
         "X-DroneDream-Session-Id": session_id,
         "X-DroneDream-Timestamp": timestamp_text,
@@ -92,6 +94,9 @@ def _proof(
         "X-DroneDream-Body-Sha256": body_sha256,
         "X-DroneDream-Signature": signature,
     }
+    if idempotency_key is not None:
+        headers["Idempotency-Key"] = idempotency_key
+    return headers
 
 
 def test_desktop_bridge_accepts_one_proof_and_rejects_replay(
@@ -169,7 +174,12 @@ def test_desktop_bridge_preserves_user_ownership_boundary(
     created = client.post(
         "/api/v1/jobs",
         headers={
-            **_proof("POST", "/api/v1/jobs", body=payload),
+            **_proof(
+                "POST",
+                "/api/v1/jobs",
+                body=payload,
+                idempotency_key=str(uuid4()),
+            ),
             "Content-Type": "application/json",
         },
         content=payload,
@@ -183,6 +193,57 @@ def test_desktop_bridge_preserves_user_ownership_boundary(
         headers=_proof("GET", foreign_path, token=TOKEN_B),
     )
     assert foreign.status_code == 404
+
+
+def test_desktop_business_mutation_requires_idempotency_key(
+    client: TestClient,
+    monkeypatch: object,
+) -> None:
+    _configure(monkeypatch)
+    payload = (
+        b'{"track_type":"circle","start_point":{"x":0,"y":0},"altitude_m":5,'
+        b'"wind":{"north":0,"east":0,"south":0,"west":0},'
+        b'"sensor_noise_level":"medium","objective_profile":"robust",'
+        b'"optimizer_strategy":"heuristic","simulator_backend":"mock"}'
+    )
+
+    response = client.post(
+        "/api/v1/jobs",
+        headers={
+            **_proof("POST", "/api/v1/jobs", body=payload),
+            "Content-Type": "application/json",
+        },
+        content=payload,
+    )
+
+    assert response.status_code == 428
+    assert response.json()["error"]["code"] == "IDEMPOTENCY_KEY_REQUIRED"
+
+
+def test_desktop_bridge_binds_idempotency_key_to_request_proof(
+    client: TestClient,
+    monkeypatch: object,
+) -> None:
+    _configure(monkeypatch)
+    signed_key = str(uuid4())
+    replaced_key = str(uuid4())
+    headers = _proof(
+        "POST",
+        "/api/v1/jobs/compare",
+        body=b'{"job_ids":["job_missing"]}',
+        idempotency_key=signed_key,
+    )
+    headers["Idempotency-Key"] = replaced_key
+    headers["Content-Type"] = "application/json"
+
+    response = client.post(
+        "/api/v1/jobs/compare",
+        headers=headers,
+        content=b'{"job_ids":["job_missing"]}',
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "DESKTOP_BRIDGE_INVALID_PROOF"
 
 
 def test_desktop_bridge_does_not_wrap_public_health(

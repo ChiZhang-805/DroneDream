@@ -25,8 +25,8 @@ from app.config import Settings
 from app.db import SessionLocal
 from app.response import err
 
-_VERSION = "DD-BRIDGE-V1"
-_DERIVATION_LABEL = b"dronedream-desktop-bridge-v1"
+_VERSION = "DD-BRIDGE-V2"
+_DERIVATION_LABEL = b"dronedream-desktop-bridge-v2"
 _MAX_BODY_BYTES = 2 * 1024 * 1024
 
 
@@ -70,6 +70,7 @@ def _canonical_request(
     path_query: str,
     body_sha256: str,
     authorization_sha256: str,
+    idempotency_key: str,
 ) -> bytes:
     return (
         "\n".join(
@@ -83,6 +84,7 @@ def _canonical_request(
                 path_query,
                 body_sha256,
                 authorization_sha256,
+                idempotency_key,
                 "",
             )
         )
@@ -185,6 +187,17 @@ async def enforce_desktop_bridge(
 
     authorization = request.headers.get("Authorization", "")
     authorization_sha256 = hashlib.sha256(authorization.encode("utf-8")).hexdigest()
+    raw_idempotency_key = request.headers.get("Idempotency-Key", "")
+    if raw_idempotency_key:
+        parsed_idempotency_key = _canonical_uuid(raw_idempotency_key)
+        if parsed_idempotency_key is None:
+            return _rejection(
+                "DESKTOP_BRIDGE_INVALID_PROOF",
+                "The desktop idempotency key is malformed.",
+            )
+        idempotency_key = parsed_idempotency_key
+    else:
+        idempotency_key = ""
     raw_path = request.scope.get("raw_path")
     path_query = (
         bytes(raw_path).decode("ascii")
@@ -203,6 +216,7 @@ async def enforce_desktop_bridge(
         path_query=path_query,
         body_sha256=body_sha256,
         authorization_sha256=authorization_sha256,
+        idempotency_key=idempotency_key,
     )
     try:
         expected = hmac.new(_bridge_key(), canonical, hashlib.sha256).hexdigest()

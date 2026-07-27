@@ -78,6 +78,7 @@ export interface DesktopApiRequest {
   body?: string | null;
   accessToken?: string | null;
   accept?: "application/json" | "application/octet-stream" | "text/csv";
+  idempotencyKey?: string | null;
 }
 
 export interface DesktopApiResponse {

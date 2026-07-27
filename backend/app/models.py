@@ -84,6 +84,56 @@ class DesktopBridgeNonce(Base):
     )
 
 
+class ApiIdempotencyRecord(Base):
+    """Atomic receipt for one authenticated business mutation.
+
+    The response is committed in the same transaction as the domain change.
+    A retry can therefore replay the original result without executing the
+    mutation again, including after the desktop application restarts.
+    """
+
+    __tablename__ = "api_idempotency_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key_hash",
+            name="uq_api_idempotency_user_key",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+        default=lambda: _new_id("idem"),
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    idempotency_key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    operation: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="IN_PROGRESS",
+        index=True,
+    )
+    response_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    resource_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    resource_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
 class BatchJob(Base):
     __tablename__ = "batch_jobs"
 

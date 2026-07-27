@@ -94,12 +94,122 @@ async function triggerBrowserDownload(
   }
 }
 
+interface RequestPolicy {
+  requireRuntimeLiveness?: boolean;
+  idempotentMutation?: boolean;
+}
+
+interface PendingMutation {
+  fingerprint: string;
+  idempotencyKey: string;
+  createdAt: number;
+}
+
+const PENDING_MUTATIONS_STORAGE_KEY =
+  "dronedream.api.pending-mutations.v1";
+const PENDING_MUTATION_TTL_MS = 30 * 60 * 1000;
+const MAX_PENDING_MUTATIONS = 16;
+const CANONICAL_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function loadPendingMutations(now = Date.now()): PendingMutation[] {
+  try {
+    const parsed = JSON.parse(
+      localStorage.getItem(PENDING_MUTATIONS_STORAGE_KEY) ?? "[]",
+    ) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((value): value is PendingMutation => {
+        if (!value || typeof value !== "object") return false;
+        const candidate = value as Partial<PendingMutation>;
+        return (
+          typeof candidate.fingerprint === "string" &&
+          /^[0-9a-f]{64}$/.test(candidate.fingerprint) &&
+          typeof candidate.idempotencyKey === "string" &&
+          CANONICAL_UUID.test(candidate.idempotencyKey) &&
+          typeof candidate.createdAt === "number" &&
+          Number.isFinite(candidate.createdAt) &&
+          candidate.createdAt <= now &&
+          now - candidate.createdAt <= PENDING_MUTATION_TTL_MS
+        );
+      })
+      .slice(-MAX_PENDING_MUTATIONS);
+  } catch {
+    return [];
+  }
+}
+
+function savePendingMutations(entries: PendingMutation[]): void {
+  try {
+    if (entries.length === 0) {
+      localStorage.removeItem(PENDING_MUTATIONS_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(
+      PENDING_MUTATIONS_STORAGE_KEY,
+      JSON.stringify(entries.slice(-MAX_PENDING_MUTATIONS)),
+    );
+  } catch {
+    // Storage can be unavailable under restrictive WebView policies. The
+    // in-call exact retry remains safe even without restart persistence.
+  }
+}
+
+async function mutationFingerprint(
+  path: string,
+  init: RequestInit | undefined,
+): Promise<string | null> {
+  if (!crypto.subtle) return null;
+  const method = (init?.method ?? "GET").toUpperCase();
+  const body = typeof init?.body === "string" ? init.body : "";
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${method}\n${path}\n${body}`),
+  );
+  return Array.from(new Uint8Array(digest), (value) =>
+    value.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function preparePendingMutation(
+  path: string,
+  init: RequestInit | undefined,
+): Promise<PendingMutation> {
+  const fingerprint = await mutationFingerprint(path, init);
+  const now = Date.now();
+  const existing = loadPendingMutations(now);
+  if (fingerprint) {
+    const match = existing.find(
+      (entry) => entry.fingerprint === fingerprint,
+    );
+    if (match) return match;
+  }
+  const created: PendingMutation = {
+    fingerprint: fingerprint ?? "0".repeat(64),
+    idempotencyKey: crypto.randomUUID(),
+    createdAt: now,
+  };
+  if (fingerprint) savePendingMutations([...existing, created]);
+  return created;
+}
+
+function clearPendingMutation(pending: PendingMutation | null): void {
+  if (!pending || pending.fingerprint === "0".repeat(64)) return;
+  savePendingMutations(
+    loadPendingMutations().filter(
+      (entry) =>
+        entry.fingerprint !== pending.fingerprint ||
+        entry.idempotencyKey !== pending.idempotencyKey,
+    ),
+  );
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,
-  requireRuntimeLiveness = false,
+  policy: RequestPolicy = {},
 ): Promise<T> {
-  if (isDesktopRuntime() && requireRuntimeLiveness) {
+  if (isDesktopRuntime() && policy.requireRuntimeLiveness) {
     const readiness = getDesktopReadinessSession()?.snapshot;
     if (!readiness?.ready) {
       throw new ApiClientError(
@@ -133,18 +243,42 @@ async function request<T>(
     }
   }
 
+  const pendingMutation = policy.idempotentMutation
+    ? await preparePendingMutation(path, init)
+    : null;
+  const idempotencyKey = pendingMutation?.idempotencyKey ?? null;
+  const send = () =>
+    transportRequest(path, init, "application/json", idempotencyKey);
   let response: Response;
   try {
-    response = await transportRequest(path, init, "application/json");
+    response = await send();
   } catch (networkError) {
-    throw new ApiClientError(
-      "NETWORK_ERROR",
-      networkError instanceof Error
-        ? networkError.message
-        : "Failed to reach the API.",
-      null,
-      0,
-    );
+    // A transport failure can occur after the Runtime committed the action but
+    // before its response reached the WebView. Retrying once is safe only for
+    // endpoints whose durable backend receipt binds this exact key and body.
+    if (idempotencyKey) {
+      try {
+        response = await send();
+      } catch (retryError) {
+        throw new ApiClientError(
+          "NETWORK_ERROR",
+          retryError instanceof Error
+            ? retryError.message
+            : "Failed to reach the API after a safe retry.",
+          null,
+          0,
+        );
+      }
+    } else {
+      throw new ApiClientError(
+        "NETWORK_ERROR",
+        networkError instanceof Error
+          ? networkError.message
+          : "Failed to reach the API.",
+        null,
+        0,
+      );
+    }
   }
 
   let envelope: ApiEnvelope<T>;
@@ -163,7 +297,11 @@ async function request<T>(
   // malformed backend must not turn a 4xx/5xx response into a successful
   // mutation merely by returning a body with `success: true`.
   if (response.ok && envelope.success === true) {
+    clearPendingMutation(pendingMutation);
     return envelope.data;
+  }
+  if (!response.ok && envelope.success === false) {
+    clearPendingMutation(pendingMutation);
   }
   const error = envelope?.error;
   throw new ApiClientError(
@@ -188,6 +326,7 @@ async function transportRequest(
   init?: RequestInit,
   accept: "application/json" | "application/octet-stream" | "text/csv" =
     "application/json",
+  idempotencyKey: string | null = null,
 ): Promise<Response> {
   if (!isDesktopRuntime()) {
     return fetch(`${API_BASE_URL}/api/v1${path}`, {
@@ -197,6 +336,9 @@ async function transportRequest(
         Accept: accept,
         ...authHeaders(),
         ...(init?.headers ?? {}),
+        ...(idempotencyKey
+          ? { "Idempotency-Key": idempotencyKey }
+          : {}),
       },
     });
   }
@@ -214,6 +356,7 @@ async function transportRequest(
     body: (init?.body as string | undefined) ?? null,
     accessToken: currentAccessToken(),
     accept,
+    idempotencyKey,
   });
   const decoded = decodeBase64(bridged.bodyBase64);
   const bodyBuffer = Uint8Array.from(decoded).buffer;
@@ -262,7 +405,10 @@ export const apiClient = {
     return request<Job>("/jobs", {
       method: "POST",
       body: JSON.stringify(req),
-    }, true);
+    }, {
+      requireRuntimeLiveness: true,
+      idempotentMutation: true,
+    });
   },
 
   async listJobs(params?: {
@@ -294,12 +440,12 @@ export const apiClient = {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}`, {
       method: "PATCH",
       body: JSON.stringify(req),
-    });
+    }, { idempotentMutation: true });
   },
   async deleteJob(jobId: string): Promise<DeleteJobResponse> {
     return request<DeleteJobResponse>(`/jobs/${encodeURIComponent(jobId)}`, {
       method: "DELETE",
-    });
+    }, { idempotentMutation: true });
   },
 
   async listJobTrials(jobId: string): Promise<TrialSummary[]> {
@@ -435,14 +581,17 @@ export const apiClient = {
   async cancelJob(jobId: string): Promise<Job> {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel`, {
       method: "POST",
-    });
+    }, { idempotentMutation: true });
   },
 
   async rerunJob(jobId: string, req?: JobRerunRequest): Promise<Job> {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/rerun`, {
       method: "POST",
       body: JSON.stringify(req ?? {}),
-    }, true);
+    }, {
+      requireRuntimeLiveness: true,
+      idempotentMutation: true,
+    });
   },
 
   async compareJobs(jobIds: string[]): Promise<JobCompareResponse> {
@@ -494,7 +643,10 @@ export const apiClient = {
     return request<BatchJob>("/batches", {
       method: "POST",
       body: JSON.stringify(req),
-    }, true);
+    }, {
+      requireRuntimeLiveness: true,
+      idempotentMutation: true,
+    });
   },
 
   async listBatches(params?: {
@@ -519,7 +671,7 @@ export const apiClient = {
   async cancelBatch(batchId: string): Promise<BatchJob> {
     return request<BatchJob>(`/batches/${encodeURIComponent(batchId)}/cancel`, {
       method: "POST",
-    });
+    }, { idempotentMutation: true });
   },
 };
 

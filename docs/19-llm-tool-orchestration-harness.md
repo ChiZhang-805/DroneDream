@@ -4276,6 +4276,13 @@ key fail `409`; an abandoned `in_progress` row is reconciled against domain stat
 before it can be retried and is never treated as permission to repeat an external
 effect.
 
+The current desktop-scale implementation is the strict subset
+`(user_id, idempotency_key_hash)` plus finite operation, canonical request hash,
+status, exact JSON response, response status, resource type/ID, and timestamps.
+It deliberately survives Job deletion and process restart. The broader
+principal/tenant/route schema, expected-state binding, reconciliation states,
+retention counters, and hosted deployment metadata remain target work.
+
 The table is principal-owned for authorization/retention but deliberately does not
 cascade with a deleted Job: a short-lived tombstone must still answer an exact retry
 of `DELETE` or prevent a duplicated create after its target row is gone. Cleanup uses
@@ -5235,7 +5242,7 @@ does not replace application access control. Tauri likewise describes CSP as imp
 reduction for WebView vulnerabilities and capabilities as the IPC authority boundary,
 not as authentication for a separate loopback HTTP service. Therefore
 `AUTH_MODE=disabled + bind(127.0.0.1)` remains a development convenience, not a
-production desktop design. Bridge v1 preserves OIDC as the user identity and adds
+production desktop design. Bridge v2 preserves OIDC as the user identity and adds
 proof of desktop possession instead of inventing a second user. Rust reads neither the
 stored application secret nor a reusable bridge token into JavaScript. A fixed
 shell-free WSL command derives a domain-separated HMAC key inside the signed Runtime
@@ -5244,18 +5251,30 @@ manifest, and returns only the derived key to the native process.
 
 Each application launch owns a random UUID session ID. Every request receives a fresh
 UUID nonce and integer timestamp; the HMAC covers protocol version, Runtime ID, session
-ID, timestamp, nonce, method, exact raw path/query, SHA-256 of the body, and SHA-256 of
-the Authorization header. The API verifies the signature in constant time, enforces a
+ID, timestamp, nonce, method, exact raw path/query, SHA-256 of the body, SHA-256 of
+the Authorization header, and the optional mutation idempotency key. The API verifies
+the signature in constant time, enforces a
 30-second clock window, recomputes both digests, compares the Runtime ID, and inserts
 the nonce into `desktop_bridge_nonces` before route execution. The primary key makes
 parallel or later reuse a durable `409 DESKTOP_BRIDGE_REPLAY`, including across API
 process restarts until bounded expiry cleanup.
 
+Job and Batch create/update/rerun/cancel/delete routes now use a durable
+`api_idempotency_records` receipt. A canonical UUID is generated once per logical
+frontend action, reused for one ambiguous transport retry, and bound into Bridge v2.
+If the application stops before receiving a definitive response, a bounded 30-minute
+pending-action record retains only the SHA-256 method/path/body fingerprint, UUID, and
+creation time. It stores no request body, bearer token, or provider credential, and is
+removed after a valid success or structured failure.
+The server persists only the UUID's SHA-256. The receipt, canonical request hash, exact safe response,
+and domain mutation commit together; exact retries replay the result and changed
+operation/body reuse fails `409 IDEMPOTENCY_CONFLICT`.
+
 The current bridge still forwards from native Rust to an authenticated loopback
 listener and returns bounded bytes through IPC. Moving that last hop to a
-permission-restricted Runtime UDS, adding response MACs, per-mutation durable
-idempotency/result coalescing, expected-state versions, and native streaming save
-dialogs remain target work. The implemented claim is therefore protection against
+permission-restricted Runtime UDS, adding response MACs, expected-state versions, and
+native streaming save dialogs remain target work. The implemented claim is therefore
+protection against
 direct WebView HTTP, hostile web origins, accidental arbitrary clients, stale proofs,
 changed bodies/tokens, wrong Runtime services, and request replay. It does not claim to
 isolate DroneDream from malware already controlling the same Windows account, WSL
@@ -5269,8 +5288,9 @@ gateway; the orchestration service still uses Section 17.3.2's provider-call bou
 
 #### 17.3.5 Request proof, replay, and response binding
 
-Bridge v1 implements the request-side subset above. The remaining UDS/response-binding
-target uses the following closed frame rather than exposing raw HTTP:
+Bridge v2 implements the request-side subset plus transaction-bound Job/Batch mutation
+coalescing described above. The remaining UDS/response-binding target uses the
+following closed frame rather than exposing raw HTTP:
 
 ```text
 DesktopApiRequestV1 {
@@ -6874,9 +6894,9 @@ check; Runtime checks occur only in the launcher or after the explicit Settings
 | Current area | Reuse | Required change |
 | --- | --- | --- |
 | `backend/app/schemas.py` | parameter, scenario, acceptance, and provider validation | split orchestration mode from fixed algorithm; add plan/evidence/tool schemas plus a closed `OptimizationOutcomeContractV1` whose metric IDs, estimators, risk measures, constraints, transforms, scalarizations, references, missingness, and selection policies are registry enums rather than executable client expressions |
-| `backend/app/services/jobs.py` and `backend/app/routers/jobs.py` | strict create/rerun validation, user-scoped nested routes, bounded Job serialization, compatibility aliases | add versioned orchestration object, legacy conflict detection, redacted summaries, cursor-paginated decision/provenance/event reads, transport-injected one-time session-reference exchange, expected-state/idempotency requirements, and non-secret Job-binding rules |
-| `backend/app/auth.py`, `backend/app/desktop_bridge.py`, `backend/app/main.py`, `runtime/config/runtime.env.default`, and API routers | OIDC issuer/subject identity, asymmetric algorithm allowlist, required `exp`/`iss`/`sub`/`aud`, mandatory desktop bridge, Runtime/session/body/token-bound request HMAC, durable nonce consumption, exact CORS origins, and route-level user dependencies | move the native-to-API hop from authenticated loopback to Runtime UDS; add response binding, durable mutation idempotency/result coalescing, expected-state authorization, authenticated capabilities/readiness, hosted token profiles, and tenant/role policy before multi-tenant use |
-| `desktop/src-tauri/src/desktop_api_bridge.rs`, `desktop/src-tauri/src/lib.rs`, `desktop/src-tauri/tauri.conf.json`, and `frontend/src/api/client.ts` | finite native API bridge, shell-free Runtime key derivation, bounded method/path/body/media contract, JSON/Artifact/CSV routing outside WebView fetch, and production CSP without local API HTTP sources | replace generic relative paths with generated route DTOs; stream large downloads through native save dialogs; add response MAC and restart-safe exact-response coalescing; narrow global Tauri exposure and noVNC frame origin |
+| `backend/app/services/jobs.py` and `backend/app/routers/jobs.py` | strict create/rerun validation, user-scoped nested routes, bounded Job serialization, compatibility aliases, and atomic exact-response idempotency for Job/Batch mutations | add versioned orchestration object, legacy conflict detection, redacted summaries, cursor-paginated decision/provenance/event reads, transport-injected one-time session-reference exchange, expected-state requirements, and non-secret Job-binding rules |
+| `backend/app/auth.py`, `backend/app/desktop_bridge.py`, `backend/app/api_idempotency.py`, `backend/app/main.py`, `runtime/config/runtime.env.default`, and API routers | OIDC issuer/subject identity, asymmetric algorithm allowlist, required `exp`/`iss`/`sub`/`aud`, mandatory Bridge v2, Runtime/session/body/token/idempotency-bound request HMAC, durable nonce consumption, transaction-bound mutation result coalescing, exact CORS origins, and route-level user dependencies | move the native-to-API hop from authenticated loopback to Runtime UDS; add response binding, expected-state authorization, authenticated capabilities/readiness, hosted token profiles, and tenant/role policy before multi-tenant use |
+| `desktop/src-tauri/src/desktop_api_bridge.rs`, `desktop/src-tauri/src/lib.rs`, `desktop/src-tauri/tauri.conf.json`, and `frontend/src/api/client.ts` | finite native API bridge, shell-free Runtime key derivation, bounded method/path/body/media contract, JSON/Artifact/CSV routing outside WebView fetch, production CSP without local API HTTP sources, and one exact-key retry for covered mutations | replace generic relative paths with generated route DTOs; stream large downloads through native save dialogs; add response MAC; narrow global Tauri exposure and noVNC frame origin |
 | `backend/app/orchestration/aggregation.py` and `acceptance.py` | generation completion, case-weighted reliability denominators, hierarchical usable-replicate means before fixed case weights, seed-level worst constraints, training-field preference, continuation boundary, and a content-addressed search-role Candidate outcome compatibility projection consumed by ranking/acceptance/optimizer learning | replace exclusive GPT/CMA/experimental continuation branches with one dispatcher; migrate the embedded projection into an append-only `CandidateOutcomeEvidenceV1` ledger; finish one shared projection for validation promotion, portfolio reward, winner freeze, and reports; remove pre-ranking rounding and alternate acceptance arithmetic |
 | `backend/app/orchestration/job_manager.py` | candidate/trial creation and generation dispatch | add atomic decision-linked batch dispatch and idempotency; replace duplicate-Candidate infrastructure retry with an exact logical-Trial retry that creates an immutable physical-attempt row |
 | `backend/app/orchestration/runner.py` | short-lived per-stage sessions and polling lifecycle | split bounded lane pollers; add admission, per-user/Job fair scheduling, queue deadlines/backoff, capacity-before-running claims, drain/recovery, and paused/cancelled/unresolved fences |
@@ -7597,7 +7617,7 @@ execution.
 
 Removing direct WebView API HTTP, keeping bridge keys out of JavaScript, and requiring
 a launch-bound HMAC plus durable one-use nonce closes a real
-browser/accidental-client/replay class even while bridge v1's native last hop remains
+browser/accidental-client/replay class even while bridge v2's native last hop remains
 loopback. Replacing that hop with a Runtime UDS will further narrow exposure; neither
 design turns the current full-trust NSIS process and user-owned WSL distribution into
 mutually isolated security principals. The same Windows account can launch the
@@ -7956,7 +7976,7 @@ so later edits do not reintroduce them:
 | provider-gateway authorization audit | a non-secret “credential reference” and “authenticated worker” did not define registration versus call identities, replay behavior, or whether the database-free gateway could truly know reservation/cancellation state | split registration and call sockets, add Tauri-held launch MAC and kernel peer checks, exchange session references into Job-bound IDs, consume request-bound attempt tuples once, keep keys and egress isolated, and explicitly leave database-state truth with worker transactions unless an independent hosted grant service is added |
 | Harness supply-chain audit | release signatures and source-commit fields did not prove which registry, prompt, compiler, policy, adapter, gateway, executor, dependency, and tool bytes each Job actually executed; a mutable updater could also replace code beneath an active Job or replay old metadata | add a CI-produced signed closed-file Harness runtime manifest, independent build/SBOM provenance, startup integrity and cross-process digest agreement, content-addressed side-by-side slots, Job pinning, historical retention, and TUF-grade rollback/freeze/mix-and-match/revocation handling before unattended Runtime updates |
 | queue/backpressure audit | Execution Scheduling Gate 1.0 replaces global oldest-Trial FIFO with deterministic least-served Job selection plus per-Job Trial FIFO, while Execution Claim Gate 1.1 supplies `SKIP LOCKED`, bounded collision recovery, and attempt fencing; the same DB-polling loop can still materialize up to ten Jobs and combines simulation with finalization, while Valkey remains presence only | current desktop-scale inter-Job starvation is addressed; retain SQL as the only durable queue, then split bounded work lanes and add load-tested admission, per-user weights/priority classes, queue deadlines, transient capacity leases, one real-SITL slot until allocator proof, delayed retry without held leases, typed terminal work, fixed lock order, and overload/drain/Valkey-loss tests before hosted-scale claims |
-| desktop API/auth audit | the packaged Runtime now uses Supabase OIDC plus mandatory desktop bridge proof; JSON/Artifact/CSV calls leave the WebView through a finite Tauri command, production CSP blocks API HTTP, request HMAC binds Runtime/session/time/nonce/method/raw path/body/token, and a durable nonce ledger rejects replay; direct native-to-API loopback, response binding, mutation result idempotency, expected-state policy, and a real installed-Runtime hostile-client campaign remain open | move the native hop to fixed stdio/Runtime UDS, generate closed route DTOs, add response MAC plus durable mutation result coalescing and state/action authorization, then run the installed Windows/WSL hostile-origin/arbitrary-client/restart corpus before claiming the full target boundary |
+| desktop API/auth audit | the packaged Runtime now uses Supabase OIDC plus mandatory Bridge v2; JSON/Artifact/CSV calls leave the WebView through a finite Tauri command, production CSP blocks API HTTP, request HMAC binds Runtime/session/time/nonce/method/raw path/body/token/idempotency, a durable nonce ledger rejects proof replay, and covered Job/Batch mutations atomically persist exact-response idempotency receipts; direct native-to-API loopback, response binding, expected-state policy, generic route strings, bounded in-memory downloads, and a real installed-Runtime hostile-client campaign remain open | move the native hop to fixed stdio/Runtime UDS, generate closed route DTOs, add response MAC plus state/action authorization and native streaming, then run the installed Windows/WSL hostile-origin/arbitrary-client/restart corpus before claiming the full target boundary |
 | Windows/WSL trust-boundary audit | the earlier gateway/bridge wording implied Linux UIDs, socket ACLs, and a Tauri-held launch MAC could distinguish every local process, but the same Windows account can launch the distribution as `root` and can potentially control Tauri | narrow the V1 claim to web-origin/accidental-client/replay/wrong-Runtime-service protection; group hostile same-user/WSL-root/Tauri/host compromise as residual risk; require package identity/AppContainer plus a separately signed broker before claiming that stronger isolation |
 | Trial-evidence integrity audit | current v1 results can omit execution identity; missing metrics/flags gain favorable defaults; the runner authors metrics/pass; telemetry lacks mandatory unit/frame/time/extractor binding; sample-count RMSE is sampling-density sensitive; infrastructure failures penalize parameters; retries lack immutable attempt lineage/artifact digests; and per-Candidate “holdout” use leaks it into selection | require v3 attempt envelopes, content-addressed source artifacts, an immutable physical-attempt ledger, explicit NEU/SI/monotonic-time/coverage contracts, a signed secretless time-weighted metric verifier, closed outcome taxonomy, exact logical-Trial retry with infrastructure exclusion, registered metrics without defaults/clamping, and disjoint search/validation/sealed-final-test materialization |
 | optimizer-observation audit | the current frozen `OptimizerObservation` separates optional objective loss from feasibility, and compiler 1.9 now computes a closed Trial taxonomy plus an optimizer-learning rate that excludes infrastructure, cancellation, and invalid evidence while treating unknowns conservatively; the adapter still compresses domain/unknown outcomes into one rate, and `completed`, optional `loss`, pending reservations, and all six numerical cores lack explicit tagged/right-censored learning | carry the verified taxonomy into signed per-tool adapters as objective/constraint/right-censored tags plus separate pending reservations; declare accepted tags and state-update behavior per adapter; initially mark right-censoring unsupported rather than fabricating a finite loss |

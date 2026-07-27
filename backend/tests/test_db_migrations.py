@@ -364,6 +364,20 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "AND name='winner_freeze_delete_authorizations'"
             ).fetchall()
         }
+        api_idempotency_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' "
+                "AND name='api_idempotency_records'"
+            ).fetchall()
+        }
+        api_idempotency_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info('api_idempotency_records')"
+            ).fetchall()
+        }
         candidate_columns = {
             row[1]
             for row in connection.execute(
@@ -403,6 +417,17 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
     assert winner_freeze_authorization_tables == {
         "winner_freeze_delete_authorizations",
     }
+    assert api_idempotency_tables == {"api_idempotency_records"}
+    assert {
+        "user_id",
+        "idempotency_key_hash",
+        "operation",
+        "request_hash",
+        "status",
+        "response_json",
+        "resource_type",
+        "resource_id",
+    }.issubset(api_idempotency_columns)
     assert "evidence_ledger_required" in candidate_columns
     assert {
         "finalization_claim_token",
@@ -561,7 +586,7 @@ def test_postgresql_trial_attempt_migration_emits_immutable_guards(
     assert "belongs to another Trial" in sql
 
 
-def test_alembic_has_one_candidate_evidence_head() -> None:
+def test_alembic_has_one_schema_head() -> None:
     backend_root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "heads"],
@@ -573,7 +598,7 @@ def test_alembic_has_one_candidate_evidence_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260727_0012 (head)"]
+    assert heads == ["20260727_0013 (head)"]
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

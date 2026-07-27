@@ -17,7 +17,7 @@ use uuid::Uuid;
 #[cfg(target_os = "windows")]
 use crate::process::{command_output, windows_command};
 
-const BRIDGE_VERSION: &str = "DD-BRIDGE-V1";
+const BRIDGE_VERSION: &str = "DD-BRIDGE-V2";
 const API_ORIGIN: &str = "http://127.0.0.1:8000";
 const MAX_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
 const MAX_RESPONSE_BODY_BYTES: u64 = 64 * 1024 * 1024;
@@ -46,7 +46,7 @@ if len(secret.encode("utf-8")) < 32:
     raise SystemExit(42)
 derived = hmac.new(
     secret.encode("utf-8"),
-    b"dronedream-desktop-bridge-v1",
+    b"dronedream-desktop-bridge-v2",
     hashlib.sha256,
 ).hexdigest()
 print(json.dumps({"runtimeId": runtime_id, "key": derived}, separators=(",", ":")))
@@ -63,6 +63,8 @@ pub struct DesktopApiRequest {
     access_token: Option<String>,
     #[serde(default)]
     accept: Option<String>,
+    #[serde(default)]
+    idempotency_key: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -95,6 +97,7 @@ struct CanonicalRequest<'a> {
     path: &'a str,
     body_sha256: &'a str,
     authorization_sha256: &'a str,
+    idempotency_key: &'a str,
 }
 
 pub struct DesktopApiBridge {
@@ -220,6 +223,7 @@ fn forward_request(
         .map(|token| format!("Bearer {token}"))
         .unwrap_or_default();
     let accept = normalize_accept(request.accept.as_deref())?;
+    let idempotency_key = normalize_idempotency_key(request.idempotency_key.as_deref())?;
     let timestamp = chrono::Utc::now().timestamp().to_string();
     let nonce = Uuid::new_v4().to_string();
     let body_sha256 = sha256_hex(body.as_bytes());
@@ -233,6 +237,7 @@ fn forward_request(
         path: &request.path,
         body_sha256: &body_sha256,
         authorization_sha256: &authorization_sha256,
+        idempotency_key: &idempotency_key,
     });
     let signature = hex::encode(hmac_sha256(&credential.key, canonical.as_bytes()));
 
@@ -258,6 +263,9 @@ fn forward_request(
         .header("X-DroneDream-Nonce", &nonce)
         .header("X-DroneDream-Body-Sha256", &body_sha256)
         .header("X-DroneDream-Signature", signature);
+    if !idempotency_key.is_empty() {
+        builder = builder.header("Idempotency-Key", idempotency_key);
+    }
     if !authorization.is_empty() {
         builder = builder.header(AUTHORIZATION, authorization);
     }
@@ -329,6 +337,17 @@ fn normalize_accept(value: Option<&str>) -> Result<&str, String> {
     }
 }
 
+fn normalize_idempotency_key(value: Option<&str>) -> Result<String, String> {
+    let Some(raw) = value else {
+        return Ok(String::new());
+    };
+    let canonical = Uuid::parse_str(raw)
+        .ok()
+        .map(|value| value.to_string())
+        .filter(|value| value == &raw.to_ascii_lowercase());
+    canonical.ok_or_else(|| "The desktop idempotency key is not a canonical UUID.".to_string())
+}
+
 fn sha256_hex(value: &[u8]) -> String {
     hex::encode(Sha256::digest(value))
 }
@@ -343,9 +362,10 @@ fn canonical_request(request: &CanonicalRequest<'_>) -> String {
         path,
         body_sha256,
         authorization_sha256,
+        idempotency_key,
     } = request;
     format!(
-        "{BRIDGE_VERSION}\n{runtime_id}\n{session_id}\n{timestamp}\n{nonce}\n{method}\n{path}\n{body_sha256}\n{authorization_sha256}\n"
+        "{BRIDGE_VERSION}\n{runtime_id}\n{session_id}\n{timestamp}\n{nonce}\n{method}\n{path}\n{body_sha256}\n{authorization_sha256}\n{idempotency_key}\n"
     )
 }
 
@@ -384,6 +404,11 @@ mod tests {
         assert!(validate_path("https://evil.invalid/api/v1/jobs").is_err());
         assert!(validate_path("/api/v1/../health").is_err());
         assert!(normalize_method("PUT").is_err());
+        assert!(normalize_idempotency_key(Some("not-a-uuid")).is_err());
+        assert_eq!(
+            normalize_idempotency_key(Some("123e4567-e89b-12d3-a456-426614174000")).unwrap(),
+            "123e4567-e89b-12d3-a456-426614174000"
+        );
     }
 
     #[test]

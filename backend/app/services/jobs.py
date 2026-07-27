@@ -474,12 +474,19 @@ def _resolve_user(db: Session, user: models.User | None) -> models.User:
 
 
 def create_job(
-    db: Session, req: schemas.JobCreateRequest, *, user: models.User | None = None
+    db: Session,
+    req: schemas.JobCreateRequest,
+    *,
+    user: models.User | None = None,
+    commit: bool = True,
 ) -> models.Job:
     _validate_parameter_space(req)
     _validate_gpt_request(req)
     job = _create_job_from_config(db, user=_resolve_user(db, user), req=req, source_job_id=None)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(job)
     return job
 
@@ -588,6 +595,7 @@ def rerun_job(
     user: models.User | None = None,
     openai: schemas.OpenAIConfig | None = None,
     llm: schemas.LLMProviderConfig | None = None,
+    commit: bool = True,
 ) -> models.Job:
     resolved_user = _resolve_user(db, user)
     source = get_job(db, job_id, user=resolved_user)
@@ -698,7 +706,10 @@ def rerun_job(
         persist_objective_config=source.objective_config_json is not None,
         persist_scenario_suite=source.scenario_suite_json is not None,
     )
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(new_job)
     return new_job
 
@@ -778,6 +789,7 @@ def create_batch(
     req: schemas.BatchCreateRequest,
     *,
     user: models.User | None = None,
+    commit: bool = True,
 ) -> models.BatchJob:
     resolved_user = _resolve_user(db, user)
     for child_req in req.jobs:
@@ -793,7 +805,10 @@ def create_batch(
     db.flush()
     for child_req in req.jobs:
         _create_job_from_config(db, user=resolved_user, req=child_req, batch_id=batch.id)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(batch)
     return batch
 
@@ -898,7 +913,13 @@ def _claim_job_cancellation(
     return isinstance(rowcount, int) and rowcount == 1
 
 
-def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None) -> models.BatchJob:
+def cancel_batch(
+    db: Session,
+    batch_id: str,
+    *,
+    user: models.User | None = None,
+    commit: bool = True,
+) -> models.BatchJob:
     batch = get_batch(db, batch_id, user=user)
     if batch.jobs and all(child.status in schemas.JOB_TERMINAL_STATUSES for child in batch.jobs):
         _, terminal_status = _aggregate_batch_progress(batch.jobs)
@@ -936,13 +957,21 @@ def cancel_batch(db: Session, batch_id: str, *, user: models.User | None = None)
         purge_job_secrets(db, child, reason="batch_cancelled")
     batch.status = "CANCELLED"
     batch.cancelled_at = now
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(batch)
     return batch
 
 
 def update_job(
-    db: Session, job_id: str, req: schemas.JobUpdateRequest, *, user: models.User | None = None
+    db: Session,
+    job_id: str,
+    req: schemas.JobUpdateRequest,
+    *,
+    user: models.User | None = None,
+    commit: bool = True,
 ) -> models.Job:
     job = get_job(db, job_id, user=user)
     job.display_name = req.display_name
@@ -953,12 +982,21 @@ def update_job(
             payload_json={"display_name": req.display_name},
         )
     )
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(job)
     return job
 
 
-def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> models.Job:
+def cancel_job(
+    db: Session,
+    job_id: str,
+    *,
+    user: models.User | None = None,
+    commit: bool = True,
+) -> models.Job:
     job = get_job(db, job_id, user=user)
     if job.status in schemas.JOB_TERMINAL_STATUSES:
         code = "JOB_ALREADY_CANCELLED" if job.status == "CANCELLED" else "JOB_ALREADY_COMPLETED"
@@ -1027,12 +1065,21 @@ def cancel_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
             )
     purge_job_secrets(db, job, reason="job_cancelled")
     db.add(models.JobEvent(job_id=job.id, event_type="job_cancelled", payload_json=None))
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(job)
     return job
 
 
-def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> dict[str, object]:
+def delete_job(
+    db: Session,
+    job_id: str,
+    *,
+    user: models.User | None = None,
+    commit: bool = True,
+) -> dict[str, object]:
     job = get_job(db, job_id, user=user)
     if job.status not in schemas.JOB_TERMINAL_STATUSES:
         raise JobServiceError(
@@ -1147,7 +1194,10 @@ def delete_job(db: Session, job_id: str, *, user: models.User | None = None) -> 
         for artifact in artifact_rows:
             db.delete(artifact)
         db.delete(job)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return {"id": job_id, "deleted": True}
     except Exception as exc:
         db.rollback()

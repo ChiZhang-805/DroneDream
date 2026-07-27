@@ -56,6 +56,7 @@ afterEach(() => {
   resetDesktopReadinessSession();
   resetDesktopStartupGateSession();
   delete window.__TAURI__;
+  localStorage.clear();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -497,6 +498,71 @@ describe("apiClient envelope handling", () => {
         }),
       }),
     );
+  });
+
+  it("retries an ambiguous desktop mutation once with the same idempotency key", async () => {
+    const invoke = vi.fn()
+      .mockRejectedValueOnce(new Error("response channel closed"))
+      .mockResolvedValueOnce({
+        status: 200,
+        contentType: "application/json",
+        bodyBase64: btoa(JSON.stringify({
+          success: true,
+          data: { id: "job_1", display_name: "safe retry" },
+          error: null,
+        })),
+      });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(
+      apiClient.updateJob("job_1", { display_name: "safe retry" }),
+    ).resolves.toMatchObject({ id: "job_1", display_name: "safe retry" });
+
+    expect(invoke).toHaveBeenCalledTimes(2);
+    const firstRequest = invoke.mock.calls[0]?.[1]?.request;
+    const secondRequest = invoke.mock.calls[1]?.[1]?.request;
+    expect(firstRequest.idempotencyKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(secondRequest).toEqual(firstRequest);
+  });
+
+  it("reuses an unresolved mutation key after an application restart boundary", async () => {
+    const failedInvoke = vi.fn().mockRejectedValue(
+      new Error("response channel closed"),
+    );
+    window.__TAURI__ = { core: { invoke: failedInvoke } };
+
+    await expect(
+      apiClient.updateJob("job_1", { display_name: "recover me" }),
+    ).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+    expect(failedInvoke).toHaveBeenCalledTimes(2);
+    const unresolvedRequest = failedInvoke.mock.calls[0]?.[1]?.request;
+
+    const recoveredInvoke = vi.fn().mockResolvedValue({
+      status: 200,
+      contentType: "application/json",
+      bodyBase64: btoa(JSON.stringify({
+        success: true,
+        data: { id: "job_1", display_name: "recover me" },
+        error: null,
+      })),
+    });
+    // Replacing the native bridge models a fresh WebView process. Persistent
+    // storage is the only state shared with the new request invocation.
+    window.__TAURI__ = { core: { invoke: recoveredInvoke } };
+
+    await expect(
+      apiClient.updateJob("job_1", { display_name: "recover me" }),
+    ).resolves.toMatchObject({ id: "job_1", display_name: "recover me" });
+
+    const recoveredRequest = recoveredInvoke.mock.calls[0]?.[1]?.request;
+    expect(recoveredRequest.idempotencyKey).toBe(
+      unresolvedRequest.idempotencyKey,
+    );
+    expect(
+      localStorage.getItem("dronedream.api.pending-mutations.v1"),
+    ).toBeNull();
   });
 
   it("loads the versioned parameter catalog from the advanced endpoint", async () => {

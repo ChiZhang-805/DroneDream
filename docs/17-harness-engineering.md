@@ -820,17 +820,30 @@ the production CSP no longer permits direct WebView HTTP access to the local API
 
 Rust derives a domain-separated bridge key inside the dedicated WSL Runtime and
 signs every request over the Runtime ID, per-launch session, timestamp, one-use
-nonce, method, exact raw path/query, body hash, and Authorization-header hash.
+nonce, method, exact raw path/query, body hash, Authorization-header hash, and
+optional mutation idempotency key.
 FastAPI recomputes and verifies those fields before OIDC or route logic and
 durably consumes the nonce in `desktop_bridge_nonces`. Missing, expired,
 wrong-Runtime, altered-body/token, invalid-MAC, or repeated proofs fail closed.
 The regression suite also proves that a valid bridge proof does not weaken
 existing foreign-user object isolation.
 
-This gate removes the former direct WebView-to-loopback trust shortcut. The
-native last hop still uses authenticated loopback rather than a Runtime UDS, and
-mutation-result idempotency, response MACs, generated finite route DTOs, and a
-real installed Windows/WSL hostile-client campaign remain open. It therefore
-claims protection against web-origin, accidental-client, changed-request,
-wrong-Runtime, expiry, and replay classes—not isolation from compromise of the
-same Windows account, WSL root, or Tauri process.
+Business mutations now add a second durable gate. The frontend generates one
+canonical UUID for each create, update, rerun, cancel, delete, or Batch action,
+reuses it for one ambiguous transport retry, and Bridge v2 binds it to the HMAC.
+If both transport attempts remain ambiguous, a bounded 30-minute client record
+retains only the SHA-256 request fingerprint, UUID, and creation time. A fresh
+WebView can therefore reuse the same action key without persisting request
+content or provider credentials; a valid success or structured error removes it.
+`api_idempotency_records` stores only the key hash and canonical request hash.
+The domain mutation and exact safe response commit in one transaction, so an
+exact concurrent, restarted, or lost-response retry returns the original result;
+changed payload or operation reuse fails `409 IDEMPOTENCY_CONFLICT`.
+
+This removes the former direct WebView-to-loopback trust shortcut and the
+duplicate-business-effect gap for the covered Job/Batch routes. The native last
+hop still uses authenticated loopback rather than a Runtime UDS; response MACs,
+expected-state versions, generated finite route DTOs, native artifact streaming,
+and a real installed Windows/WSL hostile-client campaign remain open. The gate
+therefore does not claim isolation from compromise of the same Windows account,
+WSL root, or Tauri process.
