@@ -731,6 +731,7 @@ contract. The code audit found the following gaps:
 | Outcome Contract compiler 2.10 stores append-only physical-attempt claims/outcomes and one immutable accepted-attempt pointer | addressed for current v3 aggregation |
 | Trial context was reconstructed after the claim commit from mutable Candidate, scenario, and Job rows | addressed by Outcome Contract 2.19 and claim receipt v3: one deep claim-time snapshot builds the simulator context and binds Candidate source/generation/metadata plus advanced scenario configuration; pre-launch and terminal row-locked checks reject `INPUT_EVIDENCE_DRIFT`, while historical v1/v2 projections remain exact |
 | a persisted Trial payload could differ from the frozen Scenario Suite before its first claim, a coordinated rewrite could change both rows, and generation-offset seeds were resolved only against generation zero | addressed by Outcome Contract 2.20: dispatch and execution share one canonical payload builder; the pre-simulator gate rechecks the creation-time Outcome Contract, reconstructs the generation-specific authorized matrix, and rejects coordinated Job/Trial rewrites as `OUTCOME_CONTRACT_DRIFT` or individual case, seed, role, weight, source, generation, advanced-configuration, and fidelity divergence as `SCENARIO_CONTRACT_DRIFT` |
+| simultaneous workers could collide on the oldest Trial and conditional-update losers returned idle even when later queue rows remained | addressed by Execution Claim Gate 1.1: PostgreSQL uses `FOR UPDATE SKIP LOCKED`, all dialects retain the atomic status/lease update, and bounded collision retries continue to the next eligible row; eight-worker single-Trial and eight-Trial pool races prove one physical execution per Trial and unique claim/outcome evidence |
 | direct-GPT feedback grouped matched Trials only by `scenario_type` | addressed by Prompt Schema 2.3: same-type configured cases receive stable provider-safe aliases and retain separate weight, allowlisted configuration, metric, and failure summaries in frozen suite order; raw case IDs and holdout cases remain sealed |
 | Outcome Contract compilers 2.8-2.20 bind retained Artifact bytes, accepted-attempt identity and frozen input, authoritative Scenario Suite dispatch, PX4 telemetry semantics and raw ULog bytes, independently derived evaluation windows, core geometry, outcome verdict, score, trusted external-failure classification, and verified model-feedback reads through Trial and Candidate evidence | addressed for the bundled local PX4 path and current v3 aggregation; SQL/object-store atomic publication and operational WORM controls remain separate boundaries |
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
@@ -8621,11 +8622,14 @@ Current focused validation:
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-900 passed
+1055 passed
 
 Focused PX4 evidence, trusted taxonomy, optimizer-learning, and GPT prompt
 regression: 312 passed. Runtime contracts: 48 tests passed with 4 expected
 Windows skips for POSIX/WSL-only secure ULog deletion.
+
+Focused orchestration regression: 53 passed, including two eight-worker
+physical-attempt claim races repeated ten times each before the full suite.
 
 Focused Harness context, dynamic eligibility, trace, provider-campaign, and
 capability regression: 55 passed.

@@ -695,6 +695,18 @@ rejected as `INPUT_EVIDENCE_DRIFT`. Historical v1 and v2 receipts remain
 verifiable with their exact original projections instead of being silently
 upgraded to v3.
 
+Execution Claim Gate 1.1 hardens worker concurrency at the physical-attempt
+boundary. PostgreSQL workers select queue rows with `FOR UPDATE SKIP LOCKED`,
+while the conditional status/lease update remains the cross-dialect
+single-winner fence. A bounded collision loop makes SQLite development workers
+and any conditional-update loser continue to the next eligible Trial instead
+of reporting an empty queue while work remains. Two real-thread regressions
+start eight workers simultaneously: one proves that a single logical Trial
+creates exactly one simulator call, claim receipt, metric, accepted outcome,
+and claim event; the other drains eight pending Trials and proves all attempt,
+claim-evidence, and outcome-evidence identities are distinct. Each race is also
+repeated ten times locally before the full regression gate.
+
 Prompt Schema 2.3 closes a separate model-feedback ambiguity. Earlier direct-GPT
 feedback grouped Trials only by `scenario_type`, so two configured cases with
 the same type but different weight or physical configuration could collapse

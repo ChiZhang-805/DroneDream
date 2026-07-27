@@ -114,6 +114,8 @@ def _resolve_backend_override(
 
 logger = logging.getLogger("drone_dream.orchestration.trial")
 
+_MAX_CLAIM_COLLISION_RETRIES = 32
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -949,49 +951,63 @@ def claim_and_run_one_pending_trial(
         & (models.Trial.lease_expires_at <= now)
     )
     claim_pool = or_(claimable, stale_running) if reclaim_enabled else claimable
-    selected_trial = db.execute(
-        select(models.Trial.id, models.Trial.job_id, models.Trial.status)
-        .where(claim_pool)
-        .order_by(models.Trial.queued_at.asc().nullsfirst(), models.Trial.created_at.asc())
-        .limit(1)
-    ).one_or_none()
-    if selected_trial is None:
-        return None
-    trial_id = str(selected_trial.id)
-    job_id = str(selected_trial.job_id)
-    was_pending = selected_trial.status == "PENDING"
+    claim_collisions = 0
+    while True:
+        selected_trial = db.execute(
+            select(models.Trial.id, models.Trial.job_id, models.Trial.status)
+            .where(claim_pool)
+            .order_by(
+                models.Trial.queued_at.asc().nullsfirst(),
+                models.Trial.created_at.asc(),
+            )
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        ).one_or_none()
+        if selected_trial is None:
+            return None
+        trial_id = str(selected_trial.id)
+        job_id = str(selected_trial.job_id)
+        was_pending = selected_trial.status == "PENDING"
+
+        # --- Claim ------------------------------------------------------
+        update_stmt = (
+            update(models.Trial)
+            .where(models.Trial.id == trial_id)
+            .where(claim_pool)
+            .values(
+                status="RUNNING",
+                worker_id=worker_id,
+                lease_owner=worker_id,
+                lease_expires_at=lease_until,
+                claimed_at=now,
+                finished_at=None,
+                failure_code=None,
+                failure_reason=None,
+                log_excerpt=None,
+            )
+            .values(attempt_count=(models.Trial.attempt_count + 1))
+            .values(
+                started_at=case(
+                    (models.Trial.started_at.is_(None), now),
+                    else_=models.Trial.started_at,
+                )
+            )
+        )
+        claim_result = db.execute(update_stmt)
+        if claim_result.rowcount == 1:  # type: ignore[attr-defined]
+            break
+        db.rollback()
+        claim_collisions += 1
+        if claim_collisions >= _MAX_CLAIM_COLLISION_RETRIES:
+            logger.warning(
+                "worker %s exhausted %d conditional-claim retries",
+                worker_id,
+                _MAX_CLAIM_COLLISION_RETRIES,
+            )
+            return None
 
     backend_override: str | None = None
     env_backend = _env_simulator_backend() if adapter is None else None
-
-    # --- Claim ----------------------------------------------------------
-    update_stmt = (
-        update(models.Trial)
-        .where(models.Trial.id == trial_id)
-        .where(claim_pool)
-        .values(
-            status="RUNNING",
-            worker_id=worker_id,
-            lease_owner=worker_id,
-            lease_expires_at=lease_until,
-            claimed_at=now,
-            finished_at=None,
-            failure_code=None,
-            failure_reason=None,
-            log_excerpt=None,
-        )
-        .values(attempt_count=(models.Trial.attempt_count + 1))
-        .values(
-            started_at=case(
-                (models.Trial.started_at.is_(None), now),
-                else_=models.Trial.started_at,
-            )
-        )
-    )
-    claim_result = db.execute(update_stmt)
-    if claim_result.rowcount != 1:  # type: ignore[attr-defined]
-        db.rollback()
-        return None
 
     trial = db.get(models.Trial, trial_id)
     if trial is None:

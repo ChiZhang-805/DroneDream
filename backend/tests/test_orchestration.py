@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+import threading
 import time
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
@@ -1398,6 +1399,27 @@ def _seed_single_pending_trial(ctx: dict[str, object]) -> str:
         return trial.id
 
 
+def _seed_pending_trial_pool(ctx: dict[str, object], *, count: int) -> list[str]:
+    first_trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    trial_ids = [first_trial_id]
+    with ctx["db_module"].SessionLocal() as db:
+        first_trial = db.get(models.Trial, first_trial_id)
+        assert first_trial is not None
+        for seed in range(1, count):
+            trial = models.Trial(
+                job_id=first_trial.job_id,
+                candidate_id=first_trial.candidate_id,
+                seed=seed,
+                status="PENDING",
+            )
+            db.add(trial)
+            db.flush()
+            trial_ids.append(trial.id)
+        db.commit()
+    return trial_ids
+
+
 def test_pending_trial_claim_is_single_winner(orchestration_ctx):
     ctx = orchestration_ctx
     trial_id = _seed_single_pending_trial(ctx)
@@ -1412,6 +1434,188 @@ def test_pending_trial_claim_is_single_winner(orchestration_ctx):
         assert trial.claimed_at is not None
         event_types = [e.event_type for e in trial.job.events]
         assert "trial_claimed" in event_types
+
+
+def test_simultaneous_workers_create_one_physical_attempt(orchestration_ctx):
+    """A concurrent claim race must execute and accept exactly one attempt."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    worker_count = 8
+    start_barrier = threading.Barrier(worker_count + 1)
+    simulator_entered = threading.Event()
+    release_simulator = threading.Event()
+    competitors_finished = threading.Event()
+    result_lock = threading.Lock()
+    adapter_lock = threading.Lock()
+    results: list[str | None] = []
+    errors: list[BaseException] = []
+    simulator_calls = 0
+
+    class CoordinatedAdapter(MockSimulatorAdapter):
+        backend_name = "concurrent-claim-mock"
+
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            nonlocal simulator_calls
+            with adapter_lock:
+                simulator_calls += 1
+            simulator_entered.set()
+            release_simulator.wait(timeout=10)
+            return super().run_trial(trial_ctx)
+
+    adapter = CoordinatedAdapter()
+
+    def compete(worker_number: int) -> None:
+        try:
+            start_barrier.wait()
+            with ctx["db_module"].SessionLocal() as worker_db:
+                claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                    worker_db,
+                    f"simultaneous-worker-{worker_number}",
+                    adapter=adapter,
+                )
+            with result_lock:
+                results.append(claimed)
+                if len(results) + len(errors) >= worker_count - 1:
+                    competitors_finished.set()
+        except BaseException as exc:
+            with result_lock:
+                errors.append(exc)
+                if len(results) + len(errors) >= worker_count - 1:
+                    competitors_finished.set()
+
+    workers = [
+        threading.Thread(target=compete, args=(index,), daemon=True)
+        for index in range(worker_count)
+    ]
+    for worker in workers:
+        worker.start()
+
+    start_barrier.wait()
+    try:
+        assert simulator_entered.wait(timeout=10), "no worker reached the simulator"
+        assert competitors_finished.wait(timeout=10), (
+            "competing workers did not settle while the winning execution was fenced"
+        )
+    finally:
+        release_simulator.set()
+        for worker in workers:
+            worker.join(timeout=10)
+
+    assert all(not worker.is_alive() for worker in workers)
+    assert errors == []
+    assert results.count(trial_id) == 1
+    assert results.count(None) == worker_count - 1
+    assert simulator_calls == 1
+
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "COMPLETED"
+        assert trial.attempt_count == 1
+        assert trial.metric is not None
+        assert trial.accepted_attempt_id is not None
+        assert len(trial.execution_attempts) == 1
+        attempt = trial.execution_attempts[0]
+        assert attempt.id == trial.accepted_attempt_id
+        assert attempt.attempt_count == 1
+        assert attempt.claim_evidence_json["schema_id"] == (
+            "dronedream.trial-execution-attempt-claim/v3"
+        )
+        assert attempt.outcome is not None
+        assert attempt.outcome.accepted is True
+        assert attempt.outcome.terminal_status == "COMPLETED"
+        assert attempt.outcome.outcome_class == "success"
+        claim_events = [
+            event for event in trial.job.events if event.event_type == "trial_claimed"
+        ]
+        assert len(claim_events) == 1
+
+
+def test_simultaneous_workers_drain_distinct_pending_pool(orchestration_ctx):
+    """Claim collisions must not strand workers while other Trials are pending."""
+
+    ctx = orchestration_ctx
+    worker_count = 8
+    trial_ids = _seed_pending_trial_pool(ctx, count=worker_count)
+    start_barrier = threading.Barrier(worker_count + 1)
+    all_simulators_entered = threading.Event()
+    release_simulators = threading.Event()
+    result_lock = threading.Lock()
+    adapter_lock = threading.Lock()
+    results: list[str | None] = []
+    errors: list[BaseException] = []
+    simulator_calls = 0
+
+    class PoolAdapter(MockSimulatorAdapter):
+        backend_name = "concurrent-pool-mock"
+
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            nonlocal simulator_calls
+            with adapter_lock:
+                simulator_calls += 1
+                if simulator_calls == worker_count:
+                    all_simulators_entered.set()
+            release_simulators.wait(timeout=10)
+            return super().run_trial(trial_ctx)
+
+    adapter = PoolAdapter()
+
+    def compete(worker_number: int) -> None:
+        try:
+            start_barrier.wait()
+            with ctx["db_module"].SessionLocal() as worker_db:
+                claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                    worker_db,
+                    f"pool-worker-{worker_number}",
+                    adapter=adapter,
+                )
+            with result_lock:
+                results.append(claimed)
+        except BaseException as exc:
+            with result_lock:
+                errors.append(exc)
+
+    workers = [
+        threading.Thread(target=compete, args=(index,), daemon=True)
+        for index in range(worker_count)
+    ]
+    for worker in workers:
+        worker.start()
+
+    start_barrier.wait()
+    try:
+        assert all_simulators_entered.wait(timeout=10), (
+            "claim collisions left runnable Trials in the pending pool"
+        )
+    finally:
+        release_simulators.set()
+        for worker in workers:
+            worker.join(timeout=10)
+
+    assert all(not worker.is_alive() for worker in workers)
+    assert errors == []
+    assert simulator_calls == worker_count
+    assert None not in results
+    assert len(results) == worker_count
+    assert set(results) == set(trial_ids)
+
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trials = list(
+            db.scalars(select(models.Trial).where(models.Trial.id.in_(trial_ids)))
+        )
+        assert len(trials) == worker_count
+        assert all(trial.status == "COMPLETED" for trial in trials)
+        assert all(trial.attempt_count == 1 for trial in trials)
+        assert all(trial.metric is not None for trial in trials)
+        attempts = [trial.execution_attempts[0] for trial in trials]
+        assert len({attempt.id for attempt in attempts}) == worker_count
+        assert len({attempt.claim_evidence_id for attempt in attempts}) == worker_count
+        assert all(attempt.outcome is not None for attempt in attempts)
+        assert all(attempt.outcome.accepted is True for attempt in attempts)
+        assert len({attempt.outcome.evidence_id for attempt in attempts}) == worker_count
 
 
 def test_running_trial_reclaimed_after_lease_expiry(orchestration_ctx):
