@@ -707,6 +707,19 @@ and claim event; the other drains eight pending Trials and proves all attempt,
 claim-evidence, and outcome-evidence identities are distinct. Each race is also
 repeated ten times locally before the full regression gate.
 
+Execution Scheduling Gate 1.0 removes global oldest-row monopolization from the
+current simulation lane. Before choosing a Trial, the worker selects the
+eligible Job with the fewest physical claims recorded across its Trials; ties
+retain deterministic Job FIFO, and the oldest eligible Trial within that Job is
+then selected. PostgreSQL briefly locks that Job row with `SKIP LOCKED`, so
+simultaneous workers spread across runnable Jobs instead of serializing behind
+one large experiment. The conditional Trial update and fencing token remain the
+authority for exactly-once acceptance. A two-Job regression proves six
+sequential claims alternate between Jobs while preserving each Job's internal
+FIFO. This is the implemented small-scale per-Job fairness policy; per-user
+weights, priority classes, capacity admission, and normalized resource-cost
+scheduling remain future hosted-runtime controls.
+
 Evidence Precision Gate 1.0 separates numerical authority from presentation.
 `TrialMetric` persists the validated adapter/verifier value without an
 aggregation-time rounding rewrite. Modern Candidate evidence retains unrounded

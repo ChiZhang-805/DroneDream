@@ -1,10 +1,10 @@
 """Trial-level execution.
 
-The worker polls for the oldest ``PENDING`` trial, claims it by moving it to
-``RUNNING``, hands control to a :class:`~app.simulator.SimulatorAdapter`,
-persists the returned metrics + artifact metadata, and sets the trial
-terminal. Progress counters on the parent job are updated atomically with
-trial completion.
+The worker polls for a fairly scheduled ``PENDING`` trial, claims it by
+moving it to ``RUNNING``, hands control to a
+:class:`~app.simulator.SimulatorAdapter`, persists the returned metrics +
+artifact metadata, and sets the trial terminal. Progress counters on the
+parent job are updated atomically with trial completion.
 
 The executor itself contains **no** simulator logic — swapping backends is
 purely a matter of setting ``SIMULATOR_BACKEND`` (see
@@ -32,9 +32,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
 
-from sqlalchemy import case, or_, select, update
+from sqlalchemy import case, exists, func, or_, select, update
 from sqlalchemy.engine import CursorResult
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app import models, schemas
 from app.config import get_settings
@@ -953,18 +953,80 @@ def claim_and_run_one_pending_trial(
     claim_pool = or_(claimable, stale_running) if reclaim_enabled else claimable
     claim_collisions = 0
     while True:
+        # Schedule the least-served eligible Job first, then its oldest Trial.
+        # The Job row is the short-lived scheduling mutex on PostgreSQL:
+        # concurrent workers skip a locked Job and spread across other runnable
+        # Jobs instead of letting one large experiment monopolize the queue.
+        # ``attempt_count`` measures actual execution claims (including retry
+        # work), so newly arrived Jobs receive prompt service without erasing
+        # the FIFO order inside any one Job.
+        eligible_trial = aliased(models.Trial)
+        eligible_claimable = (
+            (eligible_trial.status == "PENDING")
+            & (
+                eligible_trial.lease_expires_at.is_(None)
+                | (eligible_trial.lease_expires_at <= now)
+            )
+        )
+        eligible_stale_running = (
+            (eligible_trial.status == "RUNNING")
+            & (eligible_trial.lease_expires_at.is_not(None))
+            & (eligible_trial.lease_expires_at <= now)
+        )
+        eligible_pool = (
+            or_(eligible_claimable, eligible_stale_running)
+            if reclaim_enabled
+            else eligible_claimable
+        )
+        service_history = aliased(models.Trial)
+        served_attempts = (
+            select(func.coalesce(func.sum(service_history.attempt_count), 0))
+            .where(service_history.job_id == models.Job.id)
+            .correlate(models.Job)
+            .scalar_subquery()
+        )
+        selected_job_id = db.scalar(
+            select(models.Job.id)
+            .where(
+                exists(
+                    select(eligible_trial.id).where(
+                        eligible_trial.job_id == models.Job.id,
+                        eligible_pool,
+                    )
+                )
+            )
+            .order_by(
+                served_attempts.asc(),
+                models.Job.created_at.asc(),
+                models.Job.id.asc(),
+            )
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        )
+        if selected_job_id is None:
+            return None
         selected_trial = db.execute(
             select(models.Trial.id, models.Trial.job_id, models.Trial.status)
-            .where(claim_pool)
+            .where(models.Trial.job_id == selected_job_id, claim_pool)
             .order_by(
                 models.Trial.queued_at.asc().nullsfirst(),
                 models.Trial.created_at.asc(),
+                models.Trial.id.asc(),
             )
             .limit(1)
             .with_for_update(skip_locked=True)
         ).one_or_none()
         if selected_trial is None:
-            return None
+            db.rollback()
+            claim_collisions += 1
+            if claim_collisions >= _MAX_CLAIM_COLLISION_RETRIES:
+                logger.warning(
+                    "worker %s exhausted %d fair-scheduling retries",
+                    worker_id,
+                    _MAX_CLAIM_COLLISION_RETRIES,
+                )
+                return None
+            continue
         trial_id = str(selected_trial.id)
         job_id = str(selected_trial.job_id)
         was_pending = selected_trial.status == "PENDING"

@@ -732,6 +732,7 @@ contract. The code audit found the following gaps:
 | Trial context was reconstructed after the claim commit from mutable Candidate, scenario, and Job rows | addressed by Outcome Contract 2.19 and claim receipt v3: one deep claim-time snapshot builds the simulator context and binds Candidate source/generation/metadata plus advanced scenario configuration; pre-launch and terminal row-locked checks reject `INPUT_EVIDENCE_DRIFT`, while historical v1/v2 projections remain exact |
 | a persisted Trial payload could differ from the frozen Scenario Suite before its first claim, a coordinated rewrite could change both rows, and generation-offset seeds were resolved only against generation zero | addressed by Outcome Contract 2.20: dispatch and execution share one canonical payload builder; the pre-simulator gate rechecks the creation-time Outcome Contract, reconstructs the generation-specific authorized matrix, and rejects coordinated Job/Trial rewrites as `OUTCOME_CONTRACT_DRIFT` or individual case, seed, role, weight, source, generation, advanced-configuration, and fidelity divergence as `SCENARIO_CONTRACT_DRIFT` |
 | simultaneous workers could collide on the oldest Trial and conditional-update losers returned idle even when later queue rows remained | addressed by Execution Claim Gate 1.1: PostgreSQL uses `FOR UPDATE SKIP LOCKED`, all dialects retain the atomic status/lease update, and bounded collision retries continue to the next eligible row; eight-worker single-Trial and eight-Trial pool races prove one physical execution per Trial and unique claim/outcome evidence |
+| one large Job could place all of its pending Trials ahead of a later small Job | addressed for the current simulation lane by Execution Scheduling Gate 1.0: choose the least-served eligible Job under a short PostgreSQL Job-row lock, retain FIFO within the Job, and prove alternating service across two runnable Jobs; per-user weighting, priority classes, normalized costs, and admission remain hosted-runtime work |
 | direct-GPT feedback grouped matched Trials only by `scenario_type` | addressed by Prompt Schema 2.3: same-type configured cases receive stable provider-safe aliases and retain separate weight, allowlisted configuration, metric, and failure summaries in frozen suite order; raw case IDs and holdout cases remain sealed |
 | Outcome Contract compilers 2.8-2.20 bind retained Artifact bytes, accepted-attempt identity and frozen input, authoritative Scenario Suite dispatch, PX4 telemetry semantics and raw ULog bytes, independently derived evaluation windows, core geometry, outcome verdict, score, trusted external-failure classification, and verified model-feedback reads through Trial and Candidate evidence | addressed for the bundled local PX4 path and current v3 aggregation; SQL/object-store atomic publication and operational WORM controls remain separate boundaries |
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
@@ -3570,13 +3571,14 @@ resume.
 The current runtime does not use Valkey as a durable task broker. Valkey publishes
 worker presence; SQL Job and Trial rows are the actual queue of record. Each current
 tick starts up to ten queued Jobs, each initialization can insert a generation of
-Trials, the same process then executes at most one globally oldest pending Trial, and
-only afterward attempts finalization. This creates three concrete risks:
+Trials, the same process then executes at most one fairly selected pending Trial, and
+only afterward attempts finalization. Execution Scheduling Gate 1.0 now chooses the
+least-served eligible Job and its oldest Trial, closing the immediate large-Job
+monopolization defect. Two broader risks remain:
 
 1. Job initialization can create pending work faster than one local simulator consumes
    it;
-2. one large, older Job can place many older Trial rows ahead of a small, newer Job;
-3. slow provider, proposal, aggregation, or report work in one polling loop can cause
+2. slow provider, proposal, aggregation, or report work in one polling loop can cause
    head-of-line blocking for unrelated stages.
 
 The target keeps SQL as the canonical durable queue and uses Valkey only for
@@ -3661,8 +3663,15 @@ Budget reservation and capacity reservation are different:
 #### 13.7.3 Fairness and starvation resistance
 
 Global oldest-row FIFO is insufficient. It lets a large Job monopolize the simulator
-because all its generation rows may precede another Job. The scheduler uses a
-versioned two-level policy:
+because all its generation rows may precede another Job. The implemented desktop-scale
+policy, Execution Scheduling Gate 1.0, orders eligible Jobs by total physical claims,
+uses deterministic Job FIFO for ties, and then preserves Trial FIFO inside the selected
+Job. PostgreSQL locks the selected Job row with `SKIP LOCKED` only through the claim
+transaction; the Trial conditional update and attempt fence remain the execution
+authority. This provides deterministic least-served per-Job progress without a schema
+migration and is covered by a two-Job alternating-service regression.
+
+The hosted-runtime target extends that base with a versioned two-level policy:
 
 1. select an eligible priority class fixed by trusted product/evaluation policy, never
    by prompt text;
@@ -7961,7 +7970,7 @@ so later edits do not reintroduce them:
 | executor-IPC audit | “authenticated Unix socket” did not identify the peer credential, socket ownership, replay key, framed-message rules, resource-limit authority, result binding, or safe snapshot transfer, so a local process/path race could spoof work or consume resources | require a pathname socket with service ACLs and kernel peer credentials, distinct UIDs/cgroups, one-request canonical frames, nonce/attempt/input/result hashes, hard broker ceilings, sealed descriptors or no-link beneath-root resolution, and durable parent CAS |
 | provider-gateway authorization audit | a non-secret “credential reference” and “authenticated worker” did not define registration versus call identities, replay behavior, or whether the database-free gateway could truly know reservation/cancellation state | split registration and call sockets, add Tauri-held launch MAC and kernel peer checks, exchange session references into Job-bound IDs, consume request-bound attempt tuples once, keep keys and egress isolated, and explicitly leave database-state truth with worker transactions unless an independent hosted grant service is added |
 | Harness supply-chain audit | release signatures and source-commit fields did not prove which registry, prompt, compiler, policy, adapter, gateway, executor, dependency, and tool bytes each Job actually executed; a mutable updater could also replace code beneath an active Job or replay old metadata | add a CI-produced signed closed-file Harness runtime manifest, independent build/SBOM provenance, startup integrity and cross-process digest agreement, content-addressed side-by-side slots, Job pinning, historical retention, and TUF-grade rollback/freeze/mix-and-match/revocation handling before unattended Runtime updates |
-| queue/backpressure audit | the current DB-polling worker starts up to ten Jobs, can materialize their Trials, then runs one globally oldest Trial and finalizes in the same loop; Valkey is only presence, so adding provider/tool work would create queue debt, starvation, and head-of-line blocking | retain SQL as the only durable queue; split bounded work lanes; add load-tested admission, fair per-user/Job scheduling, queue deadlines, transient capacity leases, one real-SITL slot until allocator proof, delayed retry without held leases, typed terminal work, fixed lock order, and overload/drain/Valkey-loss tests |
+| queue/backpressure audit | Execution Scheduling Gate 1.0 replaces global oldest-Trial FIFO with deterministic least-served Job selection plus per-Job Trial FIFO, while Execution Claim Gate 1.1 supplies `SKIP LOCKED`, bounded collision recovery, and attempt fencing; the same DB-polling loop can still materialize up to ten Jobs and combines simulation with finalization, while Valkey remains presence only | current desktop-scale inter-Job starvation is addressed; retain SQL as the only durable queue, then split bounded work lanes and add load-tested admission, per-user weights/priority classes, queue deadlines, transient capacity leases, one real-SITL slot until allocator proof, delayed retry without held leases, typed terminal work, fixed lock order, and overload/drain/Valkey-loss tests before hosted-scale claims |
 | desktop API/auth audit | the packaged Runtime sets `AUTH_MODE=disabled`; direct WebView fetches reach a loopback API where every caller becomes the same default user, while CORS/CSP were being mistaken for caller authentication | remove private desktop `/api/v1` from loopback TCP; add a typed Tauri Rust/stdio/UDS bridge, launch-bound request proof, durable mutation idempotency, state/owner/action authorization, hosted token profiles, and explicit negative tests |
 | Windows/WSL trust-boundary audit | the earlier gateway/bridge wording implied Linux UIDs, socket ACLs, and a Tauri-held launch MAC could distinguish every local process, but the same Windows account can launch the distribution as `root` and can potentially control Tauri | narrow the V1 claim to web-origin/accidental-client/replay/wrong-Runtime-service protection; group hostile same-user/WSL-root/Tauri/host compromise as residual risk; require package identity/AppContainer plus a separately signed broker before claiming that stronger isolation |
 | Trial-evidence integrity audit | current v1 results can omit execution identity; missing metrics/flags gain favorable defaults; the runner authors metrics/pass; telemetry lacks mandatory unit/frame/time/extractor binding; sample-count RMSE is sampling-density sensitive; infrastructure failures penalize parameters; retries lack immutable attempt lineage/artifact digests; and per-Candidate “holdout” use leaks it into selection | require v3 attempt envelopes, content-addressed source artifacts, an immutable physical-attempt ledger, explicit NEU/SI/monotonic-time/coverage contracts, a signed secretless time-weighted metric verifier, closed outcome taxonomy, exact logical-Trial retry with infrastructure exclusion, registered metrics without defaults/clamping, and disjoint search/validation/sealed-final-test materialization |
@@ -8622,14 +8631,15 @@ Current focused validation:
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-1057 passed
+1058 passed
 
 Focused PX4 evidence, trusted taxonomy, optimizer-learning, and GPT prompt
 regression: 312 passed. Runtime contracts: 48 tests passed with 4 expected
 Windows skips for POSIX/WSL-only secure ULog deletion.
 
-Focused orchestration regression: 53 passed, including two eight-worker
-physical-attempt claim races repeated ten times each before the full suite.
+Focused orchestration regression: 54 passed, including two eight-worker
+physical-attempt claim races repeated ten times each before the full suite and
+one deterministic two-Job alternating-service fairness regression.
 
 Focused Harness context, dynamic eligibility, trace, provider-campaign, and
 capability regression: 55 passed.

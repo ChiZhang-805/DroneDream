@@ -1436,6 +1436,40 @@ def test_pending_trial_claim_is_single_winner(orchestration_ctx):
         assert "trial_claimed" in event_types
 
 
+def test_pending_trial_claims_are_fair_across_jobs(orchestration_ctx):
+    """A large experiment must not monopolize a sequential worker queue."""
+
+    ctx = orchestration_ctx
+    first_job_trials = _seed_pending_trial_pool(ctx, count=3)
+    second_job_trials = _seed_pending_trial_pool(ctx, count=3)
+    all_trial_ids = first_job_trials + second_job_trials
+    claimed_trial_ids: list[str] = []
+
+    for worker_number in range(len(all_trial_ids)):
+        with ctx["db_module"].SessionLocal() as db:
+            claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                f"fair-worker-{worker_number}",
+            )
+        assert claimed is not None
+        claimed_trial_ids.append(claimed)
+
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        job_by_trial = {
+            trial.id: trial.job_id
+            for trial in db.scalars(
+                select(models.Trial).where(models.Trial.id.in_(all_trial_ids))
+            )
+        }
+
+    claimed_job_ids = [job_by_trial[trial_id] for trial_id in claimed_trial_ids]
+    assert len(set(claimed_job_ids)) == 2
+    assert claimed_job_ids[0] != claimed_job_ids[1]
+    assert claimed_job_ids[0::2] == [claimed_job_ids[0]] * 3
+    assert claimed_job_ids[1::2] == [claimed_job_ids[1]] * 3
+
+
 def test_simultaneous_workers_create_one_physical_attempt(orchestration_ctx):
     """A concurrent claim race must execute and accept exactly one attempt."""
 
