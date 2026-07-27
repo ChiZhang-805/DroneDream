@@ -707,6 +707,25 @@ and claim event; the other drains eight pending Trials and proves all attempt,
 claim-evidence, and outcome-evidence identities are distinct. Each race is also
 repeated ten times locally before the full regression gate.
 
+Evidence Precision Gate 1.0 separates numerical authority from presentation.
+`TrialMetric` persists the validated adapter/verifier value without an
+aggregation-time rounding rewrite. Modern Candidate evidence retains unrounded
+objective values, acceptance RMSE, worst-seed maximum error, pass/completion
+rates, constraint margins, scalar loss, and Selection Key decision loss.
+Four-decimal compatibility fields remain available for existing reports and
+clients, but no longer decide promotion or rank. A regression gives two
+Candidates the same displayed RMSE while their unrounded losses differ by one
+millionth and proves the better canonical loss still sorts first.
+
+Metric Dependency Gate 1.0 keeps the adapter-defined composite `score`
+exclusive from other objectives until a reviewed component DAG exists. The
+compiler also rejects known reliability aliases such as completion rate,
+failure rate, and failed-Trial rate when more than one would represent the same
+underlying outcome. Core compiler tests cover these combinations, and an API
+regression proves a Job requesting both `score` and RMSE is rejected as
+`INVALID_OUTCOME_CONTRACT` before any Job, Trial, provider secret, or simulator
+work is created.
+
 Prompt Schema 2.3 closes a separate model-feedback ambiguity. Earlier direct-GPT
 feedback grouped Trials only by `scenario_type`, so two configured cases with
 the same type but different weight or physical configuration could collapse

@@ -16,7 +16,7 @@ import pytest
 
 from app import models, schemas
 from app.optimization.domain import ParameterDomain, SearchSpace
-from app.optimization.outcome_contract import build_selection_key
+from app.optimization.outcome_contract import build_selection_key, selection_order_key
 from app.optimization.outcome_evidence import (
     compile_candidate_outcome_evidence,
     trial_outcome_evidence_row,
@@ -1774,6 +1774,39 @@ def test_acceptance_uses_unrounded_versioned_projection_fields() -> None:
     assert result.reason == "rmse_above_target"
     assert result.rmse == pytest.approx(0.123456)
     assert result.max_error == pytest.approx(0.500006)
+
+
+def test_selection_order_uses_unrounded_decision_loss_not_display_metric() -> None:
+    """Display-equivalent candidates retain their canonical numerical order."""
+
+    better_loss = 0.123441
+    worse_loss = 0.123442
+    better = {
+        "rmse": round(better_loss, 4),
+        "selection_key": build_selection_key(
+            evidence_complete=True,
+            hard_feasible=True,
+            hard_constraint_violation=0.0,
+            training_failure_rate=0.0,
+            decision_loss=better_loss,
+        ),
+    }
+    worse = {
+        "rmse": round(worse_loss, 4),
+        "selection_key": build_selection_key(
+            evidence_complete=True,
+            hard_feasible=True,
+            hard_constraint_violation=0.0,
+            training_failure_rate=0.0,
+            decision_loss=worse_loss,
+        ),
+    }
+
+    assert better["rmse"] == worse["rmse"] == 0.1234
+    assert selection_order_key(better, better["rmse"]) < selection_order_key(
+        worse,
+        worse["rmse"],
+    )
 
 
 @pytest.mark.parametrize("unsafe_count", (float("nan"), float("inf"), True, -1))

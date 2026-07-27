@@ -737,7 +737,7 @@ contract. The code audit found the following gaps:
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
 | legacy aggregation initially mixes all metrics and only the modern objective path replaces key fields with training values | compatibility paths remain too easy to use as if they had the same isolation guarantees |
 | rate parsing previously clamped values into `[0, 1]` | addressed: acceptance now rejects non-finite or out-of-range persisted pass/completion rates as `invalid_rate_evidence` instead of normalizing corrupted evidence |
-| completed metrics are rounded before durable aggregation | display precision and evidence precision are conflated |
+| completed compatibility metrics are rounded for display/report projections | addressed by Evidence Precision Gate 1.0: `TrialMetric` persists validated adapter/verifier values, while modern Candidate evidence and Selection Key retain unrounded objective, constraint, promotion, and loss values; a display-tie regression proves four-decimal equality cannot change canonical rank |
 
 The target therefore treats **evidence compilation** as a first-class trusted stage,
 not as a few additional fields on `TrialMetric`.
@@ -1317,7 +1317,7 @@ remaining rows continue to define the next contract revisions:
 | optimizer feasibility additionally requires `failure_rate < 0.5` | the threshold remains a compatibility policy, but is now one named constant serialized into Outcome Contract V1 rather than four hidden literals |
 | acceptance previously read rounded compatibility RMSE and max-error fields | Outcome Contract compiler 1.3 adds one versioned unrounded promotion projection: hierarchical fixed-suite mean RMSE, worst usable-seed max error, and dispatched-seed case-weighted pass/completion rates |
 | holdout promotion requires every holdout Trial to complete and pass | this can be a defensible release rule, but it is currently separate from `min_pass_rate`, objective constraints, and the reported estimand |
-| a derived `score` may be selected with any of its component metrics | without a metric-dependency graph, RMSE, duration, failure terms, and their composite can be counted twice |
+| a derived `score` could be selected with one of its component metrics | addressed for the current registry by Metric Dependency Gate 1.0: `score` is exclusive from every other objective, known reliability aliases are mutually exclusive, and the public Job-create path rejects overlap as `INVALID_OUTCOME_CONTRACT`; a complete component DAG is still required before admitting future composite metrics |
 
 The problem is not merely that some constants are imperfect. There are currently
 several different optimization problems: the UI profile, robust evaluator, public
@@ -8622,7 +8622,7 @@ Current focused validation:
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-1055 passed
+1057 passed
 
 Focused PX4 evidence, trusted taxonomy, optimizer-learning, and GPT prompt
 regression: 312 passed. Runtime contracts: 48 tests passed with 4 expected

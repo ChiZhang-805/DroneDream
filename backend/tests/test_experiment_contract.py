@@ -211,3 +211,28 @@ def test_job_create_rejects_unregistered_raw_optimization_metric(
     error = response.json()["error"]
     assert error["code"] == "INVALID_OUTCOME_CONTRACT"
     assert "unregistered optimization metric: custom_energy" in error["message"]
+
+
+def test_job_create_rejects_composite_score_with_component_objective(
+    client: TestClient,
+) -> None:
+    payload = _advanced_job_payload()
+    payload["objective_config"] = {
+        "objectives": [
+            {
+                "metric": "score",
+                "direction": "minimize",
+            },
+            {
+                "metric": "rmse",
+                "direction": "minimize",
+            },
+        ]
+    }
+
+    response = client.post("/api/v1/jobs", json=payload)
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_OUTCOME_CONTRACT"
+    assert "composite objective metric score cannot be combined" in error["message"]
