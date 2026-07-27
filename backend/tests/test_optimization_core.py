@@ -28,7 +28,15 @@ from app.optimization.outcome_evidence import (
 )
 from app.optimization.pareto import ParetoPoint, nondominated_front, representative_points
 from app.optimization.robust import aggregate_metric, evaluate_candidate
-from app.optimization.scenarios import holdout_matrix, scenario_matrix, training_matrix
+from app.optimization.scenarios import (
+    holdout_matrix,
+    resolve_scenario_case,
+    scenario_execution_payload,
+    scenario_matrix,
+    scenario_matrix_for_generation,
+    training_matrix,
+    validate_scenario_execution_contract,
+)
 from app.optimization.winner_evidence import (
     WinnerSelectionEvidenceError,
     compile_winner_selection_evidence,
@@ -1043,3 +1051,109 @@ def test_scenario_matrix_is_fixed_across_candidates_and_splits_holdout() -> None
         "scenario_weight": 1.0,
         "holdout": True,
     }
+
+
+def test_non_common_random_number_trial_resolves_against_its_generation() -> None:
+    suite = ScenarioSuiteConfig(
+        cases=[
+            ScenarioCaseConfig(
+                id="wind-train",
+                scenario_type="wind_perturbed",
+                seeds=[17],
+                weight=2.0,
+                config={"wind_mps": 7},
+            )
+        ],
+        common_random_numbers=False,
+    )
+    run = scenario_matrix_for_generation(suite, generation_index=3)[0]
+    assert run.seed != 17
+    payload = scenario_execution_payload(
+        run,
+        source="optimizer",
+        generation_index=3,
+        advanced_scenario_config={"gust": {"enabled": True}},
+        optimizer_fidelity_value=1.0,
+        optimizer_requested_fidelity_value=1.0,
+    )
+
+    resolution = resolve_scenario_case(
+        suite,
+        scenario_type=run.scenario_type,
+        scenario_config=payload,
+        seed=run.seed,
+    )
+    contract = validate_scenario_execution_contract(
+        suite,
+        scenario_type=run.scenario_type,
+        scenario_config=payload,
+        seed=run.seed,
+        candidate_source="optimizer",
+        candidate_generation=3,
+        candidate_is_baseline=False,
+        optimizer_metadata={"fidelity": 1.0},
+        advanced_scenario_config={"gust": {"enabled": True}},
+    )
+
+    assert resolution.matched
+    assert resolution.case is not None
+    assert resolution.case.id == "wind-train"
+    assert contract.valid
+    assert contract.expected_config == payload
+
+
+def test_scenario_execution_contract_rejects_payload_and_fidelity_drift() -> None:
+    suite = ScenarioSuiteConfig(
+        cases=[
+            ScenarioCaseConfig(id="train-a", seeds=[11, 12]),
+            ScenarioCaseConfig(
+                id="holdout",
+                seeds=[91],
+                holdout=True,
+            ),
+        ]
+    )
+    run = scenario_matrix_for_generation(suite, generation_index=2)[0]
+    payload = scenario_execution_payload(
+        run,
+        source="optimizer",
+        generation_index=2,
+        advanced_scenario_config={},
+        optimizer_fidelity_value=0.5,
+        optimizer_requested_fidelity_value=0.5,
+    )
+    drifted = {**payload, "scenario_weight": 99.0}
+
+    contract = validate_scenario_execution_contract(
+        suite,
+        scenario_type=run.scenario_type,
+        scenario_config=drifted,
+        seed=run.seed,
+        candidate_source="optimizer",
+        candidate_generation=2,
+        candidate_is_baseline=False,
+        optimizer_metadata={
+            "effective_fidelity": 0.5,
+            "requested_fidelity": 0.5,
+        },
+        advanced_scenario_config={},
+    )
+    fidelity_drift = validate_scenario_execution_contract(
+        suite,
+        scenario_type=run.scenario_type,
+        scenario_config=payload,
+        seed=run.seed,
+        candidate_source="optimizer",
+        candidate_generation=2,
+        candidate_is_baseline=False,
+        optimizer_metadata={
+            "effective_fidelity": 0.75,
+            "requested_fidelity": 0.5,
+        },
+        advanced_scenario_config={},
+    )
+
+    assert not contract.valid
+    assert contract.error == "scenario_payload_mismatch"
+    assert not fidelity_drift.valid
+    assert fidelity_drift.error == "optimizer_fidelity_mismatch"

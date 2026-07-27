@@ -675,9 +675,11 @@ def test_claim_time_input_snapshot_fails_closed_before_simulator_on_drift(
         )
         assert claim is not None
         assert claim.schema_id == (
-            "dronedream.trial-execution-attempt-claim/v2"
+            "dronedream.trial-execution-attempt-claim/v3"
         )
         assert claim.execution_input_sha256 is not None
+        assert claim.candidate_contract_sha256 is not None
+        assert claim.scenario_contract_sha256 is not None
         assert attempt.outcome is not None
         assert attempt.outcome.outcome_class == "invalid_evidence"
         assert adapter.backend_name == attempt.simulator_backend
@@ -843,6 +845,28 @@ def test_legacy_v1_claim_remains_accepted_end_to_end(
         claim_payload = current_claim.model_dump(mode="json")
         claim_payload.pop("evidence_id")
         claim_payload.pop("execution_input_sha256")
+        claim_payload.pop("candidate_contract_sha256")
+        claim_payload.pop("scenario_contract_sha256")
+        legacy_inputs = module._snapshot_trial_attempt_inputs_v2(
+            trial=trial,
+            job=trial.job,
+            candidate=trial.candidate,
+        )
+        claim_payload["parameter_sha256"] = module._sha256_id(
+            legacy_inputs["candidate_parameters"]
+        )
+        claim_payload["scenario_sha256"] = module._sha256_id(
+            {
+                "seed": legacy_inputs["trial"]["seed"],
+                "scenario_type": legacy_inputs["trial"]["scenario_type"],
+                "scenario_config": legacy_inputs["trial"][
+                    "scenario_config"
+                ],
+            }
+        )
+        claim_payload["job_config_sha256"] = module._sha256_id(
+            legacy_inputs["job_config"]
+        )
         claim_payload["schema_id"] = (
             "dronedream.trial-execution-attempt-claim/v1"
         )
@@ -885,6 +909,390 @@ def test_legacy_v1_claim_remains_accepted_end_to_end(
         assert accepted is not None
         assert accepted.claim_evidence_id == legacy_claim_id
         assert accepted.outcome_evidence_id == legacy_outcome.evidence_id
+
+
+def test_legacy_v2_claim_remains_accepted_end_to_end(
+    orchestration_ctx,
+) -> None:
+    """A historical v2 combined snapshot remains verifiable and admissible."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-v2-compatibility",
+            )
+            == trial_id
+        )
+
+    from app.storage.evidence import candidate_trial_artifact_evidence
+
+    module = ctx["attempt_evidence"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        assert trial.finished_at is not None
+        attempt = trial.accepted_attempt
+        assert attempt is not None
+        outcome = attempt.outcome
+        assert outcome is not None
+        current_claim = module.verify_trial_attempt_claim(
+            attempt.claim_evidence_json
+        )
+        assert current_claim is not None
+        legacy_inputs = module._snapshot_trial_attempt_inputs_v2(
+            trial=trial,
+            job=trial.job,
+            candidate=trial.candidate,
+        )
+        claim_payload = current_claim.model_dump(mode="json")
+        claim_payload.pop("evidence_id")
+        claim_payload.pop("candidate_contract_sha256")
+        claim_payload.pop("scenario_contract_sha256")
+        claim_payload["schema_id"] = (
+            "dronedream.trial-execution-attempt-claim/v2"
+        )
+        claim_payload["parameter_sha256"] = module._sha256_id(
+            legacy_inputs["candidate_parameters"]
+        )
+        claim_payload["scenario_sha256"] = module._sha256_id(
+            {
+                "seed": legacy_inputs["trial"]["seed"],
+                "scenario_type": legacy_inputs["trial"]["scenario_type"],
+                "scenario_config": legacy_inputs["trial"][
+                    "scenario_config"
+                ],
+            }
+        )
+        claim_payload["job_config_sha256"] = module._sha256_id(
+            legacy_inputs["job_config"]
+        )
+        claim_payload["execution_input_sha256"] = module._sha256_id(
+            legacy_inputs
+        )
+        legacy_claim_id = module._sha256_id(claim_payload)
+        attempt.claim_evidence_id = legacy_claim_id
+        attempt.claim_evidence_json = {
+            "evidence_id": legacy_claim_id,
+            **claim_payload,
+        }
+
+        artifact_mapping = candidate_trial_artifact_evidence(
+            trial.candidate,
+            [trial],
+            verify_bytes=True,
+        )
+        assert artifact_mapping is not None
+        artifact_evidence = artifact_mapping[trial.id]
+        legacy_outcome = module._compile_attempt_outcome(
+            attempt=attempt,
+            terminal_status=trial.status,
+            outcome_class=outcome.outcome_class,
+            accepted=True,
+            failure_code=trial.failure_code,
+            metric_snapshot=module._metric_snapshot(trial),
+            artifact_evidence=artifact_evidence,
+            finished_at=trial.finished_at,
+            superseded_by_attempt_count=None,
+        )
+        outcome.evidence_id = legacy_outcome.evidence_id
+        outcome.evidence_json = legacy_outcome.model_dump(mode="json")
+
+        assert module.trial_attempt_claim_matches_current_inputs(
+            trial,
+            attempt=attempt,
+        )
+        accepted = module.accepted_trial_attempt_evidence(
+            trial,
+            artifact_evidence=artifact_evidence,
+        )
+        assert accepted is not None
+        assert accepted.claim_evidence_id == legacy_claim_id
+
+
+def test_configured_scenario_contract_is_checked_before_simulator(
+    orchestration_ctx,
+) -> None:
+    """A pre-claim payload mutation is quarantined without simulator I/O."""
+
+    ctx = orchestration_ctx
+    schemas = ctx["schemas"]
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                simulator_backend="mock",
+                optimizer_strategy="none",
+                scenario_suite=schemas.ScenarioSuiteConfig(
+                    cases=[
+                        schemas.ScenarioCaseConfig(
+                            id="nominal",
+                            seeds=[101],
+                            config={"wind_mps": 0},
+                        )
+                    ]
+                ),
+            ),
+        )
+        job_id = job.id
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+        trial = db.scalar(
+            select(models.Trial).where(models.Trial.job_id == job_id)
+        )
+        assert trial is not None
+        payload = dict(trial.scenario_config_json or {})
+        payload["scenario_weight"] = 99.0
+        trial.scenario_config_json = payload
+        db.commit()
+        trial_id = trial.id
+
+    class NeverStartedAdapter:
+        backend_name = "scenario-contract-probe"
+
+        def __init__(self) -> None:
+            self.prepare_calls = 0
+            self.run_calls = 0
+            self.cleanup_calls = 0
+
+        def prepare(self, _ctx) -> None:
+            self.prepare_calls += 1
+
+        def run_trial(self, _ctx):
+            self.run_calls += 1
+            raise AssertionError("invalid scenario must not run")
+
+        def cleanup(self, _ctx) -> None:
+            self.cleanup_calls += 1
+
+    adapter = NeverStartedAdapter()
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-scenario-contract",
+                adapter=adapter,
+            )
+            == trial_id
+        )
+
+    assert adapter.prepare_calls == 0
+    assert adapter.run_calls == 0
+    assert adapter.cleanup_calls == 0
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "FAILED"
+        assert trial.failure_code == "SCENARIO_CONTRACT_DRIFT"
+        assert trial.accepted_attempt is not None
+        assert trial.accepted_attempt.outcome is not None
+        assert (
+            trial.accepted_attempt.outcome.outcome_class
+            == "invalid_evidence"
+        )
+
+
+def test_valid_configured_scenario_contract_executes_normally(
+    orchestration_ctx,
+) -> None:
+    """The strict gate admits an untouched authoritative dispatch."""
+
+    ctx = orchestration_ctx
+    schemas = ctx["schemas"]
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                simulator_backend="mock",
+                optimizer_strategy="none",
+                advanced_scenario_config={
+                    "wind_gusts": {
+                        "enabled": True,
+                        "magnitude_mps": 2.0,
+                    }
+                },
+                scenario_suite=schemas.ScenarioSuiteConfig(
+                    cases=[
+                        schemas.ScenarioCaseConfig(
+                            id="wind",
+                            scenario_type="wind_perturbed",
+                            seeds=[202],
+                            weight=2.0,
+                            config={"wind_mps": 6},
+                        )
+                    ]
+                ),
+            ),
+        )
+        job_id = job.id
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+        trial = db.scalar(
+            select(models.Trial).where(models.Trial.job_id == job_id)
+        )
+        assert trial is not None
+        trial_id = trial.id
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-valid-scenario-contract",
+            )
+            == trial_id
+        )
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "COMPLETED"
+        assert trial.failure_code is None
+        assert trial.metric is not None
+        assert trial.accepted_attempt is not None
+        claim = ctx["attempt_evidence"].verify_trial_attempt_claim(
+            trial.accepted_attempt.claim_evidence_json
+        )
+        assert claim is not None
+        assert claim.schema_id == (
+            "dronedream.trial-execution-attempt-claim/v3"
+        )
+
+
+def test_trial_gate_rejects_coordinated_job_and_scenario_rewrite(
+    orchestration_ctx,
+) -> None:
+    """Matching rewritten rows still cannot replace the creation-time contract."""
+
+    ctx = orchestration_ctx
+    schemas = ctx["schemas"]
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                simulator_backend="mock",
+                optimizer_strategy="none",
+                scenario_suite=schemas.ScenarioSuiteConfig(
+                    cases=[
+                        schemas.ScenarioCaseConfig(
+                            id="nominal",
+                            seeds=[303],
+                            weight=1.0,
+                        )
+                    ]
+                ),
+            ),
+        )
+        job_id = job.id
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+        job = db.get(models.Job, job_id)
+        assert job is not None
+        trial = db.scalar(
+            select(models.Trial).where(models.Trial.job_id == job_id)
+        )
+        assert trial is not None
+        rewritten_suite = dict(job.scenario_suite_json or {})
+        rewritten_cases = [
+            dict(case) for case in rewritten_suite.get("cases", [])
+        ]
+        rewritten_cases[0]["weight"] = 3.0
+        rewritten_suite["cases"] = rewritten_cases
+        job.scenario_suite_json = rewritten_suite
+        rewritten_trial = dict(trial.scenario_config_json or {})
+        rewritten_trial["scenario_weight"] = 3.0
+        trial.scenario_config_json = rewritten_trial
+        db.commit()
+        trial_id = trial.id
+
+    class NeverStartedAdapter:
+        backend_name = "coordinated-contract-rewrite-probe"
+
+        def prepare(self, _ctx) -> None:
+            raise AssertionError("rewritten contract must not prepare")
+
+        def run_trial(self, _ctx):
+            raise AssertionError("rewritten contract must not run")
+
+        def cleanup(self, _ctx) -> None:
+            raise AssertionError("rewritten contract must not clean up")
+
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-coordinated-contract-rewrite",
+                adapter=NeverStartedAdapter(),
+            )
+            == trial_id
+        )
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "FAILED"
+        assert trial.failure_code == "OUTCOME_CONTRACT_DRIFT"
+        assert trial.accepted_attempt is not None
+        assert trial.accepted_attempt.outcome is not None
+        assert (
+            trial.accepted_attempt.outcome.outcome_class
+            == "invalid_evidence"
+        )
+
+
+def test_claim_v3_detects_candidate_contract_drift(
+    orchestration_ctx,
+    monkeypatch,
+) -> None:
+    """Candidate generation/source metadata cannot change after claim."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    original_record_event = ctx["trial_executor"].record_event
+
+    def mutate_candidate_contract(db, job_id, event_type, payload):
+        if event_type == "trial_claimed":
+            with ctx["db_module"].SessionLocal() as other_db:
+                trial = other_db.get(models.Trial, trial_id)
+                assert trial is not None
+                trial.candidate.generation_index = 12
+                trial.candidate.source_type = "optimizer"
+                trial.candidate.optimizer_metadata_json = {
+                    "fidelity": 0.5
+                }
+                other_db.commit()
+        return original_record_event(db, job_id, event_type, payload)
+
+    monkeypatch.setattr(
+        ctx["trial_executor"],
+        "record_event",
+        mutate_candidate_contract,
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        assert (
+            ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-candidate-contract",
+            )
+            == trial_id
+        )
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "FAILED"
+        assert trial.failure_code == "INPUT_EVIDENCE_DRIFT"
+        attempt = trial.accepted_attempt
+        assert attempt is not None
+        claim = ctx["attempt_evidence"].verify_trial_attempt_claim(
+            attempt.claim_evidence_json
+        )
+        assert claim is not None
+        assert claim.schema_id == (
+            "dronedream.trial-execution-attempt-claim/v3"
+        )
 
 
 def test_completion_fence_locks_job_before_updating_trial(

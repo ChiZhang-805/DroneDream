@@ -660,12 +660,11 @@ shape.
 
 Outcome Contract compiler 2.19 closes the claim-to-simulator race. The worker
 deep-copies one canonical claim-time snapshot before its first claim commit and
-stores it through `dronedream.trial-execution-attempt-claim/v2`. It builds
-`TrialContext` from that same snapshot, including nested Candidate parameters,
-case weight and advanced scenario configuration, reference track, vehicle
-profile, and Job configuration. A pre-launch check rejects source drift already
-committed when that gate runs as `INPUT_EVIDENCE_DRIFT`; the terminal fence
-remains authoritative for any change racing or following that check.
+builds `TrialContext` from that same snapshot, including nested Candidate
+parameters, case weight and advanced scenario configuration, reference track,
+vehicle profile, and Job configuration. A pre-launch check rejects source drift
+already committed when that gate runs as `INPUT_EVIDENCE_DRIFT`; the terminal
+fence remains authoritative for any change racing or following that check.
 
 Because a simulator may run outside the database transaction for minutes, the
 terminal path reacquires the Trial completion CAS, row-locks the Job and
@@ -674,8 +673,27 @@ metric, Artifact, or outcome is admitted. Drift during the external run
 therefore rejects the result as invalid evidence instead of allowing it to
 train the optimizer. Completion takes the same Job-before-Trial lock order as
 cancellation so their race cannot form a reverse-order row-lock cycle. Legacy
-v1 claims retain their original three-hash verification rules and are never
-silently reinterpreted as v2.
+v1 and v2 claims retain their original snapshot and verification rules.
+
+Outcome Contract compiler 2.20 makes the configured Scenario Suite authoritative
+at execution time. Dispatch and execution now share one canonical payload
+builder. Before simulator I/O, the worker first rechecks the Job against its
+creation-time, content-addressed Outcome Contract, then reconstructs the
+generation-specific matrix, including deterministic seed offsets when common
+random numbers are disabled. It proves the Trial's case, role, seed, weight,
+source, generation, advanced configuration, and optimizer fidelity are exactly
+authorized. A coordinated rewrite of both the Job suite and Trial is rejected
+as `OUTCOME_CONTRACT_DRIFT`; a Trial-only mismatch is quarantined as
+`SCENARIO_CONTRACT_DRIFT`, so neither can become optimizer evidence.
+
+New physical attempts use
+`dronedream.trial-execution-attempt-claim/v3`. In addition to the combined
+execution snapshot, v3 binds Candidate source, generation, baseline role,
+optimizer metadata, the Job's advanced scenario configuration, and a dedicated
+scenario-contract digest. Any post-claim mutation of those authorities is
+rejected as `INPUT_EVIDENCE_DRIFT`. Historical v1 and v2 receipts remain
+verifiable with their exact original projections instead of being silently
+upgraded to v3.
 
 Prompt Schema 2.3 closes a separate model-feedback ambiguity. Earlier direct-GPT
 feedback grouped Trials only by `scenario_type`, so two configured cases with

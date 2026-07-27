@@ -36,9 +36,10 @@ from sqlalchemy import case, or_, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
-from app import models
+from app import models, schemas
 from app.config import get_settings
 from app.optimization.outcome_taxonomy import classify_trial_outcome
+from app.optimization.scenarios import validate_scenario_execution_contract
 from app.orchestration.attempt_evidence import (
     TrialAttemptEvidenceError,
     record_accepted_trial_attempt_outcome,
@@ -48,6 +49,7 @@ from app.orchestration.attempt_evidence import (
     trial_attempt_claim_matches_current_inputs,
 )
 from app.orchestration.events import record_event
+from app.orchestration.outcome_contract_guard import check_job_outcome_contract
 from app.parameters import get_parameter, validate_parameter_values
 from app.simulator import (
     ArtifactMetadata,
@@ -62,7 +64,9 @@ from app.simulator.base import (
     FAILURE_ARTIFACT_PERSISTENCE,
     FAILURE_INPUT_EVIDENCE_DRIFT,
     FAILURE_INVALID_PARAMETERS,
+    FAILURE_OUTCOME_CONTRACT_DRIFT,
     FAILURE_RESULT_PERSISTENCE,
+    FAILURE_SCENARIO_CONTRACT_DRIFT,
     FAILURE_SIM_ERROR,
 )
 from app.storage import get_artifact_storage
@@ -385,6 +389,64 @@ def _claim_inputs_still_match(
             trial,
             attempt=current_attempt,
         )
+    )
+
+
+def _trial_execution_contract_failure(
+    db: Session,
+    *,
+    trial: models.Trial,
+    job: models.Job,
+    candidate: models.CandidateParameterSet,
+) -> tuple[str, str] | None:
+    """Return a closed failure when frozen Trial authority has diverged."""
+
+    if not check_job_outcome_contract(db, job).valid:
+        return (
+            FAILURE_OUTCOME_CONTRACT_DRIFT,
+            "frozen_job_outcome_contract_mismatch",
+        )
+    if not job.scenario_suite_json:
+        return None
+    if candidate.job_id != job.id:
+        return (FAILURE_SCENARIO_CONTRACT_DRIFT, "candidate_job_mismatch")
+    if candidate.source_type == "baseline":
+        if (
+            not candidate.is_baseline
+            or job.baseline_candidate_id != candidate.id
+        ):
+            return (
+                FAILURE_SCENARIO_CONTRACT_DRIFT,
+                "baseline_candidate_identity_mismatch",
+            )
+    elif candidate.is_baseline or job.baseline_candidate_id == candidate.id:
+        return (
+            FAILURE_SCENARIO_CONTRACT_DRIFT,
+            "candidate_baseline_role_mismatch",
+        )
+    try:
+        suite = schemas.ScenarioSuiteConfig(**job.scenario_suite_json)
+    except (TypeError, ValueError):
+        return (
+            FAILURE_SCENARIO_CONTRACT_DRIFT,
+            "invalid_persisted_scenario_suite",
+        )
+    contract = validate_scenario_execution_contract(
+        suite,
+        scenario_type=trial.scenario_type,
+        scenario_config=trial.scenario_config_json,
+        seed=trial.seed,
+        candidate_source=candidate.source_type,
+        candidate_generation=candidate.generation_index,
+        candidate_is_baseline=candidate.is_baseline,
+        optimizer_metadata=candidate.optimizer_metadata_json,
+        advanced_scenario_config=job.advanced_scenario_config_json,
+    )
+    if contract.valid:
+        return None
+    return (
+        FAILURE_SCENARIO_CONTRACT_DRIFT,
+        contract.error or "scenario_contract_mismatch",
     )
 
 
@@ -952,7 +1014,14 @@ def claim_and_run_one_pending_trial(
     cancellation_event = threading.Event()
     ctx: TrialContext | None = None
     context_error: TypeError | ValueError | None = None
+    execution_contract_failure: tuple[str, str] | None = None
     if candidate is not None and job is not None:
+        execution_contract_failure = _trial_execution_contract_failure(
+            db,
+            trial=trial,
+            job=job,
+            candidate=candidate,
+        )
         input_snapshot = snapshot_trial_attempt_inputs(
             trial=trial,
             job=job,
@@ -1098,6 +1167,38 @@ def claim_and_run_one_pending_trial(
                 "Trial, Candidate, or Job execution inputs changed after the "
                 "attempt was claimed; the simulator was not started."
             ),
+            attempt_id=attempt_id,
+        )
+        return trial_id
+
+    if execution_contract_failure is not None:
+        contract_failure_code, contract_failure_reason = (
+            execution_contract_failure
+        )
+        logger.warning(
+            "rejected non-authoritative execution contract trial=%s: %s",
+            trial_id,
+            contract_failure_reason,
+        )
+        if not _acquire_completion_fence(
+            db,
+            lease_token,
+            lease_seconds=lease_seconds,
+        ):
+            return trial_id
+        trial = db.get(models.Trial, trial_id)
+        if trial is None:  # pragma: no cover - defensive only.
+            db.rollback()
+            return trial_id
+        _mark_trial_failed(
+            db,
+            trial,
+            code=contract_failure_code,
+            reason=(
+                "The Trial execution inputs do not match the frozen Job and "
+                f"Scenario Suite contract ({contract_failure_reason}); the "
+                "simulator was not started."
+            )[:1000],
             attempt_id=attempt_id,
         )
         return trial_id

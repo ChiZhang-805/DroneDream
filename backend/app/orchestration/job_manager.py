@@ -22,6 +22,9 @@ from app import models, schemas
 from app.optimization.experimental_types import ExperimentalOptimizerStrategy
 from app.optimization.scenarios import (
     ScenarioRun,
+    optimizer_fidelity,
+    optimizer_requested_fidelity,
+    scenario_execution_payload,
     scenario_matrix_for_generation,
     training_matrix_for_fidelity,
 )
@@ -100,17 +103,30 @@ def _scenario_payload(
     *,
     source: str,
     generation_index: int,
+    optimizer_fidelity_value: float | None = None,
+    optimizer_requested_fidelity_value: float | None = None,
 ) -> dict[str, Any]:
-    base = {
-        **run.persistence_config(),
-        "scenario": run.scenario_type,
-        "source": source,
-        "generation_index": generation_index,
-        "scenario_case_id": run.case_id,
-        "scenario_weight": run.weight,
-        "holdout": run.holdout,
-    }
-    return constants.with_advanced_scenario(base, job.advanced_scenario_config_json)
+    if source == "optimizer":
+        optimizer_fidelity_value = (
+            1.0
+            if optimizer_fidelity_value is None
+            else optimizer_fidelity_value
+        )
+        optimizer_requested_fidelity_value = (
+            1.0
+            if optimizer_requested_fidelity_value is None
+            else optimizer_requested_fidelity_value
+        )
+    return scenario_execution_payload(
+        run,
+        source=source,
+        generation_index=generation_index,
+        advanced_scenario_config=job.advanced_scenario_config_json,
+        optimizer_fidelity_value=optimizer_fidelity_value,
+        optimizer_requested_fidelity_value=(
+            optimizer_requested_fidelity_value
+        ),
+    )
 
 
 def _baseline_parameters_for_job(job: models.Job) -> dict[str, float]:
@@ -223,31 +239,13 @@ def _proposal_fingerprint(
 def _optimizer_fidelity(metadata: object) -> float:
     """Return a validated optimizer fidelity for persisted or proposed metadata."""
 
-    if not isinstance(metadata, dict):
-        return 1.0
-    raw = metadata.get("effective_fidelity", metadata.get("fidelity", 1.0))
-    if isinstance(raw, bool) or not isinstance(raw, str | int | float):
-        return 0.0
-    try:
-        fidelity = float(raw)
-    except (TypeError, ValueError):
-        return 0.0
-    return fidelity if 0.0 < fidelity <= 1.0 and math.isfinite(fidelity) else 0.0
+    return optimizer_fidelity(metadata)
 
 
 def _optimizer_requested_fidelity(metadata: object) -> float:
     """Return the nominal level, preserving whether holdouts were verified."""
 
-    if not isinstance(metadata, dict):
-        return 1.0
-    raw = metadata.get("requested_fidelity", metadata.get("fidelity", 1.0))
-    if isinstance(raw, bool) or not isinstance(raw, str | int | float):
-        return 0.0
-    try:
-        fidelity = float(raw)
-    except (TypeError, ValueError):
-        return 0.0
-    return fidelity if 0.0 < fidelity <= 1.0 and math.isfinite(fidelity) else 0.0
+    return optimizer_requested_fidelity(metadata)
 
 
 def _uses_multi_fidelity(metadata: object) -> bool:
@@ -712,9 +710,9 @@ def _dispatch_optimizer_trials(
                 run,
                 source="optimizer",
                 generation_index=candidate.generation_index,
+                optimizer_fidelity_value=fidelity,
+                optimizer_requested_fidelity_value=requested_fidelity,
             )
-            payload["optimizer_fidelity"] = fidelity
-            payload["optimizer_requested_fidelity"] = requested_fidelity
             trial = models.Trial(
                 job_id=job.id,
                 candidate_id=candidate.id,
