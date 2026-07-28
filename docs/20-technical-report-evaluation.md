@@ -380,10 +380,15 @@ backend\.venv\Scripts\python.exe `
 
 backend\.venv\Scripts\python.exe `
   backend\scripts\evaluate_harness_reflection_triggers.py `
-  --check
+  --check `
+  --allow-archived-evidence-2-7-prompt-1-6
 
 backend\.venv\Scripts\python.exe `
   backend\scripts\evaluate_harness_reflection_outcome_stress.py `
+  --check
+
+backend\.venv\Scripts\python.exe `
+  backend\scripts\evaluate_harness_cross_job_memory.py `
   --check
 
 backend\.venv\Scripts\python.exe `
@@ -405,3 +410,20 @@ versioned ablation JSON/CSV/hash under `backend/evaluation_artifacts/` are
 source-controlled software-contract evidence; generated files under
 `artifacts/technical-report/` are frozen report inputs and are not
 physical-performance evidence.
+
+### Evidence 2.8 cross-Job memory contract
+
+The current software contract is Evidence 2.8 / Prompt Template 1.7 / Decision
+Trace 1.4. Its new `harness-cross-job-memory-contract-v1` bundle contains 10
+deterministic in-memory SQLite cases: two compatible same-user retrievals and
+eight negative isolation/lifecycle cases covering cross-user, anonymous,
+task-family, catalog-version, revocation, expiry, contract-version, and
+source-receipt drift. All 10 pass; provider, network, and simulator calls are
+zero, and the provider projection contains no source or owner identifiers.
+
+This result is software-contract evidence, not an optimizer-quality result. The
+latest online provider freeze and 554-Trial component outcome ablation remain
+Evidence 2.7 / Prompt 1.6 historical freezes. They must stay byte-identical and
+must not be cited as validation of the cross-Job memory channel. A new
+current-version provider run and an equal-budget outcome comparison remain
+separate gates.

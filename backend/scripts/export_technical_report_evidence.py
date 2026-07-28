@@ -39,10 +39,14 @@ from app.orchestration.harness_context import (  # noqa: E402
     HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_PROMPT_TEMPLATE_VERSION,
 )
+from app.orchestration.harness_cross_job_memory_evaluation import (  # noqa: E402
+    verify_harness_cross_job_memory_artifact,
+    verify_harness_cross_job_memory_manifest,
+)
 from app.orchestration.harness_evaluation import (  # noqa: E402
     grade_routing_prediction_artifact,
+    load_archived_routing_prediction_artifact,
     load_routing_eval_cases,
-    load_routing_prediction_artifact,
 )
 from app.orchestration.harness_outcome_campaign import (  # noqa: E402
     load_harness_outcome_campaign,
@@ -56,11 +60,11 @@ from app.orchestration.harness_reflection_trigger_ablation import (  # noqa: E40
     verify_harness_reflection_trigger_manifest,
 )
 from app.orchestration.harness_routing_holdout import (  # noqa: E402
-    load_locked_routing_policy_holdout,
-    load_locked_routing_policy_result,
+    load_archived_locked_routing_policy_holdout,
+    load_archived_locked_routing_policy_result,
 )
 
-REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v8"
+REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v9"
 REPORT_EVIDENCE_MANIFEST_SCHEMA_VERSION = "dronedream.technical-report-evidence-manifest.v1"
 SUPPORTED_TEST_RUN_RECEIPT_SCHEMA_VERSIONS = {
     "dronedream.test-run-receipt.v1",
@@ -107,6 +111,20 @@ DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_SHA256 = (
 )
 DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS = (
     BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.json"
+)
+DEFAULT_HARNESS_CROSS_JOB_MEMORY = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-cross-job-memory-contract-v1.json"
+)
+DEFAULT_HARNESS_CROSS_JOB_MEMORY_MANIFEST = (
+    BACKEND_ROOT
+    / "evaluation_artifacts"
+    / "harness-cross-job-memory-contract-v1.manifest.json"
+)
+DEFAULT_HARNESS_CROSS_JOB_MEMORY_CSV = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-cross-job-memory-contract-v1.csv"
+)
+DEFAULT_HARNESS_CROSS_JOB_MEMORY_SHA256 = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-cross-job-memory-contract-v1.sha256"
 )
 DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_MANIFEST = (
     BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.manifest.json"
@@ -642,6 +660,14 @@ def build_report_evidence_bundle(
     harness_reflection_outcome_stress_sha256_path: Path = (
         DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_SHA256
     ),
+    harness_cross_job_memory_path: Path = DEFAULT_HARNESS_CROSS_JOB_MEMORY,
+    harness_cross_job_memory_manifest_path: Path = (
+        DEFAULT_HARNESS_CROSS_JOB_MEMORY_MANIFEST
+    ),
+    harness_cross_job_memory_csv_path: Path = DEFAULT_HARNESS_CROSS_JOB_MEMORY_CSV,
+    harness_cross_job_memory_sha256_path: Path = (
+        DEFAULT_HARNESS_CROSS_JOB_MEMORY_SHA256
+    ),
     backend_test_receipt_path: Path | None = None,
     routing_holdout_corpus_path: Path = DEFAULT_ROUTING_HOLDOUT_CORPUS,
     routing_holdout_manifest_path: Path = DEFAULT_ROUTING_HOLDOUT_MANIFEST,
@@ -652,9 +678,14 @@ def build_report_evidence_bundle(
     source_commit = _validate_source_commit(source_commit)
     generated_at = _validate_generated_at(generated_at)
     cases = load_routing_eval_cases(routing_corpus_path)
-    routing_artifact = load_routing_prediction_artifact(
+    routing_artifact = load_archived_routing_prediction_artifact(
         routing_predictions_path,
         cases,
+        evidence_schema_version="2.7",
+        prompt_template_version="1.6",
+        prompt_suite_sha256=(
+            "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
+        ),
     )
     routing_report = grade_routing_prediction_artifact(routing_artifact, cases)
     prediction_counts = Counter(
@@ -671,8 +702,8 @@ def build_report_evidence_bundle(
             "The frozen provider response is graded deterministically. A fresh "
             "model call is a stochastic rerun, not causal proof of a prompt change."
         ),
-        "contract_current": True,
-        "qualification_scope": "current_evidence_2_7_prompt_1_6",
+        "contract_current": False,
+        "qualification_scope": "archived_evidence_2_7_prompt_1_6",
         "current_evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
         "current_prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
         "evidence_schema_version": routing_artifact.evidence_schema_version,
@@ -879,6 +910,32 @@ def build_report_evidence_bundle(
         "contrast_summaries": verified_outcome_stress["contrast_summaries"],
         "comparison_rows": verified_outcome_stress["comparison_rows"],
     }
+    cross_job_manifest_payload = _load_json_object(
+        harness_cross_job_memory_manifest_path
+    )
+    verified_cross_job_manifest = verify_harness_cross_job_memory_manifest(
+        cross_job_manifest_payload
+    )
+    cross_job_payload = _load_json_object(harness_cross_job_memory_path)
+    verified_cross_job = verify_harness_cross_job_memory_artifact(
+        cross_job_payload,
+        manifest=verified_cross_job_manifest,
+    )
+    _verify_sha256_sidecar(
+        harness_cross_job_memory_sha256_path,
+        bound_paths=(
+            harness_cross_job_memory_path,
+            harness_cross_job_memory_csv_path,
+            harness_cross_job_memory_manifest_path,
+        ),
+    )
+    harness_cross_job_memory = {
+        "claim_boundary": verified_cross_job["claim_boundary"],
+        "artifact_sha256": verified_cross_job["artifact_sha256"],
+        "manifest_sha256": verified_cross_job["manifest_sha256"],
+        "summary": verified_cross_job["summary"],
+        "case_rows": verified_cross_job["case_rows"],
+    }
     backend_tests = (
         None
         if backend_test_receipt_path is None
@@ -887,14 +944,18 @@ def build_report_evidence_bundle(
             source_commit=source_commit,
         )
     )
-    holdout_bundle = load_locked_routing_policy_holdout(
+    holdout_bundle = load_archived_locked_routing_policy_holdout(
         routing_holdout_corpus_path,
         routing_holdout_manifest_path,
         routing_corpus_path,
+        policy_input_suite_sha256=(
+            "29e937ea2d69453056b75a8f1ebf19afba8eabeab185e0cc0d012ffaeedc15d7"
+        ),
     )
-    holdout_result = load_locked_routing_policy_result(
+    holdout_result = load_archived_locked_routing_policy_result(
         routing_holdout_result_path,
         holdout_bundle,
+        evidence_schema_version="2.7",
     )
     holdout_category_counts: Counter[str] = Counter()
     holdout_category_passes: Counter[str] = Counter()
@@ -905,9 +966,18 @@ def build_report_evidence_bundle(
         "evidence_class": holdout_result.evidence_class,
         "claim_boundary": (
             "Measures exact production tool-eligibility sets on a separate, "
-            "hash-locked deterministic policy corpus. It makes no LLM routing "
-            "quality, simulator outcome, or permanent-blindness claim."
+            "hash-locked deterministic policy corpus archived under Evidence 2.7. "
+            "Eligibility policy 1.1 still reproduces its exact labels under current "
+            "software, but its historical evidence snapshot is not relabelled as "
+            "Evidence 2.8. It makes no LLM routing quality, simulator outcome, or "
+            "permanent-blindness claim."
         ),
+        "contract_current": False,
+        "qualification_scope": "archived_evidence_2_7_eligibility_policy_1_1",
+        "current_evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+        "evidence_schema_version": holdout_result.evidence_schema_version,
+        "tool_registry_version": holdout_result.tool_registry_version,
+        "eligibility_policy_version": holdout_result.eligibility_policy_version,
         "corpus_role": holdout_result.source_role,
         "case_count": holdout_result.case_count,
         "passed_count": holdout_result.passed_count,
@@ -970,6 +1040,18 @@ def build_report_evidence_bundle(
         "harness_reflection_outcome_stress_sha256": _repository_source(
             harness_reflection_outcome_stress_sha256_path
         ),
+        "harness_cross_job_memory": _repository_source(
+            harness_cross_job_memory_path
+        ),
+        "harness_cross_job_memory_manifest": _repository_source(
+            harness_cross_job_memory_manifest_path
+        ),
+        "harness_cross_job_memory_csv": _repository_source(
+            harness_cross_job_memory_csv_path
+        ),
+        "harness_cross_job_memory_sha256": _repository_source(
+            harness_cross_job_memory_sha256_path
+        ),
         "routing_policy_holdout_corpus": _repository_source(routing_holdout_corpus_path),
         "routing_policy_holdout_manifest": _repository_source(routing_holdout_manifest_path),
         "routing_policy_holdout_result": _repository_source(routing_holdout_result_path),
@@ -989,6 +1071,7 @@ def build_report_evidence_bundle(
         "harness_component_outcome_ablation": harness_component_ablation,
         "harness_reflection_trigger_ablation": (harness_reflection_trigger_ablation),
         "harness_reflection_outcome_stress": (harness_reflection_outcome_stress),
+        "harness_cross_job_memory": harness_cross_job_memory,
         "routing_policy_holdout": routing_policy_holdout,
     }
     if backend_tests is not None:
@@ -1060,6 +1143,7 @@ def write_report_evidence_bundle(
     harness_outcome_campaign = bundle["harness_outcome_campaign"]
     harness_reflection_trigger_ablation = bundle["harness_reflection_trigger_ablation"]
     harness_reflection_outcome_stress = bundle["harness_reflection_outcome_stress"]
+    harness_cross_job_memory = bundle["harness_cross_job_memory"]
     routing_policy_holdout = bundle["routing_policy_holdout"]
     trigger_rows = []
     for case in harness_reflection_trigger_ablation["case_rows"]:
@@ -1112,6 +1196,10 @@ def write_report_evidence_bundle(
     _write_csv(
         csv_directory / "harness_reflection_outcome_comparisons.csv",
         harness_reflection_outcome_stress["comparison_rows"],
+    )
+    _write_csv(
+        csv_directory / "harness_cross_job_memory_cases.csv",
+        harness_cross_job_memory["case_rows"],
     )
     _write_csv(
         csv_directory / "routing_policy_holdout_categories.csv",
@@ -1240,6 +1328,26 @@ def _parse_args() -> argparse.Namespace:
         default=DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_SHA256,
     )
     parser.add_argument(
+        "--harness-cross-job-memory",
+        type=Path,
+        default=DEFAULT_HARNESS_CROSS_JOB_MEMORY,
+    )
+    parser.add_argument(
+        "--harness-cross-job-memory-manifest",
+        type=Path,
+        default=DEFAULT_HARNESS_CROSS_JOB_MEMORY_MANIFEST,
+    )
+    parser.add_argument(
+        "--harness-cross-job-memory-csv",
+        type=Path,
+        default=DEFAULT_HARNESS_CROSS_JOB_MEMORY_CSV,
+    )
+    parser.add_argument(
+        "--harness-cross-job-memory-sha256",
+        type=Path,
+        default=DEFAULT_HARNESS_CROSS_JOB_MEMORY_SHA256,
+    )
+    parser.add_argument(
         "--backend-test-receipt",
         type=Path,
         required=True,
@@ -1299,6 +1407,14 @@ def main() -> int:
         ),
         harness_reflection_outcome_stress_sha256_path=(
             args.harness_reflection_outcome_stress_sha256.resolve()
+        ),
+        harness_cross_job_memory_path=args.harness_cross_job_memory.resolve(),
+        harness_cross_job_memory_manifest_path=(
+            args.harness_cross_job_memory_manifest.resolve()
+        ),
+        harness_cross_job_memory_csv_path=args.harness_cross_job_memory_csv.resolve(),
+        harness_cross_job_memory_sha256_path=(
+            args.harness_cross_job_memory_sha256.resolve()
         ),
         backend_test_receipt_path=args.backend_test_receipt.resolve(),
         routing_holdout_corpus_path=args.routing_holdout_corpus.resolve(),

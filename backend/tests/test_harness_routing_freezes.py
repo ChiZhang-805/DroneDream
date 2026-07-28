@@ -12,6 +12,7 @@ import pytest
 
 from app.orchestration.harness_evaluation import (
     grade_routing_prediction_artifact,
+    load_archived_routing_prediction_artifact,
     load_routing_eval_cases,
     load_routing_prediction_artifact,
 )
@@ -37,10 +38,18 @@ EVIDENCE_2_7_PROMPT_1_6 = (
 EVALUATOR_SCRIPT = BACKEND_ROOT / "scripts" / "evaluate_harness_router.py"
 
 
-def test_current_online_provider_freeze_is_bound_and_qualified() -> None:
+def test_latest_online_provider_freeze_is_bound_and_explicitly_archived() -> None:
     cases = load_routing_eval_cases(CORPUS)
 
-    artifact = load_routing_prediction_artifact(EVIDENCE_2_7_PROMPT_1_6, cases)
+    artifact = load_archived_routing_prediction_artifact(
+        EVIDENCE_2_7_PROMPT_1_6,
+        cases,
+        evidence_schema_version="2.7",
+        prompt_template_version="1.6",
+        prompt_suite_sha256=(
+            "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
+        ),
+    )
     report = grade_routing_prediction_artifact(artifact, cases)
 
     assert hashlib.sha256(EVIDENCE_2_7_PROMPT_1_6.read_bytes()).hexdigest() == (
@@ -91,6 +100,7 @@ def test_evaluator_cli_binds_worktree_backend_from_repository_root() -> None:
             str(EVALUATOR_SCRIPT),
             "--predictions",
             str(EVIDENCE_2_7_PROMPT_1_6),
+            "--allow-archived-evidence-2-7-prompt-1-6",
         ],
         cwd=REPOSITORY_ROOT,
         check=False,
@@ -102,8 +112,17 @@ def test_evaluator_cli_binds_worktree_backend_from_repository_root() -> None:
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
     assert Path(report["backend_root"]) == BACKEND_ROOT.resolve()
-    assert report["evidence_schema_version"] == "2.7"
+    assert report["evidence_schema_version"] == "2.8"
     assert report["tool_registry_version"] == "2.1"
-    assert report["prompt_template_version"] == "1.6"
+    assert report["prompt_template_version"] == "1.7"
     assert report["grade"]["passed_count"] == 24
     assert report["comparison"]["qualification"]["qualified"] is True
+    assert report["prediction_provenance"]["contract_current"] is False
+    assert report["prediction_provenance"]["qualification_scope"] == (
+        "archived_evidence_2_7_prompt_1_6"
+    )
+    assert report["prediction_provenance"]["evidence_schema_version"] == "2.7"
+    assert report["prediction_provenance"]["prompt_template_version"] == "1.6"
+    assert report["prediction_provenance"]["prompt_suite_sha256"] == (
+        "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
+    )

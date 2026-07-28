@@ -76,10 +76,18 @@ def test_harness_ablation_rejects_hash_or_claim_upgrade() -> None:
         verify_harness_ablation_artifact(artifact)
 
 
-def test_committed_harness_ablation_matches_current_contracts_and_hashes() -> None:
+def test_committed_harness_ablation_remains_a_verified_legacy_freeze() -> None:
     artifact = load_harness_ablation_artifact(JSON_ARTIFACT)
 
-    assert artifact == build_harness_ablation_artifact()
+    current = build_harness_ablation_artifact()
+    assert artifact != current
+    assert artifact["contract_versions"]["harness_evidence_schema"] == "2.7"
+    assert artifact["contract_versions"]["prompt_template"] == "1.6"
+    assert artifact["artifact_sha256"] == (
+        "f91a848c84d1766fd728968f4d82d49a9bc3af7fc2cc036da5b99efed62bb8f2"
+    )
+    assert current["contract_versions"]["harness_evidence_schema"] == "2.8"
+    assert current["contract_versions"]["prompt_template"] == "1.7"
     manifest = SHA256_ARTIFACT.read_text(encoding="ascii").splitlines()
     assert manifest == [
         f"{hashlib.sha256(JSON_ARTIFACT.read_bytes()).hexdigest()}  {JSON_ARTIFACT.name}",

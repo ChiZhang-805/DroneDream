@@ -135,12 +135,14 @@ def write_harness_reflection_trigger_files(
     manifest_path: Path,
     sha256_path: Path,
     check: bool = False,
+    artifact: dict[str, Any] | None = None,
+    manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    manifest = build_harness_reflection_trigger_manifest()
-    artifact = build_harness_reflection_trigger_artifact()
+    resolved_manifest = manifest or build_harness_reflection_trigger_manifest()
+    resolved_artifact = artifact or build_harness_reflection_trigger_artifact()
     payloads = render_harness_reflection_trigger_files(
-        artifact,
-        manifest,
+        resolved_artifact,
+        resolved_manifest,
         json_name=json_path.name,
         csv_name=csv_path.name,
         manifest_name=manifest_path.name,
@@ -167,12 +169,12 @@ def write_harness_reflection_trigger_files(
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(payload)
     return {
-        "artifact_sha256": artifact["artifact_sha256"],
-        "manifest_sha256": manifest["manifest_sha256"],
+        "artifact_sha256": resolved_artifact["artifact_sha256"],
+        "manifest_sha256": resolved_manifest["manifest_sha256"],
         "json_file_sha256": _sha256(payloads[0]),
         "csv_file_sha256": _sha256(payloads[1]),
         "manifest_file_sha256": _sha256(payloads[2]),
-        "summary": artifact["summary"],
+        "summary": resolved_artifact["summary"],
     }
 
 
@@ -195,17 +197,38 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Recompute the suite and require byte-identical frozen files.",
     )
+    parser.add_argument(
+        "--allow-archived-evidence-2-7-prompt-1-6",
+        action="store_true",
+        help=(
+            "Verify the explicitly pinned historical Evidence 2.7 / Prompt 1.6 "
+            "files in check-only mode instead of rebuilding current contracts."
+        ),
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = _parse_args()
+    archived_artifact = None
+    archived_manifest = None
+    if args.allow_archived_evidence_2_7_prompt_1_6:
+        if not args.check:
+            raise ValueError("archived reflection-trigger evidence is check-only")
+        archived_artifact = json.loads(
+            args.json_output.resolve().read_text(encoding="utf-8")
+        )
+        archived_manifest = json.loads(
+            args.manifest_output.resolve().read_text(encoding="utf-8")
+        )
     result = write_harness_reflection_trigger_files(
         json_path=args.json_output.resolve(),
         csv_path=args.csv_output.resolve(),
         manifest_path=args.manifest_output.resolve(),
         sha256_path=args.sha256_output.resolve(),
         check=args.check,
+        artifact=archived_artifact,
+        manifest=archived_manifest,
     )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0

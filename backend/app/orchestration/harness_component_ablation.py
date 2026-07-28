@@ -72,6 +72,9 @@ HARNESS_COMPONENT_ABLATION_ARMS = (
 HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS = 2
 HARNESS_COMPONENT_ABLATION_MAX_TOTAL_TRIALS = 40
 HARNESS_COMPONENT_ABLATION_TARGET_RELATIVE_IMPROVEMENT = 0.05
+HARNESS_COMPONENT_ABLATION_LEGACY_MANIFEST_SHA256 = (
+    "28092e9a5114bd4a02c297246cde8467014e22553d93c028a19b08db678a5072"
+)
 
 HarnessComponentArm = Literal[
     "full_aurora",
@@ -248,8 +251,15 @@ def verify_harness_component_ablation_manifest(payload: object) -> dict[str, Any
         raise ValueError("Harness component-ablation manifest hash is invalid")
     if declared_hash != _manifest_sha256(manifest):
         raise ValueError("Harness component-ablation manifest hash does not recompute")
+    runtime = payload.get("runtime_contract")
+    legacy = (
+        isinstance(runtime, dict)
+        and runtime.get("evidence_schema_version") == "2.7"
+        and runtime.get("prompt_template_version") == "1.6"
+        and declared_hash == HARNESS_COMPONENT_ABLATION_LEGACY_MANIFEST_SHA256
+    )
     current = build_harness_component_ablation_manifest()
-    if payload != current:
+    if payload != current and not legacy:
         raise ValueError("Harness component-ablation manifest drifted")
     return payload
 

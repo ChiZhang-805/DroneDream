@@ -33,17 +33,17 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     second = _build_bundle()
 
     assert first == second
-    assert first["schema_version"] == "dronedream.technical-report-evidence.v8"
+    assert first["schema_version"] == "dronedream.technical-report-evidence.v9"
     assert first["source_commit"] == _TEST_SOURCE_COMMIT
     assert first["generated_at"] == _TEST_GENERATED_AT
     assert len(first["bundle_sha256"]) == 64
 
     routing = first["routing"]
     assert routing["evidence_class"] == "development_routing_corpus"
-    assert routing["contract_current"] is True
-    assert routing["qualification_scope"] == "current_evidence_2_7_prompt_1_6"
-    assert routing["current_evidence_schema_version"] == "2.7"
-    assert routing["current_prompt_template_version"] == "1.6"
+    assert routing["contract_current"] is False
+    assert routing["qualification_scope"] == "archived_evidence_2_7_prompt_1_6"
+    assert routing["current_evidence_schema_version"] == "2.8"
+    assert routing["current_prompt_template_version"] == "1.7"
     assert routing["evidence_schema_version"] == "2.7"
     assert routing["tool_registry_version"] == "2.1"
     assert routing["prompt_template_version"] == "1.6"
@@ -226,6 +226,32 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
         "harness_reflection_outcome_stress_sha256",
     } <= set(first["sources"])
 
+    cross_job_memory = first["harness_cross_job_memory"]
+    assert cross_job_memory["artifact_sha256"] == (
+        "e1abf46c2aa44e9be3f37b92ae2d41213235179f16dd7b9b7d794d850938c01a"
+    )
+    assert cross_job_memory["manifest_sha256"] == (
+        "b8d55e358d5642cb01be331f5318e4a048b871ccfe4606664202eeba4109ec85"
+    )
+    assert cross_job_memory["summary"] == {
+        "case_count": 10,
+        "failed_count": 0,
+        "network_calls": 0,
+        "passed_count": 10,
+        "provider_calls": 0,
+        "provider_identifier_leak_count": 0,
+        "retrieval_negative_count": 8,
+        "retrieval_positive_count": 2,
+        "simulator_runs": 0,
+    }
+    assert all(row["passed"] is True for row in cross_job_memory["case_rows"])
+    assert {
+        "harness_cross_job_memory",
+        "harness_cross_job_memory_manifest",
+        "harness_cross_job_memory_csv",
+        "harness_cross_job_memory_sha256",
+    } <= set(first["sources"])
+
     backend_tests = first["backend_tests"]
     assert backend_tests["source_commit"] == _TEST_SOURCE_COMMIT
     assert backend_tests["full_suite"]["result"] == {
@@ -239,6 +265,14 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     holdout = first["routing_policy_holdout"]
     assert holdout["evidence_class"] == "deterministic_router_policy_holdout"
     assert holdout["corpus_role"] == "locked_holdout"
+    assert holdout["contract_current"] is False
+    assert holdout["qualification_scope"] == (
+        "archived_evidence_2_7_eligibility_policy_1_1"
+    )
+    assert holdout["current_evidence_schema_version"] == "2.8"
+    assert holdout["evidence_schema_version"] == "2.7"
+    assert holdout["tool_registry_version"] == "2.1"
+    assert holdout["eligibility_policy_version"] == "1.1"
     assert holdout["case_count"] == 16
     assert holdout["passed_count"] == 16
     assert holdout["pass_rate"] == 1.0
@@ -431,6 +465,14 @@ def test_report_evidence_writes_chart_ready_csv(tmp_path: Path) -> None:
     assert (
         sum(row["comparison_arm"] == "no_observed_outcome_reflection" for row in stress_rows) == 5
     )
+    with (csv_directory / "harness_cross_job_memory_cases.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        memory_rows = list(csv.DictReader(handle))
+    assert len(memory_rows) == 10
+    assert sum(row["passed"] == "True" for row in memory_rows) == 10
+    assert sum(int(row["retrieved_experience_count"]) for row in memory_rows) == 2
     with (csv_directory / "routing_policy_holdout_categories.csv").open(
         encoding="utf-8",
         newline="",

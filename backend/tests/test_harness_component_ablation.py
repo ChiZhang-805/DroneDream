@@ -122,9 +122,13 @@ def test_ablation_really_removes_memory_and_reflection_before_routing() -> None:
         )
 
 
-def test_committed_component_ablation_matches_current_production_contracts() -> None:
-    assert _load_manifest() == build_harness_component_ablation_manifest()
-    assert _load_artifact() == build_harness_component_ablation_artifact()
+def test_committed_component_ablation_remains_a_verified_legacy_freeze() -> None:
+    manifest = _load_manifest()
+    artifact = _load_artifact()
+    assert manifest["runtime_contract"]["evidence_schema_version"] == "2.7"
+    assert manifest["runtime_contract"]["prompt_template_version"] == "1.6"
+    assert manifest != build_harness_component_ablation_manifest()
+    assert artifact != build_harness_component_ablation_artifact()
 
 
 def test_component_ablation_rejects_claim_or_metric_tamper() -> None:

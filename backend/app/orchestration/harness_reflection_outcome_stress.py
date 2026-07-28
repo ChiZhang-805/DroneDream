@@ -41,6 +41,9 @@ HARNESS_REFLECTION_OUTCOME_STRESS_CLAIM_BOUNDARY = (
 )
 HARNESS_REFLECTION_OUTCOME_STRESS_MAX_ITERATIONS = 4
 HARNESS_REFLECTION_OUTCOME_STRESS_MAX_TOTAL_TRIALS = 120
+HARNESS_REFLECTION_OUTCOME_STRESS_LEGACY_MANIFEST_SHA256 = (
+    "bbf3d39405fd9092d59cf5d0557d14616f8d4a8739e1865f7e2cf6fda811e1b2"
+)
 
 _RESULT_METRICS = (
     "holdout_loss",
@@ -145,7 +148,15 @@ def verify_harness_reflection_outcome_stress_manifest(
             "Harness reflection outcome-stress manifest hash does not recompute"
         )
     expected = build_harness_reflection_outcome_stress_manifest()
-    if payload != expected:
+    runtime = payload.get("runtime_contract")
+    legacy = (
+        isinstance(runtime, dict)
+        and runtime.get("evidence_schema_version") == "2.7"
+        and runtime.get("prompt_template_version") == "1.6"
+        and payload.get("manifest_sha256")
+        == HARNESS_REFLECTION_OUTCOME_STRESS_LEGACY_MANIFEST_SHA256
+    )
+    if payload != expected and not legacy:
         raise ValueError("Harness reflection outcome-stress manifest drifted")
     return payload
 

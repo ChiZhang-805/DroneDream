@@ -17,8 +17,9 @@ from app.orchestration.harness_routing_campaign import (
 )
 from app.orchestration.harness_routing_holdout import (
     evaluate_locked_routing_policy_holdout,
+    load_archived_locked_routing_policy_holdout,
+    load_archived_locked_routing_policy_result,
     load_locked_routing_policy_holdout,
-    load_locked_routing_policy_result,
     write_locked_routing_policy_result,
 )
 
@@ -29,6 +30,18 @@ DEVELOPMENT = FIXTURES / "harness_routing_eval_v1.jsonl"
 RESULT = (
     Path(__file__).parents[1] / "evaluation_artifacts" / "harness-routing-policy-holdout-v3.json"
 )
+ARCHIVED_POLICY_INPUT_SUITE_SHA256 = (
+    "29e937ea2d69453056b75a8f1ebf19afba8eabeab185e0cc0d012ffaeedc15d7"
+)
+
+
+def _load_archived_bundle():
+    return load_archived_locked_routing_policy_holdout(
+        CORPUS,
+        MANIFEST,
+        DEVELOPMENT,
+        policy_input_suite_sha256=ARCHIVED_POLICY_INPUT_SUITE_SHA256,
+    )
 
 
 class _ForbiddenClient:
@@ -37,7 +50,7 @@ class _ForbiddenClient:
 
 
 def test_locked_holdout_is_hash_bound_and_disjoint_from_development() -> None:
-    bundle = load_locked_routing_policy_holdout(CORPUS, MANIFEST, DEVELOPMENT)
+    bundle = _load_archived_bundle()
     development = load_routing_eval_cases(DEVELOPMENT)
 
     assert bundle.manifest.corpus_role == "locked_holdout"
@@ -49,7 +62,7 @@ def test_locked_holdout_is_hash_bound_and_disjoint_from_development() -> None:
 
 
 def test_locked_holdout_exactly_matches_current_eligibility_policy() -> None:
-    bundle = load_locked_routing_policy_holdout(CORPUS, MANIFEST, DEVELOPMENT)
+    bundle = _load_archived_bundle()
 
     result = evaluate_locked_routing_policy_holdout(bundle)
 
@@ -62,9 +75,13 @@ def test_locked_holdout_exactly_matches_current_eligibility_policy() -> None:
 
 
 def test_committed_holdout_result_reproduces_without_online_calls() -> None:
-    bundle = load_locked_routing_policy_holdout(CORPUS, MANIFEST, DEVELOPMENT)
+    bundle = _load_archived_bundle()
 
-    result = load_locked_routing_policy_result(RESULT, bundle)
+    result = load_archived_locked_routing_policy_result(
+        RESULT,
+        bundle,
+        evidence_schema_version="2.7",
+    )
 
     assert result.qualified is True
     assert result.result_destination == "evaluation_artifact"
@@ -78,7 +95,7 @@ def test_locked_holdout_rejects_every_adaptive_writeback(
     destination: str,
     tmp_path: Path,
 ) -> None:
-    bundle = load_locked_routing_policy_holdout(CORPUS, MANIFEST, DEVELOPMENT)
+    bundle = _load_archived_bundle()
     result = evaluate_locked_routing_policy_holdout(bundle)
 
     with pytest.raises(ValueError, match="evaluation-only"):
@@ -117,19 +134,28 @@ def test_manifest_and_result_tampering_fail_closed(tmp_path: Path) -> None:
     mutated_manifest = tmp_path / MANIFEST.name
     mutated_manifest.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="corpus_sha256"):
-        load_locked_routing_policy_holdout(CORPUS, mutated_manifest, DEVELOPMENT)
+        load_archived_locked_routing_policy_holdout(
+            CORPUS,
+            mutated_manifest,
+            DEVELOPMENT,
+            policy_input_suite_sha256=ARCHIVED_POLICY_INPUT_SUITE_SHA256,
+        )
 
-    bundle = load_locked_routing_policy_holdout(CORPUS, MANIFEST, DEVELOPMENT)
+    bundle = _load_archived_bundle()
     artifact = json.loads(RESULT.read_text(encoding="utf-8"))
     artifact["grades"][0]["passed"] = False
     mutated_result = tmp_path / RESULT.name
     mutated_result.write_text(json.dumps(artifact), encoding="utf-8")
-    with pytest.raises(ValueError, match="invalid locked"):
-        load_locked_routing_policy_result(mutated_result, bundle)
+    with pytest.raises(ValueError, match="invalid archived locked"):
+        load_archived_locked_routing_policy_result(
+            mutated_result,
+            bundle,
+            evidence_schema_version="2.7",
+        )
 
 
 def test_result_writer_is_create_only(tmp_path: Path) -> None:
-    bundle = load_locked_routing_policy_holdout(CORPUS, MANIFEST, DEVELOPMENT)
+    bundle = _load_archived_bundle()
     result = evaluate_locked_routing_policy_holdout(bundle)
     output = tmp_path / "result.json"
     output.write_text("keep-existing", encoding="utf-8")
@@ -138,3 +164,8 @@ def test_result_writer_is_create_only(tmp_path: Path) -> None:
         write_locked_routing_policy_result(output, result)
 
     assert output.read_text(encoding="utf-8") == "keep-existing"
+
+
+def test_current_loader_rejects_archived_policy_input_digest() -> None:
+    with pytest.raises(ValueError, match="policy_input_suite_sha256"):
+        load_locked_routing_policy_holdout(CORPUS, MANIFEST, DEVELOPMENT)

@@ -241,6 +241,48 @@ def load_locked_routing_policy_holdout(
 ) -> HarnessRoutingPolicyHoldoutBundle:
     """Load a holdout only after all role, hash, and separation checks pass."""
 
+    return _load_locked_routing_policy_holdout(
+        corpus_path,
+        manifest_path,
+        development_corpus_path,
+        archived_policy_input_suite_sha256=None,
+    )
+
+
+def load_archived_locked_routing_policy_holdout(
+    corpus_path: Path,
+    manifest_path: Path,
+    development_corpus_path: Path,
+    *,
+    policy_input_suite_sha256: str,
+) -> HarnessRoutingPolicyHoldoutBundle:
+    """Load an explicitly pinned historical holdout without relabelling it current.
+
+    Historical evidence snapshots cannot be reproduced byte-for-byte after the
+    evidence contract changes. The caller must therefore supply the independently
+    frozen policy-input digest; every stable corpus and separation binding is still
+    recomputed from current repository bytes.
+    """
+
+    if len(policy_input_suite_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in policy_input_suite_sha256
+    ):
+        raise ValueError("archived policy_input_suite_sha256 must be lowercase SHA-256")
+    return _load_locked_routing_policy_holdout(
+        corpus_path,
+        manifest_path,
+        development_corpus_path,
+        archived_policy_input_suite_sha256=policy_input_suite_sha256,
+    )
+
+
+def _load_locked_routing_policy_holdout(
+    corpus_path: Path,
+    manifest_path: Path,
+    development_corpus_path: Path,
+    *,
+    archived_policy_input_suite_sha256: str | None,
+) -> HarnessRoutingPolicyHoldoutBundle:
     try:
         manifest = HarnessRoutingPolicyHoldoutManifest.model_validate_json(
             manifest_path.read_text(encoding="utf-8")
@@ -261,7 +303,11 @@ def load_locked_routing_policy_holdout(
         "case_count": len(cases),
         "corpus_sha256": routing_policy_holdout_corpus_sha256(cases),
         "case_ids_sha256": _case_ids_sha256(cases),
-        "policy_input_suite_sha256": routing_policy_input_suite_sha256(cases),
+        "policy_input_suite_sha256": (
+            routing_policy_input_suite_sha256(cases)
+            if archived_policy_input_suite_sha256 is None
+            else archived_policy_input_suite_sha256
+        ),
         "development_corpus_sha256": routing_corpus_sha256(development_cases),
     }
     for field_name, actual in checks.items():
@@ -325,6 +371,37 @@ def load_locked_routing_policy_result(
     return result
 
 
+def load_archived_locked_routing_policy_result(
+    path: Path,
+    bundle: HarnessRoutingPolicyHoldoutBundle,
+    *,
+    evidence_schema_version: str,
+) -> HarnessRoutingPolicyHoldoutResult:
+    """Verify one explicitly pinned historical result against current policy logic."""
+
+    try:
+        result = HarnessRoutingPolicyHoldoutResult.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as exc:
+        raise ValueError("invalid archived locked routing holdout result artifact") from exc
+    if (
+        result.evidence_schema_version != evidence_schema_version
+        or result.tool_registry_version != HARNESS_TOOL_REGISTRY_VERSION
+        or result.eligibility_policy_version != HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION
+    ):
+        raise ValueError("archived locked routing holdout version binding mismatch")
+    expected = evaluate_locked_routing_policy_holdout(bundle).model_copy(
+        update={"evidence_schema_version": evidence_schema_version}
+    )
+    if result != expected:
+        raise ValueError(
+            "archived locked routing holdout result does not match frozen inputs "
+            "and current eligibility policy"
+        )
+    return result
+
+
 def write_locked_routing_policy_result(
     path: Path,
     result: HarnessRoutingPolicyHoldoutResult,
@@ -351,6 +428,8 @@ __all__ = [
     "HarnessRoutingPolicyHoldoutManifest",
     "HarnessRoutingPolicyHoldoutResult",
     "evaluate_locked_routing_policy_holdout",
+    "load_archived_locked_routing_policy_holdout",
+    "load_archived_locked_routing_policy_result",
     "load_locked_routing_policy_holdout",
     "load_locked_routing_policy_result",
     "routing_policy_holdout_corpus_sha256",

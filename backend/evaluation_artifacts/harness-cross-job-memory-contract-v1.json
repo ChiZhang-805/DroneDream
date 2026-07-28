@@ -1,0 +1,140 @@
+{
+  "artifact_sha256": "e1abf46c2aa44e9be3f37b92ae2d41213235179f16dd7b9b7d794d850938c01a",
+  "case_rows": [
+    {
+      "case_id": "same_user_exact_task_exact_scenario",
+      "expected_retrieved_experience_count": 1,
+      "full_prompt_sha256": "c2fc405510981a376c398ad8edf01cd7309236f331ff6dd791198c865f1d9b91",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "passed": true,
+      "prompt_binding_changed": true,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 1,
+      "scenario_similarity": 1.0
+    },
+    {
+      "case_id": "same_user_exact_task_shifted_scenario",
+      "expected_retrieved_experience_count": 1,
+      "full_prompt_sha256": "ce2b19858dfa78dfb8ce1d1e7ff06755c85a29da3f6a819bcda72ac41c5daf33",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "8bd51616f6ea36fbbc232a9fceebdf29ec3ab5c19508077499f28943be8db449",
+      "passed": true,
+      "prompt_binding_changed": true,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 1,
+      "scenario_similarity": 0.8
+    },
+    {
+      "case_id": "cross_user_isolated",
+      "expected_retrieved_experience_count": 0,
+      "full_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "passed": true,
+      "prompt_binding_changed": false,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 0,
+      "scenario_similarity": null
+    },
+    {
+      "case_id": "anonymous_user_isolated",
+      "expected_retrieved_experience_count": 0,
+      "full_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "passed": true,
+      "prompt_binding_changed": false,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 0,
+      "scenario_similarity": null
+    },
+    {
+      "case_id": "task_family_mismatch",
+      "expected_retrieved_experience_count": 0,
+      "full_prompt_sha256": "435c9421162fd4882315ddab952eba98aae434dbcd9445f168a7a25ab3b41df7",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "435c9421162fd4882315ddab952eba98aae434dbcd9445f168a7a25ab3b41df7",
+      "passed": true,
+      "prompt_binding_changed": false,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 0,
+      "scenario_similarity": null
+    },
+    {
+      "case_id": "parameter_catalog_drift",
+      "expected_retrieved_experience_count": 0,
+      "full_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "passed": true,
+      "prompt_binding_changed": false,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 0,
+      "scenario_similarity": null
+    },
+    {
+      "case_id": "revoked_excluded",
+      "expected_retrieved_experience_count": 0,
+      "full_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "passed": true,
+      "prompt_binding_changed": false,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 0,
+      "scenario_similarity": null
+    },
+    {
+      "case_id": "expired_excluded",
+      "expected_retrieved_experience_count": 0,
+      "full_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "passed": true,
+      "prompt_binding_changed": false,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 0,
+      "scenario_similarity": null
+    },
+    {
+      "case_id": "contract_version_drift_excluded",
+      "expected_retrieved_experience_count": 0,
+      "full_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "passed": true,
+      "prompt_binding_changed": false,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 0,
+      "scenario_similarity": null
+    },
+    {
+      "case_id": "source_receipt_drift_excluded",
+      "expected_retrieved_experience_count": 0,
+      "full_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "inserted_source_experience_count": 1,
+      "no_memory_prompt_sha256": "2ec933eee3a8493cb8aa9de3324095dc6266eefe2f9da20b5b5d473e8ac02c91",
+      "passed": true,
+      "prompt_binding_changed": false,
+      "provider_identifiers_absent": true,
+      "retrieved_experience_count": 0,
+      "scenario_similarity": null
+    }
+  ],
+  "claim_boundary": "This deterministic in-memory SQLite evaluation proves the current software retrieval, isolation, retention, revocation, contract-drift, receipt-binding, provider-projection, and prompt-binding behavior for the enumerated fixtures. It makes no claim of optimizer-quality benefit, LLM superiority, physical fidelity, transfer to other tasks, real-aircraft performance, or flight safety.",
+  "generated_at": "2026-07-28T16:00:00Z",
+  "manifest_sha256": "b8d55e358d5642cb01be331f5318e4a048b871ccfe4606664202eeba4109ec85",
+  "schema_version": "dronedream.harness-cross-job-memory-evaluation/v1",
+  "summary": {
+    "case_count": 10,
+    "failed_count": 0,
+    "network_calls": 0,
+    "passed_count": 10,
+    "provider_calls": 0,
+    "provider_identifier_leak_count": 0,
+    "retrieval_negative_count": 8,
+    "retrieval_positive_count": 2,
+    "simulator_runs": 0
+  }
+}

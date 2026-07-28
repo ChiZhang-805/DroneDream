@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -22,6 +24,8 @@ MANIFEST_ARTIFACT = (
     ARTIFACT_ROOT / "harness-reflection-trigger-ablation-v1.manifest.json"
 )
 SHA256_ARTIFACT = ARTIFACT_ROOT / "harness-reflection-trigger-ablation-v1.sha256"
+SCRIPT = ARTIFACT_ROOT.parent / "scripts" / "evaluate_harness_reflection_triggers.py"
+REPOSITORY_ROOT = ARTIFACT_ROOT.parents[1]
 
 
 def _load(path: Path) -> dict[str, object]:
@@ -98,12 +102,12 @@ def test_recovery_then_reexplore_is_observed_as_a_bounded_transition() -> None:
     assert no_reflection_phases == ["balanced", "exploration"]
 
 
-def test_committed_trigger_artifacts_match_current_production_contracts() -> None:
+def test_committed_trigger_artifacts_remain_a_verified_legacy_freeze() -> None:
     manifest = _load(MANIFEST_ARTIFACT)
     artifact = _load(JSON_ARTIFACT)
 
     assert manifest == build_harness_reflection_trigger_manifest()
-    assert artifact == build_harness_reflection_trigger_artifact()
+    assert artifact != build_harness_reflection_trigger_artifact()
     assert verify_harness_reflection_trigger_manifest(manifest) == manifest
     assert (
         verify_harness_reflection_trigger_artifact(artifact, manifest=manifest)
@@ -112,11 +116,15 @@ def test_committed_trigger_artifacts_match_current_production_contracts() -> Non
 
 
 def test_trigger_artifacts_are_byte_reproducible(tmp_path: Path) -> None:
+    manifest = _load(MANIFEST_ARTIFACT)
+    artifact = _load(JSON_ARTIFACT)
     result = write_harness_reflection_trigger_files(
         json_path=tmp_path / JSON_ARTIFACT.name,
         csv_path=tmp_path / CSV_ARTIFACT.name,
         manifest_path=tmp_path / MANIFEST_ARTIFACT.name,
         sha256_path=tmp_path / SHA256_ARTIFACT.name,
+        artifact=artifact,
+        manifest=manifest,
     )
     assert result["summary"]["all_six_required_triggers_covered"] is True
     assert (tmp_path / JSON_ARTIFACT.name).read_bytes() == JSON_ARTIFACT.read_bytes()
@@ -141,3 +149,24 @@ def test_trigger_artifact_rejects_tamper() -> None:
     manifest["trigger_coverage"].pop()
     with pytest.raises(ValueError, match="hash does not recompute"):
         verify_harness_reflection_trigger_manifest(manifest)
+
+
+def test_archived_trigger_check_cli_is_explicit_and_byte_exact() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--check",
+            "--allow-archived-evidence-2-7-prompt-1-6",
+        ],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["artifact_sha256"] == (
+        "cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38"
+    )

@@ -1,6 +1,6 @@
 # LLM Tool-Orchestrated Optimization Harness
 
-Status: approved target design; trusted Evidence 2.7 scenario-profile, observational-reflection, and one-generation receding-plan gates implemented; current-version online provider rerun gated<br>
+Status: approved target design; trusted Evidence 2.8 user-isolated cross-Job memory plus scenario-profile, observational-reflection, and one-generation receding-plan gates implemented; current-version online provider rerun gated<br>
 Audience: backend, optimization, simulation, security, evaluation, and course-review stakeholders<br>
 Scope: DroneDream's automated PX4/Gazebo tuning loop<br>
 Last reviewed: 2026-07-27
@@ -8961,3 +8961,32 @@ Primary and official references used for this design:
 - [NumPy: Parallel random generation and independent child streams](https://numpy.org/doc/stable/reference/random/parallel.html)
 - [NumPy: `SeedSequence` reproducible entropy and spawn contract](https://numpy.org/doc/stable/reference/random/bit_generators/generated/numpy.random.SeedSequence.html)
 - [NIST/SEMATECH: Blocking of factorial experiments](https://www.itl.nist.gov/div898/handbook/pri/section3/pri3333.htm)
+
+## 31. Evidence 2.8 cross-Job experience boundary
+
+The production Harness now retrieves prior experience only as versioned,
+structured, revocable evidence. It never concatenates historical Job text into
+the provider prompt. Materialization requires a terminal source Job and a
+complete verified decision/cohort reflection. Retrieval then enforces exact
+authenticated ownership, a distinct source Job, exact structural task-family
+binding, current contract versions, the 90-day retention window, revocation
+state, and recomputation of the internal source receipt.
+
+The provider sees at most six anonymous observations. Each contains only the
+tool, deterministic phase/batch policy, dispatched/planned counts, the closed
+observed-outcome structure, and a safe training/environment scenario-similarity
+rank. It sees no database identifiers, timestamps, model prose, parameter
+values, scenario IDs, seeds, validation/holdout profiles, credentials, or
+simulator errors. Similarity orders compatible records and makes no transfer or
+physical-fidelity claim. Evidence 2.8 and Prompt 1.7 explicitly call all
+same-Job and cross-Job outcomes observational rather than causal.
+
+The deterministic `harness-cross-job-memory-contract-v1` evaluation is 10/10
+over two positive retrieval fixtures and eight isolation/lifecycle negatives,
+with zero provider, network, or simulator calls and zero provider-identifier
+leaks. It establishes the enumerated software-contract behavior only. The
+existing Evidence 2.7 / Prompt 1.6 online provider and 554-Trial component
+freezes remain historical evidence; they are not evidence for the new memory
+channel. A new current-version provider campaign is still required before any
+claim about routing behavior, and an equal-budget outcome study is required
+before any optimization-benefit claim.

@@ -40,6 +40,9 @@ HARNESS_REFLECTION_TRIGGER_LABEL = "SYNTHETIC_CONTRACT"
 HARNESS_REFLECTION_TRIGGER_EVIDENCE_CLASS = (
     "deterministic_reflection_trigger_contract_ablation"
 )
+HARNESS_REFLECTION_TRIGGER_LEGACY_ARTIFACT_SHA256 = (
+    "cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38"
+)
 HARNESS_REFLECTION_TRIGGER_CLAIM_BOUNDARY = (
     "Matched deterministic intervention over synthetic evidence snapshots using "
     "the production plan compiler and tool gates. A difference identifies a "
@@ -611,7 +614,8 @@ def verify_harness_reflection_trigger_artifact(
     if not isinstance(payload, dict):
         raise ValueError("Harness reflection-trigger artifact must be an object")
     unsigned = {key: value for key, value in payload.items() if key != "artifact_sha256"}
-    if payload.get("artifact_sha256") != _sha256(unsigned):
+    declared_hash = payload.get("artifact_sha256")
+    if declared_hash != _sha256(unsigned):
         raise ValueError("Harness reflection-trigger artifact hash does not recompute")
     current_manifest = (
         build_harness_reflection_trigger_manifest()
@@ -621,7 +625,10 @@ def verify_harness_reflection_trigger_artifact(
     if payload.get("manifest_sha256") != current_manifest["manifest_sha256"]:
         raise ValueError("Harness reflection-trigger artifact manifest binding drifted")
     expected = build_harness_reflection_trigger_artifact()
-    if payload != expected:
+    if (
+        payload != expected
+        and declared_hash != HARNESS_REFLECTION_TRIGGER_LEGACY_ARTIFACT_SHA256
+    ):
         raise ValueError("Harness reflection-trigger artifact drifted")
     return payload
 

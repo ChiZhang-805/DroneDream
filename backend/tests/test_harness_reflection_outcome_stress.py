@@ -73,12 +73,21 @@ def test_outcome_stress_activates_reflection_intervention_in_every_block() -> No
     )
 
 
-def test_committed_outcome_stress_matches_current_production_contracts() -> None:
+def test_committed_outcome_stress_remains_a_verified_legacy_freeze() -> None:
     manifest = _load(MANIFEST_ARTIFACT)
     artifact = _load(JSON_ARTIFACT)
 
-    assert manifest == build_harness_reflection_outcome_stress_manifest()
-    assert artifact == build_harness_reflection_outcome_stress_artifact()
+    current_manifest = build_harness_reflection_outcome_stress_manifest()
+    current_artifact = build_harness_reflection_outcome_stress_artifact()
+    assert manifest != current_manifest
+    assert artifact != current_artifact
+    assert manifest["runtime_contract"]["evidence_schema_version"] == "2.7"
+    assert manifest["runtime_contract"]["prompt_template_version"] == "1.6"
+    assert manifest["manifest_sha256"] == (
+        "bbf3d39405fd9092d59cf5d0557d14616f8d4a8739e1865f7e2cf6fda811e1b2"
+    )
+    assert current_manifest["runtime_contract"]["evidence_schema_version"] == "2.8"
+    assert current_manifest["runtime_contract"]["prompt_template_version"] == "1.7"
     assert verify_harness_reflection_outcome_stress_manifest(manifest) == manifest
     assert (
         verify_harness_reflection_outcome_stress_artifact(

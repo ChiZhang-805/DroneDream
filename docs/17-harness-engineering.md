@@ -1125,3 +1125,40 @@ would otherwise expose unwatermarked bytes before the tier decision. Tests
 cover one watermark per page, paid omission, client-tier spoof resistance,
 gateway failure closure, S3 redirect resistance, and the iteration lineage,
 feedback, and rationale fields.
+
+### Evidence 2.8 cross-Job experience memory
+
+Evidence 2.8 and Prompt Template 1.7 add a bounded cross-Job observation channel
+without turning historical text into prompt context. Only a terminal Job's
+`verified_complete` decision/cohort pairs can be materialized. The persisted
+row contains a closed tool/plan/outcome projection plus an internal SHA-256
+receipt; it does not contain model rationale, candidate parameters, simulator
+text, scenario IDs, seeds, holdout profiles, credentials, or error messages.
+
+Retrieval requires all of the following:
+
+- an authenticated non-null owner and an exact `user_id` match on both the
+  experience row and its still-existing source Job;
+- a different terminal source Job;
+- an exact structural task-family hash, including the internal catalog,
+  parameter-space, objective, vehicle, and simulator-backend contract binding;
+- current memory, Evidence, Prompt, Tool Registry, and eligibility-policy
+  versions;
+- an unexpired, non-revoked row whose internal source receipt recomputes.
+
+Safe training/environment aggregates produce a deterministic
+`scenario_similarity` rank. That value is a retrieval-order signal only, not a
+physical similarity or transfer guarantee. Holdout structure is excluded from
+the cross-Job profile. At most six observations enter one snapshot, the
+retention window is 90 days, source-Job deletion cascades, and authenticated
+DELETE routes can revoke one source Job or all of the caller's memories.
+Missing or changed source receipts revoke rather than refresh a record.
+
+`harness-cross-job-memory-contract-v1` is a 10-case, network-free in-memory
+SQLite contract evaluation. It covers exact and shifted scenarios, cross-user,
+anonymous, task-family and catalog isolation, explicit revocation, expiry,
+contract drift, receipt drift, provider identifier absence, and prompt/trace
+binding. Its 10/10 result proves those enumerated software contracts only; it
+does not prove optimizer benefit, LLM superiority, PX4/Gazebo fidelity, or
+real-flight safety. The previous 554-Trial Evidence 2.7 component ablation
+remains a byte-frozen legacy result and is not relabeled as Evidence 2.8.

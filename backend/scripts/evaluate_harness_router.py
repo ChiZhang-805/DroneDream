@@ -23,6 +23,7 @@ from app.orchestration.harness_context import (  # noqa: E402
 from app.orchestration.harness_evaluation import (  # noqa: E402
     compile_routing_eval_snapshot,
     grade_routing_prediction_artifact,
+    load_archived_routing_prediction_artifact,
     load_routing_eval_cases,
     load_routing_prediction_artifact,
     routing_corpus_sha256,
@@ -53,6 +54,14 @@ def _parser() -> argparse.ArgumentParser:
         / "harness_routing_eval_v1.jsonl",
     )
     parser.add_argument(
+        "--allow-archived-evidence-2-7-prompt-1-6",
+        action="store_true",
+        help=(
+            "Grade the explicitly pinned historical Evidence 2.7 / Prompt 1.6 "
+            "freeze instead of requiring the current production prompt."
+        ),
+    )
+    parser.add_argument(
         "--predictions",
         type=Path,
         help=(
@@ -79,6 +88,7 @@ def main() -> int:
         "case_count": len(cases),
         "categories": sorted({case.category for case in cases}),
         "tool_count": len(HARNESS_TOOL_DEFINITIONS),
+        "contract_role": "current_software",
         "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
         "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
         "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
@@ -106,9 +116,21 @@ def main() -> int:
         result["prompt_output"] = str(args.emit_prompts)
 
     if args.predictions is not None:
-        artifact = load_routing_prediction_artifact(
-            args.predictions,
-            cases,
+        artifact = (
+            load_archived_routing_prediction_artifact(
+                args.predictions,
+                cases,
+                evidence_schema_version="2.7",
+                prompt_template_version="1.6",
+                prompt_suite_sha256=(
+                    "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
+                ),
+            )
+            if args.allow_archived_evidence_2_7_prompt_1_6
+            else load_routing_prediction_artifact(
+                args.predictions,
+                cases,
+            )
         )
         report = grade_routing_prediction_artifact(artifact, cases)
         result["grade"] = report.predictions.model_dump(mode="json")
@@ -122,6 +144,18 @@ def main() -> int:
             "provider": artifact.provider,
             "model_snapshot": artifact.model_snapshot,
             "generation_config": artifact.generation_config.model_dump(mode="json"),
+            "evidence_schema_version": artifact.evidence_schema_version,
+            "tool_registry_version": artifact.tool_registry_version,
+            "prompt_template_version": artifact.prompt_template_version,
+            "prompt_suite_sha256": artifact.prompt_suite_sha256,
+            "contract_current": (
+                not args.allow_archived_evidence_2_7_prompt_1_6
+            ),
+            "qualification_scope": (
+                "archived_evidence_2_7_prompt_1_6"
+                if args.allow_archived_evidence_2_7_prompt_1_6
+                else "current_contract"
+            ),
         }
 
     print(json.dumps(result, indent=2, sort_keys=True))
