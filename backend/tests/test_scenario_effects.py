@@ -11,6 +11,7 @@ from app.simulator.scenario_effects import (
     ScenarioEffectContractError,
     build_scenario_effect_evidence,
     build_scenario_effect_request,
+    compile_bundled_sdf_profile,
     compile_bundled_steady_wind,
     scenario_effect_value_sha256,
     validate_scenario_effect_evidence,
@@ -167,7 +168,7 @@ def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
     assert effects["obstacles"]["mechanism"] == "gazebo_entity_factory"
     assert effects["job_config.wind"]["capability"]["status"] == "available"
     assert effects["scenario_config.wind_mps"]["capability"]["status"] == "available"
-    assert effects["wind_gusts"]["capability"]["status"] == "requires_runtime_extension"
+    assert effects["wind_gusts"]["capability"]["status"] == "available"
     assert effects["wind_gusts"]["requested_value"] == {
         "enabled": True,
         "magnitude_mps": 4.0,
@@ -184,6 +185,104 @@ def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
         item["launcher_input"]["request_path_env"] == "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH"
         for item in effects.values()
     )
+
+
+def test_compile_bundled_sdf_profile_binds_explicit_physics() -> None:
+    request = _request(
+        advanced={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4.0,
+                "direction_deg": 90.0,
+                "period_s": 8.0,
+            },
+            "sensor_degradation": {
+                "gps_noise_m": 2.0,
+                "baro_noise_m": 0.5,
+                "imu_noise_scale": 1.5,
+            },
+            "battery": {"mass_payload_kg": 1.2},
+        }
+    )
+
+    profile = compile_bundled_sdf_profile(request)
+
+    assert profile is not None
+    assert profile["wind_gust"] == {
+        "peak_magnitude_mps": 4.0,
+        "mean_magnitude_mps": 2.0,
+        "direction_deg_clockwise_from_north": 90.0,
+        "period_s": 8.0,
+        "time_for_rise_s": 1.0,
+        "mean_linear_velocity_mps": {"x": 2.0, "y": 0.0, "z": 0.0},
+        "horizontal_magnitude_sine_amplitude_percent": 1.0,
+        "range_mps": [0.0, 4.0],
+        "effect_ids": ["wind_gusts"],
+    }
+    assert profile["sensor_noise"]["gps_position_stddev_m"] == 2.0
+    assert profile["sensor_noise"]["barometer_altitude_stddev_m"] == 0.5
+    assert profile["sensor_noise"]["barometer_pressure_stddev_pa"] == 6.0
+    assert profile["sensor_noise"]["imu_noise_scale"] == 1.5
+    assert profile["payload"]["mass_kg"] == 1.2
+    assert profile["payload"]["assumption"] == "centered_uniform_cuboid"
+    assert profile["payload"]["inertia_increment_kg_m2"] == {
+        "ixx": pytest.approx(0.005),
+        "iyy": pytest.approx(0.005),
+        "izz": pytest.approx(0.008),
+    }
+
+
+@pytest.mark.parametrize(
+    ("scenario_type", "config", "section", "expected"),
+    [
+        (
+            "noise_perturbed",
+            {},
+            "sensor_noise",
+            {"gps_position_stddev_m": 1.0, "imu_noise_scale": 2.0},
+        ),
+        (
+            "turbulence",
+            {"intensity": 0.8},
+            "wind_gust",
+            {"peak_magnitude_mps": 4.0, "period_s": 5.0},
+        ),
+        (
+            "payload_changed",
+            {"mass_payload_kg": 1.5},
+            "payload",
+            {"mass_kg": 1.5},
+        ),
+        (
+            "actuator_delay",
+            {"delay_ms": 80.0},
+            "actuator_dynamics",
+            {"time_constant_up_s": 0.08, "time_constant_down_s": 0.08},
+        ),
+    ],
+)
+def test_scenario_markers_compile_to_concrete_sdf_profiles(
+    scenario_type: str,
+    config: dict[str, object],
+    section: str,
+    expected: dict[str, float],
+) -> None:
+    request = build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type=scenario_type,
+        scenario_config=config,
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+
+    profile = compile_bundled_sdf_profile(request)
+
+    assert profile is not None
+    for key, value in expected.items():
+        assert profile[section][key] == value
 
 
 def test_request_hash_rejects_tampering() -> None:

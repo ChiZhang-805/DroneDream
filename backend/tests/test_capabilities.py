@@ -82,13 +82,23 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert real_cli["max_concurrency_per_host_without_instance_allocator"] == 1
     assert real_cli["instance_allocation"] == "operator_managed"
     assert real_cli["bundled_runner_advanced_effects"] == [
+        "actuator_first_order_delay",
+        "gust_and_turbulence",
         "obstacles",
+        "payload_mass_and_inertia",
+        "sensor_noise",
         "steady_wind",
     ]
     scenario_effects = real_cli["scenario_effect_contract"]
-    assert scenario_effects["physically_applied"] == ["obstacles", "steady_wind"]
+    assert scenario_effects["physically_applied"] == real_cli["bundled_runner_advanced_effects"]
     assert scenario_effects["obstacles"]["mechanism"] == "gazebo_entity_factory"
     assert scenario_effects["steady_wind"]["mechanism"] == "gazebo_wind_effects"
+    assert scenario_effects["trial_local_sdf_profiles"]["mechanisms"] == [
+        "gazebo_wind_effects",
+        "sdformat_sensor_noise",
+        "sdformat_model_inertial",
+        "sdformat_actuator_dynamics",
+    ]
     assert "probabilistic GPS dropout" in scenario_effects["requires_runtime_extension"]
     assert real_cli["unverified_effect_passthrough_opt_in"] is True
     assert data["optimizers"]["items"]["gpt"]["ready"] is False

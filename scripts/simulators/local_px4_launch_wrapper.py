@@ -31,6 +31,20 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+# This wrapper is launched as a standalone script. Python consequently places
+# ``scripts/simulators`` (not the repository root) first on ``sys.path``. A
+# bundled Runtime can also have an older ``app`` distribution installed in its
+# virtual environment, so a fallback-only insertion is insufficient: that
+# installed package may import successfully while missing the checkout's newer
+# simulator contracts. Prefer the backend adjacent to this exact wrapper before
+# importing any ``app`` module, matching px4_gazebo_runner.py's source binding.
+_BACKEND_ROOT = Path(__file__).resolve().parents[2] / "backend"
+if _BACKEND_ROOT.is_dir():
+    _backend_root_text = str(_BACKEND_ROOT)
+    while _backend_root_text in sys.path:
+        sys.path.remove(_backend_root_text)
+    sys.path.insert(0, _backend_root_text)
+
 DEFAULT_MAKE_TARGET = "gz_x500"
 DEFAULT_RUN_SECONDS = 30
 DEFAULT_READY_TIMEOUT_SECONDS = 30
@@ -413,7 +427,11 @@ def _preflight_scenario_effects(
         ]
 
     engine = _load_scenario_effect_engine()
-    bundled_ids = {"obstacles", *engine.BUNDLED_STEADY_WIND_EFFECT_IDS}
+    bundled_ids = {
+        "obstacles",
+        *engine.BUNDLED_STEADY_WIND_EFFECT_IDS,
+        *engine.BUNDLED_SDF_PROFILE_EFFECT_IDS,
+    }
     unavailable = [
         effect
         for effect in request["effects"]
@@ -506,6 +524,194 @@ def _validated_world_name(world: str) -> str:
     return world
 
 
+def _ensure_xml_path(parent: ET.Element, *tags: str) -> ET.Element:
+    current = parent
+    for tag in tags:
+        child = current.find(tag)
+        if child is None:
+            child = ET.SubElement(current, tag)
+        current = child
+    return current
+
+
+def _set_gaussian_stddev(container: ET.Element, value: float) -> None:
+    noise = _ensure_xml_path(container, "noise")
+    noise.set("type", "gaussian")
+    _ensure_xml_path(noise, "mean").text = "0"
+    _ensure_xml_path(noise, "stddev").text = f"{value:.17g}"
+
+
+def _apply_sensor_noise_sdf(
+    base_link: ET.Element,
+    profile: dict[str, Any],
+) -> dict[str, Any]:
+    gps = base_link.find("./sensor[@name='navsat_sensor']")
+    barometer = base_link.find("./sensor[@name='air_pressure_sensor']")
+    imu = base_link.find("./sensor[@name='imu_sensor']")
+    if gps is None or barometer is None or imu is None:
+        raise RuntimeError("pinned x500_base model is missing a required physical sensor")
+
+    gps_stddev = float(profile["gps_position_stddev_m"])
+    navsat = _ensure_xml_path(gps, "navsat", "position_sensing")
+    for axis in ("horizontal", "vertical"):
+        _set_gaussian_stddev(_ensure_xml_path(navsat, axis), gps_stddev)
+
+    barometer_stddev = float(profile["barometer_pressure_stddev_pa"])
+    pressure = _ensure_xml_path(barometer, "air_pressure", "pressure")
+    _set_gaussian_stddev(pressure, barometer_stddev)
+
+    imu_scale = float(profile["imu_noise_scale"])
+    expected_imu: dict[str, float] = {}
+    for group in ("angular_velocity", "linear_acceleration"):
+        for axis in ("x", "y", "z"):
+            axis_element = imu.find(f"./imu/{group}/{axis}")
+            noise = (
+                axis_element.find("noise")
+                if axis_element is not None
+                else None
+            )
+            if axis_element is None or noise is None:
+                raise RuntimeError(
+                    f"pinned x500_base IMU is missing {group}/{axis}/noise"
+                )
+            raw_stddev = noise.findtext("stddev")
+            try:
+                base_stddev = float(raw_stddev or "")
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"pinned x500_base IMU {group}/{axis} stddev is invalid"
+                ) from exc
+            scaled = base_stddev * imu_scale
+            _set_gaussian_stddev(axis_element, scaled)
+            expected_imu[f"{group}.{axis}"] = scaled
+    return {
+        "gps_position_stddev_m": gps_stddev,
+        "barometer_pressure_stddev_pa": barometer_stddev,
+        "imu_stddev": expected_imu,
+    }
+
+
+def _apply_payload_sdf(
+    base_link: ET.Element,
+    profile: dict[str, Any],
+) -> dict[str, Any]:
+    inertial = base_link.find("inertial")
+    if inertial is None:
+        raise RuntimeError("pinned x500_base model has no base_link inertial")
+    mass_node = inertial.find("mass")
+    inertia = inertial.find("inertia")
+    if mass_node is None or inertia is None:
+        raise RuntimeError("pinned x500_base inertial is incomplete")
+    try:
+        original_mass = float(mass_node.text or "")
+        original_inertia = {
+            name: float(inertia.findtext(name, default=""))
+            for name in ("ixx", "ixy", "ixz", "iyy", "iyz", "izz")
+        }
+    except ValueError as exc:
+        raise RuntimeError("pinned x500_base mass/inertia is invalid") from exc
+    increment = profile["inertia_increment_kg_m2"]
+    final_mass = original_mass + float(profile["mass_kg"])
+    final_inertia = dict(original_inertia)
+    for name in ("ixx", "iyy", "izz"):
+        final_inertia[name] = original_inertia[name] + float(increment[name])
+    mass_node.text = f"{final_mass:.17g}"
+    for name, value in final_inertia.items():
+        node = inertia.find(name)
+        if node is None:
+            raise RuntimeError(f"pinned x500_base inertia is missing {name}")
+        node.text = f"{value:.17g}"
+    return {
+        "original_mass_kg": original_mass,
+        "payload_mass_kg": float(profile["mass_kg"]),
+        "final_mass_kg": final_mass,
+        "original_inertia_kg_m2": original_inertia,
+        "final_inertia_kg_m2": final_inertia,
+        "payload_assumption": profile["assumption"],
+        "payload_dimensions_m": profile["dimensions_m"],
+        "payload_center_m": profile["center_m"],
+    }
+
+
+def _apply_actuator_dynamics_sdf(
+    model_root: ET.Element,
+    profile: dict[str, Any],
+) -> dict[str, Any]:
+    model = model_root.find("./model[@name='x500']")
+    if model is None:
+        raise RuntimeError("pinned x500 model SDF has no x500 model")
+    expected_numbers = set(profile["motor_numbers"])
+    observed: dict[int, dict[str, float]] = {}
+    for plugin in model.findall("plugin"):
+        if plugin.get("name") != "gz::sim::systems::MulticopterMotorModel":
+            continue
+        try:
+            motor_number = int(plugin.findtext("motorNumber", default=""))
+        except ValueError as exc:
+            raise RuntimeError("pinned x500 motor plugin has invalid motorNumber") from exc
+        if motor_number not in expected_numbers or motor_number in observed:
+            raise RuntimeError("pinned x500 motor plugin set is invalid")
+        up = float(profile["time_constant_up_s"])
+        down = float(profile["time_constant_down_s"])
+        _ensure_xml_path(plugin, "timeConstantUp").text = f"{up:.17g}"
+        _ensure_xml_path(plugin, "timeConstantDown").text = f"{down:.17g}"
+        observed[motor_number] = {
+            "time_constant_up_s": up,
+            "time_constant_down_s": down,
+        }
+    if set(observed) != expected_numbers:
+        raise RuntimeError("pinned x500 model does not expose all four motor plugins")
+    return {
+        "model": profile["model"],
+        "requested_delay_ms": float(profile["requested_delay_ms"]),
+        "motors": [
+            {"motor_number": number, **observed[number]}
+            for number in sorted(observed)
+        ],
+    }
+
+
+def _configure_wind_effects_plugin(
+    plugin: ET.Element,
+    gust_profile: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if gust_profile is None:
+        return None
+    _ensure_xml_path(plugin, "force_approximation_scaling_factor").text = "1"
+    magnitude = _ensure_xml_path(plugin, "horizontal", "magnitude")
+    rise_time = float(gust_profile["time_for_rise_s"])
+    if not math.isfinite(rise_time) or rise_time <= 0:
+        raise RuntimeError("WindEffects gust time_for_rise must be finite and greater than zero")
+    _ensure_xml_path(magnitude, "time_for_rise").text = f"{rise_time:.17g}"
+    magnitude_sin = _ensure_xml_path(magnitude, "sin")
+    _ensure_xml_path(magnitude_sin, "amplitude_percent").text = (
+        f"{float(gust_profile['horizontal_magnitude_sine_amplitude_percent']):.17g}"
+    )
+    _ensure_xml_path(magnitude_sin, "period").text = (
+        f"{float(gust_profile['period_s']):.17g}"
+    )
+    _set_gaussian_stddev(magnitude, 0.0)
+    direction = _ensure_xml_path(plugin, "horizontal", "direction")
+    _ensure_xml_path(direction, "time_for_rise").text = f"{rise_time:.17g}"
+    direction_sin = _ensure_xml_path(direction, "sin")
+    _ensure_xml_path(direction_sin, "amplitude").text = "0"
+    _ensure_xml_path(direction_sin, "period").text = (
+        f"{float(gust_profile['period_s']):.17g}"
+    )
+    _set_gaussian_stddev(direction, 0.0)
+    _set_gaussian_stddev(_ensure_xml_path(plugin, "vertical"), 0.0)
+    return {
+        "mean_linear_velocity_mps": gust_profile["mean_linear_velocity_mps"],
+        "peak_magnitude_mps": float(gust_profile["peak_magnitude_mps"]),
+        "period_s": float(gust_profile["period_s"]),
+        "time_for_rise_s": rise_time,
+        "amplitude_percent": float(
+            gust_profile["horizontal_magnitude_sine_amplitude_percent"]
+        ),
+        "range_mps": gust_profile["range_mps"],
+    }
+
+
 def _prepare_steady_wind_overlay(
     request: dict[str, Any],
     engine: Any,
@@ -519,13 +725,19 @@ def _prepare_steady_wind_overlay(
     """Create an isolated world/model overlay before Gazebo starts."""
 
     compiled = engine.compile_bundled_steady_wind(request)
-    if compiled is None:
+    compiled_sdf_profile = engine.compile_bundled_sdf_profile(request)
+    if compiled is None and compiled_sdf_profile is None:
         return None
     normalized_model = simulator_model.removeprefix("gz_")
     if normalized_model not in {"x500", "x500_depth", "x500_vision"}:
         raise ScenarioEffectUnsupportedError(
             "bundled steady wind currently supports PX4 x500, x500_depth, and "
             "x500_vision simulator models"
+        )
+    if compiled_sdf_profile is not None and normalized_model != "x500":
+        raise ScenarioEffectUnsupportedError(
+            "bundled Trial-local sensor, gust, payload, and actuator profiles "
+            "currently require the PX4 x500 simulator model"
         )
     if not autopilot_dir:
         raise ScenarioEffectUnsupportedError(
@@ -539,8 +751,15 @@ def _prepare_steady_wind_overlay(
     gazebo_root = px4_root / "Tools" / "simulation" / "gz"
     source_model_dir = gazebo_root / "models" / "x500_base"
     source_model_sdf = source_model_dir / "model.sdf"
+    source_vehicle_model_dir = gazebo_root / "models" / normalized_model
+    source_vehicle_model_sdf = source_vehicle_model_dir / "model.sdf"
     source_world_sdf = gazebo_root / "worlds" / f"{world_name}.sdf"
-    for source in (source_model_sdf, source_world_sdf):
+    # PX4's px4-rc.gzsim spawns the top-level vehicle from the explicit
+    # ``PX4_GZ_MODELS/<model>/model.sdf`` path. It does not resolve that file
+    # through GZ_SIM_RESOURCE_PATH. Always bind a Trial-local top-level model,
+    # even when only x500_base or world fields are changed.
+    trusted_sources = [source_model_sdf, source_vehicle_model_sdf, source_world_sdf]
+    for source in trusted_sources:
         if not source.is_file() or source.is_symlink():
             raise ScenarioEffectUnsupportedError(
                 f"trusted pinned PX4 Gazebo input is missing or unsafe: {source}"
@@ -573,12 +792,18 @@ def _prepare_steady_wind_overlay(
     model_root = runtime_root / "models"
     world_root = runtime_root / "worlds"
     overlay_model_dir = model_root / "x500_base"
+    overlay_vehicle_model_dir = model_root / normalized_model
     overlay_world_sdf = world_root / f"{world_name}.sdf"
-    if overlay_model_dir.exists() or overlay_world_sdf.exists():
+    if (
+        overlay_model_dir.exists()
+        or overlay_vehicle_model_dir.exists()
+        or overlay_world_sdf.exists()
+    ):
         raise RuntimeError("Trial-local scenario runtime overlay already exists")
     model_root.mkdir(parents=True, exist_ok=True)
     world_root.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source_model_dir, overlay_model_dir)
+    shutil.copytree(source_vehicle_model_dir, overlay_vehicle_model_dir)
     shutil.copy2(source_world_sdf, overlay_world_sdf)
 
     overlay_model_sdf = overlay_model_dir / "model.sdf"
@@ -588,13 +813,39 @@ def _prepare_steady_wind_overlay(
         context="Trial-local PX4 model SDF",
     )
     model_root_xml = model_tree.getroot()
+    if model_root_xml is None:
+        raise RuntimeError("pinned x500_base model SDF has no root element")
     base_link = model_root_xml.find("./model[@name='x500_base']/link[@name='base_link']")
     if base_link is None:
         raise RuntimeError("pinned x500_base model has no base_link")
-    enable_wind = base_link.find("enable_wind")
-    if enable_wind is None:
-        enable_wind = ET.SubElement(base_link, "enable_wind")
-    enable_wind.text = "true"
+    gust_profile = (
+        compiled_sdf_profile.get("wind_gust")
+        if isinstance(compiled_sdf_profile, dict)
+        else None
+    )
+    wind_requested = compiled is not None or gust_profile is not None
+    if compiled is not None and gust_profile is not None and compiled["speed_mps"] > 1e-9:
+        raise ScenarioEffectUnsupportedError(
+            "the bundled sinusoidal gust profile cannot be superimposed exactly on a "
+            "non-zero steady-wind vector; split these into separate physical scenarios"
+        )
+    if wind_requested:
+        enable_wind = base_link.find("enable_wind")
+        if enable_wind is None:
+            enable_wind = ET.SubElement(base_link, "enable_wind")
+        enable_wind.text = "true"
+
+    applied_sdf_profile: dict[str, Any] = {}
+    if compiled_sdf_profile is not None and "sensor_noise" in compiled_sdf_profile:
+        applied_sdf_profile["sensor_noise"] = _apply_sensor_noise_sdf(
+            base_link,
+            compiled_sdf_profile["sensor_noise"],
+        )
+    if compiled_sdf_profile is not None and "payload" in compiled_sdf_profile:
+        applied_sdf_profile["payload"] = _apply_payload_sdf(
+            base_link,
+            compiled_sdf_profile["payload"],
+        )
 
     sanitized_classic_material_scripts = 0
     for material in model_root_xml.findall(".//material"):
@@ -625,12 +876,35 @@ def _prepare_steady_wind_overlay(
     ET.indent(model_tree, space="  ")
     model_tree.write(overlay_model_sdf, encoding="utf-8", xml_declaration=True)
 
+    overlay_vehicle_model_sdf = overlay_vehicle_model_dir / "model.sdf"
+    if compiled_sdf_profile is not None and "actuator_dynamics" in compiled_sdf_profile:
+        vehicle_tree = _parse_trusted_local_xml(
+            overlay_vehicle_model_sdf,
+            trusted_root=runtime_root,
+            context="Trial-local PX4 vehicle model SDF",
+        )
+        vehicle_root_xml = vehicle_tree.getroot()
+        if vehicle_root_xml is None:
+            raise RuntimeError("pinned x500 vehicle model SDF has no root element")
+        applied_sdf_profile["actuator_dynamics"] = _apply_actuator_dynamics_sdf(
+            vehicle_root_xml,
+            compiled_sdf_profile["actuator_dynamics"],
+        )
+        ET.indent(vehicle_tree, space="  ")
+        vehicle_tree.write(
+            overlay_vehicle_model_sdf,
+            encoding="utf-8",
+            xml_declaration=True,
+        )
+
     world_tree = _parse_trusted_local_xml(
         overlay_world_sdf,
         trusted_root=runtime_root,
         context="Trial-local PX4 world SDF",
     )
     world_root_xml = world_tree.getroot()
+    if world_root_xml is None:
+        raise RuntimeError("pinned Gazebo world SDF has no root element")
     world_xml = world_root_xml.find(f"./world[@name='{world_name}']")
     if world_xml is None:
         raise RuntimeError(f"pinned world SDF does not define world {world_name!r}")
@@ -647,51 +921,76 @@ def _prepare_steady_wind_overlay(
     configured_plugins = server_config_tree.findall("./plugins/plugin")
     if not configured_plugins:
         raise RuntimeError("pinned PX4 Gazebo server config has no system plugins")
-    plugin_keys = {
-        (plugin.get("filename"), plugin.get("name")) for plugin in world_xml.findall("plugin")
-    }
-    for configured_plugin in configured_plugins:
-        plugin_key = (configured_plugin.get("filename"), configured_plugin.get("name"))
-        if not all(plugin_key):
-            raise RuntimeError("pinned PX4 Gazebo server config has an invalid system plugin")
-        if plugin_key in plugin_keys:
-            continue
-        materialized_plugin = copy.deepcopy(configured_plugin)
-        materialized_plugin.attrib.pop("entity_name", None)
-        materialized_plugin.attrib.pop("entity_type", None)
-        world_xml.append(materialized_plugin)
-        plugin_keys.add(plugin_key)
+    materialized_plugins: list[ET.Element] = []
+    wind_plugin_observation: dict[str, Any] | None = None
+    vector: dict[str, float] | None = None
+    if wind_requested:
+        plugin_keys = {
+            (plugin.get("filename"), plugin.get("name"))
+            for plugin in world_xml.findall("plugin")
+        }
+        for configured_plugin in configured_plugins:
+            plugin_key = (
+                configured_plugin.get("filename"),
+                configured_plugin.get("name"),
+            )
+            if not all(plugin_key):
+                raise RuntimeError(
+                    "pinned PX4 Gazebo server config has an invalid system plugin"
+                )
+            if plugin_key in plugin_keys:
+                continue
+            materialized_plugin = copy.deepcopy(configured_plugin)
+            materialized_plugin.attrib.pop("entity_name", None)
+            materialized_plugin.attrib.pop("entity_type", None)
+            world_xml.append(materialized_plugin)
+            materialized_plugins.append(configured_plugin)
+            plugin_keys.add(plugin_key)
 
-    wind_xml = world_xml.find("wind")
-    if wind_xml is None:
-        wind_xml = ET.SubElement(world_xml, "wind")
-    linear_velocity = wind_xml.find("linear_velocity")
-    if linear_velocity is None:
-        linear_velocity = ET.SubElement(wind_xml, "linear_velocity")
-    vector = compiled["linear_velocity_mps"]
-    linear_velocity.text = f"{vector['x']:.17g} {vector['y']:.17g} {vector['z']:.17g}"
-
-    plugins = [
-        plugin
-        for plugin in world_xml.findall("plugin")
-        if plugin.get("name") == WIND_EFFECTS_PLUGIN_NAME
-        or plugin.get("filename") == WIND_EFFECTS_PLUGIN_FILENAME
-    ]
-    if len(plugins) > 1:
-        raise RuntimeError("world SDF contains multiple conflicting WindEffects plugins")
-    if plugins:
-        plugin = plugins[0]
-        plugin.set("filename", WIND_EFFECTS_PLUGIN_FILENAME)
-        plugin.set("name", WIND_EFFECTS_PLUGIN_NAME)
-    else:
-        ET.SubElement(
-            world_xml,
-            "plugin",
-            {
-                "filename": WIND_EFFECTS_PLUGIN_FILENAME,
-                "name": WIND_EFFECTS_PLUGIN_NAME,
-            },
+        wind_xml = world_xml.find("wind")
+        if wind_xml is None:
+            wind_xml = ET.SubElement(world_xml, "wind")
+        linear_velocity = wind_xml.find("linear_velocity")
+        if linear_velocity is None:
+            linear_velocity = ET.SubElement(wind_xml, "linear_velocity")
+        vector = (
+            gust_profile["mean_linear_velocity_mps"]
+            if gust_profile is not None
+            else compiled["linear_velocity_mps"]
         )
+        linear_velocity.text = (
+            f"{vector['x']:.17g} {vector['y']:.17g} {vector['z']:.17g}"
+        )
+
+        plugins = [
+            plugin
+            for plugin in world_xml.findall("plugin")
+            if plugin.get("name") == WIND_EFFECTS_PLUGIN_NAME
+            or plugin.get("filename") == WIND_EFFECTS_PLUGIN_FILENAME
+        ]
+        if len(plugins) > 1:
+            raise RuntimeError(
+                "world SDF contains multiple conflicting WindEffects plugins"
+            )
+        if plugins:
+            plugin = plugins[0]
+            plugin.set("filename", WIND_EFFECTS_PLUGIN_FILENAME)
+            plugin.set("name", WIND_EFFECTS_PLUGIN_NAME)
+        else:
+            plugin = ET.SubElement(
+                world_xml,
+                "plugin",
+                {
+                    "filename": WIND_EFFECTS_PLUGIN_FILENAME,
+                    "name": WIND_EFFECTS_PLUGIN_NAME,
+                },
+            )
+        wind_plugin_observation = _configure_wind_effects_plugin(
+            plugin,
+            gust_profile,
+        )
+        if wind_plugin_observation is not None:
+            applied_sdf_profile["wind_gust"] = wind_plugin_observation
     ET.indent(world_tree, space="  ")
     world_tree.write(overlay_world_sdf, encoding="utf-8", xml_declaration=True)
 
@@ -738,7 +1037,7 @@ def _prepare_steady_wind_overlay(
             [
                 "#!/usr/bin/env bash",
                 "# Generated per Trial by DroneDream; never edits the pinned PX4 checkout.",
-                f"export PX4_GZ_MODELS={shlex.quote(str(gazebo_root / 'models'))}",
+                f"export PX4_GZ_MODELS={shlex.quote(str(model_root))}",
                 f"export PX4_GZ_WORLDS={shlex.quote(str(world_root))}",
                 f"export PX4_GZ_PLUGINS={shlex.quote(str(px4_plugins))}",
                 f"export PX4_GZ_SERVER_CONFIG={shlex.quote(str(px4_server_config))}",
@@ -755,22 +1054,31 @@ def _prepare_steady_wind_overlay(
     )
     return {
         "compiled_wind": compiled,
+        "compiled_sdf_profile": compiled_sdf_profile,
+        "applied_sdf_profile": applied_sdf_profile,
         "model_sdf_path": str(overlay_model_sdf),
         "model_sdf_sha256": _sha256_hex(overlay_model_sdf),
+        "vehicle_model_sdf_path": str(overlay_vehicle_model_sdf),
+        "vehicle_model_sdf_sha256": _sha256_hex(overlay_vehicle_model_sdf),
         "sanitized_classic_material_scripts": sanitized_classic_material_scripts,
         "world_sdf_path": str(overlay_world_sdf),
         "world_sdf_sha256": _sha256_hex(overlay_world_sdf),
-        "wind_enabled_link": "x500_base/base_link",
-        "wind_effects_plugin": {
-            "filename": WIND_EFFECTS_PLUGIN_FILENAME,
-            "name": WIND_EFFECTS_PLUGIN_NAME,
-        },
+        "wind_enabled_link": "x500_base/base_link" if wind_requested else None,
+        "wind_effects_plugin": (
+            {
+                "filename": WIND_EFFECTS_PLUGIN_FILENAME,
+                "name": WIND_EFFECTS_PLUGIN_NAME,
+                "profile": wind_plugin_observation,
+            }
+            if wind_requested
+            else None
+        ),
         "materialized_px4_system_plugins": [
             {
                 "filename": plugin.get("filename"),
                 "name": plugin.get("name"),
             }
-            for plugin in configured_plugins
+            for plugin in materialized_plugins
         ],
         "px4_server_config_path": str(px4_server_config),
         "px4_server_config_sha256": _sha256_hex(px4_server_config),
@@ -876,40 +1184,258 @@ def _parse_protobuf_string_message(response_text: str) -> str:
     return value
 
 
-def _runtime_wind_mode_observation(
+def _required_float_text(
+    parent: ET.Element,
+    path: str,
+    *,
+    context: str,
+) -> float:
+    raw = parent.findtext(path)
+    try:
+        value = float(raw or "")
+    except ValueError as exc:
+        raise RuntimeError(f"generated runtime SDF has invalid {context}") from exc
+    if not math.isfinite(value):
+        raise RuntimeError(f"generated runtime SDF has non-finite {context}")
+    return value
+
+
+def _assert_runtime_float(
+    actual: float,
+    expected: float,
+    *,
+    context: str,
+) -> None:
+    if not math.isclose(actual, expected, rel_tol=1e-9, abs_tol=1e-12):
+        raise RuntimeError(
+            f"generated runtime SDF {context} mismatch: "
+            f"expected {expected:.17g}, observed {actual:.17g}"
+        )
+
+
+def _runtime_sdf_profile_observation(
     generated_sdf: str,
     *,
     generated_path: Path,
     expected_vehicle_model: str,
+    applied_sdf_profile: dict[str, Any],
+    require_wind_mode: bool,
 ) -> dict[str, Any]:
     root = _parse_bounded_xml_text(
         generated_sdf,
         byte_limit=MAX_GENERATED_WORLD_SDF_BYTES,
         context="Gazebo generated-world-SDF response",
     )
-    enabled = False
-    for model in root.iter("model"):
-        if model.get("name") != expected_vehicle_model:
-            continue
-        link = model.find("./link[@name='base_link']")
-        if link is not None and (link.findtext("enable_wind") or "").strip().lower() == "true":
-            enabled = True
-            break
-    if not enabled:
+    matching_models = [
+        model for model in root.iter("model") if model.get("name") == expected_vehicle_model
+    ]
+    if len(matching_models) != 1:
+        raise RuntimeError(
+            "generated runtime SDF does not expose exactly one expected vehicle "
+            f"model {expected_vehicle_model}"
+        )
+    model = matching_models[0]
+    base_link = model.find("./link[@name='base_link']")
+    if base_link is None:
+        raise RuntimeError(
+            f"generated runtime SDF has no {expected_vehicle_model}/base_link"
+        )
+    enabled = (base_link.findtext("enable_wind") or "").strip().lower() == "true"
+    if require_wind_mode and not enabled:
         raise RuntimeError(
             "generated runtime SDF does not prove expected wind-enabled vehicle "
             f"{expected_vehicle_model}/base_link enable_wind=true"
         )
+    verified_sections: list[str] = []
+
+    expected_sensor = applied_sdf_profile.get("sensor_noise")
+    if isinstance(expected_sensor, dict):
+        gps = base_link.find("./sensor[@name='navsat_sensor']")
+        barometer = base_link.find("./sensor[@name='air_pressure_sensor']")
+        imu = base_link.find("./sensor[@name='imu_sensor']")
+        if gps is None or barometer is None or imu is None:
+            raise RuntimeError("generated runtime SDF omitted a profiled x500 sensor")
+        for axis in ("horizontal", "vertical"):
+            actual = _required_float_text(
+                gps,
+                f"./navsat/position_sensing/{axis}/noise/stddev",
+                context=f"navsat {axis} position noise",
+            )
+            _assert_runtime_float(
+                actual,
+                float(expected_sensor["gps_position_stddev_m"]),
+                context=f"navsat {axis} position noise",
+            )
+        actual_baro = _required_float_text(
+            barometer,
+            "./air_pressure/pressure/noise/stddev",
+            context="barometer pressure noise",
+        )
+        _assert_runtime_float(
+            actual_baro,
+            float(expected_sensor["barometer_pressure_stddev_pa"]),
+            context="barometer pressure noise",
+        )
+        for key, expected in expected_sensor["imu_stddev"].items():
+            group, axis = key.split(".", 1)
+            actual = _required_float_text(
+                imu,
+                f"./imu/{group}/{axis}/noise/stddev",
+                context=f"IMU {group} {axis} noise",
+            )
+            _assert_runtime_float(
+                actual,
+                float(expected),
+                context=f"IMU {group} {axis} noise",
+            )
+        verified_sections.append("sensor_noise")
+
+    expected_payload = applied_sdf_profile.get("payload")
+    if isinstance(expected_payload, dict):
+        final_mass = _required_float_text(
+            base_link,
+            "./inertial/mass",
+            context="base_link mass",
+        )
+        _assert_runtime_float(
+            final_mass,
+            float(expected_payload["final_mass_kg"]),
+            context="base_link mass",
+        )
+        for name, expected in expected_payload["final_inertia_kg_m2"].items():
+            actual = _required_float_text(
+                base_link,
+                f"./inertial/inertia/{name}",
+                context=f"base_link inertia {name}",
+            )
+            _assert_runtime_float(
+                actual,
+                float(expected),
+                context=f"base_link inertia {name}",
+            )
+        verified_sections.append("payload")
+
+    expected_actuator = applied_sdf_profile.get("actuator_dynamics")
+    if isinstance(expected_actuator, dict):
+        observed_motors: set[int] = set()
+        for plugin in model.findall("plugin"):
+            if plugin.get("name") != "gz::sim::systems::MulticopterMotorModel":
+                continue
+            try:
+                motor_number = int(plugin.findtext("motorNumber", default=""))
+            except ValueError as exc:
+                raise RuntimeError(
+                    "generated runtime SDF has invalid motorNumber"
+                ) from exc
+            if motor_number in observed_motors:
+                raise RuntimeError(
+                    "generated runtime SDF has duplicate motorNumber"
+                )
+            observed_motors.add(motor_number)
+            expected_motor = next(
+                (
+                    item
+                    for item in expected_actuator["motors"]
+                    if item["motor_number"] == motor_number
+                ),
+                None,
+            )
+            if expected_motor is None:
+                raise RuntimeError(
+                    "generated runtime SDF exposes an unexpected motor plugin"
+                )
+            for tag, key in (
+                ("timeConstantUp", "time_constant_up_s"),
+                ("timeConstantDown", "time_constant_down_s"),
+            ):
+                actual = _required_float_text(
+                    plugin,
+                    tag,
+                    context=f"motor {motor_number} {tag}",
+                )
+                _assert_runtime_float(
+                    actual,
+                    float(expected_motor[key]),
+                    context=f"motor {motor_number} {tag}",
+                )
+        expected_numbers = {
+            int(item["motor_number"]) for item in expected_actuator["motors"]
+        }
+        if observed_motors != expected_numbers:
+            raise RuntimeError(
+                "generated runtime SDF motor plugin coverage does not match the profile"
+            )
+        verified_sections.append("actuator_dynamics")
+
+    expected_gust = applied_sdf_profile.get("wind_gust")
+    if isinstance(expected_gust, dict):
+        wind_plugins = [
+            plugin
+            for plugin in root.iter("plugin")
+            if plugin.get("name") == WIND_EFFECTS_PLUGIN_NAME
+            or plugin.get("filename") == WIND_EFFECTS_PLUGIN_FILENAME
+        ]
+        if len(wind_plugins) != 1:
+            raise RuntimeError(
+                "generated runtime SDF does not expose exactly one WindEffects plugin"
+            )
+        plugin = wind_plugins[0]
+        for path, expected, context in (
+            (
+                "./horizontal/magnitude/time_for_rise",
+                expected_gust["time_for_rise_s"],
+                "gust magnitude time_for_rise",
+            ),
+            (
+                "./horizontal/magnitude/sin/amplitude_percent",
+                expected_gust["amplitude_percent"],
+                "gust amplitude_percent",
+            ),
+            (
+                "./horizontal/magnitude/sin/period",
+                expected_gust["period_s"],
+                "gust period",
+            ),
+            (
+                "./horizontal/direction/time_for_rise",
+                expected_gust["time_for_rise_s"],
+                "gust direction time_for_rise",
+            ),
+        ):
+            _assert_runtime_float(
+                _required_float_text(plugin, path, context=context),
+                float(expected),
+                context=context,
+            )
+        verified_sections.append("wind_gust")
+
     generated_path.parent.mkdir(parents=True, exist_ok=True)
     generated_path.write_text(generated_sdf, encoding="utf-8")
     return {
         "source_vehicle_model": "x500_base",
         "vehicle_model": expected_vehicle_model,
         "link_name": "base_link",
-        "enable_wind": True,
+        "enable_wind": enabled,
+        "verified_profile_sections": verified_sections,
+        "applied_sdf_profile": applied_sdf_profile,
         "sdf_path": str(generated_path),
         "sdf_sha256": _sha256_hex(generated_path),
     }
+
+
+def _runtime_wind_mode_observation(
+    generated_sdf: str,
+    *,
+    generated_path: Path,
+    expected_vehicle_model: str,
+) -> dict[str, Any]:
+    return _runtime_sdf_profile_observation(
+        generated_sdf,
+        generated_path=generated_path,
+        expected_vehicle_model=expected_vehicle_model,
+        applied_sdf_profile={},
+        require_wind_mode=True,
+    )
 
 
 def _run_gazebo_command(
@@ -945,32 +1471,48 @@ def _apply_steady_wind_effects(
     world: str,
 ) -> dict[str, dict[str, Any]]:
     compiled = engine.compile_bundled_steady_wind(request)
-    if compiled is None:
+    compiled_sdf_profile = engine.compile_bundled_sdf_profile(request)
+    if compiled is None and compiled_sdf_profile is None:
         return {}
-    if overlay is None or overlay.get("compiled_wind") != compiled:
-        raise RuntimeError("Trial-local steady-wind overlay is missing or request-mismatched")
+    if (
+        overlay is None
+        or overlay.get("compiled_wind") != compiled
+        or overlay.get("compiled_sdf_profile") != compiled_sdf_profile
+    ):
+        raise RuntimeError(
+            "Trial-local physical scenario overlay is missing or request-mismatched"
+        )
     gz_cli = _gazebo_cli()
     if not gz_cli:
         raise ScenarioEffectUnsupportedError(
-            "Gazebo gz CLI is unavailable; steady wind requires wind_info and "
-            "generate_world_sdf verification services"
+            "Gazebo gz CLI is unavailable; physical SDF profiles require "
+            "generate_world_sdf and wind profiles also require wind_info"
         )
     world_name = _validated_world_name(world)
     wind_topic = f"/world/{world_name}/wind"
     wind_info_service = f"/world/{world_name}/wind_info"
     generated_sdf_service = f"/world/{world_name}/generate_world_sdf"
+    gust_profile = (
+        compiled_sdf_profile.get("wind_gust")
+        if isinstance(compiled_sdf_profile, dict)
+        else None
+    )
+    wind_requested = compiled is not None or gust_profile is not None
     services_text = _run_gazebo_command(
         [gz_cli, "service", "--list"],
         timeout=10.0,
         failure_context="could not inspect Gazebo services",
     )
     services = set(services_text.split())
+    required_services = {generated_sdf_service}
+    if wind_requested:
+        required_services.add(wind_info_service)
     missing_services = sorted(
-        service for service in (wind_info_service, generated_sdf_service) if service not in services
+        service for service in required_services if service not in services
     )
     if missing_services:
         raise ScenarioEffectUnsupportedError(
-            "Gazebo steady-wind verification services are unavailable: "
+            "Gazebo physical-profile verification services are unavailable: "
             + ", ".join(missing_services)
         )
 
@@ -978,84 +1520,94 @@ def _apply_steady_wind_effects(
         100,
         _parse_int(os.environ.get("PX4_GAZEBO_WIND_TIMEOUT_MS"), default=5000),
     )
-    vector = compiled["linear_velocity_mps"]
-    wind_message = (
-        "linear_velocity { "
-        f"x: {vector['x']:.17g} y: {vector['y']:.17g} z: {vector['z']:.17g}"
-        " } enable_wind: true"
-    )
-    _run_gazebo_command(
-        [
-            gz_cli,
-            "topic",
-            "-t",
-            wind_topic,
-            "-m",
-            "gz.msgs.Wind",
-            "-p",
-            wind_message,
-        ],
-        timeout=max(5.0, (timeout_ms / 1000.0) + 2.0),
-        failure_context="could not publish Gazebo steady wind",
-    )
-
+    vector: dict[str, float] | None = None
     readback: dict[str, Any] | None = None
-    readback_error = ""
-    attempts = max(
-        1,
-        min(
-            50,
-            _parse_int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS"), default=10),
-        ),
-    )
-    for attempt in range(attempts):
-        try:
-            response_text = _run_gazebo_command(
-                [
-                    gz_cli,
-                    "service",
-                    "-s",
-                    wind_info_service,
-                    "--reqtype",
-                    "gz.msgs.Empty",
-                    "--reptype",
-                    "gz.msgs.Wind",
-                    "--timeout",
-                    str(timeout_ms),
-                    "--req",
-                    "",
-                ],
-                timeout=max(5.0, (timeout_ms / 1000.0) + 2.0),
-                failure_context="Gazebo wind_info request failed",
-            )
-            candidate = _parse_wind_info_response(response_text)
-            vector_matches = all(
-                math.isclose(
-                    candidate["linear_velocity_mps"][axis],
-                    vector[axis],
-                    rel_tol=1e-9,
-                    abs_tol=1e-9,
-                )
-                for axis in ("x", "y", "z")
-            )
-            if vector_matches and candidate["enable_wind"] is True:
-                readback = {
-                    "linear_velocity_mps": {
-                        axis: round(candidate["linear_velocity_mps"][axis], 12)
-                        for axis in ("x", "y", "z")
-                    },
-                    "enable_wind": True,
-                }
-                break
-            readback_error = f"mismatched readback {candidate}"
-        except RuntimeError as exc:
-            readback_error = str(exc)
-        if attempt + 1 < attempts:
-            time.sleep(0.1)
-    if readback is None:
-        raise RuntimeError(
-            "Gazebo wind_info never matched the requested steady wind: " + readback_error
+    if wind_requested:
+        vector = (
+            gust_profile["mean_linear_velocity_mps"]
+            if gust_profile is not None
+            else compiled["linear_velocity_mps"]
         )
+        wind_message = (
+            "linear_velocity { "
+            f"x: {vector['x']:.17g} y: {vector['y']:.17g} z: {vector['z']:.17g}"
+            " } enable_wind: true"
+        )
+        _run_gazebo_command(
+            [
+                gz_cli,
+                "topic",
+                "-t",
+                wind_topic,
+                "-m",
+                "gz.msgs.Wind",
+                "-p",
+                wind_message,
+            ],
+            timeout=max(5.0, (timeout_ms / 1000.0) + 2.0),
+            failure_context="could not publish Gazebo wind profile",
+        )
+
+        readback_error = ""
+        attempts = max(
+            1,
+            min(
+                50,
+                _parse_int(
+                    os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS"),
+                    default=10,
+                ),
+            ),
+        )
+        for attempt in range(attempts):
+            try:
+                response_text = _run_gazebo_command(
+                    [
+                        gz_cli,
+                        "service",
+                        "-s",
+                        wind_info_service,
+                        "--reqtype",
+                        "gz.msgs.Empty",
+                        "--reptype",
+                        "gz.msgs.Wind",
+                        "--timeout",
+                        str(timeout_ms),
+                        "--req",
+                        "",
+                    ],
+                    timeout=max(5.0, (timeout_ms / 1000.0) + 2.0),
+                    failure_context="Gazebo wind_info request failed",
+                )
+                candidate = _parse_wind_info_response(response_text)
+                vector_matches = all(
+                    math.isclose(
+                        candidate["linear_velocity_mps"][axis],
+                        vector[axis],
+                        rel_tol=1e-9,
+                        abs_tol=1e-9,
+                    )
+                    for axis in ("x", "y", "z")
+                )
+                if vector_matches and candidate["enable_wind"] is True:
+                    readback = {
+                        "linear_velocity_mps": {
+                            axis: round(candidate["linear_velocity_mps"][axis], 12)
+                            for axis in ("x", "y", "z")
+                        },
+                        "enable_wind": True,
+                    }
+                    break
+                readback_error = f"mismatched readback {candidate}"
+            except RuntimeError as exc:
+                readback_error = str(exc)
+            if attempt + 1 < attempts:
+                time.sleep(0.1)
+        if readback is None:
+            raise RuntimeError(
+                "Gazebo wind_info never matched the requested wind profile: "
+                + readback_error
+            )
 
     runtime_sdf: dict[str, Any] | None = None
     runtime_sdf_error = ""
@@ -1099,93 +1651,128 @@ def _apply_steady_wind_effects(
         last_attempt_path.parent.mkdir(parents=True, exist_ok=True)
         last_attempt_path.write_text(generated_sdf, encoding="utf-8")
         try:
-            runtime_sdf = _runtime_wind_mode_observation(
+            runtime_sdf = _runtime_sdf_profile_observation(
                 generated_sdf,
                 generated_path=generated_path,
                 expected_vehicle_model=expected_vehicle_model,
+                applied_sdf_profile=overlay.get("applied_sdf_profile", {}),
+                require_wind_mode=wind_requested,
             )
             break
         except RuntimeError as exc:
             runtime_sdf_error = str(exc)
-            if not runtime_sdf_error.startswith(
-                "generated runtime SDF does not prove expected wind-enabled vehicle "
-            ):
-                raise
         if attempt + 1 < runtime_sdf_attempts:
             time.sleep(0.25)
     if runtime_sdf is None:
         raise RuntimeError(
-            "Gazebo runtime SDF never exposed the wind-enabled vehicle model: " + runtime_sdf_error
+            "Gazebo runtime SDF never proved the requested physical profile: "
+            + runtime_sdf_error
         )
-    observations = [
-        {
-            "source": wind_info_service,
-            "kind": "readback",
-            "value": readback,
-            "sha256": engine.scenario_effect_value_sha256(readback),
-        },
-        {
-            "source": generated_sdf_service,
-            "kind": "artifact",
-            "value": runtime_sdf,
-            "sha256": engine.scenario_effect_value_sha256(runtime_sdf),
-        },
-        {
-            "source": "trial_overlay/world_sdf",
-            "kind": "artifact",
-            "value": {
-                "path": overlay["world_sdf_path"],
-                "sha256": overlay["world_sdf_sha256"],
-                "linear_velocity_mps": vector,
-                "wind_effects_plugin": overlay["wind_effects_plugin"],
-                "materialized_px4_system_plugins": overlay["materialized_px4_system_plugins"],
-                "px4_server_config": {
-                    "path": overlay["px4_server_config_path"],
-                    "sha256": overlay["px4_server_config_sha256"],
+    observations: list[dict[str, Any]] = []
+    if readback is not None:
+        observations.append(
+            {
+                "source": wind_info_service,
+                "kind": "readback",
+                "value": readback,
+                "sha256": engine.scenario_effect_value_sha256(readback),
+            }
+        )
+    observations.extend(
+        [
+            {
+                "source": generated_sdf_service,
+                "kind": "artifact",
+                "value": runtime_sdf,
+                "sha256": engine.scenario_effect_value_sha256(runtime_sdf),
+            },
+            {
+                "source": "trial_overlay/world_sdf",
+                "kind": "artifact",
+                "value": {
+                    "path": overlay["world_sdf_path"],
+                    "sha256": overlay["world_sdf_sha256"],
+                    "linear_velocity_mps": vector,
+                    "wind_effects_plugin": overlay["wind_effects_plugin"],
+                    "materialized_px4_system_plugins": overlay[
+                        "materialized_px4_system_plugins"
+                    ],
+                    "px4_server_config": {
+                        "path": overlay["px4_server_config_path"],
+                        "sha256": overlay["px4_server_config_sha256"],
+                    },
                 },
             },
-        },
-        {
-            "source": "trial_overlay/x500_base_model_sdf",
-            "kind": "artifact",
-            "value": {
-                "path": overlay["model_sdf_path"],
-                "sha256": overlay["model_sdf_sha256"],
-                "wind_enabled_link": overlay["wind_enabled_link"],
-                "sanitized_classic_material_scripts": overlay["sanitized_classic_material_scripts"],
+            {
+                "source": "trial_overlay/x500_base_model_sdf",
+                "kind": "artifact",
+                "value": {
+                    "path": overlay["model_sdf_path"],
+                    "sha256": overlay["model_sdf_sha256"],
+                    "wind_enabled_link": overlay["wind_enabled_link"],
+                    "sanitized_classic_material_scripts": overlay[
+                        "sanitized_classic_material_scripts"
+                    ],
+                },
             },
-        },
-        {
-            "source": "trial_overlay/px4_gz_env",
-            "kind": "artifact",
-            "value": {
-                "path": overlay["px4_trial_gz_env_path"],
-                "sha256": overlay["px4_trial_gz_env_sha256"],
-                "rootfs_path": overlay["px4_trial_rootfs_path"],
-                "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom",
+            {
+                "source": "trial_overlay/x500_model_sdf",
+                "kind": "artifact",
+                "value": {
+                    "path": overlay.get("vehicle_model_sdf_path"),
+                    "sha256": overlay.get("vehicle_model_sdf_sha256"),
+                },
             },
-        },
-    ]
+            {
+                "source": "trial_overlay/px4_gz_env",
+                "kind": "artifact",
+                "value": {
+                    "path": overlay["px4_trial_gz_env_path"],
+                    "sha256": overlay["px4_trial_gz_env_sha256"],
+                    "rootfs_path": overlay["px4_trial_rootfs_path"],
+                    "state_policy": (
+                        "clean_copy_without_prior_params_dataman_logs_or_eeprom"
+                    ),
+                },
+            },
+        ]
+    )
     effects_by_id = {effect["effect_id"]: effect for effect in request["effects"]}
     records: dict[str, dict[str, Any]] = {}
-    for effect_id in compiled["requested_effect_ids"]:
+    applied_effect_ids = set(compiled["requested_effect_ids"] if compiled else [])
+    if compiled_sdf_profile is not None:
+        applied_effect_ids.update(compiled_sdf_profile["requested_effect_ids"])
+    for effect_id in sorted(applied_effect_ids):
         effect = effects_by_id[effect_id]
+        is_steady_wind = effect_id in engine.BUNDLED_STEADY_WIND_EFFECT_IDS
         records[effect_id] = _scenario_effect_record(
             effect,
             status="applied",
             capability_status="available",
             reason=(
-                "Gazebo wind_info matched the compiled ENU vector and generated runtime "
-                f"SDF proved {expected_vehicle_model}/base_link WindMode"
+                (
+                    "Gazebo wind_info matched the compiled ENU vector and generated "
+                    f"runtime SDF proved {expected_vehicle_model}/base_link WindMode"
+                )
+                if is_steady_wind
+                else (
+                    "Gazebo generated runtime SDF exactly matched the request-bound "
+                    f"x500 physical profile for {effect_id}"
+                )
             ),
             evidence={
                 "requested_value_sha256": engine.scenario_effect_value_sha256(
                     effect["requested_value"]
                 ),
                 "compiled_wind": compiled,
+                "compiled_sdf_profile": compiled_sdf_profile,
                 "verification": {
                     "status": "verified",
-                    "method": "gazebo_wind_info_and_generated_world_sdf",
+                    "method": (
+                        "gazebo_wind_info_and_generated_world_sdf"
+                        if is_steady_wind
+                        else "trial_local_sdf_and_generated_world_sdf"
+                    ),
                     "observations": observations,
                 },
             },
@@ -1415,7 +2002,12 @@ def _normalize_telemetry_payload(payload: Any) -> dict[str, Any]:
             "crashed": _bool_from_value(sample["crashed"]),
         }
         for numeric_key in ("t", "x", "y", "z", "vx", "vy", "vz", "yaw"):
-            if not math.isfinite(cleaned[numeric_key]):
+            numeric_value = cleaned[numeric_key]
+            if (
+                isinstance(numeric_value, bool)
+                or not isinstance(numeric_value, (int, float))
+                or not math.isfinite(numeric_value)
+            ):
                 raise ValueError(f"telemetry sample {idx} contains non-finite {numeric_key}")
         normalized.append(cleaned)
     for idx in range(1, len(normalized)):
@@ -1659,7 +2251,7 @@ def _extract_yaw_values(
         size = min(len(q0), len(q1), len(q2), len(q3))
         if size <= 0:
             continue
-        yaw_values = [
+        attitude_yaw_values = [
             _quat_to_yaw(
                 float(q0[min(index, size - 1)]),
                 float(q1[min(index, size - 1)]),
@@ -1668,7 +2260,7 @@ def _extract_yaw_values(
             )
             for index in indices
         ]
-        return yaw_values
+        return attitude_yaw_values
 
     yaw_values: list[float] = []
     for idx in range(sample_count):
@@ -1865,8 +2457,11 @@ def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path, *, l
             proc.wait(timeout=2.0)
         return
 
+    kill_process_group = getattr(os, "killpg", None)
+    if not callable(kill_process_group):
+        return
     try:
-        os.killpg(proc.pid, signal.SIGTERM)
+        kill_process_group(proc.pid, signal.SIGTERM)
         _append_log(
             stderr_log,
             f"[local_px4_launch_wrapper] Sent SIGTERM to {label} process group",
@@ -1881,7 +2476,7 @@ def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path, *, l
         time.sleep(0.1)
 
     try:
-        os.killpg(proc.pid, signal.SIGKILL)
+        kill_process_group(proc.pid, getattr(signal, "SIGKILL", signal.SIGTERM))
         _append_log(
             stderr_log,
             f"[local_px4_launch_wrapper] Sent SIGKILL to {label} process group",
@@ -2562,6 +3157,7 @@ def main() -> int:
                 effect["effect_id"]
                 for effect in scenario_effect_request["effects"]
                 if effect["effect_id"] in scenario_engine.BUNDLED_STEADY_WIND_EFFECT_IDS
+                or effect["effect_id"] in scenario_engine.BUNDLED_SDF_PROFILE_EFFECT_IDS
             }
             if steady_wind_ids:
                 try:
@@ -2666,6 +3262,7 @@ def main() -> int:
                 effect["effect_id"]
                 for effect in scenario_effect_request["effects"]
                 if effect["effect_id"] in scenario_engine.BUNDLED_STEADY_WIND_EFFECT_IDS
+                or effect["effect_id"] in scenario_engine.BUNDLED_SDF_PROFILE_EFFECT_IDS
             }
             if steady_wind_ids:
                 try:
@@ -2906,8 +3503,8 @@ def main() -> int:
         _append_log(args.stderr_log, f"[local_px4_launch_wrapper] Real mode failure: {exc}")
         return 1
     finally:
-        for shutdown_signal, previous_handler in previous_signal_handlers.items():
-            signal.signal(shutdown_signal, previous_handler)
+        for shutdown_signal_number, previous_handler in previous_signal_handlers.items():
+            signal.signal(shutdown_signal_number, previous_handler)
 
 
 if __name__ == "__main__":

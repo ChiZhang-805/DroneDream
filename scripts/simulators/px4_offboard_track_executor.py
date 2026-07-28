@@ -79,6 +79,8 @@ class OffboardClientProtocol(Protocol):
 
     async def land(self) -> None: ...
 
+    async def close(self) -> None: ...
+
 
 class MavsdkOffboardClient:
     def __init__(self) -> None:
@@ -149,6 +151,15 @@ class MavsdkOffboardClient:
     async def land(self) -> None:
         await self._require_system().action.land()
 
+    async def close(self) -> None:
+        system = self._system
+        self._system = None
+        if system is None:
+            return
+        stop_server = getattr(system, "_stop_mavsdk_server", None)
+        if callable(stop_server):
+            stop_server()
+
 
 class FakeOffboardClient:
     def __init__(self) -> None:
@@ -157,6 +168,7 @@ class FakeOffboardClient:
         self.offboard_started = False
         self.setpoints: list[Setpoint] = []
         self.landed = False
+        self.closed = False
 
     async def connect(self, connection_url: str) -> None:
         _ = connection_url
@@ -179,6 +191,9 @@ class FakeOffboardClient:
 
     async def land(self) -> None:
         self.landed = True
+
+    async def close(self) -> None:
+        self.closed = True
 
 
 def _parse_bool(raw: str | None, *, default: bool) -> bool:
@@ -484,8 +499,15 @@ async def run_executor(
                 _log(log_path, "land command sent during failure cleanup")
             except Exception as exc:
                 _log(log_path, f"offboard failure cleanup could not land: {exc}")
-        if timing_path is not None:
-            _write_offboard_timing(timing_path, timing)
+        try:
+            if timing_path is not None:
+                _write_offboard_timing(timing_path, timing)
+        finally:
+            try:
+                await client.close()
+                _log(log_path, "offboard client closed")
+            except Exception as exc:
+                _log(log_path, f"offboard client cleanup failed: {exc}")
 
 
 def main(argv: list[str] | None = None) -> int:

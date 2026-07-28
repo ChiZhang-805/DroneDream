@@ -165,6 +165,7 @@ def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
 
     assert [sp.north_m for sp in client.setpoints[-3:]] == [0.0, 1.0, 2.0]
     assert client.landed is True
+    assert client.closed is True
     timing = json.loads(timing_path.read_text(encoding="utf-8"))
     assert timing["time_base"] == "executor_relative_seconds"
     assert timing["track_start_t"] <= timing["track_end_t"]
@@ -200,6 +201,7 @@ def test_executor_stops_offboard_and_lands_after_streaming_failure(tmp_path: Pat
 
     assert client.offboard_started is False
     assert client.landed is True
+    assert client.closed is True
     assert "offboard stopped during failure cleanup" in log_path.read_text(encoding="utf-8")
     assert "land command sent during failure cleanup" in log_path.read_text(encoding="utf-8")
 
@@ -251,6 +253,24 @@ def test_mavsdk_actions_fail_cleanly_before_connect():
 
     with pytest.raises(RuntimeError, match="offboard client is not connected"):
         asyncio.run(client.arm())
+
+
+def test_mavsdk_close_stops_embedded_server_and_clears_system():
+    class SystemStub:
+        def __init__(self) -> None:
+            self.stopped = False
+
+        def _stop_mavsdk_server(self) -> None:
+            self.stopped = True
+
+    system = SystemStub()
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = system
+
+    asyncio.run(client.close())
+
+    assert system.stopped is True
+    assert client._system is None
 
 
 def test_mavsdk_missing_exits_non_zero_with_clear_message(tmp_path: Path):

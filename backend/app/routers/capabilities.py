@@ -117,6 +117,7 @@ def _simulator_capabilities() -> dict[str, object]:
             f"SIMULATOR_BACKEND forces {override!r}; per-job real_cli selection is ignored."
         )
 
+    scenario_effect_contract = bundled_launcher_capabilities()
     return {
         "configuration_scope": "api_process",
         # API and workers can be deployed separately. Until workers publish
@@ -161,8 +162,10 @@ def _simulator_capabilities() -> dict[str, object]:
                 # operators must serialize real simulations per host.
                 "max_concurrency_per_host_without_instance_allocator": 1,
                 "instance_allocation": "operator_managed",
-                "bundled_runner_advanced_effects": ["obstacles", "steady_wind"],
-                "scenario_effect_contract": bundled_launcher_capabilities(),
+                "bundled_runner_advanced_effects": list(
+                    scenario_effect_contract["physically_applied"]
+                ),
+                "scenario_effect_contract": scenario_effect_contract,
                 "unverified_effect_passthrough_opt_in": True,
             },
         },

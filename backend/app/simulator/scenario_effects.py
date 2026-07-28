@@ -34,6 +34,37 @@ BUNDLED_STEADY_WIND_EFFECT_IDS = frozenset(
         "scenario_type.wind_perturbed",
     }
 )
+BUNDLED_SDF_PROFILE_EFFECT_IDS = frozenset(
+    {
+        "wind_gusts",
+        "scenario_type.turbulence",
+        "job_config.sensor_noise_level",
+        "sensor_degradation.gps_noise_m",
+        "sensor_degradation.baro_noise_m",
+        "sensor_degradation.imu_noise_scale",
+        "scenario_type.noise_perturbed",
+        "battery.mass_payload_kg",
+        "scenario_type.payload_changed",
+        "scenario_type.actuator_delay",
+    }
+)
+BAROMETER_PRESSURE_PA_PER_ALTITUDE_M = 12.0
+DEFAULT_TURBULENCE_PEAK_MPS = 5.0
+DEFAULT_TURBULENCE_PERIOD_S = 5.0
+DEFAULT_PAYLOAD_MASS_KG = 1.0
+DEFAULT_ACTUATOR_DELAY_MS = 80.0
+_SENSOR_NOISE_PRESETS = {
+    "low": {
+        "gps_position_stddev_m": 0.25,
+        "barometer_pressure_stddev_pa": 1.5,
+        "imu_noise_scale": 0.5,
+    },
+    "high": {
+        "gps_position_stddev_m": 1.0,
+        "barometer_pressure_stddev_pa": 6.0,
+        "imu_noise_scale": 2.0,
+    },
+}
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -140,26 +171,6 @@ def _finite_number(
 
 def _unsupported_reason(effect_id: str) -> str:
     if effect_id in {
-        "wind_gusts",
-        "scenario_type.turbulence",
-    }:
-        return (
-            "the bundled runtime supports a constant per-trial WindEffects vector, "
-            "but not a time-varying gust/turbulence schedule with exact timestamped "
-            "readback"
-        )
-    if effect_id in {
-        "job_config.sensor_noise_level",
-        "sensor_degradation.gps_noise_m",
-        "sensor_degradation.baro_noise_m",
-        "sensor_degradation.imu_noise_scale",
-        "scenario_type.noise_perturbed",
-    }:
-        return (
-            "Gazebo sensor noise is configured in model SDF; the bundled runtime "
-            "does not yet generate and verify a per-trial sensor model"
-        )
-    if effect_id in {
         "sensor_degradation.dropout_rate",
         "scenario_config.dropout_rate",
         "scenario_type.gps_dropout",
@@ -177,13 +188,6 @@ def _unsupported_reason(effect_id: str) -> str:
             "the bundled launcher does not yet apply and read back PX4 battery "
             "simulation parameters or battery failure injection"
         )
-    if effect_id in {"battery.mass_payload_kg", "scenario_type.payload_changed"}:
-        return (
-            "payload mass requires a per-trial Gazebo model/inertial definition; "
-            "the bundled runtime does not mutate vehicle inertia"
-        )
-    if effect_id == "scenario_type.actuator_delay":
-        return "the bundled launcher has no verified PX4/Gazebo actuator-delay injection"
     if effect_id == "scenario_type.combined_perturbed":
         return (
             "combined_perturbed is a scenario label, not a physical injection; "
@@ -206,12 +210,12 @@ def _mechanism_for(effect_id: str) -> str:
         return "px4_failure_injection" if "dropout" in effect_id else "sdformat_sensor_noise"
     if "gps_dropout" in effect_id or effect_id.endswith("dropout_rate"):
         return "px4_failure_injection"
-    if effect_id.startswith("battery") or effect_id.endswith("battery_degraded"):
-        return "px4_battery_simulation"
     if "payload" in effect_id:
         return "sdformat_model_inertial"
+    if effect_id.startswith("battery") or effect_id.endswith("battery_degraded"):
+        return "px4_battery_simulation"
     if "actuator_delay" in effect_id:
-        return "px4_failure_injection"
+        return "sdformat_actuator_dynamics"
     return "site_specific"
 
 
@@ -225,6 +229,32 @@ def _available_reason(effect_id: str) -> str:
         return (
             "the bundled launcher generates a Trial-local Gazebo WindEffects world/model "
             "overlay, verifies /world/<world>/wind_info, and inspects generated runtime SDF"
+        )
+    if effect_id in {"wind_gusts", "scenario_type.turbulence"}:
+        return (
+            "the bundled launcher compiles a deterministic Gazebo WindEffects sinusoidal "
+            "profile and verifies its generated runtime SDF"
+        )
+    if effect_id in {
+        "job_config.sensor_noise_level",
+        "sensor_degradation.gps_noise_m",
+        "sensor_degradation.baro_noise_m",
+        "sensor_degradation.imu_noise_scale",
+        "scenario_type.noise_perturbed",
+    }:
+        return (
+            "the bundled launcher generates a Trial-local x500 sensor SDF and verifies "
+            "the exact noise fields in Gazebo generated runtime SDF"
+        )
+    if effect_id in {"battery.mass_payload_kg", "scenario_type.payload_changed"}:
+        return (
+            "the bundled launcher adds a documented centered cuboid payload to the x500 "
+            "inertial mass and tensor in a Trial-local model and verifies generated runtime SDF"
+        )
+    if effect_id == "scenario_type.actuator_delay":
+        return (
+            "the bundled launcher maps delay_ms to x500 motor first-order response time "
+            "constants in Trial-local SDF and verifies every runtime motor plugin"
         )
     raise ScenarioEffectContractError(f"no bundled capability reason for {effect_id}")
 
@@ -338,6 +368,242 @@ def compile_bundled_steady_wind(request: dict[str, Any]) -> dict[str, Any] | Non
     return _compile_bundled_steady_wind_unchecked(request)
 
 
+def _scenario_marker_config(effect: dict[str, Any], *, effect_id: str) -> dict[str, Any]:
+    value = effect.get("requested_value")
+    if not isinstance(value, dict):
+        raise ScenarioEffectContractError(f"{effect_id} value must be an object")
+    config = value.get("config", {})
+    if not isinstance(config, dict):
+        raise ScenarioEffectContractError(f"{effect_id} config must be an object")
+    return config
+
+
+def _bounded_profile_number(
+    value: object,
+    *,
+    path: str,
+    lower: float,
+    upper: float,
+) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ScenarioEffectContractError(f"{path} must be numeric")
+    normalized = float(value)
+    if not math.isfinite(normalized) or not lower <= normalized <= upper:
+        raise ScenarioEffectContractError(f"{path} must be finite and in [{lower:g}, {upper:g}]")
+    return normalized
+
+
+def _compile_bundled_sdf_profile_unchecked(
+    request: dict[str, Any],
+) -> dict[str, Any] | None:
+    effects = [
+        effect
+        for effect in request.get("effects", [])
+        if effect.get("effect_id") in BUNDLED_SDF_PROFILE_EFFECT_IDS
+    ]
+    if not effects:
+        return None
+
+    requested_effect_ids = sorted(str(effect["effect_id"]) for effect in effects)
+    by_id = {str(effect["effect_id"]): effect for effect in effects}
+    profile: dict[str, Any] = {
+        "requested_effect_ids": requested_effect_ids,
+        "vehicle_family": "x500",
+    }
+
+    sensor_ids = {
+        "job_config.sensor_noise_level",
+        "sensor_degradation.gps_noise_m",
+        "sensor_degradation.baro_noise_m",
+        "sensor_degradation.imu_noise_scale",
+        "scenario_type.noise_perturbed",
+    }
+    if sensor_ids & set(by_id):
+        preset_name = "high" if "scenario_type.noise_perturbed" in by_id else None
+        preset_effect = by_id.get("job_config.sensor_noise_level")
+        if preset_effect is not None:
+            requested_preset = preset_effect.get("requested_value")
+            if requested_preset not in _SENSOR_NOISE_PRESETS:
+                raise ScenarioEffectContractError(
+                    "job_config.sensor_noise_level physical profile must be low or high"
+                )
+            preset_name = str(requested_preset)
+        preset = dict(_SENSOR_NOISE_PRESETS.get(preset_name or "", {}))
+        gps_stddev = float(preset.get("gps_position_stddev_m", 0.0))
+        barometer_stddev_pa = float(preset.get("barometer_pressure_stddev_pa", 3.0))
+        imu_scale = float(preset.get("imu_noise_scale", 1.0))
+
+        gps_effect = by_id.get("sensor_degradation.gps_noise_m")
+        if gps_effect is not None:
+            gps_stddev = _bounded_profile_number(
+                gps_effect.get("requested_value"),
+                path="sensor_degradation.gps_noise_m",
+                lower=0.0,
+                upper=100.0,
+            )
+        baro_effect = by_id.get("sensor_degradation.baro_noise_m")
+        barometer_altitude_stddev_m: float | None = None
+        if baro_effect is not None:
+            barometer_altitude_stddev_m = _bounded_profile_number(
+                baro_effect.get("requested_value"),
+                path="sensor_degradation.baro_noise_m",
+                lower=0.0,
+                upper=100.0,
+            )
+            barometer_stddev_pa = round(
+                barometer_altitude_stddev_m * BAROMETER_PRESSURE_PA_PER_ALTITUDE_M,
+                12,
+            )
+        imu_effect = by_id.get("sensor_degradation.imu_noise_scale")
+        if imu_effect is not None:
+            imu_scale = _bounded_profile_number(
+                imu_effect.get("requested_value"),
+                path="sensor_degradation.imu_noise_scale",
+                lower=0.0,
+                upper=10.0,
+            )
+        profile["sensor_noise"] = {
+            "preset": preset_name,
+            "gps_position_stddev_m": gps_stddev,
+            "barometer_pressure_stddev_pa": barometer_stddev_pa,
+            "barometer_altitude_stddev_m": barometer_altitude_stddev_m,
+            "barometer_pressure_pa_per_altitude_m": BAROMETER_PRESSURE_PA_PER_ALTITUDE_M,
+            "imu_noise_scale": imu_scale,
+            "effect_ids": sorted(sensor_ids & set(by_id)),
+        }
+
+    gust_effect = by_id.get("wind_gusts")
+    turbulence_effect = by_id.get("scenario_type.turbulence")
+    if gust_effect is not None or turbulence_effect is not None:
+        if gust_effect is not None:
+            value = gust_effect.get("requested_value")
+            if not isinstance(value, dict):
+                raise ScenarioEffectContractError("wind_gusts value must be an object")
+            peak_mps = _bounded_profile_number(
+                value.get("magnitude_mps"),
+                path="wind_gusts.magnitude_mps",
+                lower=0.0,
+                upper=MAX_BUNDLED_STEADY_WIND_MPS,
+            )
+            direction_deg = _bounded_profile_number(
+                value.get("direction_deg"),
+                path="wind_gusts.direction_deg",
+                lower=0.0,
+                upper=359.999999999999,
+            )
+            period_s = _bounded_profile_number(
+                value.get("period_s"),
+                path="wind_gusts.period_s",
+                lower=1e-9,
+                upper=300.0,
+            )
+        else:
+            config = _scenario_marker_config(
+                turbulence_effect or {},
+                effect_id="scenario_type.turbulence",
+            )
+            intensity = _bounded_profile_number(
+                config.get("intensity", 1.0),
+                path="scenario_type.turbulence.config.intensity",
+                lower=0.0,
+                upper=6.0,
+            )
+            peak_mps = round(DEFAULT_TURBULENCE_PEAK_MPS * intensity, 12)
+            direction_deg = _seed_bearing_deg(request.get("execution_identity", {}))
+            period_s = DEFAULT_TURBULENCE_PERIOD_S
+        mean_mps = round(peak_mps / 2.0, 12)
+        time_for_rise_s = round(min(1.0, period_s), 12)
+        profile["wind_gust"] = {
+            "peak_magnitude_mps": peak_mps,
+            "mean_magnitude_mps": mean_mps,
+            "direction_deg_clockwise_from_north": direction_deg,
+            "period_s": period_s,
+            "time_for_rise_s": time_for_rise_s,
+            "mean_linear_velocity_mps": _wind_vector_from_bearing(mean_mps, direction_deg),
+            "horizontal_magnitude_sine_amplitude_percent": 1.0,
+            "range_mps": [0.0, peak_mps],
+            "effect_ids": sorted(
+                {"wind_gusts", "scenario_type.turbulence"} & set(by_id)
+            ),
+        }
+
+    payload_effect = by_id.get("battery.mass_payload_kg")
+    payload_marker = by_id.get("scenario_type.payload_changed")
+    if payload_effect is not None or payload_marker is not None:
+        if payload_effect is not None:
+            mass_kg = _bounded_profile_number(
+                payload_effect.get("requested_value"),
+                path="battery.mass_payload_kg",
+                lower=0.0,
+                upper=20.0,
+            )
+        else:
+            config = _scenario_marker_config(
+                payload_marker or {},
+                effect_id="scenario_type.payload_changed",
+            )
+            mass_kg = _bounded_profile_number(
+                config.get("mass_payload_kg", DEFAULT_PAYLOAD_MASS_KG),
+                path="scenario_type.payload_changed.config.mass_payload_kg",
+                lower=0.0,
+                upper=20.0,
+            )
+        dimensions_m = {"x": 0.2, "y": 0.2, "z": 0.1}
+        profile["payload"] = {
+            "mass_kg": mass_kg,
+            "center_m": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "dimensions_m": dimensions_m,
+            "inertia_increment_kg_m2": {
+                "ixx": round(
+                    mass_kg * (dimensions_m["y"] ** 2 + dimensions_m["z"] ** 2) / 12.0,
+                    15,
+                ),
+                "iyy": round(
+                    mass_kg * (dimensions_m["x"] ** 2 + dimensions_m["z"] ** 2) / 12.0,
+                    15,
+                ),
+                "izz": round(
+                    mass_kg * (dimensions_m["x"] ** 2 + dimensions_m["y"] ** 2) / 12.0,
+                    15,
+                ),
+            },
+            "assumption": "centered_uniform_cuboid",
+            "effect_ids": sorted(
+                {"battery.mass_payload_kg", "scenario_type.payload_changed"} & set(by_id)
+            ),
+        }
+
+    actuator_effect = by_id.get("scenario_type.actuator_delay")
+    if actuator_effect is not None:
+        config = _scenario_marker_config(
+            actuator_effect,
+            effect_id="scenario_type.actuator_delay",
+        )
+        delay_ms = _bounded_profile_number(
+            config.get("delay_ms", DEFAULT_ACTUATOR_DELAY_MS),
+            path="scenario_type.actuator_delay.config.delay_ms",
+            lower=0.0,
+            upper=1000.0,
+        )
+        time_constant_s = round(delay_ms / 1000.0, 12)
+        profile["actuator_dynamics"] = {
+            "requested_delay_ms": delay_ms,
+            "model": "first_order_motor_response",
+            "time_constant_up_s": time_constant_s,
+            "time_constant_down_s": time_constant_s,
+            "motor_numbers": [0, 1, 2, 3],
+            "effect_ids": ["scenario_type.actuator_delay"],
+        }
+    return profile
+
+
+def compile_bundled_sdf_profile(request: dict[str, Any]) -> dict[str, Any] | None:
+    """Compile Trial-local x500 SDF perturbations without mutating pinned PX4."""
+
+    validate_scenario_effect_request(request)
+    return _compile_bundled_sdf_profile_unchecked(request)
+
+
 def build_scenario_effect_request(
     *,
     execution_identity: dict[str, Any],
@@ -366,7 +632,11 @@ def build_scenario_effect_request(
     def add(effect_id: str, source: str, value: Any) -> None:
         if any(item["effect_id"] == effect_id for item in effects):
             return
-        bundled = effect_id == "obstacles" or effect_id in BUNDLED_STEADY_WIND_EFFECT_IDS
+        bundled = (
+            effect_id == "obstacles"
+            or effect_id in BUNDLED_STEADY_WIND_EFFECT_IDS
+            or effect_id in BUNDLED_SDF_PROFILE_EFFECT_IDS
+        )
         capability_status = "available" if bundled else "requires_runtime_extension"
         effects.append(
             {
@@ -775,6 +1045,7 @@ def validate_scenario_effect_request(payload: object) -> dict[str, Any]:
                 f"scenario effect {effect_id} capability reason is invalid"
             )
     _compile_bundled_steady_wind_unchecked(payload)
+    _compile_bundled_sdf_profile_unchecked(payload)
     return payload
 
 
@@ -995,6 +1266,61 @@ def _validate_bundled_steady_wind_evidence(
         )
 
 
+def _validate_bundled_sdf_profile_evidence(
+    request: dict[str, Any],
+    requested: dict[str, Any],
+    evidence_record: dict[str, Any],
+) -> None:
+    _validate_extension_evidence(requested, evidence_record)
+    details = evidence_record["evidence"]
+    expected = _compile_bundled_sdf_profile_unchecked(request)
+    if expected is None or details.get("compiled_sdf_profile") != expected:
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} compiled SDF profile does not match the request"
+        )
+    observations = details["verification"]["observations"]
+    runtime_sdf = [
+        item
+        for item in observations
+        if item.get("kind") == "artifact"
+        and isinstance(item.get("source"), str)
+        and item["source"].endswith("/generate_world_sdf")
+    ]
+    if len(runtime_sdf) != 1:
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} requires one generated-world-SDF observation"
+        )
+    sdf_value = runtime_sdf[0].get("value")
+    vehicle_model = sdf_value.get("vehicle_model") if isinstance(sdf_value, dict) else None
+    verified_sections = (
+        sdf_value.get("verified_profile_sections") if isinstance(sdf_value, dict) else None
+    )
+    effect_sections = {
+        section
+        for section in (
+            "wind_gust",
+            "sensor_noise",
+            "payload",
+            "actuator_dynamics",
+        )
+        if section in expected
+        and requested["effect_id"] in expected[section].get("effect_ids", [])
+    }
+    if (
+        not isinstance(sdf_value, dict)
+        or sdf_value.get("source_vehicle_model") != "x500_base"
+        or vehicle_model != "x500_0"
+        or not isinstance(sdf_value.get("sdf_sha256"), str)
+        or not _SHA256.fullmatch(sdf_value["sdf_sha256"])
+        or not isinstance(verified_sections, list)
+        or not effect_sections.issubset(set(verified_sections))
+    ):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} runtime SDF does not prove its exact "
+            "x500 perturbation profile"
+        )
+
+
 def validate_scenario_effect_evidence(request: dict[str, Any], payload: object) -> dict[str, Any]:
     validate_scenario_effect_request(request)
     if not isinstance(payload, dict):
@@ -1064,6 +1390,12 @@ def validate_scenario_effect_evidence(request: dict[str, Any], payload: object) 
                     requested_by_id[effect_id],
                     effect,
                 )
+            elif effect_id in BUNDLED_SDF_PROFILE_EFFECT_IDS:
+                _validate_bundled_sdf_profile_evidence(
+                    request,
+                    requested_by_id[effect_id],
+                    effect,
+                )
             else:
                 _validate_extension_evidence(requested_by_id[effect_id], effect)
         else:
@@ -1116,7 +1448,14 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
 
     return {
         "schema_version": REQUEST_SCHEMA_VERSION,
-        "physically_applied": ["obstacles", "steady_wind"],
+        "physically_applied": [
+            "actuator_first_order_delay",
+            "gust_and_turbulence",
+            "obstacles",
+            "payload_mass_and_inertia",
+            "sensor_noise",
+            "steady_wind",
+        ],
         "obstacles": {
             "status": "available",
             "mechanism": "gazebo_entity_factory",
@@ -1140,19 +1479,35 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
                 "the exact x500-family runtime instance/base_link enable_wind"
             ),
         },
+        "trial_local_sdf_profiles": {
+            "status": "available",
+            "effect_ids": sorted(BUNDLED_SDF_PROFILE_EFFECT_IDS),
+            "mechanisms": [
+                "gazebo_wind_effects",
+                "sdformat_sensor_noise",
+                "sdformat_model_inertial",
+                "sdformat_actuator_dynamics",
+            ],
+            "requires": [
+                "Gazebo /world/<world>/generate_world_sdf",
+                "PX4 x500 model",
+            ],
+            "evidence": (
+                "request-bound compiled profile plus exact generated runtime SDF "
+                "read-back for every affected sensor, inertial, motor, and wind field"
+            ),
+        },
         "requires_runtime_extension": [
-            "time-varying wind gust and turbulence profile",
-            "sensor noise and degradation",
             "probabilistic GPS dropout",
             "battery initial state and voltage sag",
-            "vehicle payload mass",
-            "actuator delay",
+            "hard actuator failure beyond the bounded first-order delay profile",
         ],
     }
 
 
 __all__ = [
     "BUNDLED_STEADY_WIND_EFFECT_IDS",
+    "BUNDLED_SDF_PROFILE_EFFECT_IDS",
     "DEFAULT_SCENARIO_STEADY_WIND_MPS",
     "EVIDENCE_ARTIFACT_NAME",
     "EVIDENCE_SCHEMA_VERSION",
@@ -1164,6 +1519,7 @@ __all__ = [
     "build_scenario_effect_request",
     "bundled_launcher_capabilities",
     "compile_bundled_steady_wind",
+    "compile_bundled_sdf_profile",
     "load_scenario_effect_evidence",
     "load_scenario_effect_request",
     "scenario_effect_value_sha256",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import math
@@ -7,6 +8,7 @@ import os
 import shlex
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,6 +19,7 @@ from app.simulator import scenario_effects
 from app.simulator.scenario_effects import (
     EVIDENCE_ARTIFACT_NAME,
     build_scenario_effect_request,
+    compile_bundled_sdf_profile,
     compile_bundled_steady_wind,
     validate_scenario_effect_evidence,
 )
@@ -35,6 +38,41 @@ def _write_json(path: Path, payload: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
+
+
+def test_wrapper_prefers_checkout_backend_over_stale_installed_app(tmp_path: Path) -> None:
+    fake_site = tmp_path / "fake_site"
+    fake_simulator = fake_site / "app" / "simulator"
+    fake_simulator.mkdir(parents=True)
+    (fake_site / "app" / "__init__.py").write_text("", encoding="utf-8")
+    (fake_simulator / "__init__.py").write_text("", encoding="utf-8")
+
+    probe = "\n".join(
+        [
+            "import importlib.util",
+            "from pathlib import Path",
+            f"wrapper_path = Path({str(WRAPPER)!r})",
+            "spec = importlib.util.spec_from_file_location('wrapper_probe', wrapper_path)",
+            "assert spec is not None and spec.loader is not None",
+            "module = importlib.util.module_from_spec(spec)",
+            "spec.loader.exec_module(module)",
+            "print(Path(module._load_scenario_effect_engine().__file__).resolve())",
+        ]
+    )
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(fake_site)
+    proc = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    expected = Path(__file__).resolve().parents[1] / "app" / "simulator" / "scenario_effects.py"
+    assert Path(proc.stdout.strip()).resolve() == expected.resolve()
 
 
 def _make_args(tmp_path: Path) -> list[str]:
@@ -491,6 +529,7 @@ def _wind_request() -> dict[str, object]:
 def _minimal_px4_gazebo_tree(tmp_path: Path, *, world: str = "default") -> Path:
     px4_root = tmp_path / "PX4-Autopilot"
     model_dir = px4_root / "Tools" / "simulation" / "gz" / "models" / "x500_base"
+    vehicle_model_dir = px4_root / "Tools" / "simulation" / "gz" / "models" / "x500"
     world_dir = px4_root / "Tools" / "simulation" / "gz" / "worlds"
     build_root = px4_root / "build" / "px4_sitl_default"
     rootfs = build_root / "rootfs"
@@ -498,6 +537,7 @@ def _minimal_px4_gazebo_tree(tmp_path: Path, *, world: str = "default") -> Path:
     plugins = build_root / "src" / "modules" / "simulation" / "gz_plugins"
     server_config = px4_root / "src" / "modules" / "simulation" / "gz_bridge" / "server.config"
     model_dir.mkdir(parents=True)
+    vehicle_model_dir.mkdir(parents=True)
     world_dir.mkdir(parents=True)
     rootfs.mkdir(parents=True)
     executable.parent.mkdir(parents=True)
@@ -532,7 +572,33 @@ def _minimal_px4_gazebo_tree(tmp_path: Path, *, world: str = "default") -> Path:
 <sdf version="1.9">
   <model name="x500_base">
     <link name="base_link">
-      <inertial><mass>2</mass></inertial>
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.02</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.02</iyy><iyz>0</iyz><izz>0.04</izz>
+        </inertia>
+      </inertial>
+      <sensor name="air_pressure_sensor" type="air_pressure">
+        <air_pressure>
+          <pressure><noise type="gaussian"><stddev>3</stddev></noise></pressure>
+        </air_pressure>
+      </sensor>
+      <sensor name="imu_sensor" type="imu">
+        <imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><stddev>0.001</stddev></noise></x>
+            <y><noise type="gaussian"><stddev>0.001</stddev></noise></y>
+            <z><noise type="gaussian"><stddev>0.001</stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><stddev>0.01</stddev></noise></x>
+            <y><noise type="gaussian"><stddev>0.01</stddev></noise></y>
+            <z><noise type="gaussian"><stddev>0.02</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+      <sensor name="navsat_sensor" type="navsat"><navsat /></sensor>
       <visual name="rotor">
         <geometry><box><size>1 1 1</size></box></geometry>
         <material>
@@ -549,6 +615,29 @@ def _minimal_px4_gazebo_tree(tmp_path: Path, *, world: str = "default") -> Path:
         encoding="utf-8",
     )
     (model_dir / "model.config").write_text("<model/>", encoding="utf-8")
+    (vehicle_model_dir / "model.sdf").write_text(
+        """
+<sdf version="1.9">
+  <model name="x500">
+    <include><uri>model://x500_base</uri></include>
+    <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
+      <motorNumber>0</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+    </plugin>
+    <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
+      <motorNumber>1</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+    </plugin>
+    <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
+      <motorNumber>2</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+    </plugin>
+    <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
+      <motorNumber>3</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+    </plugin>
+  </model>
+</sdf>
+""".strip(),
+        encoding="utf-8",
+    )
+    (vehicle_model_dir / "model.config").write_text("<model/>", encoding="utf-8")
     (world_dir / f"{world}.sdf").write_text(
         f"""
 <sdf version="1.9">
@@ -598,6 +687,189 @@ def _overlay_stub(request: dict[str, object], tmp_path: Path) -> dict[str, objec
         "px4_trial_gz_env_path": str(trial_gz_env),
         "px4_trial_gz_env_sha256": "c" * 64,
     }
+
+
+def test_sdf_profile_mutators_round_trip_generated_runtime_sdf(tmp_path: Path) -> None:
+    request = build_scenario_effect_request(
+        execution_identity={"trial_id": "t", "seed": 42},
+        scenario_type="actuator_delay",
+        scenario_config={"delay_ms": 80.0},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "high",
+        },
+        advanced_config={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4.0,
+                "direction_deg": 90.0,
+                "period_s": 8.0,
+            },
+            "sensor_degradation": {
+                "gps_noise_m": 2.0,
+                "baro_noise_m": 0.5,
+                "imu_noise_scale": 1.5,
+            },
+            "battery": {"mass_payload_kg": 1.2},
+        },
+    )
+    profile = compile_bundled_sdf_profile(request)
+    assert profile is not None
+    model_root = ET.fromstring(
+        """
+<sdf version="1.9">
+  <model name="x500_base">
+    <link name="base_link">
+      <inertial>
+        <mass>2</mass>
+        <inertia>
+          <ixx>0.02</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.02</iyy><iyz>0</iyz><izz>0.04</izz>
+        </inertia>
+      </inertial>
+      <sensor name="air_pressure_sensor" type="air_pressure">
+        <air_pressure>
+          <pressure><noise type="gaussian"><stddev>3</stddev></noise></pressure>
+        </air_pressure>
+      </sensor>
+      <sensor name="imu_sensor" type="imu">
+        <imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><stddev>0.001</stddev></noise></x>
+            <y><noise type="gaussian"><stddev>0.001</stddev></noise></y>
+            <z><noise type="gaussian"><stddev>0.001</stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><stddev>0.01</stddev></noise></x>
+            <y><noise type="gaussian"><stddev>0.01</stddev></noise></y>
+            <z><noise type="gaussian"><stddev>0.02</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+      <sensor name="navsat_sensor" type="navsat"><navsat /></sensor>
+    </link>
+  </model>
+</sdf>
+""".strip()
+    )
+    base_link = model_root.find("./model/link")
+    assert base_link is not None
+    applied = {
+        "sensor_noise": wrapper._apply_sensor_noise_sdf(
+            base_link,
+            profile["sensor_noise"],
+        ),
+        "payload": wrapper._apply_payload_sdf(
+            base_link,
+            profile["payload"],
+        ),
+    }
+    vehicle_root = ET.fromstring(
+        """
+<sdf version="1.9">
+  <model name="x500">
+    <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
+      <motorNumber>0</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+    </plugin>
+    <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
+      <motorNumber>1</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+    </plugin>
+    <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
+      <motorNumber>2</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+    </plugin>
+    <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
+      <motorNumber>3</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+    </plugin>
+  </model>
+</sdf>
+""".strip()
+    )
+    applied["actuator_dynamics"] = wrapper._apply_actuator_dynamics_sdf(
+        vehicle_root,
+        profile["actuator_dynamics"],
+    )
+
+    runtime_root = ET.Element("sdf", {"version": "1.9"})
+    world = ET.SubElement(runtime_root, "world", {"name": "default"})
+    wind_plugin = ET.SubElement(
+        world,
+        "plugin",
+        {
+            "filename": wrapper.WIND_EFFECTS_PLUGIN_FILENAME,
+            "name": wrapper.WIND_EFFECTS_PLUGIN_NAME,
+        },
+    )
+    applied["wind_gust"] = wrapper._configure_wind_effects_plugin(
+        wind_plugin,
+        profile["wind_gust"],
+    )
+    assert applied["wind_gust"]["time_for_rise_s"] == 1.0
+    runtime_model = ET.SubElement(world, "model", {"name": "x500_0"})
+    runtime_model.append(copy.deepcopy(base_link))
+    source_vehicle = vehicle_root.find("./model")
+    assert source_vehicle is not None
+    for plugin in source_vehicle.findall("plugin"):
+        runtime_model.append(copy.deepcopy(plugin))
+
+    generated = ET.tostring(runtime_root, encoding="unicode")
+    observation = wrapper._runtime_sdf_profile_observation(
+        generated,
+        generated_path=tmp_path / "generated_world.sdf",
+        expected_vehicle_model="x500_0",
+        applied_sdf_profile=applied,
+        require_wind_mode=False,
+    )
+
+    assert observation["verified_profile_sections"] == [
+        "sensor_noise",
+        "payload",
+        "actuator_dynamics",
+        "wind_gust",
+    ]
+    assert observation["sdf_sha256"] == wrapper._sha256_hex(
+        tmp_path / "generated_world.sdf"
+    )
+    runtime_observation = {
+        "source": "/world/default/generate_world_sdf",
+        "kind": "artifact",
+        "value": observation,
+        "sha256": scenario_effects.scenario_effect_value_sha256(observation),
+    }
+    effects = []
+    for effect in request["effects"]:
+        effects.append(
+            {
+                "effect_id": effect["effect_id"],
+                "mechanism": effect["mechanism"],
+                "status": "applied",
+                "capability": {
+                    "status": "available",
+                    "reason": "verified test profile",
+                },
+                "evidence": {
+                    "requested_value_sha256": (
+                        scenario_effects.scenario_effect_value_sha256(
+                            effect["requested_value"]
+                        )
+                    ),
+                    "compiled_sdf_profile": profile,
+                    "verification": {
+                        "status": "verified",
+                        "method": "trial_local_sdf_and_generated_world_sdf",
+                        "observations": [runtime_observation],
+                    },
+                },
+            }
+        )
+    payload = scenario_effects.build_scenario_effect_evidence(
+        request,
+        launcher="test",
+        world="default",
+        effects=effects,
+    )
+    assert validate_scenario_effect_evidence(request, payload)["verification_status"] == (
+        "verified_applied"
+    )
 
 
 def test_obstacle_sdf_and_entity_factory_ack_are_verifiable(tmp_path: Path, monkeypatch) -> None:
@@ -782,8 +1054,62 @@ def test_steady_wind_overlay_is_trial_local_and_prepended_to_gazebo_paths(
     assert not (trial_rootfs / "dataman").exists()
     assert not (trial_rootfs / "log").exists()
     trial_env = (trial_rootfs / "gz_env.sh").read_text(encoding="utf-8")
-    assert str(tmp_path / "run" / "scenario_runtime" / "worlds") in trial_env
-    assert str(tmp_path / "run" / "scenario_runtime" / "models") in trial_env
+    trial_worlds = str(tmp_path / "run" / "scenario_runtime" / "worlds")
+    trial_models = str(tmp_path / "run" / "scenario_runtime" / "models")
+    assert trial_worlds in trial_env
+    assert f"export PX4_GZ_MODELS={shlex.quote(trial_models)}" in trial_env
+    assert Path(overlay["vehicle_model_sdf_path"]).is_file()
+
+
+def test_advanced_sdf_overlay_binds_trial_local_top_level_model(tmp_path: Path) -> None:
+    request = build_scenario_effect_request(
+        execution_identity={"trial_id": "advanced-overlay", "seed": 42},
+        scenario_type="actuator_delay",
+        scenario_config={"delay_ms": 80.0},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "high",
+        },
+        advanced_config={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4.0,
+                "direction_deg": 90.0,
+                "period_s": 8.0,
+            },
+            "sensor_degradation": {
+                "gps_noise_m": 2.0,
+                "baro_noise_m": 0.5,
+                "imu_noise_scale": 1.5,
+            },
+            "battery": {"mass_payload_kg": 1.2},
+        },
+    )
+    px4_root = _minimal_px4_gazebo_tree(tmp_path)
+    overlay = wrapper._prepare_steady_wind_overlay(
+        request,
+        scenario_effects,
+        run_dir=tmp_path / "run",
+        autopilot_dir=str(px4_root),
+        simulator_model="x500",
+        world="default",
+        launch_env={},
+    )
+
+    assert overlay is not None
+    vehicle_path = Path(overlay["vehicle_model_sdf_path"])
+    assert vehicle_path.parts[-3:] == ("models", "x500", "model.sdf")
+    vehicle_tree = ET.parse(vehicle_path)
+    motor_plugins = vehicle_tree.findall(
+        "./model[@name='x500']/plugin[@name='gz::sim::systems::MulticopterMotorModel']"
+    )
+    assert len(motor_plugins) == 4
+    for plugin in motor_plugins:
+        assert plugin.findtext("timeConstantUp") == "0.080000000000000002"
+        assert plugin.findtext("timeConstantDown") == "0.080000000000000002"
+    trial_env = Path(overlay["px4_trial_gz_env_path"]).read_text(encoding="utf-8")
+    expected_models = shlex.quote(str(vehicle_path.parents[1]))
+    assert f"export PX4_GZ_MODELS={expected_models}" in trial_env
 
 
 def test_trial_wind_world_launches_from_clean_rootfs(
