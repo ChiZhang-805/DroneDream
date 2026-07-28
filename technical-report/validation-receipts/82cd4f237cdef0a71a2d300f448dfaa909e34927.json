@@ -1,0 +1,233 @@
+{
+  "schema_version": "dronedream.technical-report-validation-receipt.v2",
+  "subject_commit": "82cd4f237cdef0a71a2d300f448dfaa909e34927",
+  "parent_software_head": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+  "branch": "codex/technical-report",
+  "serialization": {
+    "json_encoding": "utf-8",
+    "json_newline": "lf",
+    "final_newline": true
+  },
+  "source_tree": {
+    "file_count": 19,
+    "canonical_sha256": "986712c5c35437bdafb5962d05e6de7a351ef7fae871f2126bd5fcd7b498f834",
+    "files": [
+      {
+        "path": "technical-report/.gitignore",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "567609b1234a9b8806c5a05da6c866e480aa148d"
+      },
+      {
+        "path": "technical-report/README.md",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "e1a7debab75db681410391927a9545bbc62562dc"
+      },
+      {
+        "path": "technical-report/body.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "e4008a7730d335d12501eabf80b0c3c92a80947a"
+      },
+      {
+        "path": "technical-report/evidence-reference-manifest.json",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "7b1e2cceafb14ff5971ea684e291268affa14ead"
+      },
+      {
+        "path": "technical-report/main.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "c8fc45f7e30473ec8323d56ef4e0b09b2036836c"
+      },
+      {
+        "path": "technical-report/media/github-mark.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "15dcc3db3956993cb3e820187343cfb8a91dc872"
+      },
+      {
+        "path": "technical-report/media/media/image1.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4085ba4935d3e3cf40b5f485865d8185874d6a69"
+      },
+      {
+        "path": "technical-report/media/media/image3.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "039b35f9843decdb83a46b4eaa7fc1b179959a12"
+      },
+      {
+        "path": "technical-report/media/media/image4.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "f14342feb9137a2b7da30e0c666c6e53e51ed11d"
+      },
+      {
+        "path": "technical-report/media/media/image5.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "171f8fd78fc97b81246bd27f974c5e02c35dedaa"
+      },
+      {
+        "path": "technical-report/media/media/image6.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "82eda2ac22e1f8d43edeafe4a249d8da9bb868b4"
+      },
+      {
+        "path": "technical-report/media/media/image7.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4c0d7c6451991a9c64bca474378639c0f2dfcf57"
+      },
+      {
+        "path": "technical-report/media/media/image8.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "956477afda3c9ac2ca44b3bc511757e27942661d"
+      },
+      {
+        "path": "technical-report/scripts/audit_latex_report.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "6a4a84103a29f8cfa610168bf5b3e77d1a37dbd3"
+      },
+      {
+        "path": "technical-report/scripts/build_report.ps1",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "45511e974bd74b683b049a221e98a95a9df1abbb"
+      },
+      {
+        "path": "technical-report/scripts/create_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "303f62281d82a219c0e354ead43bb2e203f16131"
+      },
+      {
+        "path": "technical-report/scripts/generate_architecture_figure.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4e8526b8b809b2c4f54cd89254bd87453e5f2181"
+      },
+      {
+        "path": "technical-report/scripts/verify_evidence_reference_manifest.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "7cdcb5f708a034f7dc233bfb170f2c32513910d0"
+      },
+      {
+        "path": "technical-report/scripts/verify_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "3546f37a8a46059a78a6254f2c953b895d6dfa24"
+      }
+    ]
+  },
+  "evidence_reference_manifest": {
+    "path": "technical-report/evidence-reference-manifest.json",
+    "sha256": "a7b0aded1ad5c4fb5e1670bc7d2b2512dd3f3945fdf2865f6b4a669d149d6e8a",
+    "software_subject": "0429b4244fc1fd912bd211e80821ebdbabb8ae5d",
+    "software_provenance": "738157c586561ec1e5466a997cd04758263c967b",
+    "software_head": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+    "website_subject": "a64f995093e13c74318219cd0f91ad2d03016f31",
+    "website_attestation": "943f3b65187247fe67eed76bc698b262adb06994",
+    "website_prerequisite": 88
+  },
+  "pdf": {
+    "path": "technical-report/output/DroneDream_AURORA_Technical_Report.pdf",
+    "sha256": "732d8b639bff928ddae68eb0c4ccda2f4c498e67035b340410664f25b3d778c0",
+    "bytes": 760544,
+    "pages": 13
+  },
+  "audit": {
+    "path": "technical-report/output/latex-audit.json",
+    "sha256": "e87255cbe805b41a4747492fbef48adbf9af60a75344b1a1df2ca9d2a4f0446d",
+    "audited_blocks": 71,
+    "explanatory_body": {
+      "total": 44,
+      "passed_80": 44,
+      "failed_80": 0,
+      "failure_locations": []
+    },
+    "reasonable_exceptions": {
+      "definition": "Headings, list items, display formulas, code blocks, figure captions, table captions, and references do not use the explanatory-body last-line gate.",
+      "inventory": {
+        "headings": 28,
+        "list_items": 27,
+        "display_formulas": 0,
+        "code_blocks": 0,
+        "figure_captions": 6,
+        "table_captions": 9,
+        "references": 33
+      }
+    },
+    "unlocated": [],
+    "cross_page_splits": [],
+    "bottom_failures": [],
+    "gray_text_runs": 0,
+    "internal_links": 51,
+    "external_links": 33
+  },
+  "compile_log": {
+    "sha256": "117bc02d1b83c2732ac64024062d16dd0373b30076c10f3f080b150e1d1c483d",
+    "warning_counts": {
+      "overfull": 0,
+      "latex_warning": 0,
+      "package_warning": 0,
+      "undefined_control_sequence": 0,
+      "undefined_references": 0
+    },
+    "underfull_boxes": 4
+  },
+  "visual_review": {
+    "status": "passed",
+    "render_dpi": 150,
+    "inspected_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "page_bottoms_inspected": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "defects_fixed": [
+      {
+        "page": 3,
+        "issue": "Outcome Memory label was clipped in the migrated architecture figure.",
+        "resolution": "Regenerated the report-owned figure with fitted text and verified the replacement render."
+      }
+    ],
+    "remaining_blocking_defects": []
+  },
+  "reproduction": {
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File technical-report/scripts/build_report.ps1",
+    "receipt": "python technical-report/scripts/create_report_validation_receipt.py"
+  }
+}
