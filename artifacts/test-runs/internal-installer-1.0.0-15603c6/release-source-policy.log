@@ -1,0 +1,7 @@
+﻿
+> drone-dream-desktop@1.0.0 verify:release-source
+> node scripts/verify-release-source-policy.mjs --output artifacts/test-runs/internal-installer-1.0.0-15603c6/release-source-inventory.json
+
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+Release-source policy verified: 930 tracked files, 390 npm packages, 532 external Rust packages.

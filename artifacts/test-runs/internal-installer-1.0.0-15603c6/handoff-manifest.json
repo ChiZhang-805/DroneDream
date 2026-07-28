@@ -1,0 +1,130 @@
+{
+  "schema_version": "dronedream.internal-test-installer-handoff-manifest.v2",
+  "generated_at": "2026-07-28T18:15:55Z",
+  "source_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+  "artifact_policy": {
+    "single_authoritative_exe": "DroneDream_1.0.0_x64-setup.exe",
+    "binary_is_local_handoff_only": true,
+    "binary_must_not_be_rebuilt_by_publication_lines": true,
+    "upload_performed": false,
+    "supersedes_internal_installer_1_0_0_8102ffe": true
+  },
+  "release_receipt_sha256": "77174cba0defc7ba41c4c1c1d89d62c7e9dcf95a44f2d2b7def6d83bb96c4def",
+  "files": [
+    {
+      "path": "artifact-validation.json",
+      "bytes": 1176,
+      "sha256": "973ef9ad0f3e0a2aac582bebdeae9c11ab7d6d549b71bf72da3c0e19a33d65f7"
+    },
+    {
+      "path": "backend-heartbeat-isolation.log",
+      "bytes": 564,
+      "sha256": "d049c58d1d4837c87363f32e5cf9c01f7d38d11d6bfd8a595a5195b8e1bb534d"
+    },
+    {
+      "path": "backend-phase8-rerun.log",
+      "bytes": 4299,
+      "sha256": "905fb6955423b778a2c52c3cfa02395234576aeb9322a681de98090850097a1d"
+    },
+    {
+      "path": "backend-validation.log",
+      "bytes": 4473,
+      "sha256": "10126a5b55cd5bce8ca0ce2c557e9b5a4e0b169c7d139a96829a810ef5cc03a9"
+    },
+    {
+      "path": "build.log",
+      "bytes": 5558,
+      "sha256": "31096784bd1f25f7a90036b99b83cfd805bef403c2e23ae0c6c732f4a833de39"
+    },
+    {
+      "path": "download-smoke.json",
+      "bytes": 319,
+      "sha256": "4e768f6caf697a7596219d026e12e75cfcf159ff26fea60aa5ac739e90dd4296"
+    },
+    {
+      "path": "DroneDream_1.0.0_x64-setup.exe",
+      "bytes": 10389138,
+      "sha256": "b913e328079a59a94ea69be51a1c9b6352bc891a5927ba49f62bfec69341a6df"
+    },
+    {
+      "path": "DroneDream_1.0.0_x64-setup.exe.sha256",
+      "bytes": 98,
+      "sha256": "a8dce163d25d49efdc9238238d1fde19ce3e9e883df82b9a90286e720d8bf1da"
+    },
+    {
+      "path": "DroneDream_1.0.0_x64-setup.exe.sig",
+      "bytes": 420,
+      "sha256": "287bb80359258fd306faa20a5a4e081028256f9179ae26b87cbb69a38f4a9f5b"
+    },
+    {
+      "path": "evidence-2.9-check.log",
+      "bytes": 605,
+      "sha256": "446b0000a8c0f73d08be42bf344d0a18579334536eb69455c30dcaae8fd87a27"
+    },
+    {
+      "path": "evidence-2.9-source-binding.json",
+      "bytes": 4729,
+      "sha256": "6a093aa2bf1d5bdf9ee1fab5e384d9d59ce78fae37a192cf0ed64328c27afa22"
+    },
+    {
+      "path": "frontend-validation.log",
+      "bytes": 10161,
+      "sha256": "8ae7fd6906133d21b796f55e93b251300076fecaa43e6f7ae3e9046f083325c9"
+    },
+    {
+      "path": "installer-ui-validation.log",
+      "bytes": 1583,
+      "sha256": "35dac015d74e1bbabd3101d23d5ae5a5006e555be3f30ded4342361b943d8a76"
+    },
+    {
+      "path": "release-metadata-handoff.json",
+      "bytes": 3122,
+      "sha256": "73ed9b57fbcc0795739c4c3affabac3bc0d74ea83c332dc6192cfb69f5f8af30"
+    },
+    {
+      "path": "release-receipt.json",
+      "bytes": 8959,
+      "sha256": "77174cba0defc7ba41c4c1c1d89d62c7e9dcf95a44f2d2b7def6d83bb96c4def"
+    },
+    {
+      "path": "release-receipt.json.sha256",
+      "bytes": 87,
+      "sha256": "b4f860dd1585df0ae22dcf1a91d5b445e13793b0685a95e74e26d57de6606c8c"
+    },
+    {
+      "path": "release-source-inventory.json",
+      "bytes": 179068,
+      "sha256": "d799487860634131d60790ac2520b30cc7eed9fe78a30ab6d7cb6e2425015194"
+    },
+    {
+      "path": "release-source-policy.log",
+      "bytes": 403,
+      "sha256": "e48ac7cbd17506395f880874194f19a9f6e86c1015f662d689063b6a1f478172"
+    },
+    {
+      "path": "rust-validation.log",
+      "bytes": 24926,
+      "sha256": "68cfbc6c6dbed8487ec824a1474912385b48cb650c0c62dd13e00aefb7f60ff8"
+    },
+    {
+      "path": "tauri-latest.build.json",
+      "bytes": 903,
+      "sha256": "64b8cd1386a1d060aed84ed8512dda02eedbd1c0ab4b1de690e915b9b3188431"
+    },
+    {
+      "path": "tauri-latest.json",
+      "bytes": 739,
+      "sha256": "b2e44ab335b05b870a1fca46f13824717acffdc47abf282a9872929ee6292b06"
+    },
+    {
+      "path": "website-latest.json",
+      "bytes": 492,
+      "sha256": "5585e3bda5613fdc9e3a9a48cb9e9771d97e3f7e8baabf075344611a8698380a"
+    },
+    {
+      "path": "website-pages-release.json",
+      "bytes": 254,
+      "sha256": "d5de1d7508479dd03d9861b36b581b6d7ae5c891a4a17964e1866ce8c7fa06cd"
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+﻿.......F.........                                                        [100%]
+================================== FAILURES ===================================
+___________ test_llm_harness_heartbeat_prevents_live_claim_takeover ___________
+
+gpt_ctx = {'db_module': <module 'app.db' from 'Z:\\DroneDream-worktrees\\aurora-20260728\\backend\\app\\db.py'>, 'models': <modu...': <module 'app.services.jobs' from 'Z:\\DroneDream-worktrees\\aurora-20260728\\backend\\app\\services\\jobs.py'>, ...}
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002B01482D7C0>
+
+    def test_llm_harness_heartbeat_prevents_live_claim_takeover(
+        gpt_ctx,
+        monkeypatch,
+    ) -> None:
+        """A live provider call renews its explicit lease across DB sessions."""
+    
+        ctx = gpt_ctx
+        job_id = _create_job(
+            ctx,
+            strategy="llm_harness",
+            target_rmse=0.001,
+            max_iterations=2,
+        )
+        with ctx["db_module"].SessionLocal() as db:
+            assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+        while True:
+            with ctx["db_module"].SessionLocal() as db:
+                trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                    db,
+                    "heartbeat-worker",
+                )
+            if trial_id is None:
+                break
+    
+        entered = threading.Event()
+        release = threading.Event()
+        provider_wait_timeout_seconds = 30.0
+    
+        class BlockingClient:
+            def __init__(self) -> None:
+                self.calls = 0
+    
+            def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
+                self.calls += 1
+                entered.set()
+                if self.calls == 1 and not release.wait(
+                    timeout=provider_wait_timeout_seconds
+                ):
+                    raise TimeoutError("test did not release provider call")
+                return _harness_response_for_prompt(user)
+    
+        client = BlockingClient()
+        errors: list[BaseException] = []
+    
+        def finalize_in_thread() -> None:
+            try:
+                with ctx["db_module"].SessionLocal() as db:
+                    ctx["aggregation"].finalize_ready_jobs(db, limit=1)
+            except BaseException as exc:  # pragma: no cover - surfaced below
+                errors.append(exc)
+    
+        monkeypatch.setattr(
+            ctx["aggregation"],
+            "get_settings",
+            lambda: SimpleNamespace(
+                finalization_lease_seconds=1,
+                finalization_lease_heartbeat_seconds=0.05,
+            ),
+        )
+        ctx["aggregation"].set_llm_client_override(client)
+        worker = threading.Thread(target=finalize_in_thread, daemon=True)
+        worker.start()
+        try:
+            assert entered.wait(timeout=provider_wait_timeout_seconds), (
+                "finalizer never reached provider"
+            )
+            with ctx["db_module"].SessionLocal() as db:
+                job = db.get(ctx["models"].Job, job_id)
+                initial_token = job.finalization_claim_token
+                initial_expiry = job.finalization_lease_expires_at
+            assert initial_token is not None
+            assert initial_expiry is not None
+    
+            time.sleep(0.2)
+            with ctx["db_module"].SessionLocal() as db:
+                job = db.get(ctx["models"].Job, job_id)
+                assert job.finalization_claim_token == initial_token
+                assert job.finalization_lease_expires_at > initial_expiry
+                assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == []
+>           assert client.calls == 1
+E           assert 3 == 1
+E            +  where 3 = <tests.test_phase8_iterative_loop.test_llm_harness_heartbeat_prevents_live_claim_takeover.<locals>.BlockingClient object at 0x000002B07F44FB60>.calls
+
+backend\tests\test_phase8_iterative_loop.py:603: AssertionError
+=========================== short test summary info ===========================
+FAILED backend\tests\test_phase8_iterative_loop.py::test_llm_harness_heartbeat_prevents_live_claim_takeover
+1 failed, 16 passed in 31.94s

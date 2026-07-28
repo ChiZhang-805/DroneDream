@@ -1,0 +1,29 @@
+﻿COMMAND=verify-installer-ui English fresh
+UI verify: temporarily suspending DroneDream registration
+UI verify: waiting for localized entry page
+UI verify: waiting for welcome or location page
+UI verify: advancing welcome page
+UI verify: waiting for existing-installation or location page
+UI verify: waiting for application location page
+UI verify: waiting for Runtime selection page
+Interactive installer UI verified: language=English app=C:\Users\zju20\AppData\Local\DroneDream target=E:\DroneDream pathGuard=False
+ENGLISH_EXIT=0
+COMMAND=verify-installer-ui SimpChinese fresh
+UI verify: temporarily suspending DroneDream registration
+UI verify: waiting for localized entry page
+UI verify: waiting for welcome or location page
+UI verify: advancing welcome page
+UI verify: waiting for existing-installation or location page
+UI verify: waiting for application location page
+UI verify: waiting for Runtime selection page
+Interactive installer UI verified: language=SimpChinese app=C:\Users\zju20\AppData\Local\DroneDream target=E:\DroneDream pathGuard=False
+SIMPCHINESE_EXIT=0
+COMMAND=verify-installer-ui English path guard
+UI verify: temporarily suspending DroneDream registration
+UI verify: waiting for localized entry page
+UI verify: waiting for welcome or location page
+UI verify: advancing welcome page
+UI verify: waiting for existing-installation or location page
+UI verify: waiting for application location page
+Real installer page flow verified: language=English app=C:\Users\zju20\AppData\Local\DroneDream target=E:\DroneDream
+PATH_GUARD_EXIT=0

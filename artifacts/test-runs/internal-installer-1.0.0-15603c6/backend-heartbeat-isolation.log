@@ -1,0 +1,11 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.13.0, pytest-9.1.0, pluggy-1.5.0 -- C:\Users\zju20\miniconda3\python.exe
+cachedir: .pytest_cache
+rootdir: Z:\DroneDream-worktrees\aurora-20260728\backend
+configfile: pyproject.toml
+plugins: anyio-4.14.0, cov-7.1.0
+collecting ... collected 1 item
+
+backend\tests\test_phase8_iterative_loop.py::test_llm_harness_heartbeat_prevents_live_claim_takeover PASSED [100%]
+
+============================== 1 passed in 1.94s ==============================
