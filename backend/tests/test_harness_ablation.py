@@ -86,7 +86,7 @@ def test_committed_harness_ablation_remains_a_verified_legacy_freeze() -> None:
     assert artifact["artifact_sha256"] == (
         "f91a848c84d1766fd728968f4d82d49a9bc3af7fc2cc036da5b99efed62bb8f2"
     )
-    assert current["contract_versions"]["harness_evidence_schema"] == "2.8"
+    assert current["contract_versions"]["harness_evidence_schema"] == "2.9"
     assert current["contract_versions"]["prompt_template"] == "1.7"
     manifest = SHA256_ARTIFACT.read_text(encoding="ascii").splitlines()
     assert manifest == [

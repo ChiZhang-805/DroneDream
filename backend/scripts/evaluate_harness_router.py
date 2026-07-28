@@ -21,6 +21,8 @@ from app.orchestration.harness_context import (  # noqa: E402
     HARNESS_TOOL_REGISTRY_VERSION,
 )
 from app.orchestration.harness_evaluation import (  # noqa: E402
+    HarnessRoutingArchivedPredictionArtifact,
+    HarnessRoutingPredictionArtifact,
     compile_routing_eval_snapshot,
     grade_routing_prediction_artifact,
     load_archived_routing_prediction_artifact,
@@ -62,6 +64,14 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--allow-archived-evidence-2-8-prompt-1-7",
+        action="store_true",
+        help=(
+            "Grade the explicitly pinned historical Evidence 2.8 / Prompt 1.7 "
+            "freeze instead of requiring the current Evidence 2.9 snapshot."
+        ),
+    )
+    parser.add_argument(
         "--predictions",
         type=Path,
         help=(
@@ -80,6 +90,11 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> int:
     _assert_local_backend_import()
     args = _parser().parse_args()
+    if (
+        args.allow_archived_evidence_2_7_prompt_1_6
+        and args.allow_archived_evidence_2_8_prompt_1_7
+    ):
+        raise ValueError("select at most one archived routing contract")
     cases = load_routing_eval_cases(args.corpus)
     result: dict[str, object] = {
         "schema_version": "1.1",
@@ -116,8 +131,12 @@ def main() -> int:
         result["prompt_output"] = str(args.emit_prompts)
 
     if args.predictions is not None:
-        artifact = (
-            load_archived_routing_prediction_artifact(
+        artifact: (
+            HarnessRoutingPredictionArtifact
+            | HarnessRoutingArchivedPredictionArtifact
+        )
+        if args.allow_archived_evidence_2_7_prompt_1_6:
+            artifact = load_archived_routing_prediction_artifact(
                 args.predictions,
                 cases,
                 evidence_schema_version="2.7",
@@ -126,12 +145,21 @@ def main() -> int:
                     "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
                 ),
             )
-            if args.allow_archived_evidence_2_7_prompt_1_6
-            else load_routing_prediction_artifact(
+        elif args.allow_archived_evidence_2_8_prompt_1_7:
+            artifact = load_archived_routing_prediction_artifact(
+                args.predictions,
+                cases,
+                evidence_schema_version="2.8",
+                prompt_template_version="1.7",
+                prompt_suite_sha256=(
+                    "81b3cae64b16f6b8294ef05acd9792f5d86c36e6d9e2afecf2f60d4d4db41903"
+                ),
+            )
+        else:
+            artifact = load_routing_prediction_artifact(
                 args.predictions,
                 cases,
             )
-        )
         report = grade_routing_prediction_artifact(artifact, cases)
         result["grade"] = report.predictions.model_dump(mode="json")
         result["comparison"] = {
@@ -150,11 +178,16 @@ def main() -> int:
             "prompt_suite_sha256": artifact.prompt_suite_sha256,
             "contract_current": (
                 not args.allow_archived_evidence_2_7_prompt_1_6
+                and not args.allow_archived_evidence_2_8_prompt_1_7
             ),
             "qualification_scope": (
                 "archived_evidence_2_7_prompt_1_6"
                 if args.allow_archived_evidence_2_7_prompt_1_6
-                else "current_contract"
+                else (
+                    "archived_evidence_2_8_prompt_1_7"
+                    if args.allow_archived_evidence_2_8_prompt_1_7
+                    else "current_contract"
+                )
             ),
         }
 

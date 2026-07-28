@@ -12,9 +12,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import uuid
 from dataclasses import dataclass
-from typing import Any, Literal
+from datetime import datetime, timezone
+from typing import Any, Literal, cast
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -33,9 +35,13 @@ from app.orchestration.harness_budget_planner import (
     HARNESS_PLAN_REVISION_PROMPT_VERSION,
     HarnessBudgetOpportunity,
     HarnessCompiledGenerationPlan,
+    HarnessGenerationPlan,
+    HarnessPlanUncertainty,
     HarnessPlanValidation,
     HarnessProposalSummary,
     HarnessRevisionValidation,
+    HarnessStopRecommendation,
+    HarnessToolAllocation,
     build_budget_plan_messages,
     build_plan_revision_messages,
     compile_generation_plan,
@@ -54,7 +60,9 @@ from app.orchestration.harness_context import (
     HARNESS_TOOL_REGISTRY_VERSION,
     HarnessBatchPolicy,
     HarnessEvidenceSnapshot,
+    HarnessGenerationPlanMemory,
     HarnessPlanPhase,
+    HarnessToolCallExecutionMemory,
     HarnessToolId,
     build_harness_evidence,
     provider_tool_manifest,
@@ -77,6 +85,8 @@ _MAX_RATIONALE_LENGTH = 400
 _DECISION_MEMORY_LOOKBACK_GENERATIONS = 32
 _DECISION_MEMORY_RESULT_SCAN_LIMIT = 512
 _DECISION_MEMORY_COMPANION_SCAN_LIMIT = 4096
+_GENERATION_PLAN_RESULT_SCAN_LIMIT = 512
+_GENERATION_PLAN_COMPANION_SCAN_LIMIT = 4096
 _CROSS_JOB_SOURCE_SCAN_LIMIT = 12
 
 
@@ -518,6 +528,609 @@ def _recent_harness_decision_events(
     return companions
 
 
+def _recent_harness_multi_tool_events(
+    db: Session,
+    job: models.Job,
+) -> list[models.JobEvent]:
+    """Load a bounded, duplicate-preserving multi-tool provenance window."""
+
+    upper_generation = max(0, int(job.current_generation or 0)) + 1
+    lower_generation = max(
+        1,
+        upper_generation - _DECISION_MEMORY_LOOKBACK_GENERATIONS,
+    )
+    scanned_results = list(
+        db.scalars(
+            select(models.JobEvent)
+            .where(
+                models.JobEvent.job_id == job.id,
+                models.JobEvent.event_type == "harness_multi_tool_execution_result",
+            )
+            .order_by(
+                models.JobEvent.created_at.desc(),
+                models.JobEvent.id.desc(),
+            )
+            .limit(_GENERATION_PLAN_RESULT_SCAN_LIMIT + 1)
+        )
+    )
+    if len(scanned_results) > _GENERATION_PLAN_RESULT_SCAN_LIMIT:
+        return []
+    recent_results = [
+        event
+        for event in scanned_results
+        if (
+            (event_generation := _event_generation(event)) is not None
+            and lower_generation <= event_generation <= upper_generation
+        )
+    ]
+    decision_ids = tuple(
+        dict.fromkeys(
+            decision_id
+            for event in recent_results
+            if (decision_id := _event_decision_id(event)) is not None
+        )
+    )
+    if not decision_ids:
+        return []
+    decision_id_json = models.JobEvent.payload_json["decision_id"].as_string()
+    companions = list(
+        db.scalars(
+            select(models.JobEvent)
+            .where(
+                models.JobEvent.job_id == job.id,
+                models.JobEvent.event_type.in_(
+                    (
+                        "harness_budget_plan_started",
+                        "harness_budget_plan_accepted",
+                        "harness_budget_plan_fallback",
+                        "harness_budget_plan_stop_accepted",
+                        "harness_plan_revision_started",
+                        "harness_plan_revision_accepted",
+                        "harness_plan_revision_fallback",
+                        "harness_multi_tool_execution_result",
+                    )
+                ),
+                decision_id_json.in_(decision_ids),
+            )
+            .order_by(
+                models.JobEvent.created_at.asc(),
+                models.JobEvent.id.asc(),
+            )
+            .limit(_GENERATION_PLAN_COMPANION_SCAN_LIMIT + 1)
+        )
+    )
+    if len(companions) > _GENERATION_PLAN_COMPANION_SCAN_LIMIT:
+        return []
+    return companions
+
+
+def _strict_hex(value: object, *, length: int) -> str | None:
+    if (
+        not isinstance(value, str)
+        or len(value) != length
+        or any(char not in "0123456789abcdefABCDEF" for char in value)
+    ):
+        return None
+    return value.lower()
+
+
+def _bounded_number(
+    value: object,
+    *,
+    maximum: float = 600_000.0,
+) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    number = float(value)
+    if not math.isfinite(number) or number < 0.0 or number > maximum:
+        return None
+    return number
+
+
+def _multi_plan_binding(
+    payload: dict[str, object],
+) -> tuple[str, int, str, str | None] | None:
+    decision_id = _strict_hex(payload.get("decision_id"), length=32)
+    generation = payload.get("generation")
+    evidence_sha256 = _strict_hex(payload.get("evidence_sha256"), length=64)
+    raw_prompt_sha256 = payload.get("prompt_sha256")
+    prompt_sha256 = (
+        None
+        if raw_prompt_sha256 is None
+        else _strict_hex(raw_prompt_sha256, length=64)
+    )
+    if (
+        decision_id is None
+        or isinstance(generation, bool)
+        or not isinstance(generation, int)
+        or generation < 1
+        or evidence_sha256 is None
+        or (raw_prompt_sha256 is not None and prompt_sha256 is None)
+        or payload.get("evidence_schema_version") != HARNESS_EVIDENCE_SCHEMA_VERSION
+        or payload.get("tool_registry_version") != HARNESS_TOOL_REGISTRY_VERSION
+        or payload.get("budget_policy_version") != HARNESS_BUDGET_POLICY_VERSION
+        or payload.get("plan_prompt_version") != HARNESS_BUDGET_PROMPT_VERSION
+    ):
+        return None
+    return decision_id, generation, evidence_sha256, prompt_sha256
+
+
+def _validated_compiled_plan(
+    *,
+    raw_plan: object,
+    raw_opportunity: object,
+) -> HarnessCompiledGenerationPlan | None:
+    """Recompile a persisted plan and require exact canonical-byte semantics."""
+
+    try:
+        opportunity = HarnessBudgetOpportunity.model_validate_json(
+            _canonical_json(raw_opportunity)
+        )
+        compiled = HarnessCompiledGenerationPlan.model_validate_json(
+            _canonical_json(raw_plan)
+        )
+        plan = HarnessGenerationPlan(
+            schema_version="1.0",
+            decision="continue",
+            generation_goal=compiled.generation_goal,
+            tool_calls=tuple(
+                HarnessToolAllocation(
+                    tool_id=call.tool_id,
+                    allocation=call.allocation,
+                    fidelity_mode=call.fidelity_mode,
+                    focus=call.focus,
+                )
+                for call in compiled.calls
+            ),
+            stop=HarnessStopRecommendation(
+                recommended=False,
+                reason_code=None,
+            ),
+            uncertainty=HarnessPlanUncertainty(
+                level="low",
+                missing_evidence=(),
+            ),
+        )
+        expected = compile_generation_plan(plan, opportunity)
+    except (TypeError, ValueError):
+        return None
+    return compiled if expected == compiled else None
+
+
+def _revision_binding(
+    payload: dict[str, object],
+) -> tuple[str, str, int, str, str | None] | None:
+    decision_id = _strict_hex(payload.get("decision_id"), length=32)
+    revision_id = _strict_hex(payload.get("revision_id"), length=32)
+    generation = payload.get("generation")
+    plan_sha256 = _strict_hex(payload.get("compiled_plan_sha256"), length=64)
+    raw_prompt_sha256 = payload.get("prompt_sha256")
+    prompt_sha256 = (
+        None
+        if raw_prompt_sha256 is None
+        else _strict_hex(raw_prompt_sha256, length=64)
+    )
+    if (
+        decision_id is None
+        or revision_id is None
+        or isinstance(generation, bool)
+        or not isinstance(generation, int)
+        or generation < 1
+        or plan_sha256 is None
+        or (raw_prompt_sha256 is not None and prompt_sha256 is None)
+        or payload.get("revision_prompt_version")
+        != HARNESS_PLAN_REVISION_PROMPT_VERSION
+    ):
+        return None
+    return decision_id, revision_id, generation, plan_sha256, prompt_sha256
+
+
+def _selected_refs(payload: dict[str, object]) -> tuple[str, ...] | None:
+    raw = payload.get("selected_proposal_refs")
+    if not isinstance(raw, list) or any(
+        not isinstance(item, str)
+        or len(item) > 32
+        or not item.startswith("proposal_")
+        for item in raw
+    ):
+        return None
+    refs = tuple(raw)
+    return refs if len(refs) == len(set(refs)) else None
+
+
+def _event_order_key(event: models.JobEvent) -> tuple[datetime, str]:
+    created_at = event.created_at
+    if not isinstance(created_at, datetime):
+        created_at = datetime.min.replace(tzinfo=timezone.utc)
+    elif created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    return created_at, event.id if isinstance(event.id, str) else ""
+
+
+def _generation_plan_history(
+    events: list[models.JobEvent],
+    *,
+    current_generation: int,
+) -> tuple[HarnessGenerationPlanMemory, ...]:
+    """Compile only complete multi-tool event chains into provider evidence."""
+
+    ordered = sorted(events, key=_event_order_key)
+    by_decision: dict[str, list[models.JobEvent]] = {}
+    for event in ordered:
+        decision_id = _event_decision_id(event)
+        if decision_id is not None:
+            by_decision.setdefault(decision_id, []).append(event)
+
+    verified: list[tuple[models.JobEvent, HarnessGenerationPlanMemory]] = []
+    for decision_id, decision_events in by_decision.items():
+        by_type: dict[str, list[models.JobEvent]] = {}
+        for event in decision_events:
+            by_type.setdefault(event.event_type, []).append(event)
+        results = by_type.get("harness_multi_tool_execution_result", [])
+        decisions = [
+            event
+            for event_type in (
+                "harness_budget_plan_accepted",
+                "harness_budget_plan_fallback",
+                "harness_budget_plan_stop_accepted",
+            )
+            for event in by_type.get(event_type, [])
+        ]
+        if len(results) != 1 or len(decisions) != 1:
+            continue
+        result_event = results[0]
+        decision_event = decisions[0]
+        if not isinstance(result_event.payload_json, dict) or not isinstance(
+            decision_event.payload_json,
+            dict,
+        ):
+            continue
+        result_payload = dict(result_event.payload_json)
+        decision_payload = dict(decision_event.payload_json)
+        result_binding = _multi_plan_binding(result_payload)
+        decision_binding = _multi_plan_binding(decision_payload)
+        if (
+            result_binding is None
+            or decision_binding is None
+            or result_binding != decision_binding
+            or result_binding[0] != decision_id
+            or result_binding[1] > max(0, current_generation) + 1
+            or _event_order_key(decision_event) > _event_order_key(result_event)
+        ):
+            continue
+        _, generation, _, prompt_sha256 = result_binding
+        decision_source = result_payload.get("decision_source")
+        status = result_payload.get("status")
+        starts = by_type.get("harness_budget_plan_started", [])
+
+        if decision_event.event_type == "harness_budget_plan_stop_accepted":
+            if (
+                decision_source != "model"
+                or decision_payload.get("source") != "model"
+                or status != "stop_accepted"
+                or len(starts) != 1
+                or prompt_sha256 is None
+                or result_payload.get("provider_call_count") != 1
+            ):
+                continue
+            start = starts[0]
+            if not isinstance(start.payload_json, dict):
+                continue
+            if (
+                _multi_plan_binding(dict(start.payload_json)) != result_binding
+                or _event_order_key(start) > _event_order_key(decision_event)
+            ):
+                continue
+            plan_wall = _bounded_number(result_payload.get("plan_decision_wall_ms"))
+            if plan_wall is None:
+                continue
+            verified.append(
+                (
+                    result_event,
+                    HarnessGenerationPlanMemory(
+                        generation=generation,
+                        decision_source="model",
+                        revision_source="not_applicable",
+                        status="stop_accepted",
+                        planned_candidates=0,
+                        usable_proposal_count=0,
+                        dispatched_candidates=0,
+                        dispatched_trials=0,
+                        projected_trial_upper_bound=0,
+                        projected_critical_path_latency_budget_ms=0,
+                        projected_cpu_budget_ms=0,
+                        plan_decision_wall_ms=plan_wall,
+                        revision_wall_ms=0.0,
+                        tool_execution_wall_ms=0.0,
+                        actual_tool_cpu_ms=0.0,
+                        provider_call_count=1,
+                        tool_calls=(),
+                    ),
+                )
+            )
+            continue
+
+        if status not in {"dispatched", "search_space_exhausted"}:
+            continue
+        if decision_event.event_type == "harness_budget_plan_accepted":
+            if (
+                decision_source != "model"
+                or decision_payload.get("source") != "model"
+                or result_payload.get("fallback_reason") is not None
+                or len(starts) != 1
+                or prompt_sha256 is None
+            ):
+                continue
+            start = starts[0]
+            if not isinstance(start.payload_json, dict):
+                continue
+            start_payload = dict(start.payload_json)
+            if (
+                _multi_plan_binding(start_payload) != result_binding
+                or _event_order_key(start) > _event_order_key(decision_event)
+            ):
+                continue
+            raw_opportunity = start_payload.get("opportunity")
+            raw_plan = decision_payload.get("compiled_plan")
+            typed_source: Literal["model", "deterministic_fallback"] = "model"
+        else:
+            if (
+                decision_source != "deterministic_fallback"
+                or decision_payload.get("source") != "deterministic_fallback"
+                or not isinstance(decision_payload.get("reason"), str)
+                or result_payload.get("fallback_reason")
+                != decision_payload.get("reason")
+                or len(starts) > 1
+            ):
+                continue
+            raw_opportunity = decision_payload.get("opportunity")
+            raw_plan = decision_payload.get("compiled_plan")
+            typed_source = "deterministic_fallback"
+            if starts:
+                start = starts[0]
+                if not isinstance(start.payload_json, dict) or (
+                    _multi_plan_binding(dict(start.payload_json)) != result_binding
+                    or _event_order_key(start) > _event_order_key(decision_event)
+                ):
+                    continue
+
+        compiled = _validated_compiled_plan(
+            raw_plan=raw_plan,
+            raw_opportunity=raw_opportunity,
+        )
+        if (
+            compiled is None
+            or compiled.generation != generation
+            or result_payload.get("plan_sha256") != compiled.plan_sha256
+            or result_payload.get("planned_candidates")
+            != compiled.projected_candidate_count
+            or result_payload.get("projected_trial_upper_bound")
+            != compiled.projected_trial_upper_bound
+            or result_payload.get("projected_critical_path_latency_budget_ms")
+            != compiled.projected_critical_path_latency_budget_ms
+            or result_payload.get("projected_cpu_budget_ms")
+            != compiled.projected_cpu_budget_ms
+        ):
+            continue
+
+        revision_id = _strict_hex(result_payload.get("revision_id"), length=32)
+        if revision_id is None:
+            continue
+        revision_decisions = [
+            event
+            for event_type in (
+                "harness_plan_revision_accepted",
+                "harness_plan_revision_fallback",
+            )
+            for event in by_type.get(event_type, [])
+            if isinstance(event.payload_json, dict)
+            and event.payload_json.get("revision_id") == revision_id
+        ]
+        revision_starts = [
+            event
+            for event in by_type.get("harness_plan_revision_started", [])
+            if isinstance(event.payload_json, dict)
+            and event.payload_json.get("revision_id") == revision_id
+        ]
+        if len(revision_decisions) != 1:
+            continue
+        revision_event = revision_decisions[0]
+        revision_payload_json = revision_event.payload_json
+        if not isinstance(revision_payload_json, dict):
+            continue
+        revision_payload = dict(revision_payload_json)
+        revision_binding = _revision_binding(revision_payload)
+        expected_revision_binding = (
+            decision_id,
+            revision_id,
+            generation,
+            compiled.plan_sha256,
+            revision_binding[4] if revision_binding is not None else None,
+        )
+        if (
+            revision_binding is None
+            or revision_binding != expected_revision_binding
+            or _event_order_key(decision_event) > _event_order_key(revision_event)
+            or _event_order_key(revision_event) > _event_order_key(result_event)
+        ):
+            continue
+        revision_refs = _selected_refs(revision_payload)
+        result_refs = _selected_refs(result_payload)
+        if revision_refs is None or result_refs is None or revision_refs != result_refs:
+            continue
+        revision_source = result_payload.get("revision_source")
+        if revision_event.event_type == "harness_plan_revision_accepted":
+            if (
+                revision_source != "model"
+                or revision_payload.get("source") != "model"
+                or result_payload.get("revision_fallback_reason") is not None
+                or len(revision_starts) != 1
+                or revision_binding[4] is None
+            ):
+                continue
+            revision_start = revision_starts[0]
+            if not isinstance(revision_start.payload_json, dict) or (
+                _revision_binding(dict(revision_start.payload_json))
+                != revision_binding
+                or _event_order_key(revision_start) > _event_order_key(revision_event)
+            ):
+                continue
+            typed_revision_source: Literal["model", "deterministic_fallback"] = "model"
+        else:
+            if (
+                revision_source != "deterministic_fallback"
+                or not isinstance(revision_payload.get("reason"), str)
+                or result_payload.get("revision_fallback_reason")
+                != revision_payload.get("reason")
+                or len(revision_starts) > 1
+            ):
+                continue
+            if revision_starts:
+                revision_start = revision_starts[0]
+                if not isinstance(revision_start.payload_json, dict) or (
+                    _revision_binding(dict(revision_start.payload_json))
+                    != revision_binding
+                    or _event_order_key(revision_start)
+                    > _event_order_key(revision_event)
+                ):
+                    continue
+            typed_revision_source = "deterministic_fallback"
+
+        raw_tool_calls = result_payload.get("tool_calls")
+        if not isinstance(raw_tool_calls, list) or len(raw_tool_calls) != len(
+            compiled.calls
+        ):
+            continue
+        tool_memories: list[HarnessToolCallExecutionMemory] = []
+        tool_rows_valid = True
+        for raw_call, compiled_call in zip(raw_tool_calls, compiled.calls, strict=True):
+            if not isinstance(raw_call, dict) or any(
+                (
+                    raw_call.get("call_id") != compiled_call.call_id,
+                    raw_call.get("tool_id") != compiled_call.tool_id,
+                    raw_call.get("allocation") != compiled_call.allocation,
+                    raw_call.get("parallel_safe") != compiled_call.parallel_safe,
+                    raw_call.get("latency_budget_ms")
+                    != compiled_call.latency_budget_ms,
+                    raw_call.get("cpu_budget_ms") != compiled_call.cpu_budget_ms,
+                )
+            ):
+                tool_rows_valid = False
+                break
+            raw_status = raw_call.get("status")
+            raw_proposal_count = raw_call.get("proposal_count")
+            elapsed_ms = _bounded_number(raw_call.get("elapsed_ms"))
+            cpu_ms = _bounded_number(raw_call.get("cpu_ms"))
+            if (
+                raw_status
+                not in {"completed", "tool_error", "cost_budget_exceeded"}
+                or isinstance(raw_proposal_count, bool)
+                or not isinstance(raw_proposal_count, int)
+                or elapsed_ms is None
+                or cpu_ms is None
+            ):
+                tool_rows_valid = False
+                break
+            try:
+                tool_memories.append(
+                    HarnessToolCallExecutionMemory(
+                        tool_id=compiled_call.tool_id,
+                        allocation=compiled_call.allocation,
+                        parallel_safe=compiled_call.parallel_safe,
+                        status=cast(
+                            Literal[
+                                "completed",
+                                "tool_error",
+                                "cost_budget_exceeded",
+                            ],
+                            raw_status,
+                        ),
+                        proposal_count=raw_proposal_count,
+                        elapsed_ms=elapsed_ms,
+                        cpu_ms=cpu_ms,
+                        latency_budget_ms=compiled_call.latency_budget_ms,
+                        cpu_budget_ms=compiled_call.cpu_budget_ms,
+                    )
+                )
+            except (TypeError, ValueError):
+                tool_rows_valid = False
+                break
+        if not tool_rows_valid:
+            continue
+
+        plan_wall = _bounded_number(result_payload.get("plan_decision_wall_ms"))
+        revision_wall = _bounded_number(result_payload.get("revision_wall_ms"))
+        tool_wall = _bounded_number(result_payload.get("tool_execution_wall_ms"))
+        actual_cpu = _bounded_number(result_payload.get("actual_tool_cpu_ms"))
+        provider_calls = result_payload.get("provider_call_count")
+        usable = result_payload.get("usable_proposal_count")
+        dispatched_candidates = result_payload.get("dispatched_candidates")
+        dispatched_trials = result_payload.get("dispatched_trials")
+        if (
+            plan_wall is None
+            or revision_wall is None
+            or tool_wall is None
+            or actual_cpu is None
+            or isinstance(provider_calls, bool)
+            or not isinstance(provider_calls, int)
+            or not 0 <= provider_calls <= 2
+            or isinstance(usable, bool)
+            or not isinstance(usable, int)
+            or usable < 0
+            or isinstance(dispatched_candidates, bool)
+            or not isinstance(dispatched_candidates, int)
+            or dispatched_candidates < 0
+            or isinstance(dispatched_trials, bool)
+            or not isinstance(dispatched_trials, int)
+            or dispatched_trials < 0
+            or abs(actual_cpu - sum(item.cpu_ms for item in tool_memories)) > 0.01
+            or (
+                tool_memories
+                and tool_wall + 0.01 < max(item.elapsed_ms for item in tool_memories)
+            )
+            or (status == "dispatched" and len(result_refs) != dispatched_candidates)
+            or (status == "search_space_exhausted" and result_refs)
+        ):
+            continue
+        try:
+            memory = HarnessGenerationPlanMemory(
+                generation=generation,
+                decision_source=typed_source,
+                revision_source=typed_revision_source,
+                status=status,
+                planned_candidates=compiled.projected_candidate_count,
+                usable_proposal_count=usable,
+                dispatched_candidates=dispatched_candidates,
+                dispatched_trials=dispatched_trials,
+                projected_trial_upper_bound=compiled.projected_trial_upper_bound,
+                projected_critical_path_latency_budget_ms=(
+                    compiled.projected_critical_path_latency_budget_ms
+                ),
+                projected_cpu_budget_ms=compiled.projected_cpu_budget_ms,
+                plan_decision_wall_ms=plan_wall,
+                revision_wall_ms=revision_wall,
+                tool_execution_wall_ms=tool_wall,
+                actual_tool_cpu_ms=actual_cpu,
+                provider_call_count=provider_calls,
+                tool_calls=tuple(tool_memories),
+            )
+        except (TypeError, ValueError):
+            continue
+        verified.append((result_event, memory))
+
+    counts: dict[int, int] = {}
+    for _, item in verified:
+        counts[item.generation] = counts.get(item.generation, 0) + 1
+    return tuple(
+        item
+        for _, item in sorted(
+            verified,
+            key=lambda pair: _event_order_key(pair[0]),
+        )
+        if counts[item.generation] == 1
+    )
+
+
 def _compile_cross_job_memory(
     db: Session,
     *,
@@ -656,6 +1269,8 @@ def _budget_plan_fallback(
         "reason": reason,
         "model": model,
         "source": "deterministic_fallback",
+        "opportunity": opportunity.model_dump(mode="json"),
+        "compiled_plan": compiled.model_dump(mode="json"),
         "compiled_plan_sha256": compiled.plan_sha256,
         "projected_candidate_count": compiled.projected_candidate_count,
         "projected_trial_upper_bound": compiled.projected_trial_upper_bound,
@@ -704,6 +1319,7 @@ def select_optimizer_budget_plan(
     if opportunity.generation != generation:
         raise ValueError("budget opportunity generation does not match the Job")
     recent_decision_events = _recent_harness_decision_events(db, job)
+    recent_multi_tool_events = _recent_harness_multi_tool_events(db, job)
     verified_started_decision_ids = frozenset(
         verified_id
         for event in recent_decision_events
@@ -713,6 +1329,10 @@ def select_optimizer_budget_plan(
         job,
         execution_events=recent_decision_events,
         verified_started_decision_ids=verified_started_decision_ids,
+        generation_plan_history=_generation_plan_history(
+            recent_multi_tool_events,
+            current_generation=max(0, int(job.current_generation or 0)),
+        ),
     )
     evidence_snapshot = _compile_cross_job_memory(
         db,
@@ -872,12 +1492,15 @@ def select_optimizer_budget_plan(
                 "decision_id": decision_id,
                 "generation": generation,
                 "model": chosen_model,
+                "source": "model",
                 "stop_reason": stop_reason,
                 "evidence_sha256": evidence_sha256,
                 "prompt_sha256": prompt_sha256,
                 "validation": validation.model_dump(mode="json"),
                 "budget_policy_version": HARNESS_BUDGET_POLICY_VERSION,
                 "plan_prompt_version": HARNESS_BUDGET_PROMPT_VERSION,
+                "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+                "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
             },
         )
         return HarnessBudgetPlanDecision(
@@ -901,12 +1524,15 @@ def select_optimizer_budget_plan(
             "decision_id": decision_id,
             "generation": generation,
             "model": chosen_model,
+            "source": "model",
             "compiled_plan": compiled.model_dump(mode="json"),
             "evidence_sha256": evidence_sha256,
             "prompt_sha256": prompt_sha256,
             "validation": validation.model_dump(mode="json"),
             "budget_policy_version": HARNESS_BUDGET_POLICY_VERSION,
             "plan_prompt_version": HARNESS_BUDGET_PROMPT_VERSION,
+            "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+            "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
         },
     )
     return HarnessBudgetPlanDecision(
@@ -928,6 +1554,8 @@ def _revision_fallback(
     *,
     decision_id: str,
     revision_id: str,
+    generation: int,
+    compiled_plan_sha256: str,
     proposals: tuple[HarnessProposalSummary, ...],
     maximum_dispatch_candidates: int,
     reason: str,
@@ -943,6 +1571,8 @@ def _revision_fallback(
     payload: dict[str, Any] = {
         "decision_id": decision_id,
         "revision_id": revision_id,
+        "generation": generation,
+        "compiled_plan_sha256": compiled_plan_sha256,
         "reason": reason,
         "source": "deterministic_fallback",
         "model": model,
@@ -991,6 +1621,8 @@ def select_plan_revision(
             job,
             decision_id=plan_decision.decision_id,
             revision_id=revision_id,
+            generation=compiled.generation,
+            compiled_plan_sha256=compiled.plan_sha256,
             proposals=proposals,
             maximum_dispatch_candidates=maximum_dispatch_candidates,
             reason="no_usable_proposals",
@@ -1008,6 +1640,8 @@ def select_plan_revision(
             job,
             decision_id=plan_decision.decision_id,
             revision_id=revision_id,
+            generation=compiled.generation,
+            compiled_plan_sha256=compiled.plan_sha256,
             proposals=proposals,
             maximum_dispatch_candidates=maximum_dispatch_candidates,
             reason="prompt_too_large",
@@ -1023,6 +1657,8 @@ def select_plan_revision(
                 job,
                 decision_id=plan_decision.decision_id,
                 revision_id=revision_id,
+                generation=compiled.generation,
+                compiled_plan_sha256=compiled.plan_sha256,
                 proposals=proposals,
                 maximum_dispatch_candidates=maximum_dispatch_candidates,
                 reason="missing_api_key",
@@ -1073,6 +1709,8 @@ def select_plan_revision(
             job,
             decision_id=plan_decision.decision_id,
             revision_id=revision_id,
+            generation=compiled.generation,
+            compiled_plan_sha256=compiled.plan_sha256,
             proposals=proposals,
             maximum_dispatch_candidates=maximum_dispatch_candidates,
             reason="client_error",
@@ -1092,6 +1730,8 @@ def select_plan_revision(
             job,
             decision_id=plan_decision.decision_id,
             revision_id=revision_id,
+            generation=compiled.generation,
+            compiled_plan_sha256=compiled.plan_sha256,
             proposals=proposals,
             maximum_dispatch_candidates=maximum_dispatch_candidates,
             reason=validation.rejection_code or "invalid_revision",
@@ -1107,7 +1747,9 @@ def select_plan_revision(
             "revision_id": revision_id,
             "generation": compiled.generation,
             "model": plan_decision.model,
+            "source": "model",
             "prompt_sha256": prompt_sha256,
+            "compiled_plan_sha256": compiled.plan_sha256,
             "decision": revision.decision,
             "selected_proposal_refs": list(revision.selected_proposal_refs),
             "revision_prompt_version": HARNESS_PLAN_REVISION_PROMPT_VERSION,
@@ -1144,6 +1786,7 @@ def select_optimizer_tool(
     decision_id = uuid.uuid4().hex
     generation = job.current_generation + 1
     recent_decision_events = _recent_harness_decision_events(db, job)
+    recent_multi_tool_events = _recent_harness_multi_tool_events(db, job)
     verified_started_decision_ids = frozenset(
         verified_id
         for event in recent_decision_events
@@ -1153,6 +1796,10 @@ def select_optimizer_tool(
         job,
         execution_events=recent_decision_events,
         verified_started_decision_ids=verified_started_decision_ids,
+        generation_plan_history=_generation_plan_history(
+            recent_multi_tool_events,
+            current_generation=max(0, int(job.current_generation or 0)),
+        ),
     )
     evidence_snapshot = _compile_cross_job_memory(
         db,

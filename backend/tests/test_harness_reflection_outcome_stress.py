@@ -86,7 +86,7 @@ def test_committed_outcome_stress_remains_a_verified_legacy_freeze() -> None:
     assert manifest["manifest_sha256"] == (
         "bbf3d39405fd9092d59cf5d0557d14616f8d4a8739e1865f7e2cf6fda811e1b2"
     )
-    assert current_manifest["runtime_contract"]["evidence_schema_version"] == "2.8"
+    assert current_manifest["runtime_contract"]["evidence_schema_version"] == "2.9"
     assert current_manifest["runtime_contract"]["prompt_template_version"] == "1.7"
     assert verify_harness_reflection_outcome_stress_manifest(manifest) == manifest
     assert (

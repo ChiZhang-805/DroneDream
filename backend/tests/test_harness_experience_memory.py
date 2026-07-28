@@ -447,7 +447,7 @@ def test_live_harness_trace_binds_provider_safe_cross_job_memory(client) -> None
         )
         db.flush()
         assert decision.tool_id == "optimizer_portfolio"
-        assert decision.evidence_schema_version == "2.8"
+        assert decision.evidence_schema_version == "2.9"
         assert decision.prompt_template_version == "1.7"
         assert len(fake.calls) == 1
         provider_payload = json.loads(fake.calls[0]["user"])

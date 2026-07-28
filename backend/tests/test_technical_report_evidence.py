@@ -42,7 +42,7 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     assert routing["evidence_class"] == "development_routing_corpus"
     assert routing["contract_current"] is False
     assert routing["qualification_scope"] == "archived_evidence_2_7_prompt_1_6"
-    assert routing["current_evidence_schema_version"] == "2.8"
+    assert routing["current_evidence_schema_version"] == "2.9"
     assert routing["current_prompt_template_version"] == "1.7"
     assert routing["evidence_schema_version"] == "2.7"
     assert routing["tool_registry_version"] == "2.1"
@@ -228,10 +228,10 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
 
     cross_job_memory = first["harness_cross_job_memory"]
     assert cross_job_memory["artifact_sha256"] == (
-        "e1abf46c2aa44e9be3f37b92ae2d41213235179f16dd7b9b7d794d850938c01a"
+        "eba721fd489815ef3c96d4ce03c765e355592e68eb992341b7d2300cc9c8f78b"
     )
     assert cross_job_memory["manifest_sha256"] == (
-        "b8d55e358d5642cb01be331f5318e4a048b871ccfe4606664202eeba4109ec85"
+        "c89855fdccd09697b1d4331ee3d06feac851c83cf3121b27cc84a12ee2ce5d51"
     )
     assert cross_job_memory["summary"] == {
         "case_count": 10,
@@ -269,7 +269,7 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     assert holdout["qualification_scope"] == (
         "archived_evidence_2_7_eligibility_policy_1_1"
     )
-    assert holdout["current_evidence_schema_version"] == "2.8"
+    assert holdout["current_evidence_schema_version"] == "2.9"
     assert holdout["evidence_schema_version"] == "2.7"
     assert holdout["tool_registry_version"] == "2.1"
     assert holdout["eligibility_policy_version"] == "1.1"

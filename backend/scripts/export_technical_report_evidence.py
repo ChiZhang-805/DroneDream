@@ -969,7 +969,7 @@ def build_report_evidence_bundle(
             "hash-locked deterministic policy corpus archived under Evidence 2.7. "
             "Eligibility policy 1.1 still reproduces its exact labels under current "
             "software, but its historical evidence snapshot is not relabelled as "
-            "Evidence 2.8. It makes no LLM routing quality, simulator outcome, or "
+            "Evidence 2.9. It makes no LLM routing quality, simulator outcome, or "
             "permanent-blindness claim."
         ),
         "contract_current": False,

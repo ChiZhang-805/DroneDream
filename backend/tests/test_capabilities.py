@@ -23,7 +23,7 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert data["features"]["llm_tool_harness"] == {
         "available": True,
         "decision_schema_version": "1.0",
-        "evidence_schema_version": "2.8",
+        "evidence_schema_version": "2.9",
         "tool_registry_version": "2.1",
         "prompt_template_version": "1.7",
         "trace_schema_version": "1.4",

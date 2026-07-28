@@ -63,7 +63,7 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
     for case in cases:
         snapshot = compile_routing_eval_snapshot(case)
         system, user = build_decision_messages(snapshot)
-        assert snapshot.schema_version == "2.8"
+        assert snapshot.schema_version == "2.9"
         assert case.case_id not in system
         assert case.case_id not in user
         assert case.rationale not in system
@@ -71,7 +71,7 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
         assert "acceptable_tools" not in user
         assert '"case_id"' not in user
         assert '"registry_version":"2.1"' in user
-        assert '"schema_version":"2.8"' in user
+        assert '"schema_version":"2.9"' in user
         payload = json.loads(user)
         assert HARNESS_PROMPT_TEMPLATE_VERSION == "1.7"
         assert payload["score_semantics"] == {
@@ -173,7 +173,7 @@ def test_prediction_artifact_binds_corpus_prompts_versions_and_model(
         "schema_version": "1.0",
         "corpus_sha256": routing_corpus_sha256(cases),
         "prompt_suite_sha256": routing_prompt_suite_sha256(cases),
-        "evidence_schema_version": "2.8",
+        "evidence_schema_version": "2.9",
         "tool_registry_version": "2.1",
         "prompt_template_version": "1.7",
         "provider": "openai",

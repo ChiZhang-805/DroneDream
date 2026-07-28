@@ -80,13 +80,14 @@ HarnessPlanReason = Literal[
     "stable_progress",
 ]
 
-HARNESS_EVIDENCE_SCHEMA_VERSION = "2.8"
+HARNESS_EVIDENCE_SCHEMA_VERSION = "2.9"
 HARNESS_TOOL_REGISTRY_VERSION = "2.1"
 HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION = "1.1"
 HARNESS_PROMPT_TEMPLATE_VERSION = "1.7"
 HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.4"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
+MAX_GENERATION_PLAN_HISTORY_ITEMS = 8
 MAX_CROSS_JOB_EXPERIENCE_ITEMS = 6
 MAX_GENERATION_TREND_ITEMS = 32
 
@@ -678,6 +679,94 @@ class HarnessExecutionMemory(_ClosedModel):
         return self
 
 
+class HarnessToolCallExecutionMemory(_ClosedModel):
+    """Provider-safe cost/result projection for one pure proposal-tool call."""
+
+    tool_id: HarnessToolId
+    allocation: int = Field(ge=1, le=8)
+    parallel_safe: bool
+    status: Literal["completed", "tool_error", "cost_budget_exceeded"]
+    proposal_count: int = Field(ge=0, le=8)
+    elapsed_ms: float = Field(ge=0.0, le=600_000.0)
+    cpu_ms: float = Field(ge=0.0, le=600_000.0)
+    latency_budget_ms: int = Field(ge=1, le=120_000)
+    cpu_budget_ms: int = Field(ge=1, le=120_000)
+
+    @model_validator(mode="after")
+    def _validate_execution_result(self) -> HarnessToolCallExecutionMemory:
+        if self.proposal_count > self.allocation:
+            raise ValueError("tool proposal count exceeds its allocation")
+        if self.status != "completed" and self.proposal_count != 0:
+            raise ValueError("failed or over-budget tool calls cannot retain proposals")
+        return self
+
+
+class HarnessGenerationPlanMemory(_ClosedModel):
+    """Verified, de-identified plan/cost/result history for one generation."""
+
+    schema_id: Literal["dronedream.harness-generation-plan-memory/v1"] = (
+        "dronedream.harness-generation-plan-memory/v1"
+    )
+    generation: int = Field(ge=1)
+    decision_source: Literal["model", "deterministic_fallback"]
+    revision_source: Literal["model", "deterministic_fallback", "not_applicable"]
+    status: Literal["dispatched", "search_space_exhausted", "stop_accepted"]
+    planned_candidates: int = Field(ge=0, le=8)
+    usable_proposal_count: int = Field(ge=0, le=32)
+    dispatched_candidates: int = Field(ge=0, le=8)
+    dispatched_trials: int = Field(ge=0)
+    projected_trial_upper_bound: int = Field(ge=0)
+    projected_critical_path_latency_budget_ms: int = Field(ge=0, le=600_000)
+    projected_cpu_budget_ms: int = Field(ge=0, le=600_000)
+    plan_decision_wall_ms: float = Field(ge=0.0, le=600_000.0)
+    revision_wall_ms: float = Field(ge=0.0, le=600_000.0)
+    tool_execution_wall_ms: float = Field(ge=0.0, le=600_000.0)
+    actual_tool_cpu_ms: float = Field(ge=0.0, le=600_000.0)
+    provider_call_count: int = Field(ge=0, le=2)
+    tool_calls: tuple[HarnessToolCallExecutionMemory, ...] = Field(
+        default=(),
+        max_length=4,
+    )
+
+    @model_validator(mode="after")
+    def _validate_generation_result(self) -> HarnessGenerationPlanMemory:
+        if self.status == "stop_accepted":
+            if (
+                self.revision_source != "not_applicable"
+                or self.planned_candidates != 0
+                or self.usable_proposal_count != 0
+                or self.dispatched_candidates != 0
+                or self.dispatched_trials != 0
+                or self.projected_trial_upper_bound != 0
+                or self.projected_critical_path_latency_budget_ms != 0
+                or self.projected_cpu_budget_ms != 0
+                or self.revision_wall_ms != 0.0
+                or self.tool_execution_wall_ms != 0.0
+                or self.actual_tool_cpu_ms != 0.0
+                or self.tool_calls
+            ):
+                raise ValueError("accepted stop cannot claim plan or tool execution")
+            return self
+        if not self.tool_calls or self.revision_source == "not_applicable":
+            raise ValueError("continued generations require tool and revision history")
+        if self.planned_candidates < 1 or self.projected_trial_upper_bound < 1:
+            raise ValueError("continued generations require a positive compiled plan")
+        if self.usable_proposal_count > sum(
+            call.proposal_count for call in self.tool_calls
+        ):
+            raise ValueError("usable proposals exceed completed tool output")
+        if self.status == "dispatched":
+            if not (
+                1 <= self.dispatched_candidates <= self.usable_proposal_count
+                and self.dispatched_candidates <= self.planned_candidates
+                and 1 <= self.dispatched_trials <= self.projected_trial_upper_bound
+            ):
+                raise ValueError("dispatched generation exceeds verified plan output")
+        elif self.dispatched_candidates != 0 or self.dispatched_trials != 0:
+            raise ValueError("search exhaustion cannot claim a dispatch")
+        return self
+
+
 class HarnessCrossJobExperience(_ClosedModel):
     """Provider-safe projection of one verified prior-Job cohort.
 
@@ -733,7 +822,7 @@ class HarnessJobEvidence(_ClosedModel):
 
 
 class HarnessEvidenceSnapshot(_ClosedModel):
-    schema_version: Literal["2.8"] = "2.8"
+    schema_version: Literal["2.9"] = "2.9"
     job: HarnessJobEvidence
     budget: HarnessBudgetEvidence
     plan: HarnessPlanningEvidence
@@ -743,6 +832,10 @@ class HarnessEvidenceSnapshot(_ClosedModel):
     decision_memory: tuple[HarnessExecutionMemory, ...] = Field(
         default=(),
         max_length=MAX_DECISION_MEMORY_ITEMS,
+    )
+    generation_plan_history: tuple[HarnessGenerationPlanMemory, ...] = Field(
+        default=(),
+        max_length=MAX_GENERATION_PLAN_HISTORY_ITEMS,
     )
     cross_job_memory: HarnessCrossJobMemory = Field(
         default_factory=HarnessCrossJobMemory
@@ -1760,6 +1853,7 @@ def build_harness_evidence(
     *,
     execution_events: Iterable[models.JobEvent] = (),
     verified_started_decision_ids: Iterable[str] = (),
+    generation_plan_history: Iterable[HarnessGenerationPlanMemory] = (),
 ) -> tuple[HarnessEvidenceSnapshot, bool]:
     """Compile one deterministic provider-safe decision snapshot."""
 
@@ -1849,6 +1943,9 @@ def build_harness_evidence(
         search=search,
         tool_history=_tool_history(candidates, feedback_by_id),
         decision_memory=decision_memory,
+        generation_plan_history=tuple(generation_plan_history)[
+            -MAX_GENERATION_PLAN_HISTORY_ITEMS:
+        ],
         candidates=compact_candidates,
         candidate_history_total=len(candidates),
         candidate_history_included=len(compact_candidates),
@@ -1948,9 +2045,11 @@ __all__ = [
     "HARNESS_TOOL_REGISTRY",
     "HARNESS_TOOL_REGISTRY_VERSION",
     "MAX_DECISION_MEMORY_ITEMS",
+    "MAX_GENERATION_PLAN_HISTORY_ITEMS",
     "MAX_CROSS_JOB_EXPERIENCE_ITEMS",
     "MAX_GENERATION_TREND_ITEMS",
     "HarnessEvidenceSnapshot",
+    "HarnessGenerationPlanMemory",
     "HarnessCrossJobExperience",
     "HarnessCrossJobMemory",
     "HarnessEnvironmentEvidence",
@@ -1960,6 +2059,7 @@ __all__ = [
     "HarnessScenarioType",
     "HarnessTrainingScenarioProfile",
     "HarnessToolId",
+    "HarnessToolCallExecutionMemory",
     "build_harness_evidence",
     "compile_harness_plan",
     "compile_harness_scenario_evidence",

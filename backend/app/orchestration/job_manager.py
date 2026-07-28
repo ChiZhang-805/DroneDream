@@ -1783,8 +1783,11 @@ def dispatch_next_harness_generation(
                 "stop_reason": decision.stop_reason,
                 "decision_source": decision.source,
                 "plan_decision_wall_ms": round(plan_decision_wall_ms, 3),
+                "provider_call_count": 1,
                 "evidence_sha256": decision.evidence_sha256,
                 "prompt_sha256": decision.prompt_sha256,
+                "evidence_schema_version": decision.evidence_schema_version,
+                "tool_registry_version": decision.tool_registry_version,
                 "budget_policy_version": decision.budget_policy_version,
                 "plan_prompt_version": decision.plan_prompt_version,
             },
@@ -1828,6 +1831,40 @@ def dispatch_next_harness_generation(
     )
     revision_wall_ms = (time.perf_counter_ns() - revision_started) / 1_000_000
     selected_refs = revision.selected_proposal_refs
+    provider_call_count = int(
+        decision.source == "model"
+        or decision.fallback_reason in {"client_error", "invalid_plan"}
+    ) + int(
+        revision.source == "model"
+        or revision.fallback_reason
+        in {
+            "client_error",
+            "invalid_schema",
+            "unknown_proposal_reference",
+            "dispatch_capacity_exceeded",
+            "abandon_not_authorized",
+        }
+    )
+    actual_tool_cpu_ms = round(
+        sum(result.cpu_ms for result in tool_results),
+        3,
+    )
+    tool_call_ledger = [
+        {
+            "call_id": result.call.call_id,
+            "tool_id": result.call.tool_id,
+            "status": result.status,
+            "allocation": result.call.allocation,
+            "parallel_safe": result.call.parallel_safe,
+            "proposal_count": len(result.proposals),
+            "elapsed_ms": round(result.elapsed_ms, 3),
+            "cpu_ms": round(result.cpu_ms, 3),
+            "latency_budget_ms": result.call.latency_budget_ms,
+            "cpu_budget_ms": result.call.cpu_budget_ms,
+            "error_type": result.error_type,
+        }
+        for result in tool_results
+    ]
     if not summaries or not selected_refs or revision.abandoned:
         status = "search_space_exhausted"
         record_event(
@@ -1844,24 +1881,29 @@ def dispatch_next_harness_generation(
                 "revision_source": revision.source,
                 "plan_decision_wall_ms": round(plan_decision_wall_ms, 3),
                 "revision_wall_ms": round(revision_wall_ms, 3),
+                "provider_call_count": provider_call_count,
+                "selected_proposal_refs": list(selected_refs),
+                "dispatched_candidates": 0,
+                "dispatched_trials": 0,
                 "planned_candidates": plan.projected_candidate_count,
                 "usable_proposal_count": len(summaries),
+                "projected_trial_upper_bound": plan.projected_trial_upper_bound,
+                "projected_critical_path_latency_budget_ms": (
+                    plan.projected_critical_path_latency_budget_ms
+                ),
+                "projected_cpu_budget_ms": plan.projected_cpu_budget_ms,
                 "tool_execution_wall_ms": round(tool_execution_wall_ms, 3),
-                "tool_calls": [
-                    {
-                        "call_id": result.call.call_id,
-                        "tool_id": result.call.tool_id,
-                        "status": result.status,
-                        "allocation": result.call.allocation,
-                        "proposal_count": len(result.proposals),
-                        "elapsed_ms": round(result.elapsed_ms, 3),
-                        "cpu_ms": round(result.cpu_ms, 3),
-                        "latency_budget_ms": result.call.latency_budget_ms,
-                        "cpu_budget_ms": result.call.cpu_budget_ms,
-                        "error_type": result.error_type,
-                    }
-                    for result in tool_results
-                ],
+                "actual_tool_cpu_ms": actual_tool_cpu_ms,
+                "tool_calls": tool_call_ledger,
+                "evidence_sha256": decision.evidence_sha256,
+                "prompt_sha256": decision.prompt_sha256,
+                "fallback_reason": decision.fallback_reason,
+                "revision_fallback_reason": revision.fallback_reason,
+                "evidence_schema_version": decision.evidence_schema_version,
+                "tool_registry_version": decision.tool_registry_version,
+                "budget_policy_version": decision.budget_policy_version,
+                "plan_prompt_version": decision.plan_prompt_version,
+                "revision_prompt_version": revision.revision_prompt_version,
             },
         )
         return AdaptiveDispatchResult(
@@ -1916,22 +1958,6 @@ def dispatch_next_harness_generation(
     job.current_generation = generation_index
     job.current_phase = f"candidate_generation_{generation_index}"
     job.progress_total_trials += dispatched_trials
-    tool_call_ledger = [
-        {
-            "call_id": result.call.call_id,
-            "tool_id": result.call.tool_id,
-            "status": result.status,
-            "allocation": result.call.allocation,
-            "parallel_safe": result.call.parallel_safe,
-            "proposal_count": len(result.proposals),
-            "elapsed_ms": round(result.elapsed_ms, 3),
-            "cpu_ms": round(result.cpu_ms, 3),
-            "latency_budget_ms": result.call.latency_budget_ms,
-            "cpu_budget_ms": result.call.cpu_budget_ms,
-            "error_type": result.error_type,
-        }
-        for result in tool_results
-    ]
     record_event(
         db,
         job.id,
@@ -1946,39 +1972,24 @@ def dispatch_next_harness_generation(
             "revision_source": revision.source,
             "plan_decision_wall_ms": round(plan_decision_wall_ms, 3),
             "revision_wall_ms": round(revision_wall_ms, 3),
-            "provider_call_count": int(
-                decision.source == "model"
-                or decision.fallback_reason in {"client_error", "invalid_plan"}
-            )
-            + int(
-                revision.source == "model"
-                or revision.fallback_reason
-                in {
-                    "client_error",
-                    "invalid_schema",
-                    "unknown_proposal_reference",
-                    "dispatch_capacity_exceeded",
-                    "abandon_not_authorized",
-                }
-            ),
+            "provider_call_count": provider_call_count,
             "selected_proposal_refs": list(selected_refs),
             "dispatched_candidates": dispatched_candidates,
             "dispatched_trials": dispatched_trials,
             "planned_candidates": plan.projected_candidate_count,
+            "usable_proposal_count": len(summaries),
             "projected_trial_upper_bound": plan.projected_trial_upper_bound,
             "projected_critical_path_latency_budget_ms": (
                 plan.projected_critical_path_latency_budget_ms
             ),
             "projected_cpu_budget_ms": plan.projected_cpu_budget_ms,
             "tool_execution_wall_ms": round(tool_execution_wall_ms, 3),
-            "actual_tool_cpu_ms": round(
-                sum(result.cpu_ms for result in tool_results),
-                3,
-            ),
+            "actual_tool_cpu_ms": actual_tool_cpu_ms,
             "tool_calls": tool_call_ledger,
             "evidence_sha256": decision.evidence_sha256,
             "prompt_sha256": decision.prompt_sha256,
             "fallback_reason": decision.fallback_reason,
+            "revision_fallback_reason": revision.fallback_reason,
             "evidence_schema_version": decision.evidence_schema_version,
             "tool_registry_version": decision.tool_registry_version,
             "budget_policy_version": decision.budget_policy_version,

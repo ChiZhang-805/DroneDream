@@ -60,9 +60,17 @@ def _canonical_sha256(value: object) -> str:
     ).hexdigest()
 
 
-def test_current_online_provider_freeze_and_manifest_are_exactly_bound() -> None:
+def test_latest_online_provider_freeze_remains_exact_historical_evidence() -> None:
     cases = load_routing_eval_cases(CORPUS)
-    artifact = load_routing_prediction_artifact(EVIDENCE_2_8_PROMPT_1_7, cases)
+    artifact = load_archived_routing_prediction_artifact(
+        EVIDENCE_2_8_PROMPT_1_7,
+        cases,
+        evidence_schema_version="2.8",
+        prompt_template_version="1.7",
+        prompt_suite_sha256=(
+            "81b3cae64b16f6b8294ef05acd9792f5d86c36e6d9e2afecf2f60d4d4db41903"
+        ),
+    )
     report = grade_routing_prediction_artifact(artifact, cases)
 
     assert hashlib.sha256(EVIDENCE_2_8_PROMPT_1_7.read_bytes()).hexdigest() == (
@@ -199,7 +207,7 @@ def test_evaluator_cli_binds_worktree_backend_from_repository_root() -> None:
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
     assert Path(report["backend_root"]) == BACKEND_ROOT.resolve()
-    assert report["evidence_schema_version"] == "2.8"
+    assert report["evidence_schema_version"] == "2.9"
     assert report["tool_registry_version"] == "2.1"
     assert report["prompt_template_version"] == "1.7"
     assert report["grade"]["passed_count"] == 24
@@ -215,13 +223,14 @@ def test_evaluator_cli_binds_worktree_backend_from_repository_root() -> None:
     )
 
 
-def test_evaluator_cli_accepts_the_current_online_provider_freeze() -> None:
+def test_evaluator_cli_accepts_latest_online_freeze_as_historical() -> None:
     result = subprocess.run(
         [
             sys.executable,
             str(EVALUATOR_SCRIPT),
             "--predictions",
             str(EVIDENCE_2_8_PROMPT_1_7),
+            "--allow-archived-evidence-2-8-prompt-1-7",
         ],
         cwd=REPOSITORY_ROOT,
         check=False,
@@ -233,11 +242,13 @@ def test_evaluator_cli_accepts_the_current_online_provider_freeze() -> None:
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
     assert Path(report["backend_root"]) == BACKEND_ROOT.resolve()
-    assert report["evidence_schema_version"] == "2.8"
+    assert report["evidence_schema_version"] == "2.9"
     assert report["tool_registry_version"] == "2.1"
     assert report["prompt_template_version"] == "1.7"
     assert report["grade"]["passed_count"] == 23
     assert report["grade"]["pass_rate"] == pytest.approx(23 / 24)
     assert report["comparison"]["qualification"]["qualified"] is True
-    assert report["prediction_provenance"]["contract_current"] is True
-    assert report["prediction_provenance"]["qualification_scope"] == "current_contract"
+    assert report["prediction_provenance"]["contract_current"] is False
+    assert report["prediction_provenance"]["qualification_scope"] == (
+        "archived_evidence_2_8_prompt_1_7"
+    )

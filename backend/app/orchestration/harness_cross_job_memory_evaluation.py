@@ -41,7 +41,7 @@ HARNESS_CROSS_JOB_EVAL_SCHEMA_VERSION = (
 HARNESS_CROSS_JOB_EVAL_MANIFEST_SCHEMA_VERSION = (
     "dronedream.harness-cross-job-memory-evaluation-manifest/v1"
 )
-HARNESS_CROSS_JOB_EVAL_GENERATED_AT = "2026-07-28T16:00:00Z"
+HARNESS_CROSS_JOB_EVAL_GENERATED_AT = "2026-07-28T17:28:13Z"
 HARNESS_CROSS_JOB_EVAL_CLAIM_BOUNDARY = (
     "This deterministic in-memory SQLite evaluation proves the current software "
     "retrieval, isolation, retention, revocation, contract-drift, receipt-binding, "

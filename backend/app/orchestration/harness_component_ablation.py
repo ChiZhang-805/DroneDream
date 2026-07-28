@@ -495,6 +495,7 @@ def _build_context_wrapper(
         *,
         execution_events: object = (),
         verified_started_decision_ids: object = (),
+        generation_plan_history: object = (),
     ) -> tuple[HarnessEvidenceSnapshot, bool]:
         snapshot, has_scored_evidence = original(
             job,
@@ -503,6 +504,7 @@ def _build_context_wrapper(
                 Any,
                 verified_started_decision_ids,
             ),
+            generation_plan_history=cast(Any, generation_plan_history),
         )
         return intervention.apply(snapshot, has_scored_evidence)
 
