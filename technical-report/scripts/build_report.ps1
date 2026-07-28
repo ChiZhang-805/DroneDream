@@ -7,11 +7,44 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Resolve-PdfToPpmCommand {
+    param([string]$Command)
+
+    if ($Command -ne "pdftoppm") {
+        return $Command
+    }
+
+    $resolved = Get-Command $Command -ErrorAction SilentlyContinue
+    if ($null -eq $resolved -or -not $resolved.Source) {
+        return $Command
+    }
+    if ([IO.Path]::GetExtension($resolved.Source) -notin @(".cmd", ".bat")) {
+        return $Command
+    }
+
+    $overrideRoot = Split-Path -Parent $resolved.Source
+    $dependencyRoot = [IO.Path]::GetFullPath(
+        (Join-Path $overrideRoot "..\..")
+    )
+    $bundledCandidates = @(
+        (Join-Path $dependencyRoot "native\poppler\Library\bin\pdftoppm.exe"),
+        (Join-Path $dependencyRoot "native\poppler\bin\pdftoppm.exe"),
+        (Join-Path $dependencyRoot "native\poppler\bin\pdftoppm.cmd")
+    )
+    foreach ($candidate in $bundledCandidates) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            return $candidate
+        }
+    }
+    return $Command
+}
+
 $reportRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $reportRoot ".."))
 $buildRoot = [IO.Path]::GetFullPath((Join-Path $reportRoot "build"))
 $renderRoot = [IO.Path]::GetFullPath((Join-Path $buildRoot "rendered"))
 $outputRoot = [IO.Path]::GetFullPath((Join-Path $reportRoot "output"))
+$pdfToPpmCommand = Resolve-PdfToPpmCommand $PdfToPpm
 
 foreach ($path in @($buildRoot, $renderRoot, $outputRoot)) {
     if (-not $path.StartsWith($reportRoot, [StringComparison]::OrdinalIgnoreCase)) {
@@ -68,7 +101,7 @@ if ($warningMatches) {
 }
 
 $pdfPath = Join-Path $buildRoot "main.pdf"
-& $PdfToPpm `
+& $pdfToPpmCommand `
     -png `
     -r 150 `
     $pdfPath `

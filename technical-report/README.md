@@ -65,7 +65,9 @@ python technical-report/scripts/verify_claim_evidence.py `
 ## Build and audit
 
 The build requires XeLaTeX, Pandoc, Poppler (`pdftoppm`), and Python with
-`pdfplumber` and `pypdf`.
+`pdfplumber` and `pypdf`. When a Codex runtime `pdftoppm` wrapper is present,
+the script resolves the actual bundled Poppler executable from that wrapper's
+dependency root; `-PdfToPpm <path>` remains available for an explicit override.
 
 From the repository root:
 
