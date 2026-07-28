@@ -1,0 +1,129 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-parity-release-metadata-validation",
+  "generatedAtUtc": "2026-07-28T13:12:41.4994251Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "ea4dc4ccf6054c259a8ca0b4bc4c306e9358b4f9",
+    "sourceTree": "64a0d75ca1297370ca8227e69126e0051f7b7dab",
+    "parentCommit": "57981dae60249dcc7f35be8f7008175fc7b0b27a",
+    "attestationRule": "This receipt validates the subject commit only. Its later receipt-only commit is not self-attested.",
+    "sourceStateDuringValidation": "clean; one commit ahead of origin/codex/website",
+    "changedPaths": [
+      "runtime/tests/test_website_deployment.py",
+      "website/README.md",
+      "website/scripts/verify-site-parity.ps1"
+    ]
+  },
+  "scope": {
+    "problem": "The two-origin parity verifier checked identical manifests and public HTML, JavaScript, and CSS, but did not fetch and validate the deployed downloads/latest.json bytes.",
+    "resolution": [
+      "include downloads/latest.json in the public SHA256SUMS file download loop",
+      "validate its version, file name, installer SHA-256, size, publication date, download URL, and checksum URL against build-manifest.json on each origin",
+      "require release metadata to pass on both configured origins",
+      "document that release metadata is part of byte-for-byte parity",
+      "lock the behavior with a deployment contract test"
+    ],
+    "deploymentPerformed": false,
+    "productionConfigurationChanged": false
+  },
+  "environment": {
+    "operatingSystem": "Microsoft Windows NT 10.0.26200",
+    "node": "v24.14.1",
+    "npm": "11.11.0",
+    "python": "3.13.0",
+    "powershell": "5.1.26100.8875"
+  },
+  "validation": {
+    "frontendTests": {
+      "command": "npm test -- --run --maxWorkers=4",
+      "testFiles": 50,
+      "tests": 325,
+      "passed": 325,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "41216f26b5f29a6aa515d7c2926217bb1fa8ca1617f8a5543f75c029391fd37b",
+      "logBytes": 662
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "pass",
+      "logSha256": "70b3c3927615afdf5f5a277b682ce10528f9baed352029eb1ad9b1146db47acd",
+      "logBytes": 128
+    },
+    "lint": {
+      "command": "npm run lint",
+      "result": "pass",
+      "logSha256": "0a0909db1fb8b2a2edb14bdc5a7992cbb6d02839f44caf6fdd98bd1d27c4afed",
+      "logBytes": 104
+    },
+    "deploymentContract": {
+      "command": "python -m pytest runtime/tests/test_website_deployment.py -q",
+      "tests": 11,
+      "subtests": 22,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "8a80471ff77c7758925a542f1584686da2b960196f032f1c728a45942dd56311",
+      "logBytes": 200
+    },
+    "powershellSyntax": {
+      "command": "System.Management.Automation.Language.Parser.ParseFile(website/scripts/verify-site-parity.ps1)",
+      "parseErrors": 0,
+      "result": "pass"
+    },
+    "diffCheck": {
+      "command": "git diff --check",
+      "result": "pass"
+    },
+    "sharedWebsiteBuild": {
+      "command": ".\\website\\scripts\\build-pages-site.ps1",
+      "sourceCommit": "ea4dc4ccf6054c259a8ca0b4bc4c306e9358b4f9",
+      "artifactDirectoryForBothOrigins": "frontend/site-dist",
+      "result": "pass",
+      "logSha256": "0b30e4b09821fedab283576d92ef8021b144cd4e8083992af413de6313fbebc0",
+      "logBytes": 9026,
+      "note": "Vite emitted its existing greater-than-510-kB advisory; no frontend source changed in this subject."
+    }
+  },
+  "sharedArtifact": {
+    "sourceCommit": "ea4dc4ccf6054c259a8ca0b4bc4c306e9358b4f9",
+    "manifestEntries": 118,
+    "buildManifestSha256": "5b48a3b243f4a9b5fe1c7707794c377f71a450c12eeb3833ba910ace39a498dc",
+    "sha256sumsSha256": "3e4536b5547d5a00afae3147a19c201adb2f582612937c1d97b26082ad836cc4",
+    "latestJsonSha256": "8538f17340e9a8b5d5b01baba1bb9dd65f872f99d62cabaa478c60c378269990",
+    "roundtripSha256sumsSha256": "3e4536b5547d5a00afae3147a19c201adb2f582612937c1d97b26082ad836cc4",
+    "roundtripArchiveSha256": "21709dfb30e683366205e26cc12a929716582d86f167a5e2c1610250c591fac6",
+    "roundtripResult": "pass",
+    "roundtripLogSha256": "0da09a34fbf2bef8f2ddfdbd8c49f52f7c3a14cd618e252b4d2101fac7dcd1d1",
+    "roundtripLogBytes": 1140
+  },
+  "onlineNegativeGate": {
+    "command": ".\\website\\scripts\\verify-site-parity.ps1 -ExpectedCommit ea4dc4ccf6054c259a8ca0b4bc4c306e9358b4f9",
+    "result": "expected-block",
+    "failureType": "System.Net.WebException",
+    "failureReason": "The global origin could not establish a trusted TLS channel.",
+    "interpretation": "The current stale public origins are not accepted as a synchronized release. This was a read-only request; no deployment or external change occurred.",
+    "logSha256": "3430cb73dc4f0ac1dd1263f959429e94a127f1015e94d69ab087c457deb7a310",
+    "logBytes": 394
+  },
+  "visualEvidenceInheritance": {
+    "previousReceipt": "website/validation-receipts/website-integrated-final-validation-34b0698.json",
+    "previousReceiptSha256": "a558bfd52f64f32540a1979c8a21410adcb1e29c3a0535305414a52e2d6803f4",
+    "reason": "This subject changes only the parity verifier, its documentation, and its deployment contract test. It does not change frontend source, assets, copy, styles, routes, or browser behavior.",
+    "previousBrowserChecks": 100,
+    "previousBrowserPassed": 100,
+    "previousHistoryCases": 4,
+    "previousHistoryPassed": 4
+  },
+  "remainingGates": [
+    "software-line correction and independent revalidation of the History long-Job-ID cell-content collision",
+    "a real Supabase two-account account/community/RLS E2E with production-changing authority",
+    "merchant/provider configuration and signed real-payment production acceptance",
+    "an approved immutable installer release if software bytes change",
+    "GitHub Pages custom-domain certificate issuance and Enforce HTTPS",
+    "authorized deployment of this exact shared artifact to GitHub Pages and the Alibaba Cloud mirror",
+    "successful post-deployment parity including downloads/latest.json on both origins"
+  ],
+  "conclusion": "The subject closes the local release-metadata parity gap and passes all applicable local checks. Public release remains blocked by the listed external and cross-line gates; no deployment was performed."
+}
