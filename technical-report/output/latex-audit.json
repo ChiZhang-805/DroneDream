@@ -2,7 +2,7 @@
   "schema_version": "dronedream.latex-technical-report-audit.v2",
   "pdf": "technical-report/build/main.pdf",
   "source": "technical-report/body.tex",
-  "pages": 20,
+  "pages": 21,
   "paragraph_geometry": {
     "records": [
       {
@@ -10,15 +10,15 @@
         "page": 1,
         "style": "abstract",
         "policy_category": "explanatory_body",
-        "lines": 17,
-        "last_line_ratio": 0.8372,
+        "lines": 20,
+        "last_line_ratio": 0.9147,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "generalization. Claims bind to frozen commits and hashes; Windows Rust was not run.",
+        "last_line_text": "Windows Rust was not run; its toolchain gate therefore remains explicitly open for publication.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": false,
+        "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "UAV controller tuning is an iterative experiment: every Candidate must remain bound to its scenario, budget, constraints, Runtime, and retained evidence. AURORA—AGENTIC UAV REFINEMENT THROUGH OPTIMIZATION, REFLECTION, AND ASSURANCE—is the evidence-gated Harness inside DroneDream 1.0. Foundation models interpret intent and rank eligible methods, while deterministic contracts authorize execution, evidence admission, holdout isolation, and final selection. The frozen Evidence 2.8 / Prompt 1.7 online routing campaign qualifies 23/24 responses from 24 calls to the gpt-4.1-2025-04-14 snapshot; its single failing case is retained, and archived prompt histories are not treated as causal comparisons. Separate contract evidence exercises cross-Job memory and fail-closed provenance. A pinned PX4/Gazebo campaign records 6/6 passing x500 Trials across two seeds and nominal, steady-wind, and static-obstacle scenarios, with RMSE 0.332254–0.444452 m and track coverage 0.949113–0.981456. Wind read-back and obstacle creation are retained for both affected scenarios. These results establish the exercised contracts, routes, and injections. A separate same-seed advanced-effects subset records three passing trajectories after five requested effects were applied and verified. Two GPS-noise boundary attempts verify six effect injections but end at a 30.0-second PX4 readiness timeout; they are failures, not successful GPS-noise flights. Neither campaign proves optimizer superiority, broad simulator quality, obstacle avoidance, real-aircraft safety, simulation-to-reality transfer, or statistical generalization. Claims bind to frozen commits and hashes; Windows Rust was not run."
+        "text": "UAV controller tuning is an iterative experiment: every Candidate must remain bound to its scenario, budget, constraints, Runtime, and retained evidence. AURORA—AGENTIC UAV REFINEMENT THROUGH OPTIMIZATION, REFLECTION, AND ASSURANCE—is the evidence-gated Harness inside DroneDream 1.0. Foundation models interpret intent and rank eligible methods, while deterministic contracts authorize execution, evidence admission, holdout isolation, and final selection. The frozen Evidence 2.8 / Prompt 1.7 online routing campaign qualifies 23/24 responses from 24 calls to the gpt-4.1-2025-04-14 snapshot; its single failing case is retained, and archived prompt histories are not treated as causal comparisons. Separate contract evidence exercises cross-Job memory and fail-closed provenance. A pinned PX4/Gazebo campaign records 6/6 passing x500 Trials across two seeds and nominal, steady-wind, and static-obstacle scenarios, with RMSE 0.332254–0.444452 m and track coverage 0.949113–0.981456. Wind read-back and obstacle creation are retained for both affected scenarios. These results establish the exercised contracts, routes, and injections. A separate same-seed advanced-effects subset records three passing trajectories after five requested effects were applied and verified. Two GPS-noise boundary attempts verify six effect injections but end at a 30.0-second PX4 readiness timeout; they are failures, not successful GPS-noise flights. A later negative-control Trial completes deterministic GPS denial/recovery and battery-profile injection with all three effects verified, but fails the 25 m/s stability gate at 31.211302 m/s; it is excluded from both pass numerators. Neither campaign proves optimizer superiority, broad simulator quality, obstacle avoidance, real-aircraft safety, simulation-to-reality transfer, or statistical generalization. Claims bind to frozen commits and hashes; Windows Rust was not run; its toolchain gate therefore remains explicitly open for publication."
       },
       {
         "index": 2,
@@ -40,15 +40,15 @@
         "page": 1,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 7,
-        "last_line_ratio": 0.9236,
+        "lines": 8,
+        "last_line_ratio": 0.8418,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "disturbance profile enlarges the earlier matrix or supplies missing independent seeds for broader inference.",
+        "last_line_text": "enlarges the earlier matrix or supplies missing independent seeds for broader inference at release.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": true,
+        "last_line_pass_90": false,
         "line_policy_passed": true,
-        "text": "This report therefore treats each frozen physical campaign as its own evidence unit. The two-seed scenario matrix varies nominal, steady-wind, and static-obstacle conditions; the later advanced-effects campaign instead repeats one seed under a fixed five-effect profile and records separate GPS readiness failures. Their numerators, failures, environments, and permissible claims remain distinct. That separation allows additional Runtime evidence to strengthen implementation coverage without converting heterogeneous Trials into a pooled reliability estimate or an optimizer comparison. Reviewers can therefore reproduce each denominator without inferring that a new disturbance profile enlarges the earlier matrix or supplies missing independent seeds for broader inference."
+        "text": "This report therefore treats each frozen physical campaign as its own evidence unit. The two-seed scenario matrix varies nominal, steady-wind, and static-obstacle conditions; the later advanced-effects campaign instead repeats one seed under a fixed five-effect profile and records separate GPS readiness failures. A still later GPS/battery negative control completes its trajectory and effect checks but fails stability acceptance. All three numerators, failures, environments, and permissible claims remain distinct. That separation allows additional Runtime evidence to strengthen implementation coverage without converting heterogeneous Trials into a pooled reliability estimate or optimizer comparison. Reviewers can reproduce each denominator without inferring that a new disturbance profile enlarges the earlier matrix or supplies missing independent seeds for broader inference at release."
       },
       {
         "index": 4,
@@ -608,6 +608,21 @@
       {
         "index": 41,
         "page": 11,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 8,
+        "last_line_ratio": 0.9588,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "limit, so pass_flag=false despite RMSE 0.345207 m, maximum error 1.498568 m, and coverage 0.983807.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": true,
+        "line_policy_passed": true,
+        "text": "A later exact-commit negative control binds implementation fdf1250 to evidence head 2f1caae. Its runner and acceptance commands both exit zero, the 76-second Trial completes without crash, timeout, residual process, credential use, or evidence-generation failure, and all three requested effects are applied and verified. A deterministic 20% GPS-denial schedule drives SIM_GPS_USED from baseline 10 to 0 for 6 of 29 ticks, realizing 0.2068966 before exact recovery to 10. The bound ULog independently contains 7 NO_GPS/0-satellite and 49 FIX_3D/10-satellite samples. Battery read-back and flight telemetry move from 92% / 16.02 V to 80% / 15.825 V. This is a completed effect-injection Trial, but not a passing one: observed position speed reaches 31.211302 m/s against the 25 m/s policy limit, so pass_flag=false despite RMSE 0.345207 m, maximum error 1.498568 m, and coverage 0.983807."
+      },
+      {
+        "index": 42,
+        "page": 11,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -621,7 +636,7 @@
         "text": "Execution boundary — the dedicated Runtime records 6/6 successful, passing Trials for exactly two seeds and three x500 scenarios; this verifies the retained matrix, not a wider reliability distribution, optimizer advantage, released customer-performance claim, or cross-scenario reliability estimate across independently repeated installations and audits."
       },
       {
-        "index": 42,
+        "index": 43,
         "page": 11,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -636,7 +651,7 @@
         "text": "Advanced-effects boundary — the three passing same-seed trajectories authorize only the five exercised effect applications and their retained metrics; they do not enlarge the two-seed scenario matrix, establish an optimizer comparison, or support a broad stability, safety, customer-Runtime, real-aircraft, or sim-to-real claim."
       },
       {
-        "index": 43,
+        "index": 44,
         "page": 11,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -651,8 +666,23 @@
         "text": "GPS boundary — the two failed readiness attempts preserve their timeout denominator and prove only six-effect injection/read-back. They are excluded from the three successful trajectories and from every performance statistic because neither produced a successful GPS-noise flight, admissible trajectory outcome, or frozen pass flag."
       },
       {
-        "index": 44,
-        "page": 11,
+        "index": 45,
+        "page": 12,
+        "style": "bullet",
+        "policy_category": "exception_list",
+        "lines": 4,
+        "last_line_ratio": 0.3893,
+        "last_line_ratio_denominator": "usable_list_width",
+        "last_line_text": "endurance, safety, or broad-stability claims.",
+        "last_line_pass_50": false,
+        "last_line_pass_80": false,
+        "last_line_pass_90": false,
+        "line_policy_passed": false,
+        "text": "GPS/battery negative-control boundary — the later Trial proves deterministic denial/recovery, battery initial-state and voltage-sag injection/read-back, and completed trajectory execution. Its failed stability gate remains the outcome: it cannot enter the earlier 3/3 or 6/6 pass numerator, qualify the capability as a whole, or support endurance, safety, or broad-stability claims."
+      },
+      {
+        "index": 46,
+        "page": 12,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -666,8 +696,8 @@
         "text": "Injection boundary — both wind runs retain ENU (0, 2, 0) m/s read-back, and both obstacle runs retain successful create replies plus the same SDF hash; obstacle placement outside the circle track tests injection only and supplies no collision-avoidance result or collision-response evidence under alternative obstacle placements or trajectories or winds."
       },
       {
-        "index": 45,
-        "page": 11,
+        "index": 47,
+        "page": 12,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 3,
@@ -681,7 +711,7 @@
         "text": "Failure boundary — four chronological probes retain invalid input enum, dubious PX4 ownership, unsupported sensor noise, and NumPy scalar parsing. Attempt 4 is a post-fix ULog diagnostic only; it is excluded from the six-Trial numerator and cannot erase retained failures in any later customer-acceptance artifact or audit."
       },
       {
-        "index": 46,
+        "index": 48,
         "page": 12,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -696,7 +726,7 @@
         "text": "Qualification boundary — customer admission must repeat the campaign in the signed Runtime and pin vehicle/world assets, controller schema, scenarios, seeds, budgets, baseline arms, and failure taxonomy in one versioned receipt. Acceptance also requires independent outcome recomputation on a separately provisioned installation."
       },
       {
-        "index": 47,
+        "index": 49,
         "page": 12,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -711,7 +741,7 @@
         "text": "Denominator rule — retain every timeout and failed Trial; a missing receipt stays unavailable rather than being interpreted as a safe or successful run, and aggregate rates must preserve that disposition across every arm, scenario, seed block, and independently recomputed publication table without dropping unavailable runs from the denominator or seed."
       },
       {
-        "index": 48,
+        "index": 50,
         "page": 12,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -726,7 +756,7 @@
         "text": "The main benchmark will compare methods under the same pinned Runtime, controller catalog, starting design, train/holdout split, trial budget, failure thresholds, and blocked randomization schedule. Final-test manifests must be frozen before any arm observes their outcomes. The benchmark ledger must bind the Runtime image, simulator and controller commits, scenario files, parameter domains, seed blocks, initial design, stopping rule, failure-code mapping, and metric implementation. Each arm receives equal access to training outcomes and identical terminal accounting, while the final-test partition remains write-protected. Reported aggregates must be independently recomputed from persisted Trials with uncertainty, effect size, and failures retained in the denominator. The same ledger must retain every excluded run and the exact reason its result remained ineligible during external recomputation and final publication stage, before any public comparison or customer-acceptance claim."
       },
       {
-        "index": 49,
+        "index": 51,
         "page": 12,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -741,7 +771,7 @@
         "text": "The controlled comparison should progress from a default policy through fixed CMA-ES, a preregistered specialist, the deterministic portfolio, a memory-disabled AURORA arm, and the complete AURORA system."
       },
       {
-        "index": 50,
+        "index": 52,
         "page": 12,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -756,7 +786,7 @@
         "text": "Every arm must share the same scenario set, initialization, trial budget, and terminal accounting. Specialist selection must be frozen before final-test outcomes are visible, portfolio comparisons require a matched exploration budget, and the memory ablation must retain identical routing inputs. This sequence isolates increasingly specific system contributions without treating a method-name difference as causal evidence or attributing it to AURORA without a preregistered intervention, matched denominator, and independently recomputed evidence set."
       },
       {
-        "index": 51,
+        "index": 53,
         "page": 12,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -771,7 +801,7 @@
         "text": "Primary outcomes bind frozen holdout loss, feasible-campaign rate, baseline improvement, time-to-target, and terminal failure rate to every reported arm and seed block, with paired uncertainty and effect size computed from the retained scenario-level comparison units. These units govern preregistered acceptance and arm-to-arm inference at release."
       },
       {
-        "index": 52,
+        "index": 54,
         "page": 12,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -786,7 +816,7 @@
         "text": "Secondary outcomes: wall time, model tokens and cost, router latency, recovery success, scenario-wise regret, and artifact completeness for every frozen comparison arm and seed block, reported alongside termination cause and evidence eligibility so efficiency cannot hide a higher failure burden or incomplete audit surface at publication time or review."
       },
       {
-        "index": 53,
+        "index": 55,
         "page": 12,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -801,7 +831,7 @@
         "text": "Use at least five independent seeds for engineering diagnostics and preferably ten for report-level comparisons across every reported arm; freeze seed blocks before final execution and publish paired scenario-level uncertainty before making any superiority or repeatability claim across the preregistered final-test matrix and all baseline arms in scope."
       },
       {
-        "index": 54,
+        "index": 56,
         "page": 12,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -816,7 +846,7 @@
         "text": "Keep timeouts, crashes, infeasible terminations, and failed Trials in the denominator under their predeclared terminal categories; never impute a successful loss, discard a difficult seed, or replace a missing receipt with an optimistic outcome, and never reclassify an unavailable execution after completed-arm results or rankings become visible during audit."
       },
       {
-        "index": 55,
+        "index": 57,
         "page": 12,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -831,8 +861,8 @@
         "text": "Report paired uncertainty, effect sizes, sample counts, and failure dispositions for each arm and scenario family; never publish superiority from one seed, one track, a post-hoc metric, or an unregistered subset of completed runs. The registered denominator and subset must remain visible in every release table and appendix ledger."
       },
       {
-        "index": 56,
-        "page": 12,
+        "index": 58,
+        "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
@@ -846,8 +876,8 @@
         "text": "The registered comparison matrix is therefore the authoritative denominator. A release must enumerate planned and realized cells before opening final outcomes, preserve unavailable cells with their terminal reason, and regenerate every aggregate from that matrix. A summary that cannot be traced back to the frozen arm, seed, scenario, and failure registry remains exploratory and cannot enter customer qualification or any released comparative study. Its receipt must name the registry digest and the exact planned and realized cell inventory for audit."
       },
       {
-        "index": 57,
-        "page": 12,
+        "index": 59,
+        "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
@@ -861,7 +891,7 @@
         "text": "Independent recomputation must begin from that inventory rather than from a summary table. The reviewer should recover every planned cell, resolve its terminal disposition, recompute each admissible metric, and verify that exclusions follow the frozen policy before aggregating an arm. A receipt that lists only successful rows cannot support a comparative claim because it cannot distinguish an intended omission from missing evidence, a timeout, or a post-outcome deletion. The same rule applies to appendix tables and customer-facing exports."
       },
       {
-        "index": 58,
+        "index": 60,
         "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -876,7 +906,7 @@
         "text": "The desktop readiness gate is part of the product’s technical contract. The progress bar may report completion only after every check that DroneDream can perform at launch has reached a terminal pass state. The entry action must not become visible while a required check is pending or failed. After entry, runtime failures still need explicit diagnostics because network loss, disk damage, permission changes, and external service changes cannot be permanently prevented. The gate therefore certifies a timestamped launch snapshot rather than promising an error-free future session, and post-entry faults must remain recoverable, attributable, and visible without silently invalidating prior work for every affected run. Its receipt should preserve probe timestamps, dependency versions, the service endpoint, account disposition, and the first failing stage. Recovery verification should replay install, upgrade, repair, offline, and damaged-cache paths without allowing stale success to satisfy a fresh launch or conceal the newly failing dependency under the same receipted probe sequence. The receipt must also retain the exact recovery action and the first post-recovery probe so a green launcher state remains attributable to one tested environment rather than becoming a generic assertion of platform health after repair or upgrade."
       },
       {
-        "index": 59,
+        "index": 61,
         "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -891,7 +921,7 @@
         "text": "READINESS IS A CONJUNCTION, NOT A PROGRESS ANIMATION. The launcher requires a fresh supported-system probe, one owned and compatible Runtime, a healthy local service, no mandatory update, and an account accepted by the local API. Missing, stale, mismatched, unreachable, or still-checking states remain blocking. Only the current gate may mark readiness complete, change the environment badge to CHECKED, and reveal the entry action. Quantitative release evidence still needs time-to-ready p50/p95, false-ready rate, and a clean Windows/upgrade matrix across fresh install, upgrade, repair, and duplicate-download paths before any release is accepted for public distribution on a supported Windows architecture or the entry action is exposed across the declared release matrix."
       },
       {
-        "index": 60,
+        "index": 62,
         "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -906,7 +936,7 @@
         "text": "EXIT AND ACCOUNT OPERATIONS USE THE SAME RECOVERABILITY PRINCIPLE. Closing warns about an active simulation or unsaved draft, stops work that cannot survive process termination, and preserves a recoverable draft whenever possible without trapping the user in the application. Managed-model usage consumes the included quota through a server-side ledger before BYOK is required; provider receipts must later be reconciled against that ledger. Remaining evidence therefore concerns draft-recovery and exit success rates plus quota-receipt consistency, not a new product capability claim, across every managed-provider transaction, recovery path, and audit replay retained by the service ledger, with a reconciliation receipt preserved for later independent audit of account state and quota events."
       },
       {
-        "index": 61,
+        "index": 63,
         "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -921,7 +951,7 @@
         "text": "AURORA’s present evidence establishes enforceable software boundaries, reproducible mock-campaign behavior, one dedicated 6-Trial PX4/Gazebo scenario matrix, and a separate same-seed advanced-effects campaign. It does not establish broad optimization superiority or accepted customer-Runtime physical-simulator performance. The distinctions below are active claim constraints, not generic future-work disclaimers: each identifies a missing evidence unit, uncontrolled confounder, or unaccepted environment. Keeping them explicit prevents development routing accuracy, deterministic guard probes, synthetic proxy gains, and the two-seed physical matrix from being pooled into a stronger conclusion than their separate protocols support. The next experiments therefore prioritize frozen matched budgets, independent recomputation, signed Runtime acceptance, and scenario-level uncertainty over time under independently rebuilt deployments with retained failure histories and audit replay before any result advances toward customer acceptance or publication without a separately bound deployment receipt."
       },
       {
-        "index": 62,
+        "index": 64,
         "page": 13,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -936,7 +966,7 @@
         "text": "No result in this report establishes real-aircraft safety, certification, or direct simulation-to-reality transfer; those claims require separately governed hardware evidence, operational risk controls, and accepted flight testing outside the present software-contract scope and do not inherit assurance from the mock, WSL, or policy-only artifacts reported here."
       },
       {
-        "index": 63,
+        "index": 65,
         "page": 13,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -951,8 +981,8 @@
         "text": "The current Evidence 2.8 / Prompt 1.7 online freeze qualifies at 23/24 for one model snapshot and 24 calls; it establishes neither broad model generalization nor optimizer, simulator, flight-performance, or safety gain."
       },
       {
-        "index": 64,
-        "page": 13,
+        "index": 66,
+        "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -966,8 +996,8 @@
         "text": "Evidence 2.9 exercises equal-budget scripted multi-tool planning and accounting over three seed blocks, six arm runs, and 12/12 accounted calls on a mock backend with zero provider or network calls. It cannot establish real LLM planning quality, optimizer superiority, physical fidelity, real flight, or causal Harness benefit under any release."
       },
       {
-        "index": 65,
-        "page": 13,
+        "index": 67,
+        "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 2,
@@ -981,8 +1011,8 @@
         "text": "Archived Prompt 1.5 and Prompt 1.6 freezes record 19/24, 21/24, and 24/24. The unpaired histories establish neither causal prompt lift nor deterministic provider behavior under the reported seed and controls after release."
       },
       {
-        "index": 66,
-        "page": 13,
+        "index": 68,
+        "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 2,
@@ -996,7 +1026,7 @@
         "text": "The 10/10 cross-Job memory fixtures exercise retrieval, isolation, and lifecycle gates without measuring online provider effect, optimization gain, physical fidelity, real-aircraft performance, safety, or certification in review."
       },
       {
-        "index": 67,
+        "index": 69,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1011,7 +1041,7 @@
         "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels, preregistered scoring, independent custody, and a frozen separation between development examples and final evaluation cases under external final-test custody and audit."
       },
       {
-        "index": 68,
+        "index": 70,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1026,7 +1056,7 @@
         "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift; each weakened comparator changes a software protection under constructed probes and therefore cannot estimate controller performance, simulator fidelity, or benefit under real execution noise across matched scenario and seed blocks with uncertainty."
       },
       {
-        "index": 69,
+        "index": 71,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1041,7 +1071,7 @@
         "text": "The frozen four-arm mock ablation changes protocol behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive; the scripted policy does not authorize a causal performance claim outside a physical, matched-budget, multi-seed intervention with independent outcome recomputation and retained failures."
       },
       {
-        "index": 70,
+        "index": 72,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1056,7 +1086,7 @@
         "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution; all arms converge on the same deterministic portfolio, so the retained comparison isolates dispatch recovery rather than optimization quality or causal lift."
       },
       {
-        "index": 71,
+        "index": 73,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1071,7 +1101,7 @@
         "text": "The ten-scenario campaign is synthetic mock evidence used to exercise orchestration and evidence flow; it is not physical scenario coverage, vehicle-dynamics validation, disturbance fidelity, or a substitute for signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics, disturbance realism, or control quality in the signed Runtime."
       },
       {
-        "index": 72,
+        "index": 74,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1086,7 +1116,7 @@
         "text": "The dedicated Runtime matrix has only two seeds per nominal, wind, and static-obstacle scenario. The obstacle is outside the nominal track, so creation proves injection rather than avoidance; signed customer Runtime repetition and wider seed blocks remain necessary before reliability, customer acceptance, or statistical generalization across installations."
       },
       {
-        "index": 73,
+        "index": 75,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1101,22 +1131,22 @@
         "text": "The advanced-effects success subset contains three repeats of seed 42001, not independent seed blocks. Two GPS-noise attempts end at the 30.0-second readiness boundary, one file-backed attempt fails on PX4 ownership, and three earlier preflights lack machine artifacts. These records cannot be pooled with the six-Trial scenario matrix or recast as a larger success rate, and the bundle claims no Gazebo version."
       },
       {
-        "index": 74,
+        "index": 76,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
-        "lines": 3,
-        "last_line_ratio": 0.9962,
+        "lines": 4,
+        "last_line_ratio": 0.6998,
         "last_line_ratio_denominator": "usable_list_width",
-        "last_line_text": "hard-failure recovery, or combined-fault claims under the present physical-simulation evidence or qualification.",
+        "last_line_text": "actuator failure beyond the bounded first-order delay profile remain unproved.",
         "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "last_line_pass_90": true,
-        "line_policy_passed": true,
-        "text": "Probabilistic GPS dropout, battery initial state and voltage sag, and hard actuator failure beyond the bounded first-order delay profile remain Runtime extensions. Their absence prevents dropout endurance, depleted-battery, hard-failure recovery, or combined-fault claims under the present physical-simulation evidence or qualification."
+        "last_line_pass_80": false,
+        "last_line_pass_90": false,
+        "line_policy_passed": false,
+        "text": "Deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection are now verified in one completed Trial, but its 31.211302 m/s speed violates the 25 m/s stability gate. Probability-law behavior across seeds, probabilistic GPS dropout endurance, depleted-battery stability, combined-fault qualification, and hard actuator failure beyond the bounded first-order delay profile remain unproved."
       },
       {
-        "index": 75,
+        "index": 77,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1131,7 +1161,7 @@
         "text": "Optimizer comparison, physical component ablation, confidence intervals, cost/latency measurement, and UX telemetry remain pending. Each requires matched budgets, retained failures, frozen manifests, and independently recomputed outputs under its declared evidence class for external release review and recomputation at scale."
       },
       {
-        "index": 76,
+        "index": 78,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1146,7 +1176,7 @@
         "text": "External baselines such as expert manual tuning or PX4 AutoTune must be included only when controller, vehicle, track, budget, metrics, and failure accounting are genuinely aligned; unmatched access to resets, prior knowledge, simulator time, or terminal exclusions must be reported as a protocol difference rather than hidden inside a pooled ranking."
       },
       {
-        "index": 77,
+        "index": 79,
         "page": 14,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1161,7 +1191,7 @@
         "text": "The report’s evidence units answer different questions and cannot be pooled into one score. Routing cases measure tool eligibility, source probes exercise named guards, fallback arms measure recovery equivalence, and synthetic scenarios measure a deterministic proxy. Substituting one unit for another remains a construct-validity error even when every recorded value is correct and the units remain explicitly separate in every release."
       },
       {
-        "index": 78,
+        "index": 80,
         "page": 14,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1176,8 +1206,8 @@
         "text": "The same implementation sometimes generates, executes, and verifies an artifact. A comparative campaign therefore still requires independent recomputation, immutable manifests, negative controls, and failure injection before any optimization-quality difference is described as causal. The physical receipt remains first-party frozen evidence rather than third-party validation, audit, or certification under the present campaign or any later deployment decision."
       },
       {
-        "index": 79,
-        "page": 14,
+        "index": 81,
+        "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
@@ -1191,12 +1221,12 @@
         "text": "Statistical validity requires the scenario, not an optimizer Trial, to remain the primary comparison unit. Trials in one trajectory share initialization, history, stopping conditions, and candidate ancestry, so treating them as independent understates uncertainty. A publication result must freeze seed blocks, report paired scenario-wise differences, retain terminal failures in the denominator, and present effect sizes with intervals rather than one aggregate percentage. Hyperparameters, method choice, and stopping rules must be fixed before the final partition opens; exploratory findings remain useful but cannot replace the frozen confirmatory comparison across every arm or its reported causal estimate for any registered arm, scenario family, customer deployment, or release decision under review."
       },
       {
-        "index": 80,
+        "index": 82,
         "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 10,
-        "last_line_ratio": 0.8117,
+        "last_line_ratio": 0.8118,
         "last_line_ratio_denominator": "widest_rendered_line",
         "last_line_text": "must preserve that registry digest and the complete unavailable-cell disposition map for audit.",
         "last_line_pass_50": true,
@@ -1206,7 +1236,7 @@
         "text": "Operational reproducibility requires more than code and a controller vector. A repeatable run must bind the owned Runtime image, PX4/Gazebo commits, vehicle and world assets, controller schema, scenario manifest, optimizer settings, seeds, environment, and evidence verifier. It must retain cancellations, timeouts, rejected callbacks, and post-launch changes rather than successful Trials alone. The ledger already supplies the source commit, test totals, digests, and reproduction command; the remaining gap is a signed customer-Runtime campaign executable on another machine without repository-specific state, hidden assumptions, operator interpretation, or independent auditability during replay across machines, maintainers, and independently provisioned environments. The rerun must reproduce the same planned and realized registry, unavailable cells, and terminal dispositions before any metric is compared across installations, external benchmarks, or customer qualification reviews. The replay receipt must preserve that registry digest and the complete unavailable-cell disposition map for audit."
       },
       {
-        "index": 81,
+        "index": 83,
         "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1221,7 +1251,7 @@
         "text": "External validity is bounded by controller, vehicle, world, and disturbance combinations actually executed. Many Trials in one x500 setup do not cover fixed-wing vehicles, broader payload geometries, actuator saturation or hard failure, estimator dropout, battery voltage sag, or other controller structures. A broader benchmark therefore needs a declared scenario matrix with held-out combinations, not a convenient collection of worlds. Every cell must explain its distinct operating condition, mutable parameters, and invariant feasibility constraints. Results must be aggregated within and across vehicle families so a strong mean cannot conceal a systematic failure in one operationally important subgroup or declared scenario family under final evaluation before a broader cross-platform claim is admitted or published across all preregistered vehicle, disturbance, energy, and fault families in external review."
       },
       {
-        "index": 82,
+        "index": 84,
         "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1236,7 +1266,7 @@
         "text": "Measurement validity requires more than scalar holdout loss: retain trajectory error, settling time, overshoot, control effort, saturation, constraint violations, termination cause, wall-clock cost, energy use, and units."
       },
       {
-        "index": 83,
+        "index": 85,
         "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1251,7 +1281,7 @@
         "text": "Each metric needs frozen units, sampling rules, preprocessing, and direction. Feasibility remains a gate because a lower aggregate can hide oscillation or excessive actuator demand within one feasible trajectory."
       },
       {
-        "index": 84,
+        "index": 86,
         "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1266,7 +1296,7 @@
         "text": "Primary metrics and admissibility rules must be registered before optimization, while diagnostics remain visible for failure analysis; post-hoc metric choice cannot redefine a failed campaign as successful after execution once final outcomes become visible or a customer-facing ranking has already been produced or released."
       },
       {
-        "index": 85,
+        "index": 87,
         "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1281,7 +1311,7 @@
         "text": "The next comparative campaign prioritizes matched-budget PX4/Gazebo optimizer arms, physical component-level AURORA ablations, failure injection, and the readiness/exit matrix. It freezes the Runtime, controller catalog, scenario manifests, larger seed blocks, budgets, eligibility policy, and terminal taxonomy before any final arm runs. Matched baselines include fixed CMA-ES, a preselected specialist, the deterministic portfolio, and isolated AURORA variants. Signed JSON and CSV artifacts must retain failures and preserve the physical and statistical boundaries already exposed by the six-Trial matrix. The ledger must also show which planned comparisons never executed and why in the retained receipt. A causal provider-prompt study must pair Prompt 1.5, Prompt 1.6, and Prompt 1.7 calls on identical cases, model snapshot, call order, budget, and scoring rule; retain every raw response; and report paired category changes with uncertainty instead of selecting the best freeze. That design separates both current and archived routing qualifications from any future causal prompt-lift claim. The causal estimator must use paired case-level contrasts and retain category-specific disagreements, refusals, and parse failures in the denominator. The released audit artifact must preserve every paired case, call order, and response disposition for independent recomputation across every arm without selective exclusion and every published table. For external recomputation, the registry must enumerate the planned and realized seed block for every arm and preserve unavailable cells. A verifier should reproduce each table from that registry without querying application state or choosing a favorable subset after observing outcomes during publication preparation, customer review, or independent audit."
       },
       {
-        "index": 86,
+        "index": 88,
         "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1296,8 +1326,8 @@
         "text": "Figures 3, 5, and 6 trace to evidence bundle v9, canonical SHA-256 prefix d33c308ce3b47138; Figure 1 is a schematic. Figures 2 and 4 also consume the current online-routing artifact at software head ef00362, file SHA-256 prefix d2359e0540aa. Its manifest file and canonical prefixes are 6b625b8c0a6a and 3ab3830ecf79; implementation source is aeffaae01a81. The exact 24 provider calls completed in 77.8 seconds and were independently regraded without rerunning the campaign, contacting the provider again, or mutating evidence."
       },
       {
-        "index": 87,
-        "page": 15,
+        "index": 89,
+        "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
@@ -1311,7 +1341,7 @@
         "text": "Evidence 2.9 is separately bound to source 136a1e3 and evidence head 15603c6. Its artifact file and internal SHA-256 prefixes are b20060eb76bf and e5c27308a9be; manifest file and internal prefixes are db78d1c8c999 and 3c49e2b96b3f. The CSV file prefix is 3911632e6dfe, and the retained generation/failure receipt prefix is 611783c9388b. These bytes authorize only the offline equal-budget, scripted/mock plan-history and accounting contract under the frozen mock Runtime; they authorize no online planning-quality or optimizer-outcome claim."
       },
       {
-        "index": 88,
+        "index": 90,
         "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1326,7 +1356,7 @@
         "text": "The v9 bundle separately binds c1222c9 to receipt head 8102ffe. Its exact-source logs record 1,204/1,204 tests in 854.71 seconds plus 28/28 focused checks in 6.98 seconds; receipt wall intervals are 864.488 and 8.451 seconds. Ruff and mypy remain unreceipted, and Windows Rust was not run. Cross-Job artifact and manifest canonical prefixes are e1abf46c2aa44e9b and b8d55e358d5642cb; the ten-case evaluation is deterministic in-memory SQLite evidence rather than an online provider or simulator study, physical-performance result, or deployment qualification."
       },
       {
-        "index": 89,
+        "index": 91,
         "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1341,7 +1371,7 @@
         "text": "The physical campaign independently binds 86273db to 3b09951. Manifest file and canonical prefixes are 4ac760428ead1506 and 9440bb24f25dbf07; receipt file and internal prefixes are 8f7e1c953338ae87 and 4746dd220583d64b. Its 159-file tree and 598-source-file / 154-retained-file inventories reverify without mismatch. Embedded identifier 5f0f62c789680e5e and handoff identifier c373dc9e4964301a do not resolve as Git commits; the reachable chain is c373dc992d43ff92 to 5f0f62c707c541ae to 3b09951bbea2e5f1. The report therefore verifies frozen bytes and reachable source while retaining the source-binding defect as an explicit provenance limitation for external reviewers, customer acceptance, and downstream release claims during independent replay."
       },
       {
-        "index": 90,
+        "index": 92,
         "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1356,7 +1386,22 @@
         "text": "The advanced-physics campaign is independently bound to subject 26b957e, exporter 06cfdeb, and evidence head d14bf9c. Its 114 committed files total 9,442,999 bytes. Manifest prefixes are file 599c2b8b89bedb52 and canonical 0cae86ded8d92c6c. Receipt prefixes are file 99e257fb56d46d92 and canonical 0e83d002587590f3. The manifest inventories 1,205 source files and 305,040,238 bytes, retains 111 files and 8,994,710 bytes, and binds the full inventory with prefix 125463206a7965b3. Its three successful trajectories, two GPS readiness boundaries, one file-backed preflight failure, and three non-machine-verified terminal preflights remain separate evidence classes and denominators. This separation prevents a failed readiness probe from becoming flight evidence."
       },
       {
-        "index": 91,
+        "index": 93,
+        "page": 16,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 6,
+        "last_line_ratio": 0.976,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "mechanism replaced the unavailable SimulatorMavlink failure-handler path in the exact frozen Runtime lineage.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": true,
+        "line_policy_passed": true,
+        "text": "The later GPS/battery negative control binds evidence head 2f1caae; its implementation commit is fdf1250. The receipt prefix is 2d6470fb085e638c; failure lineage is 882acd480bfca395; ULog is dc3b156e6ae61442; the applied scenario is 7973680f267b2643; and the 159-test JUnit is 67d614764b213408. The receipt distinguishes successful Trial completion and three verified effects from failed stability acceptance. Its attempt-16 lineage also retains two MAVLink command-420 arrivals with zero acknowledgments before the supported SIM_GPS_USED mechanism replaced the unavailable SimulatorMavlink failure-handler path in the exact frozen Runtime lineage."
+      },
+      {
+        "index": 94,
         "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1371,8 +1416,23 @@
         "text": "Execution Claim Gate 1.1 and Outcome Contract 2.20 bind each Trial/Candidate/Job snapshot and scenario matrix before evidence admission. Evidence 2.8 / Prompt 1.7 / Decision Trace 1.4 binds the cross-Job memory contract and its OBSERVATIONAL_NOT_CAUSAL projection. The current online freeze qualifies at 23/24 for its exact model snapshot and controls, while the archived Prompt 1.6 freeze records 24/24 and Prompt 1.5 histories remain visible at 19/24 and 21/24. These unpaired observations are not causal prompt evidence. Policy holdout passes 16/16, and the fallback campaign matches the direct arm in 10/10 comparisons across 15 Jobs and 579 Trials. The non-comparative physical matrix records 6/6 passing Trials across two seeds and three scenarios and retains four failure probes. The advanced-physics subset separately records three same-seed passing trajectories under five verified effects; its two GPS-noise attempts terminate at readiness and are not performance runs. Latest website source 8710553 to receipt-only head 96aba5d records 13/13 focused checks, 325/325 frontend tests, typecheck, lint, application and shared builds, 11/11 deployment tests with 22/22 subtests, and 5/5 performance routes. Its desktop English and Chinese download copy each occupies two lines with final-line fills 0.895 and 0.835; the mobile layout-only audit reports zero violations. The receipt binds release-truth ancestor fd7e770 to 87e049c, which separately records 100/100 browser checks and 118 checksum entries across 119 files. No deployment occurred; TLS, dual-target publication, production Supabase/payment, and two differing unsigned public installers remain external gates. Git-object replay rejects missing bytes, and the two-commit pattern authenticates only bytes present at the source freeze; a receipt never widens the associated claim boundary across later audits, releases, publications, customer communications, acceptance decisions, or independently repeated qualification reviews under the frozen source ledger, and never authorizes an absent claim, substituted artifact, later source, or unrecorded execution in any downstream release [."
       },
       {
-        "index": 92,
+        "index": 95,
         "page": 16,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 5,
+        "last_line_ratio": 0.8074,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "receipts, or customer reviews across independently reviewed release and qualification cycles.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": false,
+        "line_policy_passed": false,
+        "text": "For this negative control, evidence admission is intentionally asymmetric: zero exit codes and a true Trial-success flag establish that the orchestrated run completed and yielded reviewable artifacts, whereas the policy outcome independently remains failed. Keeping both state vectors prevents operational completion, verified effect application, or retained metrics from being silently substituted for a passing stability decision in later reports, dashboards, release receipts, or customer reviews across independently reviewed release and qualification cycles."
+      },
+      {
+        "index": 96,
+        "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
@@ -1386,8 +1446,8 @@
         "text": "DroneDream 1.0 positions AURORA as an evidence-gated Harness for UAV controller optimization in simulation: model reasoning interprets intent and coordinates eligible methods, while deterministic contracts retain authority over inputs, execution, evidence admission, and completion. The frozen release demonstrates exercised software boundaries through routing, holdout-policy, guard-ablation, fallback-equivalence, claim-receipt, case-separated feedback, and a 10/10 cross-Job memory contract evaluation. That memory result is observational and non-causal; it establishes only the enumerated software fixtures. The current 23/24 online routing qualification is likewise bounded to 24 calls, one frozen model snapshot, and the exact development corpus retained for review."
       },
       {
-        "index": 93,
-        "page": 16,
+        "index": 97,
+        "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 3,
@@ -1401,8 +1461,8 @@
         "text": "Evidence 2.9 separately demonstrates equal configured budgets and complete plan-history accounting for three scripted/mock seed blocks. Its zero-provider, zero-network closure is not evidence of online LLM planning quality, optimizer benefit, simulator fidelity, or flight performance or customer acceptance at release."
       },
       {
-        "index": 94,
-        "page": 16,
+        "index": 98,
+        "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 2,
@@ -1416,8 +1476,8 @@
         "text": "A dedicated Runtime also records a fixed two-seed, three-scenario PX4/Gazebo matrix with 6/6 passing Trials and verified wind and obstacle injection under its fixed campaign, environment, and retained receipts."
       },
       {
-        "index": 95,
-        "page": 16,
+        "index": 99,
+        "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
@@ -1431,7 +1491,22 @@
         "text": "The separately frozen advanced-physics evidence adds three passing same-seed trajectories with verified payload, actuator-delay, barometer, IMU, and gust effects. Its two GPS-noise injections terminate at the 30.0-second readiness boundary and remain failed non-performance attempts. One file-backed ownership failure and three non-machine-verified preflights remain visible rather than being removed from the history. This retained history constrains every later success-rate calculation across every subsequent release, acceptance record, and audit cycle."
       },
       {
-        "index": 96,
+        "index": 100,
+        "page": 17,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 4,
+        "last_line_ratio": 0.9354,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "success rate under any release or customer-qualification denominator or evidence class in a signed Runtime.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": true,
+        "line_policy_passed": false,
+        "text": "A later negative control separately completes deterministic GPS denial/recovery and battery-profile injection, yet fails stability because position speed reaches 31.211302 m/s above a 25 m/s limit. It verifies the exercised mechanisms and read-backs, not an additional passing flight, capability-wide qualification, or a larger campaign success rate under any release or customer-qualification denominator or evidence class in a signed Runtime."
+      },
+      {
+        "index": 101,
         "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1446,7 +1521,7 @@
         "text": "Neither evidence class establishes optimizer superiority, broad stability, collision avoidance, signed customer-Runtime acceptance, real-aircraft safety, or simulation-to-reality transfer. The next decisive step is therefore a larger matched-arm campaign plus signed-Runtime repetition and independent recomputation, without weakening AURORA’s provenance and leakage boundaries during later evidence campaigns or releases."
       },
       {
-        "index": 97,
+        "index": 102,
         "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -1461,63 +1536,66 @@
         "text": "The current release therefore changes what future experiments can safely assert before it changes the empirical flight result itself. Claim v3, Outcome Contract 2.20, input/outcome/scenario drift rejection, and cross-Job fair scheduling make concurrent attempt counts, parameter provenance, and scenario eligibility independently auditable. The retained four-probe failure history shows why post-fix diagnostics must remain separate from successful Trials. A decisive external campaign must still freeze PX4/Gazebo versions, manifests, larger seed blocks, budgets, metrics, and baseline arms before execution; retain every timeout and failed Trial; and recompute signed outcomes outside the application process. This separation keeps AURORA’s demonstrated software assurances and narrow execution evidence distinct from optimization-quality claims that only a matched comparative study can establish with preregistered uncertainty across every retained arm, failure, and scenario family in the final registry."
       }
     ],
-    "audited": 97,
+    "audited": 102,
     "unlocated": [],
     "cross_page_splits": [],
     "last_line_below_50": [
       20,
       21,
       22,
-      41,
-      44,
+      42,
+      45,
       46,
-      47,
-      51,
-      52,
+      48,
+      49,
       53,
       54,
-      62,
+      55,
+      56,
       64,
-      67,
-      68,
-      69,
-      70,
-      71,
-      72,
-      76
-    ],
-    "last_line_below_80": [
-      20,
-      21,
-      22,
-      41,
-      44,
-      46,
-      47,
-      51,
-      52,
-      53,
-      54,
-      62,
-      64,
-      67,
-      68,
+      66,
       69,
       70,
       71,
       72,
       73,
-      76
+      74,
+      78
+    ],
+    "last_line_below_80": [
+      20,
+      21,
+      22,
+      42,
+      45,
+      46,
+      48,
+      49,
+      53,
+      54,
+      55,
+      56,
+      64,
+      66,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      78
     ],
     "explanatory_body": {
-      "total": 61,
-      "passed_80": 61,
+      "total": 65,
+      "passed_80": 65,
       "failed_80": 0,
       "failures": []
     },
     "short_list_items": {
-      "total": 15,
-      "passed_90": 15,
+      "total": 14,
+      "passed_90": 14,
       "failed_90": 0,
       "failures": [],
       "above_3_lines": [
@@ -1540,103 +1618,109 @@
           "text": "Infrastructure faults, cancellation, malformed evidence, and conflicting terminal states are quarantined and cannot update search or routing memory under any later decision path or replay; each rejected row retains a stable quarantine reason and remains visible to operational diagnostics and independent evidence accounting without later relabeling."
         },
         {
-          "index": 41,
+          "index": 42,
           "page": 11,
           "lines": 4,
           "text": "Execution boundary — the dedicated Runtime records 6/6 successful, passing Trials for exactly two seeds and three x500 scenarios; this verifies the retained matrix, not a wider reliability distribution, optimizer advantage, released customer-performance claim, or cross-scenario reliability estimate across independently repeated installations and audits."
         },
         {
-          "index": 44,
-          "page": 11,
+          "index": 45,
+          "page": 12,
           "lines": 4,
-          "text": "Injection boundary — both wind runs retain ENU (0, 2, 0) m/s read-back, and both obstacle runs retain successful create replies plus the same SDF hash; obstacle placement outside the circle track tests injection only and supplies no collision-avoidance result or collision-response evidence under alternative obstacle placements or trajectories or winds."
+          "text": "GPS/battery negative-control boundary — the later Trial proves deterministic denial/recovery, battery initial-state and voltage-sag injection/read-back, and completed trajectory execution. Its failed stability gate remains the outcome: it cannot enter the earlier 3/3 or 6/6 pass numerator, qualify the capability as a whole, or support endurance, safety, or broad-stability claims."
         },
         {
           "index": 46,
           "page": 12,
           "lines": 4,
+          "text": "Injection boundary — both wind runs retain ENU (0, 2, 0) m/s read-back, and both obstacle runs retain successful create replies plus the same SDF hash; obstacle placement outside the circle track tests injection only and supplies no collision-avoidance result or collision-response evidence under alternative obstacle placements or trajectories or winds."
+        },
+        {
+          "index": 48,
+          "page": 12,
+          "lines": 4,
           "text": "Qualification boundary — customer admission must repeat the campaign in the signed Runtime and pin vehicle/world assets, controller schema, scenarios, seeds, budgets, baseline arms, and failure taxonomy in one versioned receipt. Acceptance also requires independent outcome recomputation on a separately provisioned installation."
         },
         {
-          "index": 47,
+          "index": 49,
           "page": 12,
           "lines": 4,
           "text": "Denominator rule — retain every timeout and failed Trial; a missing receipt stays unavailable rather than being interpreted as a safe or successful run, and aggregate rates must preserve that disposition across every arm, scenario, seed block, and independently recomputed publication table without dropping unavailable runs from the denominator or seed."
         },
         {
-          "index": 51,
+          "index": 53,
           "page": 12,
           "lines": 4,
           "text": "Primary outcomes bind frozen holdout loss, feasible-campaign rate, baseline improvement, time-to-target, and terminal failure rate to every reported arm and seed block, with paired uncertainty and effect size computed from the retained scenario-level comparison units. These units govern preregistered acceptance and arm-to-arm inference at release."
         },
         {
-          "index": 52,
+          "index": 54,
           "page": 12,
           "lines": 4,
           "text": "Secondary outcomes: wall time, model tokens and cost, router latency, recovery success, scenario-wise regret, and artifact completeness for every frozen comparison arm and seed block, reported alongside termination cause and evidence eligibility so efficiency cannot hide a higher failure burden or incomplete audit surface at publication time or review."
         },
         {
-          "index": 53,
+          "index": 55,
           "page": 12,
           "lines": 4,
           "text": "Use at least five independent seeds for engineering diagnostics and preferably ten for report-level comparisons across every reported arm; freeze seed blocks before final execution and publish paired scenario-level uncertainty before making any superiority or repeatability claim across the preregistered final-test matrix and all baseline arms in scope."
         },
         {
-          "index": 54,
+          "index": 56,
           "page": 12,
           "lines": 4,
           "text": "Keep timeouts, crashes, infeasible terminations, and failed Trials in the denominator under their predeclared terminal categories; never impute a successful loss, discard a difficult seed, or replace a missing receipt with an optimistic outcome, and never reclassify an unavailable execution after completed-arm results or rankings become visible during audit."
         },
         {
-          "index": 62,
+          "index": 64,
           "page": 13,
           "lines": 4,
           "text": "No result in this report establishes real-aircraft safety, certification, or direct simulation-to-reality transfer; those claims require separately governed hardware evidence, operational risk controls, and accepted flight testing outside the present software-contract scope and do not inherit assurance from the mock, WSL, or policy-only artifacts reported here."
         },
         {
-          "index": 64,
-          "page": 13,
+          "index": 66,
+          "page": 14,
           "lines": 4,
           "text": "Evidence 2.9 exercises equal-budget scripted multi-tool planning and accounting over three seed blocks, six arm runs, and 12/12 accounted calls on a mock backend with zero provider or network calls. It cannot establish real LLM planning quality, optimizer superiority, physical fidelity, real flight, or causal Harness benefit under any release."
-        },
-        {
-          "index": 67,
-          "page": 14,
-          "lines": 4,
-          "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels, preregistered scoring, independent custody, and a frozen separation between development examples and final evaluation cases under external final-test custody and audit."
-        },
-        {
-          "index": 68,
-          "page": 14,
-          "lines": 4,
-          "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift; each weakened comparator changes a software protection under constructed probes and therefore cannot estimate controller performance, simulator fidelity, or benefit under real execution noise across matched scenario and seed blocks with uncertainty."
         },
         {
           "index": 69,
           "page": 14,
           "lines": 4,
-          "text": "The frozen four-arm mock ablation changes protocol behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive; the scripted policy does not authorize a causal performance claim outside a physical, matched-budget, multi-seed intervention with independent outcome recomputation and retained failures."
+          "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels, preregistered scoring, independent custody, and a frozen separation between development examples and final evaluation cases under external final-test custody and audit."
         },
         {
           "index": 70,
           "page": 14,
           "lines": 4,
-          "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution; all arms converge on the same deterministic portfolio, so the retained comparison isolates dispatch recovery rather than optimization quality or causal lift."
+          "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift; each weakened comparator changes a software protection under constructed probes and therefore cannot estimate controller performance, simulator fidelity, or benefit under real execution noise across matched scenario and seed blocks with uncertainty."
         },
         {
           "index": 71,
           "page": 14,
           "lines": 4,
-          "text": "The ten-scenario campaign is synthetic mock evidence used to exercise orchestration and evidence flow; it is not physical scenario coverage, vehicle-dynamics validation, disturbance fidelity, or a substitute for signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics, disturbance realism, or control quality in the signed Runtime."
+          "text": "The frozen four-arm mock ablation changes protocol behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive; the scripted policy does not authorize a causal performance claim outside a physical, matched-budget, multi-seed intervention with independent outcome recomputation and retained failures."
         },
         {
           "index": 72,
           "page": 14,
           "lines": 4,
-          "text": "The dedicated Runtime matrix has only two seeds per nominal, wind, and static-obstacle scenario. The obstacle is outside the nominal track, so creation proves injection rather than avoidance; signed customer Runtime repetition and wider seed blocks remain necessary before reliability, customer acceptance, or statistical generalization across installations."
+          "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution; all arms converge on the same deterministic portfolio, so the retained comparison isolates dispatch recovery rather than optimization quality or causal lift."
         },
         {
           "index": 73,
+          "page": 14,
+          "lines": 4,
+          "text": "The ten-scenario campaign is synthetic mock evidence used to exercise orchestration and evidence flow; it is not physical scenario coverage, vehicle-dynamics validation, disturbance fidelity, or a substitute for signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics, disturbance realism, or control quality in the signed Runtime."
+        },
+        {
+          "index": 74,
+          "page": 14,
+          "lines": 4,
+          "text": "The dedicated Runtime matrix has only two seeds per nominal, wind, and static-obstacle scenario. The obstacle is outside the nominal track, so creation proves injection rather than avoidance; signed customer Runtime repetition and wider seed blocks remain necessary before reliability, customer acceptance, or statistical generalization across installations."
+        },
+        {
+          "index": 75,
           "page": 14,
           "lines": 4,
           "text": "The advanced-effects success subset contains three repeats of seed 42001, not independent seed blocks. Two GPS-noise attempts end at the 30.0-second readiness boundary, one file-backed attempt fails on PX4 ownership, and three earlier preflights lack machine artifacts. These records cannot be pooled with the six-Trial scenario matrix or recast as a larger success rate, and the bundle claims no Gazebo version."
@@ -1645,13 +1729,19 @@
           "index": 76,
           "page": 14,
           "lines": 4,
+          "text": "Deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection are now verified in one completed Trial, but its 31.211302 m/s speed violates the 25 m/s stability gate. Probability-law behavior across seeds, probabilistic GPS dropout endurance, depleted-battery stability, combined-fault qualification, and hard actuator failure beyond the bounded first-order delay profile remain unproved."
+        },
+        {
+          "index": 78,
+          "page": 14,
+          "lines": 4,
           "text": "External baselines such as expert manual tuning or PX4 AutoTune must be included only when controller, vehicle, track, budget, metrics, and failure accounting are genuinely aligned; unmatched access to resets, prior knowledge, simulator time, or terminal exclusions must be reported as a protocol difference rather than hidden inside a pooled ranking."
         }
       ]
     },
     "exceptions": {
       "categories": {
-        "exception_list": 36,
+        "exception_list": 37,
         "exception_caption": 0,
         "exception_other": 0
       },
@@ -1666,53 +1756,57 @@
       29,
       32,
       40,
-      49,
-      50,
-      56,
-      57,
-      77,
-      78,
-      82,
-      83,
+      51,
+      52,
+      58,
+      59,
+      79,
+      80,
       84,
+      85,
       86,
-      87,
       88,
-      93,
-      94,
+      89,
+      90,
       95,
-      96
+      97,
+      98,
+      99,
+      100,
+      101
     ],
     "bullets_above_3_lines": [
       20,
       21,
       22,
-      41,
-      44,
+      42,
+      45,
       46,
-      47,
-      51,
-      52,
+      48,
+      49,
       53,
       54,
-      62,
+      55,
+      56,
       64,
-      67,
-      68,
+      66,
       69,
       70,
       71,
       72,
       73,
-      76
+      74,
+      75,
+      76,
+      78
     ]
   },
   "paragraph_policy": {
     "explanatory_body": {
       "definition": "Abstract and prose paragraphs that explain a claim, method, result, limitation, or evidence boundary.",
       "last_line_target_ratio": 0.8,
-      "total": 61,
-      "passed": 61,
+      "total": 65,
+      "passed": 65,
       "failed": 0,
       "failure_locations": []
     },
@@ -1720,8 +1814,8 @@
       "definition": "Rendered list items of one to three lines; the final line is measured against the usable list width to the body right margin.",
       "last_line_target_ratio": 0.9,
       "maximum_lines": 3,
-      "total": 15,
-      "passed": 15,
+      "total": 14,
+      "passed": 14,
       "failed": 0,
       "failure_locations": [],
       "above_3_lines": [
@@ -1744,109 +1838,121 @@
           "text": "Infrastructure faults, cancellation, malformed evidence, and conflicting terminal states are quarantined and cannot update search or routing memory under any later decision path or replay; each rejected row retains a stable quarantine reason and remains visible to operational diagnostics and independent evidence accounting without later relabeling."
         },
         {
-          "index": 41,
+          "index": 42,
           "page": 11,
           "lines": 4,
           "text": "Execution boundary — the dedicated Runtime records 6/6 successful, passing Trials for exactly two seeds and three x500 scenarios; this verifies the retained matrix, not a wider reliability distribution, optimizer advantage, released customer-performance claim, or cross-scenario reliability estimate across independently repeated installations and audits."
         },
         {
-          "index": 44,
-          "page": 11,
+          "index": 45,
+          "page": 12,
           "lines": 4,
-          "text": "Injection boundary — both wind runs retain ENU (0, 2, 0) m/s read-back, and both obstacle runs retain successful create replies plus the same SDF hash; obstacle placement outside the circle track tests injection only and supplies no collision-avoidance result or collision-response evidence under alternative obstacle placements or trajectories or winds."
+          "text": "GPS/battery negative-control boundary — the later Trial proves deterministic denial/recovery, battery initial-state and voltage-sag injection/read-back, and completed trajectory execution. Its failed stability gate remains the outcome: it cannot enter the earlier 3/3 or 6/6 pass numerator, qualify the capability as a whole, or support endurance, safety, or broad-stability claims."
         },
         {
           "index": 46,
           "page": 12,
           "lines": 4,
+          "text": "Injection boundary — both wind runs retain ENU (0, 2, 0) m/s read-back, and both obstacle runs retain successful create replies plus the same SDF hash; obstacle placement outside the circle track tests injection only and supplies no collision-avoidance result or collision-response evidence under alternative obstacle placements or trajectories or winds."
+        },
+        {
+          "index": 48,
+          "page": 12,
+          "lines": 4,
           "text": "Qualification boundary — customer admission must repeat the campaign in the signed Runtime and pin vehicle/world assets, controller schema, scenarios, seeds, budgets, baseline arms, and failure taxonomy in one versioned receipt. Acceptance also requires independent outcome recomputation on a separately provisioned installation."
         },
         {
-          "index": 47,
+          "index": 49,
           "page": 12,
           "lines": 4,
           "text": "Denominator rule — retain every timeout and failed Trial; a missing receipt stays unavailable rather than being interpreted as a safe or successful run, and aggregate rates must preserve that disposition across every arm, scenario, seed block, and independently recomputed publication table without dropping unavailable runs from the denominator or seed."
         },
         {
-          "index": 51,
+          "index": 53,
           "page": 12,
           "lines": 4,
           "text": "Primary outcomes bind frozen holdout loss, feasible-campaign rate, baseline improvement, time-to-target, and terminal failure rate to every reported arm and seed block, with paired uncertainty and effect size computed from the retained scenario-level comparison units. These units govern preregistered acceptance and arm-to-arm inference at release."
         },
         {
-          "index": 52,
+          "index": 54,
           "page": 12,
           "lines": 4,
           "text": "Secondary outcomes: wall time, model tokens and cost, router latency, recovery success, scenario-wise regret, and artifact completeness for every frozen comparison arm and seed block, reported alongside termination cause and evidence eligibility so efficiency cannot hide a higher failure burden or incomplete audit surface at publication time or review."
         },
         {
-          "index": 53,
+          "index": 55,
           "page": 12,
           "lines": 4,
           "text": "Use at least five independent seeds for engineering diagnostics and preferably ten for report-level comparisons across every reported arm; freeze seed blocks before final execution and publish paired scenario-level uncertainty before making any superiority or repeatability claim across the preregistered final-test matrix and all baseline arms in scope."
         },
         {
-          "index": 54,
+          "index": 56,
           "page": 12,
           "lines": 4,
           "text": "Keep timeouts, crashes, infeasible terminations, and failed Trials in the denominator under their predeclared terminal categories; never impute a successful loss, discard a difficult seed, or replace a missing receipt with an optimistic outcome, and never reclassify an unavailable execution after completed-arm results or rankings become visible during audit."
         },
         {
-          "index": 62,
+          "index": 64,
           "page": 13,
           "lines": 4,
           "text": "No result in this report establishes real-aircraft safety, certification, or direct simulation-to-reality transfer; those claims require separately governed hardware evidence, operational risk controls, and accepted flight testing outside the present software-contract scope and do not inherit assurance from the mock, WSL, or policy-only artifacts reported here."
         },
         {
-          "index": 64,
-          "page": 13,
+          "index": 66,
+          "page": 14,
           "lines": 4,
           "text": "Evidence 2.9 exercises equal-budget scripted multi-tool planning and accounting over three seed blocks, six arm runs, and 12/12 accounted calls on a mock backend with zero provider or network calls. It cannot establish real LLM planning quality, optimizer superiority, physical fidelity, real flight, or causal Harness benefit under any release."
-        },
-        {
-          "index": 67,
-          "page": 14,
-          "lines": 4,
-          "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels, preregistered scoring, independent custody, and a frozen separation between development examples and final evaluation cases under external final-test custody and audit."
-        },
-        {
-          "index": 68,
-          "page": 14,
-          "lines": 4,
-          "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift; each weakened comparator changes a software protection under constructed probes and therefore cannot estimate controller performance, simulator fidelity, or benefit under real execution noise across matched scenario and seed blocks with uncertainty."
         },
         {
           "index": 69,
           "page": 14,
           "lines": 4,
-          "text": "The frozen four-arm mock ablation changes protocol behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive; the scripted policy does not authorize a causal performance claim outside a physical, matched-budget, multi-seed intervention with independent outcome recomputation and retained failures."
+          "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels, preregistered scoring, independent custody, and a frozen separation between development examples and final evaluation cases under external final-test custody and audit."
         },
         {
           "index": 70,
           "page": 14,
           "lines": 4,
-          "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution; all arms converge on the same deterministic portfolio, so the retained comparison isolates dispatch recovery rather than optimization quality or causal lift."
+          "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift; each weakened comparator changes a software protection under constructed probes and therefore cannot estimate controller performance, simulator fidelity, or benefit under real execution noise across matched scenario and seed blocks with uncertainty."
         },
         {
           "index": 71,
           "page": 14,
           "lines": 4,
-          "text": "The ten-scenario campaign is synthetic mock evidence used to exercise orchestration and evidence flow; it is not physical scenario coverage, vehicle-dynamics validation, disturbance fidelity, or a substitute for signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics, disturbance realism, or control quality in the signed Runtime."
+          "text": "The frozen four-arm mock ablation changes protocol behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive; the scripted policy does not authorize a causal performance claim outside a physical, matched-budget, multi-seed intervention with independent outcome recomputation and retained failures."
         },
         {
           "index": 72,
           "page": 14,
           "lines": 4,
-          "text": "The dedicated Runtime matrix has only two seeds per nominal, wind, and static-obstacle scenario. The obstacle is outside the nominal track, so creation proves injection rather than avoidance; signed customer Runtime repetition and wider seed blocks remain necessary before reliability, customer acceptance, or statistical generalization across installations."
+          "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution; all arms converge on the same deterministic portfolio, so the retained comparison isolates dispatch recovery rather than optimization quality or causal lift."
         },
         {
           "index": 73,
+          "page": 14,
+          "lines": 4,
+          "text": "The ten-scenario campaign is synthetic mock evidence used to exercise orchestration and evidence flow; it is not physical scenario coverage, vehicle-dynamics validation, disturbance fidelity, or a substitute for signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics, disturbance realism, or control quality in the signed Runtime."
+        },
+        {
+          "index": 74,
+          "page": 14,
+          "lines": 4,
+          "text": "The dedicated Runtime matrix has only two seeds per nominal, wind, and static-obstacle scenario. The obstacle is outside the nominal track, so creation proves injection rather than avoidance; signed customer Runtime repetition and wider seed blocks remain necessary before reliability, customer acceptance, or statistical generalization across installations."
+        },
+        {
+          "index": 75,
           "page": 14,
           "lines": 4,
           "text": "The advanced-effects success subset contains three repeats of seed 42001, not independent seed blocks. Two GPS-noise attempts end at the 30.0-second readiness boundary, one file-backed attempt fails on PX4 ownership, and three earlier preflights lack machine artifacts. These records cannot be pooled with the six-Trial scenario matrix or recast as a larger success rate, and the bundle claims no Gazebo version."
         },
         {
           "index": 76,
+          "page": 14,
+          "lines": 4,
+          "text": "Deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection are now verified in one completed Trial, but its 31.211302 m/s speed violates the 25 m/s stability gate. Probability-law behavior across seeds, probabilistic GPS dropout endurance, depleted-battery stability, combined-fault qualification, and hard actuator failure beyond the bounded first-order delay profile remain unproved."
+        },
+        {
+          "index": 78,
           "page": 14,
           "lines": 4,
           "text": "External baselines such as expert manual tuning or PX4 AutoTune must be included only when controller, vehicle, track, budget, metrics, and failure accounting are genuinely aligned; unmatched access to resets, prior knowledge, simulator time, or terminal exclusions must be reported as a protocol difference rather than hidden inside a pooled ranking."
@@ -1857,7 +1963,7 @@
       "definition": "Headings, display formulas, code blocks, figure captions, table captions, and references do not use either rendered last-line gate; list items use the separate short-list policy.",
       "inventory": {
         "headings": 34,
-        "list_items": 36,
+        "list_items": 37,
         "display_formulas": 0,
         "code_blocks": 0,
         "figure_captions": 6,
@@ -1878,9 +1984,9 @@
     {
       "page": 1,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 745.49,
-      "gap_to_body_bottom_points": 11.36,
-      "gap_to_body_bottom_lines": 0.947,
+      "content_bottom_points": 763.44,
+      "gap_to_body_bottom_points": 0.0,
+      "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
     },
     {
@@ -1958,15 +2064,15 @@
     {
       "page": 11,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 746.41,
-      "gap_to_body_bottom_points": 10.44,
-      "gap_to_body_bottom_lines": 0.87,
+      "content_bottom_points": 759.56,
+      "gap_to_body_bottom_points": 0.0,
+      "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
     },
     {
       "page": 12,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 767.26,
+      "content_bottom_points": 760.88,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -1974,15 +2080,15 @@
     {
       "page": 13,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 752.06,
-      "gap_to_body_bottom_points": 4.79,
-      "gap_to_body_bottom_lines": 0.399,
+      "content_bottom_points": 761.64,
+      "gap_to_body_bottom_points": 0.0,
+      "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
     },
     {
       "page": 14,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 762.33,
+      "content_bottom_points": 762.93,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -1990,31 +2096,31 @@
     {
       "page": 15,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 746.73,
-      "gap_to_body_bottom_points": 10.12,
-      "gap_to_body_bottom_lines": 0.843,
-      "passed_bottom_line": true
-    },
-    {
-      "page": 16,
-      "body_bottom_target_points": 756.85,
-      "content_bottom_points": 763.44,
+      "content_bottom_points": 770.64,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
     },
     {
+      "page": 16,
+      "body_bottom_target_points": 756.85,
+      "content_bottom_points": 745.3,
+      "gap_to_body_bottom_points": 11.55,
+      "gap_to_body_bottom_lines": 0.963,
+      "passed_bottom_line": true
+    },
+    {
       "page": 17,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 748.57,
-      "gap_to_body_bottom_points": 8.28,
-      "gap_to_body_bottom_lines": 0.69,
+      "content_bottom_points": 756.67,
+      "gap_to_body_bottom_points": 0.18,
+      "gap_to_body_bottom_lines": 0.015,
       "passed_bottom_line": true
     },
     {
       "page": 18,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 765.68,
+      "content_bottom_points": 766.39,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -2022,13 +2128,21 @@
     {
       "page": 19,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 744.17,
-      "gap_to_body_bottom_points": 12.68,
-      "gap_to_body_bottom_lines": 1.057,
+      "content_bottom_points": 743.53,
+      "gap_to_body_bottom_points": 13.32,
+      "gap_to_body_bottom_lines": 1.11,
       "passed_bottom_line": true
     },
     {
       "page": 20,
+      "body_bottom_target_points": 756.85,
+      "content_bottom_points": 743.81,
+      "gap_to_body_bottom_points": 13.04,
+      "gap_to_body_bottom_lines": 1.087,
+      "passed_bottom_line": true
+    },
+    {
+      "page": 21,
       "body_bottom_target_points": 756.85,
       "content_bottom_points": 745.56,
       "gap_to_body_bottom_points": 11.29,

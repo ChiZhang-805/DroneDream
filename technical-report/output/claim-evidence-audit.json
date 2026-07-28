@@ -3,21 +3,21 @@
   "status": "passed",
   "ledger": {
     "path": "technical-report/claim-evidence-ledger.json",
-    "sha256": "927ffbae7299e94daf4cd70bf486d5af40fe2fce140a836e3c55e04a29367b46"
+    "sha256": "28a9d7e1a6ab4e8f46cb0c740f3412c00c6192bb43230cb2e023ae71c55d9bca"
   },
   "evidence_reference_manifest": {
     "path": "technical-report/evidence-reference-manifest.json",
-    "sha256": "9b48ca3215dcab3eccd9e3eb0cbe52bafac992a6450cb4b204d77e1241daa3e4"
+    "sha256": "6f0da0c9fd94c04cf5e7227f978597c56f96f6bef3417299857e1dd0a1d239c1"
   },
   "report_source": {
     "path": "technical-report/body.tex",
-    "sha256": "dda24c12fb0e76f2a7e9c70a574e49f2c8b7b8811444f27aad9797ede517e450"
+    "sha256": "5e5734af3f2b5f0333d14fa1bb6c0d0b86a6bf1fe1150072e306d7d44d6c0aa7"
   },
-  "claim_total": 36,
-  "claim_passed": 36,
+  "claim_total": 40,
+  "claim_passed": 40,
   "claim_failed": 0,
-  "assertion_total": 277,
-  "prohibited_literal_checks": 13,
+  "assertion_total": 319,
+  "prohibited_literal_checks": 15,
   "verified_sources": [
     {
       "id": "advanced_physics_gps_boundary_stderr",
@@ -42,6 +42,30 @@
       "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
       "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.receipt.json",
       "sha256": "99e257fb56d46d9293ba9365ccae604ddd697802370b877360541628ebd1354f"
+    },
+    {
+      "id": "advanced_physics_runtime_negative_control_failure_lineage",
+      "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/failure-lineage.json",
+      "sha256": "882acd480bfca39591f0daa01faea73ac9780cd3a514cd362fe8a2a2629e00b5"
+    },
+    {
+      "id": "advanced_physics_runtime_negative_control_focused_junit",
+      "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/focused-tests.xml",
+      "sha256": "67d614764b213408833f50be63c0490e27c99dbcca41f349ab6281b605fc6b8c"
+    },
+    {
+      "id": "advanced_physics_runtime_negative_control_receipt",
+      "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/receipt.json",
+      "sha256": "2d6470fb085e638c52754f580d22a5d3d50d2f26000e584148557f3c505fdd8a"
+    },
+    {
+      "id": "advanced_physics_runtime_negative_control_scenario_applied",
+      "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/scenario_effects.applied.json",
+      "sha256": "7973680f267b2643690b998b84111ffb3887f1efc2cf556b09acd1d73a24846a"
     },
     {
       "id": "backend_1204_full_log",
@@ -660,6 +684,59 @@
       ],
       "source_id": "advanced_physics_gps_boundary_stderr",
       "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-battery-negative-control",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_receipt",
+      "assertions": 28,
+      "body_literals": 5,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-battery-failure-lineage",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_failure_lineage",
+      "assertions": 5,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-battery-scenario-effects",
+      "report_locations": [
+        "Section 4.8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_scenario_applied",
+      "assertions": 6,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-battery-focused-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_focused_junit",
+      "assertions": 3,
       "body_literals": 1,
       "status": "passed",
       "failures": []
