@@ -13,8 +13,7 @@ def run_git(repo: Path, *args: str) -> bytes:
         ["git", *args],
         cwd=repo,
         check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
     )
     return completed.stdout
 
@@ -36,6 +35,17 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_current_file(path: Path, serialization: str | None) -> str:
+    payload = path.read_bytes()
+    if serialization is None:
+        return sha256(payload)
+    if serialization != "utf8_lf":
+        raise ValueError(f"unsupported current hash serialization: {serialization}")
+    text = payload.decode("utf-8")
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    return sha256(normalized.encode("utf-8"))
+
+
 def require(condition: bool, message: str, failures: list[str]) -> None:
     if not condition:
         failures.append(message)
@@ -50,14 +60,11 @@ def verify_commit(repo: Path, commit: str, failures: list[str]) -> None:
     require(resolved == commit, f"commit did not resolve exactly: {commit}", failures)
 
 
-def verify_ancestor(
-    repo: Path, ancestor: str, descendant: str, failures: list[str]
-) -> None:
+def verify_ancestor(repo: Path, ancestor: str, descendant: str, failures: list[str]) -> None:
     completed = subprocess.run(
         ["git", "merge-base", "--is-ancestor", ancestor, descendant],
         cwd=repo,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
     )
     require(
         completed.returncode == 0,
@@ -67,13 +74,12 @@ def verify_ancestor(
 
 
 def main() -> int:
-    repo = Path(
-        run_git(Path.cwd(), "rev-parse", "--show-toplevel").decode().strip()
-    )
+    repo = Path(run_git(Path.cwd(), "rev-parse", "--show-toplevel").decode().strip())
     manifest_path = repo / "technical-report" / "evidence-reference-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     failures: list[str] = []
     verified_artifacts: list[dict[str, str]] = []
+    verified_sources: list[dict[str, str]] = []
 
     require(
         manifest.get("schema_version")
@@ -95,9 +101,7 @@ def main() -> int:
     external_root = Path(str(migration.get("external_source_root", "")))
     for entry in migration.get("initial_byte_verification", []):
         relative = Path(entry["path"])
-        external_path = Path(
-            entry.get("external_source_path", external_root / relative)
-        )
+        external_path = Path(entry.get("external_source_path", external_root / relative))
         current_path = repo / "technical-report" / relative
         if not external_path.is_file():
             failures.append(f"missing external migration source: {relative}")
@@ -111,7 +115,14 @@ def main() -> int:
         if not current_path.is_file():
             failures.append(f"missing migrated report file: {relative}")
             continue
-        current_actual = sha256_file(current_path)
+        try:
+            current_actual = sha256_current_file(
+                current_path,
+                entry.get("current_hash_serialization"),
+            )
+        except (UnicodeDecodeError, ValueError) as exc:
+            failures.append(f"invalid current hash serialization for {relative}: {exc}")
+            continue
         if entry.get("modified_after_migration") is False:
             require(
                 current_actual == entry["source_sha256"],
@@ -159,9 +170,7 @@ def main() -> int:
     software_json: dict[str, dict[str, Any]] = {}
     for artifact in software["artifacts"]:
         try:
-            payload, parsed = git_json(
-                repo, artifact["ref_commit"], artifact["path"]
-            )
+            payload, parsed = git_json(repo, artifact["ref_commit"], artifact["path"])
         except (subprocess.CalledProcessError, UnicodeDecodeError, json.JSONDecodeError):
             failures.append(f"unreadable software artifact: {artifact['id']}")
             continue
@@ -172,14 +181,52 @@ def main() -> int:
             failures,
         )
         software_json[artifact["id"]] = parsed
-        verified_artifacts.append(
-            {"id": artifact["id"], "sha256": actual}
+        verified_artifacts.append({"id": artifact["id"], "sha256": actual})
+
+    source_reference_ids: set[str] = set()
+    for source in software.get("source_references", []):
+        source_id = str(source["id"])
+        require(
+            source_id not in source_reference_ids,
+            f"duplicate software source reference: {source_id}",
+            failures,
+        )
+        source_reference_ids.add(source_id)
+        require(
+            source["ref_commit"] == software["branch_head"],
+            f"source reference is not pinned to software head: {source_id}",
+            failures,
+        )
+        require(
+            bool(str(source.get("evidence_role", "")).strip()),
+            f"source reference lacks an evidence role: {source_id}",
+            failures,
+        )
+        try:
+            payload = run_git(
+                repo,
+                "show",
+                f"{source['ref_commit']}:{source['path']}",
+            )
+        except subprocess.CalledProcessError:
+            failures.append(f"unreadable software source reference: {source_id}")
+            continue
+        actual = sha256(payload)
+        require(
+            actual == source["file_sha256"],
+            f"SHA-256 mismatch for {source_id}: {actual}",
+            failures,
+        )
+        verified_sources.append(
+            {
+                "id": source_id,
+                "path": source["path"],
+                "sha256": actual,
+            }
         )
 
     bundle_entry = next(
-        item
-        for item in software["artifacts"]
-        if item["id"] == "technical_report_evidence_bundle"
+        item for item in software["artifacts"] if item["id"] == "technical_report_evidence_bundle"
     )
     bundle = software_json.get("technical_report_evidence_bundle", {})
     require(
@@ -193,9 +240,7 @@ def main() -> int:
         failures,
     )
 
-    software_manifest = software_json.get(
-        "technical_report_evidence_manifest", {}
-    )
+    software_manifest = software_json.get("technical_report_evidence_manifest", {})
     require(
         software_manifest.get("source_commit") == software["subject_commit"],
         "software evidence manifest source_commit mismatch",
@@ -260,8 +305,7 @@ def main() -> int:
         failures,
     )
     require(
-        website_receipt.get("summarySha256")
-        == website_artifact["summary_sha256"],
+        website_receipt.get("summarySha256") == website_artifact["summary_sha256"],
         "website summary SHA-256 mismatch",
         failures,
     )
@@ -291,15 +335,12 @@ def main() -> int:
         "website deterministic build receipt mismatch",
         failures,
     )
-    verified_artifacts.append(
-        {"id": website_artifact["id"], "sha256": website_actual}
-    )
+    verified_artifacts.append({"id": website_artifact["id"], "sha256": website_actual})
 
     prerequisites = manifest.get("merge_prerequisites", [])
     require(
         any(
-            item.get("pull_request") == 88
-            and item.get("required_before_report_merge") is True
+            item.get("pull_request") == 88 and item.get("required_before_report_merge") is True
             for item in prerequisites
         ),
         "website PR #88 prerequisite missing",
@@ -311,6 +352,7 @@ def main() -> int:
         "status": "passed" if not failures else "failed",
         "verified_commits": commit_fields,
         "verified_artifacts": verified_artifacts,
+        "verified_sources": verified_sources,
         "failures": failures,
     }
     print(json.dumps(result, indent=2, ensure_ascii=False))

@@ -95,6 +95,25 @@ if ($LASTEXITCODE -ne 0) {
 
 $audit = Get-Content -LiteralPath $auditPath -Raw -Encoding UTF8 |
     ConvertFrom-Json
+$claimAuditPath = Join-Path $buildRoot "claim-evidence-audit.json"
+& $Python `
+    (Join-Path $reportRoot "scripts\verify_claim_evidence.py") `
+    --repository $repositoryRoot `
+    --ledger (Join-Path $reportRoot "claim-evidence-ledger.json") `
+    --manifest (Join-Path $reportRoot "evidence-reference-manifest.json") `
+    --body (Join-Path $reportRoot "body.tex") `
+    --output $claimAuditPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Claim-evidence audit failed with exit code $LASTEXITCODE"
+}
+$claimAudit = Get-Content -LiteralPath $claimAuditPath -Raw -Encoding UTF8 |
+    ConvertFrom-Json
+if (
+    $claimAudit.status -ne "passed" -or
+    [int]$claimAudit.claim_failed -ne 0
+) {
+    throw "Claim-evidence audit did not pass every declared claim"
+}
 $bodyAudit = $audit.paragraph_geometry.explanatory_body
 $paragraphFailures = [int]$bodyAudit.failed_80
 $invalidLinks = 0
@@ -122,6 +141,16 @@ Write-Host (
         [int]$audit.paragraph_geometry.exceptions.categories.exception_list,
         [int]$audit.paragraph_geometry.exceptions.categories.exception_caption,
         [int]$audit.paragraph_geometry.exceptions.categories.exception_other
+)
+Write-Host (
+    (
+        "Claim evidence: claims={0}/{1}, assertions={2}, " +
+        "immutable-sources={3}"
+    ) -f
+        [int]$claimAudit.claim_passed,
+        [int]$claimAudit.claim_total,
+        [int]$claimAudit.assertion_total,
+        @($claimAudit.verified_sources).Count
 )
 Write-Host (
     (
@@ -179,8 +208,10 @@ if ($hardFailures -contains $true) {
 
 $publishedPdf = Join-Path $outputRoot "DroneDream_AURORA_Technical_Report.pdf"
 $publishedAudit = Join-Path $outputRoot "latex-audit.json"
+$publishedClaimAudit = Join-Path $outputRoot "claim-evidence-audit.json"
 Copy-Item -LiteralPath $pdfPath -Destination $publishedPdf -Force
 Copy-Item -LiteralPath $auditPath -Destination $publishedAudit -Force
+Copy-Item -LiteralPath $claimAuditPath -Destination $publishedClaimAudit -Force
 
 [ordered]@{
     pages = $audit.pages
@@ -194,6 +225,12 @@ Copy-Item -LiteralPath $auditPath -Destination $publishedAudit -Force
     gray_text_runs = $audit.gray_text_run_count
     internal_links = $audit.links.internal
     external_links = $audit.links.external
+    claim_total = $claimAudit.claim_total
+    claim_passed = $claimAudit.claim_passed
+    claim_failed = $claimAudit.claim_failed
+    claim_assertions = $claimAudit.assertion_total
+    immutable_claim_sources = @($claimAudit.verified_sources).Count
     pdf = $publishedPdf
     audit = $publishedAudit
+    claim_audit = $publishedClaimAudit
 } | ConvertTo-Json

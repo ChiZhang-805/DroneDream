@@ -1,0 +1,622 @@
+{
+  "schema_version": "dronedream.technical-report-claim-evidence-ledger.v1",
+  "report_source": "technical-report/body.tex",
+  "evidence_reference_manifest": "technical-report/evidence-reference-manifest.json",
+  "claims": [
+    {
+      "id": "backend-validation-boundary",
+      "report_locations": [
+        "Abstract",
+        "Section 8",
+        "Table 6"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/backend_tests/full_suite/result/passed",
+          "expected": 1139
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/backend_tests/full_suite/result/failed",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/backend_tests/full_suite/duration_seconds",
+          "expected": 759.17
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/backend_tests/full_suite/tested_state/exact_final_commit_run",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/backend_tests/focused_checks/0/result/passed",
+          "expected": 59
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/backend_tests/focused_checks/0/result/failed",
+          "expected": 0
+        }
+      ],
+      "body_contains": [
+        "1,139/1,139 tests in",
+        "759.17 seconds on a pre-commit worktree",
+        "59-check subject bridge",
+        "Windows Rust was not run"
+      ]
+    },
+    {
+      "id": "website-validation-boundary",
+      "report_locations": [
+        "Section 8",
+        "Table 6"
+      ],
+      "source_id": "website_validation_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/checks/frontendTests/tests",
+          "expected": "322/322"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/checks/deploymentContract/tests",
+          "expected": "9/9"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/checks/sharedSiteBuild/runs",
+          "expected": 2
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/artifact/fileCount",
+          "expected": 117
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/artifact/deterministicAcrossTwoBuilds",
+          "expected": true
+        }
+      ],
+      "body_contains": [
+        "322/322 tests",
+        "nine deployment tests",
+        "117-file output across two builds"
+      ]
+    },
+    {
+      "id": "archived-provider-routing",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Figure 2",
+        "Figure 4",
+        "Table 1"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/case_count",
+          "expected": 24
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/passed_count",
+          "expected": 24
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/contract_current",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/qualification_scope",
+          "expected": "archived_evidence_2_4_prompt_1_1"
+        },
+        {
+          "kind": "json_product_approx",
+          "pointers": [
+            "/routing/case_count",
+            "/routing/best_constant_pass_rate"
+          ],
+          "expected": 14.0,
+          "tolerance": 1e-12
+        },
+        {
+          "kind": "json_product_approx",
+          "pointers": [
+            "/routing/case_count",
+            "/routing/uniform_random_expected_pass_rate"
+          ],
+          "expected": 5.625,
+          "tolerance": 1e-12
+        },
+        {
+          "kind": "json_sum_field",
+          "pointer": "/routing/tool_selection_rows",
+          "field": "selected_count",
+          "expected": 24
+        }
+      ],
+      "body_contains": [
+        "24/24 from persisted per-case",
+        "14/24",
+        "5.625/24",
+        "Evidence 2.4 / Prompt 1.1 only"
+      ]
+    },
+    {
+      "id": "deterministic-policy-holdout",
+      "report_locations": [
+        "Abstract",
+        "Section 4.2",
+        "Table 2",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/routing_policy_holdout/case_count",
+          "expected": 16
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing_policy_holdout/passed_count",
+          "expected": 16
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing_policy_holdout/online_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing_policy_holdout/simulator_runs",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing_policy_holdout/feedback_writebacks",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing_policy_holdout/corpus_role",
+          "expected": "locked_holdout"
+        }
+      ],
+      "body_contains": [
+        "16/16 exact comparisons",
+        "0 calls; 0",
+        "Eligibility-set determinism"
+      ]
+    },
+    {
+      "id": "source-contract-ablation",
+      "report_locations": [
+        "Abstract",
+        "Section 4.3",
+        "Figure 3",
+        "Table 3",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_ablations/summary/probe_count",
+          "expected": 25
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_ablations/summary/full_contract_correct_count",
+          "expected": 25
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_ablations/summary/ablated_contract_correct_count",
+          "expected": 6
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_ablations/causal_claim_permitted",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_ablations/physical_fidelity",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "25/25 probes, whereas the matched weakened variants satisfy 6/25",
+        "Fail-closed guard behavior"
+      ]
+    },
+    {
+      "id": "fallback-outcome-campaign",
+      "report_locations": [
+        "Abstract",
+        "Section 4.4",
+        "Table 4",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_outcome_campaign/summary/arm_run_count",
+          "expected": 15
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_outcome_campaign/summary/total_persisted_trials",
+          "expected": 579
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_outcome_campaign/summary/fallback_comparison_count",
+          "expected": 10
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_outcome_campaign/summary/exact_outcome_match_count",
+          "expected": 10
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_outcome_campaign/summary/all_evidence_complete",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_outcome_campaign/network_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_outcome_campaign/physical_fidelity",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_outcome_campaign/harness_causal_benefit_claim_permitted",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "campaign runs 15 Jobs and persists 579 Trials",
+        "all 10 blockwise comparisons",
+        "Matched offline recovery"
+      ]
+    },
+    {
+      "id": "component-outcome-ablation",
+      "report_locations": [
+        "Abstract",
+        "Section 7",
+        "Table 7",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_component_outcome_ablation/summary/arm_run_count",
+          "expected": 20
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_component_outcome_ablation/summary/total_persisted_trials",
+          "expected": 554
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_component_outcome_ablation/summary/comparison_count",
+          "expected": 15
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_component_outcome_ablation/summary/interpretation_status_counts/observed_protocol_difference",
+          "expected": 5
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_component_outcome_ablation/summary/interpretation_status_counts/no_observed_protocol_difference",
+          "expected": 10
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_component_outcome_ablation/summary/inconclusive_component_isolation_count",
+          "expected": 5
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_component_outcome_ablation/network_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_component_outcome_ablation/general_causal_claim_permitted",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "20 Jobs and 554 Trials",
+        "five expose an observed protocol difference and ten show no observed",
+        "five receipt-only-memory isolations remain explicitly inconclusive"
+      ]
+    },
+    {
+      "id": "synthetic-coverage-campaign",
+      "report_locations": [
+        "Section 4.6",
+        "Figure 5",
+        "Figure 6",
+        "Table 5",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/simulation_coverage/candidate_budget",
+          "expected": 61
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/simulation_coverage/evaluated_candidate_count",
+          "expected": 61
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/simulation_coverage/scenario_count",
+          "expected": 10
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/simulation_coverage/baseline_holdout_loss",
+          "expected": 0.82811
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/simulation_coverage/selected_holdout_loss",
+          "expected": 0.58525
+        },
+        {
+          "kind": "json_approx",
+          "pointer": "/simulation_coverage/relative_improvement_rate",
+          "expected": 0.29327021772469836,
+          "tolerance": 1e-15
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/simulation_coverage/holdout_oracle_regret",
+          "expected": 0.0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/simulation_coverage/physical_fidelity",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/simulation_coverage/simulator_backend",
+          "expected": "mock"
+        },
+        {
+          "kind": "latex_scenario_table",
+          "pointer": "/simulation_coverage/scenario_rows",
+          "expected_rows": 10
+        }
+      ],
+      "body_contains": [
+        "61-candidate mock campaign",
+        "0.82811 to 0.58525 (29.327\\% relative)",
+        "ranged from 21.8\\%",
+        "to 33.2\\%"
+      ]
+    },
+    {
+      "id": "synthetic-generalization-campaign",
+      "report_locations": [
+        "Section 4.6",
+        "Section 7.1",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/scenario_generalization/candidate_budget",
+          "expected": 61
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/scenario_generalization/evaluated_candidate_count",
+          "expected": 61
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/scenario_generalization/training_case_count",
+          "expected": 5
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/scenario_generalization/validation_case_count",
+          "expected": 10
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/scenario_generalization/validation_outcomes_used_for_selection",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/scenario_generalization/physical_fidelity",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/scenario_generalization/simulator_backend",
+          "expected": "mock"
+        }
+      ],
+      "body_contains": [
+        "2 $\\times$ 61 Candidates",
+        "Coverage v3 / generalization",
+        "Seed and mixed-shift reporting"
+      ]
+    },
+    {
+      "id": "frozen-contract-versions",
+      "report_locations": [
+        "Section 3.1",
+        "Section 8",
+        "Appendix A.5"
+      ],
+      "source_id": "harness_contract_design",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "Evidence 2.7"
+        },
+        {
+          "kind": "text_contains",
+          "expected": "Prompt Template 1.5"
+        },
+        {
+          "kind": "text_contains",
+          "expected": "Decision Trace 1.3"
+        },
+        {
+          "kind": "text_contains",
+          "expected": "Execution Claim Gate 1.1"
+        },
+        {
+          "kind": "text_contains",
+          "expected": "Outcome Contract 2.20"
+        },
+        {
+          "kind": "text_contains",
+          "expected": "Execution Scheduling Gate 1.0"
+        }
+      ],
+      "body_contains": [
+        "Evidence 2.7",
+        "Prompt 1.5",
+        "Decision Trace 1.3",
+        "Execution Claim Gate 1.1",
+        "Outcome Contract 2.20",
+        "Scheduling Gate 1.0"
+      ]
+    },
+    {
+      "id": "phase-qualified-tool-surface",
+      "report_locations": [
+        "Appendix A.5",
+        "Table 8"
+      ],
+      "source_id": "harness_phase_registry",
+      "assertions": [
+        {
+          "kind": "phase_role_count",
+          "phase": "exploration",
+          "expected": 6
+        },
+        {
+          "kind": "phase_role_count",
+          "phase": "recovery",
+          "expected": 4
+        },
+        {
+          "kind": "phase_role_count",
+          "phase": "refinement",
+          "expected": 5
+        },
+        {
+          "kind": "phase_role_count",
+          "phase": "diversification",
+          "expected": 7
+        },
+        {
+          "kind": "phase_role_count",
+          "phase": "verification",
+          "expected": 5
+        },
+        {
+          "kind": "phase_role_count",
+          "phase": "balanced",
+          "expected": 8
+        }
+      ],
+      "body_contains": [
+        "Exploration & 6 &",
+        "Recovery & 4 &",
+        "Refinement & 5 &",
+        "Diversification & 7 &",
+        "Verification & 5 &",
+        "Balanced & 8 &"
+      ]
+    },
+    {
+      "id": "px4-gazebo-wind-acceptance-boundary",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "px4_gazebo_evidence_boundary",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "constant horizontal wind has a bundled source implementation"
+        },
+        {
+          "kind": "text_contains",
+          "expected": "6ea3539157ca358c70a515878b77077af7d4611d"
+        },
+        {
+          "kind": "text_contains",
+          "expected": "Gazebo 8.14.0"
+        },
+        {
+          "kind": "text_contains",
+          "expected": "`verified_applied` evidence"
+        },
+        {
+          "kind": "text_contains",
+          "expected": "signed installer Runtime must still repeat this acceptance gate"
+        }
+      ],
+      "body_contains": [
+        "6ea3539157ca358c70a515878b77077af7d4611d",
+        "Gazebo 8.14.0",
+        "signed installer Runtime has not yet passed this acceptance campaign"
+      ]
+    },
+    {
+      "id": "px4-runtime-pin",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "runtime_dependency_pins",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "PX4_GIT_COMMIT=6ea3539157ca358c70a515878b77077af7d4611d"
+        }
+      ],
+      "body_contains": [
+        "6ea3539157ca358c70a515878b77077af7d4611d"
+      ]
+    }
+  ]
+}

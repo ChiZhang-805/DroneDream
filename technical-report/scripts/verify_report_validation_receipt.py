@@ -99,8 +99,13 @@ def main() -> None:
     )
     receipt_bytes = commit_file(repo, artifact_commit, receipt_path)
     receipt = require_lf_json(receipt_bytes, "receipt")
+    schema_version = receipt["schema_version"]
     require(
-        receipt["schema_version"] == "dronedream.technical-report-validation-receipt.v2",
+        schema_version
+        in {
+            "dronedream.technical-report-validation-receipt.v2",
+            "dronedream.technical-report-validation-receipt.v3",
+        },
         "unsupported receipt schema",
     )
     require(
@@ -137,6 +142,52 @@ def main() -> None:
         sha256_bytes(manifest_bytes) == manifest_record["sha256"],
         "evidence-reference manifest hash mismatch",
     )
+
+    claim_summary: dict[str, Any] | None = None
+    if schema_version == "dronedream.technical-report-validation-receipt.v3":
+        claim_record = receipt["claim_evidence"]
+        ledger_record = claim_record["ledger"]
+        ledger_bytes = commit_file(
+            repo,
+            subject_commit,
+            str(ledger_record["path"]),
+        )
+        require_lf_json(ledger_bytes, "claim ledger")
+        require(
+            sha256_bytes(ledger_bytes) == ledger_record["sha256"],
+            "committed claim ledger hash mismatch",
+        )
+        claim_audit_record = claim_record["audit"]
+        claim_audit_bytes = commit_file(
+            repo,
+            artifact_commit,
+            str(claim_audit_record["path"]),
+        )
+        claim_audit = require_lf_json(claim_audit_bytes, "claim audit")
+        require(
+            sha256_bytes(claim_audit_bytes) == claim_audit_record["sha256"],
+            "committed claim audit hash mismatch",
+        )
+        require(
+            claim_audit["status"] == "passed"
+            and claim_audit["claim_total"] == claim_audit_record["claims"]
+            and claim_audit["claim_passed"] == claim_audit_record["passed"]
+            and claim_audit["claim_failed"] == claim_audit_record["failed"] == 0
+            and claim_audit["assertion_total"] == claim_audit_record["assertions"]
+            and claim_audit["ledger"]["sha256"] == ledger_record["sha256"]
+            and claim_audit["evidence_reference_manifest"]["sha256"] == manifest_record["sha256"],
+            "committed claim-evidence audit summary mismatch",
+        )
+        require(
+            claim_audit["verified_sources"] == claim_audit_record["verified_sources"],
+            "committed claim source inventory mismatch",
+        )
+        claim_summary = {
+            "claim_audit_sha256": sha256_bytes(claim_audit_bytes),
+            "claims": claim_audit["claim_total"],
+            "claim_assertions": claim_audit["assertion_total"],
+            "verified_claim_sources": len(claim_audit["verified_sources"]),
+        }
 
     pdf_record = receipt["pdf"]
     pdf_bytes = commit_file(repo, artifact_commit, str(pdf_record["path"]))
@@ -175,22 +226,20 @@ def main() -> None:
         "committed audit has cross-page paragraph splits",
     )
 
-    print(
-        json.dumps(
-            {
-                "status": "passed",
-                "artifact_commit": artifact_commit,
-                "subject_commit": subject_commit,
-                "receipt_path": receipt_path,
-                "receipt_sha256": sha256_bytes(receipt_bytes),
-                "pdf_sha256": sha256_bytes(pdf_bytes),
-                "audit_sha256": sha256_bytes(audit_bytes),
-                "pages": len(PdfReader(io.BytesIO(pdf_bytes)).pages),
-                "explanatory_body_passed_80": policy["passed"],
-            },
-            ensure_ascii=False,
-        )
-    )
+    result = {
+        "status": "passed",
+        "artifact_commit": artifact_commit,
+        "subject_commit": subject_commit,
+        "receipt_path": receipt_path,
+        "receipt_sha256": sha256_bytes(receipt_bytes),
+        "pdf_sha256": sha256_bytes(pdf_bytes),
+        "audit_sha256": sha256_bytes(audit_bytes),
+        "pages": len(PdfReader(io.BytesIO(pdf_bytes)).pages),
+        "explanatory_body_passed_80": policy["passed"],
+    }
+    if claim_summary is not None:
+        result.update(claim_summary)
+    print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":

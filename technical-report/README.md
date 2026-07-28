@@ -47,6 +47,21 @@ evidence:
 python technical-report/scripts/verify_evidence_reference_manifest.py
 ```
 
+The report-owned `claim-evidence-ledger.json` binds publication-facing
+counts, rates, scenario rows, contract versions, phase-role counts, and the
+PX4/Gazebo qualification boundary to those immutable source IDs. It contains
+report assertions and references, not copied backend evidence. Verify every
+declared projection against Git object bytes:
+
+```powershell
+python technical-report/scripts/verify_claim_evidence.py `
+  --repository . `
+  --ledger technical-report/claim-evidence-ledger.json `
+  --manifest technical-report/evidence-reference-manifest.json `
+  --body technical-report/body.tex `
+  --output technical-report/output/claim-evidence-audit.json
+```
+
 ## Build and audit
 
 The build requires XeLaTeX, Pandoc, Poppler (`pdftoppm`), and Python with
@@ -61,18 +76,36 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 The script performs two XeLaTeX passes, rejects warning gates, renders all 13
 pages, runs the structural/paragraph/link audit, and publishes the validated
-PDF and portable audit to `technical-report/output/`. The paragraph gate
-requires all explanatory prose, including the abstract, to end with a
-rendered line at least 80% as wide as its usable body line. Headings, lists,
-display formulas, code blocks, figure/table captions, and references are
-inventoried as reasonable exceptions instead of being silently pooled with
-body prose. Intermediate files remain under the ignored
+PDF, layout audit, and claim-evidence audit to `technical-report/output/`.
+The claim gate fails the build when a declared report projection drifts from
+its frozen JSON pointer, source assertion, or computed phase-role count. The
+paragraph gate requires all explanatory prose, including the abstract, to end
+with a rendered line at least 80% as wide as its usable body line. Headings,
+lists, display formulas, code blocks, figure/table captions, and references
+are inventoried as reasonable exceptions instead of being silently pooled
+with body prose. Intermediate files remain under the ignored
 `technical-report/build/` directory.
 
 The audit and receipt writers emit UTF-8 JSON with LF newlines as exact bytes,
-independent of the host operating system. After the artifact layer is
-committed, verify the hashes against Git object bytes rather than the mutable
-working-tree representation:
+independent of the host operating system. After visually reviewing the final
+13-page render, create the artifact-layer receipt:
+
+```powershell
+python technical-report/scripts/create_report_validation_receipt.py `
+  --repository . `
+  --subject-commit <source-commit> `
+  --pdf technical-report/output/DroneDream_AURORA_Technical_Report.pdf `
+  --audit technical-report/output/latex-audit.json `
+  --claim-audit technical-report/output/claim-evidence-audit.json `
+  --claim-ledger technical-report/claim-evidence-ledger.json `
+  --log technical-report/build/main.log `
+  --manifest technical-report/evidence-reference-manifest.json `
+  --output technical-report/validation-receipts/<source-commit>.json `
+  --visual-review-passed
+```
+
+After the artifact layer is committed, verify the hashes against Git object
+bytes rather than the mutable working-tree representation:
 
 ```powershell
 python technical-report/scripts/verify_report_validation_receipt.py `

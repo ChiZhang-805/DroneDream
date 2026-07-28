@@ -11,9 +11,11 @@ from typing import Any
 from pypdf import PdfReader
 
 SOURCE_PATHS = (
+    "technical-report/.gitattributes",
     "technical-report/.gitignore",
     "technical-report/README.md",
     "technical-report/body.tex",
+    "technical-report/claim-evidence-ledger.json",
     "technical-report/evidence-reference-manifest.json",
     "technical-report/main.tex",
     "technical-report/media",
@@ -107,6 +109,8 @@ def main() -> None:
     parser.add_argument("--subject-commit", required=True)
     parser.add_argument("--pdf", type=Path, required=True)
     parser.add_argument("--audit", type=Path, required=True)
+    parser.add_argument("--claim-audit", type=Path, required=True)
+    parser.add_argument("--claim-ledger", type=Path, required=True)
     parser.add_argument("--log", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -123,12 +127,22 @@ def main() -> None:
 
     pdf = args.pdf.resolve()
     audit_path = args.audit.resolve()
+    claim_audit_path = args.claim_audit.resolve()
+    claim_ledger_path = args.claim_ledger.resolve()
     log_path = args.log.resolve()
     manifest_path = args.manifest.resolve()
-    for path in (pdf, audit_path, log_path, manifest_path):
+    for path in (
+        pdf,
+        audit_path,
+        claim_audit_path,
+        claim_ledger_path,
+        log_path,
+        manifest_path,
+    ):
         require(path.is_file(), f"missing validation input: {path}")
 
     audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    claim_audit = json.loads(claim_audit_path.read_text(encoding="utf-8"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     log_text = log_path.read_text(encoding="utf-8", errors="replace")
     warning_counts = {
@@ -153,10 +167,26 @@ def main() -> None:
     )
     require(not audit["bottom_failures"], "page-bottom audit failed")
     require(audit["gray_text_run_count"] == 0, "unexpected gray text")
+    require(
+        claim_audit["status"] == "passed"
+        and claim_audit["claim_failed"] == 0
+        and claim_audit["claim_passed"] == claim_audit["claim_total"]
+        and claim_audit["claim_total"] >= 13
+        and claim_audit["assertion_total"] >= 80,
+        "claim-evidence audit did not pass its complete declared scope",
+    )
+    require(
+        claim_audit["ledger"]["sha256"] == sha256_file(claim_ledger_path),
+        "claim-evidence ledger hash mismatch",
+    )
+    require(
+        claim_audit["evidence_reference_manifest"]["sha256"] == sha256_file(manifest_path),
+        "claim audit evidence-reference manifest hash mismatch",
+    )
     require(args.visual_review_passed, "visual review attestation was not supplied")
 
     receipt = {
-        "schema_version": "dronedream.technical-report-validation-receipt.v2",
+        "schema_version": "dronedream.technical-report-validation-receipt.v3",
         "subject_commit": subject_commit,
         "parent_software_head": manifest["software"]["branch_head"],
         "branch": git(repo, "branch", "--show-current"),
@@ -200,6 +230,21 @@ def main() -> None:
             "internal_links": audit["links"]["internal"],
             "external_links": audit["links"]["external"],
         },
+        "claim_evidence": {
+            "ledger": {
+                "path": "technical-report/claim-evidence-ledger.json",
+                "sha256": sha256_file(claim_ledger_path),
+            },
+            "audit": {
+                "path": "technical-report/output/claim-evidence-audit.json",
+                "sha256": sha256_file(claim_audit_path),
+                "claims": claim_audit["claim_total"],
+                "passed": claim_audit["claim_passed"],
+                "failed": claim_audit["claim_failed"],
+                "assertions": claim_audit["assertion_total"],
+                "verified_sources": claim_audit["verified_sources"],
+            },
+        },
         "compile_log": {
             "sha256": sha256_file(log_path),
             "warning_counts": warning_counts,
@@ -229,7 +274,26 @@ def main() -> None:
                 "powershell -NoProfile -ExecutionPolicy Bypass "
                 "-File technical-report/scripts/build_report.ps1"
             ),
-            "receipt": ("python technical-report/scripts/create_report_validation_receipt.py"),
+            "receipt": (
+                "python technical-report/scripts/create_report_validation_receipt.py "
+                "--repository . --subject-commit <source-commit> "
+                "--pdf technical-report/output/DroneDream_AURORA_Technical_Report.pdf "
+                "--audit technical-report/output/latex-audit.json "
+                "--claim-audit technical-report/output/claim-evidence-audit.json "
+                "--claim-ledger technical-report/claim-evidence-ledger.json "
+                "--log technical-report/build/main.log "
+                "--manifest technical-report/evidence-reference-manifest.json "
+                "--output technical-report/validation-receipts/<source-commit>.json "
+                "--visual-review-passed"
+            ),
+            "claim_evidence": (
+                "python technical-report/scripts/verify_claim_evidence.py "
+                "--repository . "
+                "--ledger technical-report/claim-evidence-ledger.json "
+                "--manifest technical-report/evidence-reference-manifest.json "
+                "--body technical-report/body.tex "
+                "--output technical-report/output/claim-evidence-audit.json"
+            ),
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -241,6 +305,7 @@ def main() -> None:
                 "subject_commit": subject_commit,
                 "pdf_sha256": receipt["pdf"]["sha256"],
                 "audit_sha256": receipt["audit"]["sha256"],
+                "claim_audit_sha256": receipt["claim_evidence"]["audit"]["sha256"],
                 "output": str(args.output),
             },
             ensure_ascii=False,
