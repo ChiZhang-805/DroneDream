@@ -306,6 +306,29 @@ does not use receipt-only memory after reflection is removed, the incremental
 effect of that receipt-only component is explicitly marked **inconclusive**
 rather than credited with a benefit.
 
+The separate reflection-trigger intervention freezes six required production
+contract states and seven evaluated steps. Four steps show a direct causal
+contract difference in phase, executable tool surface, and selected tool.
+High-cost stagnation is a negative control: its trusted search summary remains
+decision-governing after observed-outcome removal. Search-space exhaustion has
+no dispatched cohort and is therefore marked
+`inconclusive_intervention_not_activated`. This is source-level causal protocol
+evidence, not an outcome-benefit result. The canonical artifact SHA-256 is
+`cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38`.
+
+The pilot-informed long-horizon stress expands the same five seed blocks and
+four arms to four generations and a common 120-Trial ceiling. All 20 synthetic
+Jobs complete with 1,588 persisted Trials, complete evidence, and zero network
+calls. The no-reflection intervention activates and changes tool sequence and
+outcome in all five primary comparisons, but neither performance direction is
+consistent: full AURORA has lower holdout loss in 1/5 blocks and lower realized
+Trial count in 3/5. The no-reflection arm has lower holdout loss in 4/5 and
+lower Trial count in 2/5; comparison-minus-full Trial count totals `+44`.
+Accordingly, the frozen artifact permits a synthetic protocol-effect statement
+only and explicitly rejects general quality, cost, LLM, PX4/Gazebo, physical,
+or safety benefit. Its canonical SHA-256 is
+`6da3544651ee56428b6e78f1613fd520c46b789dc3e7f9d44fc8be153dd9f5b3`.
+
 The real PX4/Gazebo main table, broader physical component-level outcome ablations,
 multi-seed physical confidence intervals, latency/token/cost results, and UX
 measurements remain unfilled until their locked experiments run.

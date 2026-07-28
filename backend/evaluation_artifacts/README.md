@@ -45,6 +45,44 @@ The `harness-contract-ablation-v2.*` and
 successors. Their `v1` counterparts remain immutable historical freezes; the
 version bump prevents a Prompt/Evidence upgrade from overwriting prior bytes.
 
+`harness-reflection-trigger-ablation-v1.*` freezes six direct input
+interventions against the production receding-plan compiler, eligibility gate,
+and selectable-tool surface. Across seven evaluated steps, four interventions
+change phase, tool surface, and selected tool. The high-cost/stagnation case is
+an explicit no-observed-difference result because the trusted search summary,
+not the removed observed outcome, governs that decision. The search-space
+exhaustion case is explicitly inconclusive because no dispatched cohort exists
+and therefore no reflection intervention activates. The artifact SHA-256 is
+`cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38`.
+Recompute and require byte-identical files with:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe scripts\evaluate_harness_reflection_triggers.py --check
+```
+
+`harness-reflection-outcome-stress-v1.*` extends the same four matched arms
+and five seed blocks to a pilot-informed four-generation, 120-Trial ceiling.
+The 20 synthetic Jobs persist 1,588 Trials with complete evidence and zero
+network calls. Removing verified observed outcomes activates the intervention
+and changes both tool sequence and frozen outcome in all five blocks. It does
+not establish a general benefit: full AURORA has lower holdout loss in one
+block and the comparison in four; full AURORA uses fewer realized Trials in
+three blocks and the comparison in two. The aggregate comparison-minus-full
+Trial delta is `+44`, but the paired direction is mixed and must not be
+described as a consistent cost reduction. The protocol is synthetic,
+pilot-informed, and non-confirmatory; it establishes neither LLM superiority
+nor PX4/Gazebo, physical, sim-to-real, safety, or generalized causal benefit.
+The artifact SHA-256 is
+`6da3544651ee56428b6e78f1613fd520c46b789dc3e7f9d44fc8be153dd9f5b3`.
+Recompute all arms and require byte-identical files with:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe `
+  scripts\evaluate_harness_reflection_outcome_stress.py --check
+```
+
 `simulation-coverage-mock-v3.json` is the current separate deterministic
 outcome campaign; v2 remains an immutable historical freeze. The v3 campaign
 runs the production optimizer portfolio against all ten mock scenario types,

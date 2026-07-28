@@ -287,6 +287,8 @@ def _job_request(
     seed_block: int,
     *,
     arm: HarnessComponentArm,
+    max_iterations: int = HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS,
+    max_total_trials: int = HARNESS_COMPONENT_ABLATION_MAX_TOTAL_TRIALS,
 ) -> schemas.JobCreateRequest:
     strategy = (
         "optimizer_portfolio"
@@ -297,8 +299,8 @@ def _job_request(
         display_name=f"synthetic-component-ablation-{seed_block}",
         simulator_backend="mock",
         optimizer_strategy=strategy,  # type: ignore[arg-type]
-        max_iterations=HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS,
-        max_total_trials=HARNESS_COMPONENT_ABLATION_MAX_TOTAL_TRIALS,
+        max_iterations=max_iterations,
+        max_total_trials=max_total_trials,
         objective_config=schemas.ObjectiveConfig(
             objectives=[
                 schemas.ObjectiveSpec(metric="rmse", direction="minimize"),
@@ -698,7 +700,13 @@ def _decision_trace_from_outcome(
     return trace
 
 
-def _run_arm(seed_block: int, arm: HarnessComponentArm) -> dict[str, Any]:
+def _run_arm(
+    seed_block: int,
+    arm: HarnessComponentArm,
+    *,
+    max_iterations: int = HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS,
+    max_total_trials: int = HARNESS_COMPONENT_ABLATION_MAX_TOTAL_TRIALS,
+) -> dict[str, Any]:
     if arm not in HARNESS_COMPONENT_ABLATION_ARMS:
         raise ValueError(f"unknown component-ablation arm: {arm}")
     client = (
@@ -738,7 +746,12 @@ def _run_arm(seed_block: int, arm: HarnessComponentArm) -> dict[str, Any]:
             job = job_services._create_job_from_config(
                 db,
                 user=user,
-                req=_job_request(seed_block, arm=arm),
+                req=_job_request(
+                    seed_block,
+                    arm=arm,
+                    max_iterations=max_iterations,
+                    max_total_trials=max_total_trials,
+                ),
             )
             job_id = job.id
             db.commit()
@@ -747,6 +760,7 @@ def _run_arm(seed_block: int, arm: HarnessComponentArm) -> dict[str, Any]:
                 factory,
                 job_id=job_id,
                 client=cast(Any, client),
+                max_steps=max_total_trials + 20,
             )
         finally:
             aggregation.set_llm_client_override(previous_client)

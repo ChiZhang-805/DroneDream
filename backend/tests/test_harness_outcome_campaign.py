@@ -5,6 +5,7 @@ import hashlib
 import json
 import socket
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -12,6 +13,7 @@ from app.orchestration.harness_outcome_campaign import (
     HARNESS_OUTCOME_CAMPAIGN_ARMS,
     HARNESS_OUTCOME_CAMPAIGN_SEED_BLOCKS,
     SyntheticNetworkConnectBlocked,
+    _drive_job,
     _network_connect_guard,
     build_harness_outcome_campaign,
     load_harness_outcome_campaign,
@@ -82,6 +84,22 @@ def test_campaign_guard_blocks_and_counts_network_connects() -> None:
 def test_campaign_client_override_is_not_a_production_api_field() -> None:
     assert "llm_client_override" not in JobCreateRequest.model_fields
     assert "client" not in JobCreateRequest.model_fields
+
+
+@pytest.mark.parametrize("max_steps", [0, -1, True])
+def test_campaign_driver_rejects_invalid_explicit_step_limit(
+    max_steps: int,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="campaign orchestration step limit must be positive",
+    ):
+        _drive_job(
+            cast(Any, None),
+            job_id="not-started",
+            client=None,
+            max_steps=max_steps,
+        )
 
 
 def test_campaign_rejects_claim_upgrade_or_outcome_tamper() -> None:

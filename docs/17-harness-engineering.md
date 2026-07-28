@@ -927,6 +927,43 @@ under its frozen protocol, but it does not assign a separate benefit to
 receipt-only memory and does not establish general AURORA, LLM, PX4/Gazebo, or
 real-flight performance.
 
+### Reflection trigger and long-horizon stress closures
+
+`backend/scripts/evaluate_harness_reflection_triggers.py` directly intervenes
+on the verified observed outcome in decision memory and recompiles the
+production receding plan, capability eligibility, selectable-tool surface, and
+local frozen policy. The six-case suite covers high cost without improvement,
+failure concentration, search-space exhaustion, phase transition,
+recovery-to-re-exploration, and tool-eligibility change. Four of seven evaluated
+steps change phase, executable tool surface, and selected tool. The suite also
+preserves two important non-positive controls: trusted search-summary
+stagnation remains decision-governing when only reflection is removed, and an
+exhausted search with no dispatched cohort cannot activate the intervention.
+The latter is marked inconclusive rather than credited to reflection.
+
+The frozen trigger artifact has canonical SHA-256
+`cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38`.
+It establishes that verified reflection is decision-relevant for named
+production-contract states, not that reflection improves optimizer quality.
+
+`backend/scripts/evaluate_harness_reflection_outcome_stress.py` then extends
+the four matched component arms to four generations and a common 120-Trial
+ceiling. Its 20 synthetic Jobs persist 1,588 Trials with complete evidence,
+zero network calls, no credentials, and `physical_fidelity=false`. Removing
+observed-outcome reflection activates the intervention and changes the tool
+sequence and frozen outcome in all five seed blocks. However, the paired
+quality result is mixed: full AURORA has lower holdout loss in one block and
+the no-reflection arm in four. Realized Trial direction is also mixed: full
+AURORA is lower in three blocks and no-reflection is lower in two, although the
+aggregate comparison-minus-full delta is `+44`.
+
+The long-horizon artifact is deliberately labeled
+`SYNTHETIC_MOCK_PILOT_INFORMED`, non-confirmatory, and has canonical SHA-256
+`6da3544651ee56428b6e78f1613fd520c46b789dc3e7f9d44fc8be153dd9f5b3`.
+It demonstrates a causal protocol effect in these frozen synthetic blocks,
+while explicitly rejecting a general quality, cost, LLM, PX4/Gazebo, physical,
+sim-to-real, flight-safety, or user-benefit claim.
+
 ### Locked deterministic router-policy holdout
 
 The separate

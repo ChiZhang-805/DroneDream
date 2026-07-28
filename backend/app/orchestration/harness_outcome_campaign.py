@@ -520,6 +520,7 @@ def _drive_job(
     *,
     job_id: str,
     client: _ProviderErrorClient | _InvalidResponseClient | None,
+    max_steps: int | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run one isolated Job using a process-local, test-only client object.
 
@@ -527,6 +528,14 @@ def _drive_job(
     cannot be supplied through the production API. It is an in-process
     evaluation seam used here so no credential or provider transport exists.
     """
+
+    step_limit = (
+        HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS + 20
+        if max_steps is None
+        else max_steps
+    )
+    if isinstance(step_limit, bool) or step_limit < 1:
+        raise ValueError("campaign orchestration step limit must be positive")
 
     previous_client = aggregation._llm_client_override
     aggregation.set_llm_client_override(client)
@@ -536,7 +545,7 @@ def _drive_job(
             started = job_manager.start_queued_jobs(db, limit=1)
         if started != [job_id]:
             raise RuntimeError("campaign Job did not enter RUNNING")
-        for _step in range(HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS + 20):
+        for _step in range(step_limit):
             ran_trial = False
             with factory() as db:
                 trial_id = trial_executor.claim_and_run_one_pending_trial(

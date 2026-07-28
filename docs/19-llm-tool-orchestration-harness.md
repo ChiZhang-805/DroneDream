@@ -8793,6 +8793,44 @@ reduced-fidelity-capable strategy even when earlier full-matrix evidence exists.
 These are trusted dispatch contracts, not model instructions, and regressions
 cover every phase exclusion plus the pre-dispatch fidelity floor.
 
+### 30.18 Reflection causal-contract and long-horizon stress evidence
+
+The first Evidence 2.7 component campaign was insufficient to isolate several
+important reflection states: it stopped after two generations, its no-memory
+and no-reflection arms were behaviorally identical, and its five changed rows
+did not establish a general benefit. Two separate deterministic protocols now
+make those limits measurable instead of interpreting absence as success.
+
+The reflection-trigger protocol directly removes only the verified
+`observed_outcome` from otherwise matched decision memory, then invokes the
+production plan compiler, capability gate, phase-role tool intersection, and
+frozen local selector. Six named cases cover high cost without improvement,
+failure concentration, search-space exhaustion, phase transition,
+recovery-to-re-exploration, and tool-eligibility change. Across seven steps,
+four change phase, selectable tool surface, and selected tool. Trusted
+search-summary stagnation is an intentional no-observed-difference control.
+Search-space exhaustion has no dispatched cohort, so reflection cannot be
+intervened on and the case is explicitly inconclusive. The canonical artifact
+hash is
+`cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38`.
+
+The long-horizon outcome stress uses the same five seed blocks and four arms
+with a common four-generation, 120-Trial ceiling. It persists 1,588 synthetic
+Trials across 20 Jobs, with complete evidence, zero network calls, and no real
+credential. The primary no-reflection intervention activates in 5/5 blocks and
+changes both tool sequence and frozen outcome in 5/5. Those causal protocol
+differences do not imply a quality benefit: paired holdout signs favor full
+AURORA in one block and no-reflection in four. Realized Trial signs favor full
+AURORA in three blocks and no-reflection in two; the comparison-minus-full
+aggregate is `+44`, but the direction is not consistent. The canonical
+artifact hash is
+`6da3544651ee56428b6e78f1613fd520c46b789dc3e7f9d44fc8be153dd9f5b3`.
+
+Both protocols are deterministic Mock evidence. The long-horizon design is
+pilot-informed and non-confirmatory. Neither protocol permits a generalized
+quality or cost claim, LLM superiority, PX4/Gazebo or physical performance,
+sim-to-real transfer, flight safety, or user benefit.
+
 ## 31. Reference index
 
 Primary and official references used for this design:
