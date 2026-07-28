@@ -65,6 +65,10 @@ class User(Base):
 
     jobs: Mapped[list[Job]] = relationship(back_populates="user")
     batch_jobs: Mapped[list[BatchJob]] = relationship(back_populates="user")
+    harness_experiences: Mapped[list[HarnessExperienceMemory]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class DesktopBridgeNonce(Base):
@@ -286,6 +290,10 @@ class Job(Base):
     )
     secrets: Mapped[list[JobSecret]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
+    )
+    harness_experiences: Mapped[list[HarnessExperienceMemory]] = relationship(
+        back_populates="source_job",
+        cascade="all, delete-orphan",
     )
     batch: Mapped[BatchJob | None] = relationship(back_populates="jobs")
 
@@ -742,6 +750,89 @@ class CandidateEvidenceDeleteAuthorization(Base):
     )
 
 
+class HarnessExperienceMemory(Base):
+    """Revocable, bounded cross-Job Harness experience.
+
+    Rows contain only closed structured observations compiled from verified
+    Harness decision/cohort receipts. Provider-visible projections never expose
+    the ownership/source identifiers or the internal receipt binding.
+    """
+
+    __tablename__ = "harness_experience_memories"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_job_id",
+            "source_generation",
+            name="uq_harness_experience_source_generation",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+        default=lambda: _new_id("hexp"),
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_job_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    memory_schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_evidence_schema_version: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )
+    source_prompt_template_version: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )
+    source_tool_registry_version: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )
+    source_eligibility_policy_version: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )
+    task_family_sha256: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True
+    )
+    scenario_profile_json: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False
+    )
+    tool_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    decision_source: Mapped[str] = mapped_column(String(32), nullable=False)
+    plan_phase: Mapped[str] = mapped_column(String(32), nullable=False)
+    batch_policy: Mapped[str] = mapped_column(String(32), nullable=False)
+    dispatched_candidates: Mapped[int] = mapped_column(Integer, nullable=False)
+    planned_candidates: Mapped[int] = mapped_column(Integer, nullable=False)
+    observed_outcome_json: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False
+    )
+    source_receipt_sha256: Mapped[str] = mapped_column(
+        String(64), nullable=False, unique=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    revocation_reason: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+
+    user: Mapped[User] = relationship(back_populates="harness_experiences")
+    source_job: Mapped[Job] = relationship(back_populates="harness_experiences")
+
+
 class JobEvent(Base):
     __tablename__ = "job_events"
 
@@ -784,6 +875,7 @@ __all__ = [
     "CandidateEvidenceDeleteAuthorization",
     "CandidateEvidenceReceipt",
     "CandidateParameterSet",
+    "HarnessExperienceMemory",
     "Job",
     "JobEvent",
     "JobReport",

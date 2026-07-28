@@ -23,6 +23,10 @@ from app import models
 from app.config import get_settings
 from app.optimization.experimental_types import ExperimentalOptimizerStrategy
 from app.orchestration.events import record_event
+from app.orchestration.experience_memory import (
+    materialize_verified_terminal_job_experiences,
+    retrieve_cross_job_memory,
+)
 from app.orchestration.harness_context import (
     HARNESS_DECISION_TRACE_SCHEMA_VERSION,
     HARNESS_EVIDENCE_SCHEMA_VERSION,
@@ -54,6 +58,7 @@ _MAX_RATIONALE_LENGTH = 400
 _DECISION_MEMORY_LOOKBACK_GENERATIONS = 32
 _DECISION_MEMORY_RESULT_SCAN_LIMIT = 512
 _DECISION_MEMORY_COMPANION_SCAN_LIMIT = 4096
+_CROSS_JOB_SOURCE_SCAN_LIMIT = 12
 
 
 def _decision_schema(
@@ -187,10 +192,12 @@ def build_decision_messages(
         "generation. Compare remaining budget, parameter dimension, training-case "
         "heterogeneity, replicate cost, weight concentration, safe perturbation "
         "magnitudes, feasibility, optimizer-learning failure rate, improvement "
-        "trend, stagnation, and prior tool outcomes. Validation counts describe "
+        "trend, stagnation, same-Job prior tool outcomes, and compatible cross-Job "
+        "structured observations. Validation counts describe "
         "cost only; never infer hidden validation types, conditions, or results. "
-        "Treat observed decision outcomes as bounded associations, not causal "
-        "rewards or child-tool credit. The deterministic receding-horizon plan "
+        "Treat same-Job and cross-Job observed decision outcomes as bounded "
+        "associations, not causal rewards, transfer guarantees, or child-tool "
+        "credit. The deterministic receding-horizon plan "
         "sets the current phase and batch policy; select a tool compatible with "
         "that phase because the plan will be recomputed after the cohort result. "
         "Every provider-visible aggregated score uses DroneDream's deterministic "
@@ -220,6 +227,9 @@ def build_decision_messages(
                 "decision_memory[].observed_outcome.incumbent_score_before",
                 "decision_memory[].observed_outcome.cohort_best_score",
                 "decision_memory[].observed_outcome.incumbent_score_after",
+                "cross_job_memory.experiences[].observed_outcome.incumbent_score_before",
+                "cross_job_memory.experiences[].observed_outcome.cohort_best_score",
+                "cross_job_memory.experiences[].observed_outcome.incumbent_score_after",
                 "candidates[].aggregated_score",
             ],
             "raw_metric_policy": "do_not_compare_without_explicit_direction",
@@ -231,7 +241,10 @@ def build_decision_messages(
             "case profiles and job-wide simulation conditions without guessing "
             "anything about sealed validation cases. Reflect on verified prior "
             "cohort results when present, but do not infer causality from "
-            "observational improvement. Treat every listed aggregate score as a "
+            "observational improvement. Cross-Job experience is restricted to "
+            "the same authenticated owner and exact structural task family; use "
+            "scenario_similarity only as a retrieval rank, never as a physical "
+            "fidelity or transfer guarantee. Treat every listed aggregate score as a "
             "minimized loss, so a smaller finite value is better. Respect the "
             "supplied one-generation "
             "planning phase and batch policy; do not invent a later open-loop "
@@ -450,6 +463,56 @@ def _recent_harness_decision_events(
     return companions
 
 
+def _compile_cross_job_memory(
+    db: Session,
+    *,
+    current_job: models.Job,
+    current_snapshot: HarnessEvidenceSnapshot,
+) -> HarnessEvidenceSnapshot:
+    """Lazily materialize bounded terminal history, then retrieve it safely."""
+
+    if not isinstance(current_job.user_id, str) or not current_job.user_id:
+        return current_snapshot
+    source_jobs = list(
+        db.scalars(
+            select(models.Job)
+            .where(
+                models.Job.user_id == current_job.user_id,
+                models.Job.id != current_job.id,
+                models.Job.status.in_(("COMPLETED", "FAILED", "CANCELLED")),
+            )
+            .order_by(models.Job.updated_at.desc(), models.Job.id.desc())
+            .limit(_CROSS_JOB_SOURCE_SCAN_LIMIT)
+        )
+    )
+    for source_job in source_jobs:
+        source_events = _recent_harness_decision_events(db, source_job)
+        verified_started = frozenset(
+            verified_id
+            for event in source_events
+            if (verified_id := _verified_started_decision_id(event)) is not None
+        )
+        source_snapshot, _ = build_harness_evidence(
+            source_job,
+            execution_events=source_events,
+            verified_started_decision_ids=verified_started,
+        )
+        materialize_verified_terminal_job_experiences(
+            db,
+            source_job=source_job,
+            snapshot=source_snapshot,
+        )
+    db.flush()
+    cross_job_memory = retrieve_cross_job_memory(
+        db,
+        current_job=current_job,
+        current_snapshot=current_snapshot,
+    )
+    return current_snapshot.model_copy(
+        update={"cross_job_memory": cross_job_memory}
+    )
+
+
 def _fallback(
     db: Session,
     job: models.Job,
@@ -544,6 +607,11 @@ def select_optimizer_tool(
         job,
         execution_events=recent_decision_events,
         verified_started_decision_ids=verified_started_decision_ids,
+    )
+    evidence_snapshot = _compile_cross_job_memory(
+        db,
+        current_job=job,
+        current_snapshot=evidence_snapshot,
     )
     evidence = evidence_snapshot.model_dump(mode="json", exclude_none=True)
     evidence_json = _canonical_json(evidence)

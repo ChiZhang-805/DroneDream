@@ -15,6 +15,12 @@ from app import models, schemas
 from app.api_idempotency import begin_mutation
 from app.auth import get_current_user
 from app.db import get_db
+from app.orchestration.experience_memory import (
+    HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+    HARNESS_EXPERIENCE_RETENTION_DAYS,
+    HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION,
+    revoke_cross_job_experiences,
+)
 from app.orchestration.winner_freeze import (
     WinnerFreezeError,
     require_winner_freeze_receipt,
@@ -326,6 +332,87 @@ def delete_job(
         _raise(err)
     response = ok(payload)
     return gate.complete(response, resource_type="job", resource_id=job_id)
+
+
+@router.delete("/jobs/{job_id}/harness-experiences")
+def revoke_job_harness_experiences(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict[str, object]:
+    """Revoke retrievable cross-Job observations sourced from one owned Job."""
+
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="harness_experiences.revoke_job",
+        idempotency_key=idempotency_key,
+        payload={"job_id": job_id},
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    revoked = revoke_cross_job_experiences(
+        db,
+        user_id=user.id,
+        source_job_id=job.id,
+    )
+    response = ok(
+        {
+            "job_id": job.id,
+            "revoked_count": revoked,
+            "memory_schema_version": HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+            "retrieval_policy_version": (
+                HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION
+            ),
+            "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
+        }
+    )
+    return gate.complete(
+        response,
+        resource_type="harness_experience_memory",
+        resource_id=job.id,
+    )
+
+
+@router.delete("/harness-experiences")
+def revoke_all_harness_experiences(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict[str, object]:
+    """Revoke every still-active cross-Job observation owned by the caller."""
+
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="harness_experiences.revoke_all",
+        idempotency_key=idempotency_key,
+        payload={},
+    )
+    if gate.replay is not None:
+        return gate.replay
+    revoked = revoke_cross_job_experiences(db, user_id=user.id)
+    response = ok(
+        {
+            "revoked_count": revoked,
+            "memory_schema_version": HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+            "retrieval_policy_version": (
+                HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION
+            ),
+            "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
+        }
+    )
+    return gate.complete(
+        response,
+        resource_type="harness_experience_memory",
+        resource_id=user.id,
+    )
 
 
 @router.get("/jobs/{job_id}/trials")

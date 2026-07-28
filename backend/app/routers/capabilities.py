@@ -14,6 +14,11 @@ from app.orchestration.decision_harness import (
     HARNESS_DECISION_TRACE_SCHEMA_VERSION,
     HARNESS_PROMPT_TEMPLATE_VERSION,
 )
+from app.orchestration.experience_memory import (
+    HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+    HARNESS_EXPERIENCE_RETENTION_DAYS,
+    HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION,
+)
 from app.orchestration.harness_context import (
     HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_TOOL_REGISTRY_VERSION,
@@ -192,6 +197,19 @@ def read_capabilities() -> dict[str, object]:
                     "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
                     "trace_schema_version": HARNESS_DECISION_TRACE_SCHEMA_VERSION,
                     "tool_registry": "closed",
+                    "cross_job_memory": {
+                        "available": True,
+                        "schema_version": (
+                            HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION
+                        ),
+                        "retrieval_policy_version": (
+                            HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION
+                        ),
+                        "scope": "same_authenticated_user",
+                        "task_family_policy": "exact_structural_match",
+                        "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
+                        "revocable": True,
+                    },
                 },
             },
             "simulators": _simulator_capabilities(),

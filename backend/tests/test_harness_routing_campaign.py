@@ -76,7 +76,7 @@ def test_cli_preflight_binds_the_script_backend_without_credentials(
     preflight = json.loads(result.stdout)
     assert Path(preflight["backend_root"]) == BACKEND_ROOT.resolve()
     assert preflight["case_count"] == 24
-    assert preflight["prompt_template_version"] == "1.6"
+    assert preflight["prompt_template_version"] == "1.7"
     assert preflight["output_exists"] is False
     assert not output.exists()
 

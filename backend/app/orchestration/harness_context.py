@@ -80,13 +80,14 @@ HarnessPlanReason = Literal[
     "stable_progress",
 ]
 
-HARNESS_EVIDENCE_SCHEMA_VERSION = "2.7"
+HARNESS_EVIDENCE_SCHEMA_VERSION = "2.8"
 HARNESS_TOOL_REGISTRY_VERSION = "2.1"
 HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION = "1.1"
-HARNESS_PROMPT_TEMPLATE_VERSION = "1.6"
-HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.3"
+HARNESS_PROMPT_TEMPLATE_VERSION = "1.7"
+HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.4"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
+MAX_CROSS_JOB_EXPERIENCE_ITEMS = 6
 MAX_GENERATION_TREND_ITEMS = 32
 
 _ALLOWED_SOURCE_TYPES = frozenset({"baseline", "optimizer", "llm_optimizer"})
@@ -677,6 +678,50 @@ class HarnessExecutionMemory(_ClosedModel):
         return self
 
 
+class HarnessCrossJobExperience(_ClosedModel):
+    """Provider-safe projection of one verified prior-Job cohort.
+
+    Ownership and source identifiers, raw text, parameters, seeds, holdout
+    details, and exact timestamps are deliberately absent.
+    """
+
+    schema_id: Literal["dronedream.harness-cross-job-experience/v1"] = (
+        "dronedream.harness-cross-job-experience/v1"
+    )
+    match_quality: Literal["exact_task_family"] = "exact_task_family"
+    scenario_similarity: float = Field(ge=0.0, le=1.0)
+    tool_id: HarnessToolId
+    decision_source: Literal["model", "deterministic_fallback"]
+    plan_phase: HarnessPlanPhase
+    batch_policy: HarnessBatchPolicy
+    dispatched_candidates: int = Field(ge=1)
+    planned_candidates: int = Field(ge=1)
+    observed_outcome: HarnessObservedDecisionOutcome
+
+    @model_validator(mode="after")
+    def _validate_dispatch(self) -> HarnessCrossJobExperience:
+        if self.dispatched_candidates > self.planned_candidates:
+            raise ValueError("cross-Job experience dispatch exceeds its plan")
+        return self
+
+
+class HarnessCrossJobMemory(_ClosedModel):
+    """Closed retrieval result with an explicit non-causal claim boundary."""
+
+    schema_id: Literal["dronedream.harness-cross-job-memory/v1"] = (
+        "dronedream.harness-cross-job-memory/v1"
+    )
+    retrieval_policy_version: Literal["1.0"] = "1.0"
+    retention_days: Literal[90] = 90
+    scope: Literal["same_authenticated_user"] = "same_authenticated_user"
+    task_family_policy: Literal["exact_structural_match"] = "exact_structural_match"
+    claim_boundary: Literal["observational_not_causal"] = "observational_not_causal"
+    experiences: tuple[HarnessCrossJobExperience, ...] = Field(
+        default=(),
+        max_length=MAX_CROSS_JOB_EXPERIENCE_ITEMS,
+    )
+
+
 class HarnessJobEvidence(_ClosedModel):
     objective_profile: HarnessObjectiveProfile
     track_type: HarnessTrackType
@@ -688,7 +733,7 @@ class HarnessJobEvidence(_ClosedModel):
 
 
 class HarnessEvidenceSnapshot(_ClosedModel):
-    schema_version: Literal["2.7"] = "2.7"
+    schema_version: Literal["2.8"] = "2.8"
     job: HarnessJobEvidence
     budget: HarnessBudgetEvidence
     plan: HarnessPlanningEvidence
@@ -698,6 +743,9 @@ class HarnessEvidenceSnapshot(_ClosedModel):
     decision_memory: tuple[HarnessExecutionMemory, ...] = Field(
         default=(),
         max_length=MAX_DECISION_MEMORY_ITEMS,
+    )
+    cross_job_memory: HarnessCrossJobMemory = Field(
+        default_factory=HarnessCrossJobMemory
     )
     candidates: tuple[HarnessCandidateEvidence, ...] = Field(max_length=MAX_EVIDENCE_CANDIDATES)
     candidate_history_total: int = Field(ge=0)
@@ -1900,8 +1948,11 @@ __all__ = [
     "HARNESS_TOOL_REGISTRY",
     "HARNESS_TOOL_REGISTRY_VERSION",
     "MAX_DECISION_MEMORY_ITEMS",
+    "MAX_CROSS_JOB_EXPERIENCE_ITEMS",
     "MAX_GENERATION_TREND_ITEMS",
     "HarnessEvidenceSnapshot",
+    "HarnessCrossJobExperience",
+    "HarnessCrossJobMemory",
     "HarnessEnvironmentEvidence",
     "HarnessObservedDecisionOutcome",
     "HarnessPlanningEvidence",

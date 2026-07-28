@@ -23,11 +23,20 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert data["features"]["llm_tool_harness"] == {
         "available": True,
         "decision_schema_version": "1.0",
-        "evidence_schema_version": "2.7",
+        "evidence_schema_version": "2.8",
         "tool_registry_version": "2.1",
-        "prompt_template_version": "1.6",
-        "trace_schema_version": "1.3",
+        "prompt_template_version": "1.7",
+        "trace_schema_version": "1.4",
         "tool_registry": "closed",
+        "cross_job_memory": {
+            "available": True,
+            "schema_version": "1.0",
+            "retrieval_policy_version": "1.0",
+            "scope": "same_authenticated_user",
+            "task_family_policy": "exact_structural_match",
+            "retention_days": 90,
+            "revocable": True,
+        },
     }
     assert data["simulators"]["authoritative"] is False
     assert data["optimizers"]["authoritative"] is False
