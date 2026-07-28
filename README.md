@@ -1,8 +1,6 @@
-<p align="center">
-  <img src="docs/assets/drone-dream-icon.png" alt="DroneDream icon" width="220" />
-</p>
-
-<h1 align="center">🚁 DroneDream</h1>
+<h1 align="center">
+  <img src="docs/assets/brand/drone-dream-lockup-primary.png" alt="DroneDream" width="760" />
+</h1>
 
 ---
 
