@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 from app.orchestration.harness_multi_tool_budget_evaluation import (
     HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY,
@@ -9,6 +12,10 @@ from app.orchestration.harness_multi_tool_budget_evaluation import (
     build_harness_multi_tool_budget_manifest,
 )
 from scripts.evaluate_harness_multi_tool_budget import _payloads
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = BACKEND_ROOT.parent
+EVALUATOR = BACKEND_ROOT / "scripts" / "evaluate_harness_multi_tool_budget.py"
 
 
 def _sha256(payload: dict[str, object], field: str) -> str:
@@ -105,3 +112,18 @@ def test_multi_tool_evaluation_manifest_and_rendered_files_bind_artifact() -> No
         "harness-multi-tool-budget-evaluation-v1.manifest.json",
         "harness-multi-tool-budget-evaluation-v1.sha256",
     }
+
+
+def test_multi_tool_evaluator_binds_backend_when_launched_from_repo_root() -> None:
+    result = subprocess.run(
+        [sys.executable, str(EVALUATOR), "--help"],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--source-commit" in result.stdout
+    assert "--generated-at" in result.stdout

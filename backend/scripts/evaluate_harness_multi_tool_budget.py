@@ -8,10 +8,16 @@ import csv
 import hashlib
 import io
 import json
+import sys
 from pathlib import Path
 from typing import Any, cast
 
-from app.orchestration.harness_multi_tool_budget_evaluation import (
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+while str(BACKEND_ROOT) in sys.path:
+    sys.path.remove(str(BACKEND_ROOT))
+sys.path.insert(0, str(BACKEND_ROOT))
+
+from app.orchestration.harness_multi_tool_budget_evaluation import (  # noqa: E402
     HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY,
     HARNESS_MULTI_TOOL_BUDGET_EVAL_MANIFEST_SCHEMA_VERSION,
     HARNESS_MULTI_TOOL_BUDGET_EVAL_SCHEMA_VERSION,
@@ -19,7 +25,7 @@ from app.orchestration.harness_multi_tool_budget_evaluation import (
     build_harness_multi_tool_budget_manifest,
 )
 
-DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "evaluation_artifacts"
+DEFAULT_ROOT = BACKEND_ROOT / "evaluation_artifacts"
 DEFAULT_STEM = "harness-multi-tool-budget-evaluation-v1"
 
 
