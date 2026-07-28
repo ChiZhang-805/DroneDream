@@ -54,7 +54,10 @@ from app.orchestration.harness_routing_holdout import (  # noqa: E402
 
 REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v7"
 REPORT_EVIDENCE_MANIFEST_SCHEMA_VERSION = "dronedream.technical-report-evidence-manifest.v1"
-TEST_RUN_RECEIPT_SCHEMA_VERSION = "dronedream.test-run-receipt.v1"
+SUPPORTED_TEST_RUN_RECEIPT_SCHEMA_VERSIONS = {
+    "dronedream.test-run-receipt.v1",
+    "dronedream.test-run-receipt.v2",
+}
 DEFAULT_ROUTING_CORPUS = BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_eval_v1.jsonl"
 DEFAULT_ROUTING_PREDICTIONS = (
     BACKEND_ROOT
@@ -180,7 +183,7 @@ def _load_backend_test_receipt(
         or hashlib.sha256(_canonical_json(unsigned).encode("utf-8")).hexdigest() != declared_hash
     ):
         raise ValueError("backend test receipt hash does not recompute")
-    if payload.get("schema_version") != TEST_RUN_RECEIPT_SCHEMA_VERSION:
+    if payload.get("schema_version") not in SUPPORTED_TEST_RUN_RECEIPT_SCHEMA_VERSIONS:
         raise ValueError("backend test receipt schema is unsupported")
     if payload.get("source_commit") != source_commit:
         raise ValueError("backend test receipt does not bind the source commit")
@@ -192,10 +195,12 @@ def _load_backend_test_receipt(
     if (
         not isinstance(result, dict)
         or result.get("status") != "passed"
-        or result.get("passed") != 1139
+        or isinstance(result.get("passed"), bool)
+        or not isinstance(result.get("passed"), int)
+        or result["passed"] <= 0
         or result.get("failed") != 0
     ):
-        raise ValueError("backend test receipt does not prove the 1,139-test run")
+        raise ValueError("backend test receipt does not prove a passing full-suite run")
     log = full_suite.get("log")
     if not isinstance(log, dict):
         raise ValueError("backend test receipt is missing its full-suite log")
@@ -220,11 +225,11 @@ def _load_backend_test_receipt(
         ):
             raise ValueError("backend test receipt log binding does not recompute")
         verified_logs.append(resolved_log)
-    if "1139 passed in" not in verified_logs[0].read_text(
+    if f"{result['passed']} passed in" not in verified_logs[0].read_text(
         encoding="utf-8",
         errors="replace",
     ):
-        raise ValueError("backend full-suite log does not contain the 1,139-test result")
+        raise ValueError("backend full-suite log does not contain the declared result")
     if not focused_checks:
         raise ValueError("backend test receipt requires passing focused checks")
     for check in focused_checks:

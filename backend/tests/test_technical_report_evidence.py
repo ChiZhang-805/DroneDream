@@ -237,6 +237,34 @@ def test_report_evidence_refuses_validation_feedback_in_mixed_shift() -> None:
         summarize_scenario_generalization(payload)
 
 
+def test_report_evidence_rejects_receipt_log_count_mismatch(tmp_path: Path) -> None:
+    receipt = json.loads(_TEST_RECEIPT.read_text(encoding="utf-8"))
+    receipt["full_suite"]["result"]["passed"] = 1142
+    unsigned = dict(receipt)
+    unsigned.pop("receipt_sha256")
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(
+            unsigned,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="does not contain the declared result"):
+        build_report_evidence_bundle(
+            source_commit=_TEST_SOURCE_COMMIT,
+            generated_at=_TEST_GENERATED_AT,
+            backend_test_receipt_path=receipt_path,
+        )
+
+
 def test_report_evidence_writes_chart_ready_csv(tmp_path: Path) -> None:
     bundle = _build_bundle()
     output_path = tmp_path / "evidence.json"

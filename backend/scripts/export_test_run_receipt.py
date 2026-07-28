@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-TEST_RUN_RECEIPT_SCHEMA_VERSION = "dronedream.test-run-receipt.v1"
+TEST_RUN_RECEIPT_SCHEMA_VERSION = "dronedream.test-run-receipt.v2"
 
 
 def _canonical_json(value: object) -> str:
@@ -92,6 +92,7 @@ def build_test_run_receipt(
     focused_duration_seconds: float,
     focused_passed: int,
     bridge_reason: str,
+    exact_final_commit_run: bool = False,
 ) -> dict[str, Any]:
     """Return one deterministic receipt from explicit metadata and immutable logs."""
 
@@ -156,9 +157,9 @@ def build_test_run_receipt(
             },
             "log": _repository_log(full_suite_log_path),
             "tested_state": {
-                "kind": "pre_commit_worktree",
+                "kind": "commit" if exact_final_commit_run else "pre_commit_worktree",
                 "base_commit": base_commit,
-                "exact_final_commit_run": False,
+                "exact_final_commit_run": exact_final_commit_run,
             },
         },
         "focused_checks": [
@@ -180,8 +181,8 @@ def build_test_run_receipt(
             }
         ],
         "validation_bridge": {
-            "full_suite_rerun_performed": False,
-            "focused_rerun_required": True,
+            "full_suite_rerun_performed": exact_final_commit_run,
+            "focused_rerun_required": not exact_final_commit_run,
             "focused_rerun_performed": True,
             "reason": bridge_reason,
         },
@@ -215,6 +216,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--focused-duration-seconds", type=float, required=True)
     parser.add_argument("--focused-passed", type=int, required=True)
     parser.add_argument("--bridge-reason", required=True)
+    parser.add_argument(
+        "--exact-final-commit-run",
+        action="store_true",
+        help="Declare that the full suite ran from a clean checkout of source_commit.",
+    )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -243,6 +249,7 @@ def main() -> int:
         focused_duration_seconds=args.focused_duration_seconds,
         focused_passed=args.focused_passed,
         bridge_reason=args.bridge_reason,
+        exact_final_commit_run=args.exact_final_commit_run,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
