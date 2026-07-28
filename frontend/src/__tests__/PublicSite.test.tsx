@@ -45,8 +45,8 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("heading", { name: /Tune with evidence/i })).toBeVisible();
     expect(screen.getByText("WINDOWS PREVIEW")).toBeVisible();
     expect(screen.queryByText("WINDOWS RELEASE")).toBeNull();
-    expect(screen.getByText(/Preview candidate: verify its SHA-256 before installation/i)).toBeVisible();
-    expect(screen.getByText(/This installer is not yet Authenticode-signed/i)).toBeVisible();
+    expect(screen.getByText(/This preview candidate is not Authenticode-signed/i)).toBeVisible();
+    expect(screen.getByText(/Verify its SHA-256 before installation/i)).toBeVisible();
     expect(screen.getByRole("link", { name: "Download Windows preview" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Download preview" })).toBeVisible();
     expect(screen.queryByText("LAB")).toBeNull();
@@ -376,6 +376,7 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(screen.queryByText("WINDOWS 正式版")).toBeNull();
     expect(screen.getByText(/当前为未签名的预览候选版本/)).toBeVisible();
     expect(screen.getByText(/Windows 可能显示“未知发布者”警告/)).toBeVisible();
+    expect(screen.getByText(/请务必确认下载文件与本页记录一致后再安装/)).toBeVisible();
     expect(screen.getByRole("link", { name: "下载 Windows 预览版" })).toBeVisible();
     expect(screen.getByRole("link", { name: "下载预览版" })).toBeVisible();
     expect(screen.getByRole("link", { name: "代码签名政策" })).toBeVisible();

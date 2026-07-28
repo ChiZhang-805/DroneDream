@@ -207,7 +207,7 @@ const content = {
     downloadEyebrow: "WINDOWS PREVIEW",
     downloadTitle: "Run DroneDream on your PC.",
     downloadBody:
-      "Preview candidate: verify its SHA-256 before installation. This installer is not yet Authenticode-signed, so Windows may show an unknown-publisher warning.",
+      "This preview candidate is not Authenticode-signed. Verify its SHA-256 before installation; Windows may show an unknown-publisher warning.",
     downloadAgain: "Download preview",
     version: "Version",
     size: "Installer size",
@@ -394,7 +394,7 @@ const content = {
     downloadEyebrow: "WINDOWS 预览版",
     downloadTitle: "在本机运行 DroneDream。",
     downloadBody:
-      "当前为未签名的预览候选版本。安装前请核对 SHA-256；Windows 可能显示“未知发布者”警告。",
+      "当前为未签名的预览候选版本。安装前请核对 SHA-256；Windows 可能显示“未知发布者”警告，请务必确认下载文件与本页记录一致后再安装。",
     downloadAgain: "下载预览版",
     version: "版本",
     size: "安装包大小",
