@@ -15,7 +15,8 @@ POINTS_PER_MM = 72.0 / 25.4
 PAGE_WIDTH_MM = 210.0
 BODY_RIGHT_MARGIN_MM = 19.0
 BODY_BOTTOM_MARGIN_MM = 16.0
-BODY_BOTTOM_TOLERANCE_POINTS = 40.0
+BODY_BASELINE_POINTS = 12.0
+BODY_BOTTOM_TOLERANCE_POINTS = BODY_BASELINE_POINTS
 
 
 def normalize(text: str) -> list[str]:
@@ -459,7 +460,9 @@ def bottom_audit(pdf: Path) -> list[dict[str, object]]:
                     "body_bottom_target_points": round(body_bottom_target, 2),
                     "content_bottom_points": round(content_bottom, 2),
                     "gap_to_body_bottom_points": round(gap_to_body_bottom, 2),
-                    "gap_to_body_bottom_lines": round(gap_to_body_bottom / 12.0, 3),
+                "gap_to_body_bottom_lines": round(
+                    gap_to_body_bottom / BODY_BASELINE_POINTS, 3
+                ),
                     "passed_bottom_line": (gap_to_body_bottom <= BODY_BOTTOM_TOLERANCE_POINTS),
                 }
             )
@@ -521,6 +524,15 @@ def main() -> None:
                 ),
                 "inventory": exception_inventory,
             },
+        },
+        "page_bottom_policy": {
+            "definition": (
+                "Rendered body content on every page must end within one "
+                "12-point body line of the audited bottom target."
+            ),
+            "body_bottom_margin_mm": BODY_BOTTOM_MARGIN_MM,
+            "baseline_points": BODY_BASELINE_POINTS,
+            "maximum_unused_body_lines": 1.0,
         },
         "bottoms": bottoms,
         "bottom_failures": [item["page"] for item in bottoms if not item["passed_bottom_line"]],

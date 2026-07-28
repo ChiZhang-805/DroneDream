@@ -243,12 +243,12 @@ def make_tool_distribution(evidence: dict[str, Any], path: Path) -> None:
         MAGENTA,
         ROSE,
     ]
-    fig, ax = plt.subplots(figsize=(5.2, 1.72))
+    fig, ax = plt.subplots(figsize=(5.2, 1.82))
     bars = ax.barh(labels, values, color=gradient[: len(values)])
     ax.set_xlim(0, max(values) + 2)
     ax.set_xlabel("Selected cases")
-    ax.tick_params(axis="x", labelsize=10)
-    ax.tick_params(axis="y", labelsize=9.6, pad=2)
+    ax.tick_params(axis="x", labelsize=10.5)
+    ax.tick_params(axis="y", labelsize=10.3, pad=2)
     ax.grid(axis="x", color="#EEEAF2", linewidth=0.8)
     ax.set_axisbelow(True)
     ax.spines[["top", "right"]].set_visible(False)
@@ -258,7 +258,7 @@ def make_tool_distribution(evidence: dict[str, Any], path: Path) -> None:
             bar.get_y() + bar.get_height() / 2,
             str(value),
             va="center",
-            fontsize=10.5,
+            fontsize=11,
             fontweight="bold",
         )
     fig.subplots_adjust(left=0.265, right=0.975, bottom=0.25, top=0.96)
@@ -291,13 +291,13 @@ def make_scenario_chart(evidence: dict[str, Any], path: Path) -> None:
     selected = [row["selected_holdout_loss"] for row in rows]
     x = np.arange(len(labels))
     width = 0.38
-    fig, ax = plt.subplots(figsize=(6.1, 2.92))
+    fig, ax = plt.subplots(figsize=(6.1, 3.0))
     ax.bar(x - width / 2, baseline, width, label="Baseline", color=LAVENDER)
     ax.bar(x + width / 2, selected, width, label="Selected", color=VIOLET)
-    ax.set_xticks(x, labels, fontsize=9.5, rotation=28, ha="right")
-    ax.set_ylabel("Holdout loss (lower is better)")
-    ax.tick_params(axis="y", labelsize=10)
-    ax.legend(frameon=False, ncol=2, fontsize=10)
+    ax.set_xticks(x, labels, fontsize=10.2, rotation=28, ha="right")
+    ax.set_ylabel("Holdout loss (lower is better)", fontsize=10.8)
+    ax.tick_params(axis="y", labelsize=10.3)
+    ax.legend(frameon=False, ncol=2, fontsize=10.5)
     ax.grid(axis="y", color="#EEEAF2", linewidth=0.8)
     ax.set_axisbelow(True)
     ax.spines[["top", "right"]].set_visible(False)
@@ -316,13 +316,13 @@ def make_scenario_heatmap(evidence: dict[str, Any], path: Path) -> None:
         "dreamline",
         ["#F5F0FF", LAVENDER, VIOLET, MAGENTA, ROSE],
     )
-    fig, ax = plt.subplots(figsize=(6.5, 1.8))
+    fig, ax = plt.subplots(figsize=(6.5, 1.95))
     image = ax.imshow(values, aspect="auto", cmap=cmap, vmin=15, vmax=35)
-    ax.set_yticks([0], ["Relative\nimprovement"], fontsize=10)
+    ax.set_yticks([0], ["Relative\nimprovement"], fontsize=10.5)
     ax.set_xticks(
         range(len(labels)),
         labels,
-        fontsize=9,
+        fontsize=9.8,
         rotation=30,
         ha="right",
     )
@@ -335,7 +335,7 @@ def make_scenario_heatmap(evidence: dict[str, Any], path: Path) -> None:
             va="center",
             color=WHITE if value > 29 else INK,
             fontweight="bold",
-            fontsize=9.5,
+            fontsize=10.2,
         )
     ax.tick_params(length=0)
     for spine in ax.spines.values():
@@ -348,7 +348,7 @@ def make_scenario_heatmap(evidence: dict[str, Any], path: Path) -> None:
         fraction=0.14,
         label="Relative loss reduction (%)",
     )
-    colorbar.ax.tick_params(labelsize=9)
+    colorbar.ax.tick_params(labelsize=9.6)
     fig.tight_layout()
     fig.savefig(path, dpi=220, bbox_inches="tight")
     plt.close(fig)

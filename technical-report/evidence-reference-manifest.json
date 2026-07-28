@@ -158,16 +158,16 @@
       {
         "path": "main.tex",
         "source_sha256": "2878e1bef3b2142b72d453b8791b8132df53084506ff73a93ce6b2e362a26594",
-        "modified_after_migration": true,
-        "current_hash_serialization": "utf8_lf",
-        "current_sha256": "05ea58f66757681c3e03c06c5c5d5a93eda00b34754766043fe226fbabacab50"
+          "modified_after_migration": true,
+          "current_hash_serialization": "utf8_lf",
+          "current_sha256": "252c9f2cb39e7ead580b6e9348190160eab382e79b6e080d76c5a6cabb761d86"
       },
       {
         "path": "body.tex",
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
-        "modified_after_migration": true,
-        "current_hash_serialization": "utf8_lf",
-        "current_sha256": "29135a5eb56f818c76e58d6e0a196f6bc88730e676e6ae898dbd3a7d6795522c"
+          "modified_after_migration": true,
+          "current_hash_serialization": "utf8_lf",
+          "current_sha256": "96c83d0e6dd29b434308a71e451f9930d8755d529a905de443ec09e640225b9d"
       },
       {
         "path": "media/github-mark.png",
@@ -205,35 +205,35 @@
       },
       {
         "path": "media/media/image6.png",
-        "source_sha256": "2675fc9964d7f24a0fcdc892ad758d33151772fcc5a1339603435f0f71ff18f5",
-        "modified_after_migration": true,
-        "current_sha256": "57f871b1c90a14e915bb4b8b8d66ac0d589c7fb507191e93e8c26fb183b1c600",
-        "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
+          "source_sha256": "2675fc9964d7f24a0fcdc892ad758d33151772fcc5a1339603435f0f71ff18f5",
+          "modified_after_migration": true,
+          "current_sha256": "4b9ee0257fda7b3e8011c25f6ee8973444258c4d82c9c081108eb891db158eef",
+          "generator": "technical-report/scripts/generate_data_figures.py",
+          "reason": "Regenerated from the frozen v7 evidence bundle with larger tool labels and a taller report-owned layout."
       },
       {
         "path": "media/media/image7.png",
-        "source_sha256": "60d29c9551538c2926d61a631ecd44e2eb7ad819a5074d21301673afd76888b2",
-        "modified_after_migration": true,
-        "current_sha256": "d289ad647bb92a4df8cfc12e6edc12c2bf4628bd0fac0be57794876c2b788f12",
-        "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
+          "source_sha256": "60d29c9551538c2926d61a631ecd44e2eb7ad819a5074d21301673afd76888b2",
+          "modified_after_migration": true,
+          "current_sha256": "b272974682f66d95ec013fc2bf98c8bbe01d27b9d1c6e5ce1a9396c4406c086f",
+          "generator": "technical-report/scripts/generate_data_figures.py",
+          "reason": "Regenerated from the frozen v7 evidence bundle with larger scenario labels and preserved chart spacing."
       },
       {
         "path": "media/media/image8.png",
-        "source_sha256": "23c4ee6cb0ffd2779b9851ce9a43068aba37ebb56cc3defedd9157e889a67c55",
-        "modified_after_migration": true,
-        "current_sha256": "ff7e41c1d91f3cd5e07bc461cd045bc8c3c3558112e91a9880e56346162898e9",
-        "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
+          "source_sha256": "23c4ee6cb0ffd2779b9851ce9a43068aba37ebb56cc3defedd9157e889a67c55",
+          "modified_after_migration": true,
+          "current_sha256": "46f2b6f6242545582a22bb46ea9ed069ac08360cae596c8920484bfee5531661",
+          "generator": "technical-report/scripts/generate_data_figures.py",
+          "reason": "Regenerated from the frozen v7 evidence bundle with larger cell, axis, and colorbar labels and no overlap."
       },
       {
         "path": "scripts/audit_latex_report.py",
         "external_source_path": "C:/Users/zju20/Documents/Codex/2026-07-25/files-mentioned-by-the-user-drone/work/audit_latex_report.py",
         "source_sha256": "15dca6941e5eb191fbcee42941824475ba39b26c44b7b79ccf084784792c858c",
-        "modified_after_migration": true,
-        "current_hash_serialization": "utf8_lf",
-        "current_sha256": "7f440eccb45b56f1ad43bc5629aa612f8bb8fcb119cc0d9d82238b5367870f82"
+          "modified_after_migration": true,
+          "current_hash_serialization": "utf8_lf",
+          "current_sha256": "59c7e970c9a5232142154903de698b616e1da4186fc14b7a82e4b8cf768ccbbd"
       }
     ]
   }

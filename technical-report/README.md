@@ -98,6 +98,11 @@ paragraph gate requires all explanatory prose, including the abstract, to end
 with a rendered line at least 80% as wide as its usable body line. Short list
 items are audited separately: every item must remain within three rendered
 lines and its final line must fill at least 90% of the usable list width.
+The page-bottom gate independently requires the lowest rendered body content
+on every page to finish within one 12-point body line of the audited bottom
+target; substantive technical explanation, table spacing, and figure sizing
+must resolve excess space rather than hidden text or forced last-line
+justification.
 Headings, display formulas, code blocks, figure/table captions, and references
 are inventoried as reasonable exceptions instead of being silently pooled
 with body prose. Intermediate files remain under the ignored

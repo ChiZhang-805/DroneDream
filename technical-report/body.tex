@@ -241,7 +241,9 @@ reduced-fidelity strategy to fidelity 1.0 before acceptance.
 Provenance-bound memory admits trusted outcomes, while the final gate
 freezes holdout results and rejects incomplete artifacts. Each stage
 narrows authority, so fluent output cannot bypass an executable contract
-or test.
+or test. The retained decision trace records the selected tool together
+with every filtered alternative and its rejection basis during later
+replay.
 
 \noindent\makebox[\linewidth][c]{%
 \includegraphics[width=6.50000in,height=2.54583in]{media/media/image3.png}}
@@ -336,7 +338,13 @@ route, fidelity, and cohort position, while non-causal GP/CMA diagnostic
 matrices remain outside that decision hash
 {[}\protect\hyperlink{ref_1}{\emph{1}}{]}. This boundary lets supported
 machines replay identical candidate sequences across machines before any
-provider decision receives credit.
+provider decision receives credit. The transcript is compared at the
+executed-Candidate boundary rather than against optimizer diagnostics
+that may vary by library implementation. A replay mismatch therefore
+identifies a decision-relevant divergence before a provider route or
+reported observation is accepted, keeping numerical implementation drift
+separate from evidence drift during independent replay and release
+review.
 
 \textbf{Feedback is verified again at the model boundary.} Optimizers,
 the closed-tool router, and direct proposer share a training-feedback
@@ -449,10 +457,10 @@ tasks, vehicles, scenarios, or provider outputs.
 \begingroup
 \refstepcounter{table}\textnormal{Table \thetable: Current and historical routing accuracy with claim boundary}\par
 \vspace{0.22em}
-\footnotesize
-\renewcommand{\arraystretch}{0.88}
+\small
+\renewcommand{\arraystretch}{0.92}
 \arrayrulecolor{DDPrint}
-\begin{tabular}{@{}L{0.32\linewidth}C{0.19\linewidth}L{0.36\linewidth}@{}}
+\begin{tabular}{@{}L{0.30\linewidth}C{0.19\linewidth}L{0.43\linewidth}@{}}
 \toprule
 \textbf{Comparator} & \textbf{Acceptable selections} & \textbf{Evidence
 treatment}\tabularnewline
@@ -552,7 +560,12 @@ their designated protection is removed. This construction demonstrates
 enforceable behavior for fallback, provider trust, outcome isolation,
 and tool eligibility; it is not a statistical effect estimate and does
 not measure optimizer quality, simulated control performance, flight
-safety, or readiness.
+safety, or readiness. The comparison is diagnostic because each weakened
+arm changes one named admission rule while leaving inputs and expected
+outputs fixed. A failed probe therefore localizes enforcement coverage at
+the source boundary; it does not estimate how frequently that boundary is
+reached in customer workloads or how much any optimizer improves a
+controller in release decisions.
 
 \Needspace{11\baselineskip}
 \begin{center}
@@ -632,7 +645,12 @@ deterministic portfolio after routing, the result does not show LLM
 superiority, causal AURORA benefit, PX4/Gazebo performance,
 controller quality, or flight safety. That bounded conclusion is
 replayable from retained Candidates, Trials, receipts, and comparison
-fields under the frozen protocol, using the archived JSON and CSV exports as the independent audit surface.}
+fields under the frozen protocol, using the archived JSON and CSV exports
+as the independent audit surface. A future recovery claim must rerun the
+matched design with an actual provider failure class and retain any
+arm-specific divergence instead of assuming that mock equality
+generalizes. This is the minimum evidence needed to distinguish recovery
+coverage from recovery performance.}
 
 \subsection{\texorpdfstring{\textbf{4.5 Tool-use
 behavior}}{4.5 Tool-use behavior}}\label{tool-use-behavior}
@@ -661,7 +679,7 @@ controller behavior under a shared scenario, seed, and execution budget,
 and it cannot establish repeatability beyond the frozen routing corpus itself.
 
 \noindent\makebox[\linewidth][c]{%
-\includegraphics[width=6.50000in,height=2.16856in]{media/media/image6.png}}
+\includegraphics[width=6.50000in]{media/media/image6.png}}
 
 \emph{Figure 4. Tool distribution across the current 24-case Evidence
 2.7 / Prompt 1.6 development freeze; counts describe selection frequency
@@ -692,7 +710,7 @@ claim and terminal disposition for independent replay after every
 failure, retry, recovery, and ownership transition.
 
 \noindent\makebox[\linewidth][c]{%
-\includegraphics[width=5.00000in,height=2.41445in]{media/media/image7.png}}
+\includegraphics[width=5.15000in]{media/media/image7.png}}
 
 \emph{Figure 5. Baseline and selected holdout loss across ten frozen
 synthetic scenarios; evidence metadata records a mock simulator, false
@@ -738,7 +756,7 @@ vehicles or simulators
 and cannot be interpreted as PX4/Gazebo, real-aircraft, safety, or sim-to-real evidence.
 
 \noindent\makebox[\linewidth][c]{%
-\includegraphics[width=6.50000in,height=1.25000in]{media/media/image8.png}}
+\includegraphics[width=6.50000in,height=1.35000in]{media/media/image8.png}}
 
 \emph{Figure 6. Relative loss reduction by mock scenario.}
 
@@ -919,7 +937,11 @@ service changes cannot be permanently prevented. The gate therefore
   first failing stage. Recovery verification should replay install,
   upgrade, repair, offline, and damaged-cache paths without allowing stale
   success to satisfy a fresh launch or conceal the newly failing
-  dependency under the same receipted probe sequence.
+  dependency under the same receipted probe sequence. The receipt must
+  also retain the exact recovery action and the first post-recovery probe
+  so a green launcher state remains attributable to one tested
+  environment rather than becoming a generic assertion of platform
+  health after repair or upgrade.
 
 \textbf{Readiness is a conjunction, not a progress animation.} The
 launcher requires a fresh supported-system probe, one owned and
@@ -1158,7 +1180,13 @@ fallback campaign matches the direct arm in 10/10 frozen comparisons
   so a later rebuild cannot silently accept a different evidence
   contract. Independent replay must recompute declared counts and hashes
   from Git object bytes and reject missing objects before comparing
-  presentation-layer bytes or customer-facing claims.
+  presentation-layer bytes or customer-facing claims. This two-commit
+  publication pattern prevents a receipt from authenticating bytes that
+  did not exist at the source freeze. Reviewers can rebuild the source
+  subject, compare its hashes, and inspect the later artifact commit
+  without trusting the working tree that produced either object. Any
+  mismatch remains a new report revision rather than an editorial
+  substitution during independent review.
 
 \section{\texorpdfstring{\textbf{9.
 Conclusion}}{9. Conclusion}}\label{conclusion}
@@ -1471,10 +1499,10 @@ deliberately bounded offline decision protocol.
 \looseness=-1
 
 \begingroup
-\footnotesize
-\renewcommand{\arraystretch}{1.22}
+\small
+\renewcommand{\arraystretch}{1.08}
 \setlength{\LTpre}{0.60em}
-\begin{longtable}[]{@{}L{0.25\linewidth}C{0.08\linewidth}C{0.10\linewidth}L{0.30\linewidth}L{0.13\linewidth}@{}}
+\begin{longtable}[]{@{}L{0.23\linewidth}C{0.08\linewidth}C{0.10\linewidth}L{0.32\linewidth}L{0.17\linewidth}@{}}
 \caption{Frozen four-arm component outcome ablation}\tabularnewline
 \toprule
 \textbf{Arm} & \textbf{Jobs} & \textbf{Trials} &
@@ -1562,17 +1590,24 @@ not provider, PX4/Gazebo, or flight behavior. Each reproducible value
   any dependency SHA, figure, assertion, or receipt field drifts. This
   keeps the website handoff limited to the final PDF and its hash while
   preserving source, scripts, manifests, and receipts under report
-  ownership. That separation lets the website cite the artifact without
-  acquiring authority to regenerate, alter, or reinterpret the report's
-  evidence chain; any revised PDF requires a new report source commit,
-  complete build, visual review, and validation receipt.
+ownership. That separation lets the website cite the artifact without
+acquiring authority to regenerate, alter, or reinterpret the report's
+evidence chain; any revised PDF requires a new report source commit,
+complete build, visual review, and validation receipt. The ledger also
+separates regeneration from interpretation: reproducing the same artifact
+does not authorize a reader to widen the claim boundary attached to any
+row. A changed source, dependency, or conclusion must receive a new
+subject commit, regenerated figures, and a fresh receipt instead of
+inheriting the prior report's validation status. This lifecycle keeps
+editorial revision, evidence revision, and product release as separately
+reviewable events under the same auditable release boundary.
 
 \begingroup
-\footnotesize
-\renewcommand{\arraystretch}{1.02}
+\small
+\renewcommand{\arraystretch}{1.06}
 \setlength{\LTpre}{0.30em}
 \setlength{\LTpost}{0.20em}
-\begin{longtable}[]{@{}L{0.25\linewidth}C{0.15\linewidth}L{0.22\linewidth}L{0.28\linewidth}@{}}
+\begin{longtable}[]{@{}L{0.25\linewidth}C{0.15\linewidth}L{0.21\linewidth}L{0.31\linewidth}@{}}
 \caption{Evidence-source and claim-boundary ledger}\tabularnewline
 \toprule
 \textbf{Evidence surface} & \textbf{Scale} &
