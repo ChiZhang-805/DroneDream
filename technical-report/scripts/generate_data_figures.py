@@ -163,9 +163,9 @@ def make_ablation_chart(evidence: dict[str, Any], path: Path) -> None:
     labels = [label_map[row["component"]] for row in rows]
     full = [row["full_contract_correct_rate"] * 100 for row in rows]
     ablated = [row["ablated_contract_correct_rate"] * 100 for row in rows]
-    y = np.arange(len(labels)) * 1.05
-    height = 0.32
-    fig, ax = plt.subplots(figsize=(1346 / 120, 624 / 120), dpi=120)
+    y = np.arange(len(labels)) * 1.28
+    height = 0.36
+    fig, ax = plt.subplots(figsize=(1346 / 120, 780 / 120), dpi=120)
     full_bars = ax.barh(
         y - height / 2,
         full,
@@ -181,7 +181,7 @@ def make_ablation_chart(evidence: dict[str, Any], path: Path) -> None:
         color=ROSE,
     )
     ax.set_yticks(y, labels, fontsize=14)
-    ax.set_ylim(y[-1] + 0.65, -0.85)
+    ax.set_ylim(y[-1] + 0.82, -1.05)
     ax.set_xlim(0, 118)
     ax.set_xlabel("Contract expectations satisfied (%)", fontsize=14)
     ax.tick_params(axis="x", labelsize=12)
@@ -191,7 +191,7 @@ def make_ablation_chart(evidence: dict[str, Any], path: Path) -> None:
         frameon=False,
         ncol=2,
         loc="upper center",
-        bbox_to_anchor=(0.60, 0.965),
+        bbox_to_anchor=(0.60, 0.970),
         fontsize=13,
     )
     ax.grid(axis="x", color="#EEEAF2", linewidth=0.8)
@@ -200,8 +200,9 @@ def make_ablation_chart(evidence: dict[str, Any], path: Path) -> None:
     for bars in (full_bars, ablated_bars):
         for bar in bars:
             value = bar.get_width()
+            label_x = value + 1.2 if value > 0 else 2.8
             ax.text(
-                value + 1.2,
+                label_x,
                 bar.get_y() + bar.get_height() / 2,
                 f"{value:.0f}%",
                 ha="left",
@@ -210,7 +211,7 @@ def make_ablation_chart(evidence: dict[str, Any], path: Path) -> None:
                 fontweight="bold",
                 color=INK,
             )
-    fig.subplots_adjust(left=0.25, right=0.94, bottom=0.20, top=0.72)
+    fig.subplots_adjust(left=0.25, right=0.94, bottom=0.16, top=0.78)
     fig.savefig(path, dpi=120)
     plt.close(fig)
 

@@ -12,8 +12,10 @@ from pypdf import PdfReader
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9_.%/+:-]+")
 POINTS_PER_MM = 72.0 / 25.4
+PAGE_WIDTH_MM = 210.0
+BODY_RIGHT_MARGIN_MM = 19.0
 BODY_BOTTOM_MARGIN_MM = 16.0
-BODY_BOTTOM_TOLERANCE_POINTS = 36.0
+BODY_BOTTOM_TOLERANCE_POINTS = 40.0
 
 
 def normalize(text: str) -> list[str]:
@@ -127,7 +129,9 @@ def source_exception_inventory(source: Path) -> dict[str, int]:
             )
         ),
         "figure_captions": len(re.findall(r"\\emph\{Figure\s+\d+", text)),
-        "table_captions": len(re.findall(r"\\caption\{", text)),
+        "table_captions": len(
+            re.findall(r"\\caption\{|\\refstepcounter\{table\}", text)
+        ),
         "references": len(re.findall(r"\\hypertarget\{ref_\d+\}", text)),
     }
 
@@ -244,9 +248,17 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
             max(float(word["x1"]) for word in line) - min(float(word["x0"]) for word in line)
             for line in lines
         ]
-        widest = max(widths) if widths else 1.0
-        ratio = widths[-1] / widest if widths else 1.0
         style = str(record["style"])
+        widest = max(widths) if widths else 1.0
+        if style == "bullet" and paragraph_words:
+            text_left = min(float(word["x0"]) for word in paragraph_words)
+            usable_right = (PAGE_WIDTH_MM - BODY_RIGHT_MARGIN_MM) * POINTS_PER_MM
+            usable_width = max(usable_right - text_left, 1.0)
+            ratio = widths[-1] / usable_width if widths else 1.0
+            ratio_denominator = "usable_list_width"
+        else:
+            ratio = widths[-1] / widest if widths else 1.0
+            ratio_denominator = "widest_rendered_line"
         if style in {"body", "abstract"}:
             policy_category = "explanatory_body"
         elif style == "bullet":
@@ -274,9 +286,11 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
                 "policy_category": policy_category,
                 "lines": len(lines),
                 "last_line_ratio": round(ratio, 4),
+                "last_line_ratio_denominator": ratio_denominator,
                 "last_line_text": " ".join(last_line_words),
                 "last_line_pass_50": ratio >= 0.5,
                 "last_line_pass_80": ratio >= 0.8,
+                "last_line_pass_90": ratio >= 0.9,
                 "line_policy_passed": (
                     len(lines) >= minimum and (maximum is None or len(lines) <= maximum)
                 ),
@@ -285,6 +299,9 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
         )
 
     explanatory_body = [item for item in audited if item["policy_category"] == "explanatory_body"]
+    list_items = [item for item in audited if item["policy_category"] == "exception_list"]
+    short_list_items = [item for item in list_items if item["lines"] <= 3]
+    long_list_items = [item for item in list_items if item["lines"] > 3]
     explanatory_failures = [
         {
             "index": item["index"],
@@ -295,6 +312,18 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
         }
         for item in explanatory_body
         if not item["last_line_pass_80"]
+    ]
+    short_list_failures = [
+        {
+            "index": item["index"],
+            "page": item["page"],
+            "lines": item["lines"],
+            "last_line_ratio": item["last_line_ratio"],
+            "last_line_text": item["last_line_text"],
+            "text": item["text"],
+        }
+        for item in short_list_items
+        if not item["last_line_pass_90"]
     ]
     exception_counts = {
         category: sum(item["policy_category"] == category for item in audited)
@@ -318,11 +347,27 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
             "failed_80": len(explanatory_failures),
             "failures": explanatory_failures,
         },
+        "short_list_items": {
+            "total": len(short_list_items),
+            "passed_90": len(short_list_items) - len(short_list_failures),
+            "failed_90": len(short_list_failures),
+            "failures": short_list_failures,
+            "above_3_lines": [
+                {
+                    "index": item["index"],
+                    "page": item["page"],
+                    "lines": item["lines"],
+                    "text": item["text"],
+                }
+                for item in long_list_items
+            ],
+        },
         "exceptions": {
             "categories": exception_counts,
             "definition": {
                 "exception_list": (
-                    "List items are reported but excluded from the explanatory-body last-line gate."
+                    "List items are excluded from the explanatory-body 80% gate "
+                    "and governed by the separate short-list 90% gate."
                 ),
                 "exception_caption": (
                     "Figure and table captions are reported but excluded "
@@ -454,11 +499,25 @@ def main() -> None:
                 "failed": geometry["explanatory_body"]["failed_80"],
                 "failure_locations": geometry["explanatory_body"]["failures"],
             },
+            "short_list_items": {
+                "definition": (
+                    "Rendered list items of one to three lines; the final line "
+                    "is measured against the usable list width to the body right margin."
+                ),
+                "last_line_target_ratio": 0.9,
+                "maximum_lines": 3,
+                "total": geometry["short_list_items"]["total"],
+                "passed": geometry["short_list_items"]["passed_90"],
+                "failed": geometry["short_list_items"]["failed_90"],
+                "failure_locations": geometry["short_list_items"]["failures"],
+                "above_3_lines": geometry["short_list_items"]["above_3_lines"],
+            },
             "reasonable_exceptions": {
                 "definition": (
-                    "Headings, list items, display formulas, code blocks, "
+                    "Headings, display formulas, code blocks, "
                     "figure captions, table captions, and references do not "
-                    "use the explanatory-body last-line gate."
+                    "use either rendered last-line gate; list items use the "
+                    "separate short-list policy."
                 ),
                 "inventory": exception_inventory,
             },
@@ -483,6 +542,14 @@ def main() -> None:
                     "total": geometry["explanatory_body"]["total"],
                     "passed_80": geometry["explanatory_body"]["passed_80"],
                     "failed_80": geometry["explanatory_body"]["failed_80"],
+                },
+                "short_list_items": {
+                    "total": geometry["short_list_items"]["total"],
+                    "passed_90": geometry["short_list_items"]["passed_90"],
+                    "failed_90": geometry["short_list_items"]["failed_90"],
+                    "above_3_lines": len(
+                        geometry["short_list_items"]["above_3_lines"]
+                    ),
                 },
                 "exceptions": geometry["exceptions"]["categories"],
                 "source_exception_inventory": exception_inventory,

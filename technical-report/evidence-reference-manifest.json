@@ -160,14 +160,14 @@
         "source_sha256": "2878e1bef3b2142b72d453b8791b8132df53084506ff73a93ce6b2e362a26594",
         "modified_after_migration": true,
         "current_hash_serialization": "utf8_lf",
-        "current_sha256": "07701f15bdf00ba3aa64f77f6f093c75f3781435dcdcbd0ffa6fcee98252a4f4"
+        "current_sha256": "05ea58f66757681c3e03c06c5c5d5a93eda00b34754766043fe226fbabacab50"
       },
       {
         "path": "body.tex",
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
         "modified_after_migration": true,
         "current_hash_serialization": "utf8_lf",
-        "current_sha256": "bb98c93410769ec4cf7a9d9f5e3770b7cb0d5f810651ceca1ce53a66afc51078"
+        "current_sha256": "29135a5eb56f818c76e58d6e0a196f6bc88730e676e6ae898dbd3a7d6795522c"
       },
       {
         "path": "media/github-mark.png",
@@ -199,9 +199,9 @@
         "path": "media/media/image5.png",
         "source_sha256": "b82ba193787bb56f860988f087e18ae96ecee11526093ab911c15408a56889d4",
         "modified_after_migration": true,
-        "current_sha256": "f1999c3ee2e5255e05057153ffd188899def0b7ae36bbae6ad8e387fa4a0d3ea",
+        "current_sha256": "7f0a2e57270d1a268cf973061de61fe2822ecce15a53aca35c50dda667c28d54",
         "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
+        "reason": "Regenerated from the frozen v7 evidence bundle with a taller repository-owned layout that prevents Figure 3 label crowding."
       },
       {
         "path": "media/media/image6.png",
@@ -233,7 +233,7 @@
         "source_sha256": "15dca6941e5eb191fbcee42941824475ba39b26c44b7b79ccf084784792c858c",
         "modified_after_migration": true,
         "current_hash_serialization": "utf8_lf",
-        "current_sha256": "29073ec30db1bd8cdecc2d550e78436b023698d7eade6e20d147874634c00295"
+        "current_sha256": "7f440eccb45b56f1ad43bc5629aa612f8bb8fcb119cc0d9d82238b5367870f82"
       }
     ]
   }

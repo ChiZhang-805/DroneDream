@@ -1,7 +1,7 @@
-\begin{center}
-\includegraphics[width=2.59in]{media/media/image1.png}
+\noindent\includegraphics[width=2.30in]{media/media/image1.png}
 
-\vspace{0.35em}
+\begin{center}
+\vspace{0.30em}
 \ddtitle{AURORA: Agentic UAV Refinement through\\
 Optimization, Reflection, and Assurance}
 
@@ -243,7 +243,8 @@ freezes holdout results and rejects incomplete artifacts. Each stage
 narrows authority, so fluent output cannot bypass an executable contract
 or test.
 
-\includegraphics[width=6.50000in,height=2.54583in]{media/media/image3.png}
+\noindent\makebox[\linewidth][c]{%
+\includegraphics[width=6.50000in,height=2.54583in]{media/media/image3.png}}
 
 \emph{Figure 1. AURORA's evidence-gated optimization loop inside
 DroneDream 1.0. Provenance-complete, policy-eligible outcomes alone may
@@ -252,28 +253,37 @@ influence routing memory or pass the final selection gate.}
 \begin{itemize}
 \item
   Desktop boundary --- readiness, user input, progress, settings, and
-  safe exit;
-  entry remains hidden while any required launch check is pending or
-  failed across every required readiness stage.
+  safe exit are authorized only by terminal UI state; entry remains
+  hidden while any required launch check is pending or failed, and
+  active work or unsaved drafts trigger a recoverable, attributable exit
+  path rather than silent process termination under the same readiness
+  record for audit use.
 \item
-  Backend boundary --- drafts, jobs, orchestration, APIs,
-  and artifacts; only validated state transitions and stable failure
-  codes are accepted before persistence, dispatch, or artifact
-  publication.
+  Backend boundary --- drafts, Jobs, orchestration, APIs, and artifacts
+  cross the service boundary only through validated state transitions
+  and stable failure codes; rejected transitions retain explicit reasons,
+  source-bound identifiers, and replayable receipts instead of becoming
+  persisted, dispatched, or published work before independent replay.
 \item
   AURORA authority --- context, eligibility, routing, reflection, and
-  evidence memory;
-  only provenance-complete evidence may influence a decision during routing and final selection.
+  evidence memory admit only provenance-complete, policy-eligible
+  evidence; holdout, infrastructure-fault, legacy, incomplete, or drifted
+  records remain unavailable to routing, final selection, and every later
+  replay that could otherwise reinterpret them as admissible learning
+  evidence.
 \item
-  Runtime boundary --- PX4/Gazebo and pinned dependencies; declared
-  versions are insufficient without effect and source evidence from the
+  Runtime boundary --- PX4/Gazebo and pinned dependencies require effect
+  and source evidence from the
   launched process, accepted customer Runtime, and published release
-  ledger.
+  ledger, so each physical claim must bind the executable effect,
+  expanded source, dependency commits, and an independently checked
+  receipt before release and public use.
 \item
   Cloud boundary --- authentication, community data, quota ledger, and
-  model
-  gateway; provider secrets remain server-side and never enter desktop
-  logs or artifacts under any subscription tier.
+  model gateway remain server-authoritative; provider secrets never enter
+  desktop logs or artifacts, and each managed-model debit must retain an
+  authenticated account, quota-ledger entry, provider disposition, and
+  reconcilable service receipt under its frozen billing contract.
 \end{itemize}
 
 \textbf{Claim-time inputs are immutable before launch.} Schema
@@ -362,19 +372,31 @@ reward or portfolio-child credit unless a separately controlled intervention sup
 
 \begin{itemize}
 \item
-  COMPLETED with a usable metric is admitted as successful optimizer
-  evidence.
+  COMPLETED is admitted as successful optimizer evidence only when a
+  usable metric and modern receipt bind the exact Candidate, Trial,
+  scenario, objective direction, and execution provenance; a terminal
+  label without that complete chain remains unavailable for optimizer
+  learning, final selection, export, or any later performance statement
+  in release.
 \item
   FAILED with a trusted domain failure code is admitted as a
   non-success because it may identify an infeasible or unsafe simulated
-  parameter region without being mislabeled as infrastructure failure.
+  parameter region without being mislabeled as infrastructure failure;
+  the failed attempt stays in the optimization denominator with its
+  scenario and Candidate identity intact through every later aggregate
+  and arm comparison.
 \item
   Infrastructure faults, cancellation, malformed evidence, and
   conflicting terminal states are quarantined and cannot update search
-  or routing memory under any later decision path or replay.
+  or routing memory under any later decision path or replay; each rejected
+  row retains a stable quarantine reason and remains visible to
+  operational diagnostics and independent evidence accounting without
+  later relabeling.
 \item
-  Holdout-only outcomes are
-  reserved for final evaluation and are never returned to the training history.
+  Holdout-only outcomes remain sealed for final evaluation, never return
+  to training history or provider-visible reflection, and become
+  selectable only through the frozen final gate under the predeclared
+  metric and admissibility policy.
 \end{itemize}
 
 Infrastructure failures, cancellation, malformed or internally
@@ -423,13 +445,18 @@ prompt effect, lower simulator loss, or generalization across unseen
 tasks, vehicles, scenarios, or provider outputs.
 \looseness=-1
 
-\begin{longtable}[]{@{}L{0.32\linewidth}C{0.19\linewidth}L{0.36\linewidth}@{}}
-\caption{Current and historical routing accuracy with claim boundary}\tabularnewline
+\begin{center}
+\begingroup
+\refstepcounter{table}\textnormal{Table \thetable: Current and historical routing accuracy with claim boundary}\par
+\vspace{0.22em}
+\footnotesize
+\renewcommand{\arraystretch}{0.88}
+\arrayrulecolor{DDPrint}
+\begin{tabular}{@{}L{0.32\linewidth}C{0.19\linewidth}L{0.36\linewidth}@{}}
 \toprule
 \textbf{Comparator} & \textbf{Acceptable selections} & \textbf{Evidence
 treatment}\tabularnewline
 \midrule
-\endhead
 Prompt 1.6 current freeze & 24/24 & Current development
 qualification\tabularnewline
 Prompt 1.5 first freeze & 19/24 & Unqualified\tabularnewline
@@ -442,7 +469,9 @@ baseline\tabularnewline
 Uniform random expectation & 5.625/24 & Analytical
 expectation\tabularnewline
 \bottomrule
-\end{longtable}
+\end{tabular}
+\endgroup
+\end{center}
 
 The failure sets expose where qualification changed. The first Prompt
 1.5 freeze missed five cases: two local-progress choices, one
@@ -456,7 +485,8 @@ weaknesses but cannot attribute their removal to the prompt revision.
 A controlled paired study is therefore required before any wording change
 receives causal credit.
 
-\includegraphics[width=4.35000in,height=2.56186in]{media/media/image4.png}
+\noindent\makebox[\linewidth][c]{%
+\includegraphics[width=5.40in]{media/media/image4.png}}
 
 \emph{Figure 2. Current acceptable tool selection under Evidence 2.7 /
 Prompt 1.6. The 24-case result qualifies this frozen development-routing
@@ -524,18 +554,19 @@ and tool eligibility; it is not a statistical effect estimate and does
 not measure optimizer quality, simulated control performance, flight
 safety, or readiness.
 
-\begin{longtable}[]{@{}L{0.18\linewidth}L{0.36\linewidth}C{0.10\linewidth}C{0.11\linewidth}C{0.11\linewidth}@{}}
-\caption{AURORA source-contract ablations}\tabularnewline
+\Needspace{11\baselineskip}
+\begin{center}
+\begingroup
+\small
+\renewcommand{\arraystretch}{0.94}
+\arrayrulecolor{DDPrint}
+\refstepcounter{table}\textnormal{Table \thetable: AURORA source-contract ablations}\par
+\vspace{0.35em}
+\begin{tabular}{@{}L{0.18\linewidth}L{0.36\linewidth}C{0.10\linewidth}C{0.11\linewidth}C{0.11\linewidth}@{}}
 \toprule
 \textbf{Guard} & \textbf{Protected boundary} & \textbf{Cases} &
 \textbf{Production} & \textbf{Weakened}\tabularnewline
 \midrule
-\endfirsthead
-\toprule
-\textbf{Guard} & \textbf{Protected boundary} & \textbf{Cases} &
-\textbf{Production} & \textbf{Weakened}\tabularnewline
-\midrule
-\endhead
 \vtop{\hbox{\strut deterministic}\hbox{\strut fallback}} &
 \vtop{\hbox{\strut Provider-independent}\hbox{\strut recovery path}} & 4
 & 4/4 & 1/4\tabularnewline
@@ -552,9 +583,12 @@ learning}} & 6 & 6/6 & 2/6\tabularnewline
 \vtop{\hbox{\strut Incompatible tools}\hbox{\strut remain blocked}} & 5
 & 5/5 & 1/5\tabularnewline
 \bottomrule
-\end{longtable}
+\end{tabular}
+\endgroup
+\end{center}
 
-\includegraphics[width=5.10000in,height=2.36000in]{media/media/image5.png}
+\noindent\makebox[\linewidth][c]{%
+\includegraphics[width=5.45in]{media/media/image5.png}}
 
 \emph{Figure 3. Constructed deterministic software-contract probes for
 each AURORA guard. The weakened comparison measures fail-closed boundary
@@ -626,7 +660,8 @@ selected method families; it does not measure how any method changes
 controller behavior under a shared scenario, seed, and execution budget,
 and it cannot establish repeatability beyond the frozen routing corpus itself.
 
-\includegraphics[width=6.50000in,height=2.16856in]{media/media/image6.png}
+\noindent\makebox[\linewidth][c]{%
+\includegraphics[width=6.50000in,height=2.16856in]{media/media/image6.png}}
 
 \emph{Figure 4. Tool distribution across the current 24-case Evidence
 2.7 / Prompt 1.6 development freeze; counts describe selection frequency
@@ -656,7 +691,8 @@ shared-Runtime queue monopolization. The ledger retains every authorized
 claim and terminal disposition for independent replay after every
 failure, retry, recovery, and ownership transition.
 
-\includegraphics[width=5.00000in,height=2.41445in]{media/media/image7.png}
+\noindent\makebox[\linewidth][c]{%
+\includegraphics[width=5.00000in,height=2.41445in]{media/media/image7.png}}
 
 \emph{Figure 5. Baseline and selected holdout loss across ten frozen
 synthetic scenarios; evidence metadata records a mock simulator, false
@@ -701,7 +737,8 @@ non-physical boundary. These rows do not estimate uncertainty across
 vehicles or simulators
 and cannot be interpreted as PX4/Gazebo, real-aircraft, safety, or sim-to-real evidence.
 
-\includegraphics[width=6.50000in,height=1.25000in]{media/media/image8.png}
+\noindent\makebox[\linewidth][c]{%
+\includegraphics[width=6.50000in,height=1.25000in]{media/media/image8.png}}
 
 \emph{Figure 6. Relative loss reduction by mock scenario.}
 
@@ -762,26 +799,39 @@ claim until complete simulator bindings, receipts, and acceptance evidence are f
 \begin{itemize}
 \item
   Verified boundary --- constant horizontal wind for x500 is PX4\_GAZEBO
-  evidence only inside the
-  pinned dedicated WSL Runtime; the signed installer Runtime is still pending acceptance.
+  evidence only inside the pinned dedicated WSL Runtime; it binds the
+  source and effect checks recorded for that environment, while the
+  signed installer Runtime remains unaccepted and outside every released
+  customer-performance claim or distribution certificate in any
+  channel.
 \item
   Implemented boundary --- static-obstacle injection and reply
-  validation exist in source,
-  but no released-customer performance claim is made before the signed-Runtime campaign passes.
+  validation exist in source, but implementation alone supplies neither
+  executed scenario evidence nor a performance result; no released
+  customer claim is made until the signed-Runtime campaign returns a
+  complete accepted receipt with independently recomputed,
+  failure-retaining outcomes for release.
 \item
   Pending boundary --- gust, turbulence, GPS or sensor degradation,
   battery, payload, and actuator-delay effects remain excluded from
-  physical claims until each has a complete binding, accepted receipt, and signed-Runtime evidence.
+  physical claims until each disturbance has a complete simulator
+  binding, trial-local source and effect evidence, an accepted receipt,
+  and independently reviewed signed-Runtime results for that exact
+  vehicle and scenario.
 \item
   Qualification receipt --- pin the customer Runtime, PX4/Gazebo commits,
-  vehicle and world assets, controller schema, disturbance parameters,
+  vehicle/world assets, controller schema, disturbances,
   seeds, budgets, baseline arms, failure taxonomy, and independently
-  recomputed outcomes before any physical-performance result enters the
-  ledger.
+  recomputed outcomes for claim admission; retain every excluded Trial
+  and acceptance decision in that versioned manifest with reason and
+  artifact state.
 \item
   Denominator rule --- retain every timeout and failed Trial; a missing
   receipt stays unavailable rather than being interpreted as a safe or
-  successful run.
+  successful run, and aggregate rates must preserve that disposition
+  across every arm, scenario, seed block, and independently recomputed
+  publication table without dropping unavailable runs from the
+  denominator or seed.
 \end{itemize}
 
 \section{\texorpdfstring{\textbf{5. Evaluation protocol for
@@ -817,23 +867,38 @@ without evidence.
 
 \begin{itemize}
 \item
-  Primary outcomes: frozen holdout
-  loss, feasible-campaign rate, baseline improvement, time-to-target,
-  and terminal failure rate with uncertainty for every reported arm and
-  seed block.
+  Primary outcomes bind frozen holdout loss, feasible-campaign rate,
+  baseline improvement, time-to-target, and terminal failure rate to
+  every reported arm and seed block, with paired uncertainty and effect
+  size computed from the retained scenario-level comparison units.
+  These units govern preregistered acceptance and arm-to-arm inference at
+  release.
 \item
   Secondary outcomes: wall time, model tokens and cost, router latency,
   recovery success, scenario-wise regret, and artifact completeness for
-  every frozen comparison arm and seed block.
+  every frozen comparison arm and seed block, reported alongside
+  termination cause and evidence eligibility so efficiency cannot hide a
+  higher failure burden or incomplete audit surface at publication time
+  or review.
 \item
   Use at least five independent seeds for engineering diagnostics and
-  preferably ten for
-  report-level comparisons across every reported arm before any superiority claim is published.
+  preferably ten for report-level comparisons across every reported arm;
+  freeze seed blocks before final execution and publish paired
+  scenario-level uncertainty before making any superiority or
+  repeatability claim across the preregistered final-test matrix and all
+  baseline arms in scope.
 \item
-  Keep failures in the denominator; do not impute a successful loss.
+  Keep timeouts, crashes, infeasible terminations, and failed Trials in
+  the denominator under their predeclared terminal categories; never
+  impute a successful loss, discard a difficult seed, or replace a
+  missing receipt with an optimistic outcome, and never reclassify an
+  unavailable execution after completed-arm results or rankings become
+  visible during audit.
 \item
-  Report uncertainty
-  and effect sizes; never publish superiority from one seed or one track.
+  Report paired uncertainty, effect sizes, sample counts, and failure
+  dispositions for each arm and scenario family; never publish
+  superiority from one seed, one track, a post-hoc metric, or an
+  unregistered subset of completed runs.
 \end{itemize}
 
 \section{\texorpdfstring{\textbf{6. Product reliability and
@@ -846,10 +911,15 @@ action must not become visible while a required check is pending or
 failed. After entry, runtime failures still need explicit diagnostics
 because network loss, disk damage, permission changes, and external
 service changes cannot be permanently prevented. The gate therefore
-certifies a timestamped launch snapshot rather than promising an
-error-free future session, and post-entry faults must remain recoverable,
-attributable, and visible without silently invalidating prior work for
-every affected run.
+  certifies a timestamped launch snapshot rather than promising an
+  error-free future session, and post-entry faults must remain recoverable,
+  attributable, and visible without silently invalidating prior work for
+  every affected run. Its receipt should preserve probe timestamps,
+  dependency versions, the service endpoint, account disposition, and the
+  first failing stage. Recovery verification should replay install,
+  upgrade, repair, offline, and damaged-cache paths without allowing stale
+  success to satisfy a fresh launch or conceal the newly failing
+  dependency under the same receipted probe sequence.
 
 \textbf{Readiness is a conjunction, not a progress animation.} The
 launcher requires a fresh supported-system probe, one owned and
@@ -895,44 +965,72 @@ over time.
 
 \begin{itemize}
 \item
-  No
-  result in this report establishes real-aircraft safety, certification, or direct sim-to-real transfer.
+  No result in this report establishes real-aircraft safety,
+  certification, or direct simulation-to-reality transfer; those claims
+  require separately governed hardware evidence, operational risk
+  controls, and accepted flight testing outside the present
+  software-contract scope and do not inherit assurance from the mock,
+  WSL, or policy-only artifacts reported here.
 \item
   The current 24-case Evidence 2.7 / Prompt 1.6 freeze qualifies
   development routing only. The preserved Prompt 1.5 results of 19/24
   and 21/24 expose stochastic spread; these unpaired freezes cannot
-  support a causal prompt-lift or simulator-quality claim.
+  support a causal prompt-lift, optimizer-quality, or simulator-quality
+  claim without paired calls, fixed order, identical model snapshot, and
+  case-level uncertainty.
 \item
   The current 16-case policy holdout verifies deterministic eligibility
   only; its published labels are not permanently blind and require a
-  future concealed benchmark with sealed labels.
+  future concealed benchmark with sealed labels, preregistered scoring,
+  independent custody, and a frozen separation between development
+  examples and final evaluation cases under external final-test custody
+  and audit.
 \item
   The source-contract ablation demonstrates named guard behavior, not
-  causal optimization-quality lift.
+  causal optimization-quality lift; each weakened comparator changes a
+  software protection under constructed probes and therefore cannot
+  estimate controller performance, simulator fidelity, or benefit under
+  real execution noise across matched scenario and seed blocks with
+  uncertainty.
 \item
-  The frozen four-arm mock ablation changes protocol-level behavior in
-  15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations
-  remain inconclusive under the scripted policy and do not authorize a
-  general causal or optimizer-superiority claim across broader
-  optimizer families or deployment conditions.
+  The frozen four-arm mock ablation changes protocol behavior in 15/15
+  full-arm comparisons, but its 5/5 receipt-only-memory isolations remain
+  inconclusive; the scripted policy does not authorize a causal
+  performance claim outside a physical, matched-budget, multi-seed
+  intervention with independent outcome recomputation and retained
+  failures.
 \item
   The 10/10 fallback result verifies deterministic recovery on a
   frozen mock protocol, not that AURORA improves objective value beyond
-  recovery equivalence or supports causal attribution.
+  recovery equivalence or supports causal attribution; all arms converge
+  on the same deterministic portfolio, so the retained comparison
+  isolates dispatch recovery rather than optimization quality or causal
+  lift.
 \item
-  The ten-scenario campaign is synthetic mock evidence, not physical
-  scenario coverage.
+  The ten-scenario campaign is synthetic mock evidence used to exercise
+  orchestration and evidence flow; it is not physical scenario coverage,
+  vehicle-dynamics validation, disturbance fidelity, or a substitute for
+  signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics,
+  disturbance realism, or control quality in the signed Runtime.
 \item
-  The
-  pinned steady-wind result is not yet accepted in the signed customer Runtime.
+  The pinned steady-wind result belongs to a dedicated WSL Runtime and is
+  not yet accepted in the signed customer Runtime; release qualification
+  still requires matching source, effect, scenario, and receipt checks in
+  the distributed environment. Until replay passes, the WSL observation
+  remains a prerequisite, not a release result for public use.
 \item
   Publication-grade optimizer comparisons, physical component
   ablations, multi-seed confidence intervals, cost/latency measurements,
-  and UX telemetry remain pending before customer qualification.
+  and UX telemetry remain pending before customer qualification, and
+  each study must retain failures, matched budgets, frozen manifests, and
+  independently recomputed outputs under the declared evidence class.
 \item
   External baselines such as expert manual tuning or PX4 AutoTune must
   be included only when controller, vehicle, track, budget, metrics, and
-  failure accounting are genuinely aligned.
+  failure accounting are genuinely aligned; unmatched access to resets,
+  prior knowledge, simulator time, or terminal exclusions must be
+  reported as a protocol difference rather than hidden inside a pooled
+  ranking.
 \end{itemize}
 
 \subsection{\texorpdfstring{\textbf{7.1 Threats to
@@ -1051,11 +1149,16 @@ visible at 19/24 and 21/24. This is development-routing qualification,
 not causal prompt evidence. The deterministic eligibility artifact
 passes 16/16 policy-holdout cases without network or model calls, and the
 fallback campaign matches the direct arm in 10/10 frozen comparisons
-across 15 Jobs and 579 Trials. The audit retains source hashes,
-reproduction commands, qualification scope, and artifact provenance for
-independent regeneration, replay, and release review against the two
-frozen dependency chains and their signed receipts
-{[}\protect\hyperlink{ref_1}{\emph{1}}{]}.
+  across 15 Jobs and 579 Trials. The audit retains source hashes,
+  reproduction commands, qualification scope, and artifact provenance for
+  independent regeneration, replay, and release review against the two
+  frozen dependency chains and their signed receipts
+  {[}\protect\hyperlink{ref_1}{\emph{1}}{]}. Release review additionally
+  binds the receipt schema, artifact serialization, and verifier version,
+  so a later rebuild cannot silently accept a different evidence
+  contract. Independent replay must recompute declared counts and hashes
+  from Git object bytes and reject missing objects before comparing
+  presentation-layer bytes or customer-facing claims.
 
 \section{\texorpdfstring{\textbf{9.
 Conclusion}}{9. Conclusion}}\label{conclusion}
@@ -1091,20 +1194,9 @@ protocol without ambiguity.
 
 \section{\texorpdfstring{\textbf{References}}{References}}\label{references}
 
-References follow IEEE numeric order, and every body citation links to
-its entry. External sources establish method lineage and evaluation
-conventions; no external benchmark value is imported into DroneDream
-evidence. Online sources include a July 2026 access date. A citation
-establishes lineage, not implementation; the frozen source ledger
-remains authoritative for every DroneDream capability and reported
-measurement. Implementation claims therefore require corresponding
-source paths,
-executable tests, and release evidence under the same frozen commit.
-
-\begin{multicols}{2}
-\footnotesize
-\setlength{\parskip}{0.02em}
-\setlength{\columnsep}{1.15em}
+\begingroup
+\small
+\setlength{\parskip}{0.16em}
 
 \protect\hypertarget{ref_1}{}{}{[}1{]} DroneDream, ``Release evidence
 ledger,'' ver. 1.0, evidence bundle v7, software subject
@@ -1271,7 +1363,7 @@ loop: A review of Bayesian optimization,'' Proc. IEEE, vol. 104, no. 1,
 pp. 148--175, Jan. 2016, doi: 10.1109/JPROC.2015.2494218.
 \href{https://arxiv.org/abs/1502.05700}{\emph{arXiv}}
 
-\end{multicols}
+\endgroup
 \normalsize
 
 \section{\texorpdfstring{\textbf{Appendix A. Release-contract
@@ -1462,9 +1554,18 @@ only; mock campaigns authorize bounded software and synthetic-response
 claims; component ablations authorize observed differences under their
 frozen offline router. Backend and frontend receipts validate software,
 not provider, PX4/Gazebo, or flight behavior. Each reproducible value
-remains paired with the stronger unauthorized conclusion and the future
-experiment needed to support it.
-\looseness=-1
+  remains paired with the stronger unauthorized conclusion and the future
+  experiment needed to support it. At release, the ledger also binds the
+  generated PDF, layout audit, claim audit, and validation receipt to a
+  source commit without self-reference. A verifier reads those bytes from
+  Git objects, rechecks serialization and page-level gates, and fails if
+  any dependency SHA, figure, assertion, or receipt field drifts. This
+  keeps the website handoff limited to the final PDF and its hash while
+  preserving source, scripts, manifests, and receipts under report
+  ownership. That separation lets the website cite the artifact without
+  acquiring authority to regenerate, alter, or reinterpret the report's
+  evidence chain; any revised PDF requires a new report source commit,
+  complete build, visual review, and validation receipt.
 
 \begingroup
 \footnotesize

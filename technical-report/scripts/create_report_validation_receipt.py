@@ -155,10 +155,18 @@ def main() -> None:
 
     pages = len(PdfReader(pdf).pages)
     policy = audit["paragraph_policy"]["explanatory_body"]
-    require(pages == 13 and audit["pages"] == 13, "report must contain 13 pages")
+    short_list_policy = audit["paragraph_policy"]["short_list_items"]
+    require(pages == 14 and audit["pages"] == 14, "report must contain 14 pages")
     require(
-        policy["total"] == 40 and policy["passed"] == 40 and policy["failed"] == 0,
-        "explanatory-body last-line policy did not pass 40/40",
+        policy["total"] == 41 and policy["passed"] == 41 and policy["failed"] == 0,
+        "explanatory-body last-line policy did not pass 41/41",
+    )
+    require(
+        short_list_policy["total"] == 29
+        and short_list_policy["passed"] == 29
+        and short_list_policy["failed"] == 0
+        and not short_list_policy["above_3_lines"],
+        "short-list last-line policy did not pass 29/29 within three lines",
     )
     require(not audit["paragraph_geometry"]["unlocated"], "unlocated paragraphs")
     require(
@@ -186,7 +194,7 @@ def main() -> None:
     require(args.visual_review_passed, "visual review attestation was not supplied")
 
     receipt = {
-        "schema_version": "dronedream.technical-report-validation-receipt.v3",
+        "schema_version": "dronedream.technical-report-validation-receipt.v4",
         "subject_commit": subject_commit,
         "parent_software_head": manifest["software"]["branch_head"],
         "branch": git(repo, "branch", "--show-current"),
@@ -222,6 +230,14 @@ def main() -> None:
                 "failed_80": policy["failed"],
                 "failure_locations": policy["failure_locations"],
             },
+            "short_list_items": {
+                "total": short_list_policy["total"],
+                "passed_90": short_list_policy["passed"],
+                "failed_90": short_list_policy["failed"],
+                "maximum_lines": short_list_policy["maximum_lines"],
+                "failure_locations": short_list_policy["failure_locations"],
+                "above_3_lines": short_list_policy["above_3_lines"],
+            },
             "reasonable_exceptions": audit["paragraph_policy"]["reasonable_exceptions"],
             "unlocated": audit["paragraph_geometry"]["unlocated"],
             "cross_page_splits": audit["paragraph_geometry"]["cross_page_splits"],
@@ -253,17 +269,34 @@ def main() -> None:
         "visual_review": {
             "status": "passed",
             "render_dpi": 150,
-            "inspected_pages": list(range(1, 14)),
-            "page_bottoms_inspected": list(range(1, 14)),
+            "inspected_pages": list(range(1, 15)),
+            "page_bottoms_inspected": list(range(1, 15)),
             "defects_fixed": [
                 {
-                    "page": 3,
+                    "page": 1,
                     "issue": (
-                        "Outcome Memory label was clipped in the migrated architecture figure."
+                        "The DroneDream lockup was centered instead of aligned to the upper-left report margin."
                     ),
                     "resolution": (
-                        "Regenerated the report-owned figure with fitted "
-                        "text and verified the replacement render."
+                        "Left-aligned the lockup, enlarged the title and Abstract heading, and rechecked the full page."
+                    ),
+                },
+                {
+                    "page": 6,
+                    "issue": (
+                        "Table 3 split across pages and Figure 3 labels were vertically crowded near the zero bar."
+                    ),
+                    "resolution": (
+                        "Made Table 3 indivisible, increased Figure 3 height and row spacing, and offset the zero label."
+                    ),
+                },
+                {
+                    "page": 12,
+                    "issue": (
+                        "References used two columns and retained an explanatory paragraph below the heading."
+                    ),
+                    "resolution": (
+                        "Removed the paragraph and rendered all references in one readable column."
                     ),
                 }
             ],

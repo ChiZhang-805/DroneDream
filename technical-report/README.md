@@ -89,21 +89,23 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 The script regenerates Figures 2--6 from the frozen evidence bundle in an
 ignored build directory and requires their rendered pixels to match the
 tracked PNGs. It then performs two XeLaTeX passes, rejects warning gates,
-renders all 13 pages, runs the structural/paragraph/link audit, and publishes
+renders all 14 pages, runs the structural/paragraph/link audit, and publishes
 the validated PDF, layout audit, and claim-evidence audit to
 `technical-report/output/`.
 The claim gate fails the build when a declared report projection drifts from
 its frozen JSON pointer, source assertion, or computed phase-role count. The
 paragraph gate requires all explanatory prose, including the abstract, to end
-with a rendered line at least 80% as wide as its usable body line. Headings,
-lists, display formulas, code blocks, figure/table captions, and references
+with a rendered line at least 80% as wide as its usable body line. Short list
+items are audited separately: every item must remain within three rendered
+lines and its final line must fill at least 90% of the usable list width.
+Headings, display formulas, code blocks, figure/table captions, and references
 are inventoried as reasonable exceptions instead of being silently pooled
 with body prose. Intermediate files remain under the ignored
 `technical-report/build/` directory.
 
 The audit and receipt writers emit UTF-8 JSON with LF newlines as exact bytes,
 independent of the host operating system. After visually reviewing the final
-13-page render, create the artifact-layer receipt:
+14-page render, create the artifact-layer receipt:
 
 ```powershell
 python technical-report/scripts/create_report_validation_receipt.py `

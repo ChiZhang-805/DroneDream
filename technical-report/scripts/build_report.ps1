@@ -127,8 +127,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $renderedPages = Get-ChildItem -LiteralPath $renderRoot -File -Filter "page-*.png"
-if ($renderedPages.Count -ne 13) {
-    throw "Expected 13 rendered pages, found $($renderedPages.Count)"
+if ($renderedPages.Count -ne 14) {
+    throw "Expected 14 rendered pages, found $($renderedPages.Count)"
 }
 
 $auditPath = Join-Path $buildRoot "latex-audit.json"
@@ -165,6 +165,9 @@ if (
 }
 $bodyAudit = $audit.paragraph_geometry.explanatory_body
 $paragraphFailures = [int]$bodyAudit.failed_80
+$shortListAudit = $audit.paragraph_geometry.short_list_items
+$shortListFailures = [int]$shortListAudit.failed_90
+$longListFailures = @($shortListAudit.above_3_lines).Count
 $invalidLinks = 0
 if ($null -ne $audit.links.PSObject.Properties["invalid_named_targets"]) {
     $invalidLinks = @($audit.links.invalid_named_targets).Count
@@ -173,12 +176,17 @@ if ($null -ne $audit.links.PSObject.Properties["invalid_named_targets"]) {
 Write-Host (
     (
         "Audit summary: explanatory-body={0}, pass>=80%={1}, fail<80%={2}, " +
-        "unlocated={3}, cross-page={4}, bottom-space={5}, invalid-links={6}, " +
-        "gray-text={7}"
+        "short-lists={3}, pass>=90%={4}, fail<90%={5}, list>3-lines={6}, " +
+        "unlocated={7}, cross-page={8}, bottom-space={9}, invalid-links={10}, " +
+        "gray-text={11}"
     ) -f
         [int]$bodyAudit.total,
         [int]$bodyAudit.passed_80,
         $paragraphFailures,
+        [int]$shortListAudit.total,
+        [int]$shortListAudit.passed_90,
+        $shortListFailures,
+        $longListFailures,
         @($audit.paragraph_geometry.unlocated).Count,
         @($audit.paragraph_geometry.cross_page_splits).Count,
         @($audit.bottom_failures).Count,
@@ -230,6 +238,31 @@ if ($paragraphFailures -gt 0) {
         )
     }
 }
+if ($shortListFailures -gt 0) {
+    foreach ($failure in @($shortListAudit.failures)) {
+        Write-Host (
+            (
+                "  short-list failure: item={0}, page={1}, lines={2}, " +
+                "ratio={3:P1}, last-line='{4}'"
+            ) -f
+                [int]$failure.index,
+                [int]$failure.page,
+                [int]$failure.lines,
+                [double]$failure.last_line_ratio,
+                [string]$failure.last_line_text
+        )
+    }
+}
+if ($longListFailures -gt 0) {
+    foreach ($failure in @($shortListAudit.above_3_lines)) {
+        Write-Host (
+            "  long-list failure: item={0}, page={1}, lines={2}" -f
+                [int]$failure.index,
+                [int]$failure.page,
+                [int]$failure.lines
+        )
+    }
+}
 
 $hardFailures = @(
     @($audit.paragraph_geometry.unlocated).Count -gt 0
@@ -238,14 +271,19 @@ $hardFailures = @(
     $audit.gray_text_run_count -ne 0
     $invalidLinks -gt 0
     $paragraphFailures -gt 0
+    $shortListFailures -gt 0
+    $longListFailures -gt 0
 )
 if ($hardFailures -contains $true) {
     $auditFailureMessage = (
         (
-            "Report audit failed: explanatory-body<80%={0}, unlocated={1}, " +
-            "cross-page={2}, bottom-space={3}, invalid-links={4}, gray-text={5}"
+            "Report audit failed: explanatory-body<80%={0}, short-list<90%={1}, " +
+            "list>3-lines={2}, unlocated={3}, cross-page={4}, bottom-space={5}, " +
+            "invalid-links={6}, gray-text={7}"
         ) -f
         $paragraphFailures,
+        $shortListFailures,
+        $longListFailures,
         @($audit.paragraph_geometry.unlocated).Count,
         @($audit.paragraph_geometry.cross_page_splits).Count,
         @($audit.bottom_failures).Count,
@@ -269,6 +307,10 @@ Copy-Item -LiteralPath $claimAuditPath -Destination $publishedClaimAudit -Force
     explanatory_body_total = $bodyAudit.total
     explanatory_body_passed_80 = $bodyAudit.passed_80
     explanatory_body_failed_80 = $bodyAudit.failed_80
+    short_list_total = $shortListAudit.total
+    short_list_passed_90 = $shortListAudit.passed_90
+    short_list_failed_90 = $shortListAudit.failed_90
+    short_list_above_3_lines = $longListFailures
     last_line_below_80 = @($audit.paragraph_geometry.last_line_below_80).Count
     bottom_failures = @($audit.bottom_failures).Count
     gray_text_runs = $audit.gray_text_run_count
