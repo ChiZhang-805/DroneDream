@@ -10,7 +10,6 @@ from pathlib import Path
 import pdfplumber
 from pypdf import PdfReader
 
-
 TOKEN_PATTERN = re.compile(r"[a-z0-9_.%/+:-]+")
 POINTS_PER_MM = 72.0 / 25.4
 BODY_BOTTOM_MARGIN_MM = 16.0
@@ -25,11 +24,7 @@ def normalize(text: str) -> list[str]:
         .replace("\u2014", "-")
         .replace("\u2019", "'")
     )
-    return [
-        cleaned
-        for token in TOKEN_PATTERN.findall(text)
-        if (cleaned := token.strip(".:"))
-    ]
+    return [cleaned for token in TOKEN_PATTERN.findall(text) if (cleaned := token.strip(".:"))]
 
 
 def portable_report_path(path: Path) -> str:
@@ -39,6 +34,12 @@ def portable_report_path(path: Path) -> str:
         if part.lower() == "technical-report":
             return Path(*parts[index:]).as_posix()
     return path.as_posix()
+
+
+def write_json_lf(path: Path, value: object) -> None:
+    """Write canonical UTF-8 JSON without platform newline translation."""
+    payload = json.dumps(value, indent=2, ensure_ascii=False) + "\n"
+    path.write_bytes(payload.encode("utf-8"))
 
 
 def pandoc_blocks(source: Path, pandoc: Path) -> list[dict[str, object]]:
@@ -125,9 +126,7 @@ def source_exception_inventory(source: Path) -> dict[str, int]:
                 text,
             )
         ),
-        "figure_captions": len(
-            re.findall(r"\\emph\{Figure\s+\d+", text)
-        ),
+        "figure_captions": len(re.findall(r"\\emph\{Figure\s+\d+", text)),
         "table_captions": len(re.findall(r"\\caption\{", text)),
         "references": len(re.findall(r"\\hypertarget\{ref_\d+\}", text)),
     }
@@ -202,9 +201,7 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
                 )
                 if end_index is not None:
                     span = end_index + phrase_length - start_index
-                    if phrase_length == 1 and not (
-                        len(tokens) * 0.55 <= span <= len(tokens) * 1.8
-                    ):
+                    if phrase_length == 1 and not (len(tokens) * 0.55 <= span <= len(tokens) * 1.8):
                         continue
                     match = (
                         page_index,
@@ -244,8 +241,7 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
                 lines.append([word])
         lines.sort(key=lambda line: float(line[0]["top"]))
         widths = [
-            max(float(word["x1"]) for word in line)
-            - min(float(word["x0"]) for word in line)
+            max(float(word["x1"]) for word in line) - min(float(word["x0"]) for word in line)
             for line in lines
         ]
         widest = max(widths) if widths else 1.0
@@ -282,18 +278,13 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
                 "last_line_pass_50": ratio >= 0.5,
                 "last_line_pass_80": ratio >= 0.8,
                 "line_policy_passed": (
-                    len(lines) >= minimum
-                    and (maximum is None or len(lines) <= maximum)
+                    len(lines) >= minimum and (maximum is None or len(lines) <= maximum)
                 ),
                 "text": record["text"],
             }
         )
 
-    explanatory_body = [
-        item
-        for item in audited
-        if item["policy_category"] == "explanatory_body"
-    ]
+    explanatory_body = [item for item in audited if item["policy_category"] == "explanatory_body"]
     explanatory_failures = [
         {
             "index": item["index"],
@@ -306,9 +297,7 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
         if not item["last_line_pass_80"]
     ]
     exception_counts = {
-        category: sum(
-            item["policy_category"] == category for item in audited
-        )
+        category: sum(item["policy_category"] == category for item in audited)
         for category in (
             "exception_list",
             "exception_caption",
@@ -321,12 +310,8 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
         "audited": len(audited),
         "unlocated": unlocated,
         "cross_page_splits": split,
-        "last_line_below_50": [
-            item["index"] for item in audited if not item["last_line_pass_50"]
-        ],
-        "last_line_below_80": [
-            item["index"] for item in audited if not item["last_line_pass_80"]
-        ],
+        "last_line_below_50": [item["index"] for item in audited if not item["last_line_pass_50"]],
+        "last_line_below_80": [item["index"] for item in audited if not item["last_line_pass_80"]],
         "explanatory_body": {
             "total": len(explanatory_body),
             "passed_80": len(explanatory_body) - len(explanatory_failures),
@@ -337,8 +322,7 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
             "categories": exception_counts,
             "definition": {
                 "exception_list": (
-                    "List items are reported but excluded from the "
-                    "explanatory-body last-line gate."
+                    "List items are reported but excluded from the explanatory-body last-line gate."
                 ),
                 "exception_caption": (
                     "Figure and table captions are reported but excluded "
@@ -353,13 +337,10 @@ def geometry_audit(pdf: Path, records: list[dict[str, object]]) -> dict:
         "body_below_6_lines": [
             item["index"]
             for item in audited
-            if item["policy_category"] == "explanatory_body"
-            and item["lines"] < 6
+            if item["policy_category"] == "explanatory_body" and item["lines"] < 6
         ],
         "bullets_above_3_lines": [
-            item["index"]
-            for item in audited
-            if item["style"] == "bullet" and item["lines"] > 3
+            item["index"] for item in audited if item["style"] == "bullet" and item["lines"] > 3
         ],
     }
 
@@ -377,10 +358,7 @@ def gray_text_runs(pdf: Path) -> int:
                     if max(channels) <= 1:
                         channels = [value * 255 for value in channels]
                     luminance = sum(channels) / 3
-                    is_gray = (
-                        max(channels) - min(channels) <= 10
-                        and 35 < luminance < 245
-                    )
+                    is_gray = max(channels) - min(channels) <= 10 and 35 < luminance < 245
                 if is_gray and not active:
                     count += 1
                 active = is_gray
@@ -397,16 +375,12 @@ def link_audit(pdf: Path) -> dict[str, object]:
             action = annotation.get("/A")
             if action and action.get("/URI"):
                 external.append(str(action.get("/URI")))
-            if annotation.get("/Dest") is not None or (
-                action and action.get("/D") is not None
-            ):
+            if annotation.get("/Dest") is not None or (action and action.get("/D") is not None):
                 internal += 1
     return {
         "internal": internal,
         "external": len(external),
-        "repository_link_present": (
-            "https://github.com/ChiZhang-805/DroneDream" in external
-        ),
+        "repository_link_present": ("https://github.com/ChiZhang-805/DroneDream" in external),
     }
 
 
@@ -432,9 +406,7 @@ def bottom_audit(pdf: Path) -> list[dict[str, object]]:
                 if float(item.get("top", page.height)) < body_bottom_target + 6.0
                 and float(item.get("bottom", 0.0)) <= body_bottom_target + 6.0
             ]
-            content_bottom = max(
-                [float(word["bottom"]) for word in body] + drawable_bottoms
-            )
+            content_bottom = max([float(word["bottom"]) for word in body] + drawable_bottoms)
             gap_to_body_bottom = max(0.0, body_bottom_target - content_bottom)
             results.append(
                 {
@@ -442,12 +414,8 @@ def bottom_audit(pdf: Path) -> list[dict[str, object]]:
                     "body_bottom_target_points": round(body_bottom_target, 2),
                     "content_bottom_points": round(content_bottom, 2),
                     "gap_to_body_bottom_points": round(gap_to_body_bottom, 2),
-                    "gap_to_body_bottom_lines": round(
-                        gap_to_body_bottom / 12.0, 3
-                    ),
-                    "passed_bottom_line": (
-                        gap_to_body_bottom <= BODY_BOTTOM_TOLERANCE_POINTS
-                    ),
+                    "gap_to_body_bottom_lines": round(gap_to_body_bottom / 12.0, 3),
+                    "passed_bottom_line": (gap_to_body_bottom <= BODY_BOTTOM_TOLERANCE_POINTS),
                 }
             )
     return results
@@ -496,40 +464,37 @@ def main() -> None:
             },
         },
         "bottoms": bottoms,
-        "bottom_failures": [
-            item["page"] for item in bottoms if not item["passed_bottom_line"]
-        ],
+        "bottom_failures": [item["page"] for item in bottoms if not item["passed_bottom_line"]],
         "gray_text_run_count": gray_text_runs(args.pdf),
         "links": link_audit(args.pdf),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
-        json.dumps(result, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    print(json.dumps(
-        {
-            "pages": result["pages"],
-            "audited": geometry["audited"],
-            "unlocated": len(geometry["unlocated"]),
-            "cross_page_splits": len(geometry["cross_page_splits"]),
-            "last_line_below_50": len(geometry["last_line_below_50"]),
-            "last_line_below_80": len(geometry["last_line_below_80"]),
-            "explanatory_body": {
-                "total": geometry["explanatory_body"]["total"],
-                "passed_80": geometry["explanatory_body"]["passed_80"],
-                "failed_80": geometry["explanatory_body"]["failed_80"],
+    write_json_lf(args.output, result)
+    print(
+        json.dumps(
+            {
+                "pages": result["pages"],
+                "audited": geometry["audited"],
+                "unlocated": len(geometry["unlocated"]),
+                "cross_page_splits": len(geometry["cross_page_splits"]),
+                "last_line_below_50": len(geometry["last_line_below_50"]),
+                "last_line_below_80": len(geometry["last_line_below_80"]),
+                "explanatory_body": {
+                    "total": geometry["explanatory_body"]["total"],
+                    "passed_80": geometry["explanatory_body"]["passed_80"],
+                    "failed_80": geometry["explanatory_body"]["failed_80"],
+                },
+                "exceptions": geometry["exceptions"]["categories"],
+                "source_exception_inventory": exception_inventory,
+                "body_below_6_lines": len(geometry["body_below_6_lines"]),
+                "bullets_above_3_lines": len(geometry["bullets_above_3_lines"]),
+                "bottom_failures": result["bottom_failures"],
+                "gray_text_run_count": result["gray_text_run_count"],
+                "links": result["links"],
             },
-            "exceptions": geometry["exceptions"]["categories"],
-            "source_exception_inventory": exception_inventory,
-            "body_below_6_lines": len(geometry["body_below_6_lines"]),
-            "bullets_above_3_lines": len(geometry["bullets_above_3_lines"]),
-            "bottom_failures": result["bottom_failures"],
-            "gray_text_run_count": result["gray_text_run_count"],
-            "links": result["links"],
-        },
-        ensure_ascii=False,
-    ))
+            ensure_ascii=False,
+        )
+    )
 
 
 if __name__ == "__main__":

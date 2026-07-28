@@ -69,6 +69,18 @@ inventoried as reasonable exceptions instead of being silently pooled with
 body prose. Intermediate files remain under the ignored
 `technical-report/build/` directory.
 
+The audit and receipt writers emit UTF-8 JSON with LF newlines as exact bytes,
+independent of the host operating system. After the artifact layer is
+committed, verify the hashes against Git object bytes rather than the mutable
+working-tree representation:
+
+```powershell
+python technical-report/scripts/verify_report_validation_receipt.py `
+  --repository . `
+  --commit HEAD `
+  --receipt technical-report/validation-receipts/<subject-commit>.json
+```
+
 The architecture schematic is regenerated deterministically when its labels
 or topology change:
 

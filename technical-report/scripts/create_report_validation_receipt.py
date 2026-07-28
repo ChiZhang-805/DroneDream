@@ -10,7 +10,6 @@ from typing import Any
 
 from pypdf import PdfReader
 
-
 SOURCE_PATHS = (
     "technical-report/.gitignore",
     "technical-report/README.md",
@@ -58,6 +57,12 @@ def sha256_file(path: Path) -> str:
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
+
+
+def write_json_lf(path: Path, value: object) -> None:
+    """Write canonical UTF-8 JSON without platform newline translation."""
+    payload = json.dumps(value, indent=2, ensure_ascii=False) + "\n"
+    path.write_bytes(payload.encode("utf-8"))
 
 
 def source_tree_digest(repo: Path, subject_commit: str) -> dict[str, Any]:
@@ -127,8 +132,7 @@ def main() -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     log_text = log_path.read_text(encoding="utf-8", errors="replace")
     warning_counts = {
-        name: len(pattern.findall(log_text))
-        for name, pattern in WARNING_PATTERNS.items()
+        name: len(pattern.findall(log_text)) for name, pattern in WARNING_PATTERNS.items()
     }
     require(
         all(count == 0 for count in warning_counts.values()),
@@ -139,9 +143,7 @@ def main() -> None:
     policy = audit["paragraph_policy"]["explanatory_body"]
     require(pages == 13 and audit["pages"] == 13, "report must contain 13 pages")
     require(
-        policy["total"] == 44
-        and policy["passed"] == 44
-        and policy["failed"] == 0,
+        policy["total"] == 44 and policy["passed"] == 44 and policy["failed"] == 0,
         "explanatory-body last-line policy did not pass 44/44",
     )
     require(not audit["paragraph_geometry"]["unlocated"], "unlocated paragraphs")
@@ -154,10 +156,15 @@ def main() -> None:
     require(args.visual_review_passed, "visual review attestation was not supplied")
 
     receipt = {
-        "schema_version": "dronedream.technical-report-validation-receipt.v1",
+        "schema_version": "dronedream.technical-report-validation-receipt.v2",
         "subject_commit": subject_commit,
         "parent_software_head": manifest["software"]["branch_head"],
         "branch": git(repo, "branch", "--show-current"),
+        "serialization": {
+            "json_encoding": "utf-8",
+            "json_newline": "lf",
+            "final_newline": True,
+        },
         "source_tree": source_tree_digest(repo, subject_commit),
         "evidence_reference_manifest": {
             "path": "technical-report/evidence-reference-manifest.json",
@@ -185,13 +192,9 @@ def main() -> None:
                 "failed_80": policy["failed"],
                 "failure_locations": policy["failure_locations"],
             },
-            "reasonable_exceptions": audit["paragraph_policy"][
-                "reasonable_exceptions"
-            ],
+            "reasonable_exceptions": audit["paragraph_policy"]["reasonable_exceptions"],
             "unlocated": audit["paragraph_geometry"]["unlocated"],
-            "cross_page_splits": audit["paragraph_geometry"][
-                "cross_page_splits"
-            ],
+            "cross_page_splits": audit["paragraph_geometry"]["cross_page_splits"],
             "bottom_failures": audit["bottom_failures"],
             "gray_text_runs": audit["gray_text_run_count"],
             "internal_links": audit["links"]["internal"],
@@ -200,9 +203,7 @@ def main() -> None:
         "compile_log": {
             "sha256": sha256_file(log_path),
             "warning_counts": warning_counts,
-            "underfull_boxes": len(
-                re.findall(r"Underfull \\[hv]box", log_text)
-            ),
+            "underfull_boxes": len(re.findall(r"Underfull \\[hv]box", log_text)),
         },
         "visual_review": {
             "status": "passed",
@@ -213,8 +214,7 @@ def main() -> None:
                 {
                     "page": 3,
                     "issue": (
-                        "Outcome Memory label was clipped in the migrated "
-                        "architecture figure."
+                        "Outcome Memory label was clipped in the migrated architecture figure."
                     ),
                     "resolution": (
                         "Regenerated the report-owned figure with fitted "
@@ -229,17 +229,11 @@ def main() -> None:
                 "powershell -NoProfile -ExecutionPolicy Bypass "
                 "-File technical-report/scripts/build_report.ps1"
             ),
-            "receipt": (
-                "python technical-report/scripts/"
-                "create_report_validation_receipt.py"
-            ),
+            "receipt": ("python technical-report/scripts/create_report_validation_receipt.py"),
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
-        json.dumps(receipt, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    write_json_lf(args.output, receipt)
     print(
         json.dumps(
             {
