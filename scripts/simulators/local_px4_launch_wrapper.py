@@ -17,6 +17,7 @@ import copy
 import hashlib
 import json
 import math
+import numbers
 import os
 import re
 import shlex
@@ -1535,7 +1536,11 @@ def _bool_from_value(value: Any) -> bool:
             return True
         if normalized in {"0", "false", "no", "off"}:
             return False
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
+    # pyulog exposes integer and floating fields as NumPy scalar types.  Those
+    # implement numbers.Real but are not instances of Python's built-in
+    # int/float classes.  Keep the accepted value set fail-closed at exact
+    # Boolean encodings rather than coercing arbitrary truthy objects.
+    if isinstance(value, numbers.Real) and not isinstance(value, bool):
         normalized_number = float(value)
         if math.isfinite(normalized_number) and normalized_number in {0.0, 1.0}:
             return normalized_number == 1.0

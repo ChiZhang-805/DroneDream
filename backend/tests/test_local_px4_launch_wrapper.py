@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from app.simulator import scenario_effects
@@ -374,6 +375,28 @@ def test_ulog_to_telemetry_json_writes_schema_with_attitude_groundtruth_fallback
     assert payload["samples"][1]["crashed"] is True
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (np.int8(0), False),
+        (np.uint8(1), True),
+        (np.float32(0.0), False),
+        (np.float64(1.0), True),
+    ],
+)
+def test_bool_from_value_accepts_exact_numpy_boolean_encodings(
+    value: object,
+    expected: bool,
+) -> None:
+    assert wrapper._bool_from_value(value) is expected
+
+
+@pytest.mark.parametrize("value", [np.int8(2), np.float32(0.5)])
+def test_bool_from_value_rejects_non_boolean_numpy_numbers(value: object) -> None:
+    with pytest.raises(ValueError, match="invalid boolean telemetry value"):
+        wrapper._bool_from_value(value)
+
+
 def test_ulog_to_telemetry_json_fails_when_vehicle_local_position_missing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
@@ -673,8 +696,7 @@ def test_trusted_local_xml_rejects_path_escape_and_entity_declarations(
 
     malicious = trusted_root / "malicious.sdf"
     malicious.write_text(
-        '<!DOCTYPE sdf [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>'
-        "<sdf>&xxe;</sdf>",
+        '<!DOCTYPE sdf [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><sdf>&xxe;</sdf>',
         encoding="utf-8",
     )
     with pytest.raises(RuntimeError, match="forbidden DTD or entity declaration"):
@@ -895,9 +917,7 @@ def test_steady_wind_application_requires_readback_and_runtime_sdf(
     normalized = validate_scenario_effect_evidence(request, payload)
     assert normalized["verification_status"] == "verified_applied"
     assert (tmp_path / "run" / "scenario_runtime" / "generated_world.sdf").is_file()
-    assert (
-        tmp_path / "run" / "scenario_runtime" / "generated_world.last_attempt.sdf"
-    ).is_file()
+    assert (tmp_path / "run" / "scenario_runtime" / "generated_world.last_attempt.sdf").is_file()
     assert commands[1][1:3] == ["topic", "-t"]
     assert "gz.msgs.Empty" in commands[2]
     assert "gz.msgs.SdfGeneratorConfig" in commands[3]
