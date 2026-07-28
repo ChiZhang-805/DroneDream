@@ -14,8 +14,8 @@ from app.orchestration.decision_harness import (
 from app.orchestration.harness_context import (
     HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_TOOL_REGISTRY_VERSION,
-    eligible_harness_tools,
     provider_tool_manifest,
+    selectable_harness_tools,
 )
 from app.orchestration.harness_evaluation import (
     compile_routing_eval_snapshot,
@@ -47,7 +47,7 @@ def _valid_trace() -> dict[str, object]:
     corpus = Path(__file__).parent / "fixtures" / "harness_routing_eval_v1.jsonl"
     snapshot = compile_routing_eval_snapshot(load_routing_eval_cases(corpus)[0])
     evidence = snapshot.model_dump(mode="json", exclude_none=True)
-    allowed_tools = eligible_harness_tools(snapshot)
+    allowed_tools = selectable_harness_tools(snapshot)
     manifest = provider_tool_manifest(allowed_tools)
     system, user = build_decision_messages(snapshot, tool_manifest=manifest)
     return {

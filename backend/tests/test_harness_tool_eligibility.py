@@ -12,8 +12,10 @@ from pathlib import Path
 from app.optimization.scenarios import ScenarioRun
 from app.orchestration.harness_context import (
     HARNESS_TOOL_DEFINITIONS,
+    HarnessPlanningEvidence,
     HarnessToolId,
     eligible_harness_tools,
+    selectable_harness_tools,
 )
 from app.orchestration.harness_evaluation import (
     HarnessEvalToolHistory,
@@ -23,11 +25,7 @@ from app.orchestration.harness_evaluation import (
 )
 from app.orchestration.job_manager import _effective_fidelity_mapping
 
-CORPUS = (
-    Path(__file__).parent
-    / "fixtures"
-    / "harness_tool_eligibility_boundaries_v1.jsonl"
-)
+CORPUS = Path(__file__).parent / "fixtures" / "harness_tool_eligibility_boundaries_v1.jsonl"
 
 
 def test_tool_eligibility_boundary_corpus_matches_execution_capabilities() -> None:
@@ -96,19 +94,14 @@ def test_single_seed_scenario_count_never_implies_multi_fidelity() -> None:
                 ),
             )
             case = HarnessRoutingEvalCase(
-                case_id=(
-                    f"single_seed_d{parameter_count}_"
-                    f"b{remaining_full_candidates}"
-                ),
+                case_id=(f"single_seed_d{parameter_count}_b{remaining_full_candidates}"),
                 category="failure_recovery",
                 stimulus=stimulus,
                 acceptable_tools=("optimizer_portfolio",),
                 rationale="Capability-boundary regression only.",
             )
 
-            eligible = set(
-                eligible_harness_tools(compile_routing_eval_snapshot(case))
-            )
+            eligible = set(eligible_harness_tools(compile_routing_eval_snapshot(case)))
 
             assert "multi_fidelity_mobo" not in eligible
             assert "optimizer_portfolio" in eligible
@@ -140,9 +133,7 @@ def test_replicated_scenario_matrix_exposes_multi_fidelity_at_boundary() -> None
             rationale="Capability-boundary regression only.",
         )
 
-        assert required_tool in eligible_harness_tools(
-            compile_routing_eval_snapshot(case)
-        )
+        assert required_tool in eligible_harness_tools(compile_routing_eval_snapshot(case))
 
 
 def test_router_multi_fidelity_gate_matches_dispatch_fidelity_mapping() -> None:
@@ -181,3 +172,77 @@ def test_router_multi_fidelity_gate_matches_dispatch_fidelity_mapping() -> None:
 
     assert all(effective == 1.0 for _requested, effective in single_seed_mapping)
     assert any(effective < 1.0 for _requested, effective in replicated_mapping)
+
+
+def test_phase_policy_removes_incompatible_but_capable_tools() -> None:
+    stimulus = HarnessRoutingStimulus(
+        parameter_count=16,
+        objective_count=2,
+        constraint_count=2,
+        current_generation=4,
+        max_iterations=10,
+        remaining_trials=96,
+        trials_per_candidate=8,
+        training_case_count=4,
+        training_replicate_count=8,
+        scored_candidate_count=20,
+        feasible_candidate_count=8,
+        trailing_stagnant_generations=0,
+    )
+    snapshot = compile_routing_eval_snapshot(
+        HarnessRoutingEvalCase(
+            case_id="phase_policy_surface",
+            category="mixed_tool_history",
+            stimulus=stimulus,
+            acceptable_tools=("optimizer_portfolio",),
+            rationale="Phase-policy contract only.",
+        )
+    )
+    assert set(eligible_harness_tools(snapshot)) == set(HARNESS_TOOL_DEFINITIONS)
+
+    expected_exclusions = {
+        "exploration": {"turbo", "surrogate_cma_es"},
+        "recovery": {
+            "multi_fidelity_mobo",
+            "turbo",
+            "saasbo",
+            "surrogate_cma_es",
+        },
+        "refinement": {"multi_fidelity_mobo", "saasbo", "bipop_cma_es"},
+        "diversification": {"turbo"},
+        "verification": {
+            "multi_fidelity_mobo",
+            "saasbo",
+            "bipop_cma_es",
+        },
+        "balanced": set(),
+    }
+    policy_by_phase = {
+        "exploration": "broad",
+        "recovery": "conservative",
+        "refinement": "balanced",
+        "diversification": "broad",
+        "verification": "conservative",
+        "balanced": "balanced",
+    }
+    reason_by_phase = {
+        "exploration": "insufficient_scored_history",
+        "recovery": "high_domain_failure_rate",
+        "refinement": "recent_verified_improvement",
+        "diversification": "stagnation_detected",
+        "verification": "final_generation",
+        "balanced": "stable_progress",
+    }
+    for phase, exclusions in expected_exclusions.items():
+        phased = snapshot.model_copy(
+            update={
+                "plan": HarnessPlanningEvidence(
+                    phase=phase,  # type: ignore[arg-type]
+                    batch_policy=policy_by_phase[phase],  # type: ignore[arg-type]
+                    reason_codes=(reason_by_phase[phase],),  # type: ignore[arg-type]
+                )
+            }
+        )
+        selectable = set(selectable_harness_tools(phased))
+        assert selectable == set(HARNESS_TOOL_DEFINITIONS) - exclusions
+        assert {"cma_es", "optimizer_portfolio"} <= selectable

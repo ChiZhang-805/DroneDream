@@ -36,6 +36,7 @@ from app.orchestration.experimental_optimizer import (
     is_experimental_strategy,
     propose_experimental_generation,
 )
+from app.orchestration.harness_context import HarnessBatchPolicy, HarnessPlanPhase
 from app.orchestration.llm_parameter_proposer import (
     LlmProposal,
     OpenAIClientLike,
@@ -75,6 +76,7 @@ class AdaptiveDispatchResult:
 
     status: str
     dispatched_candidates: int = 0
+    planned_candidates: int = 0
 
 
 def _now() -> datetime:
@@ -108,9 +110,7 @@ def _scenario_payload(
 ) -> dict[str, Any]:
     if source == "optimizer":
         optimizer_fidelity_value = (
-            1.0
-            if optimizer_fidelity_value is None
-            else optimizer_fidelity_value
+            1.0 if optimizer_fidelity_value is None else optimizer_fidelity_value
         )
         optimizer_requested_fidelity_value = (
             1.0
@@ -123,9 +123,7 @@ def _scenario_payload(
         generation_index=generation_index,
         advanced_scenario_config=job.advanced_scenario_config_json,
         optimizer_fidelity_value=optimizer_fidelity_value,
-        optimizer_requested_fidelity_value=(
-            optimizer_requested_fidelity_value
-        ),
+        optimizer_requested_fidelity_value=(optimizer_requested_fidelity_value),
     )
 
 
@@ -1035,7 +1033,10 @@ def dispatch_next_cma_es_generation(
                 "generation_index": generation_index,
             },
         )
-        return AdaptiveDispatchResult(status="search_space_exhausted")
+        return AdaptiveDispatchResult(
+            status="search_space_exhausted",
+            planned_candidates=1,
+        )
     candidate = _create_optimizer_candidate(
         db,
         job,
@@ -1062,7 +1063,11 @@ def dispatch_next_cma_es_generation(
             "strategy": "cma_es",
         },
     )
-    return AdaptiveDispatchResult(status="dispatched", dispatched_candidates=1)
+    return AdaptiveDispatchResult(
+        status="dispatched",
+        dispatched_candidates=1,
+        planned_candidates=1,
+    )
 
 
 def _experimental_batch_target(
@@ -1106,6 +1111,23 @@ def _experimental_batch_target(
     return max(2, min(4, dimensions))
 
 
+def _batch_size_for_policy(
+    safe_maximum: int,
+    policy: HarnessBatchPolicy,
+) -> int:
+    """Translate a closed planning policy into a locally bounded batch size."""
+
+    if safe_maximum < 1:
+        raise ValueError("safe batch maximum must be positive")
+    if policy == "conservative":
+        return 1
+    if policy == "balanced":
+        return max(1, (safe_maximum + 1) // 2)
+    if policy == "broad":
+        return safe_maximum
+    raise ValueError("unsupported Harness batch policy")
+
+
 def _has_successful_full_fidelity_optimizer_evidence(job: models.Job) -> bool:
     """Return whether at least one optimizer point passed a complete full matrix.
 
@@ -1121,11 +1143,35 @@ def _has_successful_full_fidelity_optimizer_evidence(job: models.Job) -> bool:
     )
 
 
+def _required_fidelity_for_plan(
+    *,
+    can_schedule_reduced_fidelity: bool,
+    plan_phase: HarnessPlanPhase,
+    has_full_optimizer_evidence: bool,
+    generation_index: int,
+    max_iterations: int,
+    full_candidate_capacity: int,
+) -> float | None:
+    """Compile the non-negotiable fidelity floor for one planned cohort."""
+
+    if not can_schedule_reduced_fidelity:
+        return None
+    if plan_phase == "verification":
+        return 1.0
+    if not has_full_optimizer_evidence and (
+        generation_index >= max_iterations or full_candidate_capacity <= 1
+    ):
+        return 1.0
+    return None
+
+
 def dispatch_next_experimental_generation(
     db: Session,
     job: models.Job,
     *,
     strategy_override: ExperimentalOptimizerStrategy | None = None,
+    batch_policy: HarnessBatchPolicy = "broad",
+    plan_phase: HarnessPlanPhase = "balanced",
 ) -> AdaptiveDispatchResult:
     """Generate and dispatch one batch from an accuracy-first optimizer."""
 
@@ -1155,11 +1201,15 @@ def dispatch_next_experimental_generation(
         "optimizer_portfolio",
     }
     has_full_optimizer_evidence = _has_successful_full_fidelity_optimizer_evidence(job)
-    force_full_fidelity = (
-        can_schedule_reduced_fidelity
-        and not has_full_optimizer_evidence
-        and (generation_index >= job.max_iterations or capacity <= 1)
+    required_fidelity = _required_fidelity_for_plan(
+        can_schedule_reduced_fidelity=can_schedule_reduced_fidelity,
+        plan_phase=plan_phase,
+        has_full_optimizer_evidence=has_full_optimizer_evidence,
+        generation_index=generation_index,
+        max_iterations=job.max_iterations,
+        full_candidate_capacity=capacity,
     )
+    force_full_fidelity = required_fidelity == 1.0
     allocatable_capacity = capacity
     if (
         can_schedule_reduced_fidelity
@@ -1171,10 +1221,11 @@ def dispatch_next_experimental_generation(
         # least one optimizer candidate instead of ending with low-fidelity
         # evidence only.
         allocatable_capacity = max(1, capacity - 1)
-    batch_size = min(
+    safe_batch_maximum = min(
         allocatable_capacity,
         _experimental_batch_target(job, strategy),
     )
+    batch_size = _batch_size_for_policy(safe_batch_maximum, batch_policy)
     proposals = propose_experimental_generation(
         job=job,
         candidates=list(job.candidates),
@@ -1182,7 +1233,7 @@ def dispatch_next_experimental_generation(
         generation_index=generation_index,
         batch_size=batch_size,
         fidelity_mapping=fidelity_mapping,
-        required_fidelity=1.0 if force_full_fidelity else None,
+        required_fidelity=required_fidelity,
         strategy_override=strategy,
     )
     dispatched_candidates = 0
@@ -1274,7 +1325,10 @@ def dispatch_next_experimental_generation(
         dispatched_candidates += 1
         dispatched_trials += len(trials)
     if dispatched_candidates == 0:
-        return AdaptiveDispatchResult(status="search_space_exhausted")
+        return AdaptiveDispatchResult(
+            status="search_space_exhausted",
+            planned_candidates=batch_size,
+        )
 
     job.current_generation = generation_index
     job.current_phase = f"candidate_generation_{generation_index}"
@@ -1294,6 +1348,7 @@ def dispatch_next_experimental_generation(
     return AdaptiveDispatchResult(
         status="dispatched",
         dispatched_candidates=dispatched_candidates,
+        planned_candidates=batch_size,
     )
 
 
@@ -1374,6 +1429,8 @@ def dispatch_next_harness_generation(
             db,
             job,
             strategy_override=as_experimental_strategy(decision.tool_id),
+            batch_policy=decision.batch_policy,
+            plan_phase=decision.plan_phase,
         )
     record_event(
         db,
@@ -1386,8 +1443,11 @@ def dispatch_next_harness_generation(
             "generation": generation_index,
             "tool_id": decision.tool_id,
             "decision_source": decision.source,
+            "plan_phase": decision.plan_phase,
+            "batch_policy": decision.batch_policy,
             "status": result.status,
             "dispatched_candidates": result.dispatched_candidates,
+            "planned_candidates": result.planned_candidates,
             "evidence_sha256": decision.evidence_sha256,
             "prompt_sha256": decision.prompt_sha256,
             "fallback_reason": decision.fallback_reason,

@@ -29,11 +29,13 @@ from app.orchestration.harness_context import (
     HARNESS_PROMPT_TEMPLATE_VERSION,
     HARNESS_TOOL_REGISTRY,
     HARNESS_TOOL_REGISTRY_VERSION,
+    HarnessBatchPolicy,
     HarnessEvidenceSnapshot,
+    HarnessPlanPhase,
     HarnessToolId,
     build_harness_evidence,
-    eligible_harness_tools,
     provider_tool_manifest,
+    selectable_harness_tools,
 )
 from app.orchestration.llm_parameter_proposer import (
     OpenAIClientLike,
@@ -89,7 +91,7 @@ def decision_schema_for_snapshot(
 ) -> dict[str, Any]:
     """Return the exact closed response schema for one evidence snapshot."""
 
-    return _decision_schema(eligible_harness_tools(snapshot))
+    return _decision_schema(selectable_harness_tools(snapshot))
 
 
 @dataclass(frozen=True)
@@ -105,6 +107,8 @@ class HarnessDecision:
     evidence_sha256: str
     prompt_sha256: str | None = None
     fallback_reason: str | None = None
+    plan_phase: HarnessPlanPhase = "balanced"
+    batch_policy: HarnessBatchPolicy = "balanced"
     evidence_schema_version: str = HARNESS_EVIDENCE_SCHEMA_VERSION
     tool_registry_version: str = HARNESS_TOOL_REGISTRY_VERSION
     prompt_template_version: str = HARNESS_PROMPT_TEMPLATE_VERSION
@@ -162,7 +166,7 @@ def validate_harness_decision_response(
 
     return _validate_response(
         raw,
-        allowed_tools=eligible_harness_tools(snapshot),
+        allowed_tools=selectable_harness_tools(snapshot),
     )
 
 
@@ -180,28 +184,37 @@ def build_decision_messages(
     system = (
         "You are DroneDream's bounded optimization planner. Select exactly one "
         "optimizer tool from the supplied closed, versioned registry for the next "
-        "generation. Compare remaining budget, parameter dimension, scenario cost, "
-        "feasibility, optimizer-learning failure rate, improvement trend, "
-        "stagnation, and prior tool outcomes. Treat observed decision outcomes as "
-        "bounded associations, not causal rewards or child-tool credit. Use only "
-        "the supplied evidence. You cannot run tools, change "
+        "generation. Compare remaining budget, parameter dimension, training-case "
+        "heterogeneity, replicate cost, weight concentration, safe perturbation "
+        "magnitudes, feasibility, optimizer-learning failure rate, improvement "
+        "trend, stagnation, and prior tool outcomes. Validation counts describe "
+        "cost only; never infer hidden validation types, conditions, or results. "
+        "Treat observed decision outcomes as bounded associations, not causal "
+        "rewards or child-tool credit. The deterministic receding-horizon plan "
+        "sets the current phase and batch policy; select a tool compatible with "
+        "that phase because the plan will be recomputed after the cohort result. "
+        "Use only the supplied evidence. You cannot run tools, change "
         "constraints, modify budgets, access credentials, or invent additional "
         "tool IDs. Return only JSON that conforms to the required schema."
     )
     user_payload = {
         "tool_manifest": (
-            provider_tool_manifest(eligible_harness_tools(evidence_snapshot))
+            provider_tool_manifest(selectable_harness_tools(evidence_snapshot))
             if tool_manifest is None
             else tool_manifest
         ),
         "evidence": evidence_snapshot.model_dump(mode="json", exclude_none=True),
         "instructions": (
             "Choose one tool for the next bounded generation. Prefer measured "
-            "progress and budget efficiency. Reflect on verified prior cohort "
-            "results when present, but do not infer causality from observational "
-            "improvement. Use the deterministic portfolio when specialization is "
-            "not supported by the evidence, and explain the numeric evidence "
-            "behind the choice briefly in rationale."
+            "progress and budget efficiency. Account for the anonymous training "
+            "case profiles and job-wide simulation conditions without guessing "
+            "anything about sealed validation cases. Reflect on verified prior "
+            "cohort results when present, but do not infer causality from "
+            "observational improvement. Respect the supplied one-generation "
+            "planning phase and batch policy; do not invent a later open-loop "
+            "schedule. Use the deterministic portfolio when "
+            "specialization is not supported by the evidence, and explain the "
+            "numeric evidence behind the choice briefly in rationale."
         ),
     }
     return system, _canonical_json(user_payload)
@@ -242,7 +255,7 @@ def verify_harness_decision_trace(
             failures.append("evidence_schema_version_mismatch")
         if payload.get("evidence_sha256") != computed_evidence_sha256:
             failures.append("evidence_sha256_mismatch")
-    expected_allowed_tools = eligible_harness_tools(snapshot) if snapshot is not None else None
+    expected_allowed_tools = selectable_harness_tools(snapshot) if snapshot is not None else None
 
     raw_manifest = payload.get("tool_manifest")
     manifest: dict[str, object] | None = raw_manifest if isinstance(raw_manifest, dict) else None
@@ -418,6 +431,7 @@ def _fallback(
     db: Session,
     job: models.Job,
     *,
+    snapshot: HarnessEvidenceSnapshot,
     decision_id: str,
     generation: int,
     reason: str,
@@ -450,6 +464,8 @@ def _fallback(
             "generation": generation,
             "reason": reason,
             "tool_id": HARNESS_FALLBACK_TOOL,
+            "plan_phase": snapshot.plan.phase,
+            "batch_policy": snapshot.plan.batch_policy,
             "evidence_sha256": evidence_sha256,
             "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
             "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
@@ -470,6 +486,8 @@ def _fallback(
         evidence_sha256=evidence_sha256,
         prompt_sha256=prompt_sha256,
         fallback_reason=reason,
+        plan_phase=snapshot.plan.phase,
+        batch_policy=snapshot.plan.batch_policy,
         evidence_schema_version=HARNESS_EVIDENCE_SCHEMA_VERSION,
         tool_registry_version=HARNESS_TOOL_REGISTRY_VERSION,
         prompt_template_version=HARNESS_PROMPT_TEMPLATE_VERSION,
@@ -513,6 +531,7 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            snapshot=evidence_snapshot,
             decision_id=decision_id,
             generation=generation,
             reason="missing_model",
@@ -524,6 +543,7 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            snapshot=evidence_snapshot,
             decision_id=decision_id,
             generation=generation,
             reason="insufficient_evidence",
@@ -531,7 +551,7 @@ def select_optimizer_tool(
             model=chosen_model,
         )
 
-    allowed_tools = eligible_harness_tools(evidence_snapshot)
+    allowed_tools = selectable_harness_tools(evidence_snapshot)
     tool_manifest = provider_tool_manifest(allowed_tools)
     system, user = build_decision_messages(
         evidence_snapshot,
@@ -542,6 +562,7 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            snapshot=evidence_snapshot,
             decision_id=decision_id,
             generation=generation,
             reason="prompt_too_large",
@@ -557,6 +578,7 @@ def select_optimizer_tool(
             return _fallback(
                 db,
                 job,
+                snapshot=evidence_snapshot,
                 decision_id=decision_id,
                 generation=generation,
                 reason="missing_api_key",
@@ -605,6 +627,7 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            snapshot=evidence_snapshot,
             decision_id=decision_id,
             generation=generation,
             reason="client_error",
@@ -619,6 +642,7 @@ def select_optimizer_tool(
         return _fallback(
             db,
             job,
+            snapshot=evidence_snapshot,
             decision_id=decision_id,
             generation=generation,
             reason="invalid_response",
@@ -636,6 +660,8 @@ def select_optimizer_tool(
             "generation": generation,
             "tool_id": tool_id,
             "rationale": rationale,
+            "plan_phase": evidence_snapshot.plan.phase,
+            "batch_policy": evidence_snapshot.plan.batch_policy,
             "model": chosen_model,
             "evidence_sha256": evidence_sha256,
             "prompt_sha256": prompt_sha256,
@@ -653,6 +679,8 @@ def select_optimizer_tool(
         model=chosen_model,
         evidence_sha256=evidence_sha256,
         prompt_sha256=prompt_sha256,
+        plan_phase=evidence_snapshot.plan.phase,
+        batch_policy=evidence_snapshot.plan.batch_policy,
         evidence_schema_version=HARNESS_EVIDENCE_SCHEMA_VERSION,
         tool_registry_version=HARNESS_TOOL_REGISTRY_VERSION,
         prompt_template_version=HARNESS_PROMPT_TEMPLATE_VERSION,

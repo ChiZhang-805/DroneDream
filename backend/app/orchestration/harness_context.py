@@ -47,12 +47,44 @@ HarnessToolId = Literal[
 HarnessSourceType = Literal["baseline", "optimizer", "llm_optimizer", "unknown"]
 HarnessObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom", "unknown"]
 HarnessTrackType = Literal["circle", "u_turn", "lemniscate", "custom", "unknown"]
+HarnessScenarioType = Literal[
+    "nominal",
+    "noise_perturbed",
+    "wind_perturbed",
+    "combined_perturbed",
+    "turbulence",
+    "gps_dropout",
+    "payload_changed",
+    "battery_degraded",
+    "actuator_delay",
+    "custom",
+]
+HarnessSensorNoiseLevel = Literal["low", "medium", "high", "unknown"]
+HarnessPlanPhase = Literal[
+    "exploration",
+    "recovery",
+    "refinement",
+    "diversification",
+    "verification",
+    "balanced",
+]
+HarnessBatchPolicy = Literal["conservative", "balanced", "broad"]
+HarnessPlanReason = Literal[
+    "final_generation",
+    "single_full_candidate_remaining",
+    "high_domain_failure_rate",
+    "insufficient_scored_history",
+    "no_feasible_candidate",
+    "stagnation_detected",
+    "recent_verified_improvement",
+    "stable_progress",
+]
 
-HARNESS_EVIDENCE_SCHEMA_VERSION = "2.5"
+HARNESS_EVIDENCE_SCHEMA_VERSION = "2.7"
 HARNESS_TOOL_REGISTRY_VERSION = "2.1"
 HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION = "1.1"
-HARNESS_PROMPT_TEMPLATE_VERSION = "1.2"
-HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.1"
+HARNESS_PROMPT_TEMPLATE_VERSION = "1.5"
+HARNESS_DECISION_TRACE_SCHEMA_VERSION = "1.3"
 MAX_EVIDENCE_CANDIDATES = 12
 MAX_DECISION_MEMORY_ITEMS = 8
 MAX_GENERATION_TREND_ITEMS = 32
@@ -75,6 +107,21 @@ _ALLOWED_SCENARIO_TYPES = frozenset(
     }
 )
 _ALLOWED_ROBUST_AGGREGATIONS = frozenset({"mean", "worst", "cvar", "percentile"})
+_SAFE_SCENARIO_PERTURBATION_RANGES: dict[str, tuple[float, float]] = {
+    "wind_mps": (0.0, 30.0),
+    "dropout_rate": (0.0, 1.0),
+    "mass_payload_kg": (0.0, 20.0),
+    "delay_ms": (0.0, 250.0),
+    "intensity": (0.0, 2.0),
+}
+_SAFE_PERTURBATIONS_BY_SCENARIO_TYPE: dict[str, frozenset[str]] = {
+    "wind_perturbed": frozenset({"wind_mps"}),
+    "gps_dropout": frozenset({"dropout_rate"}),
+    "payload_changed": frozenset({"mass_payload_kg"}),
+    "actuator_delay": frozenset({"delay_ms"}),
+    "turbulence": frozenset({"intensity"}),
+    "combined_perturbed": frozenset(_SAFE_SCENARIO_PERTURBATION_RANGES),
+}
 _ALLOWED_METRICS = (
     "rmse",
     "max_error",
@@ -104,6 +151,17 @@ _ALLOWED_FALLBACK_REASONS = frozenset(
         "invalid_response",
     }
 )
+_ALLOWED_PLAN_PHASES = frozenset(
+    {
+        "exploration",
+        "recovery",
+        "refinement",
+        "diversification",
+        "verification",
+        "balanced",
+    }
+)
+_ALLOWED_BATCH_POLICIES = frozenset({"conservative", "balanced", "broad"})
 
 JsonScalar: TypeAlias = bool | int | float | None
 JsonMetric: TypeAlias = JsonScalar | list[JsonScalar]
@@ -237,6 +295,82 @@ HARNESS_TOOL_REGISTRY: dict[HarnessToolId, str] = {
     tool_id: definition.summary for tool_id, definition in HARNESS_TOOL_DEFINITIONS.items()
 }
 
+_PHASE_COMPATIBLE_SEARCH_ROLES: dict[
+    HarnessPlanPhase,
+    frozenset[
+        Literal[
+            "general",
+            "constraint_aware",
+            "multi_fidelity",
+            "local_exploitation",
+            "sparse_high_dimension",
+            "surrogate_evolution",
+            "restart_exploration",
+            "balanced_fallback",
+        ]
+    ],
+] = {
+    "exploration": frozenset(
+        {
+            "general",
+            "constraint_aware",
+            "multi_fidelity",
+            "sparse_high_dimension",
+            "restart_exploration",
+            "balanced_fallback",
+        }
+    ),
+    "recovery": frozenset(
+        {
+            "general",
+            "constraint_aware",
+            "restart_exploration",
+            "balanced_fallback",
+        }
+    ),
+    "refinement": frozenset(
+        {
+            "general",
+            "constraint_aware",
+            "local_exploitation",
+            "surrogate_evolution",
+            "balanced_fallback",
+        }
+    ),
+    "diversification": frozenset(
+        {
+            "general",
+            "constraint_aware",
+            "multi_fidelity",
+            "sparse_high_dimension",
+            "surrogate_evolution",
+            "restart_exploration",
+            "balanced_fallback",
+        }
+    ),
+    "verification": frozenset(
+        {
+            "general",
+            "constraint_aware",
+            "local_exploitation",
+            "surrogate_evolution",
+            "balanced_fallback",
+        }
+    ),
+    "balanced": frozenset(
+        {
+            "general",
+            "constraint_aware",
+            "multi_fidelity",
+            "local_exploitation",
+            "sparse_high_dimension",
+            "surrogate_evolution",
+            "restart_exploration",
+            "balanced_fallback",
+        }
+    ),
+}
+
 
 class HarnessCandidateEvidence(_ClosedModel):
     generation: int = Field(ge=0)
@@ -260,13 +394,137 @@ class HarnessBudgetEvidence(_ClosedModel):
     remaining_full_candidate_capacity: int = Field(ge=0)
 
 
+class HarnessPlanningEvidence(_ClosedModel):
+    """Deterministic receding-horizon plan for the next bounded generation.
+
+    The plan is compiled from provider-safe evidence. The model may select a
+    compatible optimizer, but it cannot enlarge the batch policy or carry a
+    stale multi-step plan past the next observed generation.
+    """
+
+    schema_id: Literal["dronedream.harness-receding-plan/v1"] = (
+        "dronedream.harness-receding-plan/v1"
+    )
+    phase: HarnessPlanPhase
+    batch_policy: HarnessBatchPolicy
+    horizon_generations: Literal[1] = 1
+    replan_after_generation: Literal[True] = True
+    reason_codes: tuple[HarnessPlanReason, ...] = Field(min_length=1, max_length=3)
+
+    @model_validator(mode="after")
+    def _validate_phase_policy(self) -> HarnessPlanningEvidence:
+        expected = {
+            "exploration": "broad",
+            "recovery": "conservative",
+            "refinement": "balanced",
+            "diversification": "broad",
+            "verification": "conservative",
+            "balanced": "balanced",
+        }[self.phase]
+        if self.batch_policy != expected:
+            raise ValueError("planning phase and batch policy are inconsistent")
+        if len(set(self.reason_codes)) != len(self.reason_codes):
+            raise ValueError("planning reason codes must be unique")
+        return self
+
+
+class HarnessTrainingScenarioProfile(_ClosedModel):
+    """Anonymous, bounded description of one provider-visible training case."""
+
+    case_alias: str = Field(pattern=r"^training_case_[1-9][0-9]?$")
+    scenario_type: HarnessScenarioType
+    replicate_count: int = Field(ge=1, le=100)
+    weight_share: float = Field(gt=0.0, le=1.0)
+    safe_perturbations: dict[str, float] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_safe_perturbations(self) -> HarnessTrainingScenarioProfile:
+        for key, value in self.safe_perturbations.items():
+            bounds = _SAFE_SCENARIO_PERTURBATION_RANGES.get(key)
+            if (
+                bounds is None
+                or key
+                not in _SAFE_PERTURBATIONS_BY_SCENARIO_TYPE.get(
+                    self.scenario_type,
+                    frozenset(),
+                )
+                or not math.isfinite(value)
+                or not bounds[0] <= value <= bounds[1]
+            ):
+                raise ValueError("training scenario contains an unsafe perturbation")
+        return self
+
+
+class HarnessEnvironmentEvidence(_ClosedModel):
+    """Provider-safe job-wide simulation conditions with no user-authored prose."""
+
+    steady_wind_component_l1_mps: float = Field(ge=0.0, le=40.0)
+    sensor_noise_level: HarnessSensorNoiseLevel
+    advanced_config_present: bool
+    gust_magnitude_mps: float | None = Field(default=None, ge=0.0, le=30.0)
+    gust_period_s: float | None = Field(default=None, gt=0.0, le=300.0)
+    obstacle_count: int = Field(ge=0, le=512)
+    gps_noise_m: float = Field(ge=0.0, le=100.0)
+    baro_noise_m: float = Field(ge=0.0, le=100.0)
+    imu_noise_scale: float = Field(ge=0.0, le=10.0)
+    sensor_dropout_rate: float = Field(ge=0.0, le=1.0)
+    battery_initial_percent: float = Field(ge=0.0, le=100.0)
+    voltage_sag: bool
+    mass_payload_kg: float | None = Field(default=None, ge=0.0, le=20.0)
+
+    @model_validator(mode="after")
+    def _validate_gust_pair(self) -> HarnessEnvironmentEvidence:
+        if (self.gust_magnitude_mps is None) != (self.gust_period_s is None):
+            raise ValueError("enabled gust evidence requires both magnitude and period")
+        return self
+
+
 class HarnessScenarioEvidence(_ClosedModel):
     training_case_count: int = Field(ge=0)
     validation_case_count: int = Field(ge=0)
     training_replicate_count: int = Field(ge=0)
     validation_replicate_count: int = Field(ge=0)
     training_type_counts: dict[str, int] = Field(default_factory=dict)
+    training_replicate_min: int = Field(ge=0)
+    training_replicate_max: int = Field(ge=0)
+    training_weight_concentration: float = Field(ge=0.0, le=1.0)
+    effective_training_case_count: float = Field(ge=0.0, le=64.0)
+    training_cases: tuple[HarnessTrainingScenarioProfile, ...] = Field(
+        default=(),
+        max_length=64,
+    )
+    environment: HarnessEnvironmentEvidence
     common_random_numbers: bool | None = None
+
+    @model_validator(mode="after")
+    def _validate_training_profile(self) -> HarnessScenarioEvidence:
+        if len(self.training_cases) != self.training_case_count:
+            raise ValueError("training case profile count does not match aggregate count")
+        if self.training_case_count == 0:
+            if (
+                self.training_replicate_count != 0
+                or self.training_replicate_min != 0
+                or self.training_replicate_max != 0
+                or self.training_weight_concentration != 0.0
+                or self.effective_training_case_count != 0.0
+            ):
+                raise ValueError("empty training suite cannot contain profile aggregates")
+            return self
+        replicate_counts = [case.replicate_count for case in self.training_cases]
+        if (
+            sum(replicate_counts) != self.training_replicate_count
+            or min(replicate_counts) != self.training_replicate_min
+            or max(replicate_counts) != self.training_replicate_max
+        ):
+            raise ValueError("training replicate aggregates do not match case profiles")
+        if not math.isclose(
+            sum(case.weight_share for case in self.training_cases),
+            1.0,
+            rel_tol=0.0,
+            abs_tol=1e-6,
+        ):
+            raise ValueError("training case weight shares must sum to one")
+        return self
 
 
 class HarnessGenerationBest(_ClosedModel):
@@ -354,6 +612,8 @@ class HarnessExecutionMemory(_ClosedModel):
     generation: int = Field(ge=0)
     tool_id: HarnessToolId
     decision_source: Literal["model", "deterministic_fallback", "unknown"]
+    plan_phase: HarnessPlanPhase
+    batch_policy: HarnessBatchPolicy
     status: Literal[
         "dispatched",
         "max_iterations_reached",
@@ -362,6 +622,7 @@ class HarnessExecutionMemory(_ClosedModel):
         "unknown",
     ]
     dispatched_candidates: int = Field(ge=0)
+    planned_candidates: int = Field(ge=0)
     reflection_status: Literal[
         "verified_complete",
         "not_applicable",
@@ -392,6 +653,18 @@ class HarnessExecutionMemory(_ClosedModel):
 
     @model_validator(mode="after")
     def _validate_reflection_state(self) -> HarnessExecutionMemory:
+        if self.status == "dispatched" and not (
+            1 <= self.dispatched_candidates <= self.planned_candidates
+        ):
+            raise ValueError("dispatched execution requires a covering positive plan")
+        if self.status == "search_space_exhausted" and not (
+            self.dispatched_candidates == 0 and self.planned_candidates >= 1
+        ):
+            raise ValueError("search exhaustion requires a positive attempted plan")
+        if self.status in {"max_iterations_reached", "budget_exhausted"} and (
+            self.dispatched_candidates != 0 or self.planned_candidates != 0
+        ):
+            raise ValueError("pre-dispatch terminal status cannot carry a candidate plan")
         if self.reflection_status == "verified_complete":
             if self.status != "dispatched" or self.observed_outcome is None:
                 raise ValueError("verified reflection requires a dispatched observed outcome")
@@ -415,9 +688,10 @@ class HarnessJobEvidence(_ClosedModel):
 
 
 class HarnessEvidenceSnapshot(_ClosedModel):
-    schema_version: Literal["2.5"] = "2.5"
+    schema_version: Literal["2.7"] = "2.7"
     job: HarnessJobEvidence
     budget: HarnessBudgetEvidence
+    plan: HarnessPlanningEvidence
     scenarios: HarnessScenarioEvidence
     search: HarnessSearchSummary
     tool_history: tuple[HarnessToolHistory, ...] = ()
@@ -435,6 +709,62 @@ def _finite(value: object) -> float | None:
         return None
     numeric = float(value)
     return numeric if math.isfinite(numeric) else None
+
+
+def _safe_training_perturbations(
+    case: schemas.ScenarioCaseConfig,
+) -> dict[str, float]:
+    allowed = _SAFE_PERTURBATIONS_BY_SCENARIO_TYPE.get(
+        case.scenario_type,
+        frozenset(),
+    )
+    compiled: dict[str, float] = {}
+    for key in sorted(allowed):
+        numeric = _finite(case.config.get(key))
+        bounds = _SAFE_SCENARIO_PERTURBATION_RANGES[key]
+        if numeric is not None and bounds[0] <= numeric <= bounds[1]:
+            compiled[key] = numeric
+    return compiled
+
+
+def _environment_evidence(job: models.Job) -> HarnessEnvironmentEvidence:
+    wind = schemas.WindVector(
+        north=float(job.wind_north),
+        east=float(job.wind_east),
+        south=float(job.wind_south),
+        west=float(job.wind_west),
+    )
+    raw_advanced = job.advanced_scenario_config_json
+    if raw_advanced is not None and not isinstance(raw_advanced, dict):
+        raise ValueError("advanced scenario config must be an object")
+    advanced = schemas.AdvancedScenarioConfig(**(raw_advanced or {}))
+    gusts = advanced.wind_gusts
+    sensor_noise_level = (
+        job.sensor_noise_level if job.sensor_noise_level in {"low", "medium", "high"} else "unknown"
+    )
+    return HarnessEnvironmentEvidence(
+        steady_wind_component_l1_mps=sum(
+            abs(value)
+            for value in (
+                wind.north,
+                wind.east,
+                wind.south,
+                wind.west,
+            )
+        ),
+        sensor_noise_level=cast(HarnessSensorNoiseLevel, sensor_noise_level),
+        advanced_config_present=raw_advanced is not None,
+        gust_magnitude_mps=gusts.magnitude_mps if gusts.enabled else None,
+        gust_period_s=gusts.period_s if gusts.enabled else None,
+        obstacle_count=len(advanced.obstacles),
+        gps_noise_m=advanced.sensor_degradation.gps_noise_m,
+        baro_noise_m=advanced.sensor_degradation.baro_noise_m,
+        imu_noise_scale=advanced.sensor_degradation.imu_noise_scale,
+        sensor_dropout_rate=advanced.sensor_degradation.dropout_rate,
+        battery_initial_percent=advanced.battery.initial_percent,
+        voltage_sag=advanced.battery.voltage_sag,
+        mass_payload_kg=advanced.battery.mass_payload_kg,
+    )
 
 
 def _safe_metric(value: object, *, depth: int = 0) -> JsonMetric | None:
@@ -556,21 +886,36 @@ def _registered_parameter_names(job: models.Job) -> tuple[str, ...]:
     return tuple(names[:64])
 
 
-def _scenario_evidence(job: models.Job) -> HarnessScenarioEvidence:
+def compile_harness_scenario_evidence(job: models.Job) -> HarnessScenarioEvidence:
     raw_suite = job.scenario_suite_json if isinstance(job.scenario_suite_json, dict) else {}
+    environment = _environment_evidence(job)
     if not raw_suite:
+        replicate_count = max(1, int(job.trials_per_candidate or 1))
         return HarnessScenarioEvidence(
             training_case_count=1,
             validation_case_count=0,
-            training_replicate_count=max(1, int(job.trials_per_candidate or 1)),
+            training_replicate_count=replicate_count,
             validation_replicate_count=0,
-            training_type_counts={},
+            training_type_counts={"nominal": 1},
+            training_replicate_min=replicate_count,
+            training_replicate_max=replicate_count,
+            training_weight_concentration=1.0,
+            effective_training_case_count=1.0,
+            training_cases=(
+                HarnessTrainingScenarioProfile(
+                    case_alias="training_case_1",
+                    scenario_type="nominal",
+                    replicate_count=replicate_count,
+                    weight_share=1.0,
+                ),
+            ),
+            environment=environment,
             common_random_numbers=None,
         )
     suite = schemas.ScenarioSuiteConfig(**raw_suite)
     runs = scenario_matrix(suite)
     type_counts: dict[str, int] = defaultdict(int)
-    training_case_count = 0
+    training_cases = [case for case in suite.cases if case.enabled and not case.holdout]
     validation_case_count = 0
     for case in suite.cases:
         if not case.enabled:
@@ -578,15 +923,33 @@ def _scenario_evidence(job: models.Job) -> HarnessScenarioEvidence:
         if case.holdout:
             validation_case_count += 1
             continue
-        training_case_count += 1
         if case.scenario_type in _ALLOWED_SCENARIO_TYPES:
             type_counts[str(case.scenario_type)] += 1
+    total_training_weight = sum(case.weight for case in training_cases)
+    case_profiles = tuple(
+        HarnessTrainingScenarioProfile(
+            case_alias=f"training_case_{index + 1}",
+            scenario_type=case.scenario_type,
+            replicate_count=len(case.seeds),
+            weight_share=(case.weight / total_training_weight),
+            safe_perturbations=_safe_training_perturbations(case),
+        )
+        for index, case in enumerate(training_cases)
+    )
+    replicate_counts = [case.replicate_count for case in case_profiles]
+    weight_shares = [case.weight_share for case in case_profiles]
     return HarnessScenarioEvidence(
-        training_case_count=training_case_count,
+        training_case_count=len(training_cases),
         validation_case_count=validation_case_count,
         training_replicate_count=sum(1 for run in runs if not run.holdout),
         validation_replicate_count=sum(1 for run in runs if run.holdout),
         training_type_counts=dict(sorted(type_counts.items())),
+        training_replicate_min=min(replicate_counts),
+        training_replicate_max=max(replicate_counts),
+        training_weight_concentration=max(weight_shares),
+        effective_training_case_count=(1.0 / sum(share**2 for share in weight_shares)),
+        training_cases=case_profiles,
+        environment=environment,
         common_random_numbers=suite.common_random_numbers,
     )
 
@@ -1047,6 +1410,15 @@ def _decision_memory(
         tool_id = decision_payload.get("tool_id")
         if tool_id not in HARNESS_TOOL_DEFINITIONS or result_payload.get("tool_id") != tool_id:
             continue
+        plan_phase = decision_payload.get("plan_phase")
+        batch_policy = decision_payload.get("batch_policy")
+        if (
+            plan_phase not in _ALLOWED_PLAN_PHASES
+            or batch_policy not in _ALLOWED_BATCH_POLICIES
+            or result_payload.get("plan_phase") != plan_phase
+            or result_payload.get("batch_policy") != batch_policy
+        ):
+            continue
         raw_source = result_payload.get("decision_source")
         raw_reason = decision_payload.get("reason")
         if decision_type == "harness_decision_accepted":
@@ -1100,11 +1472,19 @@ def _decision_memory(
 
         raw_status = result_payload.get("status")
         dispatched_candidates = _bounded_int(result_payload.get("dispatched_candidates"))
+        planned_candidates = _bounded_int(result_payload.get("planned_candidates"))
         if (
             raw_status not in _ALLOWED_EXECUTION_STATUSES
             or dispatched_candidates is None
+            or planned_candidates is None
             or (raw_status == "dispatched" and dispatched_candidates == 0)
             or (raw_status != "dispatched" and dispatched_candidates != 0)
+            or (raw_status == "dispatched" and planned_candidates < dispatched_candidates)
+            or (raw_status == "search_space_exhausted" and planned_candidates < 1)
+            or (
+                raw_status in {"max_iterations_reached", "budget_exhausted"}
+                and planned_candidates != 0
+            )
             or (raw_status == "dispatched" and generation > max(0, current_generation))
         ):
             continue
@@ -1118,6 +1498,8 @@ def _decision_memory(
                         Literal["model", "deterministic_fallback"],
                         decision_source,
                     ),
+                    plan_phase=cast(HarnessPlanPhase, plan_phase),
+                    batch_policy=cast(HarnessBatchPolicy, batch_policy),
                     status=cast(
                         Literal[
                             "dispatched",
@@ -1128,6 +1510,7 @@ def _decision_memory(
                         raw_status,
                     ),
                     dispatched_candidates=dispatched_candidates,
+                    planned_candidates=planned_candidates,
                     fallback_reason=cast(
                         Literal[
                             "missing_model",
@@ -1240,6 +1623,90 @@ def _select_candidates(
     )
 
 
+def compile_harness_plan(
+    *,
+    parameter_count: int,
+    budget: HarnessBudgetEvidence,
+    search: HarnessSearchSummary,
+    decision_memory: tuple[HarnessExecutionMemory, ...],
+) -> HarnessPlanningEvidence:
+    """Compile the next safe planning phase from bounded observed evidence.
+
+    This is a one-generation receding-horizon plan, not an open-loop schedule.
+    Every dispatched cohort must be observed before a later phase is compiled.
+    Validation-only outcomes never enter the failure or improvement signals.
+    """
+
+    reasons: list[HarnessPlanReason] = []
+    if budget.remaining_generations <= 1:
+        reasons.append("final_generation")
+    if budget.remaining_full_candidate_capacity <= 1:
+        reasons.append("single_full_candidate_remaining")
+    if reasons:
+        return HarnessPlanningEvidence(
+            phase="verification",
+            batch_policy="conservative",
+            reason_codes=tuple(reasons[:3]),
+        )
+
+    latest_outcome = next(
+        (
+            item.observed_outcome
+            for item in reversed(decision_memory)
+            if item.reflection_status == "verified_complete" and item.observed_outcome is not None
+        ),
+        None,
+    )
+    latest_domain_failure_rate = (
+        latest_outcome.domain_failure_trial_count / latest_outcome.optimizer_learning_trial_count
+        if latest_outcome is not None and latest_outcome.optimizer_learning_trial_count > 0
+        else 0.0
+    )
+    if latest_domain_failure_rate >= 0.35 or (
+        search.completed_candidate_count >= 2 and search.observed_failure_rate >= 0.45
+    ):
+        return HarnessPlanningEvidence(
+            phase="recovery",
+            batch_policy="conservative",
+            reason_codes=("high_domain_failure_rate",),
+        )
+
+    minimum_history = max(4, min(8, max(0, parameter_count) + 1))
+    if search.scored_candidate_count < minimum_history:
+        reasons.append("insufficient_scored_history")
+    if search.feasible_candidate_count == 0:
+        reasons.append("no_feasible_candidate")
+    if reasons:
+        return HarnessPlanningEvidence(
+            phase="exploration",
+            batch_policy="broad",
+            reason_codes=tuple(reasons[:3]),
+        )
+
+    if search.trailing_stagnant_generations >= 2:
+        return HarnessPlanningEvidence(
+            phase="diversification",
+            batch_policy="broad",
+            reason_codes=("stagnation_detected",),
+        )
+
+    if latest_outcome is not None and (
+        latest_outcome.observed_absolute_improvement is not None
+        and latest_outcome.observed_absolute_improvement > 0.0
+    ):
+        return HarnessPlanningEvidence(
+            phase="refinement",
+            batch_policy="balanced",
+            reason_codes=("recent_verified_improvement",),
+        )
+
+    return HarnessPlanningEvidence(
+        phase="balanced",
+        batch_policy="balanced",
+        reason_codes=("stable_progress",),
+    )
+
+
 def build_harness_evidence(
     job: models.Job,
     *,
@@ -1265,7 +1732,7 @@ def build_harness_evidence(
         if isinstance(job.scenario_suite_json, dict) and job.scenario_suite_json
         else None
     )
-    scenarios = _scenario_evidence(job)
+    scenarios = compile_harness_scenario_evidence(job)
     full_trials_per_candidate = max(
         1,
         scenarios.training_replicate_count + scenarios.validation_replicate_count,
@@ -1291,6 +1758,33 @@ def build_harness_evidence(
         HarnessTrackType,
         job.track_type if job.track_type in _ALLOWED_TRACK_TYPES else "unknown",
     )
+    budget = HarnessBudgetEvidence(
+        current_generation=max(0, int(job.current_generation or 0)),
+        max_iterations=max(0, int(job.max_iterations or 0)),
+        remaining_generations=max(
+            0,
+            int(job.max_iterations or 0) - int(job.current_generation or 0),
+        ),
+        used_trials=used_trials,
+        max_total_trials=max_total_trials,
+        remaining_trials=remaining_trials,
+        full_trials_per_candidate=full_trials_per_candidate,
+        remaining_full_candidate_capacity=(remaining_trials // full_trials_per_candidate),
+    )
+    search = _search_summary(candidates, feedback_by_id)
+    decision_memory = _decision_memory(
+        list(execution_events),
+        current_generation=max(0, int(job.current_generation or 0)),
+        verified_started_decision_ids=frozenset(verified_started_decision_ids),
+        candidates=candidates,
+        feedback_by_id=feedback_by_id,
+    )
+    plan = compile_harness_plan(
+        parameter_count=len(parameter_names),
+        budget=budget,
+        search=search,
+        decision_memory=decision_memory,
+    )
     snapshot = HarnessEvidenceSnapshot(
         job=HarnessJobEvidence(
             objective_profile=objective_profile,
@@ -1301,29 +1795,12 @@ def build_harness_evidence(
             constraint_count=len(constraints) if isinstance(constraints, list) else 0,
             robust_aggregation=str(robust_aggregation),
         ),
-        budget=HarnessBudgetEvidence(
-            current_generation=max(0, int(job.current_generation or 0)),
-            max_iterations=max(0, int(job.max_iterations or 0)),
-            remaining_generations=max(
-                0,
-                int(job.max_iterations or 0) - int(job.current_generation or 0),
-            ),
-            used_trials=used_trials,
-            max_total_trials=max_total_trials,
-            remaining_trials=remaining_trials,
-            full_trials_per_candidate=full_trials_per_candidate,
-            remaining_full_candidate_capacity=(remaining_trials // full_trials_per_candidate),
-        ),
+        budget=budget,
+        plan=plan,
         scenarios=scenarios,
-        search=_search_summary(candidates, feedback_by_id),
+        search=search,
         tool_history=_tool_history(candidates, feedback_by_id),
-        decision_memory=_decision_memory(
-            list(execution_events),
-            current_generation=max(0, int(job.current_generation or 0)),
-            verified_started_decision_ids=frozenset(verified_started_decision_ids),
-            candidates=candidates,
-            feedback_by_id=feedback_by_id,
-        ),
+        decision_memory=decision_memory,
         candidates=compact_candidates,
         candidate_history_total=len(candidates),
         candidate_history_included=len(compact_candidates),
@@ -1369,6 +1846,30 @@ def eligible_harness_tools(
     return tuple(tool_id for tool_id in HARNESS_TOOL_DEFINITIONS if tool_id in eligible)
 
 
+def selectable_harness_tools(
+    snapshot: HarnessEvidenceSnapshot,
+) -> tuple[HarnessToolId, ...]:
+    """Apply both execution-capability and current planning-phase gates.
+
+    The capability gate answers whether a tool can run against the current
+    evidence shape. This second authority boundary removes tools whose search
+    role conflicts with the deterministic one-generation plan. Provider
+    schemas, manifests, response validation, and trace verification all use
+    this same set, so prompt text cannot widen the executable surface.
+    """
+
+    eligible = eligible_harness_tools(snapshot)
+    compatible_roles = _PHASE_COMPATIBLE_SEARCH_ROLES[snapshot.plan.phase]
+    selectable = tuple(
+        tool_id
+        for tool_id in eligible
+        if HARNESS_TOOL_DEFINITIONS[tool_id].search_role in compatible_roles
+    )
+    if not selectable or "optimizer_portfolio" not in selectable:
+        raise ValueError("Harness phase policy must preserve a deterministic fallback")
+    return selectable
+
+
 def provider_tool_manifest(
     allowed_tools: Iterable[HarnessToolId] | None = None,
 ) -> dict[str, object]:
@@ -1401,11 +1902,19 @@ __all__ = [
     "MAX_DECISION_MEMORY_ITEMS",
     "MAX_GENERATION_TREND_ITEMS",
     "HarnessEvidenceSnapshot",
+    "HarnessEnvironmentEvidence",
     "HarnessObservedDecisionOutcome",
+    "HarnessPlanningEvidence",
+    "HarnessScenarioEvidence",
+    "HarnessScenarioType",
+    "HarnessTrainingScenarioProfile",
     "HarnessToolId",
     "build_harness_evidence",
+    "compile_harness_plan",
+    "compile_harness_scenario_evidence",
     "compile_provider_safe_metric",
     "eligible_harness_tools",
     "optimizer_learning_outcome_for_trial",
     "provider_tool_manifest",
+    "selectable_harness_tools",
 ]

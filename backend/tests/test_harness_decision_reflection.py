@@ -81,8 +81,7 @@ def test_observed_outcome_compiles_verified_generation_without_causal_credit(
     second = _candidate("cand_second", generation=1, source_type="optimizer")
     candidates = [baseline, first, second]
     receipts = {
-        candidate.id: _receipt(candidate, accepted_attempt_count=3)
-        for candidate in candidates
+        candidate.id: _receipt(candidate, accepted_attempt_count=3) for candidate in candidates
     }
     monkeypatch.setattr(
         harness_context,
@@ -98,8 +97,11 @@ def test_observed_outcome_compiles_verified_generation_without_causal_credit(
         generation=1,
         tool_id="optimizer_portfolio",
         decision_source="model",
+        plan_phase="balanced",
+        batch_policy="balanced",
         status="dispatched",
         dispatched_candidates=2,
+        planned_candidates=2,
     )
 
     reflected = harness_context._observed_outcome_for_execution(
@@ -137,8 +139,7 @@ def test_observed_outcome_fails_closed_for_incomplete_generation_evidence(
     child = _candidate("cand_child", generation=1, source_type="optimizer")
     candidates = [baseline, child]
     receipts = {
-        candidate.id: _receipt(candidate, accepted_attempt_count=2)
-        for candidate in candidates
+        candidate.id: _receipt(candidate, accepted_attempt_count=2) for candidate in candidates
     }
     if tamper == "broken_receipt":
         receipts.pop(child.id)
@@ -167,8 +168,11 @@ def test_observed_outcome_fails_closed_for_incomplete_generation_evidence(
         generation=1,
         tool_id="cma_es",
         decision_source="model",
+        plan_phase="balanced",
+        batch_policy="balanced",
         status="dispatched",
         dispatched_candidates=2 if tamper == "count_mismatch" else 1,
+        planned_candidates=2 if tamper == "count_mismatch" else 1,
     )
 
     reflected = harness_context._observed_outcome_for_execution(
@@ -186,8 +190,11 @@ def test_zero_dispatch_result_never_manufactures_an_outcome() -> None:
         generation=2,
         tool_id="turbo",
         decision_source="model",
+        plan_phase="diversification",
+        batch_policy="broad",
         status="search_space_exhausted",
         dispatched_candidates=0,
+        planned_candidates=1,
     )
 
     reflected = harness_context._observed_outcome_for_execution(
