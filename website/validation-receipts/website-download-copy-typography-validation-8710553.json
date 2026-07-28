@@ -1,0 +1,196 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-download-copy-typography-validation",
+  "generatedAtUtc": "2026-07-28T15:25:09.8960156Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "87105531e0f591662c724dcbbe96f3adbfa4a321",
+    "sourceParent": "87e049cc426bec0f16ace8130bac672dbb778f22",
+    "sourceStateDuringValidation": "clean; source commit was one commit ahead of origin/codex/website during validation",
+    "attestationRule": "This receipt validates the source commit only. Its later receipt-only commit is not self-attested.",
+    "previousWebsiteReceipt": "website/validation-receipts/website-release-truth-manual-validation-fd7e770.json",
+    "previousWebsiteReceiptSha256": "034ef134858fe906cdb3c97aa263fa7c36c63a2c59b0216cb5f41ceebdd566f1"
+  },
+  "scope": {
+    "sourceFiles": [
+      "frontend/src/site/SiteApp.tsx",
+      "frontend/src/__tests__/PublicSite.test.tsx"
+    ],
+    "change": "Rebalanced only the English and Simplified Chinese downloadBody truthfulness copy introduced by fd7e7702. Both locales continue to identify the current installer as an unsigned preview candidate, require SHA-256 verification, and warn that Windows may show an unknown-publisher prompt.",
+    "excluded": "No layout, CSS, other page, manual, PDF, PRIVACY, deployment script, release metadata, installer, backend, software-line, report-line, production configuration, or public origin was changed."
+  },
+  "environment": {
+    "operatingSystem": "Microsoft Windows NT 10.0.26200.0",
+    "powershell": "5.1.26100.8875",
+    "node": "v24.14.1",
+    "npm": "11.11.0",
+    "python": "Python 3.13.0",
+    "browser": "Microsoft Edge",
+    "validationSupabase": "local non-production placeholders",
+    "productionAccountUsed": false,
+    "deploymentPerformed": false,
+    "logSha256": "4d4b2de70177bbf934c04355398bfc722ae98fe2de2ec65899b3e75902b89d79",
+    "logBytes": 500
+  },
+  "automatedValidation": {
+    "focusedPublicSiteTests": {
+      "command": "npm test -- --run src/__tests__/PublicSite.test.tsx",
+      "testFiles": 1,
+      "tests": 13,
+      "passed": 13,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "929c949f66884a6d6800b641a3eb5c476fb4e63aa8e2cc79f152cbe7f8c06ed6",
+      "logBytes": 686
+    },
+    "frontendTests": {
+      "command": "npm test -- --run --maxWorkers=4",
+      "testFiles": 50,
+      "tests": 325,
+      "passed": 325,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "aed4c02d1921bdd84e6bf043d15a96a5235fc3a05844ab0b5ae7d899b204e6a2",
+      "logBytes": 662
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "pass",
+      "logSha256": "70b3c3927615afdf5f5a277b682ce10528f9baed352029eb1ad9b1146db47acd",
+      "logBytes": 128
+    },
+    "lint": {
+      "command": "npm run lint",
+      "result": "pass",
+      "logSha256": "0a0909db1fb8b2a2edb14bdc5a7992cbb6d02839f44caf6fdd98bd1d27c4afed",
+      "logBytes": 104
+    },
+    "applicationBuild": {
+      "command": "npm run build",
+      "result": "pass",
+      "exitCode": 0,
+      "logSha256": "97bde1318b4f439af83414c3b3a691532cc79b2e33c84218af6835a703f75178",
+      "logBytes": 4650,
+      "note": "Vite emitted its existing greater-than-510-kB chunk advisory; the process completed successfully with exit code 0."
+    },
+    "deploymentContract": {
+      "command": "python -m pytest runtime/tests/test_website_deployment.py -q",
+      "tests": 11,
+      "subtests": 22,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "8a80471ff77c7758925a542f1584686da2b960196f032f1c728a45942dd56311",
+      "logBytes": 200
+    },
+    "performance": {
+      "command": "node website/scripts/audit-site-performance.mjs http://127.0.0.1:4175/ <ignored-cache>/performance.json",
+      "routes": 5,
+      "passed": 5,
+      "failed": 0,
+      "result": "pass",
+      "reportSha256": "ed2706c06fa763ca29a5bea5d3e87d5a2cde1497ba9df4b7cc008e3b97fcf9be",
+      "reportBytes": 17861,
+      "logSha256": "97b60ca89d815b30f5ff13ac52fa2fc15a06d61a2f31eff9ab47de706394a1b6",
+      "logBytes": 2346
+    },
+    "diffAndSourceState": {
+      "command": "git diff --check; git status --porcelain",
+      "result": "pass",
+      "worktreeClean": true
+    }
+  },
+  "desktopTypography": {
+    "command": "node website/scripts/audit-site-typography.mjs http://127.0.0.1:4175/ 1440 1000 0.80 <ignored-cache>/typography-desktop.json full",
+    "result": "pass",
+    "mode": "full",
+    "minimumFinalLineFill": 0.8,
+    "typographyFailures": 0,
+    "lineParityFailures": 0,
+    "layoutViolations": 0,
+    "downloadBody": {
+      "english": {
+        "lines": 2,
+        "finalLineFill": 0.895,
+        "contentWidthPx": 580,
+        "finalLineWidthPx": 519.328
+      },
+      "simplifiedChinese": {
+        "lines": 2,
+        "finalLineFill": 0.835,
+        "contentWidthPx": 580,
+        "finalLineWidthPx": 484.125
+      }
+    },
+    "reportSha256": "c2770ef607615a9c6bb698c2e13db26fe4ba0cb5e09ed9cbecd45dbce9f42a3c",
+    "reportBytes": 267826,
+    "logSha256": "264212148ad2d6d509a47de11be506b5a2452fc12073038a32e4f3f34e07f037",
+    "logBytes": 6662
+  },
+  "mobileLayout": {
+    "command": "node website/scripts/audit-site-typography.mjs http://127.0.0.1:4175/ 390 844 0.80 <ignored-cache>/typography-mobile.json layout-only",
+    "result": "pass",
+    "mode": "layout-only",
+    "layoutViolations": 0,
+    "downloadBodyNaturalLines": {
+      "english": 4,
+      "simplifiedChinese": 4
+    },
+    "note": "The mobile contract intentionally audits overflow and clipping only; natural mobile wrapping is not promoted to a typography product failure.",
+    "reportSha256": "f510164983deed28cdb42b6f701eaf8f0f395428fc6cfc6ade6d4d2099a4e178",
+    "reportBytes": 276950,
+    "logSha256": "892a8aaad90e72aecf234cafa6fbca881cebe636986e44ff2bc7b37d71932e93",
+    "logBytes": 6622
+  },
+  "visualValidation": {
+    "cases": [
+      "English 1440x1000",
+      "Simplified Chinese 1440x1000",
+      "English 390x844",
+      "Simplified Chinese 390x844"
+    ],
+    "count": 4,
+    "browser": "Microsoft Edge",
+    "captureMode": "prefers-reduced-motion plus stable fonts and layout",
+    "reportSha256": "72290dcc98e7cae5d9acf44e66bcfe64db20b7256a6302266544b61ed59158e5",
+    "reportBytes": 3947,
+    "screenshotSha256": {
+      "englishDesktop": "317283d2464d6d8aa2b0dbddeef39bbf3ae0a36bd2ccc88758afb6e5e35e650d",
+      "chineseDesktop": "b16a3c2c6c22e51f7d03201b1bceeee2de477152c052046feed8b9d26b32a5ea",
+      "englishMobile": "938f6833bb723bec6e11005db07e770f1fb70740e0f64fd759b84486419754e9",
+      "chineseMobile": "a179bd567b435e93d959f2de07d7dd62186b9f97776a892d82d90ee6ac613e63"
+    },
+    "visualReview": "All four original-resolution captures were inspected. Desktop EN/ZH both show two balanced download-body lines with complete heading, CTA, and metadata cards. Mobile EN/ZH both show four natural lines with complete CTA and stacked metadata cards. No clipping, overlap, horizontal escape, missing text, or mid-animation opacity remains."
+  },
+  "sharedWebsiteArtifact": {
+    "command": "website/scripts/build-pages-site.ps1",
+    "result": "pass",
+    "sourceCommit": "87105531e0f591662c724dcbbe96f3adbfa4a321",
+    "artifactKind": "dronedream-shared-static-site",
+    "githubPagesAndBaotaUseTheSameArtifact": true,
+    "buildManifestSha256": "c90541a88623451cf144ab96ccfe21b25173c26242fbf5ea132a2eb08456a926",
+    "buildManifestBytes": 717,
+    "sha256SumsSha256": "5a8700c587fc8601099bc0258e4b0a8a32ca4c63ace4150295c6cb620946ac00",
+    "sha256SumsBytes": 13046,
+    "verifiedSha256SumsEntries": 118,
+    "latestJsonSha256": "8538f17340e9a8b5d5b01baba1bb9dd65f872f99d62cabaa478c60c378269990",
+    "latestJsonBytes": 521,
+    "buildLogSha256": "aab4f271bc7bab77d85e0839fedc636c7783db8a325d9102878cf16ddc3e392c",
+    "buildLogBytes": 11372,
+    "localIntegrityLogSha256": "6d44aa90dec7eb5c9b55c8d611f31cc3a0b5abcf773b16ebd6688e70ebe2a291",
+    "localIntegrityLogBytes": 224,
+    "note": "This proves one local commit-pinned artifact for both deployment targets. It does not claim either public origin has been updated."
+  },
+  "actionsNotPerformed": [
+    "No GitHub Pages deployment was triggered.",
+    "No Alibaba Cloud or BaoTa upload was performed.",
+    "No GitHub Release asset, installer, DNS, TLS, certificate, server, payment, or production Supabase setting was changed."
+  ],
+  "remainingExternalGates": [
+    "Obtain explicit deployment authorization, then publish this exact shared artifact to GitHub Pages and Alibaba Cloud/BaoTa without rebuilding either target independently.",
+    "Correct the GitHub Pages custom-domain certificate state, enforce HTTPS, and verify the certificate hostname for getdronedream.com.",
+    "After deployment, require identical build-manifest.json, SHA256SUMS, downloads/latest.json, selected HTML/JS/CSS bytes, and installer metadata across both public origins.",
+    "The currently public GitHub and Alibaba installer bytes remain different and both are unsigned; a release-authorized software/signing line must produce a new immutable signed candidate before either can be described as fixed.",
+    "Complete real two-account production Supabase community/RLS validation and merchant/payment validation only under explicit production authorization."
+  ]
+}
