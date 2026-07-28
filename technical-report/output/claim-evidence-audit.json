@@ -1,0 +1,233 @@
+{
+  "schema_version": "dronedream.technical-report-claim-evidence-audit.v1",
+  "status": "passed",
+  "ledger": {
+    "path": "technical-report/claim-evidence-ledger.json",
+    "sha256": "99cf20a817af38e18ec932f63c32451fdce23162beccc1db7ef8295546e4b3d4"
+  },
+  "evidence_reference_manifest": {
+    "path": "technical-report/evidence-reference-manifest.json",
+    "sha256": "4d0e7a420b60372a483c5afd34252b8aed81c7275fa7836943bc42cc02908a9f"
+  },
+  "report_source": {
+    "path": "technical-report/body.tex",
+    "sha256": "476d2fb5c8ea8f00a420e79b775d4ba22566a26e32c45f3ba7d1473dc62ede06"
+  },
+  "claim_total": 13,
+  "claim_passed": 13,
+  "claim_failed": 0,
+  "assertion_total": 80,
+  "verified_sources": [
+    {
+      "id": "harness_contract_design",
+      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+      "path": "docs/19-llm-tool-orchestration-harness.md",
+      "sha256": "05c17b0f1663d637939adbd2a708f575db2b2bbd25803a6b0b7413bbf3b0f664"
+    },
+    {
+      "id": "harness_phase_registry",
+      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+      "path": "backend/app/orchestration/harness_context.py",
+      "sha256": "0dab5fae5b19b76bd18a205d83cd7abff3c2160083082751c676017e2a3a5aa3"
+    },
+    {
+      "id": "px4_gazebo_evidence_boundary",
+      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+      "path": "docs/08-px4-gazebo.md",
+      "sha256": "b8c58164b0efee355d90ac53cbded031e441d39cfc20a374f192db06212700fd"
+    },
+    {
+      "id": "runtime_dependency_pins",
+      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+      "path": "runtime/pins.env",
+      "sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5"
+    },
+    {
+      "id": "technical_report_evidence_bundle",
+      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+      "path": "artifacts/technical-report/evidence.json",
+      "sha256": "99eeeb9c87e2b14b67b54d2af35d16ea001d6ae987bff1a91ad426783d8cdfb7"
+    },
+    {
+      "id": "website_validation_receipt",
+      "ref_commit": "943f3b65187247fe67eed76bc698b262adb06994",
+      "path": "website/validation-receipts/a64f995093e13c74318219cd0f91ad2d03016f31.json",
+      "sha256": "6f0fc8bafb092cee5f1f05c484f60d9f73a88ba1d7f0b4e16f564a65506569f9"
+    }
+  ],
+  "claims": [
+    {
+      "id": "backend-validation-boundary",
+      "report_locations": [
+        "Abstract",
+        "Section 8",
+        "Table 6"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 6,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "website-validation-boundary",
+      "report_locations": [
+        "Section 8",
+        "Table 6"
+      ],
+      "source_id": "website_validation_receipt",
+      "assertions": 5,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "archived-provider-routing",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Figure 2",
+        "Figure 4",
+        "Table 1"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 7,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "deterministic-policy-holdout",
+      "report_locations": [
+        "Abstract",
+        "Section 4.2",
+        "Table 2",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 6,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "source-contract-ablation",
+      "report_locations": [
+        "Abstract",
+        "Section 4.3",
+        "Figure 3",
+        "Table 3",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 5,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "fallback-outcome-campaign",
+      "report_locations": [
+        "Abstract",
+        "Section 4.4",
+        "Table 4",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 8,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "component-outcome-ablation",
+      "report_locations": [
+        "Abstract",
+        "Section 7",
+        "Table 7",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 8,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "synthetic-coverage-campaign",
+      "report_locations": [
+        "Section 4.6",
+        "Figure 5",
+        "Figure 6",
+        "Table 5",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 10,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "synthetic-generalization-campaign",
+      "report_locations": [
+        "Section 4.6",
+        "Section 7.1",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 7,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "frozen-contract-versions",
+      "report_locations": [
+        "Section 3.1",
+        "Section 8",
+        "Appendix A.5"
+      ],
+      "source_id": "harness_contract_design",
+      "assertions": 6,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "phase-qualified-tool-surface",
+      "report_locations": [
+        "Appendix A.5",
+        "Table 8"
+      ],
+      "source_id": "harness_phase_registry",
+      "assertions": 6,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-gazebo-wind-acceptance-boundary",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "px4_gazebo_evidence_boundary",
+      "assertions": 5,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-runtime-pin",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "runtime_dependency_pins",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    }
+  ],
+  "failures": []
+}

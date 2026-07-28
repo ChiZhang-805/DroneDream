@@ -803,13 +803,13 @@
         "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 7,
-        "last_line_ratio": 0.8108,
-        "last_line_text": "reproduction command needed for deterministic regeneration and independent review after release.",
+        "lines": 8,
+        "last_line_ratio": 0.8099,
+        "last_line_text": "audits, and reproduction commands for independent review under the pinned dependency commits.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "Figures 2–6 trace to evidence bundle v6, canonical SHA-256 prefix bd99720f50a63d28; Figure 1 is a schematic. The bundle binds software subject 0429b42, provenance 738157c, and head a0040d4. Its backend receipt records 1,139/1,139 tests in 759.17 seconds on a pre-commit worktree, not an exact-final run; 59 affected checks passed on the subject. Ruff and mypy are unreceipted, and Windows Rust was not run. The website receipt links a64f995 to 943f3b6 and records 322/322 tests, typecheck, lint, build, nine deployment tests, and deterministic 117-file output across two builds. The reference manifest verifies both chains without copying raw evidence; its companion receipt binds report source, PDF, audits, and the reproduction command needed for deterministic regeneration and independent review after release."
+        "text": "Figures 2–6 trace to evidence bundle v6, canonical SHA-256 prefix bd99720f50a63d28; Figure 1 is a schematic. The bundle binds software subject 0429b42, provenance 738157c, and head a0040d4. Its backend receipt records 1,139/1,139 tests in 759.17 seconds on a pre-commit worktree, not an exact-final run; 59 affected checks passed on the subject. Ruff and mypy are unreceipted, and Windows Rust was not run. The website receipt links a64f995 to 943f3b6 and records 322/322 tests, typecheck, lint, build, nine deployment tests, and deterministic 117-file output across two builds. The reference manifest pins both chains without copying raw evidence. Its claim audit resolves reported counts, rates, scenario rows, contract versions, phase counts, and Runtime boundaries to immutable Git bytes; the companion receipt binds source, PDF, audits, and reproduction commands for independent review under the pinned dependency commits."
       },
       {
         "index": 63,
@@ -921,12 +921,12 @@
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 6,
-        "last_line_ratio": 0.8705,
-        "last_line_text": "seeing which stronger conclusion remains unauthorized under the declared evidence boundary and receipt.",
+        "last_line_ratio": 0.9913,
+        "last_line_text": "under the declared evidence boundary and which future experiment is required to authorize it with reproducible evidence.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "Every quantitative statement routes through one named artifact rather than console output or reconstructed prose. The exporter verifies each file, recomputes its aggregate, and records the evidence class. Router rows therefore support eligibility claims only; mock campaigns support bounded software and synthetic-response claims; component ablations support observed protocol differences under their frozen offline router. Backend and frontend receipts establish software validation, not provider, PX4/Gazebo, or real-flight qualification. A reviewer can therefore reproduce each number while seeing which stronger conclusion remains unauthorized under the declared evidence boundary and receipt."
+        "text": "A machine-checked ledger binds every displayed count, rate, scenario row, contract version, phase count, and Runtime boundary to immutable Git bytes and fails the build on drift. Router rows support eligibility claims only; mock campaigns support bounded software and synthetic-response claims; component ablations support observed protocol differences under their frozen offline router. Backend and frontend receipts establish software validation, not provider, PX4/Gazebo, or real-flight qualification. Reviewers can reproduce each value while seeing which stronger conclusion remains unauthorized under the declared evidence boundary and which future experiment is required to authorize it with reproducible evidence."
       }
     ],
     "audited": 71,
