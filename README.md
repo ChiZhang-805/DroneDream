@@ -7,12 +7,19 @@
 </p>
 
 <p align="center">
+  <img alt="React and Three.js" src="https://img.shields.io/badge/React-Three.js-7C3AED?style=for-the-badge&logo=react&logoColor=white" />
+  <img alt="English and Simplified Chinese" src="https://img.shields.io/badge/English%20%2B%20%E4%B8%AD%E6%96%87-bilingual-2563EB?style=for-the-badge" />
+  <img alt="Keyboard and responsive access" src="https://img.shields.io/badge/Access-keyboard%20%2B%20responsive-8B5CF6?style=for-the-badge" />
+  <img alt="GitHub Pages and Alibaba Cloud delivery" src="https://img.shields.io/badge/Delivery-Pages%20%2B%20Alibaba-EC4899?style=for-the-badge&logo=githubpages&logoColor=white" />
+</p>
+
+<p align="center">
   <a href="https://getdronedream.com/">Global website</a> ·
   <a href="website/README.md">Alibaba Cloud delivery</a> ·
   <a href="https://github.com/ChiZhang-805/DroneDream/releases">Releases</a>
 </p>
 
-## The website track
+## 🌐 The website track
 
 This branch owns DroneDream’s public web experience. It explains the product,
 guides visitors toward the Windows application and console, publishes the user
@@ -22,7 +29,7 @@ space for discussing reproducible tuning work.
 The website introduces the software; it does not duplicate the software’s
 backend, optimizer evidence, or technical-report source.
 
-## What visitors can do
+## 🧭 What visitors can do
 
 The public experience brings together five connected journeys:
 
@@ -36,7 +43,7 @@ The public experience brings together five connected journeys:
 Release metadata and checksums keep the download experience connected to the
 corresponding GitHub release rather than to an opaque uploaded file.
 
-## One experience, two delivery targets
+## 🔁 One experience, two delivery targets
 
 The canonical global release target is GitHub Pages at
 [getdronedream.com](https://getdronedream.com/). The same verified static
@@ -48,7 +55,7 @@ Both targets share one build manifest and file-hash inventory. Deployment
 scripts validate the candidate release before activation, preserve rollback
 boundaries, and prevent a partial upload from becoming the public site.
 
-## Designed for clarity and access
+## ✨ Designed for clarity and access
 
 The site uses DroneDream’s pink, violet, and blue identity across the animated
 landing experience, product cards, manuals, pricing, account flows, and
@@ -60,7 +67,7 @@ support, accessible names, modal focus traps, typography fit, contained
 overflow, and real-browser desktop/mobile checks are part of the release
 contract.
 
-## Relationship to software and report
+## 🔗 Relationship to software and report
 
 The website may publish approved product screenshots, release metadata, user
 manuals, and a finished technical-report PDF. It does not own the experiment
@@ -73,7 +80,7 @@ track; the publication-ready report is consumed from
 That separation lets the public story stay synchronized without turning the
 website branch into a second copy of either project.
 
-## Visit and follow
+## 🚀 Visit and follow
 
 - Visit [getdronedream.com](https://getdronedream.com/) for the global product
   experience.
