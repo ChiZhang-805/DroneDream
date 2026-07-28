@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "receipt_id": "history-job-id-collision-1dc8a1d",
+  "generated_at": "2026-07-28T13:12:08.845Z",
+  "branch": "codex/software",
+  "source_commit": "1dc8a1d6bc3d71a078d24eeb85a4286a4cdb7d1b",
+  "source_dirty_during_exact_browser_run": false,
+  "defect": {
+    "name": "History long Job ID collides with adjacent track type",
+    "owner": "software",
+    "scope": [
+      "frontend/scripts/verify-history-layout.mjs",
+      "frontend/src/__tests__/HistoryCompare.test.tsx",
+      "frontend/src/pages/History.tsx",
+      "frontend/src/styles.css"
+    ],
+    "resolution": "Keep the complete Job ID as link text and title while constraining its visible code box to the fixed Job ID cell with a scoped ellipsis."
+  },
+  "source_file_sha256": {
+    "frontend/scripts/verify-history-layout.mjs": "352dc4e14fc831bf34785f6ac0700c9290fc393b37ef15b830bcfb6659004138",
+    "frontend/src/__tests__/HistoryCompare.test.tsx": "79395b13a7d5f22e018aba3edd7f8e76e4594a33bb4174c050155e3eee701d41",
+    "frontend/src/pages/History.tsx": "d49a65a6c2ff8c75b522b2b1c660d3177a24a75542201920be33bc85922ad241",
+    "frontend/src/styles.css": "a16069a0bf2cd45de1b41a4ba6de3373c82d6f124f22e298424bd3530834456b"
+  },
+  "failure_baseline": {
+    "website_reported_source": "34b0698",
+    "website_receipt_only_attestation": "57981da",
+    "local_command": "npm run test:history-layout -- --label=before-job-id-fix-471a0e7 --expect-job-id-collision --output=artifacts/test-runs/history-job-id-collision/before-471a0e7",
+    "base_commit": "471a0e72d9721e1b2de009076cf1ce350faab3b1",
+    "source_dirty": true,
+    "source_changes": [
+      "M frontend/scripts/verify-history-layout.mjs"
+    ],
+    "note": "Only the verifier was modified to inject and measure the long synthetic ID; the pre-fix stylesheet hash remained frozen.",
+    "stylesheet_sha256": "3352af5909dff6655eeadbbedae279cb06164efdc14df7c00170d0b7a2a0680c",
+    "started_at": "2026-07-28T13:06:29.428Z",
+    "finished_at": "2026-07-28T13:06:34.528Z",
+    "result": "4/4 cases reproduced code-box overlap while page-level overflow remained contained",
+    "geometry": {
+      "desktop_job_id_cell_right": 665.98,
+      "desktop_job_id_code_right": 1444.73,
+      "desktop_track_cell_left": 665.98,
+      "mobile_job_id_cell_right": 425.98,
+      "mobile_job_id_code_right": 1204.73,
+      "mobile_track_cell_left": 425.98
+    },
+    "measurements": "artifacts/test-runs/history-job-id-collision/before-471a0e7/measurements.json",
+    "measurements_sha256": "3382c14bcfd6f3dabf080feee62e3d7ec30ee605593ec1b193f070a03f5bf29c"
+  },
+  "exact_commit_browser_verification": {
+    "command": "npm run test:history-layout -- --label=after-1dc8a1d --output=artifacts/test-runs/history-job-id-collision/after-1dc8a1d",
+    "browser": "Microsoft Edge 150.0.4078.99",
+    "started_at": "2026-07-28T13:10:09.514Z",
+    "finished_at": "2026-07-28T13:10:14.451Z",
+    "duration_ms": 4937,
+    "result": "4/4 passed",
+    "measurements": "artifacts/test-runs/history-job-id-collision/after-1dc8a1d/measurements.json",
+    "measurements_sha256": "23406b392712fef393de488256f8e7d4302410e078e9cb57c24812c28585a933",
+    "cases": [
+      {
+        "id": "desktop-en",
+        "locale": "en",
+        "viewport": "1440x1000",
+        "document": "1440/1440",
+        "app_main": "1200/1200",
+        "history_page": "1157/1157",
+        "history_results": "1116/1280",
+        "local_horizontal_scroll_px": 164,
+        "job_id_contained": true,
+        "job_id_overlaps_track_type": false,
+        "rightmost_action_reached": true
+      },
+      {
+        "id": "desktop-zh",
+        "locale": "zh-CN",
+        "viewport": "1440x1000",
+        "document": "1440/1440",
+        "app_main": "1200/1200",
+        "history_page": "1157/1157",
+        "history_results": "1116/1280",
+        "local_horizontal_scroll_px": 164,
+        "job_id_contained": true,
+        "job_id_overlaps_track_type": false,
+        "rightmost_action_reached": true
+      },
+      {
+        "id": "mobile-en",
+        "locale": "en",
+        "viewport": "390x844",
+        "document": "390/390",
+        "app_main": "390/390",
+        "history_page": "347/347",
+        "history_results": "306/1280",
+        "local_horizontal_scroll_px": 974,
+        "job_id_contained": true,
+        "job_id_overlaps_track_type": false,
+        "rightmost_action_reached": true
+      },
+      {
+        "id": "mobile-zh",
+        "locale": "zh-CN",
+        "viewport": "390x844",
+        "document": "390/390",
+        "app_main": "390/390",
+        "history_page": "347/347",
+        "history_results": "306/1280",
+        "local_horizontal_scroll_px": 974,
+        "job_id_contained": true,
+        "job_id_overlaps_track_type": false,
+        "rightmost_action_reached": true
+      }
+    ],
+    "common_checks": {
+      "full_job_id_remains_in_dom_and_title": true,
+      "document_width_parity": true,
+      "history_results_owns_horizontal_scroll": true,
+      "last_header_visible_at_scroll_end": true,
+      "last_delete_visible_and_focusable_at_scroll_end": true,
+      "unsafe_api_requests": 0,
+      "console_errors": 0,
+      "page_errors": 0
+    }
+  },
+  "focused_gates": [
+    {
+      "command": "npm test -- --run src/__tests__/HistoryCompare.test.tsx",
+      "result": "6 passed, 0 failed"
+    },
+    {
+      "command": "npm run typecheck",
+      "result": "passed"
+    },
+    {
+      "command": "npm run lint",
+      "result": "passed"
+    }
+  ],
+  "broader_gates": {
+    "frontend_full_vitest": {
+      "command": "npm test -- --reporter=json --outputFile=../artifacts/test-runs/history-job-id-collision/after-1dc8a1d/frontend-full-vitest.json",
+      "started_at": "2026-07-28T13:10:28.676Z",
+      "result": "319 passed, 1 failed",
+      "machine_report": "artifacts/test-runs/history-job-id-collision/after-1dc8a1d/frontend-full-vitest.json",
+      "machine_report_sha256": "c9d2fa3bc9e526d23dfdedc8f7786f3073b85bd2f0617f4d5a1eedd08dcebdbd",
+      "failure": {
+        "path": "frontend/src/__tests__/PublicSite.test.tsx",
+        "test": "DroneDream public website renders three directly comparable plans with the same ordered feature rows",
+        "reason": "The software branch PublicSite source does not issue the website branch's later /billing-checkout/availability request.",
+        "ownership": "website",
+        "disposition": "Preserved without cross-line modification; independent website-line full suite was previously reported green."
+      }
+    },
+    "console_build": {
+      "command": "npm run console:build",
+      "result": "not run to artifact completion",
+      "reason": "The authenticated build requires VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY. The config failed before emitting a build; placeholder rerun was intentionally avoided because site-dist is website deployment output outside software ownership."
+    }
+  }
+}
