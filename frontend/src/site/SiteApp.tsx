@@ -782,6 +782,10 @@ export function SiteApp() {
       : path === "/community"
         ? "community"
         : "home";
+  const communityView = sitePage === "community"
+    && new URLSearchParams(window.location.search).get("view") === "all"
+    ? "all"
+    : "recent";
 
   useEffect(() => {
     document.title = copy.metaTitle;
@@ -1085,7 +1089,12 @@ export function SiteApp() {
   };
 
   return (
-    <div className="dd-site" data-locale={locale} data-page={sitePage}>
+    <div
+      className="dd-site"
+      data-locale={locale}
+      data-page={sitePage}
+      data-community-view={sitePage === "community" ? communityView : undefined}
+    >
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
         <a className="site-brand" href="/" onClick={closeMenu} aria-label="DroneDream">
@@ -1573,29 +1582,31 @@ export function SiteApp() {
         </div>
       ) : null}
 
-      <footer className="site-footer">
-        <div className="site-shell">
-          <div className="site-footer-brand" role="img" aria-label="DroneDream">
-            <BrandLockup variant="primary" />
+      {sitePage === "home" ? (
+        <footer className="site-footer">
+          <div className="site-shell">
+            <div className="site-footer-brand" role="img" aria-label="DroneDream">
+              <BrandLockup variant="primary" />
+            </div>
+            <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
+            <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
+              <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
+                <FeatureIcon name="shield" />
+                {copy.codeSigningPolicy}
+              </a>
+              <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
+                <DocumentIcon />
+                {copy.privacyPolicy}
+              </a>
+              <a href={COMMUNITY_GUIDELINES_URL} target="_blank" rel="noreferrer">
+                <FeatureIcon name="report" />
+                {copy.communityGuidelines}
+              </a>
+            </nav>
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
           </div>
-          <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
-          <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
-            <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
-              <FeatureIcon name="shield" />
-              {copy.codeSigningPolicy}
-            </a>
-            <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
-              <DocumentIcon />
-              {copy.privacyPolicy}
-            </a>
-            <a href={COMMUNITY_GUIDELINES_URL} target="_blank" rel="noreferrer">
-              <FeatureIcon name="report" />
-              {copy.communityGuidelines}
-            </a>
-          </nav>
-          <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
-        </div>
-      </footer>
+        </footer>
+      ) : null}
     </div>
   );
 }

@@ -434,7 +434,7 @@ export function CommunityPage({
     }
   }, [copy.unavailable]);
 
-  const visibleTopics = allTopicsView ? topics : topics.slice(0, 3);
+  const visibleTopics = allTopicsView ? topics : topics.slice(0, 5);
 
   const openTopic = (topic: CommunityTopic) => {
     captureTopicTrigger();

@@ -23,6 +23,11 @@ interface ManualPageProps {
 
 type LoadState = "loading" | "ready" | "error";
 
+interface ManualNavigationChapter {
+  heading: ManualHeading;
+  subsections: ManualHeading[];
+}
+
 const manualCopy = {
   en: {
     ariaLabel: "DroneDream manual contents",
@@ -40,6 +45,8 @@ const manualCopy = {
     error: "The manual document could not be loaded.",
     retry: "Try again",
     noMatches: "No chapter title matches this search.",
+    expandChapter: "Expand chapter",
+    collapseChapter: "Collapse chapter",
   },
   "zh-CN": {
     ariaLabel: "DroneDream 说明书目录",
@@ -57,11 +64,18 @@ const manualCopy = {
     error: "说明书正文加载失败。",
     retry: "重新加载",
     noMatches: "没有与搜索内容匹配的章节标题。",
+    expandChapter: "展开章节",
+    collapseChapter: "收起章节",
   },
 } as const;
 
 function normalizeSearch(value: string, locale: SiteLocale): string {
   return value.trim().toLocaleLowerCase(locale);
+}
+
+function manualNavigationLabel(heading: ManualHeading, locale: SiteLocale): string {
+  if (!/^2\.2(?:\s|$)/u.test(heading.plainLabel)) return heading.plainLabel;
+  return locale === "zh-CN" ? "2.2 账户与数据" : "2.2 Accounts and data";
 }
 
 export function ManualPage({ locale }: ManualPageProps) {
@@ -73,6 +87,9 @@ export function ManualPage({ locale }: ManualPageProps) {
   const [state, setState] = useState<LoadState>("loading");
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState("");
+  const [expandedChapterIds, setExpandedChapterIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [loadAttempt, setLoadAttempt] = useState(0);
   const articleRef = useRef<HTMLElement>(null);
 
@@ -82,6 +99,7 @@ export function ManualPage({ locale }: ManualPageProps) {
     setSource("");
     setQuery("");
     setActiveId("");
+    setExpandedChapterIds(new Set());
 
     void fetch(`${documentRoot}.md`, {
       cache: "force-cache",
@@ -104,13 +122,36 @@ export function ManualPage({ locale }: ManualPageProps) {
   }, [documentRoot, loadAttempt]);
 
   const headings = useMemo(() => extractManualHeadings(source), [source]);
-  const navigationHeadings = useMemo(() => {
+  const navigationChapters = useMemo(() => {
     const normalized = normalizeSearch(query, locale);
-    const searchable = headings.filter((heading) => heading.level <= 2);
-    if (!normalized) return searchable;
-    return searchable.filter((heading) =>
-      normalizeSearch(heading.plainLabel, locale).includes(normalized),
-    );
+    const chapters: ManualNavigationChapter[] = [];
+    headings
+      .filter((heading) => heading.level <= 2)
+      .forEach((heading) => {
+        if (heading.level === 1) {
+          chapters.push({ heading, subsections: [] });
+          return;
+        }
+        chapters.at(-1)?.subsections.push(heading);
+      });
+    if (!normalized) return chapters;
+    return chapters.flatMap((chapter) => {
+      const chapterMatches = normalizeSearch(
+        manualNavigationLabel(chapter.heading, locale),
+        locale,
+      ).includes(normalized);
+      const matchingSubsections = chapter.subsections.filter((heading) =>
+        normalizeSearch(
+          manualNavigationLabel(heading, locale),
+          locale,
+        ).includes(normalized),
+      );
+      if (!chapterMatches && matchingSubsections.length === 0) return [];
+      return [{
+        ...chapter,
+        subsections: chapterMatches ? chapter.subsections : matchingSubsections,
+      }];
+    });
   }, [headings, locale, query]);
 
   useEffect(() => {
@@ -160,15 +201,21 @@ export function ManualPage({ locale }: ManualPageProps) {
     window.history.replaceState(null, "", `#${heading.id}`);
   };
 
+  const toggleChapter = (chapterId: string) => {
+    setExpandedChapterIds((current) => {
+      const next = new Set(current);
+      if (next.has(chapterId)) next.delete(chapterId);
+      else next.add(chapterId);
+      return next;
+    });
+  };
+
   return (
     <div className="site-portal site-manual-page">
       <aside className="manual-sidebar" aria-label={copy.ariaLabel}>
         <header className="manual-sidebar-title">
           <BookOpen aria-hidden="true" />
-          <div>
-            <strong>{copy.contents}</strong>
-            <span>{copy.edition}</span>
-          </div>
+          <strong>{copy.contents}</strong>
         </header>
 
         <label className="manual-search">
@@ -197,30 +244,72 @@ export function ManualPage({ locale }: ManualPageProps) {
         </div>
 
         <nav aria-label={copy.contents}>
-          {navigationHeadings.map((heading) => (
-            <a
-              key={heading.id}
-              href={`#${heading.id}`}
-              className={[
-                heading.level === 2 ? "is-subsection" : "",
-                activeId === heading.id ? "is-active" : "",
-              ].filter(Boolean).join(" ")}
-              aria-current={activeId === heading.id ? "location" : undefined}
-              onClick={(event) => {
-                event.preventDefault();
-                navigateToHeading(heading);
-              }}
-            >
-              <span aria-hidden="true">
-                {heading.level === 1
-                  ? String(heading.majorIndex + 1).padStart(2, "0")
-                  : "—"}
-              </span>
-              <strong>{heading.plainLabel}</strong>
-              <ChevronRight aria-hidden="true" />
-            </a>
-          ))}
-          {state === "ready" && !navigationHeadings.length ? (
+          {navigationChapters.map((chapter) => {
+            const expanded = Boolean(query)
+              || expandedChapterIds.has(chapter.heading.id);
+            const chapterPanelId = `${chapter.heading.id}-subsections`;
+            const chapterContainsActive = activeId === chapter.heading.id
+              || chapter.subsections.some((heading) => heading.id === activeId);
+            return (
+              <div
+                key={chapter.heading.id}
+                className={`manual-nav-chapter${chapterContainsActive ? " contains-active" : ""}`}
+              >
+                <div className="manual-nav-chapter-row">
+                  <a
+                    href={`#${chapter.heading.id}`}
+                    className={activeId === chapter.heading.id ? "is-active" : ""}
+                    aria-current={activeId === chapter.heading.id ? "location" : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateToHeading(chapter.heading);
+                    }}
+                  >
+                    <span aria-hidden="true">
+                      {String(chapter.heading.majorIndex + 1).padStart(2, "0")}
+                    </span>
+                    <strong>{manualNavigationLabel(chapter.heading, locale)}</strong>
+                  </a>
+                  {chapter.subsections.length ? (
+                    <button
+                      type="button"
+                      className="manual-nav-toggle"
+                      aria-expanded={expanded}
+                      aria-controls={chapterPanelId}
+                      aria-label={`${expanded ? copy.collapseChapter : copy.expandChapter}: ${manualNavigationLabel(chapter.heading, locale)}`}
+                      onClick={() => toggleChapter(chapter.heading.id)}
+                    >
+                      <ChevronRight aria-hidden="true" />
+                    </button>
+                  ) : null}
+                </div>
+                {chapter.subsections.length ? (
+                  <div
+                    id={chapterPanelId}
+                    className="manual-nav-subsections"
+                    hidden={!expanded}
+                  >
+                    {chapter.subsections.map((heading) => (
+                      <a
+                        key={heading.id}
+                        href={`#${heading.id}`}
+                        className={`is-subsection${activeId === heading.id ? " is-active" : ""}`}
+                        aria-current={activeId === heading.id ? "location" : undefined}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          navigateToHeading(heading);
+                        }}
+                      >
+                        <span aria-hidden="true">—</span>
+                        <strong>{manualNavigationLabel(heading, locale)}</strong>
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+          {state === "ready" && !navigationChapters.length ? (
             <p className="manual-no-results">{copy.noMatches}</p>
           ) : null}
         </nav>

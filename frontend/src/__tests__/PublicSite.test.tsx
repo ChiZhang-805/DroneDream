@@ -145,6 +145,10 @@ Each reference explains purpose, selection, default, and validation.
 # 1. Installation and first launch
 
 Complete the readiness gate before entering the tuning platform.
+
+## 2.2 Account, cloud data, and local drafts
+
+Account records and local drafts follow different storage boundaries.
 `;
     const chineseManual = `---
 title: "DroneDream 1.0.0 用户说明书"
@@ -178,7 +182,11 @@ title: "DroneDream 1.0.0 用户说明书"
 
     expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(screen.getByRole("heading", { name: "DroneDream 1.0.0 User Manual" })).toBeVisible();
-    expect(screen.getByRole("complementary", { name: "DroneDream manual contents" })).toBeVisible();
+    const manualContents = screen.getByRole("complementary", {
+      name: "DroneDream manual contents",
+    });
+    expect(manualContents).toBeVisible();
+    expect(within(manualContents).queryByText("English edition")).toBeNull();
     expect(await screen.findByRole("heading", { name: "About this manual" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "How to read the field references" })).toBeVisible();
     expect(screen.getByRole("img", { name: "Tuning Chat interface" })).toHaveAttribute(
@@ -195,6 +203,40 @@ title: "DroneDream 1.0.0 用户说明书"
       "/docs/downloads/DroneDream-Manual-en.md",
     );
     expect(container.querySelector("iframe")).toBeNull();
+    expect(container.querySelector(".site-footer")).toBeNull();
+
+    const firstChapterToggle = within(manualContents).getByRole("button", {
+      name: "Expand chapter: About this manual",
+    });
+    const secondChapterToggle = within(manualContents).getByRole("button", {
+      name: "Expand chapter: 1. Installation and first launch",
+    });
+    expect(firstChapterToggle).toHaveAttribute("aria-expanded", "false");
+    expect(secondChapterToggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(manualContents).queryByRole("link", {
+      name: "How to read the field references",
+    })).toBeNull();
+
+    fireEvent.click(firstChapterToggle);
+    expect(firstChapterToggle).toHaveAttribute("aria-expanded", "true");
+    expect(secondChapterToggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(manualContents).getByRole("link", {
+      name: "How to read the field references",
+    })).toBeVisible();
+
+    fireEvent.click(secondChapterToggle);
+    expect(firstChapterToggle).toHaveAttribute("aria-expanded", "true");
+    expect(secondChapterToggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(manualContents).getByRole("link", {
+      name: "2.2 Accounts and data",
+    })).toBeVisible();
+    expect(within(manualContents).queryByText(
+      "2.2 Account, cloud data, and local drafts",
+    )).toBeNull();
+
+    fireEvent.click(firstChapterToggle);
+    expect(firstChapterToggle).toHaveAttribute("aria-expanded", "false");
+    expect(secondChapterToggle).toHaveAttribute("aria-expanded", "true");
 
     fireEvent.click(screen.getByRole("button", { name: "Switch to Simplified Chinese" }));
     await waitFor(() => {
@@ -205,6 +247,21 @@ title: "DroneDream 1.0.0 用户说明书"
       "/docs/downloads/DroneDream-Manual-zh-CN.md",
       expect.objectContaining({ cache: "force-cache" }),
     );
+  });
+
+  it.each([
+    ["/pricing/", undefined],
+    ["/community/", "recent"],
+    ["/community/?view=all", "all"],
+  ])("keeps the homepage footer off the standalone route %s", (route, communityView) => {
+    window.history.replaceState(null, "", route);
+    const { container } = renderSite();
+
+    expect(container.querySelector(".site-footer")).toBeNull();
+    const site = container.querySelector(".dd-site");
+    if (communityView) {
+      expect(site).toHaveAttribute("data-community-view", communityView);
+    }
   });
 
   it("renders three directly comparable plans with the same ordered feature rows", async () => {
@@ -412,8 +469,8 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(fallbackRelease).toMatchObject({
       version: "1.0.0",
       fileName: "DroneDream_1.0.0_x64-setup.exe",
-      sha256: "f35c7aad9006a29607395a0e14b74d150b82fbf25afe3ff65474bdd764e7cf92",
-      sizeBytes: 10_386_896,
+      sha256: "b913e328079a59a94ea69be51a1c9b6352bc891a5927ba49f62bfec69341a6df",
+      sizeBytes: 10_389_138,
       publishedAt: "2026-07-28",
     });
     expect(isWebsiteRelease(fallbackRelease)).toBe(true);

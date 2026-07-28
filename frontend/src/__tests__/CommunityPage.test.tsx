@@ -108,6 +108,28 @@ describe("CommunityPage public data loading", () => {
     expect(screen.queryByRole("link", { name: "More topics" })).toBeNull();
   });
 
+  it("offers up to five recent topics for the responsive four-or-five-column shelf", async () => {
+    window.history.replaceState(null, "", "/community/");
+    const topics = Array.from({ length: 6 }, (_, index) => ({
+      ...topicFixture,
+      id: `00000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`,
+      title: `Recent topic ${index + 1}`,
+    }));
+    supabaseMock.rpc.mockImplementation((name: string) => {
+      if (name === "community_list_comments") return rpcResult([]);
+      return rpcResult(topics);
+    });
+
+    const { container } = render(
+      <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Recent topic 1" })).toBeVisible();
+    expect(container.querySelectorAll(".community-topic-grid > article")).toHaveLength(5);
+    expect(screen.queryByRole("heading", { name: "Recent topic 6" })).toBeNull();
+    expect(screen.getByRole("link", { name: "More topics" })).toBeVisible();
+  });
+
   it("loads only the selected topic's comments when opening a discussion", async () => {
     render(
       <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
@@ -229,6 +251,9 @@ describe("CommunityPage public data loading", () => {
       screen.getByRole("button", { name: "Close" }),
     ).toHaveFocus());
     const topicDialog = screen.getByRole("dialog", { name: "Stable hover evidence" });
+    expect(topicDialog.querySelector(
+      ".community-topic-dialog-visual > .community-cover-art",
+    )).toBeVisible();
     expect(within(topicDialog).getByRole("textbox", {
       name: "Add a useful observation or a reproducible next step…",
     })).toBeVisible();
