@@ -48,7 +48,7 @@ If the readiness gate stops before 100%, use the displayed failure item rather t
 
 The installer should be allowed to update the registered DroneDream installation rather than creating unrelated copies in different folders. If Windows shows more than one installation entry, keep the newest signed or hash-verified 1.0.0 installation and uninstall the obsolete entry through Windows Settings. Do not delete runtime folders manually while a study is active, because its worker may still own files, processes, and leases that belong to that registered application installation record.
 
-When downloading a new build, compare the published SHA-256 value with the downloaded installer before opening it. A matching hash proves that the bytes are the published bytes; it does not replace Windows code-signing checks. DroneDream remains version 1.0.0 in this manual, even when internal fixes are delivered under the same product version.
+When downloading a new build, compare the published SHA-256 value with the downloaded installer before opening it. A matching hash proves that the bytes are the published bytes; it does not replace Windows code-signing checks. This manual describes version 1.0.0, whose currently published preview candidate is not Authenticode-signed. If installer bytes change, the replacement must use a newly approved version, versioned file name, SHA-256, and `latest.json`; the existing versioned URL must never be overwritten.
 
 # 2. Workspace orientation
 
@@ -464,6 +464,8 @@ For a reproducibility review, also retain the experiment JSON, custom track JSON
 | BYOK | Key at most 512 characters; model at most 128; clean HTTP/HTTPS base URL at most 2,048 | Required fields are missing or the URL embeds credentials, a query string, a fragment, or no hostname. |
 
 Treat this appendix as a quick diagnosis, not a replacement for the field explanations in Steps 1–4. When more than one value is invalid, DroneDream directs attention to the earliest blocking field; correct it, continue forward, and allow the full compiler to expose any dependent issue that remains in later sections of the submitted experiment configuration.
+
+<!-- manual-pdf-pagebreak -->
 
 # Appendix D — Glossary
 

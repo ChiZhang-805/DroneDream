@@ -3,7 +3,7 @@
 Effective date: July 25, 2026
 
 DroneDream is an open-source PX4 and Gazebo control-parameter optimization application.
-The signed desktop application can be used without a DroneDream cloud account.
+The desktop application can be used without a DroneDream cloud account.
 The public website separately offers an optional Supabase-backed account and
 community. Local desktop use does not automatically upload experiment results
 to the website operator or to the community.

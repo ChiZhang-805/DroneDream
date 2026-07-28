@@ -1,0 +1,167 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[a4paper,top=18mm,bottom=17mm,left=18mm,right=18mm,headheight=19pt,headsep=7pt,footskip=11mm]{geometry}
+\usepackage{fontspec}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{grffile}
+\usepackage{eso-pic}
+\usepackage{amsmath,amssymb}
+\usepackage{longtable,booktabs,array}
+\usepackage{etoolbox}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{caption}
+\usepackage{mdframed}
+\usepackage[normalem]{ulem}
+\usepackage[unicode=true,colorlinks=true,linkcolor=brandPurple,urlcolor=brandPurple,citecolor=brandPurple]{hyperref}
+\usepackage{bookmark}
+
+\definecolor{brandPurple}{HTML}{7047FF}
+\definecolor{brandPink}{HTML}{ED3CB7}
+\definecolor{brandCyan}{HTML}{48D5E8}
+\definecolor{ink}{HTML}{191728}
+\definecolor{muted}{HTML}{6E6B79}
+\definecolor{rule}{HTML}{D9D2E8}
+\definecolor{calloutBackground}{HTML}{F6F2FF}
+
+\defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\setmainfont{$mainfont$}
+\setsansfont{$sansfont$}
+\setmonofont{Consolas}
+$if(linebreaklocale)$
+\XeTeXlinebreaklocale "$linebreaklocale$"
+\XeTeXlinebreakskip = 0pt plus 1pt
+$endif$
+
+\hypersetup{
+  pdftitle={$title$},
+  pdfauthor={$author$},
+  pdfsubject={DroneDream 1.0.0 user documentation},
+  pdfcreator={XeLaTeX},
+  pdfproducer={DroneDream documentation pipeline},
+  pdfborder={0 0 0},
+  breaklinks=true
+}
+\urlstyle{same}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3.2pt plus 0.6pt minus 0.3pt}
+\setlength{\emergencystretch}{3em}
+\setlength{\LTpre}{4pt}
+\setlength{\LTpost}{6pt}
+\setlength{\tabcolsep}{3.2pt}
+\renewcommand{\arraystretch}{1.16}
+\raggedbottom
+\clubpenalty=10000
+\widowpenalty=10000
+\displaywidowpenalty=10000
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}}
+\providecommand{\passthrough}[1]{#1}
+
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>0.60\textheight 0.60\textheight\else\Gin@nat@height\fi}
+\def\fps@figure{htbp}
+\makeatother
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+
+\captionsetup{
+  font={small,color=muted},
+  labelfont={bf,color=ink},
+  justification=raggedright,
+  singlelinecheck=false,
+  skip=4pt
+}
+
+\titleformat{\section}
+  {\sffamily\bfseries\color{brandPurple}\fontsize{15}{18}\selectfont}
+  {}{0pt}{}
+\titleformat{\subsection}
+  {\sffamily\bfseries\color{ink}\fontsize{10.7}{13}\selectfont}
+  {}{0pt}{}
+\titleformat{\subsubsection}
+  {\sffamily\bfseries\color{ink}\fontsize{9.3}{11.5}\selectfont}
+  {}{0pt}{}
+\titlespacing*{\section}{0pt}{12pt plus 2pt minus 1pt}{5pt}
+\titlespacing*{\subsection}{0pt}{8pt plus 1pt minus 1pt}{3pt}
+\titlespacing*{\subsubsection}{0pt}{6pt plus 1pt minus 1pt}{2pt}
+
+\setlist[itemize]{leftmargin=4.2mm,itemsep=1.2pt,topsep=2pt,parsep=0pt}
+\setlist[enumerate]{leftmargin=5.2mm,itemsep=1.2pt,topsep=2pt,parsep=0pt}
+\renewcommand{\labelitemi}{\textcolor{brandPurple}{\scriptsize\textbullet}}
+
+\renewenvironment{quote}
+  {\begin{mdframed}[
+      backgroundcolor=calloutBackground,
+      linecolor=brandPurple,
+      linewidth=0.7pt,
+      leftmargin=0pt,
+      rightmargin=0pt,
+      innerleftmargin=8pt,
+      innerrightmargin=8pt,
+      innertopmargin=6pt,
+      innerbottommargin=6pt,
+      skipabove=5pt,
+      skipbelow=6pt
+    ]\small}
+  {\end{mdframed}}
+
+\AtBeginEnvironment{longtable}{%
+  \fontsize{7.3}{9.0}\selectfont
+  \setlength{\tabcolsep}{2.4pt}
+}
+\AtEndEnvironment{longtable}{\normalsize}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\sffamily\bfseries\fontsize{7.5}{9}\selectfont\textcolor{brandPurple}{DroneDream}}
+\fancyhead[R]{\sffamily\fontsize{7.5}{9}\selectfont\textcolor{muted}{$manualtype$}}
+\fancyfoot[L]{\sffamily\fontsize{6.7}{8}\selectfont\textcolor{muted}{Version $version$}}
+\fancyfoot[R]{\sffamily\fontsize{6.7}{8}\selectfont\textcolor{muted}{\thepage}}
+\renewcommand{\headrulewidth}{0.35pt}
+\renewcommand{\footrulewidth}{0pt}
+\makeatletter
+\renewcommand{\headrule}{%
+  \hbox to\headwidth{\color{rule}\leaders\hrule height \headrulewidth\hfill}}
+\makeatother
+
+\renewcommand{\contentsname}{$contentsname$}
+\renewcommand{\cfttoctitlefont}{\sffamily\bfseries\color{brandPurple}\fontsize{18}{22}\selectfont}
+\renewcommand{\cftaftertoctitle}{\par\vspace{4pt}\color{rule}\hrule\vspace{8pt}}
+\renewcommand{\cftsecfont}{\sffamily\bfseries\color{ink}\fontsize{8.4}{10.5}\selectfont}
+\renewcommand{\cftsubsecfont}{\sffamily\color{muted}\fontsize{7.7}{9.7}\selectfont}
+\renewcommand{\cftsecpagefont}{\sffamily\bfseries\color{brandPurple}\fontsize{8.2}{10}\selectfont}
+\renewcommand{\cftsubsecpagefont}{\sffamily\color{muted}\fontsize{7.7}{9.7}\selectfont}
+\setlength{\cftbeforesecskip}{2.2pt}
+\setlength{\cftbeforesubsecskip}{0.4pt}
+\setcounter{tocdepth}{2}
+\setcounter{secnumdepth}{0}
+
+\begin{document}
+\special{pdf:trailerid [<$trailerid$> <$trailerid$>]}
+
+\thispagestyle{empty}
+\AddToShipoutPictureBG*{%
+  \AtPageLowerLeft{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{$coverimage$}%
+  }%
+}
+\null
+\clearpage
+
+\thispagestyle{empty}
+\tableofcontents
+\clearpage
+
+\setcounter{page}{1}
+\pagestyle{fancy}
+\fontsize{9.2}{11.8}\selectfont
+
+$body$
+
+\end{document}
