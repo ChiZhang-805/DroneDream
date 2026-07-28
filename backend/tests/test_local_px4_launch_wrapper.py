@@ -1376,6 +1376,38 @@ def test_wrapper_offboard_executor_invoked_while_px4_running(tmp_path: Path):
     assert (tmp_path / "run" / "offboard_executor.log").exists()
 
 
+def test_wrapper_windows_cleanup_timeout_is_best_effort(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = {"killed": False}
+
+    def timeout_taskkill(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(
+            cmd="taskkill",
+            timeout=wrapper.WINDOWS_PROCESS_TREE_TERMINATION_TIMEOUT_SECONDS,
+        )
+
+    fake_proc = SimpleNamespace(
+        pid=12345,
+        poll=lambda: None,
+        kill=lambda: state.__setitem__("killed", True),
+        wait=lambda timeout: None,
+    )
+    stderr_log = tmp_path / "stderr.log"
+    monkeypatch.setattr(wrapper.os, "name", "nt")
+    monkeypatch.setattr(wrapper.subprocess, "run", timeout_taskkill)
+
+    wrapper._terminate_process_group(
+        fake_proc,
+        stderr_log,
+        label="PX4",
+    )
+
+    assert state["killed"] is True
+    assert "Timed out terminating PX4 process tree" in stderr_log.read_text(encoding="utf-8")
+
+
 def test_wrapper_offboard_executor_failure_exits_non_zero(tmp_path: Path):
     launcher = tmp_path / "launcher.py"
     launcher.write_text("import time\nprint('launched')\ntime.sleep(30)\n", encoding="utf-8")

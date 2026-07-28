@@ -54,6 +54,7 @@ DEFAULT_TRACK_MARKER_Z_OFFSET = 0.03
 DEFAULT_TRACK_MARKER_COLOR = "0 0.8 1 1"
 DEFAULT_TRACK_MARKER_LINE_WIDTH = 0.08
 DEFAULT_TRACK_MARKER_MODE = "line_strip"
+WINDOWS_PROCESS_TREE_TERMINATION_TIMEOUT_SECONDS = 30.0
 MAX_JSON_BYTES = 16 * 1024 * 1024
 MAX_TELEMETRY_SAMPLES = 50_000
 MAX_ULOG_BYTES = 1024 * 1024 * 1024
@@ -1833,14 +1834,27 @@ def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path, *, l
                 text=True,
                 capture_output=True,
                 check=False,
-                timeout=10,
+                timeout=WINDOWS_PROCESS_TREE_TERMINATION_TIMEOUT_SECONDS,
             )
             _append_log(
                 stderr_log,
                 f"[local_px4_launch_wrapper] Sent SIGTERM to {label} process group "
                 "(taskkill tree on Windows)",
             )
-        except OSError:
+        except subprocess.TimeoutExpired:
+            _append_log(
+                stderr_log,
+                f"[local_px4_launch_wrapper] Timed out terminating {label} "
+                "process tree; killing the launcher process as a fallback",
+            )
+            with contextlib.suppress(OSError):
+                proc.kill()
+        except OSError as exc:
+            _append_log(
+                stderr_log,
+                f"[local_px4_launch_wrapper] Could not terminate {label} "
+                f"process tree during cleanup: {exc}",
+            )
             return
         with contextlib.suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=2.0)

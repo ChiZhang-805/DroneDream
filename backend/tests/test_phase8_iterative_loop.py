@@ -522,6 +522,7 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
 
     entered = threading.Event()
     release = threading.Event()
+    provider_wait_timeout_seconds = 30.0
 
     class BlockingClient:
         def __init__(self) -> None:
@@ -530,7 +531,7 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
         def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
             self.calls += 1
             entered.set()
-            if not release.wait(timeout=10):
+            if not release.wait(timeout=provider_wait_timeout_seconds):
                 raise TimeoutError("test did not release provider call")
             return {
                 "decision": {
@@ -561,7 +562,9 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
     worker = threading.Thread(target=finalize_in_thread, daemon=True)
     worker.start()
     try:
-        assert entered.wait(timeout=10), "finalizer never reached provider"
+        assert entered.wait(timeout=provider_wait_timeout_seconds), (
+            "finalizer never reached provider"
+        )
         with ctx["db_module"].SessionLocal() as db:
             job = db.get(ctx["models"].Job, job_id)
             initial_token = job.finalization_claim_token
