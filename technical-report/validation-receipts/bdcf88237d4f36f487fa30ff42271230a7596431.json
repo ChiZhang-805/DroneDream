@@ -1,0 +1,352 @@
+{
+  "schema_version": "dronedream.technical-report-validation-receipt.v3",
+  "subject_commit": "bdcf88237d4f36f487fa30ff42271230a7596431",
+  "parent_software_head": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+  "branch": "codex/technical-report",
+  "serialization": {
+    "json_encoding": "utf-8",
+    "json_newline": "lf",
+    "final_newline": true
+  },
+  "source_tree": {
+    "file_count": 23,
+    "canonical_sha256": "e696ba47d785e480257cb1d0cf2c54203b5dcf57b09b73839ed88f2c5d8073b1",
+    "files": [
+      {
+        "path": "technical-report/.gitattributes",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "2900551e86fa40edfca725c9c5ffe19a3ee4371b"
+      },
+      {
+        "path": "technical-report/.gitignore",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "567609b1234a9b8806c5a05da6c866e480aa148d"
+      },
+      {
+        "path": "technical-report/README.md",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "b8ea3cb6387023dc34bfb1fa53ccd4bf73a59fc4"
+      },
+      {
+        "path": "technical-report/body.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "3e79fcc5148910081644a535ad6195b7a335f5a4"
+      },
+      {
+        "path": "technical-report/claim-evidence-ledger.json",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "1728705b06ebb6690b2284ba89f0074129441d35"
+      },
+      {
+        "path": "technical-report/evidence-reference-manifest.json",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "9c0860dc1c5ea066d3342d6909e97324494ce76c"
+      },
+      {
+        "path": "technical-report/main.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4ee2d96d0980e2023c0283ea5ced753ab7bafb20"
+      },
+      {
+        "path": "technical-report/media/github-mark.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "15dcc3db3956993cb3e820187343cfb8a91dc872"
+      },
+      {
+        "path": "technical-report/media/media/image1.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4085ba4935d3e3cf40b5f485865d8185874d6a69"
+      },
+      {
+        "path": "technical-report/media/media/image3.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "039b35f9843decdb83a46b4eaa7fc1b179959a12"
+      },
+      {
+        "path": "technical-report/media/media/image4.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "42d99b03ec335b7f59033a5c39b7164c5523a09a"
+      },
+      {
+        "path": "technical-report/media/media/image5.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "20b68dc87f7378107977d5f8819d168b396bf9ed"
+      },
+      {
+        "path": "technical-report/media/media/image6.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "8e495bd883826ead7131fc8e4a3f7aa95e2936f4"
+      },
+      {
+        "path": "technical-report/media/media/image7.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "dea34d0091e5ede9640056267af9b970b48e86e1"
+      },
+      {
+        "path": "technical-report/media/media/image8.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "e027ba5d2042eab6f34bf80c778836ea53fa3645"
+      },
+      {
+        "path": "technical-report/scripts/audit_latex_report.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "6a4a84103a29f8cfa610168bf5b3e77d1a37dbd3"
+      },
+      {
+        "path": "technical-report/scripts/build_report.ps1",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "836a11cd6d4dbd85f95c47604e0f1e132525401f"
+      },
+      {
+        "path": "technical-report/scripts/create_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "86c1049d231828361413cb73c61801ec8b46b4a4"
+      },
+      {
+        "path": "technical-report/scripts/generate_architecture_figure.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4e8526b8b809b2c4f54cd89254bd87453e5f2181"
+      },
+      {
+        "path": "technical-report/scripts/generate_data_figures.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "7ea83a635b882cde16016f937faafd18fdc970f5"
+      },
+      {
+        "path": "technical-report/scripts/verify_claim_evidence.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "196b4b555d72240f24dafe94936e8bddd643b3ef"
+      },
+      {
+        "path": "technical-report/scripts/verify_evidence_reference_manifest.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "65924001ac1036ef1224d9618bb00a9256c35517"
+      },
+      {
+        "path": "technical-report/scripts/verify_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "27c1048fe085c09454f487caa9d39dd43387b87a"
+      }
+    ]
+  },
+  "evidence_reference_manifest": {
+    "path": "technical-report/evidence-reference-manifest.json",
+    "sha256": "4ee17221518a813d6b965a84fa1373329c2cba7f3965a87a1adb33f212888aa4",
+    "software_subject": "742b12467efc9b37b7e4a2fa3ac73b7578f21385",
+    "software_provenance": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+    "software_head": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+    "website_subject": "a64f995093e13c74318219cd0f91ad2d03016f31",
+    "website_attestation": "943f3b65187247fe67eed76bc698b262adb06994",
+    "website_prerequisite": 88
+  },
+  "pdf": {
+    "path": "technical-report/output/DroneDream_AURORA_Technical_Report.pdf",
+    "sha256": "606f92289af8a7c2167c125e55b8d95e63dcd0b7d4ad2c414e7103120a6ab2f5",
+    "bytes": 745220,
+    "pages": 13
+  },
+  "audit": {
+    "path": "technical-report/output/latex-audit.json",
+    "sha256": "2ddc4a0f294063098cccf4e53be488e1bbc8657018e0c32a5c7cbd78320bf86b",
+    "audited_blocks": 69,
+    "explanatory_body": {
+      "total": 40,
+      "passed_80": 40,
+      "failed_80": 0,
+      "failure_locations": []
+    },
+    "reasonable_exceptions": {
+      "definition": "Headings, list items, display formulas, code blocks, figure captions, table captions, and references do not use the explanatory-body last-line gate.",
+      "inventory": {
+        "headings": 28,
+        "list_items": 29,
+        "display_formulas": 0,
+        "code_blocks": 0,
+        "figure_captions": 6,
+        "table_captions": 9,
+        "references": 33
+      }
+    },
+    "unlocated": [],
+    "cross_page_splits": [],
+    "bottom_failures": [],
+    "gray_text_runs": 0,
+    "internal_links": 51,
+    "external_links": 33
+  },
+  "claim_evidence": {
+    "ledger": {
+      "path": "technical-report/claim-evidence-ledger.json",
+      "sha256": "d2fa4a51e9a4021949c1473f78c0ec9197cc7004ed778329f77baa6fc943eb21"
+    },
+    "audit": {
+      "path": "technical-report/output/claim-evidence-audit.json",
+      "sha256": "d81dacaf11203e0a72ad2e1fad7052bd3f6be885baa061b7a45c806739d5e582",
+      "claims": 16,
+      "passed": 16,
+      "failed": 0,
+      "assertions": 110,
+      "verified_sources": [
+        {
+          "id": "harness_component_outcome_ablation_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+          "sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82"
+        },
+        {
+          "id": "harness_contract_ablation_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-contract-ablation-v2.json",
+          "sha256": "8fc1340179d10c974ca9f53b0a8d97e4459c54bc39932518ee6c8c66fa3ab88a"
+        },
+        {
+          "id": "harness_contract_design",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "docs/19-llm-tool-orchestration-harness.md",
+          "sha256": "129676c4e6d58bb8f61fdd335da31d4c55c04cf89e4c27dcc21bce8adbe5c267"
+        },
+        {
+          "id": "harness_fallback_outcome_campaign_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+          "sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d"
+        },
+        {
+          "id": "harness_phase_registry",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/app/orchestration/harness_context.py",
+          "sha256": "f081a8c12bf50dc330a4aad509bd3454999af519c1dc4ecaf9a03df3db0e1376"
+        },
+        {
+          "id": "px4_gazebo_evidence_boundary",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "docs/08-px4-gazebo.md",
+          "sha256": "b8c58164b0efee355d90ac53cbded031e441d39cfc20a374f192db06212700fd"
+        },
+        {
+          "id": "routing_development_corpus_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+          "sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1"
+        },
+        {
+          "id": "routing_prompt_1_5_first_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-20260728.json",
+          "sha256": "fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf"
+        },
+        {
+          "id": "routing_prompt_1_5_rerun_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.5-rerun-20260728.json",
+          "sha256": "9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571"
+        },
+        {
+          "id": "routing_prompt_1_6_current_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
+          "sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4"
+        },
+        {
+          "id": "runtime_dependency_pins",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "runtime/pins.env",
+          "sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5"
+        },
+        {
+          "id": "technical_report_evidence_bundle",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "artifacts/technical-report/evidence-v7.json",
+          "sha256": "93232a2f0027503c24cfe4a8a1768d518f436cd35a3db72e788fc42f5eb45c55"
+        },
+        {
+          "id": "website_validation_receipt",
+          "ref_commit": "943f3b65187247fe67eed76bc698b262adb06994",
+          "path": "website/validation-receipts/a64f995093e13c74318219cd0f91ad2d03016f31.json",
+          "sha256": "6f0fc8bafb092cee5f1f05c484f60d9f73a88ba1d7f0b4e16f564a65506569f9"
+        }
+      ]
+    }
+  },
+  "compile_log": {
+    "sha256": "af030a8ee5ae9b490d2e7f03402eb49fce19da9b4e1d76199df7de209086f7ab",
+    "warning_counts": {
+      "overfull": 0,
+      "latex_warning": 0,
+      "package_warning": 0,
+      "undefined_control_sequence": 0,
+      "undefined_references": 0
+    },
+    "underfull_boxes": 0
+  },
+  "visual_review": {
+    "status": "passed",
+    "render_dpi": 150,
+    "inspected_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "page_bottoms_inspected": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "defects_fixed": [
+      {
+        "page": 3,
+        "issue": "Outcome Memory label was clipped in the migrated architecture figure.",
+        "resolution": "Regenerated the report-owned figure with fitted text and verified the replacement render."
+      }
+    ],
+    "remaining_blocking_defects": []
+  },
+  "reproduction": {
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File technical-report/scripts/build_report.ps1",
+    "receipt": "python technical-report/scripts/create_report_validation_receipt.py --repository . --subject-commit <source-commit> --pdf technical-report/output/DroneDream_AURORA_Technical_Report.pdf --audit technical-report/output/latex-audit.json --claim-audit technical-report/output/claim-evidence-audit.json --claim-ledger technical-report/claim-evidence-ledger.json --log technical-report/build/main.log --manifest technical-report/evidence-reference-manifest.json --output technical-report/validation-receipts/<source-commit>.json --visual-review-passed",
+    "claim_evidence": "python technical-report/scripts/verify_claim_evidence.py --repository . --ledger technical-report/claim-evidence-ledger.json --manifest technical-report/evidence-reference-manifest.json --body technical-report/body.tex --output technical-report/output/claim-evidence-audit.json"
+  }
+}

@@ -10,13 +10,13 @@
         "page": 1,
         "style": "abstract",
         "policy_category": "explanatory_body",
-        "lines": 20,
-        "last_line_ratio": 1.0,
-        "last_line_text": "outcomes under frozen conditions, with retained failures and independent recomputation before any deployment or release decision.",
+        "lines": 19,
+        "last_line_ratio": 0.8357,
+        "last_line_text": "any public deployment, release decision, or customer-facing claim about simulator or optimizer performance.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "UAV controller tuning in simulation is often framed as gain search, yet a credible experiment must also bind every Candidate to an intended scenario, finite budget, objective and constraint policy, trustworthy execution, and holdout boundary. Foundation models can interpret intent and coordinate methods, but a fluent response cannot prove that the declared experiment actually ran. AURORA—AGENTIC UAV REFINEMENT THROUGH OPTIMIZATION, REFLECTION, AND ASSURANCE—is the evidence-gated Harness inside DroneDream 1.0. It compiles bounded context, filters tool eligibility before routing, selects versioned optimizers or deterministic fallbacks, executes from an immutable Trial, Candidate, and Job snapshot, verifies claim receipt v3 and Outcome Contract 2.20, isolates fault and holdout evidence, and freezes final selection only after deterministic checks pass. Models may propose and route work; software contracts retain authority over parameter domains, state transitions, evidence admission, and completion. Evidence 2.7 additionally compiles a bounded observational reflection from each verified decision cohort. It admits accepted work, optimizer-learning Trials, domain failures, feasibility, incumbent change, and observed improvement only when the execution receipt and every modern Candidate receipt agree; any incomplete, legacy, or drifted cohort makes the entire block unavailable, and no association becomes causal tool credit. Exact-commit evidence records 1,147 backend tests in 788.78 seconds plus an 81-check focused supplement on the same software subject; Windows Rust was not run. Frozen software artifacts further record 16/16 deterministic policy-holdout checks, 25/25 guarded source-contract probes versus 6/25 weakened, and 10/10 matched fallback comparisons over 15 Jobs and 579 Trials. A network-free four-arm ablation spans 20 Jobs and 554 Trials, while its receipt-only-memory isolation remains inconclusive in 5/5 seed blocks. The current Evidence 2.7 / Prompt 1.6 provider freeze grades 24/24; Prompt 1.5 histories grade 19/24 (unqualified) and 21/24 (qualified), exposing unpaired stochastic variation rather than causal prompt lift. These results validate exercised routing, provenance, reflection, and recovery contracts, not general optimizer superiority, physical simulator quality, real-aircraft safety, or simulation-to-reality transfer. Customer qualification still requires matched multi-seed PX4/Gazebo outcomes under frozen conditions, with retained failures and independent recomputation before any deployment or release decision."
+        "text": "UAV controller tuning in simulation must bind every Candidate to an intended scenario, finite budget, objective and constraint policy, trustworthy execution, and holdout boundary. Foundation models can interpret intent and coordinate methods, but fluent output cannot prove execution. AURORA—AGENTIC UAV REFINEMENT THROUGH OPTIMIZATION, REFLECTION, AND ASSURANCE—is the evidence-gated Harness inside DroneDream 1.0. It compiles bounded context, filters tool eligibility before routing, selects versioned optimizers or deterministic fallbacks, executes immutable Trial, Candidate, and Job snapshots, verifies claim receipt v3 and Outcome Contract 2.20, isolates fault and holdout evidence, and freezes selection only after deterministic checks pass. Models may propose and route work; software contracts retain authority over parameter domains, state transitions, evidence admission, and completion. Evidence 2.7 compiles bounded observational reflection from verified decision cohorts. It admits learning only when the execution receipt and every modern Candidate receipt agree; incomplete, legacy, or drifted cohorts make the block unavailable, and no association becomes causal tool credit. Exact-commit evidence records 1,147 backend tests in 788.78 seconds plus an 81-check focused supplement on the same software subject; Windows Rust was not run. Frozen software artifacts further record 16/16 deterministic policy-holdout checks, 25/25 guarded source-contract probes versus 6/25 weakened, and 10/10 matched fallback comparisons over 15 Jobs and 579 Trials. A network-free four-arm ablation spans 20 Jobs and 554 Trials, while its receipt-only-memory isolation remains inconclusive in 5/5 seed blocks. The current Evidence 2.7 / Prompt 1.6 provider freeze grades 24/24; Prompt 1.5 histories grade 19/24 (unqualified) and 21/24 (qualified), exposing unpaired stochastic variation rather than causal prompt lift. These results validate exercised routing, provenance, reflection, and recovery contracts, not general optimizer superiority, physical simulator quality, real-aircraft safety, or simulation-to-reality transfer. Customer qualification still requires matched multi-seed PX4/Gazebo outcomes under frozen conditions, with retained failures and independent recomputation before any public deployment, release decision, or customer-facing claim about simulator or optimizer performance."
       },
       {
         "index": 2,
@@ -982,9 +982,9 @@
     {
       "page": 1,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 796.6,
-      "gap_to_body_bottom_points": 0.0,
-      "gap_to_body_bottom_lines": 0.0,
+      "content_bottom_points": 785.65,
+      "gap_to_body_bottom_points": 10.89,
+      "gap_to_body_bottom_lines": 0.907,
       "passed_bottom_line": true
     },
     {
