@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "auditKind": "public-installer-byte-and-signature-recheck",
+  "checkedAtUtc": "2026-07-28T13:53:39.0451680Z",
+  "websiteBranch": "codex/website",
+  "websiteHead": "7713527266e3e044e2be8ac7b6811f1996ee171a",
+  "websiteArtifactSourceCommit": "3e58802e98d1181289e507bb3e6e5818f9c547b4",
+  "release": {
+    "tag": "signpath-candidate-v1.0.0",
+    "fileName": "DroneDream_1.0.0_x64-setup.exe",
+    "checksumFileName": "DroneDream_1.0.0_x64-setup.exe.sha256",
+    "isDraft": false,
+    "isPrerelease": true,
+    "publishedAt": "2026-07-21T04:30:21Z"
+  },
+  "githubRelease": {
+    "httpStatus": 200,
+    "bytes": 5526509,
+    "sha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+    "matchesPagesReleaseJson": true,
+    "matchesBuiltLatestJson": true,
+    "matchesReleaseAssetDigest": true,
+    "checksumAssetBytes": 98,
+    "checksumAssetSha256": "7aaa61a1c536829554c24d78165ee23134bddf7671960f323a8d24606456b32e",
+    "checksumDeclaresMatchingHashAndFileName": true,
+    "authenticodeStatus": "NotSigned",
+    "peCertificateTableFileOffset": 0,
+    "peCertificateTableSize": 0,
+    "hasPeCertificateTable": false,
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0"
+  },
+  "baotaMirror": {
+    "httpStatus": 200,
+    "bytes": 9881226,
+    "sha256": "aad5a7fdb1196059ce2e15b33e2495830f77ed5f1070e56e5423796b9ca96b86",
+    "matchesMirrorLatestJson": true,
+    "checksumAssetBytes": 98,
+    "checksumAssetSha256": "e7cd2b624cfedab6ef974b41ddfa28b5d263a2292ed8f551c57cb516ef30cd08",
+    "checksumDeclaresMatchingHashAndFileName": true,
+    "matchesGithubReleaseBytes": false,
+    "authenticodeStatus": "NotSigned",
+    "peCertificateTableFileOffset": 0,
+    "peCertificateTableSize": 0,
+    "hasPeCertificateTable": false,
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0"
+  },
+  "conclusion": {
+    "publicGithubAssetIntegrity": "pass",
+    "dualOriginInstallerParity": "fail",
+    "authenticodeSigning": "fail",
+    "deploymentPerformed": false,
+    "requiredAction": "Software/release ownership must produce a new immutable signed installer if installer bytes change. Website deployment must then publish one matching latest.json and the same commit-pinned site artifact to both origins; do not overwrite the existing versioned URL with different bytes."
+  }
+}
