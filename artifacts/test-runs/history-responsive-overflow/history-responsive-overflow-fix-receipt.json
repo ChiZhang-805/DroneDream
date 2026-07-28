@@ -1,0 +1,191 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "console-history-responsive-overflow-fix",
+  "generatedAtUtc": "2026-07-28T08:36:16.262Z",
+  "subjectCommit": "3e5979e0f36ed830000fb2ff0d66a20eb3abb762",
+  "subjectParentCommit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+  "branch": "codex/software",
+  "scope": {
+    "modifiedSourceFiles": [
+      "frontend/package.json",
+      "frontend/scripts/verify-history-layout.mjs",
+      "frontend/src/styles.css"
+    ],
+    "modifiedWebsiteFiles": [],
+    "modifiedReportFiles": [],
+    "cssContract": [
+      ".history-page { min-width: 0; }",
+      ".history-body { min-width: 0; }",
+      ".history-body > .section-card { min-width: 0; }",
+      ".history-body > .section-card:last-child .section-card-body { min-width: 0; }",
+      ".history-results { min-width: 0; }"
+    ],
+    "nonHistoryCardsAffected": false
+  },
+  "frozenFailureBaseline": {
+    "websiteCommit": "11ff98a6a7fe7c4c02203cf75b878bf9535cf0ba",
+    "websiteSubjectCommit": "ceaab92b9816ce76b95a597d20100b1a7fefe6c9",
+    "websiteReceipt": "website/validation-receipts/console-history-responsive-baseline-ceaab92b.json",
+    "websiteReceiptSha256": "5dd6a860b281d72ffe9bab9f8d9db582888c7f9b13959533c7e3d2c594660979",
+    "websiteMatrix": {
+      "checks": 56,
+      "passed": 50,
+      "failed": 6,
+      "externalWarnings": 0
+    },
+    "independentMeasurement": {
+      "path": "artifacts/test-runs/history-responsive-overflow/before-verified/measurements.json",
+      "sha256": "9abcfb38d5ab589bee5262015dbce898b2156ea93cd85b988554d0fdcbdd7d4b",
+      "sourceCommit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "sourceDirty": true,
+      "sourceChanges": [
+        "M frontend/package.json",
+        "?? frontend/scripts/verify-history-layout.mjs"
+      ],
+      "sourceChangesAffectLayout": false,
+      "stylesheetSha256": "2fb9d0a494adaee95b6a9ca58e04af0353ef796a075306b8a96691775b409be6",
+      "browser": "Microsoft Edge 150.0.4078.99",
+      "startedAtUtc": "2026-07-28T08:30:32.883Z",
+      "finishedAtUtc": "2026-07-28T08:30:38.533Z",
+      "cases": {
+        "desktop-en": {
+          "document": "1440/1440",
+          "appMain": "1200/1342",
+          "historyPage": "1157/1321",
+          "historyResults": "1280/1280"
+        },
+        "desktop-zh": {
+          "document": "1440/1440",
+          "appMain": "1200/1342",
+          "historyPage": "1157/1321",
+          "historyResults": "1280/1280"
+        },
+        "mobile-en": {
+          "document": "390/1342",
+          "appMain": "390/1342",
+          "historyPage": "347/1321",
+          "historyResults": "1280/1280"
+        },
+        "mobile-zh": {
+          "document": "390/1342",
+          "appMain": "390/1342",
+          "historyPage": "347/1321",
+          "historyResults": "1280/1280"
+        }
+      }
+    }
+  },
+  "verification": {
+    "canonicalBrowserMeasurement": {
+      "command": "npm run test:history-layout -- --label=after-3e5979e",
+      "path": "artifacts/test-runs/history-responsive-overflow/after-3e5979e/measurements.json",
+      "sha256": "b92861a08afb060fdbae1b8afafe18332d23b7778312621afdf1b8a09067adf3",
+      "sourceCommit": "3e5979e0f36ed830000fb2ff0d66a20eb3abb762",
+      "sourceDirty": false,
+      "stylesheetSha256": "3352af5909dff6655eeadbbedae279cb06164efdc14df7c00170d0b7a2a0680c",
+      "verifierSha256": "d9e77599fc5550f033bd37a01f8fc6a107f007d0f13bf46ad9f5a5adf27cefa5",
+      "browser": "Microsoft Edge 150.0.4078.99",
+      "startedAtUtc": "2026-07-28T08:35:23.387Z",
+      "finishedAtUtc": "2026-07-28T08:35:29.590Z",
+      "durationMs": 6203,
+      "passed": true,
+      "unsafeApiRequests": 0,
+      "consoleErrors": 0,
+      "pageErrors": 0,
+      "cases": {
+        "desktop-en": {
+          "document": "1440/1440",
+          "appMain": "1200/1200",
+          "historyPage": "1157/1157",
+          "historyResults": "1116/1280",
+          "scrollLeftAtRightEdge": "164/164",
+          "rightmostHeaderVisible": true,
+          "rightmostDeleteVisibleAndFocused": true,
+          "reachableActions": "5/5"
+        },
+        "desktop-zh": {
+          "document": "1440/1440",
+          "appMain": "1200/1200",
+          "historyPage": "1157/1157",
+          "historyResults": "1116/1280",
+          "scrollLeftAtRightEdge": "164/164",
+          "rightmostHeaderVisible": true,
+          "rightmostDeleteVisibleAndFocused": true,
+          "reachableActions": "5/5"
+        },
+        "mobile-en": {
+          "document": "390/390",
+          "appMain": "390/390",
+          "historyPage": "347/347",
+          "historyResults": "306/1280",
+          "scrollLeftAtRightEdge": "974/974",
+          "rightmostHeaderVisible": true,
+          "rightmostDeleteVisibleAndFocused": true,
+          "reachableActions": "5/5"
+        },
+        "mobile-zh": {
+          "document": "390/390",
+          "appMain": "390/390",
+          "historyPage": "347/347",
+          "historyResults": "306/1280",
+          "scrollLeftAtRightEdge": "974/974",
+          "rightmostHeaderVisible": true,
+          "rightmostDeleteVisibleAndFocused": true,
+          "reachableActions": "5/5"
+        }
+      }
+    },
+    "focusedHistoryTests": {
+      "command": "npm test -- HistoryCompare",
+      "testFilesPassed": 1,
+      "testsPassed": 6,
+      "testsFailed": 0
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "passed": true
+    },
+    "lint": {
+      "command": "npm run lint",
+      "passed": true
+    },
+    "productionBuild": {
+      "command": "npm run build",
+      "passed": true,
+      "warning": "Existing main application chunk exceeds the configured 510 kB warning threshold."
+    },
+    "fullFrontendTests": {
+      "command": "npm test",
+      "testFilesPassed": 49,
+      "testFilesFailed": 1,
+      "testsPassed": 319,
+      "testsFailed": 1,
+      "passed": false,
+      "failure": "PublicSite.test.tsx billing-checkout availability fetch expectation",
+      "ownership": "website-only frontend/src/site and PublicSite test",
+      "sourceModifiedByThisClosure": false,
+      "focusedRerun": {
+        "command": "npm test -- PublicSite",
+        "testsPassed": 12,
+        "testsFailed": 1,
+        "sameFailureReproduced": true,
+        "log": "artifacts/test-runs/history-responsive-overflow/public-site-focused-rerun.log",
+        "logSha256": "72c14964d73976a6a0470ef4290ef5275095d4b9b40624b0410427fd0cd2875c"
+      }
+    },
+    "gitDiffCheck": {
+      "command": "git diff HEAD^ HEAD --check",
+      "passed": true
+    }
+  },
+  "evidenceFiles": {
+    "beforeScreenshots": 8,
+    "afterScreenshots": 8,
+    "afterScreenshotHashesEmbeddedInCanonicalMeasurement": true
+  },
+  "handoff": {
+    "websiteIndependentRevalidationRequired": true,
+    "websiteBranchMutationPerformed": false,
+    "reportBranchMutationPerformed": false
+  }
+}

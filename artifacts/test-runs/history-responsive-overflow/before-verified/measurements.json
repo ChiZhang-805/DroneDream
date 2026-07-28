@@ -1,0 +1,850 @@
+{
+  "schemaVersion": 1,
+  "label": "before-verified",
+  "expected": "overflow reproduced",
+  "sourceCommit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+  "sourceDirty": true,
+  "sourceChanges": [
+    "M frontend/package.json",
+    "?? frontend/scripts/verify-history-layout.mjs"
+  ],
+  "stylesheetSha256": "2fb9d0a494adaee95b6a9ca58e04af0353ef796a075306b8a96691775b409be6",
+  "verifierSha256": "0bf16de18379c016cf42c9322f2a1b3b1f333841f8ece2ae1a739dc1fcaa5172",
+  "command": "npm run test:history-layout -- --label=before-verified --expect-overflow",
+  "browser": {
+    "name": "Microsoft Edge",
+    "version": "150.0.4078.99"
+  },
+  "startedAt": "2026-07-28T08:30:32.883Z",
+  "finishedAt": "2026-07-28T08:30:38.533Z",
+  "durationMs": 5650,
+  "passed": true,
+  "cases": [
+    {
+      "id": "desktop-en",
+      "locale": "en",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "expected": "overflow reproduced",
+      "passed": true,
+      "containmentViolations": [
+        "appMain 1200/1342",
+        "historyPage 1157/1321",
+        "historyBody 1157/1321"
+      ],
+      "initial": {
+        "language": "en",
+        "document": {
+          "clientWidth": 1440,
+          "scrollWidth": 1440
+        },
+        "body": {
+          "clientWidth": 1440,
+          "scrollWidth": 1440,
+          "left": 0,
+          "right": 1440,
+          "width": 1440,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "appShell": {
+          "clientWidth": 1440,
+          "scrollWidth": 1440,
+          "left": 0,
+          "right": 1440,
+          "width": 1440,
+          "minWidth": "0px",
+          "overflowX": "hidden"
+        },
+        "sidebar": {
+          "clientWidth": 239,
+          "scrollWidth": 239,
+          "left": 0,
+          "right": 240,
+          "width": 240,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "appHeader": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200,
+          "left": 240,
+          "right": 1440,
+          "width": 1200,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "appMain": {
+          "clientWidth": 1200,
+          "scrollWidth": 1342,
+          "left": 240,
+          "right": 1440,
+          "width": 1200,
+          "minWidth": "auto",
+          "overflowX": "hidden"
+        },
+        "historyPage": {
+          "clientWidth": 1157,
+          "scrollWidth": 1321,
+          "left": 261.59,
+          "right": 1418.41,
+          "width": 1156.81,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "historyBody": {
+          "clientWidth": 1157,
+          "scrollWidth": 1321,
+          "left": 261.59,
+          "right": 1418.41,
+          "width": 1156.81,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "resultCard": {
+          "clientWidth": 1319,
+          "scrollWidth": 1319,
+          "left": 261.59,
+          "right": 1582.38,
+          "width": 1320.78,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "resultCardBody": {
+          "clientWidth": 1282,
+          "scrollWidth": 1282,
+          "left": 280.98,
+          "right": 1562.98,
+          "width": 1282,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "historyResults": {
+          "clientWidth": 1280,
+          "scrollWidth": 1280,
+          "left": 280.98,
+          "right": 1562.98,
+          "width": 1282,
+          "minWidth": "auto",
+          "overflowX": "auto"
+        },
+        "historyTable": {
+          "clientWidth": 1280,
+          "scrollWidth": 1280,
+          "left": 281.98,
+          "right": 1561.98,
+          "width": 1280,
+          "minWidth": "1280px",
+          "overflowX": "visible"
+        },
+        "actions": [
+          {
+            "name": "history navigation",
+            "selector": ".app-nav a[href$=\"/history\"]",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 12,
+            "right": 227,
+            "width": 215,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "application settings",
+            "selector": ".app-header .launcher-settings-button",
+            "exists": true,
+            "disabled": false,
+            "display": "grid",
+            "visibility": "visible",
+            "left": 1378,
+            "right": 1416,
+            "width": 38,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "new job",
+            "selector": ".history-header .btn-primary",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 1260.69,
+            "right": 1418.41,
+            "width": 157.72,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "clear filters",
+            "selector": ".history-clear-filters",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 1460.97,
+            "right": 1562.98,
+            "width": 102.02,
+            "horizontallyReachable": false
+          },
+          {
+            "name": "compare selected",
+            "selector": ".history-compare-button",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 1395.33,
+            "right": 1562.98,
+            "width": 167.66,
+            "horizontallyReachable": false
+          }
+        ]
+      },
+      "rightEdge": {
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "maxScrollLeft": 0,
+        "scrollLeft": 0,
+        "reachedEnd": true,
+        "lastHeaderVisible": false,
+        "lastDeleteVisible": false,
+        "deleteFocused": true
+      },
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:5189/api/v1/jobs?page=1&page_size=200"
+        }
+      ],
+      "unsafeRequests": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshots": [
+        "desktop-en-initial.png",
+        "desktop-en-table-right.png"
+      ]
+    },
+    {
+      "id": "desktop-zh",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "expected": "overflow reproduced",
+      "passed": true,
+      "containmentViolations": [
+        "appMain 1200/1342",
+        "historyPage 1157/1321",
+        "historyBody 1157/1321"
+      ],
+      "initial": {
+        "language": "zh-CN",
+        "document": {
+          "clientWidth": 1440,
+          "scrollWidth": 1440
+        },
+        "body": {
+          "clientWidth": 1440,
+          "scrollWidth": 1440,
+          "left": 0,
+          "right": 1440,
+          "width": 1440,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "appShell": {
+          "clientWidth": 1440,
+          "scrollWidth": 1440,
+          "left": 0,
+          "right": 1440,
+          "width": 1440,
+          "minWidth": "0px",
+          "overflowX": "hidden"
+        },
+        "sidebar": {
+          "clientWidth": 239,
+          "scrollWidth": 239,
+          "left": 0,
+          "right": 240,
+          "width": 240,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "appHeader": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200,
+          "left": 240,
+          "right": 1440,
+          "width": 1200,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "appMain": {
+          "clientWidth": 1200,
+          "scrollWidth": 1342,
+          "left": 240,
+          "right": 1440,
+          "width": 1200,
+          "minWidth": "auto",
+          "overflowX": "hidden"
+        },
+        "historyPage": {
+          "clientWidth": 1157,
+          "scrollWidth": 1321,
+          "left": 261.59,
+          "right": 1418.41,
+          "width": 1156.81,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "historyBody": {
+          "clientWidth": 1157,
+          "scrollWidth": 1321,
+          "left": 261.59,
+          "right": 1418.41,
+          "width": 1156.81,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "resultCard": {
+          "clientWidth": 1319,
+          "scrollWidth": 1319,
+          "left": 261.59,
+          "right": 1582.38,
+          "width": 1320.78,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "resultCardBody": {
+          "clientWidth": 1282,
+          "scrollWidth": 1282,
+          "left": 280.98,
+          "right": 1562.98,
+          "width": 1282,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "historyResults": {
+          "clientWidth": 1280,
+          "scrollWidth": 1280,
+          "left": 280.98,
+          "right": 1562.98,
+          "width": 1282,
+          "minWidth": "auto",
+          "overflowX": "auto"
+        },
+        "historyTable": {
+          "clientWidth": 1280,
+          "scrollWidth": 1280,
+          "left": 281.98,
+          "right": 1561.98,
+          "width": 1280,
+          "minWidth": "1280px",
+          "overflowX": "visible"
+        },
+        "actions": [
+          {
+            "name": "history navigation",
+            "selector": ".app-nav a[href$=\"/history\"]",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 12,
+            "right": 227,
+            "width": 215,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "application settings",
+            "selector": ".app-header .launcher-settings-button",
+            "exists": true,
+            "disabled": false,
+            "display": "grid",
+            "visibility": "visible",
+            "left": 1378,
+            "right": 1416,
+            "width": 38,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "new job",
+            "selector": ".history-header .btn-primary",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 1316.67,
+            "right": 1418.41,
+            "width": 101.73,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "clear filters",
+            "selector": ".history-clear-filters",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 1476.19,
+            "right": 1562.98,
+            "width": 86.8,
+            "horizontallyReachable": false
+          },
+          {
+            "name": "compare selected",
+            "selector": ".history-compare-button",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 1410.58,
+            "right": 1562.98,
+            "width": 152.41,
+            "horizontallyReachable": false
+          }
+        ]
+      },
+      "rightEdge": {
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "maxScrollLeft": 0,
+        "scrollLeft": 0,
+        "reachedEnd": true,
+        "lastHeaderVisible": false,
+        "lastDeleteVisible": false,
+        "deleteFocused": true
+      },
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:5189/api/v1/jobs?page=1&page_size=200"
+        }
+      ],
+      "unsafeRequests": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshots": [
+        "desktop-zh-initial.png",
+        "desktop-zh-table-right.png"
+      ]
+    },
+    {
+      "id": "mobile-en",
+      "locale": "en",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "expected": "overflow reproduced",
+      "passed": true,
+      "containmentViolations": [
+        "document 390/1342",
+        "appMain 390/1342",
+        "historyPage 347/1321",
+        "historyBody 347/1321"
+      ],
+      "initial": {
+        "language": "en",
+        "document": {
+          "clientWidth": 390,
+          "scrollWidth": 1342
+        },
+        "body": {
+          "clientWidth": 390,
+          "scrollWidth": 1342,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "appShell": {
+          "clientWidth": 390,
+          "scrollWidth": 1342,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "sidebar": {
+          "clientWidth": 390,
+          "scrollWidth": 390,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "appHeader": {
+          "clientWidth": 390,
+          "scrollWidth": 390,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "appMain": {
+          "clientWidth": 390,
+          "scrollWidth": 1342,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "historyPage": {
+          "clientWidth": 347,
+          "scrollWidth": 1321,
+          "left": 21.59,
+          "right": 368.41,
+          "width": 346.81,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "historyBody": {
+          "clientWidth": 347,
+          "scrollWidth": 1321,
+          "left": 21.59,
+          "right": 368.41,
+          "width": 346.81,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "resultCard": {
+          "clientWidth": 1319,
+          "scrollWidth": 1319,
+          "left": 21.59,
+          "right": 1342.38,
+          "width": 1320.78,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "resultCardBody": {
+          "clientWidth": 1282,
+          "scrollWidth": 1282,
+          "left": 40.98,
+          "right": 1322.98,
+          "width": 1282,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "historyResults": {
+          "clientWidth": 1280,
+          "scrollWidth": 1280,
+          "left": 40.98,
+          "right": 1322.98,
+          "width": 1282,
+          "minWidth": "auto",
+          "overflowX": "auto"
+        },
+        "historyTable": {
+          "clientWidth": 1280,
+          "scrollWidth": 1280,
+          "left": 41.98,
+          "right": 1321.98,
+          "width": 1280,
+          "minWidth": "1280px",
+          "overflowX": "visible"
+        },
+        "actions": [
+          {
+            "name": "history navigation",
+            "selector": ".app-nav a[href$=\"/history\"]",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 12,
+            "right": 192.2,
+            "width": 180.2,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "application settings",
+            "selector": ".app-header .launcher-settings-button",
+            "exists": true,
+            "disabled": false,
+            "display": "grid",
+            "visibility": "visible",
+            "left": 342,
+            "right": 378,
+            "width": 36,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "new job",
+            "selector": ".history-header .btn-primary",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 21.59,
+            "right": 179.31,
+            "width": 157.72,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "clear filters",
+            "selector": ".history-clear-filters",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 40.98,
+            "right": 1322.98,
+            "width": 1282,
+            "horizontallyReachable": false
+          },
+          {
+            "name": "compare selected",
+            "selector": ".history-compare-button",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 1155.33,
+            "right": 1322.98,
+            "width": 167.66,
+            "horizontallyReachable": false
+          }
+        ]
+      },
+      "rightEdge": {
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "maxScrollLeft": 0,
+        "scrollLeft": 0,
+        "reachedEnd": true,
+        "lastHeaderVisible": false,
+        "lastDeleteVisible": false,
+        "deleteFocused": true
+      },
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:5189/api/v1/jobs?page=1&page_size=200"
+        }
+      ],
+      "unsafeRequests": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshots": [
+        "mobile-en-initial.png",
+        "mobile-en-table-right.png"
+      ]
+    },
+    {
+      "id": "mobile-zh",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "expected": "overflow reproduced",
+      "passed": true,
+      "containmentViolations": [
+        "document 390/1342",
+        "appMain 390/1342",
+        "historyPage 347/1321",
+        "historyBody 347/1321"
+      ],
+      "initial": {
+        "language": "zh-CN",
+        "document": {
+          "clientWidth": 390,
+          "scrollWidth": 1342
+        },
+        "body": {
+          "clientWidth": 390,
+          "scrollWidth": 1342,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "appShell": {
+          "clientWidth": 390,
+          "scrollWidth": 1342,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "sidebar": {
+          "clientWidth": 390,
+          "scrollWidth": 390,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "appHeader": {
+          "clientWidth": 390,
+          "scrollWidth": 390,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "appMain": {
+          "clientWidth": 390,
+          "scrollWidth": 1342,
+          "left": 0,
+          "right": 390,
+          "width": 390,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "historyPage": {
+          "clientWidth": 347,
+          "scrollWidth": 1321,
+          "left": 21.59,
+          "right": 368.41,
+          "width": 346.81,
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        "historyBody": {
+          "clientWidth": 347,
+          "scrollWidth": 1321,
+          "left": 21.59,
+          "right": 368.41,
+          "width": 346.81,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "resultCard": {
+          "clientWidth": 1319,
+          "scrollWidth": 1319,
+          "left": 21.59,
+          "right": 1342.38,
+          "width": 1320.78,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "resultCardBody": {
+          "clientWidth": 1282,
+          "scrollWidth": 1282,
+          "left": 40.98,
+          "right": 1322.98,
+          "width": 1282,
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        "historyResults": {
+          "clientWidth": 1280,
+          "scrollWidth": 1280,
+          "left": 40.98,
+          "right": 1322.98,
+          "width": 1282,
+          "minWidth": "auto",
+          "overflowX": "auto"
+        },
+        "historyTable": {
+          "clientWidth": 1280,
+          "scrollWidth": 1280,
+          "left": 41.98,
+          "right": 1321.98,
+          "width": 1280,
+          "minWidth": "1280px",
+          "overflowX": "visible"
+        },
+        "actions": [
+          {
+            "name": "history navigation",
+            "selector": ".app-nav a[href$=\"/history\"]",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 12,
+            "right": 192.2,
+            "width": 180.2,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "application settings",
+            "selector": ".app-header .launcher-settings-button",
+            "exists": true,
+            "disabled": false,
+            "display": "grid",
+            "visibility": "visible",
+            "left": 342,
+            "right": 378,
+            "width": 36,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "new job",
+            "selector": ".history-header .btn-primary",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 266.67,
+            "right": 368.41,
+            "width": 101.73,
+            "horizontallyReachable": true
+          },
+          {
+            "name": "clear filters",
+            "selector": ".history-clear-filters",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 40.98,
+            "right": 1322.98,
+            "width": 1282,
+            "horizontallyReachable": false
+          },
+          {
+            "name": "compare selected",
+            "selector": ".history-compare-button",
+            "exists": true,
+            "disabled": false,
+            "display": "flex",
+            "visibility": "visible",
+            "left": 1170.58,
+            "right": 1322.98,
+            "width": 152.41,
+            "horizontallyReachable": false
+          }
+        ]
+      },
+      "rightEdge": {
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "maxScrollLeft": 0,
+        "scrollLeft": 0,
+        "reachedEnd": true,
+        "lastHeaderVisible": false,
+        "lastDeleteVisible": false,
+        "deleteFocused": true
+      },
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "http://127.0.0.1:5189/api/v1/jobs?page=1&page_size=200"
+        }
+      ],
+      "unsafeRequests": [],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshots": [
+        "mobile-zh-initial.png",
+        "mobile-zh-table-right.png"
+      ]
+    }
+  ]
+}
