@@ -78,7 +78,20 @@ the JSON file SHA-256 is
 `d1b8c1931b64ca5df971e24e34c03f4f202585b852612b11458abeb57a70dd07`,
 and the manifest file SHA-256 is
 `6bd08f15b034dccf3922b4ccd95a5e1368dde79a49719dede1e628a002a3dafc`.
-The v6 and v7 bundles remain immutable historical freezes.
+
+The current non-overwriting handoff is
+`artifacts/technical-report/evidence-v9.json`. It binds
+`source_commit=c1222c9215e01a56351f6588af0d2b8694bca831`,
+`generated_at=2026-07-28T15:44:30Z`, the current Evidence 2.8 cross-Job
+memory contract, the explicitly archived Evidence 2.7 / Prompt 1.6 provider
+and component/stress freezes, and the exact-commit 1,204-test receipt plus its
+28-test focused supplement. Its canonical bundle SHA-256 is
+`d33c308ce3b47138572c86bf7f45aa8e4a37901a0248a5d5e0d3cd71ce2bfa8a`;
+the JSON file SHA-256 is
+`a2bed29533b321fa00086bf901f7c5ebbf35ab503e50cde4de568b3420e0a08a`,
+and the manifest file SHA-256 is
+`3bc7bd0eac65cf5e8f9ef7e05c0f5e62403a7cf23c5be4f0905ae4b503847fc9`.
+The v6, v7, and v8 bundles remain immutable historical freezes.
 
 `backend/scripts/evaluate_harness_ablations.py` independently reproduces the
 source-contract ablation JSON, CSV, and file-hash manifest. Its comparator is
@@ -393,19 +406,20 @@ backend\.venv\Scripts\python.exe `
 
 backend\.venv\Scripts\python.exe `
   backend\scripts\export_technical_report_evidence.py `
-  --source-commit 65a33bbd70f999962afd1bea1e374dcd5e9de460 `
-  --generated-at 2026-07-28T12:58:32Z `
-  --backend-test-receipt artifacts\test-runs\aurora-software-65a33bb-receipt.json `
-  --output artifacts\technical-report\evidence-v8.json `
-  --manifest-output artifacts\technical-report\evidence-v8.manifest.json `
-  --sha256-output artifacts\technical-report\evidence-v8.sha256 `
-  --csv-directory artifacts\technical-report\csv-v8
+  --source-commit c1222c9215e01a56351f6588af0d2b8694bca831 `
+  --generated-at 2026-07-28T15:44:30Z `
+  --backend-test-receipt artifacts\test-runs\aurora-software-c1222c9-receipt.json `
+  --output artifacts\technical-report\evidence-v9.json `
+  --manifest-output artifacts\technical-report\evidence-v9.manifest.json `
+  --sha256-output artifacts\technical-report\evidence-v9.sha256 `
+  --csv-directory artifacts\technical-report\csv-v9
 ```
 
-The resulting v8 report JSON and companion manifest repeat the explicit source
+The resulting v9 report JSON and companion manifest repeat the explicit source
 commit and generation time, include SHA-256 hashes for every source artifact,
-and bind the normalized bundle digest. The source list includes each
-reflection trigger/stress JSON, CSV, manifest, and `.sha256` sidecar. The
+and bind the normalized bundle digest. The 25-entry source list includes each
+reflection trigger/stress and cross-Job memory JSON, CSV, manifest, and
+`.sha256` sidecar. The
 versioned ablation JSON/CSV/hash under `backend/evaluation_artifacts/` are
 source-controlled software-contract evidence; generated files under
 `artifacts/technical-report/` are frozen report inputs and are not

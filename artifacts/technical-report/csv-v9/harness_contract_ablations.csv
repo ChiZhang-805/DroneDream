@@ -1,0 +1,6 @@
+ablated_contract_correct_count,ablated_contract_correct_rate,absolute_contract_delta,component,full_contract_correct_count,full_contract_correct_rate,probe_count
+1,0.25,0.75,deterministic_fallback,4,1.0,4
+2,0.4,0.6,provider_trust_filter,5,1.0,5
+2,0.3333333333333333,0.6666666666666667,scenario_and_outcome_isolation,6,1.0,6
+0,0.0,1.0,scenario_profile_context,5,1.0,5
+1,0.2,0.8,tool_eligibility_gate,5,1.0,5

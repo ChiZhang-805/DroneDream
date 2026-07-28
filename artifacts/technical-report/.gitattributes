@@ -1,2 +1,5 @@
 # Frozen PX4 campaign evidence is content-addressed over exact retained bytes.
 px4-physical-campaign-v1-5f0f62c/** -text -diff
+
+# Evidence v9 CSV projections are hashed over the generator's original bytes.
+csv-v9/** -text -diff

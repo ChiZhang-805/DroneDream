@@ -1,0 +1,55 @@
+{
+  "base_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+  "claim_boundary": "Diagnostic summary of observed pre-commit failures. It is not a passing test receipt and does not reconstruct stdout that was not persisted at execution time. Passing qualification comes only from aurora-software-c1222c9-receipt.json and its content-addressed logs.",
+  "final_source_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+  "records": [
+    {
+      "failure": "Two technical-evidence tests failed because the Evidence 2.7 locked holdout policy-input digest was recomputed through the current Evidence 2.8 snapshot builder.",
+      "id": "archived_holdout_contract_drift",
+      "observed_result": {
+        "failed": 2,
+        "passed": 6,
+        "status": "failed"
+      },
+      "resolution": "Added explicit archived holdout and result loaders with caller-pinned Evidence 2.7 bindings while still recomputing corpus separation and current eligibility-policy labels.",
+      "triggering_command": "python -m pytest backend/tests/test_technical_report_evidence.py -q",
+      "verification": "The combined holdout and technical-evidence suite later passed 19/19, and the exact-source focused suite passed 28/28."
+    },
+    {
+      "failure": "Strict mypy reported one missing return annotation on the cross-Job evaluation snapshot helper.",
+      "id": "cross_job_evaluation_return_annotation",
+      "observed_result": {
+        "errors": 1,
+        "status": "failed"
+      },
+      "resolution": "Declared HarnessEvidenceSnapshot as the helper return type and imported the closed model explicitly.",
+      "triggering_command": "python -m mypy --config-file backend/pyproject.toml backend/app/orchestration/harness_routing_holdout.py backend/scripts/export_technical_report_evidence.py",
+      "verification": "Strict mypy later reported no issues across the changed Harness, exporter, router, and evaluation modules."
+    },
+    {
+      "failure": "The new cross-Job evaluation CLI failed from the repository root with ModuleNotFoundError: No module named 'app'.",
+      "id": "cross_job_cli_backend_binding",
+      "observed_result": {
+        "exit_code": 1,
+        "status": "failed"
+      },
+      "resolution": "Bound the script directory's backend root at sys.path position zero and added a subprocess regression that runs from the repository root.",
+      "triggering_command": "python backend/scripts/evaluate_harness_cross_job_memory.py --check",
+      "verification": "The same command later exited zero and reproduced the 10/10 artifact and manifest hashes."
+    },
+    {
+      "failure": "Two legacy-freeze tests still asserted byte equality with current Evidence 2.8 builders, and the reflection-trigger check CLI compared current bytes to the archived Evidence 2.7 files.",
+      "id": "legacy_freeze_relabeling_guard",
+      "observed_result": {
+        "failed": 2,
+        "passed": 19,
+        "separate_cli_exit_code": 1,
+        "status": "failed"
+      },
+      "resolution": "Changed tests to require verified historical bytes to differ from current builders, added exact legacy digests, and made archived CLI verification explicit and check-only.",
+      "triggering_command": "python -m pytest backend/tests/test_harness_component_ablation.py backend/tests/test_harness_reflection_trigger_ablation.py backend/tests/test_harness_ablation.py backend/tests/test_harness_reflection_outcome_stress.py -q",
+      "verification": "The corrected legacy-freeze regression passed 19/19 in 188.46 seconds, and the archived reflection-trigger JSON/CSV/manifest/sidecar check exited zero."
+    }
+  ],
+  "schema_version": "dronedream.precommit-diagnostic-summary/v1"
+}

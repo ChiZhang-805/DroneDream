@@ -1,0 +1,58 @@
+{
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "pytest": "9.1.0",
+    "python": "3.13.0"
+  },
+  "focused_checks": [
+    {
+      "command": "python -m pytest backend/tests/test_harness_experience_memory.py backend/tests/test_harness_cross_job_memory_evaluation.py backend/tests/test_harness_routing_holdout.py backend/tests/test_technical_report_evidence.py -q",
+      "duration_seconds": 8.451,
+      "finished_at": "2026-07-28T15:44:22.066Z",
+      "log": {
+        "path": "artifacts/test-runs/aurora-software-c1222c9-focused.log",
+        "sha256": "571ded85369e1747d9ae02f8dadb4b499e887168b8a5ca686edddc2248f10bbf",
+        "size_bytes": 204
+      },
+      "result": {
+        "failed": 0,
+        "passed": 28,
+        "status": "passed"
+      },
+      "started_at": "2026-07-28T15:44:13.614Z",
+      "working_directory": "."
+    }
+  ],
+  "full_suite": {
+    "command": "python -m pytest backend/tests -q",
+    "duration_seconds": 864.488,
+    "finished_at": "2026-07-28T15:43:54.308Z",
+    "log": {
+      "path": "artifacts/test-runs/aurora-software-c1222c9-pytest.log",
+      "sha256": "e12a1503ebde1400c882a90f1b49d4fb5fb274300f4f193db9e3a051c70d6e5f",
+      "size_bytes": 2824
+    },
+    "result": {
+      "failed": 0,
+      "passed": 1204,
+      "status": "passed"
+    },
+    "started_at": "2026-07-28T15:29:29.820Z",
+    "tested_state": {
+      "base_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+      "exact_final_commit_run": true,
+      "kind": "commit"
+    },
+    "working_directory": "."
+  },
+  "generated_at": "2026-07-28T15:44:30Z",
+  "receipt_sha256": "9d3b0cfd9c99a32ee9055741448797d3e5c72f894e0207650e37bd31da9eff9d",
+  "schema_version": "dronedream.test-run-receipt.v2",
+  "source_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+  "validation_bridge": {
+    "focused_rerun_performed": true,
+    "focused_rerun_required": false,
+    "full_suite_rerun_performed": true,
+    "reason": "Full and focused suites ran from clean source_commit c1222c9215e01a56351f6588af0d2b8694bca831; the focused run supplements, and does not bridge from, the exact full run."
+  }
+}
