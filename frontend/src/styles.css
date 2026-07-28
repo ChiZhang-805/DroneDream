@@ -7714,6 +7714,17 @@ a {
   table-layout: fixed;
 }
 
+.history-results .history-job-id-link,
+.history-results .history-job-id-link code {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .history-empty-row td {
   height: clamp(240px, 42vh, 540px);
   color: var(--text-muted);
