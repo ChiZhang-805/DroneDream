@@ -1,0 +1,313 @@
+{
+  "bundle": {
+    "bundle_sha256": "df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b",
+    "bytes": 121221,
+    "file_sha256": "27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89",
+    "path": "evidence-v10.json"
+  },
+  "claim_boundary": "Exact-byte aggregation of the previously frozen v9 report evidence, one retained 24-call OpenAI development-corpus routing campaign, the offline Evidence 2.9 multi-tool dispatcher budget evaluation, and real PX4/Gazebo bundled-effect evidence. Evidence classes remain separate. The bundle does not establish current Evidence 2.9 online routing, causal Harness outcome benefit, optimizer superiority, universal perturbed-flight success, sim-to-real transfer, real-aircraft safety, or final report/release readiness.",
+  "csv_exports": {
+    "advanced_physics_coverage.csv": {
+      "bytes": 1424,
+      "path": "csv-v10/advanced_physics_coverage.csv",
+      "sha256": "81d70cf74107dad464617e7706295adc69ca36a066dd85cf58803c84e08f73b9"
+    },
+    "multi_tool_budget_blocks.csv": {
+      "bytes": 257,
+      "path": "csv-v10/multi_tool_budget_blocks.csv",
+      "sha256": "e07b8223c7a871ded6b4f64f74cb8706ad5bf1d0075fe7a3e90f95baa09da120"
+    },
+    "online_routing_cases.csv": {
+      "bytes": 2347,
+      "path": "csv-v10/online_routing_cases.csv",
+      "sha256": "a4c6da6dd90ec9fa40aa108ed2a405cfbcb94259a348345521b003e09b164b9f"
+    }
+  },
+  "generated_at": "2026-07-28T23:54:28Z",
+  "release_readiness": {
+    "claim_boundary": "This evidence export is not a final release receipt. A current Evidence 2.9 online campaign requires a new, batch-specific user approval before any API-key access. Current-source full regression, Windows Rust, and report/PDF gates must remain separate and explicit.",
+    "current_source_full_regression_receipt_included": false,
+    "current_source_windows_rust_gate_included": false,
+    "online_provider_refresh_requires_separate_user_approval": true,
+    "online_routing_current_for_evidence_2_9": false,
+    "release_ready": false,
+    "report_pdf_gate_included": false
+  },
+  "schema_version": "dronedream.technical-report-evidence-manifest.v2",
+  "source_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+  "sources": {
+    "advanced_physics_manifest": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 7069,
+      "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.manifest.json",
+      "sha256": "5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3",
+      "snapshot_commit": "83982f37899f8054e24a749af8e6469fedf48e8d"
+    },
+    "advanced_physics_receipt": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 1314,
+      "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.receipt.json",
+      "sha256": "1ee74f3b207d7c69e1d2cb6601bffa7d8a92f34181313c51ad22474c73995eda",
+      "snapshot_commit": "83982f37899f8054e24a749af8e6469fedf48e8d"
+    },
+    "advanced_physics_sha256": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 215,
+      "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.sha256",
+      "sha256": "096aed94fe18253cc9c9ac45acb10b478cf3b38bc58930dddafc8e5909715a3f",
+      "snapshot_commit": "83982f37899f8054e24a749af8e6469fedf48e8d"
+    },
+    "advanced_physics_test_receipt": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 2386,
+      "path": "artifacts/test-runs/advanced-physics-closure-f1e8fa8/test-receipt.json",
+      "sha256": "50994da3b3385fb81411499349ee02123a26cebfa0af39a8a464588ad29eeb79",
+      "snapshot_commit": "83982f37899f8054e24a749af8e6469fedf48e8d"
+    },
+    "backend_test_receipt": {
+      "byte_source": "git_commit_blob",
+      "bytes": 2176,
+      "path": "artifacts/test-runs/aurora-software-c1222c9-receipt.json",
+      "sha256": "6bd9290fcd58a8210531405ce8959d6ef029b261a85aca409a2915c60eb07fb2",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "evidence_v9_bundle": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 101084,
+      "path": "artifacts/technical-report/evidence-v9.json",
+      "sha256": "a2bed29533b321fa00086bf901f7c5ebbf35ab503e50cde4de568b3420e0a08a",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "evidence_v9_manifest": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 6020,
+      "path": "artifacts/technical-report/evidence-v9.manifest.json",
+      "sha256": "3bc7bd0eac65cf5e8f9ef7e05c0f5e62403a7cf23c5be4f0905ae4b503847fc9",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "evidence_v9_sha256": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 177,
+      "path": "artifacts/technical-report/evidence-v9.sha256",
+      "sha256": "a51663279617db3d40221134f24822486a0e13e72475723b0b9e27a1647587fe",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_ablations": {
+      "byte_source": "git_commit_blob",
+      "bytes": 11119,
+      "path": "backend/evaluation_artifacts/harness-contract-ablation-v2.json",
+      "sha256": "8fc1340179d10c974ca9f53b0a8d97e4459c54bc39932518ee6c8c66fa3ab88a",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_component_outcome_ablation": {
+      "byte_source": "git_commit_blob",
+      "bytes": 1651339,
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+      "sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_component_outcome_ablation_csv": {
+      "byte_source": "git_commit_blob",
+      "bytes": 5736,
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.csv",
+      "sha256": "f2f34b4ccfd9fa21ca14d71db72de36f7489608e834d53dfbdd56357ea0d1c2f",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_component_outcome_ablation_manifest": {
+      "byte_source": "git_commit_blob",
+      "bytes": 4497,
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.manifest.json",
+      "sha256": "a490e9c69e3b2b1b092341d215b1afe9cdd567373709eba24396f3cb0004e77a",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_cross_job_memory": {
+      "byte_source": "git_commit_blob",
+      "bytes": 6253,
+      "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.json",
+      "sha256": "aa1f22e72039e367991aec55ea7ad143994f0a5d6ed7f73bef9c5e5523e28281",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_cross_job_memory_csv": {
+      "byte_source": "git_commit_blob",
+      "bytes": 622,
+      "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.csv",
+      "sha256": "db8083e3da4dec61f01062689b445d1f2dc02ed1d333e1258c92a435a45660c3",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_cross_job_memory_manifest": {
+      "byte_source": "git_commit_blob",
+      "bytes": 1445,
+      "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.manifest.json",
+      "sha256": "95d36063f94b8c9280d84db028a97d0b0da03687d67465da5979917f06b5efa7",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_cross_job_memory_sha256": {
+      "byte_source": "git_commit_blob",
+      "bytes": 332,
+      "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.sha256",
+      "sha256": "94c6a44b2842d17add9fea0ca4d15fd77ada642c38f9374a5cb87595dc95d3d2",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_multi_tool_budget": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 21751,
+      "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.json",
+      "sha256": "b20060eb76bfe4b0e5fbbbbcfe6484126a469bcc552b47c0a51cfc76a436ea5d",
+      "snapshot_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8"
+    },
+    "harness_multi_tool_budget_csv": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 864,
+      "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.csv",
+      "sha256": "3911632e6dfe61056dae58852f1e9723a4beb3b953468c9ecf70263610a206a3",
+      "snapshot_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8"
+    },
+    "harness_multi_tool_budget_generation_receipt": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 2469,
+      "path": "artifacts/test-runs/harness-multi-tool-budget-evaluation-v1-generation-receipt.json",
+      "sha256": "611783c9388bfda9b21a47e02ab3e8147eec96a7219202859cdc97b63198b6da",
+      "snapshot_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8"
+    },
+    "harness_multi_tool_budget_manifest": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 1284,
+      "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.manifest.json",
+      "sha256": "db78d1c8c99938608dc27116138d3eef15788cd6da4461d0f530db7f9369226d",
+      "snapshot_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8"
+    },
+    "harness_multi_tool_budget_sha256": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 341,
+      "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.sha256",
+      "sha256": "127fd33e78489c58ee20a936a63e38c4c8dc18e235bb97a66fcd8332d0faf350",
+      "snapshot_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8"
+    },
+    "harness_outcome_campaign": {
+      "byte_source": "git_commit_blob",
+      "bytes": 1613269,
+      "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+      "sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_reflection_outcome_stress": {
+      "byte_source": "git_commit_blob",
+      "bytes": 4552945,
+      "path": "backend/evaluation_artifacts/harness-reflection-outcome-stress-v1.json",
+      "sha256": "621285b6e79d366b48077887955d5ed10398ca1c0182569334817604fd4b14c7",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_reflection_outcome_stress_csv": {
+      "byte_source": "git_commit_blob",
+      "bytes": 6220,
+      "path": "backend/evaluation_artifacts/harness-reflection-outcome-stress-v1.csv",
+      "sha256": "1e6e7c5116572ff08b87628470993c1a6cb0ec25eaea758a2e16fff69284828f",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_reflection_outcome_stress_manifest": {
+      "byte_source": "git_commit_blob",
+      "bytes": 5220,
+      "path": "backend/evaluation_artifacts/harness-reflection-outcome-stress-v1.manifest.json",
+      "sha256": "4a68893883fd887a67d11098ff83a893c1b2c725e4a064dec272858fb452084a",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_reflection_outcome_stress_sha256": {
+      "byte_source": "git_commit_blob",
+      "bytes": 332,
+      "path": "backend/evaluation_artifacts/harness-reflection-outcome-stress-v1.sha256",
+      "sha256": "4cffb73135e1be5cd6fc7af1f0ae15ee87a1115112fab36a4b0180c2f1c6135f",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_reflection_trigger_ablation": {
+      "byte_source": "git_commit_blob",
+      "bytes": 21780,
+      "path": "backend/evaluation_artifacts/harness-reflection-trigger-ablation-v1.json",
+      "sha256": "d1c7c752fbc8d3f4f4f662662c8279bdbdf46f1e9ec767e4e41df40a6311e6f9",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_reflection_trigger_ablation_csv": {
+      "byte_source": "git_commit_blob",
+      "bytes": 6525,
+      "path": "backend/evaluation_artifacts/harness-reflection-trigger-ablation-v1.csv",
+      "sha256": "3e9650bf4cc6a147cc3e6292f5aca10073ff0f1ae210c628cb5a5faf41fd05ea",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_reflection_trigger_ablation_manifest": {
+      "byte_source": "git_commit_blob",
+      "bytes": 19279,
+      "path": "backend/evaluation_artifacts/harness-reflection-trigger-ablation-v1.manifest.json",
+      "sha256": "72f6ae19b3bfcea19e0351e3fbd4cbd0b83ae82793ea175823f2afdbe514933c",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "harness_reflection_trigger_ablation_sha256": {
+      "byte_source": "git_commit_blob",
+      "bytes": 338,
+      "path": "backend/evaluation_artifacts/harness-reflection-trigger-ablation-v1.sha256",
+      "sha256": "8b62b9ef894344100b37f1d47bdc7490023d2d39481ca703ae87f011ae4ac019",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "routing_corpus": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 14987,
+      "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+      "sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1",
+      "snapshot_commit": "ef00362927475b2fc411a4d82084bbbae8846582"
+    },
+    "routing_online_manifest": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 2912,
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.manifest.json",
+      "sha256": "6b625b8c0a6aa60282fa7c7be2f6b0ad8277b4610feb09c6c5e4b44222329307",
+      "snapshot_commit": "ef00362927475b2fc411a4d82084bbbae8846582"
+    },
+    "routing_policy_holdout_corpus": {
+      "byte_source": "git_commit_blob",
+      "bytes": 5818,
+      "path": "backend/tests/fixtures/harness_routing_policy_holdout_v1.jsonl",
+      "sha256": "d98d11773187efc225edcda2c38b9cf6c1ab6d7fe4df01f977589de65ec39179",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "routing_policy_holdout_manifest": {
+      "byte_source": "git_commit_blob",
+      "bytes": 794,
+      "path": "backend/tests/fixtures/harness_routing_policy_holdout_v3.manifest.json",
+      "sha256": "5a0795ffc7a2a342cc0faf3edca29a54f3b1e72d5cf2842f5e8d16b7c2c0ef78",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "routing_policy_holdout_result": {
+      "byte_source": "git_commit_blob",
+      "bytes": 6578,
+      "path": "backend/evaluation_artifacts/harness-routing-policy-holdout-v3.json",
+      "sha256": "c10941ab0af221bc53d0c4f2d37eb7605c7a1a045b83b3775966cb9573bac2da",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "routing_predictions": {
+      "byte_source": "working_tree_matches_git_commit_blob",
+      "bytes": 12818,
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.json",
+      "sha256": "d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4",
+      "snapshot_commit": "ef00362927475b2fc411a4d82084bbbae8846582"
+    },
+    "routing_predictions_v9": {
+      "byte_source": "git_commit_blob",
+      "bytes": 12819,
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
+      "sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "scenario_generalization": {
+      "byte_source": "git_commit_blob",
+      "bytes": 9034,
+      "path": "backend/evaluation_artifacts/scenario-generalization-mock-v1.json",
+      "sha256": "a2ab40d2962ac9f883281f24b0f3e8fb0f5316847f71ea3734ec9370ad858030",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    },
+    "simulation_coverage": {
+      "byte_source": "git_commit_blob",
+      "bytes": 6577,
+      "path": "backend/evaluation_artifacts/simulation-coverage-mock-v3.json",
+      "sha256": "f7523608ae3e7752fed04a789978c58b7546f89bd43098ea041e7ddfa9fbdf12",
+      "snapshot_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986"
+    }
+  }
+}
