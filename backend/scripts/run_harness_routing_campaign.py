@@ -64,6 +64,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider", default="openai")
     parser.add_argument("--timeout-seconds", type=float, default=60.0)
     parser.add_argument("--max-retries", type=int, default=1)
+    parser.add_argument("--temperature", type=float)
+    parser.add_argument("--top-p", type=float)
+    parser.add_argument("--seed", type=int)
     parser.add_argument(
         "--preflight-only",
         action="store_true",
@@ -88,6 +91,9 @@ def main() -> int:
         "json_object" if base_url else "json_schema"
     )
     generation_config = HarnessRoutingGenerationConfig(
+        temperature=args.temperature,
+        top_p=args.top_p,
+        seed=args.seed,
         response_format=response_format,
     )
     preflight = {
@@ -124,6 +130,9 @@ def main() -> int:
             base_url=base_url,
             timeout_seconds=args.timeout_seconds,
             max_retries=args.max_retries,
+            temperature=generation_config.temperature,
+            top_p=generation_config.top_p,
+            seed=generation_config.seed,
         )
 
     artifact = run_harness_routing_campaign(

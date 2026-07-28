@@ -214,13 +214,35 @@ class OpenAIJsonClient:
         timeout_seconds: float = 60.0,
         max_retries: int = 1,
         max_response_bytes: int = 1_000_000,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        seed: int | None = None,
     ) -> None:
+        if temperature is not None and (
+            isinstance(temperature, bool)
+            or not isinstance(temperature, (int, float))
+            or not math.isfinite(float(temperature))
+            or not 0.0 <= float(temperature) <= 2.0
+        ):
+            raise ValueError("temperature must be a finite number between 0 and 2")
+        if top_p is not None and (
+            isinstance(top_p, bool)
+            or not isinstance(top_p, (int, float))
+            or not math.isfinite(float(top_p))
+            or not 0.0 < float(top_p) <= 1.0
+        ):
+            raise ValueError("top_p must be a finite number greater than 0 and at most 1")
+        if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
+            raise ValueError("seed must be an integer")
         self._api_key = api_key
         self._proposal_schema = proposal_schema
         self._base_url = base_url
         self._timeout_seconds = timeout_seconds
         self._max_retries = max_retries
         self._max_response_bytes = max_response_bytes
+        self._temperature = None if temperature is None else float(temperature)
+        self._top_p = None if top_p is None else float(top_p)
+        self._seed = seed
 
     def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
         try:
@@ -265,6 +287,13 @@ class OpenAIJsonClient:
                     "Idempotency-Key": f"dd-{uuid.uuid4()}",
                 },
             }
+            for name, value in (
+                ("temperature", self._temperature),
+                ("top_p", self._top_p),
+                ("seed", self._seed),
+            ):
+                if value is not None:
+                    arguments[name] = value
             if include_response_format:
                 arguments["response_format"] = response_format
             return client.chat.completions.create(**arguments)

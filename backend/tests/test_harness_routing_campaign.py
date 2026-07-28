@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -22,6 +23,7 @@ from app.orchestration.harness_routing_campaign import (
     run_harness_routing_campaign,
     write_frozen_routing_artifact,
 )
+from app.orchestration.llm_parameter_proposer import OpenAIJsonClient
 
 CORPUS = Path(__file__).parent / "fixtures" / "harness_routing_eval_v1.jsonl"
 BACKEND_ROOT = Path(__file__).parents[1]
@@ -62,6 +64,12 @@ def test_cli_preflight_binds_the_script_backend_without_credentials(
             str(output),
             "--model-snapshot",
             "gpt-test-snapshot",
+            "--temperature",
+            "0",
+            "--top-p",
+            "0.9",
+            "--seed",
+            "20260728",
             "--preflight-only",
         ],
         cwd=REPOSITORY_ROOT,
@@ -77,8 +85,83 @@ def test_cli_preflight_binds_the_script_backend_without_credentials(
     assert Path(preflight["backend_root"]) == BACKEND_ROOT.resolve()
     assert preflight["case_count"] == 24
     assert preflight["prompt_template_version"] == "1.7"
+    assert preflight["generation_config"] == {
+        "response_format": "json_schema",
+        "seed": 20260728,
+        "temperature": 0.0,
+        "top_p": 0.9,
+    }
     assert preflight["output_exists"] is False
     assert not output.exists()
+
+
+def test_openai_json_client_forwards_explicit_generation_controls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeCompletions:
+        def create(self, **arguments: object) -> object:
+            captured["arguments"] = arguments
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content='{"decision":{"tool_id":"turbo","rationale":"bounded"}}'
+                        )
+                    )
+                ]
+            )
+
+    class _FakeOpenAI:
+        def __init__(self, **arguments: object) -> None:
+            captured["client_arguments"] = arguments
+            self.chat = SimpleNamespace(completions=_FakeCompletions())
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=_FakeOpenAI))
+    client = OpenAIJsonClient(
+        "test-key",
+        proposal_schema={"type": "object"},
+        temperature=0.0,
+        top_p=0.9,
+        seed=20260728,
+    )
+
+    response = client.generate(
+        model="gpt-test-snapshot",
+        system="system",
+        user="user",
+    )
+
+    arguments = captured["arguments"]
+    assert isinstance(arguments, dict)
+    assert arguments["temperature"] == 0.0
+    assert arguments["top_p"] == 0.9
+    assert arguments["seed"] == 20260728
+    assert response["decision"]["tool_id"] == "turbo"
+
+
+def test_openai_json_client_omits_unconfigured_generation_controls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeCompletions:
+        def create(self, **arguments: object) -> object:
+            captured.update(arguments)
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="{}"))])
+
+    class _FakeOpenAI:
+        def __init__(self, **_arguments: object) -> None:
+            self.chat = SimpleNamespace(completions=_FakeCompletions())
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=_FakeOpenAI))
+    client = OpenAIJsonClient("test-key", proposal_schema={"type": "object"})
+
+    assert client.generate(model="gpt-test-snapshot", system="system", user="user") == {}
+    assert "temperature" not in captured
+    assert "top_p" not in captured
+    assert "seed" not in captured
 
 
 def test_campaign_runs_exact_prompts_and_creates_loadable_artifact(
