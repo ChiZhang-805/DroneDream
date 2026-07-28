@@ -695,6 +695,39 @@ rejected as `INPUT_EVIDENCE_DRIFT`. Historical v1 and v2 receipts remain
 verifiable with their exact original projections instead of being silently
 upgraded to v3.
 
+Outcome Contract compiler 3.0 adds
+`dronedream.validation-generalization-evidence/v1`. After validation
+aggregation, the compiler compares the verified training and validation
+objectives using each objective's declared minimize/maximize direction and
+records signed and relative degradation without introducing a hidden
+acceptance threshold. It classifies the configured shift as replicated
+validation, disjoint-seed, configuration, scenario-type, or mixed shift and
+limits the claim to that observed simulation boundary.
+
+The receipt is content-addressed, nested inside the holdout projection, and
+therefore covered by the existing Candidate report-evidence hash. It is
+strictly `validation_report_only_no_adaptive_feedback`: Candidate selection,
+optimizer observations, Harness reflection, and subsequent tool allocation do
+not read it. The receipt separately binds the configured validation replicate
+count, materialized Trial count, and completed Trial count; all three must
+match before it can qualify. Incomplete or errored validation produces no
+partial metric claim; failed validation may retain complete diagnostic gaps
+but cannot qualify.
+The current `holdout=true` role remains operational validation, not an untouched
+final test, and this evidence does not claim open-world or real-flight
+generalization.
+
+The frozen `scenario-generalization-mock-v1.json` campaign exercises that
+contract beyond unit-level classification. A 61-Candidate production optimizer
+run receives five training cases only. Once the transcript and selected
+parameters are fixed, report-only validation evaluates five stronger
+configurations of known scenario types and five previously unseen scenario
+types on disjoint seeds. The resulting receipt qualifies
+`mixed_shift_robustness` while honestly recording the measured
+train-to-validation degradation. The artifact is deterministic mock evidence
+with `physical_fidelity=false`; validation outcomes cannot enter Candidate
+selection, decision memory, reflection, or tool allocation.
+
 Execution Claim Gate 1.1 hardens worker concurrency at the physical-attempt
 boundary. PostgreSQL workers select queue rows with `FOR UPDATE SKIP LOCKED`,
 while the conditional status/lease update remains the cross-dialect
@@ -765,7 +798,7 @@ production-prompt hashes plus Evidence/Tool/Prompt versions, provider, model
 snapshot, sampling settings, selections, and rationales. Stale or incomplete
 artifacts are rejected before grading.
 
-Harness Evidence 2.5 and Tool Registry 2.1 add a deterministic precondition
+Harness Evidence 2.7 and Tool Registry 2.1 retain the deterministic precondition
 gate before routing. The model receives only tools compatible with the current
 parameter dimension, objective/constraint shape, scenario replication, scored
 evidence, feasibility coverage, generation, and stagnation state. A globally
@@ -775,13 +808,14 @@ taxonomy as Candidate ranking: infrastructure, cancellation, invalid evidence,
 and holdout outcomes cannot make a parameter region or optimizer family appear
 unsafe.
 
-Evidence 2.5 also closes the first bounded reflection loop. For each recent
-decision/result pair that already passes the started/accepted/result provenance
-checks, the compiler locates only `source_type="optimizer"` Candidates from the
-same dispatched generation. The cohort must exactly match the dispatch receipt,
-every Candidate must have a current v2 evidence-ledger receipt, and every
-training feedback projection must verify. Otherwise reflection is marked
-`unavailable` as a whole; legacy sibling fields are never used to fill gaps.
+Evidence 2.7 retains the bounded reflection loop introduced in Evidence 2.5.
+For each recent decision/result pair that already passes the
+started/accepted/result provenance checks, the compiler locates only
+`source_type="optimizer"` Candidates from the same dispatched generation. The
+cohort must exactly match the dispatch receipt, every Candidate must have a
+current v2 evidence-ledger receipt, and every training feedback projection
+must verify. Otherwise reflection is marked `unavailable` as a whole; legacy
+sibling fields are never used to fill gaps.
 
 A complete reflection exposes only aggregate counts and finite training-side
 scores: accepted physical attempts, optimizer-learning Trials, trusted domain
@@ -799,6 +833,28 @@ to a child strategy. Prompt Template 1.2 instructs the router to reflect on
 these verified cohort results while prohibiting causal reward or child-tool
 credit language. Any mutation of the reflected block changes the prompt and
 evidence hashes and fails current trace verification.
+
+Evidence 2.6 closes the next scenario-understanding gap without opening the
+sealed-validation boundary. Every enabled training case now receives an
+anonymous ordinal alias and contributes its trusted scenario type, replicate
+count, normalized weight share, and only simulator-relevant numeric
+perturbations admitted by a scenario-specific allowlist. The provider also
+receives bounded job-wide environment facts: steady-wind component magnitude,
+sensor-noise level, enabled gust magnitude and period, obstacle count,
+sensor-degradation values, and battery/payload conditions. Arbitrary case JSON,
+labels, IDs, seeds, prose, and out-of-range or scenario-incompatible fields are
+discarded.
+
+The snapshot additionally reports minimum and maximum training replicates,
+maximum normalized case weight, and the effective number of weighted training
+cases. These are descriptive facts, not a fabricated scalar difficulty score.
+The current Prompt Template 1.5 requires the router to compare training-case
+heterogeneity, replicate cost, weight concentration, and safe perturbation
+magnitudes while treating validation counts as cost only. A paired regression
+changes holdout IDs, types, seeds, weights, and configuration while preserving
+counts and requires provider-visible scenario evidence to remain identical;
+another regression proves that meaningful training profiles change the frozen
+prompt.
 
 The prior 24/24 online-provider Artifact was generated under Evidence 2.4 and
 Prompt Template 1.1. It remains an archived historical result, but current
@@ -838,7 +894,8 @@ arm retains the decision receipt but removes only the observational result.
 The artifact measures the intervention count and actual tool sequence before
 interpreting any outcome.
 
-The committed v1 campaign contains 20 synthetic Jobs and 764 persisted Trials.
+The regenerated v1 campaign contains 20 synthetic Jobs and 554 persisted Trials
+under Evidence 2.7's receding-horizon batch policy.
 Every arm has complete evidence and zero network calls. Full AURORA selects
 `constrained_mobo > turbo` in all five blocks; both memory ablations select
 `constrained_mobo > optimizer_portfolio`; the fixed arm selects the portfolio
@@ -861,9 +918,9 @@ real-flight performance.
 The separate
 `backend/tests/fixtures/harness_routing_policy_holdout_v1.jsonl` corpus is a
 16-case, hash-locked **deterministic tool-eligibility policy holdout**. Its
-Evidence 2.5 input binding is frozen separately in
-`harness_routing_policy_holdout_v2.manifest.json`; the Evidence 2.4 manifest
-and result remain archived rather than being rewritten. It is
+Evidence 2.7 input binding is frozen separately in
+`harness_routing_policy_holdout_v3.manifest.json`; the Evidence 2.4 and 2.6
+manifests and results remain archived rather than being rewritten. It is
 not the 24-case development corpus, not a provider/model benchmark, and not
 PX4/Gazebo evidence. Its strict manifest binds the canonical corpus, case IDs,
 compiled policy inputs, and current development-corpus hash; all case IDs are
@@ -883,6 +940,55 @@ simulation outcomes. The hand-authored labels are repository-visible after the
 freeze, so this is also not a permanently blind generalization benchmark. Those
 claims still require a separately frozen provider campaign and locked simulator
 comparisons.
+
+### Evidence 2.7 one-generation receding plan
+
+Evidence 2.7 adds `dronedream.harness-receding-plan/v1`. The compiler assigns
+exactly one current phase—exploration, recovery, refinement, diversification,
+verification, or balanced—and one closed batch policy. The plan horizon is
+always one generation and `replan_after_generation` is always true, so a stale
+open-loop schedule cannot survive the next observed cohort.
+
+The precedence is deterministic. A final generation or a single remaining
+full-candidate slot forces conservative verification. High verified domain
+failure forces conservative recovery. Sparse scored history or no feasible
+candidate requests broad exploration; repeated stagnation requests broad
+diversification; verified improvement requests balanced refinement; otherwise
+the policy remains balanced. The model may select only from the separately
+eligible tool registry, while trusted orchestration translates conservative,
+balanced, and broad into one, half-ceiling, and full safe batch capacity.
+
+Accepted decisions and execution receipts persist the phase, batch policy, and
+planned Candidate count. Decision memory admits them only when the decision and
+result agree and the dispatched count fits the plan. The started trace hashes
+the complete planning object, and regression tests mutate that object to prove
+both evidence and prompt digests fail closed. These contracts establish
+bounded planning and auditability; they do not establish that any phase is
+optimal on unseen landscapes or that fewer synthetic Trials imply better
+PX4/Gazebo or real-flight performance.
+
+### Phase-qualified tools and full-fidelity verification
+
+The provider-visible tool surface now applies two independent fail-closed
+gates. The capability gate first removes tools that cannot consume the current
+problem shape or evidence. The phase gate then intersects that set with the
+search roles authorized by the current one-generation plan. The resulting
+`selectable_harness_tools` set is used by the JSON schema, provider manifest,
+response validator, accepted-decision path, and trace verifier. A model cannot
+select a capability-compatible local tool during exploration or recovery, nor
+select a restart or sparse-screening tool during refinement or verification,
+even if prompt text suggests doing so. CMA-ES and the deterministic optimizer
+portfolio remain bounded fallbacks in every phase.
+
+Verification is also an execution property rather than a prompt preference.
+When a reduced-fidelity-capable strategy reaches the verification phase,
+trusted dispatch passes `required_fidelity=1.0` regardless of whether earlier
+full-matrix evidence exists. Final-generation and last-capacity reserve rules
+retain the same full-fidelity floor. Focused regressions prove both the exact
+phase/tool matrix and the fidelity floor before candidate rows are created.
+These gates establish semantic consistency between planning and execution;
+they do not establish that the phase taxonomy is optimal on unseen simulator
+landscapes.
 
 ### Desktop Request Proof Gate 1.0
 

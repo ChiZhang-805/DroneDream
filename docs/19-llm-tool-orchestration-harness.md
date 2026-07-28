@@ -1,6 +1,6 @@
 # LLM Tool-Orchestrated Optimization Harness
 
-Status: approved target design; trusted Evidence 2.5 observational reflection gate and frozen campaign runner implemented; current-version online provider rerun gated<br>
+Status: approved target design; trusted Evidence 2.7 scenario-profile, observational-reflection, and one-generation receding-plan gates implemented; current-version online provider rerun gated<br>
 Audience: backend, optimization, simulation, security, evaluation, and course-review stakeholders<br>
 Scope: DroneDream's automated PX4/Gazebo tuning loop<br>
 Last reviewed: 2026-07-27
@@ -8630,24 +8630,44 @@ omitted from GPT scenario feedback. Prompt schema 2.1 recomputes its denominator
 completion/pass rates, and failure codes from optimizer-learning Trial classes,
 so an external producer cannot poison the LLM optimizer through a side channel.
 
-Current focused validation:
+Outcome Contract compiler 3.0 adds a report-only generalization receipt after
+the validation matrix completes. The content-addressed
+`dronedream.validation-generalization-evidence/v1` projection binds the
+Scenario Suite, labels the actual seed/configuration/scenario-type shift, and
+computes direction-aware training-to-validation gaps for every registered
+objective plus scalar loss. Missing, incomplete, or errored validation never
+emits a partial quantitative conclusion; failed validation remains
+non-qualifying even when its diagnostic gaps are complete. Qualification also
+requires the configured validation replicate count, actual Trial count, and
+completed Trial count to match exactly, preventing a truncated validation
+matrix from being mislabeled as a pass.
+
+This receipt cannot enter the model prompt, decision memory, optimizer
+observations, Candidate ranking, or adaptive tool allocation. A paired
+regression changes validation outcomes from excellent to failed while
+requiring the training score and Candidate selection to remain identical. The
+only authorized consumers are reporting and the existing promotion gate.
+Accordingly, the evidence can support only the named shift in the configured
+simulation campaign. It is neither a sealed final test nor real-flight or
+open-world generalization evidence.
+
+The immutable `scenario-generalization-mock-v1.json` campaign now supplies a
+concrete mixed-shift instance of this contract. The optimizer selects from 61
+Candidates using five training cases only. A later report-only matrix contains
+five changed configurations of known scenario types and five scenario types
+absent from training, with disjoint validation seeds. The receipt qualifies
+`mixed_shift_robustness`, records the actual train-to-validation degradation,
+and remains explicitly `physical_fidelity=false`. A regression replaces the
+validation evaluator with a failure sentinel while running the training-only
+optimizer, proving that no validation call is available at selection time.
+
+Current frozen backend validation:
 
 ```text
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-1058 passed
-
-Focused PX4 evidence, trusted taxonomy, optimizer-learning, and GPT prompt
-regression: 312 passed. Runtime contracts: 48 tests passed with 4 expected
-Windows skips for POSIX/WSL-only secure ULog deletion.
-
-Focused orchestration regression: 54 passed, including two eight-worker
-physical-attempt claim races repeated ten times each before the full suite and
-one deterministic two-Job alternating-service fairness regression.
-
-Focused Harness context, dynamic eligibility, trace, provider-campaign, and
-capability regression: 55 passed.
+1139 passed in 759.17s
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 
@@ -8664,6 +8684,19 @@ current prompt_suite_sha256:
 d300d0516378974fb57be896b155ef1a537278594b03c0ecbdceff9ade26dc59
 ```
 
+The content-addressed receipt at
+`artifacts/test-runs/aurora-backend-1139-receipt.json` binds the command,
+Windows/Python/pytest environment, start and finish times, result, full log
+SHA-256, and software source commit
+`0429b4244fc1fd912bd211e80821ebdbabb8ae5d`. The full suite ran on the
+pre-commit AURORA worktree, so it is explicitly marked
+`exact_final_commit_run=false`. After formatter-only and evidence-contract
+changes, 59 directly affected tests passed in 65.67 seconds on the bound source
+commit; the receipt does not misrepresent that focused bridge as a second full
+run. The Windows Rust desktop gate was not run on this host because Visual
+Studio C++ Build Tools and `link.exe` were unavailable, so the backend receipt
+does not satisfy that separate release gate.
+
 The first complete online-provider freeze used
 `gpt-4.1-2025-04-14` with native strict JSON Schema and no requested
 temperature, top-p, or seed override. Independent reload and grading produced
@@ -8673,7 +8706,7 @@ Artifact SHA-256 is
 `8a6531580243f1fa1493f68570b01e965231995f6b754290aca9d6f285d4575b`.
 This proves the archived Evidence 2.4 / Prompt Template 1.1 model and tool gate
 could discriminate the development cases; it does not qualify the current
-Evidence 2.5 / Prompt Template 1.2 contract, prove lower final simulation loss,
+Evidence 2.7 / Prompt Template 1.5 contract, prove lower final simulation loss,
 or replace a blocked, budget-matched simulator campaign. Current loaders reject
 that Artifact as stale until a fresh online provider freeze is run.
 
@@ -8693,6 +8726,61 @@ to child tools. Missing, legacy, incomplete, count-mismatched, or drifted
 evidence makes the entire outcome `unavailable`; zero-dispatch results are
 `not_applicable`. Prompt Template 1.2 requires reflection on verified numeric
 cohorts while explicitly forbidding causal or child-credit inference.
+
+### 30.16 Evidence 2.6 scenario-profile context
+
+The routing snapshot now describes each enabled training case with an anonymous
+ordinal alias, trusted scenario type, replicate count, normalized weight share,
+and a scenario-specific allowlist of bounded numeric perturbations. It also
+reports replicate range, maximum weight concentration, effective weighted case
+count, and a closed job-wide environment summary. This lets the planner compare
+simulation cost and training heterogeneity instead of seeing only aggregate
+case counts.
+
+The compiler does not expose arbitrary scenario JSON, IDs, seeds, labels,
+instructions, out-of-range values, or incompatible perturbation keys. Holdout
+details remain sealed; only validation case and replicate counts contribute to
+cost. Current Prompt Template 1.5 explicitly prohibits inferring validation
+types, conditions, or results. Paired tests require two jobs with identical
+training inputs and counts but different holdout IDs, types, seeds, weights,
+and configs to produce identical provider-visible scenario evidence.
+
+### 30.17 Evidence 2.7 one-generation receding plan
+
+The evidence compiler now turns verified budget, search, and observational
+memory into one closed planning record before any model call. Its phase is one
+of `exploration`, `recovery`, `refinement`, `diversification`,
+`verification`, or `balanced`; its batch policy is one of `conservative`,
+`balanced`, or `broad`. The record binds a one-generation horizon, mandates
+replanning after the cohort, and carries a short closed reason-code tuple.
+
+Planning authority remains deterministic. Final capacity has priority over
+every adaptive signal; verified high domain-failure rates have priority over
+exploration and improvement; sparse history and missing feasibility trigger
+exploration; stagnation triggers diversification; verified progress permits
+refinement. Trusted dispatch converts the policy to a locally safe Candidate
+count and never permits the provider to enlarge it. The decision and execution
+events must agree on phase and policy, and the execution's planned count must
+cover the dispatched count before that record may enter future memory.
+
+Prompt Template 1.5 exposes the bounded plan but explicitly forbids a later
+open-loop schedule. Decision Trace 1.3 hashes the complete plan with the
+provider-safe snapshot and exact prompt. Unit and integration regressions cover
+all six phases, phase-policy mismatch, safe cohort sizing, real dispatch
+propagation, privacy/context limits, and plan-field tampering. The offline
+component campaign changed from 764 to 554 persisted synthetic Trials after
+this policy entered production, but that difference is protocol behavior on a
+mock landscape—not causal evidence of optimizer quality, physical performance,
+or user benefit.
+
+The executable tool surface is now stricter than capability eligibility alone.
+`selectable_harness_tools` intersects the capability-compatible registry with
+the search roles authorized for the current phase, and that exact tuple drives
+the provider schema, manifest, response validator, persisted started trace, and
+offline verifier. Verification also forces `required_fidelity=1.0` for every
+reduced-fidelity-capable strategy even when earlier full-matrix evidence exists.
+These are trusted dispatch contracts, not model instructions, and regressions
+cover every phase exclusion plus the pre-dispatch fidelity floor.
 
 ## 31. Reference index
 

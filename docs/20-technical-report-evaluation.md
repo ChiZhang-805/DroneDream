@@ -50,6 +50,21 @@ for chart-ready evidence already present in the repository. It validates
 provenance, recomputes headline metrics, emits hashes, and refuses to relabel a
 mock campaign as physical evidence.
 
+The frozen report-line handoff is
+`dronedream.technical-report-evidence.v6`, with
+`source_commit=0429b4244fc1fd912bd211e80821ebdbabb8ae5d` and
+`generated_at=2026-07-28T04:59:08Z`. The exporter requires both values instead
+of consulting the wall clock, validates their syntax, and includes them in the
+canonical bundle hash. With unchanged inputs and explicit metadata,
+regeneration is byte-verifiable.
+`artifacts/technical-report/evidence.manifest.json` lists every report source
+and SHA-256, including the 554-Trial component-ablation JSON, CSV, and
+preregistration manifest plus the 1,139-test backend receipt.
+The canonical bundle SHA-256 is
+`bd99720f50a63d282287b7ed2ee7b4692e416bc00db218a864ebc462f8298258`;
+the manifest and `evidence.sha256` bind the generated files without changing
+the software source commit.
+
 `backend/scripts/evaluate_harness_ablations.py` independently reproduces the
 source-contract ablation JSON, CSV, and file-hash manifest. Its comparator is
 not a product mode: it intentionally removes one named guard at a time so the
@@ -203,12 +218,37 @@ The exporter currently produces:
 - a 61-candidate synthetic campaign over ten named scenario types whose
   holdout loss changes from `0.82811` to `0.58525` (29.327%); all ten scenario
   losses improve. This is `SYNTHETIC_MOCK`, with
-  `physical_fidelity=false`.
+  `physical_fidelity=false`. The immutable v3 campaign also contains a
+  content-addressed `seed_robustness` receipt over ten disjoint validation
+  seeds. For the selected Candidate, training loss is `0.58554` and validation
+  loss is `0.58525`, a signed degradation of `-0.00029` (approximately
+  `-0.0495%`, meaning a small improvement). The receipt is report-only and
+  cannot feed adaptive search.
 
-The deterministic source-contract ablation now contains 20 constructed probes
+The separate immutable
+`scenario-generalization-mock-v1.json` campaign closes the previously
+compiler-only configuration/type gap. The optimizer sees five training cases
+and selects from 61 Candidates before any validation runs. The frozen
+report-only matrix then evaluates five stronger configurations of known types
+and five scenario types absent from training, each on a disjoint seed. The
+selected Candidate is the exact finite-grid optimum on both the training and
+validation aggregates: training score is `0.87340`, mixed-shift validation
+score is `1.03057`, and the receipt therefore records a `17.995%` relative
+train-to-validation degradation. Against the unchanged baseline, however,
+validation score improves by `25.072%`, and every validation case improves.
+This qualifies only `mixed_shift_robustness` on the deterministic mock
+landscape. It is neither a sealed final test nor PX4/Gazebo, real-flight,
+sim-to-real, or open-world evidence.
+
+The deterministic source-contract ablation now contains 25 constructed probes
 covering provider trust filtering, tool eligibility, deterministic fallback,
-and scenario/outcome isolation. The full production contracts satisfy 20/20
-declared expectations; the deliberately weakened comparators satisfy 6/20.
+scenario/outcome isolation, and the Evidence 2.7 scenario-profile and planning
+boundary. The
+full production contracts satisfy 25/25 declared expectations; the deliberately
+weakened comparators satisfy 6/25. The five scenario-profile probes cover
+anonymous weighted training cases, scenario-specific perturbation allowlists,
+out-of-range filtering, holdout-content noninterference, and the bounded
+job-wide environment summary.
 This is `SOURCE_ABLATION`: it demonstrates guard behavior on named inputs, not
 causal performance lift or simulation quality.
 
@@ -229,7 +269,8 @@ superiority, causal Harness benefit, PX4/Gazebo performance, or flight
 evidence.
 
 The AURORA component outcome ablation contains 20 complete synthetic Jobs and
-764 persisted Trials: five common seed blocks multiplied by four arms. In
+554 persisted Trials after the Evidence 2.7 receding plan: five common seed
+blocks multiplied by four arms. In
 every block, full AURORA routed `constrained_mobo` then `turbo`; removing all
 decision memory or only verified observed outcomes routed
 `constrained_mobo` then `optimizer_portfolio`; the fixed arm routed the
@@ -237,10 +278,11 @@ portfolio twice. All 20 runs made zero network calls and reached 100% evidence
 completeness. The frozen landscape produced no terminal failure or retry
 recovery, so those metrics remain explicit zeros rather than being dropped.
 
-All 15 full-arm comparisons show at least one preregistered protocol-level
-metric difference, but this is not a general superiority result: holdout
-direction varies by seed, and the report permits no LLM, PX4/Gazebo, physical,
-or generalized causal claim. Moreover, the no-memory and no-reflection arms
+Five of the 15 full-arm comparisons show a preregistered protocol-level metric
+difference and ten show no observed protocol difference. This is not a general
+superiority result: holdout direction varies by seed, and the report permits no
+LLM, PX4/Gazebo, physical, or generalized causal claim. Moreover, the no-memory
+and no-reflection arms
 are behaviorally identical in all five blocks. Because the scripted router
 does not use receipt-only memory after reflection is removed, the incremental
 effect of that receipt-only component is explicitly marked **inconclusive**
@@ -249,6 +291,19 @@ rather than credited with a benefit.
 The real PX4/Gazebo main table, broader physical component-level outcome ablations,
 multi-seed physical confidence intervals, latency/token/cost results, and UX
 measurements remain unfilled until their locked experiments run.
+
+## Software validation and remaining gate
+
+`artifacts/test-runs/aurora-backend-1139-receipt.json` is the only test receipt
+consumed by this frozen bundle. It records `1139 passed in 759.17s`, command and
+environment metadata, start and finish times, the full log hash, and source
+commit `0429b4244fc1fd912bd211e80821ebdbabb8ae5d`. The full suite ran on the
+pre-commit AURORA worktree and is honestly marked
+`exact_final_commit_run=false`; 59 directly affected tests were subsequently
+rerun and passed on the bound source commit. The Windows Rust desktop gate was
+not run because Visual Studio C++ Build Tools and `link.exe` were unavailable
+on the validation host. No Rust release-readiness claim follows from the
+backend receipt.
 
 ## Reproduction
 
@@ -278,12 +333,18 @@ backend\.venv\Scripts\python.exe `
 
 backend\.venv\Scripts\python.exe `
   backend\scripts\export_technical_report_evidence.py `
+  --source-commit 0429b4244fc1fd912bd211e80821ebdbabb8ae5d `
+  --generated-at 2026-07-28T04:59:08Z `
+  --backend-test-receipt artifacts\test-runs\aurora-backend-1139-receipt.json `
   --output artifacts\technical-report\evidence.json `
+  --manifest-output artifacts\technical-report\evidence.manifest.json `
+  --sha256-output artifacts\technical-report\evidence.sha256 `
   --csv-directory artifacts\technical-report\csv
 ```
 
-The resulting report JSON includes SHA-256 hashes for every source artifact
-and a digest over the normalized bundle. The versioned ablation JSON/CSV/hash
+The resulting v6 report JSON and companion manifest repeat the explicit source
+commit and generation time, include SHA-256 hashes for every source artifact,
+and bind the normalized bundle digest. The versioned ablation JSON/CSV/hash
 under `backend/evaluation_artifacts/` are source-controlled software-contract
-evidence; generated files under `artifacts/technical-report/` are report build
-artifacts and are not physical-performance evidence.
+evidence; generated files under `artifacts/technical-report/` are frozen report
+inputs and are not physical-performance evidence.
