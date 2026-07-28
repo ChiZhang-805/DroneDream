@@ -908,7 +908,7 @@ def test_obstacle_sdf_and_entity_factory_ack_are_verifiable(tmp_path: Path, monk
     assert "gz.msgs.Boolean" in commands[1]
 
 
-def test_preflight_reports_each_unsupported_effect_without_partial_launch() -> None:
+def test_preflight_allows_static_and_flight_timed_effects_together() -> None:
     request = build_scenario_effect_request(
         execution_identity={"trial_id": "t"},
         scenario_type="nominal",
@@ -923,16 +923,7 @@ def test_preflight_reports_each_unsupported_effect_without_partial_launch() -> N
         },
     )
 
-    records = wrapper._preflight_scenario_effects(request, site_dry_run=False)
-
-    assert records is not None
-    by_id = {item["effect_id"]: item for item in records}
-    assert by_id["obstacles"]["status"] == "skipped"
-    assert by_id["obstacles"]["capability"]["status"] == "available"
-    assert by_id["job_config.wind"]["status"] == "skipped"
-    assert by_id["job_config.wind"]["capability"]["status"] == "available"
-    assert by_id["sensor_degradation.dropout_rate"]["status"] == "unsupported"
-    assert "not a probabilistic dropout rate" in by_id["sensor_degradation.dropout_rate"]["reason"]
+    assert wrapper._preflight_scenario_effects(request, site_dry_run=False) is None
 
 
 def test_preflight_allows_bundled_wind_and_obstacles_together() -> None:

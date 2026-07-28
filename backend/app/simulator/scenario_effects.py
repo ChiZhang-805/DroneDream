@@ -20,6 +20,7 @@ REQUEST_SCHEMA_VERSION = "dronedream.scenario_effect_request.v1"
 EVIDENCE_SCHEMA_VERSION = "dronedream.scenario_effect_evidence.v1"
 REQUEST_ARTIFACT_NAME = "scenario_effects.request.json"
 EVIDENCE_ARTIFACT_NAME = "scenario_effects.applied.json"
+RUNTIME_EVIDENCE_ARTIFACT_NAME = "scenario_effects.runtime.json"
 MAX_EFFECT_CONTRACT_BYTES = 2 * 1024 * 1024
 MAX_EFFECTS_PER_REQUEST = 64
 MAX_EVIDENCE_OBSERVATIONS = 1024
@@ -48,11 +49,24 @@ BUNDLED_SDF_PROFILE_EFFECT_IDS = frozenset(
         "scenario_type.actuator_delay",
     }
 )
+BUNDLED_RUNTIME_EFFECT_IDS = frozenset(
+    {
+        "sensor_degradation.dropout_rate",
+        "scenario_config.dropout_rate",
+        "scenario_type.gps_dropout",
+        "battery.initial_percent",
+        "battery.voltage_sag",
+        "scenario_type.battery_degraded",
+    }
+)
 BAROMETER_PRESSURE_PA_PER_ALTITUDE_M = 12.0
 DEFAULT_TURBULENCE_PEAK_MPS = 5.0
 DEFAULT_TURBULENCE_PERIOD_S = 5.0
 DEFAULT_PAYLOAD_MASS_KG = 1.0
 DEFAULT_ACTUATOR_DELAY_MS = 80.0
+DEFAULT_GPS_DROPOUT_RATE = 0.2
+DEFAULT_BATTERY_INITIAL_PERCENT = 45.0
+DEFAULT_BATTERY_SAG_DRAIN_SECONDS = 300.0
 _SENSOR_NOISE_PRESETS = {
     "low": {
         "gps_position_stddev_m": 0.25,
@@ -170,24 +184,6 @@ def _finite_number(
 
 
 def _unsupported_reason(effect_id: str) -> str:
-    if effect_id in {
-        "sensor_degradation.dropout_rate",
-        "scenario_config.dropout_rate",
-        "scenario_type.gps_dropout",
-    }:
-        return (
-            "PX4 SITL GPS failure injection supports off/stuck/wrong, not a "
-            "probabilistic dropout rate; no safe schedule conversion is configured"
-        )
-    if effect_id in {
-        "battery.initial_percent",
-        "battery.voltage_sag",
-        "scenario_type.battery_degraded",
-    }:
-        return (
-            "the bundled launcher does not yet apply and read back PX4 battery "
-            "simulation parameters or battery failure injection"
-        )
     if effect_id == "scenario_type.combined_perturbed":
         return (
             "combined_perturbed is a scenario label, not a physical injection; "
@@ -207,9 +203,9 @@ def _mechanism_for(effect_id: str) -> str:
     if "wind" in effect_id or effect_id.endswith("turbulence"):
         return "gazebo_wind_effects"
     if effect_id.startswith("sensor_degradation") or "noise" in effect_id:
-        return "px4_failure_injection" if "dropout" in effect_id else "sdformat_sensor_noise"
+        return "px4_sim_gps_used" if "dropout" in effect_id else "sdformat_sensor_noise"
     if "gps_dropout" in effect_id or effect_id.endswith("dropout_rate"):
-        return "px4_failure_injection"
+        return "px4_sim_gps_used"
     if "payload" in effect_id:
         return "sdformat_model_inertial"
     if effect_id.startswith("battery") or effect_id.endswith("battery_degraded"):
@@ -255,6 +251,27 @@ def _available_reason(effect_id: str) -> str:
         return (
             "the bundled launcher maps delay_ms to x500 motor first-order response time "
             "constants in Trial-local SDF and verifies every runtime motor plugin"
+        )
+    if effect_id in {
+        "sensor_degradation.dropout_rate",
+        "scenario_config.dropout_rate",
+        "scenario_type.gps_dropout",
+    }:
+        return (
+            "the bundled offboard executor compiles the requested dropout rate into "
+            "a trial-seed-bound one-second schedule, verifies each transition from the "
+            "PX4 physical failure handler's STATUSTEXT, and verifies reset to GPS OK"
+        )
+    if effect_id in {
+        "battery.initial_percent",
+        "battery.voltage_sag",
+        "scenario_type.battery_degraded",
+    }:
+        return (
+            "the bundled offboard executor applies and reads back SIM_BAT_DRAIN and "
+            "SIM_BAT_MIN_PCT, observes battery telemetry at the track boundary, and "
+            "records the continuing sag or target floor without treating a parameter "
+            "write alone as physical proof"
         )
     raise ScenarioEffectContractError(f"no bundled capability reason for {effect_id}")
 
@@ -604,6 +621,153 @@ def compile_bundled_sdf_profile(request: dict[str, Any]) -> dict[str, Any] | Non
     return _compile_bundled_sdf_profile_unchecked(request)
 
 
+def _compile_bundled_runtime_profile_unchecked(
+    request: dict[str, Any],
+) -> dict[str, Any] | None:
+    effects = [
+        effect
+        for effect in request.get("effects", [])
+        if effect.get("effect_id") in BUNDLED_RUNTIME_EFFECT_IDS
+    ]
+    if not effects:
+        return None
+
+    by_id = {str(effect["effect_id"]): effect for effect in effects}
+    profile: dict[str, Any] = {
+        "requested_effect_ids": sorted(by_id),
+        "execution_identity_sha256": _value_hash(request.get("execution_identity", {})),
+    }
+
+    gps_ids = {
+        "sensor_degradation.dropout_rate",
+        "scenario_config.dropout_rate",
+        "scenario_type.gps_dropout",
+    }
+    requested_gps_ids = sorted(gps_ids & set(by_id))
+    if requested_gps_ids:
+        rates: list[float] = []
+        for effect_id in requested_gps_ids:
+            raw = by_id[effect_id].get("requested_value")
+            if effect_id == "scenario_type.gps_dropout":
+                raw = (
+                    raw.get("dropout_rate", DEFAULT_GPS_DROPOUT_RATE)
+                    if isinstance(raw, dict)
+                    else raw
+                )
+            rates.append(
+                _bounded_profile_number(
+                    raw,
+                    path=effect_id,
+                    lower=0.0,
+                    upper=1.0,
+                )
+            )
+        reference = rates[0]
+        if any(not math.isclose(rate, reference, rel_tol=0.0, abs_tol=1e-12) for rate in rates[1:]):
+            raise ScenarioEffectContractError(
+                "GPS dropout sources request conflicting dropout rates"
+            )
+        profile["gps_dropout"] = {
+            "requested_rate": reference,
+            "tick_period_s": 1.0,
+            "schedule_algorithm": "sha256-ranked-fixed-duty-v1",
+            "parameter_name": "SIM_GPS_USED",
+            "dropout_value": 0,
+            "availability_source": "mavsdk.telemetry.gps_info",
+            "effect_ids": requested_gps_ids,
+        }
+
+    battery_ids = {
+        "battery.initial_percent",
+        "battery.voltage_sag",
+        "scenario_type.battery_degraded",
+    }
+    requested_battery_ids = sorted(battery_ids & set(by_id))
+    if requested_battery_ids:
+        initial_percent = DEFAULT_BATTERY_INITIAL_PERCENT
+        voltage_sag = False
+        initial_effect = by_id.get("battery.initial_percent")
+        if initial_effect is not None:
+            initial_percent = _bounded_profile_number(
+                initial_effect.get("requested_value"),
+                path="battery.initial_percent",
+                lower=0.0,
+                upper=100.0,
+            )
+        sag_effect = by_id.get("battery.voltage_sag")
+        if sag_effect is not None:
+            if sag_effect.get("requested_value") is not True:
+                raise ScenarioEffectContractError("battery.voltage_sag must request true")
+            voltage_sag = True
+        marker = by_id.get("scenario_type.battery_degraded")
+        if marker is not None:
+            marker_value = marker.get("requested_value")
+            marker_config = marker_value.get("config", {}) if isinstance(marker_value, dict) else {}
+            if not isinstance(marker_config, dict):
+                raise ScenarioEffectContractError(
+                    "scenario_type.battery_degraded config must be an object"
+                )
+            initial_percent = _bounded_profile_number(
+                marker_config.get("initial_percent", DEFAULT_BATTERY_INITIAL_PERCENT),
+                path="scenario_type.battery_degraded.config.initial_percent",
+                lower=0.0,
+                upper=100.0,
+            )
+            raw_sag = marker_config.get("voltage_sag", True)
+            if not isinstance(raw_sag, bool):
+                raise ScenarioEffectContractError(
+                    "scenario_type.battery_degraded.config.voltage_sag must be boolean"
+                )
+            voltage_sag = raw_sag
+        profile["battery"] = {
+            "target_track_start_percent": initial_percent,
+            "voltage_sag": voltage_sag,
+            "sag_drain_seconds": DEFAULT_BATTERY_SAG_DRAIN_SECONDS,
+            "no_sag_hold_drain_seconds": 86400.0,
+            "parameter_names": ["SIM_BAT_DRAIN", "SIM_BAT_MIN_PCT"],
+            "effect_ids": requested_battery_ids,
+        }
+    return profile
+
+
+def compile_bundled_runtime_profile(request: dict[str, Any]) -> dict[str, Any] | None:
+    """Compile flight-timed PX4 effects for the bundled offboard executor."""
+
+    validate_scenario_effect_request(request)
+    return _compile_bundled_runtime_profile_unchecked(request)
+
+
+def compile_bundled_gps_dropout_schedule(
+    *,
+    requested_rate: float,
+    tick_count: int,
+    execution_identity_sha256: str,
+) -> list[bool]:
+    """Select an exact, seed-bound dropout duty set without a platform PRNG."""
+
+    if not math.isfinite(requested_rate) or not 0.0 <= requested_rate <= 1.0:
+        raise ScenarioEffectContractError("requested_rate must be finite and in [0, 1]")
+    if not 1 <= tick_count <= 3600:
+        raise ScenarioEffectContractError("tick_count must be in [1, 3600]")
+    if not _SHA256.fullmatch(execution_identity_sha256):
+        raise ScenarioEffectContractError(
+            "execution_identity_sha256 must be a lowercase SHA-256"
+        )
+    off_count = int(math.floor(requested_rate * tick_count + 0.5))
+    if requested_rate > 0.0 and off_count == 0:
+        off_count = 1
+    if requested_rate < 1.0 and off_count == tick_count and tick_count > 1:
+        off_count -= 1
+    ranked = sorted(
+        range(tick_count),
+        key=lambda index: hashlib.sha256(
+            f"{execution_identity_sha256}:{index}".encode("ascii")
+        ).digest(),
+    )
+    off_ticks = set(ranked[:off_count])
+    return [index in off_ticks for index in range(tick_count)]
+
+
 def build_scenario_effect_request(
     *,
     execution_identity: dict[str, Any],
@@ -636,6 +800,7 @@ def build_scenario_effect_request(
             effect_id == "obstacles"
             or effect_id in BUNDLED_STEADY_WIND_EFFECT_IDS
             or effect_id in BUNDLED_SDF_PROFILE_EFFECT_IDS
+            or effect_id in BUNDLED_RUNTIME_EFFECT_IDS
         )
         capability_status = "available" if bundled else "requires_runtime_extension"
         effects.append(
@@ -1321,6 +1486,230 @@ def _validate_bundled_sdf_profile_evidence(
         )
 
 
+def _validate_bundled_runtime_evidence(
+    request: dict[str, Any],
+    requested: dict[str, Any],
+    evidence_record: dict[str, Any],
+) -> None:
+    _validate_extension_evidence(requested, evidence_record)
+    details = evidence_record["evidence"]
+    expected = _compile_bundled_runtime_profile_unchecked(request)
+    if expected is None or details.get("compiled_runtime_profile") != expected:
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} compiled runtime profile does not match the request"
+        )
+    observations = details["verification"]["observations"]
+    if len(observations) != 1:
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} requires exactly one runtime observation"
+        )
+    observation = observations[0]
+    value = observation.get("value")
+    if not isinstance(value, dict):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} runtime observation must be an object"
+        )
+    gps_ids = set(expected.get("gps_dropout", {}).get("effect_ids", []))
+    if requested["effect_id"] in gps_ids:
+        if (
+            observation.get("kind") != "readback"
+            or observation.get("source")
+            != "mavsdk.param+telemetry/gps_info"
+            or value.get("schedule_algorithm") != "sha256-ranked-fixed-duty-v1"
+            or value.get("reset_verified") is not True
+        ):
+            raise ScenarioEffectContractError(
+                f"effect {requested['effect_id']} requires verified GPS availability/reset evidence"
+            )
+        schedule = value.get("schedule")
+        tick_count = value.get("tick_count")
+        transitions = value.get("transitions")
+        control = value.get("control_parameter")
+        control_before = control.get("before") if isinstance(control, dict) else None
+        control_restore = (
+            control.get("restore") if isinstance(control, dict) else None
+        )
+        if (
+            not isinstance(schedule, list)
+            or not schedule
+            or any(not isinstance(item, bool) for item in schedule)
+            or not isinstance(tick_count, int)
+            or isinstance(tick_count, bool)
+            or tick_count != len(schedule)
+            or not isinstance(transitions, list)
+            or not transitions
+            or any(
+                not isinstance(item, dict)
+                or item.get("physical_effect_verified") is not True
+                or not isinstance(item.get("verification"), dict)
+                or item["verification"].get("physical_effect_verified") is not True
+                for item in transitions
+            )
+            or not any(item.get("final_reset") is True for item in transitions)
+            or not isinstance(control, dict)
+            or control.get("parameter_name") != "SIM_GPS_USED"
+            or control.get("dropout_value") != 0
+            or not isinstance(control_before, int)
+            or isinstance(control_before, bool)
+            or control_before < 4
+            or control.get("recovery_value") != control_before
+            or not isinstance(control_restore, dict)
+            or control_restore.get("physical_effect_verified") is not True
+            or control.get("restore_verified") is not True
+        ):
+            raise ScenarioEffectContractError(
+                f"effect {requested['effect_id']} GPS schedule/telemetry evidence is invalid"
+            )
+        for transition in transitions:
+            verification = transition["verification"]
+            parameter = verification.get("parameter")
+            samples = verification.get("telemetry_samples")
+            failure_type = transition.get("failure_type")
+            expected_satellites = 0 if failure_type == "off" else control_before
+            if (
+                failure_type not in {"off", "ok"}
+                or verification.get("parameter_name") != "SIM_GPS_USED"
+                or not isinstance(parameter, dict)
+                or parameter.get("requested") != expected_satellites
+                or parameter.get("applied") != expected_satellites
+                or not isinstance(samples, list)
+                or not samples
+                or not all(isinstance(sample, dict) for sample in samples)
+            ):
+                raise ScenarioEffectContractError(
+                    f"effect {requested['effect_id']} GPS transition evidence is invalid"
+                )
+            final_sample = samples[-1]
+            num_satellites = final_sample.get("num_satellites")
+            fix_type = final_sample.get("fix_type")
+            if (
+                not isinstance(num_satellites, int)
+                or isinstance(num_satellites, bool)
+                or not isinstance(fix_type, int)
+                or isinstance(fix_type, bool)
+                or (
+                    failure_type == "off"
+                    and not (num_satellites < 4 and fix_type <= 1)
+                )
+                or (
+                    failure_type == "ok"
+                    and not (num_satellites >= 4 and fix_type >= 2)
+                )
+            ):
+                raise ScenarioEffectContractError(
+                    f"effect {requested['effect_id']} GPS telemetry state is invalid"
+                )
+        gps_profile = expected["gps_dropout"]
+        expected_schedule = compile_bundled_gps_dropout_schedule(
+            requested_rate=float(gps_profile["requested_rate"]),
+            tick_count=tick_count,
+            execution_identity_sha256=expected["execution_identity_sha256"],
+        )
+        off_tick_count = sum(schedule)
+        realized_rate = value.get("realized_rate")
+        if (
+            schedule != expected_schedule
+            or value.get("off_tick_count") != off_tick_count
+            or not isinstance(realized_rate, (int, float))
+            or isinstance(realized_rate, bool)
+            or not math.isclose(
+                float(realized_rate),
+                off_tick_count / tick_count,
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+        ):
+            raise ScenarioEffectContractError(
+                f"effect {requested['effect_id']} GPS duty schedule is not request-bound"
+            )
+        return
+
+    battery_ids = set(expected.get("battery", {}).get("effect_ids", []))
+    if requested["effect_id"] not in battery_ids:
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} is absent from its runtime profile"
+        )
+    if (
+        observation.get("kind") != "readback"
+        or observation.get("source") != "mavsdk.param+telemetry/battery"
+    ):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} requires battery parameter/telemetry readback"
+        )
+    battery_profile = expected["battery"]
+    start_sample = value.get("track_start_sample")
+    end_sample = value.get("track_end_sample")
+    tolerance = value.get("track_start_tolerance_percent")
+    if (
+        not isinstance(start_sample, dict)
+        or not isinstance(end_sample, dict)
+        or not isinstance(tolerance, (int, float))
+        or isinstance(tolerance, bool)
+    ):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} battery samples are incomplete"
+        )
+    try:
+        start_percent = float(start_sample["remaining_percent"])
+        end_percent = float(end_sample["remaining_percent"])
+        target_percent = float(battery_profile["target_track_start_percent"])
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} battery percentages are invalid"
+        ) from exc
+    if (
+        not all(math.isfinite(item) for item in (start_percent, end_percent, target_percent))
+        or abs(start_percent - target_percent) > float(tolerance)
+    ):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} did not verify its track-start battery state"
+        )
+    track_parameters = value.get("track_parameters")
+    expected_track_values = (
+        {
+            "SIM_BAT_MIN_PCT": 0.0,
+            "SIM_BAT_DRAIN": float(battery_profile["sag_drain_seconds"]),
+        }
+        if battery_profile["voltage_sag"]
+        else {
+            "SIM_BAT_MIN_PCT": target_percent,
+            "SIM_BAT_DRAIN": float(battery_profile["no_sag_hold_drain_seconds"]),
+        }
+    )
+    if not isinstance(track_parameters, dict) or set(track_parameters) != set(
+        expected_track_values
+    ):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} battery parameter readback is incomplete"
+        )
+    for name, expected_value in expected_track_values.items():
+        record = track_parameters[name]
+        if (
+            not isinstance(record, dict)
+            or not math.isclose(
+                float(record.get("requested", math.nan)),
+                expected_value,
+                rel_tol=1e-6,
+                abs_tol=1e-6,
+            )
+            or not math.isclose(
+                float(record.get("applied", math.nan)),
+                expected_value,
+                rel_tol=1e-6,
+                abs_tol=1e-6,
+            )
+        ):
+            raise ScenarioEffectContractError(
+                f"effect {requested['effect_id']} battery parameter {name} did not read back"
+            )
+    if battery_profile["voltage_sag"] and (
+        value.get("observed_nonincrease") is not True or end_percent > start_percent + 0.5
+    ):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} battery telemetry did not verify voltage sag"
+        )
+
+
 def validate_scenario_effect_evidence(request: dict[str, Any], payload: object) -> dict[str, Any]:
     validate_scenario_effect_request(request)
     if not isinstance(payload, dict):
@@ -1396,6 +1785,12 @@ def validate_scenario_effect_evidence(request: dict[str, Any], payload: object) 
                     requested_by_id[effect_id],
                     effect,
                 )
+            elif effect_id in BUNDLED_RUNTIME_EFFECT_IDS:
+                _validate_bundled_runtime_evidence(
+                    request,
+                    requested_by_id[effect_id],
+                    effect,
+                )
             else:
                 _validate_extension_evidence(requested_by_id[effect_id], effect)
         else:
@@ -1450,6 +1845,8 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
         "schema_version": REQUEST_SCHEMA_VERSION,
         "physically_applied": [
             "actuator_first_order_delay",
+            "battery_initial_state_and_voltage_sag",
+            "deterministic_seeded_gps_dropout",
             "gust_and_turbulence",
             "obstacles",
             "payload_mass_and_inertia",
@@ -1497,15 +1894,32 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
                 "read-back for every affected sensor, inertial, motor, and wind field"
             ),
         },
+        "flight_timed_runtime_profiles": {
+            "status": "available",
+            "effect_ids": sorted(BUNDLED_RUNTIME_EFFECT_IDS),
+            "mechanisms": [
+                "mavsdk_sim_gps_used_plus_gps_info_telemetry",
+                "px4_battery_simulation",
+            ],
+            "requires": [
+                "MAVSDK Param and Telemetry plugins",
+                "PX4 gz_bridge SIM_GPS_USED support",
+                "PX4 battery simulator",
+                "offboard executor",
+            ],
+            "evidence": (
+                "request-bound deterministic schedule, exact SIM_GPS_USED transition/restore "
+                "readback, physical GPS fix/satellite telemetry, and flight-timed battery telemetry"
+            ),
+        },
         "requires_runtime_extension": [
-            "probabilistic GPS dropout",
-            "battery initial state and voltage sag",
             "hard actuator failure beyond the bounded first-order delay profile",
         ],
     }
 
 
 __all__ = [
+    "BUNDLED_RUNTIME_EFFECT_IDS",
     "BUNDLED_STEADY_WIND_EFFECT_IDS",
     "BUNDLED_SDF_PROFILE_EFFECT_IDS",
     "DEFAULT_SCENARIO_STEADY_WIND_MPS",
@@ -1519,10 +1933,13 @@ __all__ = [
     "build_scenario_effect_request",
     "bundled_launcher_capabilities",
     "compile_bundled_steady_wind",
+    "compile_bundled_gps_dropout_schedule",
     "compile_bundled_sdf_profile",
+    "compile_bundled_runtime_profile",
     "load_scenario_effect_evidence",
     "load_scenario_effect_request",
     "scenario_effect_value_sha256",
+    "RUNTIME_EVIDENCE_ARTIFACT_NAME",
     "validate_scenario_effect_evidence",
     "validate_scenario_effect_request",
     "write_json_atomic",

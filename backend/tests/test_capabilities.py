@@ -83,6 +83,8 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert real_cli["instance_allocation"] == "operator_managed"
     assert real_cli["bundled_runner_advanced_effects"] == [
         "actuator_first_order_delay",
+        "battery_initial_state_and_voltage_sag",
+        "deterministic_seeded_gps_dropout",
         "gust_and_turbulence",
         "obstacles",
         "payload_mass_and_inertia",
@@ -99,7 +101,13 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
         "sdformat_model_inertial",
         "sdformat_actuator_dynamics",
     ]
-    assert "probabilistic GPS dropout" in scenario_effects["requires_runtime_extension"]
+    assert scenario_effects["flight_timed_runtime_profiles"]["mechanisms"] == [
+        "mavsdk_sim_gps_used_plus_gps_info_telemetry",
+        "px4_battery_simulation",
+    ]
+    assert scenario_effects["requires_runtime_extension"] == [
+        "hard actuator failure beyond the bounded first-order delay profile"
+    ]
     assert real_cli["unverified_effect_passthrough_opt_in"] is True
     assert data["optimizers"]["items"]["gpt"]["ready"] is False
     assert data["optimizers"]["items"]["gpt"]["prompt_schema_version"] == "2.3"

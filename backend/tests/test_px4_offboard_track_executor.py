@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from app.simulator import scenario_effects
+
 EXECUTOR = (
     Path(__file__).resolve().parents[2]
     / "scripts"
@@ -137,6 +139,178 @@ def test_coordinate_conversion_maps_positive_up_to_ned_down():
     assert sp.down_m == -3.5
 
 
+def test_fixed_duty_dropout_schedule_is_seeded_and_rate_bounded():
+    first = executor.compile_fixed_duty_schedule(
+        requested_rate=0.3,
+        tick_count=10,
+        execution_identity_sha256="a" * 64,
+    )
+    repeated = executor.compile_fixed_duty_schedule(
+        requested_rate=0.3,
+        tick_count=10,
+        execution_identity_sha256="a" * 64,
+    )
+    other_seed = executor.compile_fixed_duty_schedule(
+        requested_rate=0.3,
+        tick_count=10,
+        execution_identity_sha256="b" * 64,
+    )
+
+    assert first == repeated
+    assert first != other_seed
+    assert sum(first) == 3
+
+
+def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
+    tmp_path: Path,
+) -> None:
+    request = scenario_effects.build_scenario_effect_request(
+        execution_identity={
+            "trial_id": "trial-runtime",
+            "job_id": "job-runtime",
+            "candidate_id": "candidate-runtime",
+            "seed": 17,
+            "attempt_count": 1,
+        },
+        scenario_type="nominal",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={
+            "sensor_degradation": {"dropout_rate": 0.5},
+            "battery": {"initial_percent": 60.0, "voltage_sag": True},
+        },
+    )
+    profile = scenario_effects.compile_bundled_runtime_profile(request)
+    assert profile is not None
+    client = executor.FakeOffboardClient()
+    client.battery_samples = [
+        {"remaining_percent": 60.0, "voltage_v": 15.2},
+        {"remaining_percent": 58.0, "voltage_v": 15.0},
+    ]
+    evidence_path = tmp_path / scenario_effects.RUNTIME_EVIDENCE_ARTIFACT_NAME
+
+    asyncio.run(
+        executor.run_executor(
+            client,
+            [
+                executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+                executor.Setpoint(1.0, 0.0, -3.0, 0.0),
+                executor.Setpoint(2.0, 0.0, -3.0, 0.0),
+            ],
+            connection="udp://:14540",
+            takeoff_timeout_seconds=1.0,
+            track_timeout_seconds=5.0,
+            rate_hz=100.0,
+            land_after=True,
+            log_path=tmp_path / "offboard.log",
+            track_start_index=1,
+            track_end_index=2,
+            timing_path=tmp_path / "offboard_timing.json",
+            scenario_engine=scenario_effects,
+            scenario_request=request,
+            runtime_profile=profile,
+            runtime_evidence_path=evidence_path,
+        )
+    )
+
+    artifact = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert artifact["status"] == "complete"
+    assert artifact["request_sha256"] == request["request_sha256"]
+    assert [item["effect_id"] for item in artifact["records"]] == [
+        "battery.initial_percent",
+        "battery.voltage_sag",
+        "sensor_degradation.dropout_rate",
+    ]
+    gps_value = artifact["records"][2]["evidence"]["verification"]["observations"][0][
+        "value"
+    ]
+    assert gps_value["reset_verified"] is True
+    assert gps_value["off_tick_count"] == 1
+    assert gps_value["control_parameter"]["parameter_name"] == "SIM_GPS_USED"
+    assert gps_value["control_parameter"]["before"] == 10
+    assert gps_value["control_parameter"]["dropout_value"] == 0
+    assert gps_value["control_parameter"]["recovery_value"] == 10
+    assert gps_value["control_parameter"]["restore_verified"] is True
+    assert gps_value["control_parameter"]["restore"]["telemetry_samples"][-1] == {
+        "num_satellites": 10,
+        "fix_type": 3,
+        "fix_type_name": "FIX_3D",
+    }
+    assert client.int_params["SIM_GPS_USED"] == 10
+    battery_value = artifact["records"][0]["evidence"]["verification"]["observations"][0][
+        "value"
+    ]
+    assert battery_value["track_start_sample"]["remaining_percent"] == 60.0
+    assert battery_value["track_end_sample"]["remaining_percent"] == 58.0
+    final_payload = scenario_effects.build_scenario_effect_evidence(
+        request,
+        launcher="test",
+        world="default",
+        effects=artifact["records"],
+    )
+    assert scenario_effects.validate_scenario_effect_evidence(
+        request,
+        final_payload,
+    )["verification_status"] == "verified_applied"
+    tampered_reset = json.loads(json.dumps(final_payload))
+    gps_record = next(
+        item
+        for item in tampered_reset["effects"]
+        if item["effect_id"] == "sensor_degradation.dropout_rate"
+    )
+    gps_record["evidence"]["verification"]["observations"][0]["value"][
+        "reset_verified"
+    ] = False
+    gps_observation = gps_record["evidence"]["verification"]["observations"][0]
+    gps_observation["sha256"] = scenario_effects.scenario_effect_value_sha256(
+        gps_observation["value"]
+    )
+    with pytest.raises(
+        scenario_effects.ScenarioEffectContractError,
+        match="verified GPS availability/reset",
+    ):
+        scenario_effects.validate_scenario_effect_evidence(request, tampered_reset)
+
+    tampered_control = json.loads(json.dumps(final_payload))
+    control_record = next(
+        item
+        for item in tampered_control["effects"]
+        if item["effect_id"] == "sensor_degradation.dropout_rate"
+    )
+    control_observation = control_record["evidence"]["verification"]["observations"][0]
+    control_observation["value"]["control_parameter"]["restore_verified"] = False
+    control_observation["sha256"] = scenario_effects.scenario_effect_value_sha256(
+        control_observation["value"]
+    )
+    with pytest.raises(
+        scenario_effects.ScenarioEffectContractError,
+        match="GPS schedule/telemetry evidence",
+    ):
+        scenario_effects.validate_scenario_effect_evidence(request, tampered_control)
+
+    tampered_battery = json.loads(json.dumps(final_payload))
+    battery_record = next(
+        item
+        for item in tampered_battery["effects"]
+        if item["effect_id"] == "battery.initial_percent"
+    )
+    battery_record["evidence"]["verification"]["observations"][0]["value"][
+        "track_start_sample"
+    ]["remaining_percent"] = 90.0
+    battery_observation = battery_record["evidence"]["verification"]["observations"][0]
+    battery_observation["sha256"] = scenario_effects.scenario_effect_value_sha256(
+        battery_observation["value"]
+    )
+    with pytest.raises(
+        scenario_effects.ScenarioEffectContractError,
+        match="track-start battery state",
+    ):
+        scenario_effects.validate_scenario_effect_evidence(request, tampered_battery)
+
+
 def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
     client = executor.FakeOffboardClient()
     schedule = [
@@ -245,6 +419,67 @@ def test_mavsdk_readiness_timeout_applies_when_stream_emits_nothing():
     client._system = SilentSystem()
     with pytest.raises(TimeoutError, match="PX4 readiness timeout"):
         asyncio.run(client.wait_until_ready(0.01))
+
+
+def test_mavsdk_battery_remaining_percent_keeps_documented_zero_to_100_units():
+    class TelemetryStub:
+        async def battery(self):
+            yield type("Battery", (), {"remaining_percent": 91.0, "voltage_v": 15.7})()
+
+    class SystemStub:
+        telemetry = TelemetryStub()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = SystemStub()
+
+    sample = asyncio.run(client.sample_battery(1.0))
+
+    assert sample == {"remaining_percent": 91.0, "voltage_v": 15.7}
+
+
+def test_mavsdk_integer_parameter_bridge_uses_exact_int_api():
+    class ParamStub:
+        def __init__(self) -> None:
+            self.value = 10
+
+        async def get_param_int(self, name: str) -> int:
+            assert name == "SIM_GPS_USED"
+            return self.value
+
+        async def set_param_int(self, name: str, value: int) -> None:
+            assert name == "SIM_GPS_USED"
+            self.value = value
+
+    param = ParamStub()
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = type("SystemStub", (), {"param": param})()
+
+    assert asyncio.run(client.get_param_int("SIM_GPS_USED")) == 10
+    asyncio.run(client.set_param_int("SIM_GPS_USED", 0))
+    assert asyncio.run(client.get_param_int("SIM_GPS_USED")) == 0
+
+
+def test_mavsdk_gps_info_preserves_fix_type_and_satellite_count():
+    class FixTypeStub:
+        value = 3
+        name = "FIX_3D"
+
+    class TelemetryStub:
+        async def gps_info(self):
+            yield type(
+                "GpsInfo",
+                (),
+                {"num_satellites": 10, "fix_type": FixTypeStub()},
+            )()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = type("SystemStub", (), {"telemetry": TelemetryStub()})()
+
+    assert asyncio.run(client.sample_gps_info(1.0)) == {
+        "num_satellites": 10,
+        "fix_type": 3,
+        "fix_type_name": "FIX_3D",
+    }
 
 
 def test_mavsdk_actions_fail_cleanly_before_connect():

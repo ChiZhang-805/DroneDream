@@ -11,6 +11,7 @@ from app.simulator.scenario_effects import (
     ScenarioEffectContractError,
     build_scenario_effect_evidence,
     build_scenario_effect_request,
+    compile_bundled_runtime_profile,
     compile_bundled_sdf_profile,
     compile_bundled_steady_wind,
     scenario_effect_value_sha256,
@@ -176,10 +177,10 @@ def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
         "period_s": 8.0,
     }
     assert "WindEffects" in effects["wind_gusts"]["capability"]["reason"]
-    assert (
-        "not a probabilistic dropout rate"
-        in effects["sensor_degradation.dropout_rate"]["capability"]["reason"]
-    )
+    assert effects["sensor_degradation.dropout_rate"]["capability"]["status"] == "available"
+    assert "trial-seed-bound" in effects["sensor_degradation.dropout_rate"]["capability"]["reason"]
+    assert effects["battery.initial_percent"]["capability"]["status"] == "available"
+    assert "battery telemetry" in effects["battery.initial_percent"]["capability"]["reason"]
     assert "inertial" in effects["battery.mass_payload_kg"]["capability"]["reason"]
     assert all(
         item["launcher_input"]["request_path_env"] == "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH"
@@ -230,6 +231,58 @@ def test_compile_bundled_sdf_profile_binds_explicit_physics() -> None:
         "iyy": pytest.approx(0.005),
         "izz": pytest.approx(0.008),
     }
+
+
+def test_compile_bundled_runtime_profile_binds_dropout_and_battery() -> None:
+    request = _request(
+        advanced={
+            "sensor_degradation": {"dropout_rate": 0.2},
+            "battery": {"initial_percent": 60.0, "voltage_sag": True},
+        }
+    )
+
+    profile = compile_bundled_runtime_profile(request)
+
+    assert profile is not None
+    assert profile["requested_effect_ids"] == [
+        "battery.initial_percent",
+        "battery.voltage_sag",
+        "sensor_degradation.dropout_rate",
+    ]
+    assert len(profile["execution_identity_sha256"]) == 64
+    assert profile["gps_dropout"] == {
+        "requested_rate": 0.2,
+        "tick_period_s": 1.0,
+        "schedule_algorithm": "sha256-ranked-fixed-duty-v1",
+        "parameter_name": "SIM_GPS_USED",
+        "dropout_value": 0,
+        "availability_source": "mavsdk.telemetry.gps_info",
+        "effect_ids": ["sensor_degradation.dropout_rate"],
+    }
+    assert profile["battery"] == {
+        "target_track_start_percent": 60.0,
+        "voltage_sag": True,
+        "sag_drain_seconds": 300.0,
+        "no_sag_hold_drain_seconds": 86400.0,
+        "parameter_names": ["SIM_BAT_DRAIN", "SIM_BAT_MIN_PCT"],
+        "effect_ids": ["battery.initial_percent", "battery.voltage_sag"],
+    }
+
+
+def test_runtime_profile_rejects_conflicting_dropout_sources() -> None:
+    request = build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type="gps_dropout",
+        scenario_config={"dropout_rate": 0.4},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={"sensor_degradation": {"dropout_rate": 0.2}},
+    )
+
+    with pytest.raises(ScenarioEffectContractError, match="conflicting dropout rates"):
+        compile_bundled_runtime_profile(request)
 
 
 @pytest.mark.parametrize(
