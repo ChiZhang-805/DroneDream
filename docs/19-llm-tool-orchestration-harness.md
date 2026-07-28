@@ -8667,7 +8667,7 @@ Current frozen backend validation:
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-1147 passed in 788.78s
+1164 passed in 996.68s
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 
@@ -8685,14 +8685,19 @@ current prompt_suite_sha256:
 ```
 
 The content-addressed receipt at
-`artifacts/test-runs/aurora-software-742b124-receipt.json` binds the command,
+`artifacts/test-runs/aurora-software-65a33bb-receipt.json` binds the command,
 Windows/Python/pytest environment, start and finish times, result, full log
 SHA-256, and software source commit
-`742b12467efc9b37b7e4a2fa3ac73b7578f21385`. The full 1,147-test suite ran
-from that clean commit and is marked `exact_final_commit_run=true`; 81 directly
-affected checks also passed in 151.96 seconds as a supplement, not a bridge
+`65a33bbd70f999962afd1bea1e374dcd5e9de460`. The full 1,164-test suite ran
+from that clean commit and is marked `exact_final_commit_run=true`; 27 directly
+affected checks also passed in 4.58 seconds as a supplement, not a bridge
 from a different source state. The raw full-suite log SHA-256 is
-`bf7be380922ff94db7ace78912b1aed376fce1c606317b191559e959bc79e869`.
+`4802a482e51173f6d9b03908f673d897e6a718d730006a7882de0b97ce4cf35e`.
+The earlier clean `533500f...` attempt is retained separately with 1,161
+passes and two load-sensitive failures. Its raw log SHA-256 is
+`59b1f8994177259103af6fb5fc3371374c5e3c2a19e1667d60f22746bf477f5d`;
+it is diagnostic failure evidence, not a passing receipt. The final clean run
+followed the Windows process-tree cleanup and Harness heartbeat timing repair.
 The Windows Rust desktop gate was not run on this host because Visual Studio
 C++ Build Tools and `link.exe` were unavailable, so the backend receipt does
 not satisfy that separate release gate.

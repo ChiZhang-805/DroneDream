@@ -1,0 +1,58 @@
+{
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "pytest": "9.1.1",
+    "python": "3.13.0"
+  },
+  "focused_checks": [
+    {
+      "command": "Z:\\DroneDream\\backend\\.venv\\Scripts\\python.exe -m pytest -q tests\\test_harness_reflection_trigger_ablation.py tests\\test_harness_reflection_outcome_stress.py::test_outcome_stress_reports_mixed_quality_without_general_benefit_claim tests\\test_harness_reflection_outcome_stress.py::test_outcome_stress_activates_reflection_intervention_in_every_block tests\\test_harness_reflection_outcome_stress.py::test_outcome_stress_files_are_canonical tests\\test_harness_reflection_outcome_stress.py::test_outcome_stress_rejects_tamper tests\\test_technical_report_evidence.py tests\\test_test_run_receipt.py tests\\test_harness_outcome_campaign.py::test_campaign_driver_rejects_invalid_explicit_step_limit tests\\test_local_px4_launch_wrapper.py::test_wrapper_offboard_executor_invoked_while_px4_running tests\\test_local_px4_launch_wrapper.py::test_wrapper_windows_cleanup_timeout_is_best_effort tests\\test_phase8_iterative_loop.py::test_llm_harness_heartbeat_prevents_live_claim_takeover",
+      "duration_seconds": 4.58,
+      "finished_at": "2026-07-28T12:57:51.296Z",
+      "log": {
+        "path": "artifacts/test-runs/aurora-software-65a33bb-focused.log",
+        "sha256": "8566ad38c42d3c86ad1177703bd1fec79da2812804bb72d6bf1192bd9cb3bca9",
+        "size_bytes": 204
+      },
+      "result": {
+        "failed": 0,
+        "passed": 27,
+        "status": "passed"
+      },
+      "started_at": "2026-07-28T12:57:45.754Z",
+      "working_directory": "backend"
+    }
+  ],
+  "full_suite": {
+    "command": "Z:\\DroneDream\\backend\\.venv\\Scripts\\python.exe -m pytest -q",
+    "duration_seconds": 996.68,
+    "finished_at": "2026-07-28T12:57:20.120Z",
+    "log": {
+      "path": "artifacts/test-runs/aurora-software-65a33bb-pytest.log",
+      "sha256": "4802a482e51173f6d9b03908f673d897e6a718d730006a7882de0b97ce4cf35e",
+      "size_bytes": 2824
+    },
+    "result": {
+      "failed": 0,
+      "passed": 1164,
+      "status": "passed"
+    },
+    "started_at": "2026-07-28T12:40:35.038Z",
+    "tested_state": {
+      "base_commit": "65a33bbd70f999962afd1bea1e374dcd5e9de460",
+      "exact_final_commit_run": true,
+      "kind": "commit"
+    },
+    "working_directory": "backend"
+  },
+  "generated_at": "2026-07-28T12:58:32Z",
+  "receipt_sha256": "8053861b31b5d78f67eef78b04f0c51cec7fff4a609ac95a480ad5c4c8b319cf",
+  "schema_version": "dronedream.test-run-receipt.v2",
+  "source_commit": "65a33bbd70f999962afd1bea1e374dcd5e9de460",
+  "validation_bridge": {
+    "focused_rerun_performed": true,
+    "focused_rerun_required": false,
+    "full_suite_rerun_performed": true,
+    "reason": "Full suite ran from clean source_commit 65a33bbd70f999962afd1bea1e374dcd5e9de460 after preserving and fixing the initial 1161-pass/2-failure run; the focused run supplements, and does not bridge from, the exact full run."
+  }
+}

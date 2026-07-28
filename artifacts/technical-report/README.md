@@ -7,19 +7,33 @@ PX4/Gazebo or flight-performance claim.
 `evidence.json`, `evidence.manifest.json`, and `evidence.sha256` are the
 historical v6 freeze. They remain immutable.
 
+`evidence-v7.json`, `evidence-v7.manifest.json`, `evidence-v7.sha256`, and
+`csv-v7/` are the historical Prompt 1.6 / 1,147-test freeze. They also remain
+immutable.
+
 The current non-overwriting successor is:
 
-- `evidence-v7.json`: file SHA-256
-  `93232a2f0027503c24cfe4a8a1768d518f436cd35a3db72e788fc42f5eb45c55`;
-- `evidence-v7.manifest.json`: file SHA-256
-  `0702abb2e5d1aedb999c4158feaab78b25f6dc2ab7dcc07b5bcefad2b30324d2`;
-- `evidence-v7.sha256`: independent file-hash list;
-- `csv-v7/`: chart-ready projections generated from the same verified bundle.
+- `evidence-v8.json`: file SHA-256
+  `d1b8c1931b64ca5df971e24e34c03f4f202585b852612b11458abeb57a70dd07`;
+- `evidence-v8.manifest.json`: file SHA-256
+  `6bd08f15b034dccf3922b4ccd95a5e1368dde79a49719dede1e628a002a3dafc`;
+- `evidence-v8.sha256`: independent file-hash list;
+- `csv-v8/`: chart-ready projections generated from the same verified bundle.
 
-The v7 bundle has canonical content SHA-256
-`a0432d092d5e751a6f414ba4d0cb6b91cb7e9117b6fead109ef2a1c805ad8522`,
+The v8 bundle has canonical content SHA-256
+`2dad5492c8e8bd1d91a06db8b6a87c978e45cc139e83e53cf73634324ee9b3d4`,
 binds software subject commit
-`742b12467efc9b37b7e4a2fa3ac73b7578f21385`, and consumes only
-`artifacts/test-runs/aurora-software-742b124-receipt.json` for backend test
-claims. Report code may consume these bytes and hashes but must not edit the
-software evidence.
+`65a33bbd70f999962afd1bea1e374dcd5e9de460`, and consumes only
+`artifacts/test-runs/aurora-software-65a33bb-receipt.json` for passing backend
+test claims. That receipt has canonical SHA-256
+`8053861b31b5d78f67eef78b04f0c51cec7fff4a609ac95a480ad5c4c8b319cf`
+and binds the exact clean-commit run of 1,164 passing tests plus a 27-test
+focused supplement.
+
+The initial clean `533500f...` full-suite failure is retained separately as
+`artifacts/test-runs/aurora-software-533500f-pytest-failed.log`, file SHA-256
+`59b1f8994177259103af6fb5fc3371374c5e3c2a19e1667d60f22746bf477f5d`.
+It records 1,161 passes and two load-sensitive failures before the Windows
+process cleanup and heartbeat timing repair; it is diagnostic evidence and is
+not a passing receipt. Report code may consume the v8 bytes and hashes but must
+not edit the software evidence.

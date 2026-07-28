@@ -1,0 +1,8 @@
+category,case_count,passed_count,pass_rate
+baseline,1,1,1.0
+combined,1,1,1.0
+evidence_depth,5,5,1.0
+problem_dimension,2,2,1.0
+problem_shape,2,2,1.0
+restart_state,3,3,1.0
+scenario_replication,2,2,1.0

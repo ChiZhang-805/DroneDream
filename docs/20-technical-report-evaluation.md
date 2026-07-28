@@ -66,17 +66,19 @@ the manifest and `evidence.sha256` bind the generated files without changing
 the software source commit.
 
 The current software handoff is the non-overwriting
-`dronedream.technical-report-evidence.v7` successor at
-`artifacts/technical-report/evidence-v7.json`. It binds
-`source_commit=742b12467efc9b37b7e4a2fa3ac73b7578f21385`,
-`generated_at=2026-07-28T07:53:56Z`, the current Evidence 2.7 / Prompt 1.6
-24/24 provider freeze, both v2 Harness ablations, and the exact-commit
-1,147-test receipt. Its canonical bundle SHA-256 is
-`a0432d092d5e751a6f414ba4d0cb6b91cb7e9117b6fead109ef2a1c805ad8522`;
+`dronedream.technical-report-evidence.v8` successor at
+`artifacts/technical-report/evidence-v8.json`. It binds
+`source_commit=65a33bbd70f999962afd1bea1e374dcd5e9de460`,
+`generated_at=2026-07-28T12:58:32Z`, the current Evidence 2.7 / Prompt 1.6
+24/24 provider freeze, both v2 Harness ablations, the reflection trigger and
+long-horizon stress sources, and the exact-commit 1,164-test receipt. Its
+canonical bundle SHA-256 is
+`2dad5492c8e8bd1d91a06db8b6a87c978e45cc139e83e53cf73634324ee9b3d4`;
 the JSON file SHA-256 is
-`93232a2f0027503c24cfe4a8a1768d518f436cd35a3db72e788fc42f5eb45c55`,
+`d1b8c1931b64ca5df971e24e34c03f4f202585b852612b11458abeb57a70dd07`,
 and the manifest file SHA-256 is
-`0702abb2e5d1aedb999c4158feaab78b25f6dc2ab7dcc07b5bcefad2b30324d2`.
+`6bd08f15b034dccf3922b4ccd95a5e1368dde79a49719dede1e628a002a3dafc`.
+The v6 and v7 bundles remain immutable historical freezes.
 
 `backend/scripts/evaluate_harness_ablations.py` independently reproduces the
 source-contract ablation JSON, CSV, and file-hash manifest. Its comparator is
@@ -335,15 +337,17 @@ measurements remain unfilled until their locked experiments run.
 
 ## Software validation and remaining gate
 
-The current v7 bundle consumes only
-`artifacts/test-runs/aurora-software-742b124-receipt.json`. It records
-`1147 passed in 788.78s`, command and environment metadata, start and finish
+The current v8 bundle consumes only
+`artifacts/test-runs/aurora-software-65a33bb-receipt.json`. It records
+`1164 passed in 996.68s`, command and environment metadata, start and finish
 times, raw log SHA-256
-`bf7be380922ff94db7ace78912b1aed376fce1c606317b191559e959bc79e869`,
-and source commit `742b12467efc9b37b7e4a2fa3ac73b7578f21385`. The suite ran on
+`4802a482e51173f6d9b03908f673d897e6a718d730006a7882de0b97ce4cf35e`,
+and source commit `65a33bbd70f999962afd1bea1e374dcd5e9de460`. The suite ran on
 that clean commit and is marked `exact_final_commit_run=true`; a separate
-81-test focused supplement passed in 151.96 seconds. The historical v6 bundle
-continues to bind the earlier 1,139-test receipt and is not rewritten.
+27-test focused supplement passed in 4.58 seconds. The first clean
+`533500f...` attempt is preserved separately with 1,161 passes and two
+load-sensitive failures; it is not a passing receipt. The historical v6 and v7
+bundles remain immutable.
 The Windows Rust desktop gate was not run because Visual Studio C++ Build Tools
 and `link.exe` were unavailable on the validation host. No Rust
 release-readiness claim follows from the backend receipt.
@@ -375,19 +379,29 @@ backend\.venv\Scripts\python.exe `
   --check
 
 backend\.venv\Scripts\python.exe `
+  backend\scripts\evaluate_harness_reflection_triggers.py `
+  --check
+
+backend\.venv\Scripts\python.exe `
+  backend\scripts\evaluate_harness_reflection_outcome_stress.py `
+  --check
+
+backend\.venv\Scripts\python.exe `
   backend\scripts\export_technical_report_evidence.py `
-  --source-commit 742b12467efc9b37b7e4a2fa3ac73b7578f21385 `
-  --generated-at 2026-07-28T07:53:56Z `
-  --backend-test-receipt artifacts\test-runs\aurora-software-742b124-receipt.json `
-  --output artifacts\technical-report\evidence-v7.json `
-  --manifest-output artifacts\technical-report\evidence-v7.manifest.json `
-  --sha256-output artifacts\technical-report\evidence-v7.sha256 `
-  --csv-directory artifacts\technical-report\csv-v7
+  --source-commit 65a33bbd70f999962afd1bea1e374dcd5e9de460 `
+  --generated-at 2026-07-28T12:58:32Z `
+  --backend-test-receipt artifacts\test-runs\aurora-software-65a33bb-receipt.json `
+  --output artifacts\technical-report\evidence-v8.json `
+  --manifest-output artifacts\technical-report\evidence-v8.manifest.json `
+  --sha256-output artifacts\technical-report\evidence-v8.sha256 `
+  --csv-directory artifacts\technical-report\csv-v8
 ```
 
-The resulting v7 report JSON and companion manifest repeat the explicit source
+The resulting v8 report JSON and companion manifest repeat the explicit source
 commit and generation time, include SHA-256 hashes for every source artifact,
-and bind the normalized bundle digest. The versioned ablation JSON/CSV/hash
-under `backend/evaluation_artifacts/` are source-controlled software-contract
-evidence; generated files under `artifacts/technical-report/` are frozen report
-inputs and are not physical-performance evidence.
+and bind the normalized bundle digest. The source list includes each
+reflection trigger/stress JSON, CSV, manifest, and `.sha256` sidecar. The
+versioned ablation JSON/CSV/hash under `backend/evaluation_artifacts/` are
+source-controlled software-contract evidence; generated files under
+`artifacts/technical-report/` are frozen report inputs and are not
+physical-performance evidence.
