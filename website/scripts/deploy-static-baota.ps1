@@ -39,6 +39,7 @@ function Test-SiteIntegrityManifest {
     $siteRoot = [IO.Path]::GetFullPath($SiteDirectory).TrimEnd('\', '/')
     $sitePrefix = "$siteRoot$([IO.Path]::DirectorySeparatorChar)"
     $entryCount = 0
+    $manifestRelativePaths = @()
     foreach ($line in Get-Content -LiteralPath $ManifestPath -Encoding UTF8) {
         if ([string]::IsNullOrWhiteSpace($line)) {
             continue
@@ -71,6 +72,21 @@ function Test-SiteIntegrityManifest {
     }
     if ($entryCount -eq 0) {
         throw "SHA256SUMS does not contain any files."
+    }
+    $actualRelativePaths = @(
+        Get-ChildItem -LiteralPath $siteRoot -Recurse -Force -File |
+            ForEach-Object {
+                $_.FullName.Substring($siteRoot.Length + 1).Replace('\', '/')
+            } |
+            Where-Object { $_ -cne 'SHA256SUMS' }
+    )
+    foreach ($actualRelativePath in $actualRelativePaths) {
+        if ($manifestRelativePaths -cnotcontains $actualRelativePath) {
+            throw "Site artifact contains an unlisted file: $actualRelativePath"
+        }
+    }
+    if ($actualRelativePaths.Count -ne $manifestRelativePaths.Count) {
+        throw "SHA256SUMS does not cover the complete site artifact."
     }
 }
 
@@ -372,6 +388,10 @@ try {
         }
         $expectedHash = $Matches[1]
         $relativePath = $Matches[2]
+        if ($manifestRelativePaths -ccontains $relativePath) {
+            throw "SHA256SUMS contains a duplicate path: $relativePath"
+        }
+        $manifestRelativePaths += $relativePath
         if ($relativePath -notmatch (
                 '^(?:index|site|404)\.html$|' +
                 '^(?:assets|console/assets)/.+\.(?:js|css)$|' +

@@ -71,12 +71,17 @@ if ([string]$buildManifest.artifactKind -cne
 $artifactRoot = $destinationFullPath.TrimEnd('\', '/')
 $artifactPrefix = "$artifactRoot$([IO.Path]::DirectorySeparatorChar)"
 $entryCount = 0
+$manifestRelativePaths = @()
 foreach ($line in Get-Content -LiteralPath $integrityManifestPath -Encoding UTF8) {
     if ($line -notmatch '^([0-9a-f]{64})  (.+)$') {
         throw "SHA256SUMS contains an invalid entry."
     }
     $expectedHash = $Matches[1]
     $relativePath = $Matches[2]
+    if ($manifestRelativePaths -ccontains $relativePath) {
+        throw "SHA256SUMS contains a duplicate path: $relativePath"
+    }
+    $manifestRelativePaths += $relativePath
     if ([IO.Path]::IsPathRooted($relativePath) -or
         $relativePath.Contains('\') -or
         $relativePath -match '(^|/)\.\.(/|$)') {
@@ -101,6 +106,21 @@ foreach ($line in Get-Content -LiteralPath $integrityManifestPath -Encoding UTF8
 }
 if ($entryCount -eq 0) {
     throw "The downloaded artifact integrity manifest is empty."
+}
+$actualRelativePaths = @(
+    Get-ChildItem -LiteralPath $artifactRoot -Recurse -Force -File |
+        ForEach-Object {
+            $_.FullName.Substring($artifactRoot.Length + 1).Replace('\', '/')
+        } |
+        Where-Object { $_ -cne 'SHA256SUMS' }
+)
+foreach ($actualRelativePath in $actualRelativePaths) {
+    if ($manifestRelativePaths -cnotcontains $actualRelativePath) {
+        throw "Downloaded artifact contains an unlisted file: $actualRelativePath"
+    }
+}
+if ($actualRelativePaths.Count -ne $manifestRelativePaths.Count) {
+    throw "SHA256SUMS does not cover the complete downloaded artifact."
 }
 
 Write-Host "Downloaded and verified $artifactName from workflow run $RunId."

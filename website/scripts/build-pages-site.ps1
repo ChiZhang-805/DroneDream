@@ -289,7 +289,7 @@ $buildManifest = [ordered]@{
 
 $integrityManifestPath = Join-Path $outputDirectory "SHA256SUMS"
 Remove-Item -LiteralPath $integrityManifestPath -Force -ErrorAction SilentlyContinue
-$integrityLines = Get-ChildItem -LiteralPath $outputDirectory -Recurse -File |
+$integrityLines = Get-ChildItem -LiteralPath $outputDirectory -Recurse -Force -File |
     Sort-Object FullName |
     ForEach-Object {
         $relativePath = $_.FullName.Substring($outputDirectory.Length + 1).

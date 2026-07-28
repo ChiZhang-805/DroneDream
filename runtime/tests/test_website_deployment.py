@@ -120,6 +120,8 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("BatchMode=yes", wrapper)
         self.assertIn("Test-SiteIntegrityManifest", wrapper)
         self.assertIn("sha256sum --check -", wrapper)
+        self.assertIn("Site artifact contains an unlisted file", wrapper)
+        self.assertIn("-Recurse -Force -File", wrapper)
         self.assertIn("deploy-static-baota.sh", wrapper)
         self.assertIn("dronedream-staging.conf", wrapper)
         self.assertIn("dronedream-public.conf", wrapper)
@@ -190,6 +192,7 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("updaterSignature", builder)
         self.assertIn("updaterManifest", builder)
         self.assertIn("Publication file verification failed", builder)
+        self.assertIn("-Recurse -Force -File", builder)
         self.assertIn("dronedream-site-${{ github.sha }}", workflow)
         self.assertIn("include-hidden-files: true", workflow)
 
