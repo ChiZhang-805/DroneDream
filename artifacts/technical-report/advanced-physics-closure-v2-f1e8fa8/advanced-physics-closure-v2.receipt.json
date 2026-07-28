@@ -1,0 +1,24 @@
+{
+  "claim_boundary": "Exact-byte aggregation of real PX4 SITL and Gazebo evidence for every bundled DroneDream physical-effect category. It proves request-bound injection and readback within the retained x500/default-world protocols. It does not claim that every perturbed flight passed its performance policy, real-aircraft transfer, flight safety, or general controller superiority.",
+  "evidence_class": "REAL_PX4_GAZEBO_BUNDLED_EFFECT_CLOSURE",
+  "generated_at": "2026-07-28T23:34:22Z",
+  "manifest": {
+    "bytes": 7069,
+    "manifest_sha256": "7193e21ff826560e9e9f4d30453dc122d55fbee054397ff4a52f89deca15cb9f",
+    "path": "advanced-physics-closure-v2.manifest.json",
+    "sha256": "5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3"
+  },
+  "network_calls": 0,
+  "openai_api_key_used": false,
+  "real_credentials_used": false,
+  "receipt_sha256": "6f195b2908aa8673eab3bfee56c5e6cd1254b3535c3029e652f237d8a08edc10",
+  "result": {
+    "all_effects_performance_successful": false,
+    "real_aircraft_claim_permitted": false,
+    "remaining_runtime_extensions": 0,
+    "status": "complete_for_bundled_runtime_effect_contract",
+    "verified_categories": 9
+  },
+  "schema_version": "dronedream.advanced-physics-closure-receipt.v2",
+  "subject_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228"
+}
