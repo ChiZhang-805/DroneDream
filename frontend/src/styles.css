@@ -7621,6 +7621,7 @@ a {
   flex-direction: column;
   width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   gap: 0.75rem;
 }
@@ -7635,6 +7636,7 @@ a {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   gap: 0.75rem;
 }
@@ -7643,6 +7645,7 @@ a {
   display: flex;
   flex-direction: column;
   width: 100%;
+  min-width: 0;
   min-height: 0;
   margin: 0;
   padding: 0.95rem 1.15rem;
@@ -7654,6 +7657,7 @@ a {
 
 .history-body > .section-card:last-child .section-card-body {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -7699,6 +7703,7 @@ a {
 .history-results {
   flex: 1 1 auto;
   width: 100%;
+  min-width: 0;
   min-height: 0;
   background: #ffffff;
   overflow: auto;

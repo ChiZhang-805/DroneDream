@@ -14,6 +14,7 @@
     "site:build": "tsc -b && vite build --config vite.site.config.ts",
     "console:build": "vite build --config vite.console.config.ts",
     "site:preview": "vite preview --config vite.site.config.ts",
+    "test:history-layout": "node scripts/verify-history-layout.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
