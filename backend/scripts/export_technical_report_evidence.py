@@ -47,12 +47,20 @@ from app.orchestration.harness_evaluation import (  # noqa: E402
 from app.orchestration.harness_outcome_campaign import (  # noqa: E402
     load_harness_outcome_campaign,
 )
+from app.orchestration.harness_reflection_outcome_stress import (  # noqa: E402
+    verify_harness_reflection_outcome_stress_artifact,
+    verify_harness_reflection_outcome_stress_manifest,
+)
+from app.orchestration.harness_reflection_trigger_ablation import (  # noqa: E402
+    verify_harness_reflection_trigger_artifact,
+    verify_harness_reflection_trigger_manifest,
+)
 from app.orchestration.harness_routing_holdout import (  # noqa: E402
     load_locked_routing_policy_holdout,
     load_locked_routing_policy_result,
 )
 
-REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v7"
+REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v8"
 REPORT_EVIDENCE_MANIFEST_SCHEMA_VERSION = "dronedream.technical-report-evidence-manifest.v1"
 SUPPORTED_TEST_RUN_RECEIPT_SCHEMA_VERSIONS = {
     "dronedream.test-run-receipt.v1",
@@ -84,6 +92,30 @@ DEFAULT_HARNESS_COMPONENT_ABLATION_MANIFEST = (
 )
 DEFAULT_HARNESS_COMPONENT_ABLATION_CSV = (
     BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v2.csv"
+)
+DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-trigger-ablation-v1.json"
+)
+DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_MANIFEST = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-trigger-ablation-v1.manifest.json"
+)
+DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_CSV = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-trigger-ablation-v1.csv"
+)
+DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_SHA256 = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-trigger-ablation-v1.sha256"
+)
+DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.json"
+)
+DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_MANIFEST = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.manifest.json"
+)
+DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_CSV = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.csv"
+)
+DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_SHA256 = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.sha256"
 )
 DEFAULT_ROUTING_HOLDOUT_CORPUS = (
     BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_policy_holdout_v1.jsonl"
@@ -179,6 +211,20 @@ def _repository_source(path: Path) -> dict[str, str]:
         "path": relative,
         "sha256": _sha256_file(resolved),
     }
+
+
+def _verify_sha256_sidecar(
+    path: Path,
+    *,
+    bound_paths: tuple[Path, ...],
+) -> None:
+    expected = [f"{_sha256_file(bound_path)}  {bound_path.name}" for bound_path in bound_paths]
+    try:
+        actual = path.read_text(encoding="ascii").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError(f"invalid SHA-256 sidecar: {path}") from exc
+    if actual != expected:
+        raise ValueError(f"SHA-256 sidecar does not bind expected files: {path}")
 
 
 def _load_backend_test_receipt(
@@ -576,6 +622,26 @@ def build_report_evidence_bundle(
     harness_component_ablation_path: Path = DEFAULT_HARNESS_COMPONENT_ABLATION,
     harness_component_ablation_manifest_path: Path = (DEFAULT_HARNESS_COMPONENT_ABLATION_MANIFEST),
     harness_component_ablation_csv_path: Path = (DEFAULT_HARNESS_COMPONENT_ABLATION_CSV),
+    harness_reflection_trigger_ablation_path: Path = (DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION),
+    harness_reflection_trigger_ablation_manifest_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_MANIFEST
+    ),
+    harness_reflection_trigger_ablation_csv_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_CSV
+    ),
+    harness_reflection_trigger_ablation_sha256_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_SHA256
+    ),
+    harness_reflection_outcome_stress_path: Path = (DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS),
+    harness_reflection_outcome_stress_manifest_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_MANIFEST
+    ),
+    harness_reflection_outcome_stress_csv_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_CSV
+    ),
+    harness_reflection_outcome_stress_sha256_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_SHA256
+    ),
     backend_test_receipt_path: Path | None = None,
     routing_holdout_corpus_path: Path = DEFAULT_ROUTING_HOLDOUT_CORPUS,
     routing_holdout_manifest_path: Path = DEFAULT_ROUTING_HOLDOUT_MANIFEST,
@@ -733,6 +799,86 @@ def build_report_evidence_bundle(
         "comparison_rows": verified_component["comparison_rows"],
         "component_isolation_rows": verified_component["component_isolation_rows"],
     }
+    trigger_manifest_payload = _load_json_object(harness_reflection_trigger_ablation_manifest_path)
+    verified_trigger_manifest = verify_harness_reflection_trigger_manifest(trigger_manifest_payload)
+    trigger_payload = _load_json_object(harness_reflection_trigger_ablation_path)
+    verified_trigger = verify_harness_reflection_trigger_artifact(
+        trigger_payload,
+        manifest=verified_trigger_manifest,
+    )
+    _verify_sha256_sidecar(
+        harness_reflection_trigger_ablation_sha256_path,
+        bound_paths=(
+            harness_reflection_trigger_ablation_path,
+            harness_reflection_trigger_ablation_csv_path,
+            harness_reflection_trigger_ablation_manifest_path,
+        ),
+    )
+    harness_reflection_trigger_ablation = {
+        "evidence_class": verified_trigger["evidence_class"],
+        "claim_label": verified_trigger["claim_label"],
+        "claim_boundary": verified_trigger["claim_boundary"],
+        "provider_calls": verified_trigger["provider_calls"],
+        "network_calls": verified_trigger["network_calls"],
+        "real_credentials_used": verified_trigger["real_credentials_used"],
+        "simulator_runs": verified_trigger["simulator_runs"],
+        "physical_fidelity": verified_trigger["physical_fidelity"],
+        "general_causal_benefit_claim_permitted": verified_trigger[
+            "general_causal_benefit_claim_permitted"
+        ],
+        "optimizer_quality_claim_permitted": verified_trigger["optimizer_quality_claim_permitted"],
+        "artifact_sha256": verified_trigger["artifact_sha256"],
+        "manifest_sha256": verified_trigger["manifest_sha256"],
+        "summary": verified_trigger["summary"],
+        "case_rows": verified_trigger["case_rows"],
+    }
+    outcome_stress_manifest_payload = _load_json_object(
+        harness_reflection_outcome_stress_manifest_path
+    )
+    verified_outcome_stress_manifest = verify_harness_reflection_outcome_stress_manifest(
+        outcome_stress_manifest_payload
+    )
+    outcome_stress_payload = _load_json_object(harness_reflection_outcome_stress_path)
+    verified_outcome_stress = verify_harness_reflection_outcome_stress_artifact(
+        outcome_stress_payload,
+        manifest=verified_outcome_stress_manifest,
+    )
+    _verify_sha256_sidecar(
+        harness_reflection_outcome_stress_sha256_path,
+        bound_paths=(
+            harness_reflection_outcome_stress_path,
+            harness_reflection_outcome_stress_csv_path,
+            harness_reflection_outcome_stress_manifest_path,
+        ),
+    )
+    harness_reflection_outcome_stress = {
+        "evidence_class": verified_outcome_stress["evidence_class"],
+        "claim_label": verified_outcome_stress["claim_label"],
+        "claim_boundary": verified_outcome_stress["claim_boundary"],
+        "physical_fidelity": verified_outcome_stress["physical_fidelity"],
+        "simulator_backend": verified_outcome_stress["simulator_backend"],
+        "live_model_calls": verified_outcome_stress["live_model_calls"],
+        "network_calls": verified_outcome_stress["network_calls"],
+        "real_credentials_used": verified_outcome_stress["real_credentials_used"],
+        "general_causal_benefit_claim_permitted": verified_outcome_stress[
+            "general_causal_benefit_claim_permitted"
+        ],
+        "llm_superiority_claim_permitted": verified_outcome_stress[
+            "llm_superiority_claim_permitted"
+        ],
+        "px4_or_flight_claim_permitted": verified_outcome_stress["px4_or_flight_claim_permitted"],
+        "consistent_holdout_benefit_observed": verified_outcome_stress[
+            "consistent_holdout_benefit_observed"
+        ],
+        "causal_synthetic_protocol_effect_observed": verified_outcome_stress[
+            "causal_synthetic_protocol_effect_observed"
+        ],
+        "artifact_sha256": verified_outcome_stress["artifact_sha256"],
+        "manifest_sha256": verified_outcome_stress["manifest_sha256"],
+        "summary": verified_outcome_stress["summary"],
+        "contrast_summaries": verified_outcome_stress["contrast_summaries"],
+        "comparison_rows": verified_outcome_stress["comparison_rows"],
+    }
     backend_tests = (
         None
         if backend_test_receipt_path is None
@@ -800,6 +946,30 @@ def build_report_evidence_bundle(
         "harness_component_outcome_ablation_csv": _repository_source(
             harness_component_ablation_csv_path
         ),
+        "harness_reflection_trigger_ablation": _repository_source(
+            harness_reflection_trigger_ablation_path
+        ),
+        "harness_reflection_trigger_ablation_manifest": _repository_source(
+            harness_reflection_trigger_ablation_manifest_path
+        ),
+        "harness_reflection_trigger_ablation_csv": _repository_source(
+            harness_reflection_trigger_ablation_csv_path
+        ),
+        "harness_reflection_trigger_ablation_sha256": _repository_source(
+            harness_reflection_trigger_ablation_sha256_path
+        ),
+        "harness_reflection_outcome_stress": _repository_source(
+            harness_reflection_outcome_stress_path
+        ),
+        "harness_reflection_outcome_stress_manifest": _repository_source(
+            harness_reflection_outcome_stress_manifest_path
+        ),
+        "harness_reflection_outcome_stress_csv": _repository_source(
+            harness_reflection_outcome_stress_csv_path
+        ),
+        "harness_reflection_outcome_stress_sha256": _repository_source(
+            harness_reflection_outcome_stress_sha256_path
+        ),
         "routing_policy_holdout_corpus": _repository_source(routing_holdout_corpus_path),
         "routing_policy_holdout_manifest": _repository_source(routing_holdout_manifest_path),
         "routing_policy_holdout_result": _repository_source(routing_holdout_result_path),
@@ -817,6 +987,8 @@ def build_report_evidence_bundle(
         "harness_ablations": harness_ablations,
         "harness_outcome_campaign": harness_outcome_campaign,
         "harness_component_outcome_ablation": harness_component_ablation,
+        "harness_reflection_trigger_ablation": (harness_reflection_trigger_ablation),
+        "harness_reflection_outcome_stress": (harness_reflection_outcome_stress),
         "routing_policy_holdout": routing_policy_holdout,
     }
     if backend_tests is not None:
@@ -886,7 +1058,29 @@ def write_report_evidence_bundle(
     scenario_generalization = bundle["scenario_generalization"]
     harness_ablations = bundle["harness_ablations"]
     harness_outcome_campaign = bundle["harness_outcome_campaign"]
+    harness_reflection_trigger_ablation = bundle["harness_reflection_trigger_ablation"]
+    harness_reflection_outcome_stress = bundle["harness_reflection_outcome_stress"]
     routing_policy_holdout = bundle["routing_policy_holdout"]
+    trigger_rows = []
+    for case in harness_reflection_trigger_ablation["case_rows"]:
+        for step in case["steps"]:
+            full, no_reflection = step["arms"]
+            trigger_rows.append(
+                {
+                    "case_id": case["case_id"],
+                    "trigger": case["trigger"],
+                    "step_id": step["step_id"],
+                    "intervention_activated": step["intervention_activated"],
+                    "result_status": step["result_status"],
+                    "full_phase": full["plan_phase"],
+                    "no_reflection_phase": no_reflection["plan_phase"],
+                    "full_selected_tool": full["selected_tool"],
+                    "no_reflection_selected_tool": no_reflection["selected_tool"],
+                    "phase_changed": step["differences"]["plan_phase"],
+                    "tool_surface_changed": step["differences"]["selectable_tools"],
+                    "selected_tool_changed": step["differences"]["selected_tool"],
+                }
+            )
     _write_csv(
         csv_directory / "routing_categories.csv",
         routing["category_rows"],
@@ -910,6 +1104,14 @@ def write_report_evidence_bundle(
     _write_csv(
         csv_directory / "harness_fallback_outcomes.csv",
         harness_outcome_campaign["arm_rows"],
+    )
+    _write_csv(
+        csv_directory / "harness_reflection_trigger_steps.csv",
+        trigger_rows,
+    )
+    _write_csv(
+        csv_directory / "harness_reflection_outcome_comparisons.csv",
+        harness_reflection_outcome_stress["comparison_rows"],
     )
     _write_csv(
         csv_directory / "routing_policy_holdout_categories.csv",
@@ -998,6 +1200,46 @@ def _parse_args() -> argparse.Namespace:
         default=DEFAULT_HARNESS_COMPONENT_ABLATION_CSV,
     )
     parser.add_argument(
+        "--harness-reflection-trigger-ablation",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION,
+    )
+    parser.add_argument(
+        "--harness-reflection-trigger-ablation-manifest",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_MANIFEST,
+    )
+    parser.add_argument(
+        "--harness-reflection-trigger-ablation-csv",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_CSV,
+    )
+    parser.add_argument(
+        "--harness-reflection-trigger-ablation-sha256",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_SHA256,
+    )
+    parser.add_argument(
+        "--harness-reflection-outcome-stress",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS,
+    )
+    parser.add_argument(
+        "--harness-reflection-outcome-stress-manifest",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_MANIFEST,
+    )
+    parser.add_argument(
+        "--harness-reflection-outcome-stress-csv",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_CSV,
+    )
+    parser.add_argument(
+        "--harness-reflection-outcome-stress-sha256",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_SHA256,
+    )
+    parser.add_argument(
         "--backend-test-receipt",
         type=Path,
         required=True,
@@ -1036,6 +1278,28 @@ def main() -> int:
             args.harness_component_ablation_manifest.resolve()
         ),
         harness_component_ablation_csv_path=(args.harness_component_ablation_csv.resolve()),
+        harness_reflection_trigger_ablation_path=(
+            args.harness_reflection_trigger_ablation.resolve()
+        ),
+        harness_reflection_trigger_ablation_manifest_path=(
+            args.harness_reflection_trigger_ablation_manifest.resolve()
+        ),
+        harness_reflection_trigger_ablation_csv_path=(
+            args.harness_reflection_trigger_ablation_csv.resolve()
+        ),
+        harness_reflection_trigger_ablation_sha256_path=(
+            args.harness_reflection_trigger_ablation_sha256.resolve()
+        ),
+        harness_reflection_outcome_stress_path=(args.harness_reflection_outcome_stress.resolve()),
+        harness_reflection_outcome_stress_manifest_path=(
+            args.harness_reflection_outcome_stress_manifest.resolve()
+        ),
+        harness_reflection_outcome_stress_csv_path=(
+            args.harness_reflection_outcome_stress_csv.resolve()
+        ),
+        harness_reflection_outcome_stress_sha256_path=(
+            args.harness_reflection_outcome_stress_sha256.resolve()
+        ),
         backend_test_receipt_path=args.backend_test_receipt.resolve(),
         routing_holdout_corpus_path=args.routing_holdout_corpus.resolve(),
         routing_holdout_manifest_path=args.routing_holdout_manifest.resolve(),
