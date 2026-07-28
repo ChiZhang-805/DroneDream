@@ -14,7 +14,12 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { PaymentBrandMark } from "../components/PaymentBrandMark";
 import {
@@ -179,6 +184,8 @@ export function PricingPage({
   const [wechatQr, setWechatQr] = useState<string | null>(null);
   const paymentDialogRef = useRef<HTMLElement>(null);
   const paymentCloseRef = useRef<HTMLButtonElement>(null);
+  const individualAudienceRef = useRef<HTMLButtonElement>(null);
+  const businessAudienceRef = useRef<HTMLButtonElement>(null);
   const capturePaymentTrigger = useModalFocus({
     open: Boolean(selectedPlan),
     dialogRef: paymentDialogRef,
@@ -305,6 +312,31 @@ export function PricingPage({
     return planLevel >= minimumLevel[feature];
   };
 
+  const selectAudienceFromKeyboard = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    current: Audience,
+  ) => {
+    let next: Audience | null = null;
+    if (
+      event.key === "ArrowRight"
+      || event.key === "ArrowDown"
+      || event.key === "ArrowLeft"
+      || event.key === "ArrowUp"
+    ) {
+      next = current === "individual" ? "business" : "individual";
+    } else if (event.key === "Home") {
+      next = "individual";
+    } else if (event.key === "End") {
+      next = "business";
+    }
+    if (!next) return;
+    event.preventDefault();
+    setAudience(next);
+    (next === "individual" ? individualAudienceRef : businessAudienceRef)
+      .current
+      ?.focus();
+  };
+
   return (
     <div className="site-portal pricing-page">
       <header className="portal-page-heading">
@@ -316,26 +348,42 @@ export function PricingPage({
 
       <div className="pricing-audience" role="tablist" aria-label={copy.audienceLabel}>
         <button
+          ref={individualAudienceRef}
           type="button"
           role="tab"
+          id="pricing-audience-individual"
+          aria-controls="pricing-plans"
           aria-selected={audience === "individual"}
+          tabIndex={audience === "individual" ? 0 : -1}
           onClick={() => setAudience("individual")}
+          onKeyDown={(event) => selectAudienceFromKeyboard(event, "individual")}
         >
           <Sparkles aria-hidden="true" />
           {copy.individual}
         </button>
         <button
+          ref={businessAudienceRef}
           type="button"
           role="tab"
+          id="pricing-audience-business"
+          aria-controls="pricing-plans"
           aria-selected={audience === "business"}
+          tabIndex={audience === "business" ? 0 : -1}
           onClick={() => setAudience("business")}
+          onKeyDown={(event) => selectAudienceFromKeyboard(event, "business")}
         >
           <Users aria-hidden="true" />
           {copy.business}
         </button>
       </div>
 
-      <div className="pricing-grid" data-audience={audience}>
+      <div
+        id="pricing-plans"
+        className="pricing-grid"
+        data-audience={audience}
+        role="tabpanel"
+        aria-labelledby={`pricing-audience-${audience}`}
+      >
         {plans.map((plan) => (
           <article
             key={plan.id}

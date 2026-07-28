@@ -1,6 +1,13 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 
 const frontendRequire = createRequire(new URL("../../frontend/package.json", import.meta.url));
 const { chromium, firefox } = frontendRequire("playwright");
@@ -528,6 +535,39 @@ const checkHomeKeyboard = async (page) => {
   return issues;
 };
 
+const checkPricingKeyboard = async (page) => {
+  const issues = [];
+  const tabs = page.locator(".pricing-audience [role=tab]");
+  if (await tabs.count() < 2 || !await tabs.first().isVisible()) {
+    return ["pricing audience tabs are not visible"];
+  }
+  const individual = tabs.first();
+  const business = tabs.nth(1);
+  await individual.focus();
+  await page.keyboard.press("ArrowRight");
+  if (await business.getAttribute("aria-selected") !== "true") {
+    issues.push("ArrowRight did not select the business pricing audience");
+  }
+  if (!await business.evaluate((node) => node === document.activeElement)) {
+    issues.push("ArrowRight did not move focus to the business pricing audience");
+  }
+  const panel = page.locator("#pricing-plans");
+  if (
+    await panel.getAttribute("role") !== "tabpanel"
+    || await panel.getAttribute("aria-labelledby") !== await business.getAttribute("id")
+  ) {
+    issues.push("pricing audience tabs are not linked to their active panel");
+  }
+  await page.keyboard.press("Home");
+  if (await individual.getAttribute("aria-selected") !== "true") {
+    issues.push("Home did not select the first pricing audience");
+  }
+  if (!await individual.evaluate((node) => node === document.activeElement)) {
+    issues.push("Home did not return focus to the first pricing audience");
+  }
+  return issues;
+};
+
 const checkConsolePreview = async (page, routeName) => page.evaluate((activeRoute) => {
   const visible = (node) => {
     if (!(node instanceof Element)) return false;
@@ -630,12 +670,14 @@ for (const browserName of requestedBrowsers) {
       ? { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--disable-gpu"] }
       : {}),
   };
-  const browser = await definition.engine.launch(launchOptions);
+  const browser = browserName === "lenovo"
+    ? null
+    : await definition.engine.launch(launchOptions);
   try {
     const profiles = browserName === "edge" ? edgeProfiles : standardProfiles;
     for (const profile of profiles) {
       for (const locale of locales) {
-        const context = await browser.newContext({
+        const contextOptions = {
           viewport: profile.viewport,
           screen: {
             width: Math.round(profile.viewport.width * profile.deviceScaleFactor),
@@ -644,7 +686,17 @@ for (const browserName of requestedBrowsers) {
           deviceScaleFactor: profile.deviceScaleFactor,
           locale: locale === "zh-CN" ? "zh-CN" : "en-US",
           reducedMotion: "reduce",
-        });
+        };
+        const lenovoProfile = browserName === "lenovo"
+          ? mkdtempSync(join(tmpdir(), "dronedream-lenovo-matrix-"))
+          : "";
+        const context = browserName === "lenovo"
+          ? await definition.engine.launchPersistentContext(
+            lenovoProfile,
+            { ...launchOptions, ...contextOptions },
+          )
+          : await browser.newContext(contextOptions);
+        const browserVersion = context.browser()?.version() ?? browser?.version() ?? "unknown";
         await context.addInitScript((nextLocale) => {
           localStorage.setItem("drone-dream:locale", nextLocale);
         }, locale);
@@ -697,6 +749,9 @@ for (const browserName of requestedBrowsers) {
               if (profile.viewport.width <= 1050) errors.push(...await checkMobileMenu(page));
             }
             if (route.name === "home") errors.push(...await checkHomeKeyboard(page));
+            if (route.name === "pricing") {
+              errors.push(...await checkPricingKeyboard(page));
+            }
             if (route.consolePreview) {
               errors.push(...await checkConsolePreview(page, route.name));
             }
@@ -719,7 +774,7 @@ for (const browserName of requestedBrowsers) {
 
             results.push({
               browser: browserName,
-              browserVersion: browser.version(),
+              browserVersion,
               profile: profile.name,
               physicalViewport: profile.physicalViewport,
               viewport: profile.viewport,
@@ -739,11 +794,12 @@ for (const browserName of requestedBrowsers) {
           }
         } finally {
           await context.close();
+          if (lenovoProfile) rmSync(lenovoProfile, { recursive: true, force: true });
         }
       }
     }
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 }
 

@@ -210,15 +210,31 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(screen.getByRole("heading", { name: "Free" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Plus" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Pro" })).toBeVisible();
-    expect(screen.getByRole("tab", { name: "Individual" })).toHaveAttribute(
+    const individualTab = screen.getByRole("tab", { name: "Individual" });
+    const businessTab = screen.getByRole("tab", { name: "Business" });
+    expect(individualTab).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    fireEvent.click(screen.getByRole("tab", { name: "Business" }));
-    expect(screen.getByRole("tab", { name: "Business" })).toHaveAttribute(
+    expect(individualTab).toHaveAttribute("tabindex", "0");
+    expect(businessTab).toHaveAttribute("tabindex", "-1");
+    individualTab.focus();
+    fireEvent.keyDown(individualTab, { key: "ArrowRight" });
+    expect(businessTab).toHaveAttribute(
       "aria-selected",
       "true",
     );
+    expect(businessTab).toHaveFocus();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      "pricing-audience-business",
+    );
+    fireEvent.keyDown(businessTab, { key: "Home" });
+    expect(individualTab).toHaveAttribute("aria-selected", "true");
+    expect(individualTab).toHaveFocus();
+    fireEvent.keyDown(individualTab, { key: "End" });
+    expect(businessTab).toHaveAttribute("aria-selected", "true");
+    expect(businessTab).toHaveFocus();
     expect(screen.getByText(/300,000 managed AI credits/i)).toBeVisible();
     expect(screen.getByText(/3,000,000 managed AI credits/i)).toBeVisible();
     expect(screen.getByText(/15,000,000 managed AI credits/i)).toBeVisible();
