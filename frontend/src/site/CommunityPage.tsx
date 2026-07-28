@@ -26,6 +26,7 @@ import {
   type KeyboardEvent,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -36,6 +37,7 @@ import {
   CommunityImageError,
   optimizeCommunityImage,
 } from "./communityMedia";
+import { useModalFocus } from "./useModalFocus";
 
 type SiteLocale = "en" | "zh-CN";
 
@@ -330,6 +332,22 @@ export function CommunityPage({
   const [deletingTopicId, setDeletingTopicId] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
+  const composerRef = useRef<HTMLFormElement>(null);
+  const composerTitleRef = useRef<HTMLInputElement>(null);
+  const topicDialogRef = useRef<HTMLElement>(null);
+  const topicCloseRef = useRef<HTMLButtonElement>(null);
+  const captureComposerTrigger = useModalFocus({
+    open: composerOpen,
+    dialogRef: composerRef,
+    initialFocusRef: composerTitleRef,
+    onClose: () => setComposerOpen(false),
+  });
+  const captureTopicTrigger = useModalFocus({
+    open: Boolean(selectedTopic),
+    dialogRef: topicDialogRef,
+    initialFocusRef: topicCloseRef,
+    onClose: () => setSelectedTopic(null),
+  });
 
   const loadTopics = useCallback(async (offset = 0, append = false) => {
     if (!supabaseClient) {
@@ -414,18 +432,10 @@ export function CommunityPage({
     }
   }, [copy.unavailable]);
 
-  useEffect(() => {
-    if (!composerOpen && !selectedTopic) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [composerOpen, selectedTopic]);
-
   const visibleTopics = allTopicsView ? topics : topics.slice(0, 3);
 
   const openTopic = (topic: CommunityTopic) => {
+    captureTopicTrigger();
     setSelectedTopic(topic);
     setComments([]);
     setHasMoreComments(false);
@@ -437,6 +447,7 @@ export function CommunityPage({
       onRequireAccount();
       return;
     }
+    captureComposerTrigger();
     setComposerOpen(true);
   };
 
@@ -850,14 +861,27 @@ export function CommunityPage({
       </section>
 
       {composerOpen && account ? (
-        <div className="community-modal-backdrop" role="presentation">
+        <div
+          className="community-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setComposerOpen(false);
+          }}
+        >
           <form
+            ref={composerRef}
             className="community-composer"
             onSubmit={(event) => void publish(event)}
-            aria-label={copy.newTopic}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="community-composer-title"
+            tabIndex={-1}
           >
             <header>
-              <div><PenLine aria-hidden="true" /><h2>{copy.newTopic}</h2></div>
+              <div>
+                <PenLine aria-hidden="true" />
+                <h2 id="community-composer-title">{copy.newTopic}</h2>
+              </div>
               <button type="button" onClick={() => setComposerOpen(false)} aria-label={copy.close}>
                 <X aria-hidden="true" />
               </button>
@@ -865,6 +889,7 @@ export function CommunityPage({
             <label>
               <span>{copy.titleLabel}</span>
               <input
+                ref={composerTitleRef}
                 required
                 maxLength={120}
                 value={title}
@@ -991,14 +1016,23 @@ export function CommunityPage({
       ) : null}
 
       {selectedTopic ? (
-        <div className="community-modal-backdrop" role="presentation">
+        <div
+          className="community-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedTopic(null);
+          }}
+        >
           <section
+            ref={topicDialogRef}
             className="community-topic-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="community-topic-title"
+            tabIndex={-1}
           >
             <button
+              ref={topicCloseRef}
               type="button"
               className="community-dialog-close"
               onClick={() => setSelectedTopic(null)}

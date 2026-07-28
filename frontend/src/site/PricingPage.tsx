@@ -14,7 +14,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { PaymentBrandMark } from "../components/PaymentBrandMark";
 import {
@@ -24,6 +24,7 @@ import {
   type BillingAvailability,
   type PaymentMethod,
 } from "../features/settings/cloudModelAccess";
+import { useModalFocus } from "./useModalFocus";
 
 type SiteLocale = "en" | "zh-CN";
 type PaidPlanId = "plus" | "pro";
@@ -176,6 +177,14 @@ export function PricingPage({
     useState<"idle" | "checking" | "creating" | "qr" | "error">("idle");
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
   const [wechatQr, setWechatQr] = useState<string | null>(null);
+  const paymentDialogRef = useRef<HTMLElement>(null);
+  const paymentCloseRef = useRef<HTMLButtonElement>(null);
+  const capturePaymentTrigger = useModalFocus({
+    open: Boolean(selectedPlan),
+    dialogRef: paymentDialogRef,
+    initialFocusRef: paymentCloseRef,
+    onClose: () => setSelectedPlan(null),
+  });
 
   useEffect(() => {
     let active = true;
@@ -236,6 +245,7 @@ export function PricingPage({
       return;
     }
     if (plan.id === "free") return;
+    capturePaymentTrigger();
     setSelectedPlan(plan);
   };
 
@@ -380,13 +390,25 @@ export function PricingPage({
         <div className="payment-backdrop" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setSelectedPlan(null);
         }}>
-          <section className="payment-dialog" role="dialog" aria-modal="true" aria-labelledby="payment-title">
+          <section
+            ref={paymentDialogRef}
+            className="payment-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="payment-title"
+            tabIndex={-1}
+          >
             <header>
               <div>
                 <ShieldCheck aria-hidden="true" />
                 <h2 id="payment-title">{copy.paymentTitle}</h2>
               </div>
-              <button type="button" aria-label={copy.close} onClick={() => setSelectedPlan(null)}>
+              <button
+                ref={paymentCloseRef}
+                type="button"
+                aria-label={copy.close}
+                onClick={() => setSelectedPlan(null)}
+              >
                 <X aria-hidden="true" />
               </button>
             </header>

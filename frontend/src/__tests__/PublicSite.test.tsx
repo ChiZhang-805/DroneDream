@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n/I18nProvider";
@@ -269,9 +269,21 @@ title: "DroneDream 1.0.0 用户说明书"
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Choose Plus" }));
+    const trigger = screen.getByRole("button", { name: "Choose Plus" });
+    trigger.focus();
+    fireEvent.click(trigger);
 
     expect(screen.getByRole("dialog", { name: "Payment" })).toBeVisible();
+    await waitFor(() => expect(
+      screen.getByRole("button", { name: "Close payment dialog" }),
+    ).toHaveFocus());
+    const enabledDialogButtons = within(
+      screen.getByRole("dialog", { name: "Payment" }),
+    ).getAllByRole("button").filter((button) => !button.hasAttribute("disabled"));
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(enabledDialogButtons.at(-1)).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "Close payment dialog" })).toHaveFocus();
     expect(screen.getByRole("button", { name: "WeChat Pay" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -288,6 +300,12 @@ title: "DroneDream 1.0.0 用户说明书"
       expect(screen.queryByText(/Merchant payment activation/i)).toBeNull();
     });
     expect(screen.queryByText(/Review the selected plan/i)).toBeNull();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Payment" })).toBeNull();
+      expect(trigger).toHaveFocus();
+      expect(document.body.style.overflow).toBe("");
+    });
   });
 
   it("requires an account before a visitor can publish a community topic and restores focus", async () => {

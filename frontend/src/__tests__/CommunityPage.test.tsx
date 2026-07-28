@@ -185,16 +185,78 @@ describe("CommunityPage public data loading", () => {
 
     await screen.findByRole("heading", { name: "Stable hover evidence" });
     expect(container.querySelector('[data-template="evidence"]')).toBeVisible();
-    fireEvent.click(screen.getByRole("button", {
+    const trigger = screen.getByRole("button", {
       name: "Open discussion: Stable hover evidence",
-    }));
+    });
+    trigger.focus();
+    fireEvent.click(trigger);
 
     await waitFor(() => expect(
       screen.getByRole("dialog", { name: "Stable hover evidence" }),
     ).toBeVisible());
+    await waitFor(() => expect(
+      screen.getByRole("button", { name: "Close" }),
+    ).toHaveFocus());
+    const topicDialog = screen.getByRole("dialog", { name: "Stable hover evidence" });
+    const enabledTopicControls = Array.from(
+      topicDialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(enabledTopicControls.at(-1)).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
     const submit = screen.getByRole("button", { name: "Post comment" });
     expect(submit.querySelector("svg")).not.toBeNull();
     expect(submit).toHaveTextContent("Post comment");
     expect(submit.querySelector(".site-sr-only")).toHaveTextContent("Post comment");
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Stable hover evidence" })).toBeNull();
+      expect(trigger).toHaveFocus();
+      expect(document.body.style.overflow).toBe("");
+    });
+  });
+
+  it("treats the topic composer as a trapped modal and restores its trigger", async () => {
+    render(
+      <CommunityPage
+        locale="en"
+        account={{
+          id: "00000000-0000-0000-0000-000000000003",
+          email: "pilot@example.com",
+          displayName: "Pilot",
+          avatarUrl: null,
+        }}
+        onRequireAccount={vi.fn()}
+      />,
+    );
+
+    const trigger = await screen.findByRole("button", { name: "Create a topic" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Create a topic" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    await waitFor(() => expect(
+      screen.getByRole("textbox", { name: "Topic title" }),
+    ).toHaveFocus());
+    const close = screen.getByRole("button", { name: "Close" });
+    close.focus();
+    const composerControls = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(composerControls.at(-1)).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Create a topic" })).toBeNull();
+      expect(trigger).toHaveFocus();
+      expect(document.body.style.overflow).toBe("");
+    });
   });
 });
