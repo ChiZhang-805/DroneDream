@@ -182,7 +182,7 @@ export function ManualPage({ locale }: ManualPageProps) {
           />
         </label>
 
-        <div className="manual-downloads" aria-label={copy.downloads}>
+        <div className="manual-downloads" role="group" aria-label={copy.downloads}>
           <strong>{copy.downloads}</strong>
           <div>
             <a href={`${documentRoot}.md`} download>

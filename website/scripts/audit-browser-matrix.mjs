@@ -317,13 +317,25 @@ const collectAccessibility = async (page) => page.evaluate(() => {
     if (labelledBy) return labelledBy;
     const ariaLabel = node.getAttribute("aria-label")?.trim();
     if (ariaLabel) return ariaLabel;
-    if (node instanceof HTMLInputElement && node.labels?.length) {
+    if (
+      (
+        node instanceof HTMLInputElement
+        || node instanceof HTMLTextAreaElement
+        || node instanceof HTMLSelectElement
+      )
+      && node.labels?.length
+    ) {
       return [...node.labels].map((label) => label.textContent?.trim() ?? "").join(" ").trim();
+    }
+    if (
+      node instanceof HTMLInputElement
+      && ["button", "reset", "submit"].includes(node.type)
+    ) {
+      return node.value.trim();
     }
     if (node instanceof HTMLImageElement) return node.getAttribute("alt")?.trim() ?? "";
     return node.textContent?.trim()
       || node.getAttribute("title")?.trim()
-      || node.getAttribute("placeholder")?.trim()
       || "";
   };
   const labelFor = (node, index) => node.id

@@ -312,6 +312,11 @@ title: "DroneDream 1.0.0 用户说明书"
       container.querySelector('[data-brand-mark="alipay"]'),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Continue to payment" })).toBeDisabled();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Payment methods are temporarily unavailable.",
+    );
+    expect(screen.getByRole("button", { name: "WeChat Pay" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Alipay" })).toBeDisabled();
     await waitFor(() => {
       expect(screen.queryByText(/Merchant payment activation/i)).toBeNull();
     });

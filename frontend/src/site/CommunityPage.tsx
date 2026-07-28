@@ -316,7 +316,9 @@ export function CommunityPage({
   const [hasMoreTopics, setHasMoreTopics] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [hasMoreComments, setHasMoreComments] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [feedError, setFeedError] = useState<string | null>(null);
+  const [composerError, setComposerError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [settledQuery, setSettledQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -352,12 +354,12 @@ export function CommunityPage({
   const loadTopics = useCallback(async (offset = 0, append = false) => {
     if (!supabaseClient) {
       setLoading(false);
-      setError(copy.unavailable);
+      setFeedError(copy.unavailable);
       return;
     }
     if (append) setLoadingMoreTopics(true);
     else setLoading(true);
-    setError(null);
+    setFeedError(null);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
@@ -379,7 +381,7 @@ export function CommunityPage({
       setHasMoreTopics(page.length > TOPIC_PAGE_SIZE);
       setTopics((current) => append ? [...current, ...boundedPage] : boundedPage);
     } catch {
-      setError(copy.unavailable);
+      setFeedError(copy.unavailable);
     } finally {
       window.clearTimeout(timeout);
       if (append) setLoadingMoreTopics(false);
@@ -405,7 +407,7 @@ export function CommunityPage({
   ) => {
     if (!supabaseClient) return;
     setCommentsLoading(true);
-    setError(null);
+    setDialogError(null);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
@@ -425,7 +427,7 @@ export function CommunityPage({
       setHasMoreComments(page.length > COMMENT_PAGE_SIZE);
       setComments((current) => append ? [...current, ...boundedPage] : boundedPage);
     } catch {
-      setError(copy.unavailable);
+      setDialogError(copy.unavailable);
     } finally {
       window.clearTimeout(timeout);
       setCommentsLoading(false);
@@ -436,6 +438,7 @@ export function CommunityPage({
 
   const openTopic = (topic: CommunityTopic) => {
     captureTopicTrigger();
+    setDialogError(null);
     setSelectedTopic(topic);
     setComments([]);
     setHasMoreComments(false);
@@ -448,6 +451,7 @@ export function CommunityPage({
       return;
     }
     captureComposerTrigger();
+    setComposerError(null);
     setComposerOpen(true);
   };
 
@@ -467,7 +471,7 @@ export function CommunityPage({
 
   const selectImages = async (selected: File[]) => {
     setPreparingMedia(true);
-    setError(null);
+    setComposerError(null);
     try {
       const optimized: File[] = [];
       for (const file of selected.slice(0, COMMUNITY_IMAGE_MAX_FILES)) {
@@ -482,9 +486,9 @@ export function CommunityPage({
           "decode-failed": copy.mediaDecodeFailed,
           "output-too-large": copy.mediaOutputTooLarge,
         }[mediaError.code];
-        setError(message);
+        setComposerError(message);
       } else {
-        setError(copy.mediaDecodeFailed);
+        setComposerError(copy.mediaDecodeFailed);
       }
     } finally {
       setPreparingMedia(false);
@@ -533,7 +537,7 @@ export function CommunityPage({
     event.preventDefault();
     if (!account || !supabaseClient || publishing) return;
     setPublishing(true);
-    setError(null);
+    setComposerError(null);
     let uploadedPaths: string[] = [];
     try {
       const uploaded = await uploadImages();
@@ -555,7 +559,9 @@ export function CommunityPage({
       await loadTopics();
     } catch (requestError) {
       await removeUploadedImages(uploadedPaths);
-      setError(requestError instanceof Error ? requestError.message : copy.unavailable);
+      setComposerError(
+        requestError instanceof Error ? requestError.message : copy.unavailable,
+      );
     } finally {
       setPublishing(false);
     }
@@ -573,7 +579,8 @@ export function CommunityPage({
     if (!window.confirm(copy.deleteTopicConfirm)) return;
 
     setDeletingTopicId(topic.id);
-    setError(null);
+    if (selectedTopic?.id === topic.id) setDialogError(null);
+    else setFeedError(null);
     try {
       const { error: requestError } = await supabaseClient
         .from("community_topics")
@@ -598,11 +605,11 @@ export function CommunityPage({
       });
       await removeUploadedImages(mediaPaths);
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : copy.unavailable
-      );
+      const message = requestError instanceof Error
+        ? requestError.message
+        : copy.unavailable;
+      if (selectedTopic?.id === topic.id) setDialogError(message);
+      else setFeedError(message);
     } finally {
       setDeletingTopicId(null);
     }
@@ -616,6 +623,8 @@ export function CommunityPage({
     const topic = topics.find((candidate) => candidate.id === topicId)
       ?? (selectedTopic?.id === topicId ? selectedTopic : null);
     if (!topic) return;
+    if (selectedTopic?.id === topicId) setDialogError(null);
+    else setFeedError(null);
     const liked = topic.liked_by_viewer;
     const { error: requestError } = liked
       ? await supabaseClient
@@ -627,7 +636,8 @@ export function CommunityPage({
         .from("community_topic_likes")
         .insert({ topic_id: topicId, user_id: account.id });
     if (requestError) {
-      setError(requestError.message);
+      if (selectedTopic?.id === topicId) setDialogError(requestError.message);
+      else setFeedError(requestError.message);
       return;
     }
     const updateTopic = (candidate: CommunityTopic): CommunityTopic =>
@@ -649,6 +659,7 @@ export function CommunityPage({
     }
     const comment = comments.find((candidate) => candidate.id === commentId);
     if (!comment) return;
+    setDialogError(null);
     const liked = comment.liked_by_viewer;
     const { error: requestError } = liked
       ? await supabaseClient
@@ -660,7 +671,7 @@ export function CommunityPage({
         .from("community_comment_likes")
         .insert({ comment_id: commentId, user_id: account.id });
     if (requestError) {
-      setError(requestError.message);
+      setDialogError(requestError.message);
       return;
     }
     setComments((current) =>
@@ -679,6 +690,7 @@ export function CommunityPage({
   const publishComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!account || !selectedTopic || !supabaseClient || !commentBody.trim()) return;
+    setDialogError(null);
     const { error: requestError } = await supabaseClient.from("community_comments").insert({
       topic_id: selectedTopic.id,
       parent_id: replyTo?.id ?? null,
@@ -687,7 +699,7 @@ export function CommunityPage({
       body: commentBody.trim(),
     });
     if (requestError) {
-      setError(requestError.message);
+      setDialogError(requestError.message);
       return;
     }
     setCommentBody("");
@@ -742,12 +754,13 @@ export function CommunityPage({
           </label>
         </header>
 
-        <div className="community-tag-filter" aria-label={copy.tagsLabel}>
+        <div className="community-tag-filter" role="group" aria-label={copy.tagsLabel}>
           {presets.map((tagName) => (
             <button
               key={tagName}
               type="button"
               className={activeTag === tagName ? "is-active" : ""}
+              aria-pressed={activeTag === tagName}
               onClick={() => setActiveTag(activeTag === tagName ? null : tagName)}
             >
               #{tagName}
@@ -757,8 +770,12 @@ export function CommunityPage({
 
         {loading ? <p role="status">{copy.loading}</p> : null}
 
-        {!loading && error ? (
-          <p className="community-state is-error" role="status">{error}</p>
+        {!loading && feedError ? (
+          <p className="community-state is-error" role="alert">{feedError}</p>
+        ) : null}
+
+        {!loading && !feedError && visibleTopics.length === 0 ? (
+          <p className="community-state" role="status">{copy.empty}</p>
         ) : null}
 
         <div className="community-topic-grid">
@@ -803,12 +820,18 @@ export function CommunityPage({
                     <button
                       type="button"
                       className={liked ? "is-liked" : ""}
+                      aria-label={`${topic.like_count} ${copy.likes}`}
+                      aria-pressed={liked}
                       onClick={() => void toggleTopicLike(topic.id)}
                     >
                       <Heart aria-hidden="true" />
                       {topic.like_count}
                     </button>
-                    <button type="button" onClick={() => openTopic(topic)}>
+                    <button
+                      type="button"
+                      aria-label={`${topic.comment_count} ${copy.comments}`}
+                      onClick={() => openTopic(topic)}
+                    >
                       <MessageCircle aria-hidden="true" />
                       {topic.comment_count}
                     </button>
@@ -835,7 +858,7 @@ export function CommunityPage({
           })}
         </div>
 
-        {!loading && !error && allTopicsView && hasMoreTopics ? (
+        {!loading && !feedError && allTopicsView && hasMoreTopics ? (
           <button
             type="button"
             className="community-more"
@@ -846,7 +869,10 @@ export function CommunityPage({
             <ChevronRight aria-hidden="true" />
           </button>
         ) : null}
-        {!loading && !error && (!allTopicsView || !hasMoreTopics) ? (
+        {!loading
+          && !feedError
+          && (allTopicsView || visibleTopics.length > 0)
+          && (!allTopicsView || !hasMoreTopics) ? (
           <a
             className="community-more"
             href={allTopicsView ? "/community/" : "/community/?view=all"}
@@ -916,6 +942,7 @@ export function CommunityPage({
                     key={tagName}
                     type="button"
                     className={tags.includes(tagName) ? "is-active" : ""}
+                    aria-pressed={tags.includes(tagName)}
                     onClick={() =>
                       setTags(
                         tags.includes(tagName)
@@ -938,6 +965,7 @@ export function CommunityPage({
                       key={tagName}
                       type="button"
                       className="is-active"
+                      aria-pressed="true"
                       onClick={() =>
                         setTags((current) =>
                           current.filter((value) => value !== tagName)
@@ -948,6 +976,7 @@ export function CommunityPage({
                     </button>
                   ))}
                 <input
+                  aria-label={copy.customTag}
                   value={customTag}
                   onChange={(event) => setCustomTag(event.target.value)}
                   onKeyDown={addCustomTag}
@@ -989,7 +1018,9 @@ export function CommunityPage({
                 </div>
               ) : null}
             </fieldset>
-            {error ? <p className="community-form-error">{error}</p> : null}
+            {composerError ? (
+              <p className="community-form-error" role="alert">{composerError}</p>
+            ) : null}
             <footer>
               <button
                 type="button"
@@ -1061,7 +1092,9 @@ export function CommunityPage({
                   <span><UserRound aria-hidden="true" /></span>
                   <div>
                     <strong>{selectedTopic.author_name}</strong>
-                    <time>{dateLabel(locale, selectedTopic.created_at)}</time>
+                    <time dateTime={selectedTopic.created_at}>
+                      {dateLabel(locale, selectedTopic.created_at)}
+                    </time>
                   </div>
                 </div>
                 <h2 id="community-topic-title">{selectedTopic.title}</h2>
@@ -1077,6 +1110,7 @@ export function CommunityPage({
                     className={
                       account && selectedTopic.liked_by_viewer ? "is-liked" : ""
                     }
+                    aria-pressed={Boolean(account && selectedTopic.liked_by_viewer)}
                     onClick={() => void toggleTopicLike(selectedTopic.id)}
                   >
                     <Heart aria-hidden="true" />
@@ -1097,6 +1131,9 @@ export function CommunityPage({
                   ) : null}
                 </div>
               </header>
+              {dialogError ? (
+                <p className="community-form-error" role="alert">{dialogError}</p>
+              ) : null}
               <div className="community-comment-list">
                 <h3>{copy.comments}</h3>
                 {commentsLoading && comments.length === 0 ? (
@@ -1111,7 +1148,9 @@ export function CommunityPage({
                     <article key={comment.id} className={comment.parent_id ? "is-reply" : ""}>
                       <header>
                         <strong>{comment.author_name}</strong>
-                        <time>{dateLabel(locale, comment.created_at)}</time>
+                        <time dateTime={comment.created_at}>
+                          {dateLabel(locale, comment.created_at)}
+                        </time>
                       </header>
                       {comment.parent_author_name
                         ? <small>@{comment.parent_author_name}</small>
@@ -1121,6 +1160,8 @@ export function CommunityPage({
                         <button
                           type="button"
                           className={liked ? "is-liked" : ""}
+                          aria-label={`${comment.like_count} ${copy.likes}`}
+                          aria-pressed={liked}
                           onClick={() => void toggleCommentLike(comment.id)}
                         >
                           <Heart aria-hidden="true" />{comment.like_count}
@@ -1166,6 +1207,7 @@ export function CommunityPage({
                     </div>
                   ) : null}
                   <textarea
+                    aria-label={copy.commentPlaceholder}
                     required
                     maxLength={2000}
                     value={commentBody}

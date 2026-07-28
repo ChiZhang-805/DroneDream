@@ -120,6 +120,7 @@ const pricingContent = {
     alipay: "Alipay",
     card: "Credit or debit card",
     continue: "Continue to payment",
+    availabilityFailed: "Payment methods are temporarily unavailable.",
     paymentFailed: "The payment order could not be created.",
     qrTitle: "Scan with WeChat to pay",
     qrAlt: "WeChat Pay QR code",
@@ -156,6 +157,7 @@ const pricingContent = {
     alipay: "支付宝",
     card: "信用卡或借记卡",
     continue: "继续付款",
+    availabilityFailed: "支付方式暂时不可用。",
     paymentFailed: "暂时无法创建支付订单。",
     qrTitle: "请使用微信扫码支付",
     qrAlt: "微信支付二维码",
@@ -229,12 +231,12 @@ export function PricingPage({
         void error;
         setAvailability(null);
         setPaymentState("error");
-        setPaymentMessage(null);
+        setPaymentMessage(copy.availabilityFailed);
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [copy.availabilityFailed]);
 
   const plans: readonly Plan[] = availability?.plans.length === 3
     ? availability.plans.map((plan) => ({
@@ -287,6 +289,7 @@ export function PricingPage({
   const selectedMethodAvailable = Boolean(
     availability?.enabled && availability.methods[paymentMethod],
   );
+  const availabilityUnavailable = availability === null && paymentState === "error";
   const cardMethodAvailable = Boolean(availability?.methods.card);
 
   const featureLabel = (feature: FeatureKey, plan: Plan): string => {
@@ -469,7 +472,10 @@ export function PricingPage({
                 type="button"
                 aria-label={copy.wechat}
                 aria-pressed={paymentMethod === "wechat"}
-                disabled={availability ? !availability.methods.wechat : false}
+                disabled={
+                  availabilityUnavailable
+                  || (availability ? !availability.methods.wechat : false)
+                }
                 onClick={() => setPaymentMethod("wechat")}
               >
                 <span className="payment-method-logo is-wechat">
@@ -481,7 +487,10 @@ export function PricingPage({
                 type="button"
                 aria-label={copy.alipay}
                 aria-pressed={paymentMethod === "alipay"}
-                disabled={availability ? !availability.methods.alipay : false}
+                disabled={
+                  availabilityUnavailable
+                  || (availability ? !availability.methods.alipay : false)
+                }
                 onClick={() => setPaymentMethod("alipay")}
               >
                 <span className="payment-method-logo is-alipay">

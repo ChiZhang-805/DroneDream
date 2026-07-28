@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const supabaseMock = vi.hoisted(() => {
@@ -27,6 +33,20 @@ vi.mock("../features/auth/supabaseClient", () => ({
 
 import { CommunityPage } from "../site/CommunityPage";
 
+const topicFixture = {
+  id: "00000000-0000-0000-0000-000000000001",
+  author_id: "00000000-0000-0000-0000-000000000002",
+  author_name: "Pilot",
+  title: "Stable hover evidence",
+  body: "The full reproducible test description.",
+  tags: ["PX4"],
+  image_urls: [],
+  created_at: "2026-07-25T12:00:00Z",
+  comment_count: 4,
+  like_count: 7,
+  liked_by_viewer: false,
+};
+
 function rpcResult(data: unknown[]) {
   return {
     abortSignal: vi.fn().mockResolvedValue({ data, error: null }),
@@ -44,21 +64,7 @@ describe("CommunityPage public data loading", () => {
     supabaseMock.deleteAuthorEq.mockResolvedValue({ error: null });
     supabaseMock.rpc.mockImplementation((name: string) => {
       if (name === "community_list_comments") return rpcResult([]);
-      return rpcResult([
-        {
-          id: "00000000-0000-0000-0000-000000000001",
-          author_id: "00000000-0000-0000-0000-000000000002",
-          author_name: "Pilot",
-          title: "Stable hover evidence",
-          body: "The full reproducible test description.",
-          tags: ["PX4"],
-          image_urls: [],
-          created_at: "2026-07-25T12:00:00Z",
-          comment_count: 4,
-          like_count: 7,
-          liked_by_viewer: false,
-        },
-      ]);
+      return rpcResult([topicFixture]);
     });
   });
 
@@ -76,9 +82,30 @@ describe("CommunityPage public data loading", () => {
     );
     expect(screen.getByText("7")).toBeVisible();
     expect(screen.getByText("4")).toBeVisible();
+    expect(screen.getByRole("button", { name: "7 likes" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    const tagFilter = screen.getByRole("button", { name: "#Simulation" });
+    expect(tagFilter).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(tagFilter);
+    expect(tagFilter).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("searchbox", {
       name: "Search topics, evidence, or tags",
     })).toBeVisible();
+  });
+
+  it("shows an actionable empty state without a dead-end more link", async () => {
+    window.history.replaceState(null, "", "/community/");
+    supabaseMock.rpc.mockImplementation(() => rpcResult([]));
+    render(
+      <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
+    );
+
+    expect(await screen.findByText(
+      "No topic matches this view. Start the first evidence-backed discussion.",
+    )).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("link", { name: "More topics" })).toBeNull();
   });
 
   it("loads only the selected topic's comments when opening a discussion", async () => {
@@ -124,11 +151,15 @@ describe("CommunityPage public data loading", () => {
       "Describe the aircraft, route, parameters, observed result, evidence already checked, and the exact comparison you want the community to review.",
     )).toBeVisible();
 
-    const customTag = screen.getByPlaceholderText("Add a custom tag");
+    const customTag = screen.getByRole("textbox", { name: "Add a custom tag" });
     fireEvent.change(customTag, { target: { value: "Wind tunnel" } });
     fireEvent.keyDown(customTag, { key: "Enter" });
 
     expect(screen.getByRole("button", { name: "#Wind tunnel" })).toHaveClass("is-active");
+    expect(screen.getByRole("button", { name: "#Wind tunnel" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(customTag).toHaveValue("");
   });
 
@@ -198,6 +229,9 @@ describe("CommunityPage public data loading", () => {
       screen.getByRole("button", { name: "Close" }),
     ).toHaveFocus());
     const topicDialog = screen.getByRole("dialog", { name: "Stable hover evidence" });
+    expect(within(topicDialog).getByRole("textbox", {
+      name: "Add a useful observation or a reproducible next step…",
+    })).toBeVisible();
     const enabledTopicControls = Array.from(
       topicDialog.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
@@ -217,6 +251,33 @@ describe("CommunityPage public data loading", () => {
       expect(trigger).toHaveFocus();
       expect(document.body.style.overflow).toBe("");
     });
+  });
+
+  it("announces discussion errors inside the active dialog", async () => {
+    supabaseMock.rpc.mockImplementation((name: string) => {
+      if (name === "community_list_comments") {
+        return {
+          abortSignal: vi.fn().mockResolvedValue({
+            data: null,
+            error: { message: "Comment service failed." },
+          }),
+        };
+      }
+      return rpcResult([topicFixture]);
+    });
+    render(
+      <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", {
+      name: "Open discussion: Stable hover evidence",
+    }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Stable hover evidence",
+    });
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "The community connection is temporarily unavailable.",
+    );
   });
 
   it("treats the topic composer as a trapped modal and restores its trigger", async () => {
