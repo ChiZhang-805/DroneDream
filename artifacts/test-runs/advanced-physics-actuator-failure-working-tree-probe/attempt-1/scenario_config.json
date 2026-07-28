@@ -1,0 +1,17 @@
+{
+  "advanced_scenario_config": {},
+  "scenario_config": {
+    "failure_mode": "stuck_stopped_at_launch",
+    "motor_number": 2
+  },
+  "scenario_type": "actuator_failure",
+  "schema_version": "dronedream.scenario_config.v1",
+  "seed": 62001,
+  "sensor_noise_level": "medium",
+  "wind": {
+    "east": 0.0,
+    "north": 0.0,
+    "south": 0.0,
+    "west": 0.0
+  }
+}

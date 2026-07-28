@@ -1,0 +1,13 @@
+{
+  "schema_version": "dronedream.probe-preflight-failure/v1",
+  "observed_at": "2026-07-28T23:14:29Z",
+  "subject_head_verified_by_windows_git": "793f02089413f2baa8ea78387cd1e9e078f02b83",
+  "exit_code": 66,
+  "phase": "preflight_before_px4_launch",
+  "reason": "WSL git could not resolve the Windows worktree .git pointer",
+  "stderr_excerpt": "fatal: not a git repository: /mnt/z/DroneDream-worktrees/aurora-20260728/Z:/DroneDream/.git/worktrees/aurora-20260728",
+  "px4_or_gazebo_started": false,
+  "residual_process_count": 0,
+  "openai_api_key_used": false,
+  "disposition": "preserved; exact-commit and clean-worktree checks remain Windows-side preflight gates"
+}

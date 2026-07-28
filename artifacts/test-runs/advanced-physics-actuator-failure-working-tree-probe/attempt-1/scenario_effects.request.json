@@ -1,0 +1,34 @@
+{
+  "effects": [
+    {
+      "capability": {
+        "reason": "the bundled launcher hard-clamps one deterministic x500 motor to zero maximum rotational velocity in Trial-local SDF, verifies generated runtime SDF, and requires Gazebo joint-state proof that the failed rotor remains stopped while at least one healthy rotor turns",
+        "status": "available"
+      },
+      "effect_id": "scenario_type.actuator_failure",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "sdformat_actuator_hard_stop",
+      "requested_value": {
+        "config": {
+          "failure_mode": "stuck_stopped_at_launch",
+          "motor_number": 2
+        },
+        "scenario_type": "actuator_failure"
+      },
+      "source": "scenario_type"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-actuator-failure-working-tree-probe",
+    "seed": 62001,
+    "trial_id": "advanced-physics-actuator-failure-exact-793f020-seed-62001-attempt-1"
+  },
+  "request_sha256": "7fda866d8eb6bfccecf00b1bcb9ac0c78c3993783b7bf3160554c4a4dc247a8a",
+  "scenario_type": "actuator_failure",
+  "schema_version": "dronedream.scenario_effect_request.v1"
+}
