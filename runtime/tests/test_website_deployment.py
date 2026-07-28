@@ -50,20 +50,25 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
                 )
                 self.assertRegex(config, r'default\s+"no-cache";')
 
-    def test_mainland_targets_separate_production_https_from_ip_preview(self) -> None:
+    def test_targets_define_global_pages_and_bare_ip_mirror(self) -> None:
         targets = json.loads(self.read("website/deployment-targets.json"))
-        production = targets["production"]
-        preview = targets["preview"]
+        global_target = targets["global"]
+        mirror = targets["mirror"]
 
-        self.assertEqual(production["remote"], preview["remote"])
-        self.assertEqual(production["publicHost"], "cn.getdronedream.com")
-        self.assertEqual(production["vhostMode"], "preserve")
-        self.assertEqual(preview["publicHost"], "47.93.180.216")
-        self.assertEqual(preview["vhostMode"], "install")
+        self.assertEqual(set(targets), {"global", "mirror"})
+        self.assertEqual(global_target["platform"], "github-pages")
+        self.assertEqual(global_target["publicHost"], "getdronedream.com")
+        self.assertEqual(mirror["platform"], "baota")
+        self.assertEqual(mirror["publicHost"], "47.93.180.216")
+        self.assertEqual(mirror["vhostMode"], "install")
+        self.assertEqual(
+            global_target["artifactDirectory"],
+            mirror["artifactDirectory"],
+        )
 
         for name, target, expected_scheme in (
-            ("production", production, "https"),
-            ("preview", preview, "http"),
+            ("global", global_target, "https"),
+            ("mirror", mirror, "http"),
         ):
             with self.subTest(name=name):
                 uri = urlsplit(target["publicBaseUri"])
@@ -73,11 +78,7 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
                 self.assertFalse(uri.query)
                 self.assertFalse(uri.fragment)
 
-    def test_managed_vhosts_name_canonical_and_preview_hosts(self) -> None:
-        required_names = {
-            "cn.getdronedream.com",
-            "47.93.180.216",
-        }
+    def test_managed_vhosts_name_only_the_bare_ip_mirror(self) -> None:
         for name in ("dronedream-public.conf", "dronedream-staging.conf"):
             with self.subTest(name=name):
                 config = self.read(f"website/nginx/baota/{name}")
@@ -87,7 +88,8 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
                     config,
                 ):
                     configured_names.update(directive.split())
-                self.assertTrue(required_names.issubset(configured_names))
+                self.assertIn("47.93.180.216", configured_names)
+                self.assertNotIn("cn.getdronedream.com", configured_names)
 
     def test_readme_routes_baota_deployments_through_the_wrapper(self) -> None:
         readme = self.read("website/README.md")
@@ -100,6 +102,8 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertRegex(readme, r"(?i)not the supported path")
         self.assertIn("bare-IP", readme)
         self.assertIn("HTTPS", readme)
+        self.assertIn("same commit-pinned artifact", readme)
+        self.assertNotIn("cn.getdronedream.com", readme)
         self.assertIn("LEGACY", legacy_script)
         self.assertIn("deploy-static-baota.ps1", legacy_script)
 
@@ -120,36 +124,33 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("dronedream-staging.conf", wrapper)
         self.assertIn("dronedream-public.conf", wrapper)
         self.assertIn("deployment-targets.json", wrapper)
-        self.assertIn('[string]$TargetMode = "Production"', wrapper)
-        self.assertIn("Production deployments require HTTPS.", wrapper)
-        self.assertIn("Preview deployments use the explicit bare-IP HTTP target.", wrapper)
-        self.assertIn("Remote=$expectedRemote", wrapper)
+        self.assertIn('[string]$ArtifactDirectory = ""', wrapper)
+        self.assertIn("[string]$ExpectedCommit", wrapper)
+        self.assertNotIn("$TargetMode", wrapper)
+        self.assertNotIn("Production deployments", wrapper)
+        self.assertNotIn("Preview deployments", wrapper)
+        self.assertIn("dronedream-shared-static-site", wrapper)
+        self.assertIn("public-SHA256SUMS", wrapper)
+        self.assertIn("Verified the versioned GitHub release asset", wrapper)
+        self.assertIn("verify-site-parity.ps1", self.read("website/README.md"))
         self.assertIn("max-age=31536000", wrapper)
         self.assertNotRegex(wrapper, re.compile(r"(?i)private[-_ ]?key\s*=\s*['\"]"))
 
         remote_deploy = self.read("website/scripts/deploy-static-baota.sh")
         self.assertIn("http://127.0.0.1:18080/console/", remote_deploy)
-        self.assertIn('--resolve "$public_host:443:127.0.0.1"', remote_deploy)
-        self.assertIn("validate_preserved_public_vhost", remote_deploy)
-        self.assertIn("preserved vhost does not declare server_name", remote_deploy)
-        self.assertIn("does not listen on 443 with TLS", remote_deploy)
-        self.assertIn("^strict-transport-security:", remote_deploy)
+        self.assertIn("the approved bare-IP mirror", remote_deploy)
+        self.assertNotIn("validate_preserved_public_vhost", remote_deploy)
+        self.assertNotIn("public_scheme", remote_deploy)
+        self.assertNotIn("vhost_mode", remote_deploy)
+        self.assertIn("build-manifest.json", remote_deploy)
         self.assertIn("camera=\\(self\\)", remote_deploy)
 
-    def test_remote_rollback_never_removes_a_preserved_tls_vhost(self) -> None:
+    def test_remote_rollback_restores_the_previous_mirror_vhost(self) -> None:
         remote_deploy = self.read("website/scripts/deploy-static-baota.sh")
 
         self.assertIn("public_config_changed=0", remote_deploy)
         self.assertIn("if [[ $public_config_changed -eq 1 ]]; then", remote_deploy)
-        self.assertIn("if [[ $vhost_mode == install ]]; then", remote_deploy)
         self.assertEqual(remote_deploy.count("public_config_changed=1"), 1)
-        assignment = remote_deploy.index("public_config_changed=1")
-        install_gate = remote_deploy.rfind(
-            "if [[ $vhost_mode == install ]]; then",
-            0,
-            assignment,
-        )
-        self.assertNotEqual(install_gate, -1)
         rollback = remote_deploy[
             remote_deploy.index("rollback() {") : remote_deploy.index("curl_until_contains() {")
         ]
@@ -157,17 +158,17 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         remove_vhost = rollback.index('rm -f "$public_vhost"')
         self.assertLess(changed_gate, remove_vhost)
 
-    def test_pages_custom_domain_is_opt_in_until_dns_is_ready(self) -> None:
+    def test_pages_build_pins_the_verified_global_domain_and_shared_artifact(self) -> None:
         builder = self.read("website/scripts/build-pages-site.ps1")
         workflow = self.read(".github/workflows/pages.yml")
 
-        self.assertIn("DRONEDREAM_CUSTOM_DOMAIN", builder)
-        self.assertIn("Remove-Item -LiteralPath $cnamePath", builder)
-        self.assertNotIn('"getdronedream.com$([Environment]::NewLine)"', builder)
-        self.assertIn(
-            "DRONEDREAM_CUSTOM_DOMAIN: ${{ vars.DRONEDREAM_CUSTOM_DOMAIN }}",
-            workflow,
-        )
+        self.assertNotIn("DRONEDREAM_CUSTOM_DOMAIN", builder)
+        self.assertIn('$customDomain = [string]$globalTarget.publicHost', builder)
+        self.assertIn("build-manifest.json", builder)
+        self.assertIn("SHA256SUMS", builder)
+        self.assertIn("dronedream-shared-static-site", builder)
+        self.assertIn("dronedream-site-${{ github.sha }}", workflow)
+        self.assertIn("include-hidden-files: true", workflow)
 
     def test_pages_build_verifies_policy_source_and_compiled_policy_links(self) -> None:
         builder = self.read("website/scripts/build-pages-site.ps1")

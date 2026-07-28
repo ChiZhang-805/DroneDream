@@ -165,4 +165,33 @@ describe("CommunityPage public data loading", () => {
     );
     confirm.mockRestore();
   });
+
+  it("uses the matched editorial cover and an icon-only comment submit control", async () => {
+    const { container } = render(
+      <CommunityPage
+        locale="en"
+        account={{
+          id: "00000000-0000-0000-0000-000000000003",
+          email: "pilot@example.com",
+          displayName: "Pilot",
+          avatarUrl: null,
+        }}
+        onRequireAccount={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole("heading", { name: "Stable hover evidence" });
+    expect(container.querySelector('[data-template="evidence"]')).toBeVisible();
+    fireEvent.click(screen.getByRole("button", {
+      name: "Open discussion: Stable hover evidence",
+    }));
+
+    await waitFor(() => expect(
+      screen.getByRole("dialog", { name: "Stable hover evidence" }),
+    ).toBeVisible());
+    const submit = screen.getByRole("button", { name: "Post comment" });
+    expect(submit.querySelector("svg")).not.toBeNull();
+    expect(submit).toHaveTextContent("Post comment");
+    expect(submit.querySelector(".site-sr-only")).toHaveTextContent("Post comment");
+  });
 });

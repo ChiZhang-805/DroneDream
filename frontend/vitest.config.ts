@@ -10,5 +10,9 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     css: false,
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    env: {
+      VITE_BILLING_CHECKOUT_URL:
+        "https://cloud.example.test/functions/v1/billing-checkout",
+    },
   },
 });

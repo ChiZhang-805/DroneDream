@@ -1,6 +1,6 @@
 import compactLockup from "../assets/drone-dream-lockup-compact.png";
 import brandMark from "../assets/drone-dream-mark.png";
-import primaryWordmark from "../../../docs/assets/brand/drone-dream-wordmark-primary.png";
+import primaryWordmark from "../assets/drone-dream-wordmark-primary.png";
 
 type BrandLockupProps = {
   variant?: "primary" | "compact";

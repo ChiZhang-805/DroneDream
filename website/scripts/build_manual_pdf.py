@@ -64,8 +64,9 @@ CONTENT = {
                 "number": "1",
                 "title": "Start here",
                 "body": (
-                    "DroneDream is a local-first workspace for configuring, simulating, and "
-                    "comparing PX4 controller parameters. Language models clarify intent and "
+                    "DroneDream is an agentic PX4 and Gazebo control-parameter optimization "
+                    "platform for configuring, simulating, and comparing controller parameters. "
+                    "Language models clarify intent and "
                     "prepare reviewable drafts; deterministic validation, constraints, "
                     "acceptance rules, and human review keep every experiment reproducible."
                 ),
@@ -222,7 +223,7 @@ CONTENT = {
                 "number": "1",
                 "title": "开始之前",
                 "body": (
-                    "DroneDream 是一个本地优先的 PX4 控制参数调优工作台。大语言模型可以帮助理解"
+                    "DroneDream 是一个智能体驱动的 PX4 与 Gazebo 控制参数优化平台。大语言模型可以帮助理解"
                     "意图并准备可审查草稿，但字段校验、耦合规则、仿真执行和验收判断始终由确定性的"
                     "工程流程控制。"
                 ),

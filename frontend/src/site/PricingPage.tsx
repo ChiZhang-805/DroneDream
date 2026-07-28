@@ -3,7 +3,9 @@ import {
   CreditCard,
   FileOutput,
   Gauge,
+  GitCompareArrows,
   KeyRound,
+  Route,
   ShieldCheck,
   Sparkles,
   Stamp,
@@ -32,7 +34,10 @@ type FeatureKey =
   | "allowance"
   | "byok"
   | "reports"
-  | "watermarkFree";
+  | "comparisonWorkspace"
+  | "watermarkFree"
+  | "premiumRouting"
+  | "advancedHarness";
 
 interface PricingPageProps {
   locale: SiteLocale;
@@ -60,7 +65,10 @@ const FEATURE_KEYS: readonly FeatureKey[] = [
   "allowance",
   "byok",
   "reports",
+  "comparisonWorkspace",
   "watermarkFree",
+  "premiumRouting",
+  "advancedHarness",
 ];
 
 const FEATURE_ICONS: Record<FeatureKey, LucideIcon> = {
@@ -69,13 +77,16 @@ const FEATURE_ICONS: Record<FeatureKey, LucideIcon> = {
   allowance: Gauge,
   byok: KeyRound,
   reports: FileOutput,
+  comparisonWorkspace: GitCompareArrows,
   watermarkFree: Stamp,
+  premiumRouting: Route,
+  advancedHarness: Sparkles,
 };
 
 const pricingContent = {
   en: {
-    title: "The same complete product. More included AI.",
-    mobileTitle: "Choose your allowance.",
+    title: "Choose the optimization depth for every flight.",
+    mobileTitle: "Choose your optimization depth.",
     audienceLabel: "Workspace type",
     individual: "Individual",
     business: "Business",
@@ -88,10 +99,13 @@ const pricingContent = {
     unavailableStatus: "Not included",
     features: {
       workflow: "Complete DroneDream tuning workflow",
-      harness: "Full AURORA optimization Harness",
+      harness: "Core AURORA optimization Harness",
       byok: "BYOK fallback after the included allowance",
       reports: "Experiment and comparison report export",
+      comparisonWorkspace: "Expanded multi-experiment comparison workspace",
       watermarkFree: "Watermark-free PDF report export",
+      premiumRouting: "Premium managed-model routing",
+      advancedHarness: "Advanced AURORA strategy previews",
     },
     allowanceFeature: (credits: string) => `${credits} managed AI credits each month`,
     close: "Close payment dialog",
@@ -107,8 +121,8 @@ const pricingContent = {
       "The plan activates only after DroneDream verifies the payment provider callback.",
   },
   "zh-CN": {
-    title: "完整能力完全相同，只增加赠送 AI 额度。",
-    mobileTitle: "选择赠送额度。",
+    title: "为每一次飞行选择合适的优化深度。",
+    mobileTitle: "选择适合你的优化深度。",
     audienceLabel: "工作空间类型",
     individual: "个人",
     business: "商业",
@@ -121,10 +135,13 @@ const pricingContent = {
     unavailableStatus: "未包含",
     features: {
       workflow: "完整的 DroneDream 调优工作流",
-      harness: "完整的 AURORA 优化 Harness",
+      harness: "AURORA 核心优化 Harness",
       byok: "赠送额度用尽后切换到自己的 API Key",
       reports: "导出实验与对比报告",
+      comparisonWorkspace: "扩展的多实验对比工作区",
       watermarkFree: "导出无水印 PDF 报告",
+      premiumRouting: "高性能托管模型智能路由",
+      advancedHarness: "优先体验 AURORA 高级策略",
     },
     allowanceFeature: (credits: string) => `每月 ${credits} 托管模型 AI 额度`,
     close: "关闭支付弹窗",
@@ -262,8 +279,21 @@ export function PricingPage({
     return copy.features[feature];
   };
 
-  const featureIncluded = (feature: FeatureKey, plan: Plan): boolean =>
-    feature !== "watermarkFree" || plan.id !== "free";
+  const featureIncluded = (feature: FeatureKey, plan: Plan): boolean => {
+    const planLevel = { free: 0, plus: 1, pro: 2 }[plan.id];
+    const minimumLevel: Record<FeatureKey, number> = {
+      workflow: 0,
+      harness: 0,
+      allowance: 0,
+      byok: 0,
+      reports: 0,
+      comparisonWorkspace: 1,
+      watermarkFree: 1,
+      premiumRouting: 2,
+      advancedHarness: 2,
+    };
+    return planLevel >= minimumLevel[feature];
+  };
 
   return (
     <div className="site-portal pricing-page">

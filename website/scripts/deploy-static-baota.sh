@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ $# -ne 8 ]]; then
-  echo "usage: $0 ARCHIVE VERSION INSTALLER_SHA256 STAGING_CONF PUBLIC_CONF PUBLIC_HOST PUBLIC_SCHEME VHOST_MODE" >&2
+if [[ $# -ne 6 ]]; then
+  echo "usage: $0 ARCHIVE VERSION INSTALLER_SHA256 STAGING_CONF PUBLIC_CONF PUBLIC_HOST" >&2
   exit 64
 fi
 
@@ -12,8 +12,6 @@ expected_installer_sha=${3,,}
 staging_config=$4
 public_config=$5
 public_host=$6
-public_scheme=$7
-vhost_mode=$8
 
 if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "invalid release version: $version" >&2
@@ -23,36 +21,16 @@ if [[ ! $expected_installer_sha =~ ^[0-9a-f]{64}$ ]]; then
   echo "invalid installer SHA-256" >&2
   exit 64
 fi
-if [[ ! $public_host =~ ^[0-9A-Za-z.-]+$ ]]; then
-  echo "invalid public host" >&2
+if [[ $public_host != 47.93.180.216 ]]; then
+  echo "the BaoTa deployment target must be the approved bare-IP mirror" >&2
   exit 64
 fi
-if [[ $public_scheme != http && $public_scheme != https ]]; then
-  echo "invalid public scheme: $public_scheme" >&2
-  exit 64
-fi
-if [[ $vhost_mode != install && $vhost_mode != preserve ]]; then
-  echo "invalid vhost mode: $vhost_mode" >&2
-  exit 64
-fi
-if [[ $vhost_mode == install && $public_scheme != http ]]; then
-  echo "the repository-managed vhost is HTTP preview-only" >&2
-  exit 64
-fi
-if [[ $vhost_mode == preserve && $public_scheme != https ]]; then
-  echo "preserved production vhosts must be verified over HTTPS" >&2
-  exit 64
-fi
-for required_file in "$archive" "$staging_config"; do
+for required_file in "$archive" "$staging_config" "$public_config"; do
   if [[ ! -f $required_file ]]; then
     echo "missing deployment input: $required_file" >&2
     exit 66
   fi
 done
-if [[ $vhost_mode == install && ! -f $public_config ]]; then
-  echo "missing deployment input: $public_config" >&2
-  exit 66
-fi
 for command_name in awk curl find flock grep install mv nginx python3 readlink rm \
   sha256sum systemctl tar tr; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -73,11 +51,9 @@ release_dir="$releases/$release_id"
 next_link="$base/.current-${release_id}"
 candidate_link="$base/.candidate-${release_id}"
 config_backup=""
-installer_name_file=""
 had_public_config=0
 previous_target=""
 public_config_changed=0
-nginx_dump_file=""
 
 # Serialize releases so two operators or CI retries cannot delete or activate
 # each other's candidate directories during the rollback window.
@@ -91,12 +67,6 @@ fi
 cleanup_temp_files() {
   if [[ -n $config_backup ]]; then
     rm -f -- "$config_backup"
-  fi
-  if [[ -n $installer_name_file ]]; then
-    rm -f -- "$installer_name_file"
-  fi
-  if [[ -n $nginx_dump_file ]]; then
-    rm -f -- "$nginx_dump_file"
   fi
 }
 trap cleanup_temp_files EXIT
@@ -115,61 +85,10 @@ if [[ -e $staging_vhost ]]; then
   echo "$staging_vhost already exists; remove the stale DroneDream staging vhost first" >&2
   exit 73
 fi
-if [[ $vhost_mode == preserve && ! -f $public_vhost ]]; then
-  echo "the production BaoTa vhost is missing: $public_vhost" >&2
-  exit 66
-fi
-if [[ $vhost_mode == install && -e $public_vhost ]]; then
+if [[ -e $public_vhost ]]; then
   config_backup=$(mktemp /tmp/dronedream-nginx-backup.XXXXXX)
   cp -a "$public_vhost" "$config_backup"
   had_public_config=1
-fi
-
-validate_preserved_public_vhost() {
-  nginx_dump_file=$(mktemp /tmp/dronedream-nginx-dump.XXXXXX)
-  nginx -T >"$nginx_dump_file" 2>&1
-  python3 - "$nginx_dump_file" "$public_host" <<'PY'
-import pathlib
-import re
-import sys
-
-text = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-host = sys.argv[2]
-
-server_blocks: list[str] = []
-for match in re.finditer(r"\bserver\s*\{", text):
-    depth = 1
-    index = match.end()
-    while index < len(text) and depth:
-        if text[index] == "{":
-            depth += 1
-        elif text[index] == "}":
-            depth -= 1
-        index += 1
-    if depth == 0:
-        server_blocks.append(text[match.start():index])
-
-def names(block: str) -> set[str]:
-    found: set[str] = set()
-    for directive in re.findall(r"(?m)^\s*server_name\s+([^;]+);", block):
-        found.update(directive.split())
-    return found
-
-matching = [block for block in server_blocks if host in names(block)]
-if not matching:
-    raise SystemExit(f"preserved vhost does not declare server_name {host}")
-if not any(
-    re.search(r"(?m)^\s*listen\s+(?:[^;\s]+:)?443\b[^;]*\bssl\b[^;]*;", block)
-    for block in matching
-):
-    raise SystemExit(f"preserved vhost for {host} does not listen on 443 with TLS")
-PY
-  rm -f -- "$nginx_dump_file"
-  nginx_dump_file=""
-}
-
-if [[ $vhost_mode == preserve ]]; then
-  validate_preserved_public_vhost
 fi
 
 rollback() {
@@ -317,26 +236,28 @@ tar --extract --gzip --file "$archive" --directory "$upload_dir" \
   --no-same-owner --no-same-permissions
 test -f "$upload_dir/index.html"
 test -f "$upload_dir/SHA256SUMS"
+test -f "$upload_dir/build-manifest.json"
 test -f "$upload_dir/downloads/latest.json"
 pushd "$upload_dir" >/dev/null
 sha256sum --check SHA256SUMS
 popd >/dev/null
 
-installer_name_file=$(mktemp /tmp/dronedream-installer-name.XXXXXX)
-# Keep validation outside a command substitution. With `set -E`, an error
-# raised inside `$(...)` inherits the ERR trap and can invoke rollback once in
-# the subshell and once again in the parent shell.
-if ! python3 - "$upload_dir/downloads/latest.json" "$version" "$expected_installer_sha" \
-    >"$installer_name_file" <<'PY'
+if ! python3 - "$upload_dir/downloads/latest.json" \
+    "$upload_dir/build-manifest.json" "$version" "$expected_installer_sha" \
+    "$public_host" <<'PY'
 import json
 import pathlib
+import re
 import sys
 from datetime import date
 
-path = pathlib.Path(sys.argv[1])
-version = sys.argv[2]
-expected_sha = sys.argv[3]
-data = json.loads(path.read_text(encoding="utf-8"))
+metadata_path = pathlib.Path(sys.argv[1])
+build_manifest_path = pathlib.Path(sys.argv[2])
+version = sys.argv[3]
+expected_sha = sys.argv[4]
+public_host = sys.argv[5]
+data = json.loads(metadata_path.read_text(encoding="utf-8"))
+build_manifest = json.loads(build_manifest_path.read_text(encoding="utf-8"))
 if data.get("version") != version:
     raise SystemExit("latest.json version does not match the deployment version")
 if data.get("sha256") != expected_sha:
@@ -347,21 +268,23 @@ if not isinstance(name, str) or pathlib.PurePath(name).name != name:
 expected_name = f"DroneDream_{version}_x64-setup.exe"
 if name != expected_name:
     raise SystemExit("latest.json installer filename does not match the release version")
-if data.get("downloadUrl") != f"/downloads/{name}":
+release = build_manifest.get("release")
+if not isinstance(release, dict):
+    raise SystemExit("build manifest release metadata is missing")
+release_tag = release.get("releaseTag")
+if not isinstance(release_tag, str) or not re.fullmatch(r"[A-Za-z0-9._-]+", release_tag):
+    raise SystemExit("build manifest release tag is invalid")
+download_url = (
+    "https://github.com/ChiZhang-805/DroneDream/releases/download/"
+    f"{release_tag}/{name}"
+)
+if data.get("downloadUrl") != download_url:
     raise SystemExit("latest.json contains an inconsistent installer URL")
-checksum_name = f"{name}.sha256"
-if data.get("checksumUrl") != f"/downloads/{checksum_name}":
+if data.get("checksumUrl") != f"{download_url}.sha256":
     raise SystemExit("latest.json contains an inconsistent checksum URL")
-installer = path.parent / name
-checksum = path.parent / checksum_name
-if not installer.is_file() or not checksum.is_file():
-    raise SystemExit("latest.json references a missing release artifact")
 size_bytes = data.get("sizeBytes")
-if not isinstance(size_bytes, int) or size_bytes <= 0 or size_bytes != installer.stat().st_size:
-    raise SystemExit("latest.json installer size does not match the release artifact")
-checksum_fields = checksum.read_text(encoding="utf-8").strip().split()
-if checksum_fields != [expected_sha, name]:
-    raise SystemExit("published checksum file does not match latest.json")
+if not isinstance(size_bytes, int) or size_bytes <= 0:
+    raise SystemExit("latest.json installer size is invalid")
 published_at = data.get("publishedAt")
 try:
     parts = [int(part) for part in published_at.split("-")]
@@ -370,22 +293,31 @@ try:
         raise ValueError("date must use YYYY-MM-DD")
 except (AttributeError, TypeError, ValueError) as exc:
     raise SystemExit("latest.json contains an invalid publication date") from exc
-print(name)
+if (
+    build_manifest.get("schemaVersion") != 1
+    or build_manifest.get("artifactKind") != "dronedream-shared-static-site"
+    or not re.fullmatch(r"[0-9a-f]{40}", str(build_manifest.get("sourceCommit", "")))
+    or build_manifest.get("origins")
+    != {
+        "global": "https://getdronedream.com/",
+        "mirror": f"http://{public_host}/",
+    }
+):
+    raise SystemExit("build manifest does not match the approved deployment topology")
+expected_release = {
+    "version": version,
+    "releaseTag": release_tag,
+    "fileName": name,
+    "sha256": expected_sha,
+    "sizeBytes": size_bytes,
+    "publishedAt": published_at,
+}
+if release != expected_release:
+    raise SystemExit("build manifest release metadata does not match latest.json")
 PY
 then
   echo "release metadata validation failed" >&2
   false
-fi
-installer_name=$(tr -d '\r\n' <"$installer_name_file")
-rm -f -- "$installer_name_file"
-installer_name_file=""
-
-installer_path="$upload_dir/downloads/$installer_name"
-test -f "$installer_path"
-actual_installer_sha=$(sha256sum "$installer_path" | awk '{print $1}')
-if [[ $actual_installer_sha != "$expected_installer_sha" ]]; then
-  echo "installer SHA-256 does not match the expected release" >&2
-  exit 65
 fi
 
 find "$upload_dir" -type d -exec chmod 0755 {} +
@@ -396,7 +328,7 @@ ln -s "$release_dir" "$candidate_link"
 mv -Tf "$candidate_link" "$candidate"
 
 # First validate the release on a loopback-only port. Nothing public changes
-# unless this page, metadata, and installer all pass their health checks.
+# unless the page, metadata, build manifest, and security headers pass.
 install -m 0644 "$staging_config" "$staging_vhost"
 nginx -t
 systemctl reload nginx
@@ -408,37 +340,27 @@ staging_console=$(
     http://127.0.0.1:18080/console/
 )
 staging_metadata=$(
-  curl_until_contains "\"version\":  \"$version\"" -fsS --max-time 10 \
+  curl_until_regex '"version":[[:space:]]*"'"$version"'"' -fsS --max-time 10 \
     http://127.0.0.1:18080/downloads/latest.json
 )
-staging_installer_headers=$(
-  curl_until_regex '^content-type: application/octet-stream' -fsSI --max-time 10 \
-    "http://127.0.0.1:18080/downloads/$installer_name"
+staging_build_manifest=$(
+  curl_until_regex '"artifactKind":[[:space:]]*"dronedream-shared-static-site"' \
+    -fsS --max-time 10 http://127.0.0.1:18080/build-manifest.json
 )
 staging_security_headers=$(
   curl_until_security_headers -fsSI --max-time 10 http://127.0.0.1:18080/
 )
 
-# Publish the candidate. Preview mode installs the repository-managed HTTP
-# vhost. Production mode preserves the employee-managed BaoTa TLS vhost and
-# validates it before this point.
+# Publish the candidate to the repository-managed HTTP bare-IP mirror.
 ln -s "$release_dir" "$next_link"
 mv -Tf "$next_link" "$current"
-if [[ $vhost_mode == install ]]; then
-  public_config_changed=1
-  install -m 0644 "$public_config" "$public_vhost"
-fi
+public_config_changed=1
+install -m 0644 "$public_config" "$public_vhost"
 nginx -t
 systemctl reload nginx
 
-public_curl_args=()
-if [[ $public_scheme == https ]]; then
-  public_origin="https://$public_host"
-  public_curl_args=(--resolve "$public_host:443:127.0.0.1")
-else
-  public_origin="http://127.0.0.1"
-  public_curl_args=(-H "Host: $public_host")
-fi
+public_origin="http://127.0.0.1"
+public_curl_args=(-H "Host: $public_host")
 public_page=$(
   curl_until_contains '<title>DroneDream' -fsS --max-time 10 \
     "${public_curl_args[@]}" "$public_origin/"
@@ -448,26 +370,18 @@ public_console=$(
     "${public_curl_args[@]}" "$public_origin/console/"
 )
 public_metadata=$(
-  curl_until_contains "\"version\":  \"$version\"" -fsS --max-time 10 \
+  curl_until_regex '"version":[[:space:]]*"'"$version"'"' -fsS --max-time 10 \
     "${public_curl_args[@]}" "$public_origin/downloads/latest.json"
 )
-public_installer_headers=$(
-  curl_until_regex '^content-length:' -fsSI --max-time 10 \
-    "${public_curl_args[@]}" "$public_origin/downloads/$installer_name"
+public_build_manifest=$(
+  curl_until_regex '"artifactKind":[[:space:]]*"dronedream-shared-static-site"' \
+    -fsS --max-time 10 "${public_curl_args[@]}" \
+    "$public_origin/build-manifest.json"
 )
 public_security_headers=$(
   curl_until_security_headers -fsSI --max-time 10 \
     "${public_curl_args[@]}" "$public_origin/"
 )
-if [[ $public_scheme == https ]]; then
-  curl_until_regex '^strict-transport-security:' -fsSI --max-time 10 \
-    "${public_curl_args[@]}" "$public_origin/" >/dev/null
-  redirect_headers=$(
-    curl_until_regex '^location:[[:space:]]*https://'"$public_host"'/' \
-      -fsSI --max-time 10 -H "Host: $public_host" http://127.0.0.1/
-  )
-fi
-
 rm -f "$candidate" "$staging_vhost"
 nginx -t
 systemctl reload nginx
@@ -475,5 +389,4 @@ systemctl reload nginx
 trap - ERR INT TERM
 echo "DRONEDREAM_RELEASE=$release_id"
 echo "DRONEDREAM_CURRENT=$(readlink "$current")"
-echo "DRONEDREAM_INSTALLER=$installer_name"
-echo "DRONEDREAM_SHA256=$actual_installer_sha"
+echo "DRONEDREAM_SHA256=$expected_installer_sha"

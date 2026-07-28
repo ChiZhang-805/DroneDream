@@ -52,7 +52,7 @@ The stages summarize this progression:
 5. **Feedback and refinement** — use failures to improve the next attempt.
 6. **Final project** — combine the pieces into a domain-specific engineering
    system.
-7. **DroneDream** — extend the course discipline into a local-first PX4/Gazebo
+7. **DroneDream** — extend the course discipline into an evidence-governed PX4/Gazebo
    optimization product.
 
 Each stage states both the lesson and its boundary. The page deliberately avoids

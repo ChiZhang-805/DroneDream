@@ -78,4 +78,38 @@ describe("PricingPage payment channels", () => {
       expect(billingMock.createBillingCheckout).toHaveBeenCalledWith("plus", "card");
     });
   });
+
+  it("presents a strictly progressive feature matrix", async () => {
+    render(
+      <PricingPage
+        locale="en"
+        authenticated
+        onRequireAccount={vi.fn()}
+      />,
+    );
+
+    await screen.findByText(/15,000,000 managed AI credits/i);
+
+    const advancedRows = screen.getAllByText("Advanced AURORA strategy previews");
+    const routingRows = screen.getAllByText("Premium managed-model routing");
+    const comparisonRows = screen.getAllByText(
+      "Expanded multi-experiment comparison workspace",
+    );
+
+    expect(advancedRows.map((row) => row.closest("li")?.dataset.available)).toEqual([
+      "false",
+      "false",
+      "true",
+    ]);
+    expect(routingRows.map((row) => row.closest("li")?.dataset.available)).toEqual([
+      "false",
+      "false",
+      "true",
+    ]);
+    expect(comparisonRows.map((row) => row.closest("li")?.dataset.available)).toEqual([
+      "false",
+      "true",
+      "true",
+    ]);
+  });
 });

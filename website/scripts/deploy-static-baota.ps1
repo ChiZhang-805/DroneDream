@@ -4,17 +4,10 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$SshKeyPath,
 
-    [ValidateSet("Production", "Preview")]
-    [string]$TargetMode = "Production",
+    [string]$ArtifactDirectory = "",
 
-    [string]$Remote = "",
-    [string]$PublicHost = "",
-    [string]$PublicBaseUri = "",
-
-    [ValidateSet("preserve", "install")]
-    [string]$VhostMode = "preserve",
-
-    [switch]$SkipBuild
+    [ValidatePattern('^[0-9a-f]{40}$')]
+    [string]$ExpectedCommit = ""
 )
 
 Set-StrictMode -Version Latest
@@ -104,23 +97,15 @@ if (-not (Test-Path -LiteralPath $targetConfigPath -PathType Leaf)) {
 }
 $targets = Get-Content -LiteralPath $targetConfigPath -Raw -Encoding UTF8 |
     ConvertFrom-Json
-$targetName = $TargetMode.ToLowerInvariant()
-$target = $targets.$targetName
-if ($null -eq $target) {
-    throw "Deployment target configuration does not define $targetName."
+$globalTarget = $targets.global
+$target = $targets.mirror
+if ($null -eq $globalTarget -or $null -eq $target) {
+    throw "Deployment target configuration must define global and mirror."
 }
-if ([string]::IsNullOrWhiteSpace($Remote)) {
-    $Remote = [string]$target.remote
-}
-if ([string]::IsNullOrWhiteSpace($PublicHost)) {
-    $PublicHost = [string]$target.publicHost
-}
-if ([string]::IsNullOrWhiteSpace($PublicBaseUri)) {
-    $PublicBaseUri = [string]$target.publicBaseUri
-}
-if (-not $PSBoundParameters.ContainsKey("VhostMode")) {
-    $VhostMode = [string]$target.vhostMode
-}
+$Remote = [string]$target.remote
+$PublicHost = [string]$target.publicHost
+$PublicBaseUri = [string]$target.publicBaseUri
+$VhostMode = [string]$target.vhostMode
 
 if ($Remote -notmatch '^[A-Za-z_][A-Za-z0-9._-]*@[A-Za-z0-9][A-Za-z0-9.-]*$') {
     throw "Remote must use the safe user@host form without SSH options or paths."
@@ -143,25 +128,17 @@ if (-not $publicUri.IsAbsoluteUri -or
     $publicUri.DnsSafeHost -ne $PublicHost) {
     throw "PublicBaseUri must be the default-port root HTTP(S) URI for PublicHost."
 }
-$expectedRemote = [string]$target.remote
-$expectedHost = [string]$target.publicHost
-$expectedScheme = ([Uri][string]$target.publicBaseUri).Scheme
-$expectedVhostMode = [string]$target.vhostMode
-if ($Remote -cne $expectedRemote -or
-    $PublicHost -cne $expectedHost -or
-    $publicUri.Scheme -cne $expectedScheme -or
-    $VhostMode -cne $expectedVhostMode) {
-    throw (
-        "$TargetMode deployments require Remote=$expectedRemote, " +
-        "PublicHost=$expectedHost, " +
-        "scheme=$expectedScheme, and VhostMode=$expectedVhostMode."
-    )
-}
-if ($TargetMode -ceq "Production" -and $publicUri.Scheme -cne "https") {
-    throw "Production deployments require HTTPS."
-}
-if ($TargetMode -ceq "Preview" -and $publicUri.Scheme -cne "http") {
-    throw "Preview deployments use the explicit bare-IP HTTP target."
+if ([string]$globalTarget.platform -cne "github-pages" -or
+    [string]$globalTarget.publicHost -cne "getdronedream.com" -or
+    [string]$globalTarget.publicBaseUri -cne "https://getdronedream.com/" -or
+    [string]$target.platform -cne "baota" -or
+    $Remote -cne "root@47.93.180.216" -or
+    $PublicHost -cne "47.93.180.216" -or
+    $publicUri.Scheme -cne "http" -or
+    $VhostMode -cne "install" -or
+    [string]$globalTarget.artifactDirectory -cne
+        [string]$target.artifactDirectory) {
+    throw "Deployment targets do not match the approved GitHub Pages and bare-IP mirror topology."
 }
 if (-not (Test-Path -LiteralPath $SshKeyPath -PathType Leaf)) {
     throw "SSH private key file does not exist at the supplied path."
@@ -171,29 +148,29 @@ $resolvedKeyPath = (Resolve-Path -LiteralPath $SshKeyPath).Path
 $sshPath = (Get-Command ssh.exe -ErrorAction Stop).Source
 $scpPath = (Get-Command scp.exe -ErrorAction Stop).Source
 $tarPath = (Get-Command tar.exe -ErrorAction Stop).Source
-$siteDirectory = Join-Path $repositoryRoot 'frontend\site-dist'
-$buildScript = Join-Path $PSScriptRoot 'build-release-site.ps1'
+$configuredArtifactDirectory = Join-Path $repositoryRoot `
+    ([string]$target.artifactDirectory)
+if ([string]::IsNullOrWhiteSpace($ArtifactDirectory)) {
+    $ArtifactDirectory = $configuredArtifactDirectory
+}
+if (-not (Test-Path -LiteralPath $ArtifactDirectory -PathType Container)) {
+    throw "The shared website artifact directory does not exist: $ArtifactDirectory"
+}
+$siteDirectory = (Resolve-Path -LiteralPath $ArtifactDirectory).Path
 $serverDeployScript = Join-Path $PSScriptRoot 'deploy-static-baota.sh'
 $stagingConfig = Join-Path $repositoryRoot `
     'website\nginx\baota\dronedream-staging.conf'
 $publicConfig = Join-Path $repositoryRoot `
     'website\nginx\baota\dronedream-public.conf'
 
-if (-not $SkipBuild) {
-    $windowsPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
-    Invoke-NativeCommand -CommandPath $windowsPowerShell -CommandArguments @(
-        '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
-        '-File', $buildScript
-    )
-}
-
 $indexPath = Join-Path $siteDirectory 'index.html'
 $manifestPath = Join-Path $siteDirectory 'SHA256SUMS'
+$buildManifestPath = Join-Path $siteDirectory 'build-manifest.json'
 $metadataPath = Join-Path $siteDirectory 'downloads\latest.json'
 foreach ($requiredPath in @(
         $indexPath,
         $manifestPath,
+        $buildManifestPath,
         $metadataPath,
         $serverDeployScript,
         $stagingConfig,
@@ -206,43 +183,46 @@ foreach ($requiredPath in @(
 
 $metadata = Get-Content -LiteralPath $metadataPath -Raw -Encoding UTF8 |
     ConvertFrom-Json
+$buildManifest = Get-Content -LiteralPath $buildManifestPath -Raw -Encoding UTF8 |
+    ConvertFrom-Json
 $version = [string]$metadata.version
 $installerName = [string]$metadata.fileName
 $installerSha256 = ([string]$metadata.sha256).ToLowerInvariant()
+$sourceCommit = ([string]$buildManifest.sourceCommit).ToLowerInvariant()
 if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
     throw "latest.json contains an invalid release version."
 }
 $expectedInstallerName = "DroneDream_${version}_x64-setup.exe"
-if ($installerName -ne $expectedInstallerName -or
+$releaseTag = [string]$buildManifest.release.releaseTag
+$expectedDownloadUrl = "https://github.com/ChiZhang-805/DroneDream/releases/download/" +
+    "$releaseTag/$installerName"
+$expectedChecksumUrl = "$expectedDownloadUrl.sha256"
+if ([int]$buildManifest.schemaVersion -ne 1 -or
+    [string]$buildManifest.artifactKind -cne "dronedream-shared-static-site" -or
+    $sourceCommit -notmatch '^[0-9a-f]{40}$' -or
+    ($ExpectedCommit -and $sourceCommit -cne $ExpectedCommit) -or
+    [string]$buildManifest.origins.global -cne
+        [string]$globalTarget.publicBaseUri -or
+    [string]$buildManifest.origins.mirror -cne $PublicBaseUri -or
+    [string]$buildManifest.release.version -cne $version -or
+    [string]$buildManifest.release.fileName -cne $installerName -or
+    ([string]$buildManifest.release.sha256).ToLowerInvariant() -cne
+        $installerSha256 -or
+    [long]$buildManifest.release.sizeBytes -ne [long]$metadata.sizeBytes -or
+    [string]$buildManifest.release.publishedAt -cne
+        [string]$metadata.publishedAt) {
+    throw "build-manifest.json does not match the approved shared artifact contract."
+}
+if ($releaseTag -notmatch '^[A-Za-z0-9._-]+$' -or
+    $installerName -cne $expectedInstallerName -or
     $installerSha256 -notmatch '^[0-9a-f]{64}$' -or
-    [string]$metadata.downloadUrl -ne "/downloads/$installerName" -or
-    [string]$metadata.checksumUrl -ne "/downloads/$installerName.sha256") {
+    [long]$metadata.sizeBytes -le 0 -or
+    [string]$metadata.downloadUrl -cne $expectedDownloadUrl -or
+    [string]$metadata.checksumUrl -cne $expectedChecksumUrl) {
     throw "latest.json contains inconsistent installer metadata."
 }
-$installerPath = Join-Path $siteDirectory "downloads\$installerName"
-$installerChecksumPath = "$installerPath.sha256"
-if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $installerChecksumPath -PathType Leaf)) {
-    throw "latest.json references a missing installer or checksum file."
-}
-$installer = Get-Item -LiteralPath $installerPath
-if ([long]$metadata.sizeBytes -ne $installer.Length) {
-    throw "latest.json installer size does not match the generated EXE."
-}
-$actualInstallerSha256 = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).
-    Hash.ToLowerInvariant()
-if ($actualInstallerSha256 -ne $installerSha256) {
-    throw "latest.json installer SHA-256 does not match the generated EXE."
-}
-$checksumLine = (Get-Content -LiteralPath $installerChecksumPath -Raw -Encoding UTF8).Trim()
-if ($checksumLine -notmatch (
-        '^' + [regex]::Escape($installerSha256) + '\s+' +
-        [regex]::Escape($installerName) + '$'
-    )) {
-    throw "The published installer checksum file is inconsistent."
-}
 Test-SiteIntegrityManifest -SiteDirectory $siteDirectory -ManifestPath $manifestPath
-Write-Host "Verified local website release manifest for DroneDream $version."
+Write-Host "Verified shared website artifact $sourceCommit for DroneDream $version."
 
 $publicConfigText = Get-Content -LiteralPath $publicConfig -Raw -Encoding UTF8
 $configuredServerNames = @(
@@ -253,13 +233,9 @@ $configuredServerNames = @(
         $_.Groups[1].Value -split '\s+'
     }
 )
-foreach ($requiredServerName in @(
-        [string]$targets.production.publicHost,
-        [string]$targets.preview.publicHost
-    )) {
-    if ($requiredServerName -notin $configuredServerNames) {
-        throw "The BaoTa managed vhost does not declare server_name $requiredServerName."
-    }
+if ($PublicHost -notin $configuredServerNames -or
+    "cn.getdronedream.com" -in $configuredServerNames) {
+    throw "The BaoTa mirror vhost must declare only the approved bare-IP host."
 }
 
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) `
@@ -278,6 +254,28 @@ $sshOptions = @(
 
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 try {
+    $verifiedInstallerPath = Join-Path $temporaryRoot $installerName
+    $verifiedChecksumPath = "$verifiedInstallerPath.sha256"
+    Invoke-WebRequest -Uri "$expectedDownloadUrl?sha256=$installerSha256" `
+        -UseBasicParsing -OutFile $verifiedInstallerPath -TimeoutSec 120
+    Invoke-WebRequest -Uri "$expectedChecksumUrl?sha256=$installerSha256" `
+        -UseBasicParsing -OutFile $verifiedChecksumPath -TimeoutSec 30
+    $verifiedInstaller = Get-Item -LiteralPath $verifiedInstallerPath
+    $verifiedInstallerSha256 = (Get-FileHash -LiteralPath $verifiedInstallerPath `
+        -Algorithm SHA256).Hash.ToLowerInvariant()
+    $verifiedChecksumLine = (
+        Get-Content -LiteralPath $verifiedChecksumPath -Raw -Encoding UTF8
+    ).Trim()
+    if ($verifiedInstaller.Length -ne [long]$metadata.sizeBytes -or
+        $verifiedInstallerSha256 -ne $installerSha256 -or
+        $verifiedChecksumLine -notmatch (
+            '^' + [regex]::Escape($installerSha256) + '\s+' +
+            [regex]::Escape($installerName) + '$'
+        )) {
+        throw "The versioned GitHub release asset does not match the shared artifact metadata."
+    }
+    Write-Host "Verified the versioned GitHub release asset and checksum."
+
     Invoke-NativeCommand -CommandPath $tarPath -CommandArguments @(
         '--create',
         '--gzip',
@@ -316,7 +314,7 @@ try {
         'set -eu',
         "cd '$remoteDirectory'",
         "printf '%s  %s\n' '$archiveSha256' 'dronedream-site.tar.gz' | sha256sum --check -",
-        "bash ./deploy-static-baota.sh ./dronedream-site.tar.gz '$version' '$installerSha256' ./dronedream-staging.conf ./dronedream-public.conf '$PublicHost' '$($publicUri.Scheme)' '$VhostMode'"
+        "bash ./deploy-static-baota.sh ./dronedream-site.tar.gz '$version' '$installerSha256' ./dronedream-staging.conf ./dronedream-public.conf '$PublicHost'"
     ) -join '; '
     $deployArguments = @()
     $deployArguments += $sshOptions
@@ -336,32 +334,64 @@ try {
         -Uri "$publicBase/downloads/latest.json" `
         -UseBasicParsing -TimeoutSec 30
     $publicMetadata = $metadataResponse.Content | ConvertFrom-Json
-    if ([string]$publicMetadata.version -ne $version -or
-        ([string]$publicMetadata.sha256).ToLowerInvariant() -ne $installerSha256) {
+    if ([string]$publicMetadata.version -cne $version -or
+        ([string]$publicMetadata.sha256).ToLowerInvariant() -cne
+            $installerSha256 -or
+        [string]$publicMetadata.downloadUrl -cne $expectedDownloadUrl -or
+        [string]$publicMetadata.checksumUrl -cne $expectedChecksumUrl) {
         throw "The public release metadata does not match the deployed release."
     }
 
-    # Treat the public download path as part of the release, not as a separate
-    # best-effort upload. A cache-busting query also verifies that Nginx applies
-    # its download rules by normalized URI rather than accidentally falling
-    # back to the generic cache policy when a query string is present.
-    $publicInstallerPath = Join-Path $temporaryRoot 'public-installer.exe'
-    $publicInstallerUri = "$publicBase$([string]$publicMetadata.downloadUrl)" +
-        "?sha256=$installerSha256"
-    $publicInstallerResponse = Invoke-WebRequest -Uri $publicInstallerUri `
-        -UseBasicParsing -OutFile $publicInstallerPath -PassThru -TimeoutSec 120
-    $publicInstallerCacheControl = Get-ResponseHeader `
-        -Response $publicInstallerResponse -Name 'Cache-Control'
-    $publicInstallerDisposition = Get-ResponseHeader `
-        -Response $publicInstallerResponse -Name 'Content-Disposition'
-    $publicInstaller = Get-Item -LiteralPath $publicInstallerPath
-    $publicInstallerSha256 = (Get-FileHash -LiteralPath $publicInstallerPath `
+    $publicBuildManifest = (
+        Invoke-WebRequest -Uri "$publicBase/build-manifest.json" `
+            -UseBasicParsing -TimeoutSec 30
+    ).Content | ConvertFrom-Json
+    if ([string]$publicBuildManifest.sourceCommit -cne $sourceCommit -or
+        [string]$publicBuildManifest.artifactKind -cne
+            "dronedream-shared-static-site") {
+        throw "The public build manifest does not identify the deployed shared artifact."
+    }
+
+    $publicIntegrityManifestPath = Join-Path $temporaryRoot `
+        'public-SHA256SUMS'
+    Invoke-WebRequest -Uri "$publicBase/SHA256SUMS" -UseBasicParsing `
+        -OutFile $publicIntegrityManifestPath -TimeoutSec 30
+    $localManifestSha256 = (Get-FileHash -LiteralPath $manifestPath `
         -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($publicInstaller.Length -ne $installer.Length -or
-        $publicInstallerSha256 -ne $installerSha256 -or
-        $publicInstallerCacheControl -notmatch '(?i)(?:^|,)\s*no-cache(?:,|$)' -or
-        $publicInstallerDisposition -notmatch '(?i)^attachment(?:;|$)') {
-        throw "The public installer re-download did not match the local release or download policy."
+    $publicManifestSha256 = (Get-FileHash `
+        -LiteralPath $publicIntegrityManifestPath -Algorithm SHA256).
+        Hash.ToLowerInvariant()
+    if ($publicManifestSha256 -cne $localManifestSha256) {
+        throw "The mirror integrity manifest does not match the shared artifact."
+    }
+
+    $verifiedArtifactPaths = @()
+    foreach ($line in Get-Content -LiteralPath $manifestPath -Encoding UTF8) {
+        if ($line -notmatch '^([0-9a-f]{64})  (.+)$') {
+            throw "SHA256SUMS contains an invalid entry during public verification."
+        }
+        $expectedHash = $Matches[1]
+        $relativePath = $Matches[2]
+        if ($relativePath -notmatch (
+                '^(?:index|site|404)\.html$|' +
+                '^(?:assets|console/assets)/.+\.(?:js|css)$|' +
+                '^console/index\.html$'
+            )) {
+            continue
+        }
+        $downloadPath = Join-Path $temporaryRoot `
+            ("public-artifact-" + [Guid]::NewGuid().ToString('N'))
+        Invoke-WebRequest -Uri "$publicBase/$relativePath" -UseBasicParsing `
+            -OutFile $downloadPath -TimeoutSec 30
+        $actualHash = (Get-FileHash -LiteralPath $downloadPath `
+            -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -cne $expectedHash) {
+            throw "The mirror artifact differs from the shared artifact: $relativePath"
+        }
+        $verifiedArtifactPaths += $relativePath
+    }
+    if ($verifiedArtifactPaths.Count -lt 4) {
+        throw "The public artifact parity check covered too few HTML, JS, and CSS files."
     }
 
     $assetMatches = [regex]::Matches(
@@ -386,8 +416,10 @@ try {
     }
 
     Write-Host "Deployed DroneDream $version to $publicBase"
+    Write-Host "Shared artifact source commit: $sourceCommit"
+    Write-Host "Verified $($verifiedArtifactPaths.Count) public HTML, JS, and CSS files byte-for-byte."
     Write-Host "Installer SHA-256: $installerSha256"
-    Write-Host "Verified the public installer by re-downloading and hashing it."
+    Write-Host "Verified the versioned public installer independently from the site artifact."
 } finally {
     if ($remoteDirectoryCreated) {
         try {

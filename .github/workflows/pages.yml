@@ -8,6 +8,7 @@ on:
       - ".github/workflows/pages.yml"
       - "desktop/src-tauri/tauri.conf.json"
       - "frontend/**"
+      - "website/deployment-targets.json"
       - "website/pages-release.json"
       - "website/scripts/build-pages-site.ps1"
   workflow_dispatch:
@@ -43,7 +44,6 @@ jobs:
       - name: Build the version-pinned Pages site
         shell: pwsh
         env:
-          DRONEDREAM_CUSTOM_DOMAIN: ${{ vars.DRONEDREAM_CUSTOM_DOMAIN }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
@@ -51,6 +51,15 @@ jobs:
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Upload commit-pinned shared website artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dronedream-site-${{ github.sha }}
+          path: frontend/site-dist
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0

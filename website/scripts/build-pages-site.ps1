@@ -3,10 +3,13 @@ $PSNativeCommandUseErrorActionPreference = $true
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $frontendRoot = Join-Path $repositoryRoot "frontend"
+$deploymentTargetsPath = Join-Path $repositoryRoot "website\deployment-targets.json"
 $releaseConfigPath = Join-Path $repositoryRoot "website\pages-release.json"
 $tauriConfigPath = Join-Path $repositoryRoot "desktop\src-tauri\tauri.conf.json"
 $codeSigningPolicyPath = Join-Path $repositoryRoot "CODE_SIGNING_POLICY.md"
 $release = Get-Content -LiteralPath $releaseConfigPath -Raw | ConvertFrom-Json
+$deploymentTargets = Get-Content -LiteralPath $deploymentTargetsPath -Raw |
+    ConvertFrom-Json
 $tauriConfig = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
 $codeSigningPolicy = Get-Content -LiteralPath $codeSigningPolicyPath -Raw
 
@@ -17,6 +20,23 @@ $sha256 = ([string]$release.sha256).ToLowerInvariant()
 $sizeBytes = [long]$release.sizeBytes
 $publishedAt = [string]$release.publishedAt
 $expectedFileName = "DroneDream_${version}_x64-setup.exe"
+$globalTarget = $deploymentTargets.global
+$mirrorTarget = $deploymentTargets.mirror
+
+if ($null -eq $globalTarget -or $null -eq $mirrorTarget) {
+    throw "Deployment targets must define global and mirror."
+}
+if ([string]$globalTarget.platform -cne "github-pages" -or
+    [string]$globalTarget.publicHost -cne "getdronedream.com" -or
+    [string]$globalTarget.publicBaseUri -cne "https://getdronedream.com/" -or
+    [string]$mirrorTarget.platform -cne "baota" -or
+    [string]$mirrorTarget.publicHost -cne "47.93.180.216" -or
+    [string]$mirrorTarget.publicBaseUri -cne "http://47.93.180.216/" -or
+    [string]$mirrorTarget.vhostMode -cne "install" -or
+    [string]$globalTarget.artifactDirectory -cne
+        [string]$mirrorTarget.artifactDirectory) {
+    throw "Deployment targets do not match the approved global-site and bare-IP mirror topology."
+}
 
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid Pages release version: $version" }
 if ($version -ne [string]$tauriConfig.version) { throw "Pages release version must match the desktop version." }
@@ -50,6 +70,22 @@ $metadata = [ordered]@{
     sha256 = $sha256
     sizeBytes = $sizeBytes
     publishedAt = $publishedAt
+}
+
+$sourceCommit = ([string]$env:GITHUB_SHA).Trim()
+if ([string]::IsNullOrWhiteSpace($sourceCommit)) {
+    Push-Location $repositoryRoot
+    try {
+        $sourceCommit = (& git rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to resolve the source commit for the website artifact."
+        }
+    } finally {
+        Pop-Location
+    }
+}
+if ($sourceCommit -notmatch '^[0-9a-f]{40}$') {
+    throw "The website artifact source commit is invalid."
 }
 
 $npmCommand = if (Get-Command npm.cmd -ErrorAction SilentlyContinue) { "npm.cmd" } else { "npm" }
@@ -108,29 +144,57 @@ $metadataJson = $metadata | ConvertTo-Json
     $utf8WithoutBom
 )
 $cnamePath = Join-Path $outputDirectory "CNAME"
-$customDomain = ([string]$env:DRONEDREAM_CUSTOM_DOMAIN).Trim().TrimEnd(".")
-if ([string]::IsNullOrWhiteSpace($customDomain)) {
-    Remove-Item -LiteralPath $cnamePath -Force -ErrorAction SilentlyContinue
-} else {
-    if (
-        $customDomain.Length -gt 253 -or
-        $customDomain -notmatch '^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$'
-    ) {
-        throw "DRONEDREAM_CUSTOM_DOMAIN is not a valid DNS hostname."
-    }
-    [IO.File]::WriteAllText(
-        $cnamePath,
-        "$customDomain$([Environment]::NewLine)",
-        $utf8WithoutBom
-    )
-}
+$customDomain = [string]$globalTarget.publicHost
+[IO.File]::WriteAllText(
+    $cnamePath,
+    "$customDomain$([Environment]::NewLine)",
+    $utf8WithoutBom
+)
 [IO.File]::WriteAllText((Join-Path $outputDirectory ".nojekyll"), "", $utf8WithoutBom)
 
+$buildManifest = [ordered]@{
+    schemaVersion = 1
+    artifactKind = "dronedream-shared-static-site"
+    sourceCommit = $sourceCommit
+    release = [ordered]@{
+        version = $version
+        releaseTag = $releaseTag
+        fileName = $fileName
+        sha256 = $sha256
+        sizeBytes = $sizeBytes
+        publishedAt = $publishedAt
+    }
+    origins = [ordered]@{
+        global = [string]$globalTarget.publicBaseUri
+        mirror = [string]$mirrorTarget.publicBaseUri
+    }
+}
+[IO.File]::WriteAllText(
+    (Join-Path $outputDirectory "build-manifest.json"),
+    "$($buildManifest | ConvertTo-Json -Depth 4)$([Environment]::NewLine)",
+    $utf8WithoutBom
+)
+
+$integrityManifestPath = Join-Path $outputDirectory "SHA256SUMS"
+Remove-Item -LiteralPath $integrityManifestPath -Force -ErrorAction SilentlyContinue
+$integrityLines = Get-ChildItem -LiteralPath $outputDirectory -Recurse -File |
+    Sort-Object FullName |
+    ForEach-Object {
+        $relativePath = $_.FullName.Substring($outputDirectory.Length + 1).
+            Replace('\', '/')
+        $fileHash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).
+            Hash.ToLowerInvariant()
+        "$fileHash  $relativePath"
+    }
+[IO.File]::WriteAllText(
+    $integrityManifestPath,
+    "$($integrityLines -join [Environment]::NewLine)$([Environment]::NewLine)",
+    $utf8WithoutBom
+)
+
 Write-Host "GitHub Pages site built at $outputDirectory"
+Write-Host "Shared artifact source commit: $sourceCommit"
+Write-Host "Integrity manifest: $integrityManifestPath"
 Write-Host "Release asset: $($metadata.downloadUrl)"
 Write-Host "SHA-256: $sha256"
-if ([string]::IsNullOrWhiteSpace($customDomain)) {
-    Write-Host "Custom domain: disabled (GitHub Pages URL remains canonical)"
-} else {
-    Write-Host "Custom domain: $customDomain"
-}
+Write-Host "Custom domain: $customDomain"

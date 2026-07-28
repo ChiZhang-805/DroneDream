@@ -1,8 +1,11 @@
 import {
+  Activity,
   ArrowLeft,
   ArrowUpRight,
-  Camera,
+  ChartNoAxesCombined,
   ChevronRight,
+  Compass,
+  Gauge,
   Heart,
   ImagePlus,
   MessageCircle,
@@ -14,7 +17,9 @@ import {
   Trash2,
   Upload,
   UserRound,
+  Wind,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import {
   type FormEvent,
@@ -194,6 +199,104 @@ function dateLabel(locale: SiteLocale, value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+type TopicCoverTemplate = "analysis" | "comparison" | "route" | "wind" | "evidence";
+
+interface TopicCoverPresentation {
+  template: TopicCoverTemplate;
+  kicker: string;
+  emphasis: string;
+  issue: string;
+  icon: LucideIcon;
+}
+
+function topicCoverPresentation(
+  topic: CommunityTopic,
+  locale: SiteLocale,
+): TopicCoverPresentation {
+  const subject = `${topic.title} ${topic.body} ${topic.tags.join(" ")}`.toLocaleLowerCase(locale);
+  const issue = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "2-digit",
+  }).format(new Date(topic.created_at));
+  const emphasis = topic.tags[0] ?? (locale === "zh-CN" ? "飞行调优" : "Flight tuning");
+
+  if (/(wind|gust|风|抗风)/u.test(subject)) {
+    return {
+      template: "wind",
+      kicker: locale === "zh-CN" ? "抗扰研究笔记" : "ROBUSTNESS NOTE",
+      emphasis,
+      issue,
+      icon: Wind,
+    };
+  }
+  if (/(versus|compare|comparison|bayes|cma|对比|比较|优化器)/u.test(subject)) {
+    return {
+      template: "comparison",
+      kicker: locale === "zh-CN" ? "算法对照实验" : "METHOD COMPARISON",
+      emphasis,
+      issue,
+      icon: ChartNoAxesCombined,
+    };
+  }
+  if (/(route|track|waypoint|trajectory|轨迹|航线|航点)/u.test(subject)) {
+    return {
+      template: "route",
+      kicker: locale === "zh-CN" ? "飞行轨迹研究" : "FLIGHT PATH STUDY",
+      emphasis,
+      issue,
+      icon: Compass,
+    };
+  }
+  if (/(fail|failure|overshoot|error|失败|超调|故障)/u.test(subject)) {
+    return {
+      template: "analysis",
+      kicker: locale === "zh-CN" ? "问题诊断记录" : "DIAGNOSTIC LOG",
+      emphasis,
+      issue,
+      icon: Activity,
+    };
+  }
+  return {
+    template: "evidence",
+    kicker: locale === "zh-CN" ? "可复查飞行证据" : "FLIGHT EVIDENCE",
+    emphasis,
+    issue,
+    icon: Gauge,
+  };
+}
+
+function TopicCoverArtwork({
+  topic,
+  locale,
+  dialog = false,
+}: {
+  topic: CommunityTopic;
+  locale: SiteLocale;
+  dialog?: boolean;
+}) {
+  const presentation = topicCoverPresentation(topic, locale);
+  const Icon = presentation.icon;
+  return (
+    <div
+      className={`community-cover-art is-${presentation.template}${dialog ? " is-dialog" : ""}`}
+      data-template={presentation.template}
+    >
+      <span className="community-cover-shape is-primary" aria-hidden="true" />
+      <span className="community-cover-shape is-secondary" aria-hidden="true" />
+      <header>
+        <Icon aria-hidden="true" />
+        <span>{presentation.kicker}</span>
+      </header>
+      <strong>{topic.title}</strong>
+      <p><span>#{presentation.emphasis}</span></p>
+      <footer>
+        <time dateTime={topic.created_at}>{presentation.issue}</time>
+        <span>DRONEDREAM · 1.0</span>
+      </footer>
+    </div>
+  );
 }
 
 export function CommunityPage({
@@ -646,13 +749,13 @@ export function CommunityPage({
         ) : null}
 
         <div className="community-topic-grid">
-          {visibleTopics.map((topic, index) => {
+          {visibleTopics.map((topic) => {
             const liked = Boolean(account && topic.liked_by_viewer);
             return (
               <article key={topic.id}>
                 <button
                   type="button"
-                  className={`community-topic-cover is-tone-${(index % 4) + 1}`}
+                  className="community-topic-cover"
                   onClick={() => openTopic(topic)}
                   aria-label={`${copy.open}: ${topic.title}`}
                 >
@@ -664,10 +767,7 @@ export function CommunityPage({
                       decoding="async"
                     />
                   ) : (
-                    <>
-                      <Camera aria-hidden="true" />
-                      <strong>{topic.title}</strong>
-                    </>
+                    <TopicCoverArtwork topic={topic} locale={locale} />
                   )}
                 </button>
                 <div className="community-topic-card-body">
@@ -916,10 +1016,7 @@ export function CommunityPage({
                   />
                 ))
               ) : (
-                <div>
-                  <MessageCircle aria-hidden="true" />
-                  <strong>{selectedTopic.title}</strong>
-                </div>
+                <TopicCoverArtwork topic={selectedTopic} locale={locale} dialog />
               )}
             </div>
             <div className="community-topic-dialog-content">
@@ -1040,7 +1137,8 @@ export function CommunityPage({
                     placeholder={copy.commentPlaceholder}
                   />
                   <button type="submit" disabled={!commentBody.trim()}>
-                    <Send aria-hidden="true" />{copy.sendComment}
+                    <Send aria-hidden="true" />
+                    <span className="site-sr-only">{copy.sendComment}</span>
                   </button>
                 </form>
               ) : (

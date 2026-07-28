@@ -76,7 +76,7 @@ describe("DroneDream public website", () => {
       "https://github.com/ChiZhang-805/DroneDream/blob/main/PRIVACY.md",
     );
     expect(screen.getByText(
-      /Version 1\.0\.0 is published while code signing is being prepared\./i,
+      /Agentic PX4\/Gazebo parameter optimization · Windows 1\.0\.0\./i,
     )).toBeVisible();
     expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/pricing/");
     expect(screen.getByRole("link", { name: "Workflow" })).toHaveAttribute("href", "/");
@@ -115,15 +115,89 @@ describe("DroneDream public website", () => {
     await waitFor(() => expect(open).toHaveFocus());
   });
 
-  it("renders the full manual as a dedicated documentation page", () => {
+  it("renders the complete manual as native website content with downloadable editions", async () => {
     window.history.replaceState(null, "", "/manual/");
+    const englishManual = `---
+title: "DroneDream 1.0.0 User Manual"
+---
+# About this manual
 
-    renderSite();
+DroneDream turns a bounded PX4 tuning study into reviewable evidence.
 
-    expect(screen.getByRole("heading", { name: "Build explainable tuning experiments." })).toBeVisible();
-    expect(screen.getByRole("complementary", { name: "On this page" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Complete the five-step experiment" })).toBeVisible();
-    expect(screen.queryByRole("dialog", { name: /manual/i })).toBeNull();
+> **Scope.** The result remains simulation evidence.
+
+## How to read the field references
+
+Each reference explains purpose, selection, default, and validation.
+
+![Tuning Chat interface](manual-assets/en/tuning-chat.png)
+
+| Field | Purpose |
+| --- | --- |
+| Vehicle | Selects the PX4 vehicle family. |
+
+# 1. Installation and first launch
+
+Complete the readiness gate before entering the tuning platform.
+`;
+    const chineseManual = `---
+title: "DroneDream 1.0.0 用户说明书"
+---
+# 关于本说明书
+
+本说明书把完整的字段解释、软件截图和校验边界直接排成网站原生正文。
+
+## 字段说明的阅读方式
+
+每一项都会解释作用、选择方式、默认值和校验规则。
+`;
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("DroneDream-Manual-en.md")) {
+        return {
+          ok: true,
+          text: async () => englishManual,
+        } as Response;
+      }
+      if (url.endsWith("DroneDream-Manual-zh-CN.md")) {
+        return {
+          ok: true,
+          text: async () => chineseManual,
+        } as Response;
+      }
+      throw new Error("offline test");
+    });
+
+    const { container } = renderSite();
+
+    expect(screen.getByRole("heading", { name: "DroneDream 1.0.0 User Manual" })).toBeVisible();
+    expect(screen.getByRole("complementary", { name: "DroneDream manual contents" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "About this manual" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "How to read the field references" })).toBeVisible();
+    expect(screen.getByRole("img", { name: "Tuning Chat interface" })).toHaveAttribute(
+      "src",
+      "/docs/downloads/manual-assets/en/tuning-chat.png",
+    );
+    expect(screen.getByRole("table")).toBeVisible();
+    expect(screen.getAllByRole("link", { name: "PDF" })[0]).toHaveAttribute(
+      "href",
+      "/docs/downloads/DroneDream-Manual-en.pdf",
+    );
+    expect(screen.getByRole("link", { name: "Markdown" })).toHaveAttribute(
+      "href",
+      "/docs/downloads/DroneDream-Manual-en.md",
+    );
+    expect(container.querySelector("iframe")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch to Simplified Chinese" }));
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "关于本说明书" })).toBeVisible();
+    });
+    expect(screen.getByRole("complementary", { name: "DroneDream 说明书目录" })).toBeVisible();
+    expect(fetch).toHaveBeenCalledWith(
+      "/docs/downloads/DroneDream-Manual-zh-CN.md",
+      expect.objectContaining({ cache: "force-cache" }),
+    );
   });
 
   it("renders three directly comparable plans with the same ordered feature rows", async () => {
@@ -131,7 +205,7 @@ describe("DroneDream public website", () => {
 
     const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "The same complete product. More included AI." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Choose the optimization depth for every flight." })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Free" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Plus" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Pro" })).toBeVisible();
@@ -148,7 +222,7 @@ describe("DroneDream public website", () => {
     expect(screen.getByText(/3,000,000 managed AI credits/i)).toBeVisible();
     expect(screen.getByText(/15,000,000 managed AI credits/i)).toBeVisible();
     expect(screen.getAllByText(
-      "Full AURORA optimization Harness",
+      "Core AURORA optimization Harness",
     )).toHaveLength(3);
     const expectedFeatureOrder = [
       "workflow",
@@ -156,7 +230,10 @@ describe("DroneDream public website", () => {
       "allowance",
       "byok",
       "reports",
+      "comparisonWorkspace",
       "watermarkFree",
+      "premiumRouting",
+      "advancedHarness",
     ];
     container.querySelectorAll<HTMLElement>(".pricing-card").forEach((card) => {
       expect(
