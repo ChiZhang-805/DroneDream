@@ -58,6 +58,56 @@ npm.cmd --prefix frontend run site:preview
 
 Open `http://127.0.0.1:4174/`.
 
+## Local browser, accessibility, and performance review
+
+Serve the completed shared artifact before running browser QA. The audit scripts
+review the same `frontend/site-dist` directory that is packaged for both public
+origins; they do not maintain a separate mirror build.
+
+Run the bilingual layout and interaction matrix against the installed Microsoft
+Edge, Google Chrome, Lenovo Browser, and Playwright Firefox:
+
+```powershell
+node website/scripts/audit-browser-matrix.mjs `
+  http://127.0.0.1:4174/ `
+  work/website-browser-matrix.json `
+  edge,chrome,lenovo,firefox
+```
+
+The matrix covers `/`, `/pricing/`, `/manual/`, `/community/`, and `/console/`
+in English and Simplified Chinese. It checks 1440x1000 desktop and 390x844
+mobile layouts in every browser, plus 2048x1280 and a 125%-scaled 1440x1000
+profile in Edge. Missing requested browsers, page errors, overflow, clipped
+copy, unnamed controls, broken landmarks, dialog focus, mobile-menu focus, or
+keyboard interaction failures make the command fail.
+
+Use the stricter copy-fit audit for supported desktop review sizes and the
+layout-only mode for mobile, where English and Chinese line counts are expected
+to differ:
+
+```powershell
+node website/scripts/audit-site-typography.mjs `
+  http://127.0.0.1:4174/ 1440 1000 0.80 `
+  work/website-typography-1440.json full
+
+node website/scripts/audit-site-typography.mjs `
+  http://127.0.0.1:4174/ 390 844 0.80 `
+  work/website-layout-mobile.json layout-only
+```
+
+Finally, audit cold-entry resource budgets for all five routes:
+
+```powershell
+node website/scripts/audit-site-performance.mjs `
+  http://127.0.0.1:4174/ `
+  work/website-performance.json
+```
+
+This records same-origin request counts, raw and gzip-estimated bytes, resource
+categories, and the largest response. The budgets are deterministic local
+artifact gates; production latency and TLS still require independent online
+verification after an authorized deployment.
+
 ## Supported Alibaba Cloud/BaoTa deployment
 
 The current host uses BaoTa's Nginx installation and this release layout:

@@ -226,14 +226,14 @@ export function ManualPage({ locale }: ManualPageProps) {
         </nav>
       </aside>
 
-      <main className="manual-reader">
+      <section className="manual-reader" aria-labelledby="manual-reader-title">
         <header className="manual-reader-header">
           <div>
             <p>
               <Languages aria-hidden="true" />
               {copy.online} · {copy.edition}
             </p>
-            <h1>{copy.title}</h1>
+            <h1 id="manual-reader-title">{copy.title}</h1>
             <span>{copy.description}</span>
           </div>
           <a href={`${documentRoot}.pdf`} download>
@@ -272,7 +272,7 @@ export function ManualPage({ locale }: ManualPageProps) {
             </Suspense>
           ) : null}
         </article>
-      </main>
+      </section>
     </div>
   );
 }

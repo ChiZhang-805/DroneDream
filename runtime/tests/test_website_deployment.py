@@ -158,6 +158,25 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         remove_vhost = rollback.index('rm -f "$public_vhost"')
         self.assertLess(changed_gate, remove_vhost)
 
+    def test_local_quality_gates_cover_every_public_entry(self) -> None:
+        matrix = self.read("website/scripts/audit-browser-matrix.mjs")
+        performance = self.read("website/scripts/audit-site-performance.mjs")
+        readme = self.read("website/README.md")
+
+        for route in ("home", "pricing", "manual", "community", "console"):
+            with self.subTest(route=route):
+                self.assertIn(f'name: "{route}"', matrix)
+                self.assertIn(f'name: "{route}"', performance)
+        for browser in ("edge", "chrome", "lenovo", "firefox"):
+            with self.subTest(browser=browser):
+                self.assertIn(browser, matrix)
+        self.assertIn("collectAccessibility", matrix)
+        self.assertIn("prefers-reduced-motion: reduce", matrix)
+        self.assertIn("totalGzipBytes", performance)
+        self.assertIn("largestResourceRawBytes", performance)
+        self.assertIn("audit-browser-matrix.mjs", readme)
+        self.assertIn("audit-site-performance.mjs", readme)
+
     def test_pages_build_pins_the_verified_global_domain_and_shared_artifact(self) -> None:
         builder = self.read("website/scripts/build-pages-site.ps1")
         workflow = self.read(".github/workflows/pages.yml")

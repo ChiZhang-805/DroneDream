@@ -530,7 +530,7 @@ html[lang="zh-CN"] .site-hero h1 {
 .site-phase-copy[hidden] { display: none; }
 .site-phase-copy > span { color: #6d68db; font-family: ui-monospace, monospace; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; }
 .site-phase-copy h3 { margin: 0.75rem 0 0; color: #1b1f31; font-size: clamp(1.45rem, 1.7vw, 1.82rem); letter-spacing: -0.045em; line-height: 1.12; white-space: nowrap; }
-.site-phase-copy p { margin: 1.05rem 0 0; color: #72798c; font-size: 0.84rem; line-height: 1.63; }
+.site-phase-copy p { width: fit-content; max-width: 100%; margin: 1.05rem 0 0; color: #72798c; font-size: 0.84rem; line-height: 1.63; }
 .site-phase-description span { display: block; white-space: nowrap; }
 
 .site-demo-visual { position: relative; min-width: 0; padding: 1.2rem; overflow: hidden; color: #f4f6ff; background: radial-gradient(circle at 80% 15%, rgba(154, 86, 223, 0.29), transparent 32%), linear-gradient(145deg, #0b1022, #15112b 58%, #25102f); }

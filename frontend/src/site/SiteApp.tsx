@@ -1,7 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { BrandLockup } from "../components/BrandLockup";
-import { DroneLaunchScene } from "../components/DroneLaunchScene";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
 import {
@@ -20,6 +19,11 @@ import {
   isWebsiteRelease,
   type WebsiteRelease,
 } from "./release";
+
+const DroneLaunchScene = lazy(async () => {
+  const module = await import("../components/DroneLaunchScene");
+  return { default: module.DroneLaunchScene };
+});
 
 const GITHUB_URL = "https://github.com/ChiZhang-805/DroneDream";
 const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`;
@@ -105,7 +109,7 @@ const content = {
           "Let Bayesian, trust-region, evolution compete.",
           "Spend budget where the model still learns.",
           "Propose candidates with clear information value.",
-          "Replace gain guesses with disciplined evidence-led search.",
+          "Replace gain guesses with disciplined evidence.",
         ],
         status: "Candidate 24 / 60",
       },
@@ -114,11 +118,11 @@ const content = {
         title: "Compare the evidence",
         body: [
           "Check feasibility, error, overshoot, and settling.",
-          "Compare repeats, robustness, and Pareto trade-offs.",
+          "Compare repeats, robustness, Pareto trade-offs.",
           "Reject winners that break hidden constraints.",
           "Keep logs, metrics, seeds, and snapshots together.",
           "Preserve evidence for accepted control settings.",
-          "Make every result auditable across the flight team.",
+          "Make every result auditable across flight teams.",
         ],
         status: "Acceptance passed",
       },
@@ -138,10 +142,10 @@ const content = {
     capabilitiesEyebrow: "BUILT FOR ITERATION",
     capabilitiesTitle: "A local flight lab, not a parameter form.",
     capabilities: [
-      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore only the control surface your experiment needs, leaving unrelated dimensions untouched."], "sliders"],
-      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain before ranking the final winner under the same independent validation suite."], "orbit"],
-      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Resume, diagnose, and clean failed simulations before the next isolated trial begins safely."], "shield"],
-      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce every decision from evidence together with its complete experiment history."], "report"],
+      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore only the control dimensions your experiment actually needs."], "sliders"],
+      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Rank only gains that pass the same independent validation suite."], "orbit"],
+      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Diagnose and clean failed simulations before the next isolated trial."], "shield"],
+      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce each decision from its full experiment history."], "report"],
     ],
     capabilityOpen: "Open details for",
     capabilityBack: "Return to overview",
@@ -326,10 +330,10 @@ const content = {
     capabilitiesEyebrow: "为持续迭代而设计",
     capabilitiesTitle: "本地飞行实验室不只是参数表单",
     capabilities: [
-      ["按需选择参数", ["单独选择一个 PX4 参数，或直接使用整理好的控制参数组。", "为搜索范围设置安全边界，并同步声明必要的耦合依赖。", "只探索实验真正需要的控制空间，不把预算浪费在无关维度上，并始终保持预算与搜索焦点集中。"], "sliders"],
-      ["七种实验算法", ["依据实验结构与搜索空间形态匹配合适的优化算法。", "融合约束、多保真、信赖域与进化搜索共同探索候选。", "复验每一项真实收益，再通过统一的独立验证流程确定最终优胜方案、可靠结论与复核依据。"], "orbit"],
-      ["隔离运行环境", ["在专用 WSL2 中运行 PX4、Gazebo、任务进程与试验产物。", "让每次试验都与个人 Linux 文件及现有进程保持严格隔离。", "失败仿真也能安全续传、诊断和清理，并确保下一轮试验在干净环境中稳定启动与完整运行。"], "shield"],
-      ["可追溯报告", ["把每个候选方案关联到对应场景、随机种子与参数快照。", "统一保留日志、评测指标、试验产物与完整运行环境清单。", "用完整证据复现每次调优决策，同时保留实验上下文、演进过程、最终判断与完整依据。"], "report"],
+      ["按需选择参数", ["单独选择一个 PX4 参数，或直接使用整理好的控制参数组。", "为搜索范围设置安全边界，并同步声明必要的耦合依赖。", "只探索实验真正需要的控制空间，避免把预算浪费在无关维度。"], "sliders"],
+      ["七种实验算法", ["依据实验结构与搜索空间形态匹配合适的优化算法。", "融合约束、多保真、信赖域与进化搜索共同探索候选。", "只让通过统一独立复验的真实收益进入最终排名。"], "orbit"],
+      ["隔离运行环境", ["在专用 WSL2 中运行 PX4、Gazebo、任务进程与试验产物。", "让每次试验都与个人 Linux 文件及现有进程保持严格隔离。", "诊断并清理失败仿真，确保下一轮试验从干净环境启动。"], "shield"],
+      ["可追溯报告", ["把每个候选方案关联到对应场景、随机种子与参数快照。", "统一保留日志、评测指标、试验产物与完整运行环境清单。", "用完整实验历史和关键证据复现每次调优判断。"], "report"],
     ],
     capabilityOpen: "查看详情",
     capabilityBack: "返回概览",
@@ -769,6 +773,7 @@ export function SiteApp() {
   const droneFlightRef = useRef<(() => void) | null>(null);
   const authDialogRef = useRef<HTMLElement>(null);
   const authCloseRef = useRef<HTMLButtonElement>(null);
+  const authTriggerRef = useRef<HTMLElement | null>(null);
   const path = window.location.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
     ? "manual"
@@ -925,6 +930,16 @@ export function SiteApp() {
   }, [auth.account, authOpen]);
 
   useEffect(() => {
+    if (authOpen || !authTriggerRef.current) return;
+    const trigger = authTriggerRef.current;
+    authTriggerRef.current = null;
+    const focusFrame = window.requestAnimationFrame(() => {
+      if (trigger.isConnected) trigger.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [authOpen]);
+
+  useEffect(() => {
     if (!menuOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -962,6 +977,9 @@ export function SiteApp() {
 
   const closeMenu = () => setMenuOpen(false);
   const openAccount = (mode: "sign-in" | "register" = "sign-in") => {
+    authTriggerRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     setAuthMode(mode);
     setAuthCode("");
     setAuthCodeSent(false);
@@ -1139,7 +1157,9 @@ export function SiteApp() {
           <>
         <section className="site-hero" id="home" aria-labelledby="hero-title">
           <div className="site-hero-scene" aria-hidden="true">
-            <DroneLaunchScene active starflightControllerRef={droneFlightRef} visualOffsetX={1.58} />
+            <Suspense fallback={null}>
+              <DroneLaunchScene active starflightControllerRef={droneFlightRef} visualOffsetX={1.58} />
+            </Suspense>
           </div>
           <div className="site-hero-shade" aria-hidden="true" />
           <div className="site-shell site-hero-layout">

@@ -170,6 +170,7 @@ title: "DroneDream 1.0.0 用户说明书"
 
     const { container } = renderSite();
 
+    expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(screen.getByRole("heading", { name: "DroneDream 1.0.0 User Manual" })).toBeVisible();
     expect(screen.getByRole("complementary", { name: "DroneDream manual contents" })).toBeVisible();
     expect(await screen.findByRole("heading", { name: "About this manual" })).toBeVisible();
@@ -289,14 +290,18 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(screen.queryByText(/Review the selected plan/i)).toBeNull();
   });
 
-  it("requires an account before a visitor can publish a community topic", () => {
+  it("requires an account before a visitor can publish a community topic and restores focus", async () => {
     window.history.replaceState(null, "", "/community/");
 
     renderSite();
 
     expect(screen.getByRole("heading", { name: "Share questions. Compare flight evidence." })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Sign in to publish" }));
+    const trigger = screen.getByRole("button", { name: "Sign in to publish" });
+    trigger.focus();
+    fireEvent.click(trigger);
     expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it("switches the entire website to Simplified Chinese", () => {

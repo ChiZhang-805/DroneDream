@@ -722,6 +722,8 @@ export function CommunityPage({
           <label className="community-search">
             <Search aria-hidden="true" />
             <input
+              type="search"
+              aria-label={copy.search}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={copy.search}

@@ -76,6 +76,9 @@ describe("CommunityPage public data loading", () => {
     );
     expect(screen.getByText("7")).toBeVisible();
     expect(screen.getByText("4")).toBeVisible();
+    expect(screen.getByRole("searchbox", {
+      name: "Search topics, evidence, or tags",
+    })).toBeVisible();
   });
 
   it("loads only the selected topic's comments when opening a discussion", async () => {
