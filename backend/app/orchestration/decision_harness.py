@@ -193,6 +193,11 @@ def build_decision_messages(
         "rewards or child-tool credit. The deterministic receding-horizon plan "
         "sets the current phase and batch policy; select a tool compatible with "
         "that phase because the plan will be recomputed after the cohort result. "
+        "Every provider-visible aggregated score uses DroneDream's deterministic "
+        "lower-is-better loss convention: smaller finite baseline, best, cohort, "
+        "incumbent, Candidate, and tool-history scores are better. Never describe "
+        "a smaller aggregate score as worse. Do not compare raw metric values "
+        "unless their direction is explicitly supplied. "
         "Use only the supplied evidence. You cannot run tools, change "
         "constraints, modify budgets, access credentials, or invent additional "
         "tool IDs. Return only JSON that conforms to the required schema."
@@ -203,6 +208,22 @@ def build_decision_messages(
             if tool_manifest is None
             else tool_manifest
         ),
+        "score_semantics": {
+            "name": "dronedream_aggregated_loss",
+            "direction": "minimize",
+            "lower_is_better": True,
+            "applies_to": [
+                "search.baseline_score",
+                "search.best_score",
+                "search.best_score_by_generation[].best_score",
+                "tool_history[].best_score",
+                "decision_memory[].observed_outcome.incumbent_score_before",
+                "decision_memory[].observed_outcome.cohort_best_score",
+                "decision_memory[].observed_outcome.incumbent_score_after",
+                "candidates[].aggregated_score",
+            ],
+            "raw_metric_policy": "do_not_compare_without_explicit_direction",
+        },
         "evidence": evidence_snapshot.model_dump(mode="json", exclude_none=True),
         "instructions": (
             "Choose one tool for the next bounded generation. Prefer measured "
@@ -210,7 +231,9 @@ def build_decision_messages(
             "case profiles and job-wide simulation conditions without guessing "
             "anything about sealed validation cases. Reflect on verified prior "
             "cohort results when present, but do not infer causality from "
-            "observational improvement. Respect the supplied one-generation "
+            "observational improvement. Treat every listed aggregate score as a "
+            "minimized loss, so a smaller finite value is better. Respect the "
+            "supplied one-generation "
             "planning phase and batch policy; do not invent a later open-loop "
             "schedule. Use the deterministic portfolio when "
             "specialization is not supported by the evidence, and explain the "

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -21,6 +24,9 @@ from app.orchestration.harness_routing_campaign import (
 )
 
 CORPUS = Path(__file__).parent / "fixtures" / "harness_routing_eval_v1.jsonl"
+BACKEND_ROOT = Path(__file__).parents[1]
+REPOSITORY_ROOT = BACKEND_ROOT.parent
+CAMPAIGN_SCRIPT = BACKEND_ROOT / "scripts" / "run_harness_routing_campaign.py"
 
 
 class _FakeClient:
@@ -39,6 +45,40 @@ class _FakeClient:
             raise self.response
         assert isinstance(self.response, dict)
         return self.response
+
+
+def test_cli_preflight_binds_the_script_backend_without_credentials(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "would-be-online-artifact.json"
+    environment = os.environ.copy()
+    environment.pop("HARNESS_ROUTING_API_KEY", None)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CAMPAIGN_SCRIPT),
+            "--output",
+            str(output),
+            "--model-snapshot",
+            "gpt-test-snapshot",
+            "--preflight-only",
+        ],
+        cwd=REPOSITORY_ROOT,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    preflight = json.loads(result.stdout)
+    assert Path(preflight["backend_root"]) == BACKEND_ROOT.resolve()
+    assert preflight["case_count"] == 24
+    assert preflight["prompt_template_version"] == "1.6"
+    assert preflight["output_exists"] is False
+    assert not output.exists()
 
 
 def test_campaign_runs_exact_prompts_and_creates_loadable_artifact(

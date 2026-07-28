@@ -10,6 +10,7 @@ import pytest
 
 from app.orchestration.decision_harness import build_decision_messages
 from app.orchestration.harness_context import (
+    HARNESS_PROMPT_TEMPLATE_VERSION,
     HARNESS_TOOL_DEFINITIONS,
     HarnessExecutionMemory,
     HarnessObservedDecisionOutcome,
@@ -72,6 +73,25 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
         assert '"registry_version":"2.1"' in user
         assert '"schema_version":"2.7"' in user
         payload = json.loads(user)
+        assert HARNESS_PROMPT_TEMPLATE_VERSION == "1.6"
+        assert payload["score_semantics"] == {
+            "name": "dronedream_aggregated_loss",
+            "direction": "minimize",
+            "lower_is_better": True,
+            "applies_to": [
+                "search.baseline_score",
+                "search.best_score",
+                "search.best_score_by_generation[].best_score",
+                "tool_history[].best_score",
+                "decision_memory[].observed_outcome.incumbent_score_before",
+                "decision_memory[].observed_outcome.cohort_best_score",
+                "decision_memory[].observed_outcome.incumbent_score_after",
+                "candidates[].aggregated_score",
+            ],
+            "raw_metric_policy": "do_not_compare_without_explicit_direction",
+        }
+        assert "smaller finite value is better" in payload["instructions"]
+        assert "Never describe a smaller aggregate score as worse." in system
         assert tuple(
             tool["tool_id"] for tool in payload["tool_manifest"]["tools"]
         ) == selectable_harness_tools(snapshot)
@@ -152,7 +172,7 @@ def test_prediction_artifact_binds_corpus_prompts_versions_and_model(
         "prompt_suite_sha256": routing_prompt_suite_sha256(cases),
         "evidence_schema_version": "2.7",
         "tool_registry_version": "2.1",
-        "prompt_template_version": "1.5",
+        "prompt_template_version": "1.6",
         "provider": "openai",
         "model_snapshot": "gpt-test-snapshot",
         "generation_config": {
