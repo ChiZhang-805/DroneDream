@@ -1,0 +1,30 @@
+{
+  "advanced_scenario_config": {
+    "battery": {
+      "mass_payload_kg": 0.1
+    },
+    "sensor_degradation": {
+      "baro_noise_m": 0.01,
+      "imu_noise_scale": 1.01
+    },
+    "wind_gusts": {
+      "direction_deg": 90.0,
+      "enabled": true,
+      "magnitude_mps": 0.5,
+      "period_s": 8.0
+    }
+  },
+  "scenario_config": {
+    "delay_ms": 30.0
+  },
+  "scenario_type": "actuator_delay",
+  "schema_version": "dronedream.scenario_config.v1",
+  "seed": 42001,
+  "sensor_noise_level": "medium",
+  "wind": {
+    "east": 0.0,
+    "north": 0.0,
+    "south": 0.0,
+    "west": 0.0
+  }
+}

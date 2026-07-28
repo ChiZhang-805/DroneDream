@@ -1,0 +1,13 @@
+{
+  "schema_version": "dronedream.advanced-physics-execution-window/v1",
+  "subject_commit": "26b957efd985d0ac37702a8d2518e87ab65347c3",
+  "source_preflight": "windows_git_head_and_tracked_diff",
+  "runtime_user": "dronedream",
+  "run_name": "gps-readiness-boundary-attempt-2",
+  "started_at": "2026-07-28T20:21:38Z",
+  "ended_at": "2026-07-28T20:22:52Z",
+  "duration_seconds": 74,
+  "runner_exit_code": 0,
+  "preexisting_process_count": 0,
+  "residual_process_count": 0
+}

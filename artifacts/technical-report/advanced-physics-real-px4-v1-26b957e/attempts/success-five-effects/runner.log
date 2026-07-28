@@ -1,0 +1,4 @@
+RunnerError: vehicle_profile.firmware_commit was requested but PX4 firmware identity could not be verified: could not inspect PX4_AUTOPILOT_DIR Git HEAD: fatal: detected dubious ownership in repository at '/opt/PX4-Autopilot'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /opt/PX4-Autopilot

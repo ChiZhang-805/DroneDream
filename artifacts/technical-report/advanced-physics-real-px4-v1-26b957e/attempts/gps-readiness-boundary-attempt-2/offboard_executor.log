@@ -1,0 +1,5 @@
+vehicle=x500 world=default points=181 setpoints=309
+controller_params are applied by the offboard executor, not PX4 internal parameters
+connected via udp://:14540
+offboard client closed
+executor failure: PX4 readiness timeout after 30.0s

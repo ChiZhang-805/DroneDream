@@ -1,0 +1,94 @@
+{
+  "effects": [
+    {
+      "capability": {
+        "reason": "the bundled launcher compiles a deterministic Gazebo WindEffects sinusoidal profile and verifies its generated runtime SDF",
+        "status": "available"
+      },
+      "effect_id": "wind_gusts",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "gazebo_wind_effects",
+      "requested_value": {
+        "direction_deg": 90.0,
+        "enabled": true,
+        "magnitude_mps": 0.5,
+        "period_s": 8.0
+      },
+      "source": "advanced_scenario_config.wind_gusts"
+    },
+    {
+      "capability": {
+        "reason": "the bundled launcher generates a Trial-local x500 sensor SDF and verifies the exact noise fields in Gazebo generated runtime SDF",
+        "status": "available"
+      },
+      "effect_id": "sensor_degradation.baro_noise_m",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "sdformat_sensor_noise",
+      "requested_value": 0.01,
+      "source": "advanced_scenario_config.sensor_degradation.baro_noise_m"
+    },
+    {
+      "capability": {
+        "reason": "the bundled launcher generates a Trial-local x500 sensor SDF and verifies the exact noise fields in Gazebo generated runtime SDF",
+        "status": "available"
+      },
+      "effect_id": "sensor_degradation.imu_noise_scale",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "sdformat_sensor_noise",
+      "requested_value": 1.01,
+      "source": "advanced_scenario_config.sensor_degradation.imu_noise_scale"
+    },
+    {
+      "capability": {
+        "reason": "the bundled launcher adds a documented centered cuboid payload to the x500 inertial mass and tensor in a Trial-local model and verifies generated runtime SDF",
+        "status": "available"
+      },
+      "effect_id": "battery.mass_payload_kg",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "sdformat_model_inertial",
+      "requested_value": 0.1,
+      "source": "advanced_scenario_config.battery.mass_payload_kg"
+    },
+    {
+      "capability": {
+        "reason": "the bundled launcher maps delay_ms to x500 motor first-order response time constants in Trial-local SDF and verifies every runtime motor plugin",
+        "status": "available"
+      },
+      "effect_id": "scenario_type.actuator_delay",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "sdformat_actuator_dynamics",
+      "requested_value": {
+        "config": {
+          "delay_ms": 30.0
+        },
+        "scenario_type": "actuator_delay"
+      },
+      "source": "scenario_type"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 2,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-real-px4-26b957e",
+    "seed": 42001,
+    "trial_id": "advanced-physics-exact-26b957e-five-effects-seed-42001-attempt-2"
+  },
+  "request_sha256": "a3f210e43a9e660f12f203b6c1180761a049037be0dbb1fda1cc39fff7eae093",
+  "scenario_type": "actuator_delay",
+  "schema_version": "dronedream.scenario_effect_request.v1"
+}

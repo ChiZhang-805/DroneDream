@@ -1,0 +1,5 @@
+{
+  "rate_hz": 10.0,
+  "setpoint_count": 309,
+  "time_base": "executor_relative_seconds"
+}

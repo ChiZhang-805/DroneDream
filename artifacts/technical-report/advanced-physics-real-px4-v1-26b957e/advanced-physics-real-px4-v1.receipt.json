@@ -1,0 +1,26 @@
+{
+  "claim_boundary": "Real PX4 SITL and Gazebo evidence for request-bound Trial-local effect injection and readback. It is not real-aircraft evidence. The GPS-noise boundary proves injection/readback before a PX4 readiness timeout; it does not claim a successful GPS-noise flight.",
+  "exporter_commit": "06cfdeb4438be59a24510738ab135b06fdde373a",
+  "generated_at": "2026-07-28T20:39:54Z",
+  "manifest": {
+    "bytes": 446837,
+    "manifest_sha256": "0cae86ded8d92c6c008ca89873d3234c9c98d745768f92d1142b12b1471e85ca",
+    "path": "advanced-physics-real-px4-v1.manifest.json",
+    "sha256": "599c2b8b89bedb525a36c00837e8f09e7b4598c4825a01cff2942c6c5825a923"
+  },
+  "network_calls": 0,
+  "px4_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+  "real_credentials_used": false,
+  "receipt_sha256": "0e83d002587590f349ed698710c265bf432a9eec4a9e3307851967ef9ecfd789",
+  "result": {
+    "attempt_count": 6,
+    "file_backed_preflight_failures": 1,
+    "gps_readiness_boundaries": 2,
+    "passing_flights": 3,
+    "status": "passed",
+    "successful_flights": 3,
+    "terminal_only_preflights": 3
+  },
+  "schema_version": "dronedream.advanced-physics-real-px4-receipt.v1",
+  "subject_commit": "26b957efd985d0ac37702a8d2518e87ab65347c3"
+}

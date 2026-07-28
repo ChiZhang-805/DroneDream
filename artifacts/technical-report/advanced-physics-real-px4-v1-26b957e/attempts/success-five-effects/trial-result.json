@@ -1,0 +1,46 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "scenario_effect_request_json",
+      "display_name": "Scenario Effect Request",
+      "file_size_bytes": 3625,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects/scenario_effects.request.json"
+    },
+    {
+      "artifact_type": "simulator_launch_config_json",
+      "display_name": "Simulator Launch Configuration",
+      "file_size_bytes": 7616,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects/launch_config.json"
+    },
+    {
+      "artifact_type": "simulator_runtime_manifest_json",
+      "display_name": "Simulator Runtime Manifest",
+      "file_size_bytes": 7440,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects/simulator_runtime_manifest.json"
+    },
+    {
+      "artifact_type": "worker_log",
+      "display_name": "Runner Log",
+      "file_size_bytes": 334,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects/runner.log"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-real-px4-26b957e",
+    "seed": 42001,
+    "trial_id": "advanced-physics-exact-26b957e-five-effects-seed-42001"
+  },
+  "failure": {
+    "code": "SIMULATION_FAILED",
+    "reason": "vehicle_profile.firmware_commit was requested but PX4 firmware identity could not be verified: could not inspect PX4_AUTOPILOT_DIR Git HEAD: fatal: detected dubious ownership in repository at '/opt/PX4-Autopilot'\nTo add an exception for this directory, call:\n\n\tgit config --global --add safe.directory /opt/PX4-Autopilot"
+  },
+  "log_excerpt": "px4_gazebo_runner simulation failure: vehicle_profile.firmware_commit was requested but PX4 firmware identity could not be verified: could not inspect PX4_AUTOPILOT_DIR Git HEAD: fatal: detected dubious ownership in repository at '/opt/PX4-Autopilot'\nTo add an exception for this directory, call:\n\n\tgit config --global --add safe.directory /opt/PX4-Autopilot",
+  "schema_version": "dronedream.trial_result.v2",
+  "success": false
+}
