@@ -33,11 +33,15 @@ contracts, routes, and injections. A separate same-seed advanced-effects
 subset records three passing trajectories after five requested effects
 were applied and verified. Two GPS-noise boundary attempts verify six
 effect injections but end at a 30.0-second PX4 readiness timeout; they
-are failures, not successful GPS-noise flights. Neither campaign proves
+are failures, not successful GPS-noise flights. A later negative-control
+Trial completes deterministic GPS denial/recovery and battery-profile
+injection with all three effects verified, but fails the 25 m/s stability
+gate at 31.211302 m/s; it is excluded from both pass numerators. Neither
+campaign proves
 optimizer superiority, broad simulator quality, obstacle avoidance,
 real-aircraft safety, simulation-to-reality transfer, or statistical
 generalization. Claims bind to frozen commits and hashes; Windows Rust
-was not run.
+was not run; its toolchain gate therefore remains explicitly open for publication.
 
 \vspace{0.35em}
 \href{https://github.com/ChiZhang-805/DroneDream}{
@@ -69,13 +73,15 @@ This report therefore treats each frozen physical campaign as its own
 evidence unit. The two-seed scenario matrix varies nominal, steady-wind,
 and static-obstacle conditions; the later advanced-effects campaign
 instead repeats one seed under a fixed five-effect profile and records
-separate GPS readiness failures. Their numerators, failures, environments,
-and permissible claims remain distinct. That separation allows additional
-Runtime evidence to strengthen implementation coverage without converting
-heterogeneous Trials into a pooled reliability estimate or an optimizer
-comparison. Reviewers can therefore reproduce each denominator without
-inferring that a new disturbance profile enlarges the earlier matrix or
-supplies missing independent seeds for broader inference.
+separate GPS readiness failures. A still later GPS/battery negative
+control completes its trajectory and effect checks but fails stability
+acceptance. All three numerators, failures, environments, and permissible
+claims remain distinct. That separation allows additional Runtime evidence
+to strengthen implementation coverage without converting heterogeneous
+Trials into a pooled reliability estimate or optimizer comparison.
+Reviewers can reproduce each denominator without inferring that a new
+disturbance profile enlarges the earlier matrix or supplies missing
+independent seeds for broader inference at release.
 
 Foundation models provide a useful interface layer, but not experimental
 authority. Tool-using agent systems show that model reasoning becomes
@@ -967,6 +973,21 @@ ownership. Three still earlier operator-observed preflights have no raw
 files and remain explicitly non-machine-verified narrative history
 without invented hashes or timestamps.
 
+A later exact-commit negative control binds implementation
+\texttt{fdf1250} to evidence head \texttt{2f1caae}. Its runner and
+acceptance commands both exit zero, the 76-second Trial completes without
+crash, timeout, residual process, credential use, or evidence-generation
+failure, and all three requested effects are applied and verified. A
+deterministic 20\% GPS-denial schedule drives \texttt{SIM\_GPS\_USED}
+from baseline 10 to 0 for 6 of 29 ticks, realizing 0.2068966 before exact
+recovery to 10. The bound ULog independently contains 7
+\texttt{NO\_GPS}/0-satellite and 49 \texttt{FIX\_3D}/10-satellite samples.
+Battery read-back and flight telemetry move from 92\% / 16.02 V to
+80\% / 15.825 V. This is a completed effect-injection Trial, but not a
+passing one: observed position speed reaches 31.211302 m/s against the
+25 m/s policy limit, so \texttt{pass\_flag=false} despite RMSE
+0.345207 m, maximum error 1.498568 m, and coverage 0.983807.
+
 \begin{itemize}
 \item
   Execution boundary --- the dedicated Runtime records 6/6 successful,
@@ -987,6 +1008,13 @@ without invented hashes or timestamps.
   are excluded from the three successful trajectories and from every
   performance statistic because neither produced a successful
   GPS-noise flight, admissible trajectory outcome, or frozen pass flag.
+\item
+  GPS/battery negative-control boundary --- the later Trial proves
+  deterministic denial/recovery, battery initial-state and voltage-sag
+  injection/read-back, and completed trajectory execution. Its failed stability
+  gate remains the outcome: it cannot enter the earlier 3/3 or 6/6 pass
+  numerator, qualify the capability as a whole, or support endurance,
+  safety, or broad-stability claims.
 \item
   Injection boundary --- both wind runs retain ENU $(0,2,0)$ m/s
   read-back, and both obstacle runs retain successful create replies plus
@@ -1254,11 +1282,13 @@ deployment receipt.
   records cannot be pooled with the six-Trial scenario matrix or recast
   as a larger success rate, and the bundle claims no Gazebo version.
 \item
-  Probabilistic GPS dropout, battery initial state and voltage sag, and
-  hard actuator failure beyond the bounded first-order delay profile
-  remain Runtime extensions. Their absence prevents dropout endurance,
-  depleted-battery, hard-failure recovery, or combined-fault claims under
-  the present physical-simulation evidence or qualification.
+  Deterministic GPS denial/recovery and battery initial-state plus
+  voltage-sag injection are now verified in one completed Trial, but its
+  31.211302 m/s speed violates the 25 m/s stability gate. Probability-law
+  behavior across seeds, probabilistic GPS dropout endurance,
+  depleted-battery stability,
+  combined-fault qualification, and hard actuator failure beyond the
+  bounded first-order delay profile remain unproved.
 \item
   Optimizer comparison, physical component ablation, confidence
   intervals, cost/latency measurement, and UX telemetry remain pending.
@@ -1446,6 +1476,18 @@ preflight failure, and three non-machine-verified terminal preflights
 remain separate evidence classes and denominators. This separation
 prevents a failed readiness probe from becoming flight evidence.
 
+The later GPS/battery negative control binds evidence head
+\texttt{2f1caae}; its implementation commit is \texttt{fdf1250}. The
+receipt prefix is \texttt{2d6470fb085e638c}; failure lineage is
+\texttt{882acd480bfca395}; ULog is \texttt{dc3b156e6ae61442}; the applied
+scenario is \texttt{7973680f267b2643}; and the 159-test JUnit is
+\texttt{67d614764b213408}. The receipt
+distinguishes successful Trial completion and three verified effects from
+failed stability acceptance. Its attempt-16 lineage also retains two
+MAVLink command-420 arrivals with zero acknowledgments before the supported
+\texttt{SIM\_GPS\_USED} mechanism replaced the unavailable
+SimulatorMavlink failure-handler path in the exact frozen Runtime lineage.
+
 Execution Claim Gate 1.1 and Outcome Contract 2.20 bind each
 Trial/Candidate/Job snapshot and scenario matrix before evidence
 admission. Evidence 2.8 / Prompt 1.7 / Decision Trace 1.4 binds the
@@ -1479,6 +1521,15 @@ qualification reviews under the frozen source ledger, and never
 authorizes an absent claim, substituted artifact, later source, or
 unrecorded execution in any downstream release
 {[}\protect\hyperlink{ref_1}{\emph{1}}{]}.
+
+For this negative control, evidence admission is intentionally asymmetric:
+zero exit codes and a true Trial-success flag establish that the
+orchestrated run completed and yielded reviewable artifacts, whereas the
+policy outcome independently remains failed. Keeping both state vectors
+prevents operational completion, verified effect application, or retained
+metrics from being silently substituted for a passing stability decision
+in later reports, dashboards, release receipts, or customer reviews across
+independently reviewed release and qualification cycles.
 
 \section{\texorpdfstring{\textbf{9.
 Conclusion}}{9. Conclusion}}\label{conclusion}
@@ -1516,6 +1567,14 @@ preflights remain visible rather than being removed from the history. This
 retained history constrains every later success-rate calculation across
 every subsequent release, acceptance record, and audit cycle.
 
+A later negative control separately completes deterministic GPS
+denial/recovery and battery-profile injection, yet fails stability because
+position speed reaches 31.211302 m/s above a 25 m/s limit. It verifies the
+exercised mechanisms and read-backs, not an additional passing flight,
+capability-wide qualification, or a larger campaign success rate under
+any release or customer-qualification denominator or evidence class in a
+signed Runtime.
+
 Neither evidence
 class establishes optimizer superiority, broad stability, collision
 avoidance, signed customer-Runtime acceptance, real-aircraft safety, or
@@ -1550,7 +1609,7 @@ the final registry.
 \protect\hypertarget{ref_1}{}{}{[}1{]} DroneDream, ``Release evidence
 ledger,'' ver. 1.2, evidence bundle v9, current online-routing freeze,
 offline multi-tool budget closure, and real-PX4 physical campaign
-receipts, software evidence head \texttt{d14bf9c}, Jul. 2026.
+receipts, software evidence head \texttt{2f1caae}, Jul. 2026.
 
 {\RaggedRight
 \protect\hypertarget{ref_2}{}{}{[}2{]} PX4 Development Team,
@@ -1801,6 +1860,9 @@ wind/obstacle injections, not optimizer superiority or broad
 generalization. The advanced-physics campaign separately qualifies three
 same-seed trajectories under five verified effects; its two GPS
 readiness timeouts prove injection only and are not successful flights.
+The later GPS/battery negative control verifies deterministic effect
+application and Trial completion but fails its stability gate, so it
+qualifies neither a passing trajectory nor the capability as a whole.
 Customer qualification still needs matched arms, wider
 seed blocks, signed-Runtime repetition, retained failures, and independent
 recomputation; flight safety and sim-to-real transfer remain unclaimed.
@@ -1924,6 +1986,8 @@ PX4/Gazebo scenario matrix & 6 Trials; 4 probes & Physical campaign v1 &
 Dedicated-Runtime execution only\tabularnewline
 Advanced-physics PX4/Gazebo & 3 passing; 2 readiness timeouts; 1 file failure &
 Advanced physics v1 & Five-effect trajectories; GPS injection boundary\tabularnewline
+GPS/battery negative control & 1 completed; stability gate failed &
+Runtime receipt v1 & Injection/read-back only; excluded from pass rates\tabularnewline
 Website validation chain & 325 tests; 5 routes & Typography receipt v1 &
 Local validation only; no deployment\tabularnewline
 \bottomrule
@@ -2101,15 +2165,94 @@ successful-flight numerator. One earlier file-backed attempt records PX4
 dubious ownership. Three still earlier terminal-only preflights remain
 non-machine-verified narrative history because no raw files exist.
 
+The subsequent negative-control verifier begins from implementation
+\texttt{fdf1250} and evidence head \texttt{2f1caae}. It reads the
+receipt, failure lineage, applied-scenario record, JUnit file, and ULog by
+their committed paths and exact SHA-256 values; none is copied into the
+report tree. Receipt fields require runner and acceptance exit zero,
+\texttt{trial\_success=true}, three verified effects, 76 seconds, zero
+residual processes, and no API-key use. The independent ULog review fixes
+the GPS denominator at 56 samples: 7 \texttt{NO\_GPS}/0-satellite and 49
+\texttt{FIX\_3D}/10-satellite observations.
+
+Mechanism verification remains distinct from outcome acceptance. The
+fixed-duty schedule requests 20\% denial, applies 6 off ticks among 29,
+realizes 0.2068966, and verifies recovery to baseline
+\texttt{SIM\_GPS\_USED=10}. Battery telemetry falls from 92\% / 16.02 V
+to 80\% / 15.825 V. The Trial finishes without crash or timeout, but the
+31.211302 m/s observed position speed exceeds the 25 m/s policy threshold;
+therefore \texttt{pass\_flag=false}. Attempt 16 remains in the lineage:
+two command-420 records reached \texttt{vehicle\_command}, zero
+acknowledgments returned, and the gz\_bridge Runtime lacked the relevant
+SimulatorMavlink failure handler before the native parameter path was used.
+
 The admissible statement is consequently narrow: this dedicated Runtime
 applied and read back the five exercised effects during three successful
 PX4/Gazebo trajectories, and separately applied and read back GPS noise
 before two readiness failures. The bundle does not establish a Gazebo
 version, a WSL Runtime identifier, optimizer superiority, broad
 reliability, real-aircraft safety, or simulation-to-reality transfer.
-Probabilistic GPS dropout, battery initial state and voltage sag, and hard
-actuator failure beyond bounded first-order delay remain unimplemented
-Runtime extensions.
+The later negative control verifies deterministic GPS denial/recovery and
+battery-profile injection, but not a passing stability outcome, probability
+law across seeds, dropout endurance, depleted-battery qualification, or
+capability-wide acceptance. Hard actuator failure beyond bounded
+first-order delay remains unimplemented.
+
+The two state vectors are preserved independently. The execution vector is
+\texttt{runner=0}, \texttt{acceptance=0},
+\texttt{trial\_success=true}, no crash, no timeout, and zero residual
+processes. The outcome vector is \texttt{pass\_flag=false},
+\texttt{instability=true}, and
+\texttt{position\_speed\_exceeded}. This separation is why the run can be
+valid evidence of mechanism execution while remaining invalid as an
+additional passing-flight record.
+
+The deterministic GPS mechanism is also narrower than a qualified dropout
+model. A SHA-256-ranked fixed-duty schedule selects 6 off ticks from 29,
+then alternates exact parameter requests and MAVSDK \texttt{gps\_info}
+observations. Each denial requires \texttt{SIM\_GPS\_USED=0},
+\texttt{NO\_GPS}, and zero satellites; each recovery requires parameter 10,
+\texttt{FIX\_3D}, and ten satellites. The final reset is verified, but one
+seed and one fixed schedule do not establish a probability law, endurance
+under longer denial, or robustness to other transition patterns.
+
+Battery admission follows the same rule. Exact \texttt{SIM\_BAT\_*}
+read-backs establish the requested initial-state and sag profile, while
+telemetry establishes the 92\% / 16.02 V to 80\% / 15.825 V change during
+flight. Those observations do not override the speed-policy failure, and
+the retained RMSE, maximum error, and coverage remain diagnostic values for
+the failed Trial rather than performance evidence for a qualified battery
+capability or combined-fault envelope.
+
+Finally, attempt 16 explains why the supported control path matters. Two
+command-420 messages entered PX4's \texttt{vehicle\_command} stream, but
+no matching acknowledgment appeared because the gz\_x500 stack used
+gz\_bridge without the SimulatorMavlink failure handler. Attempt 18
+therefore uses the native \texttt{SIM\_GPS\_USED} path and verifies both
+parameter and telemetry consequences. Preserving that lineage prevents a
+transport-level command arrival from being mistaken for an applied physical
+effect in any later Runtime acceptance decision.
+
+Artifact admission remains minimum-sufficient. The receipt binds the
+16,803,366-byte ULog, applied-scenario record, execution window, telemetry,
+trajectory, and Trial result to exact digests; the report verifier rehashes
+the five publication-facing blobs directly from Git. No upstream attempt
+directory is copied into the report, and no metric is reconstructed from a
+mutable working-tree path or an operator transcription.
+
+Chronology is equally material. Attempts 14 and 15 retain timeout outcomes,
+attempt 16 retains command arrival without acknowledgment, and attempt 17
+records the first supported-path completion only in a dirty working tree.
+Attempt 18 alone supplies the exact-commit authority used here. This rule
+prevents a promising diagnostic, transport observation, or unfrozen success
+from displacing the narrower machine-verifiable negative-control result.
+
+Publication therefore preserves four non-interchangeable counters: 6/6
+passing scenario-matrix Trials, 3/3 passing five-effect trajectories, 0/2
+successful GPS-noise readiness attempts, and 0/1 stability passes for the
+later negative control despite 1/1 completed Trial. They are never summed
+because their scenario designs, seed structures, failure stages, effect
+profiles, and acceptance predicates define non-exchangeable experimental units.
 
 This separation is enforced mechanically. The verifier asserts the exact
 authority names, common Candidate and seed, all three successful metric

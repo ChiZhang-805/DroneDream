@@ -127,8 +127,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $renderedPages = Get-ChildItem -LiteralPath $renderRoot -File -Filter "page-*.png"
-if ($renderedPages.Count -ne 20) {
-    throw "Expected 20 rendered pages, found $($renderedPages.Count)"
+if ($renderedPages.Count -ne 21) {
+    throw "Expected 21 rendered pages, found $($renderedPages.Count)"
 }
 
 $auditPath = Join-Path $buildRoot "latex-audit.json"

@@ -22,12 +22,14 @@ The software chain is:
 - v9 receipt-only evidence head: `8102ffecb37b1f1b0e25c80d6b02db05325ca986`
 - online-routing implementation: `aeffaae01a8106f74ff811b39ec26d9d2203d1f6`
 - multi-tool budget source: `136a1e3293efa6e53f3648e21fa8f7c6b5158d6f`
-- current software/evidence head: `d14bf9c0d453599b2bc9733be8c4159fef67c220`
+- current software/evidence head: `2f1caae6fbb5b037e55a4b339dff6c590833f019`
 - physical-campaign subject: `86273db6d827a790cb0a8b1472256b23e0a629d2`
 - physical-campaign evidence head: `3b09951bbea2e5f1c64197b0347a0ed529172192`
 - advanced-physics subject: `26b957efd985d0ac37702a8d2518e87ab65347c3`
 - advanced-physics exporter: `06cfdeb4438be59a24510738ab135b06fdde373a`
 - advanced-physics evidence head: `d14bf9c0d453599b2bc9733be8c4159fef67c220`
+- GPS/battery negative-control implementation: `fdf1250398567c6658ad5148efc1c302dede4a17`
+- GPS/battery negative-control evidence head: `2f1caae6fbb5b037e55a4b339dff6c590833f019`
 
 The website chain is:
 
@@ -129,9 +131,20 @@ rechecked by the report verifier. The bundle claims PX4 SITL v1.16 at commit
 does not claim a Gazebo version or WSL Runtime identifier. Its three same-seed
 successes do not establish broad reliability, safety, real-aircraft behavior,
 sim-to-real transfer, customer acceptance, or optimizer superiority. Remaining
-Runtime extensions are probabilistic GPS dropout, battery initial state and
-voltage sag, and hard actuator failure beyond the bounded first-order delay
-profile.
+evidence gaps are probability-law behavior across seeds, dropout endurance,
+depleted-battery stability, combined-fault qualification, and hard actuator
+failure beyond the bounded first-order delay profile.
+
+A later exact-commit negative-control Trial separately verifies deterministic
+GPS denial/recovery plus battery initial-state and voltage-sag injection. Its
+runner and acceptance commands exit zero, all three effects are applied and
+verified, and the trajectory completes without crash or timeout. The result is
+nevertheless not a pass: position speed reaches 31.211302 m/s against the
+25 m/s policy gate. This Trial therefore remains excluded from both the 3/3
+advanced-effects pass numerator and the 6/6 scenario-matrix pass numerator.
+The report manifest binds its receipt, failure lineage, ULog, applied-scenario
+record, and 159-test JUnit by path, commit, and SHA-256 without copying the
+upstream attempt directory.
 
 The latest typography receipt records 13/13 focused PublicSite checks, 325/325
 frontend tests across 50 files, typecheck, lint, application and shared builds,
@@ -178,7 +191,7 @@ The A4 layout uses a 10-point body with 12-point leading, 24 mm side margins,
 and a 25 mm top / 20 mm bottom geometry. The first-page hierarchy, upper-left
 brand lockup, rounded abstract frame, and body rhythm were quantitatively
 checked against the JoyAI-RA 0.1 report while preserving DroneDream's purple
-identity and a roomier 20-page evidence narrative.
+identity and a roomier 21-page evidence narrative.
 
 From the repository root:
 
@@ -190,7 +203,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 The script regenerates Figures 2--6 from the frozen evidence bundle in an
 ignored build directory and requires their rendered pixels to match the
 tracked PNGs. It then performs two XeLaTeX passes, rejects warning gates,
-renders all 20 pages, runs the structural/paragraph/link audit, and publishes
+renders all 21 pages, runs the structural/paragraph/link audit, and publishes
 the validated PDF, layout audit, and claim-evidence audit to
 `technical-report/output/`.
 The claim gate fails the build when a declared report projection drifts from
@@ -213,7 +226,7 @@ with body prose. Intermediate files remain under the ignored
 
 The audit and receipt writers emit UTF-8 JSON with LF newlines as exact bytes,
 independent of the host operating system. After visually reviewing the final
-20-page render, create the artifact-layer receipt:
+21-page render, create the artifact-layer receipt:
 
 ```powershell
 python technical-report/scripts/create_report_validation_receipt.py `

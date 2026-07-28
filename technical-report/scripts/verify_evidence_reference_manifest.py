@@ -4,6 +4,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
@@ -178,6 +179,7 @@ def main() -> int:
     website = manifest["website"]
     physical = software["physical_campaign"]
     advanced = software["advanced_physics"]
+    negative_control = software["advanced_physics_runtime_negative_control"]
     cross_job = software["cross_job_memory"]
     online_routing = software["online_routing"]
     multi_tool_budget = software["multi_tool_budget"]
@@ -199,6 +201,8 @@ def main() -> int:
         advanced["subject_commit"],
         advanced["exporter_commit"],
         advanced["evidence_head"],
+        negative_control["implementation_commit"],
+        negative_control["evidence_head"],
         website["subject_commit"],
         website["attestation_commit"],
     ]
@@ -295,9 +299,21 @@ def main() -> int:
         advanced["evidence_head"],
         failures,
     )
+    verify_ancestor(
+        repo,
+        advanced["evidence_head"],
+        negative_control["implementation_commit"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        negative_control["implementation_commit"],
+        negative_control["evidence_head"],
+        failures,
+    )
     require(
-        advanced["evidence_head"] == software["branch_head"],
-        "advanced-physics evidence head must bind the latest software head",
+        negative_control["evidence_head"] == software["branch_head"],
+        "advanced-physics negative-control evidence must bind the latest software head",
         failures,
     )
     require(
@@ -1131,6 +1147,200 @@ def main() -> int:
         "advanced-physics GPS readiness timeout boundary drifted",
         failures,
     )
+
+    negative_receipt = software_json.get(
+        "advanced_physics_runtime_negative_control_receipt", {}
+    )
+    negative_lineage = software_json.get(
+        "advanced_physics_runtime_negative_control_failure_lineage", {}
+    )
+    negative_scenario = software_json.get(
+        "advanced_physics_runtime_negative_control_scenario_applied", {}
+    )
+    require(
+        negative_control
+        == {
+            "implementation_commit": "fdf1250398567c6658ad5148efc1c302dede4a17",
+            "evidence_head": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+            "evidence_class": "REAL_PX4_GAZEBO_GPS_BATTERY_NEGATIVE_CONTROL",
+            "claim_class": (
+                "verified_injection_readback_and_completed_trial_with_failed_"
+                "stability_acceptance"
+            ),
+            "trial_success": True,
+            "pass_flag": False,
+            "applied_effect_count": 3,
+            "focused_test_count": 159,
+        },
+        "advanced-physics negative-control manifest metadata drifted",
+        failures,
+    )
+    negative_physical = negative_receipt.get("physical_run", {})
+    require(
+        negative_receipt.get("schema_version")
+        == "dronedream.advanced-physics-runtime-receipt/v1"
+        and negative_physical.get("runner_exit_code") == 0
+        and negative_physical.get("acceptance_exit_code") == 0
+        and negative_physical.get("trial_success") is True
+        and negative_physical.get("duration_seconds") == 76
+        and negative_physical.get("residual_process_count") == 0
+        and negative_physical.get("openai_api_key_used") is False
+        and negative_physical.get("environment", {}).get("px4_firmware_commit")
+        == "6ea3539157ca358c70a515878b77077af7d4611d"
+        and negative_physical.get("environment", {}).get("vehicle") == "x500"
+        and negative_physical.get("environment", {}).get("world") == "default",
+        "advanced-physics negative-control execution boundary drifted",
+        failures,
+    )
+    negative_effect = negative_receipt.get("effect_result", {})
+    require(
+        negative_effect.get("verification_status") == "verified_applied"
+        and negative_effect.get("applied_effects")
+        == [
+            "battery.initial_percent",
+            "battery.voltage_sag",
+            "sensor_degradation.dropout_rate",
+        ]
+        and negative_effect.get("requested_dropout_rate") == 0.2
+        and negative_effect.get("tick_count") == 29
+        and negative_effect.get("off_tick_count") == 6
+        and negative_effect.get("realized_dropout_rate")
+        == 0.20689655172413793
+        and negative_effect.get("gps_control_parameter") == "SIM_GPS_USED"
+        and negative_effect.get("gps_baseline_value") == 10
+        and negative_effect.get("gps_dropout_value") == 0
+        and negative_effect.get("gps_restore_verified") is True
+        and negative_effect.get("battery_track_start", {}).get("remaining_percent")
+        == 92.0
+        and negative_effect.get("battery_track_start", {}).get("voltage_v")
+        == 16.020000457763672
+        and negative_effect.get("battery_track_end", {}).get("remaining_percent")
+        == 80.0
+        and negative_effect.get("battery_track_end", {}).get("voltage_v")
+        == 15.825000762939453,
+        "advanced-physics negative-control effect read-back drifted",
+        failures,
+    )
+    require(
+        negative_receipt.get("independent_ulog_review")
+        == {
+            "dataset": "sensor_gps",
+            "fix_3d_sample_count": 49,
+            "no_gps_sample_count": 7,
+            "observed_fix_types": [0, 3],
+            "observed_satellites_used": [0, 10],
+            "physical_transition_verified": True,
+            "sample_count": 56,
+        },
+        "advanced-physics negative-control ULog review drifted",
+        failures,
+    )
+    require(
+        negative_receipt.get("outcome")
+        == {
+            "crash_flag": False,
+            "instability_flag": True,
+            "instability_reasons": ["position_speed_exceeded"],
+            "interpretation": (
+                "The requested physical effects were verified and the trial "
+                "completed, but the controller outcome correctly failed the "
+                "stability policy under this deterministic dropout schedule."
+            ),
+            "max_error_m": 1.498568,
+            "maximum_observed_position_speed_mps": 31.211302,
+            "pass_flag": False,
+            "policy_limit_position_speed_mps": 25.0,
+            "rmse_m": 0.345207,
+            "timeout_flag": False,
+            "track_coverage": 0.983807,
+        },
+        "advanced-physics negative-control outcome drifted",
+        failures,
+    )
+    focused = negative_receipt.get("focused_test_receipt", {})
+    require(
+        focused.get("source_commit") == negative_control["implementation_commit"]
+        and focused.get("tests") == 159
+        and focused.get("passed") == 159
+        and focused.get("failures") == 0
+        and focused.get("errors") == 0
+        and focused.get("skipped") == 0
+        and focused.get("openai_api_key_used") is False
+        and focused.get("junit_xml", {}).get("sha256")
+        == "67d614764b213408833f50be63c0490e27c99dbcca41f349ab6281b605fc6b8c",
+        "advanced-physics negative-control focused-test receipt drifted",
+        failures,
+    )
+    receipt_artifacts = negative_receipt.get("artifacts", {})
+    require(
+        receipt_artifacts.get("px4_source.ulg", {}).get("sha256")
+        == "dc3b156e6ae6144263e493ec59b566ba3d7772a5ffdca8345c66218afec07f90"
+        and receipt_artifacts.get("scenario_effects.applied.json", {}).get("sha256")
+        == "7973680f267b2643690b998b84111ffb3887f1efc2cf556b09acd1d73a24846a",
+        "advanced-physics negative-control receipt artifact binding drifted",
+        failures,
+    )
+    attempt_16 = negative_lineage.get("attempt_16", {})
+    require(
+        negative_lineage.get("subject_commit")
+        == negative_control["implementation_commit"]
+        and attempt_16.get("px4_ulog", {}).get("vehicle_command_420_count") == 2
+        and attempt_16.get("px4_ulog", {}).get("vehicle_command_ack_420_count") == 0
+        and "gz_bridge" in str(attempt_16.get("root_cause", ""))
+        and "SimulatorMavlink failure handler is absent"
+        in str(attempt_16.get("root_cause", ""))
+        and negative_lineage.get("authoritative_resolution", {}).get(
+            "exact_commit_attempt"
+        )
+        == 18
+        and negative_lineage.get("authoritative_resolution", {}).get("mechanism")
+        == "PX4 gz_bridge SIM_GPS_USED with exact parameter readback and MAVSDK gps_info telemetry",
+        "advanced-physics negative-control failure lineage drifted",
+        failures,
+    )
+    scenario_effects = negative_scenario.get("effects", [])
+    require(
+        len(scenario_effects) == 3
+        and [item.get("effect_id") for item in scenario_effects]
+        == [
+            "sensor_degradation.dropout_rate",
+            "battery.initial_percent",
+            "battery.voltage_sag",
+        ]
+        and all(item.get("status") == "applied" for item in scenario_effects)
+        and all(
+            item.get("capability", {}).get("status") == "available"
+            and item.get("evidence", {}).get("verification", {}).get("status")
+            == "verified"
+            for item in scenario_effects
+        ),
+        "advanced-physics negative-control scenario effect record drifted",
+        failures,
+    )
+    junit_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "advanced_physics_runtime_negative_control_focused_junit"
+    )
+    junit_payload = run_git(
+        repo,
+        "show",
+        f"{junit_entry['ref_commit']}:{junit_entry['path']}",
+    )
+    try:
+        junit_root = ET.fromstring(junit_payload)
+        junit_suite = next(junit_root.iter("testsuite"))
+    except (ET.ParseError, StopIteration):
+        failures.append("advanced-physics negative-control JUnit is unreadable")
+    else:
+        require(
+            junit_suite.attrib.get("tests") == "159"
+            and junit_suite.attrib.get("failures") == "0"
+            and junit_suite.attrib.get("errors") == "0"
+            and junit_suite.attrib.get("skipped") == "0",
+            "advanced-physics negative-control JUnit result drifted",
+            failures,
+        )
 
     bundle_entry = next(
         item for item in software["artifacts"] if item["id"] == "technical_report_evidence_bundle"

@@ -17,7 +17,7 @@
     "branch": "codex/software",
     "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
     "provenance_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
-    "branch_head": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+    "branch_head": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
     "cross_job_memory": {
       "implementation_commit": "abb9002746e061af44a164fe749243d68d098e10",
       "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
@@ -78,6 +78,16 @@
       "source_bytes": 305040238,
       "retained_file_count": 111,
       "retained_bytes": 8994710
+    },
+    "advanced_physics_runtime_negative_control": {
+      "implementation_commit": "fdf1250398567c6658ad5148efc1c302dede4a17",
+      "evidence_head": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "evidence_class": "REAL_PX4_GAZEBO_GPS_BATTERY_NEGATIVE_CONTROL",
+      "claim_class": "verified_injection_readback_and_completed_trial_with_failed_stability_acceptance",
+      "trial_success": true,
+      "pass_flag": false,
+      "applied_effect_count": 3,
+      "focused_test_count": 159
     },
     "artifacts": [
       {
@@ -200,6 +210,36 @@
         "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.sha256",
         "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
         "file_sha256": "35b84b7a6d85617e389aa860e5ba5ad30847a88b60265eeeaf8d6281a2f07d20"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_receipt",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/receipt.json",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "2d6470fb085e638c52754f580d22a5d3d50d2f26000e584148557f3c505fdd8a"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_failure_lineage",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/failure-lineage.json",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "882acd480bfca39591f0daa01faea73ac9780cd3a514cd362fe8a2a2629e00b5"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_ulog",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/px4_source.ulg",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "dc3b156e6ae6144263e493ec59b566ba3d7772a5ffdca8345c66218afec07f90"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_scenario_applied",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/scenario_effects.applied.json",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "7973680f267b2643690b998b84111ffb3887f1efc2cf556b09acd1d73a24846a"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_focused_junit",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/focused-tests.xml",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "67d614764b213408833f50be63c0490e27c99dbcca41f349ab6281b605fc6b8c"
       }
     ],
     "source_references": [
@@ -537,7 +577,7 @@
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
           "modified_after_migration": true,
           "current_hash_serialization": "utf8_lf",
-          "current_sha256": "41a563a6ae258da828a1e68eb7fbb892309743b1d92fdeb2370d6f444525ad38"
+          "current_sha256": "cbde3018507f1c6e9a1026a6dedf218b87165f293e744d2b07278982890af991"
       },
       {
         "path": "media/github-mark.png",

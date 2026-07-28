@@ -54,6 +54,14 @@
     {
       "literal": "evidence bundle v7",
       "reason": "The current publication ledger is Evidence v9; Evidence 2.7 remains only an archived provider/data contract label."
+    },
+    {
+      "literal": "battery initial state and voltage sag, and hard actuator failure beyond bounded first-order delay remain unimplemented",
+      "reason": "The later exact-commit negative control verifies deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection; only the qualified stability outcome and remaining probability-law or hard-failure scope are absent."
+    },
+    {
+      "literal": "GPS/battery capability is qualified",
+      "reason": "The negative-control Trial completed its three effect checks but failed the 25 m/s stability gate."
     }
   ],
   "claims": [
@@ -1913,7 +1921,7 @@
         "not successful GPS-noise flight",
         "three non-machine-verified terminal preflights",
         "cannot be pooled with the six-Trial scenario matrix",
-        "Probabilistic GPS dropout",
+        "probabilistic GPS dropout",
         "Advanced-physics PX4/Gazebo & 3 passing; 2 readiness timeouts; 1 file failure"
       ]
     },
@@ -2005,6 +2013,281 @@
       ],
       "body_contains": [
         "PX4 readiness times out after 30.0 seconds"
+      ]
+    },
+    {
+      "id": "advanced-physics-gps-battery-negative-control",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.advanced-physics-runtime-receipt/v1"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/runner_exit_code",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/acceptance_exit_code",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/trial_success",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/duration_seconds",
+          "expected": 76
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/residual_process_count",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/openai_api_key_used",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/verification_status",
+          "expected": "verified_applied"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/applied_effects",
+          "expected": [
+            "battery.initial_percent",
+            "battery.voltage_sag",
+            "sensor_degradation.dropout_rate"
+          ]
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/requested_dropout_rate",
+          "expected": 0.2
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/tick_count",
+          "expected": 29
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/off_tick_count",
+          "expected": 6
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/realized_dropout_rate",
+          "expected": 0.20689655172413793
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/gps_control_parameter",
+          "expected": "SIM_GPS_USED"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/gps_restore_verified",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/battery_track_start/remaining_percent",
+          "expected": 92.0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/battery_track_end/remaining_percent",
+          "expected": 80.0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/independent_ulog_review/sample_count",
+          "expected": 56
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/independent_ulog_review/no_gps_sample_count",
+          "expected": 7
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/independent_ulog_review/fix_3d_sample_count",
+          "expected": 49
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/outcome/pass_flag",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/outcome/maximum_observed_position_speed_mps",
+          "expected": 31.211302
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/outcome/policy_limit_position_speed_mps",
+          "expected": 25.0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/outcome/rmse_m",
+          "expected": 0.345207
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/outcome/max_error_m",
+          "expected": 1.498568
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/outcome/track_coverage",
+          "expected": 0.983807
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/focused_test_receipt/source_commit",
+          "expected": "fdf1250398567c6658ad5148efc1c302dede4a17"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/focused_test_receipt/passed",
+          "expected": 159
+        }
+      ],
+      "body_contains": [
+        "A later exact-commit negative control binds implementation",
+        "deterministic 20\\% GPS-denial schedule",
+        "31.211302 m/s against the",
+        "excluded from both pass numerators",
+        "failed stability acceptance"
+      ]
+    },
+    {
+      "id": "advanced-physics-gps-battery-failure-lineage",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_failure_lineage",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/subject_commit",
+          "expected": "fdf1250398567c6658ad5148efc1c302dede4a17"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempt_16/px4_ulog/vehicle_command_420_count",
+          "expected": 2
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempt_16/px4_ulog/vehicle_command_ack_420_count",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/authoritative_resolution/exact_commit_attempt",
+          "expected": 18
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/authoritative_resolution/mechanism",
+          "expected": "PX4 gz_bridge SIM_GPS_USED with exact parameter readback and MAVSDK gps_info telemetry"
+        }
+      ],
+      "body_contains": [
+        "two command-420 records reached",
+        "zero acknowledgments returned",
+        "SimulatorMavlink failure handler"
+      ]
+    },
+    {
+      "id": "advanced-physics-gps-battery-scenario-effects",
+      "report_locations": [
+        "Section 4.8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_scenario_applied",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/effect_id",
+          "expected": "sensor_degradation.dropout_rate"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/status",
+          "expected": "applied"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/1/effect_id",
+          "expected": "battery.initial_percent"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/1/status",
+          "expected": "applied"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/2/effect_id",
+          "expected": "battery.voltage_sag"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/2/status",
+          "expected": "applied"
+        }
+      ],
+      "body_contains": [
+        "all three requested effects are applied and verified",
+        "battery initial-state and voltage-sag injection"
+      ]
+    },
+    {
+      "id": "advanced-physics-gps-battery-focused-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_focused_junit",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "tests=\"159\""
+        },
+        {
+          "kind": "text_contains",
+          "expected": "failures=\"0\""
+        },
+        {
+          "kind": "text_contains",
+          "expected": "errors=\"0\""
+        }
+      ],
+      "body_contains": [
+        "159-test JUnit"
       ]
     },
     {

@@ -156,17 +156,17 @@ def main() -> None:
     pages = len(PdfReader(pdf).pages)
     policy = audit["paragraph_policy"]["explanatory_body"]
     short_list_policy = audit["paragraph_policy"]["short_list_items"]
-    require(pages == 20 and audit["pages"] == 20, "report must contain 20 pages")
+    require(pages == 21 and audit["pages"] == 21, "report must contain 21 pages")
     require(
-        policy["total"] == 61 and policy["passed"] == 61 and policy["failed"] == 0,
-        "explanatory-body last-line policy did not pass 61/61",
+        policy["total"] == 65 and policy["passed"] == 65 and policy["failed"] == 0,
+        "explanatory-body last-line policy did not pass 65/65",
     )
     require(
-        short_list_policy["total"] == 15
-        and short_list_policy["passed"] == 15
+        short_list_policy["total"] == 14
+        and short_list_policy["passed"] == 14
         and short_list_policy["failed"] == 0
-        and len(short_list_policy["above_3_lines"]) == 21,
-        "short-list last-line policy did not pass 15/15; long-list inventory drifted",
+        and len(short_list_policy["above_3_lines"]) == 23,
+        "short-list last-line policy did not pass 14/14; long-list inventory drifted",
     )
     require(not audit["paragraph_geometry"]["unlocated"], "unlocated paragraphs")
     require(
@@ -194,7 +194,7 @@ def main() -> None:
     require(args.visual_review_passed, "visual review attestation was not supplied")
 
     receipt = {
-        "schema_version": "dronedream.technical-report-validation-receipt.v7",
+        "schema_version": "dronedream.technical-report-validation-receipt.v8",
         "subject_commit": subject_commit,
         "parent_software_head": manifest["software"]["branch_head"],
         "branch": git(repo, "branch", "--show-current"),
@@ -269,8 +269,8 @@ def main() -> None:
         "visual_review": {
             "status": "passed",
             "render_dpi": 150,
-            "inspected_pages": list(range(1, 21)),
-            "page_bottoms_inspected": list(range(1, 21)),
+            "inspected_pages": list(range(1, 22)),
+            "page_bottoms_inspected": list(range(1, 22)),
             "defects_fixed": [
                 {
                     "page": 1,
@@ -291,7 +291,7 @@ def main() -> None:
                     ),
                 },
                 {
-                    "page": 20,
+                    "page": 21,
                     "issue": (
                         "References used two columns and retained an explanatory paragraph below the heading."
                     ),
