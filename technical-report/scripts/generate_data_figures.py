@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import subprocess
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -38,16 +39,21 @@ def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def evidence_bundle(
+def evidence_sources(
     repository: Path,
     manifest_path: Path,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     entries = [
         *manifest["software"]["artifacts"],
         *manifest["software"].get("source_references", []),
     ]
-    entry = next(
+    bundle_entry = next(
         (
             item
             for item in entries
@@ -55,23 +61,63 @@ def evidence_bundle(
         ),
         None,
     )
-    if entry is None:
+    if bundle_entry is None:
         raise ValueError("manifest lacks technical_report_evidence_bundle")
-    payload = git_bytes(repository, entry["ref_commit"], entry["path"])
+    payload = git_bytes(
+        repository,
+        bundle_entry["ref_commit"],
+        bundle_entry["path"],
+    )
     actual_sha256 = sha256_bytes(payload)
-    if actual_sha256 != entry["file_sha256"]:
+    if actual_sha256 != bundle_entry["file_sha256"]:
         raise ValueError(
             "frozen evidence bundle SHA-256 drifted: "
-            f"expected {entry['file_sha256']}, found {actual_sha256}"
+            f"expected {bundle_entry['file_sha256']}, found {actual_sha256}"
         )
     evidence = json.loads(payload.decode("utf-8"))
-    if evidence.get("schema_version") != "dronedream.technical-report-evidence.v7":
-        raise ValueError("data figures require the frozen v7 evidence bundle")
+    if evidence.get("schema_version") != "dronedream.technical-report-evidence.v9":
+        raise ValueError("data figures require the frozen v9 evidence bundle")
     if evidence.get("source_commit") != manifest["software"]["subject_commit"]:
         raise ValueError("data-figure bundle source commit drifted")
-    if evidence.get("bundle_sha256") != entry["canonical_sha256"]:
+    if evidence.get("bundle_sha256") != bundle_entry["canonical_sha256"]:
         raise ValueError("data-figure canonical bundle SHA-256 drifted")
-    return evidence, entry
+    online_entry = next(
+        (
+            item
+            for item in entries
+            if item["id"] == "current_online_routing_artifact"
+        ),
+        None,
+    )
+    if online_entry is None:
+        raise ValueError("manifest lacks current_online_routing_artifact")
+    online_payload = git_bytes(
+        repository,
+        online_entry["ref_commit"],
+        online_entry["path"],
+    )
+    online_sha256 = sha256_bytes(online_payload)
+    if online_sha256 != online_entry["file_sha256"]:
+        raise ValueError(
+            "current online-routing artifact SHA-256 drifted: "
+            f"expected {online_entry['file_sha256']}, found {online_sha256}"
+        )
+    online = json.loads(online_payload.decode("utf-8"))
+    if (
+        online.get("evidence_schema_version") != "2.8"
+        or online.get("prompt_template_version") != "1.7"
+        or online.get("tool_registry_version") != "2.1"
+        or online.get("model_snapshot") != "gpt-4.1-2025-04-14"
+        or online.get("generation_config")
+        != {
+            "response_format": "json_schema",
+            "seed": 20260728,
+            "temperature": 0.0,
+            "top_p": 1.0,
+        }
+    ):
+        raise ValueError("current online-routing figure contract drifted")
+    return evidence, bundle_entry, online, online_entry
 
 
 def chart_style() -> None:
@@ -106,46 +152,62 @@ def pad_top(path: Path, target_height: int) -> None:
         canvas.save(path, dpi=dpi)
 
 
-def make_routing_bar(evidence: dict[str, Any], path: Path) -> None:
+def make_routing_bar(
+    evidence: dict[str, Any],
+    online: dict[str, Any],
+    path: Path,
+) -> None:
     routing = evidence["routing"]
     if (
         routing.get("evidence_schema_version") != "2.7"
         or routing.get("prompt_template_version") != "1.6"
-        or routing.get("qualification_scope") != "current_evidence_2_7_prompt_1_6"
+        or routing.get("qualification_scope") != "archived_evidence_2_7_prompt_1_6"
+        or routing.get("contract_current") is not False
         or routing.get("qualified") is not True
     ):
-        raise ValueError("routing figure requires current Evidence 2.7 / Prompt 1.6")
+        raise ValueError("routing figure requires archived Evidence 2.7 / Prompt 1.6")
+    if len(online.get("predictions", {})) != 24:
+        raise ValueError("current online-routing prediction inventory drifted")
     labels = [
-        "Current AURORA\nrouter (2.7 / 1.6)",
-        "Best constant\npolicy",
-        "Uniform random\nexpectation",
+        "Uniform random expectation",
+        "Best constant policy",
+        "Archived router (2.7 / 1.6)",
+        "Current router (2.8 / 1.7)",
     ]
     values = [
-        routing["pass_rate"] * 100,
-        routing["best_constant_pass_rate"] * 100,
         routing["uniform_random_expected_pass_rate"] * 100,
+        routing["best_constant_pass_rate"] * 100,
+        routing["pass_rate"] * 100,
+        23 / 24 * 100,
     ]
-    colors = [VIOLET, MAGENTA, LAVENDER]
+    count_labels = ["5.625/24", "14/24", "24/24", "23/24"]
+    colors = [ROSE, MAGENTA, LAVENDER, VIOLET]
     fig, ax = plt.subplots(figsize=(1012 / 220, 596 / 220), dpi=220)
-    bars = ax.bar(labels, values, color=colors, width=0.62)
-    ax.set_ylim(0, 110)
-    ax.set_ylabel("Acceptable tool selection (%)")
-    ax.tick_params(axis="both", labelsize=10)
-    ax.grid(axis="y", color="#EEEAF2", linewidth=0.8)
+    bars = ax.barh(labels, values, color=colors, height=0.62)
+    ax.set_xlim(0, 118)
+    ax.set_xlabel("Acceptable tool selection (%)")
+    ax.tick_params(axis="both", labelsize=10.4)
+    ax.grid(axis="x", color="#EEEAF2", linewidth=0.8)
     ax.set_axisbelow(True)
     ax.spines[["top", "right"]].set_visible(False)
-    for bar, value in zip(bars, values, strict=True):
+    for bar, value, count_label in zip(
+        bars,
+        values,
+        count_labels,
+        strict=True,
+    ):
         ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            value + 2.5,
-            f"{value:.2f}%",
-            ha="center",
-            fontsize=10.5,
+            value + 1.2,
+            bar.get_y() + bar.get_height() / 2,
+            f"{count_label} · {value:.2f}%",
+            ha="left",
+            va="center",
+            fontsize=10.2,
             fontweight="bold",
             color=INK,
         )
-    fig.tight_layout()
-    fig.savefig(path, dpi=220)
+    fig.subplots_adjust(left=0.34, right=0.94, bottom=0.22, top=0.96)
+    fig.savefig(path, dpi=220, bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
 
 
@@ -216,11 +278,15 @@ def make_ablation_chart(evidence: dict[str, Any], path: Path) -> None:
     plt.close(fig)
 
 
-def make_tool_distribution(evidence: dict[str, Any], path: Path) -> None:
-    rows = sorted(
-        evidence["routing"]["tool_selection_rows"],
-        key=lambda row: row["selected_count"],
+def make_tool_distribution(
+    online: dict[str, Any],
+    path: Path,
+) -> None:
+    counts = Counter(
+        str(row["selected_tool"])
+        for row in online["predictions"].values()
     )
+    rows = sorted(counts.items(), key=lambda item: (item[1], item[0]))
     label_map = {
         "bipop_cma_es": "BIPOP-CMA-ES",
         "constrained_mobo": "Constrained MOBO",
@@ -230,10 +296,10 @@ def make_tool_distribution(evidence: dict[str, Any], path: Path) -> None:
         "surrogate_cma_es": "Surrogate CMA-ES",
         "turbo": "TuRBO",
     }
-    if {row["tool"] for row in rows} != set(label_map):
-        raise ValueError("frozen routing tools do not match the figure contract")
-    labels = [label_map[row["tool"]] for row in rows]
-    values = [row["selected_count"] for row in rows]
+    if set(counts) != set(label_map) or sum(counts.values()) != 24:
+        raise ValueError("current routing tools do not match the figure contract")
+    labels = [label_map[tool] for tool, _ in rows]
+    values = [selected_count for _, selected_count in rows]
     gradient = [
         LAVENDER,
         "#B894F6",
@@ -365,12 +431,22 @@ def main() -> None:
     repository = args.repository.resolve()
     output_directory = args.output_directory.resolve()
     output_directory.mkdir(parents=True, exist_ok=True)
-    evidence, entry = evidence_bundle(repository, args.manifest.resolve())
+    evidence, bundle_entry, online, online_entry = evidence_sources(
+        repository,
+        args.manifest.resolve(),
+    )
     chart_style()
     outputs = {
-        "image4.png": make_routing_bar,
+        "image4.png": lambda source, path: make_routing_bar(
+            source,
+            online,
+            path,
+        ),
         "image5.png": make_ablation_chart,
-        "image6.png": make_tool_distribution,
+        "image6.png": lambda source, path: make_tool_distribution(
+            online,
+            path,
+        ),
         "image7.png": make_scenario_chart,
         "image8.png": make_scenario_heatmap,
     }
@@ -406,9 +482,16 @@ def main() -> None:
         json.dumps(
             {
                 "source": {
-                    "ref_commit": entry["ref_commit"],
-                    "path": entry["path"],
-                    "sha256": entry["file_sha256"],
+                    "evidence_bundle": {
+                        "ref_commit": bundle_entry["ref_commit"],
+                        "path": bundle_entry["path"],
+                        "sha256": bundle_entry["file_sha256"],
+                    },
+                    "current_online_routing": {
+                        "ref_commit": online_entry["ref_commit"],
+                        "path": online_entry["path"],
+                        "sha256": online_entry["file_sha256"],
+                    },
                 },
                 "outputs": result,
                 "comparison": comparison,

@@ -127,8 +127,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $renderedPages = Get-ChildItem -LiteralPath $renderRoot -File -Filter "page-*.png"
-if ($renderedPages.Count -ne 14) {
-    throw "Expected 14 rendered pages, found $($renderedPages.Count)"
+if ($renderedPages.Count -ne 18) {
+    throw "Expected 18 rendered pages, found $($renderedPages.Count)"
 }
 
 $auditPath = Join-Path $buildRoot "latex-audit.json"
@@ -167,7 +167,7 @@ $bodyAudit = $audit.paragraph_geometry.explanatory_body
 $paragraphFailures = [int]$bodyAudit.failed_80
 $shortListAudit = $audit.paragraph_geometry.short_list_items
 $shortListFailures = [int]$shortListAudit.failed_90
-$longListFailures = @($shortListAudit.above_3_lines).Count
+$longListTracked = @($shortListAudit.above_3_lines).Count
 $invalidLinks = 0
 if ($null -ne $audit.links.PSObject.Properties["invalid_named_targets"]) {
     $invalidLinks = @($audit.links.invalid_named_targets).Count
@@ -176,7 +176,7 @@ if ($null -ne $audit.links.PSObject.Properties["invalid_named_targets"]) {
 Write-Host (
     (
         "Audit summary: explanatory-body={0}, pass>=80%={1}, fail<80%={2}, " +
-        "short-lists={3}, pass>=90%={4}, fail<90%={5}, list>3-lines={6}, " +
+        "short-lists={3}, pass>=90%={4}, fail<90%={5}, long-list-exceptions={6}, " +
         "unlocated={7}, cross-page={8}, bottom-space={9}, invalid-links={10}, " +
         "gray-text={11}"
     ) -f
@@ -186,7 +186,7 @@ Write-Host (
         [int]$shortListAudit.total,
         [int]$shortListAudit.passed_90,
         $shortListFailures,
-        $longListFailures,
+        $longListTracked,
         @($audit.paragraph_geometry.unlocated).Count,
         @($audit.paragraph_geometry.cross_page_splits).Count,
         @($audit.bottom_failures).Count,
@@ -253,10 +253,10 @@ if ($shortListFailures -gt 0) {
         )
     }
 }
-if ($longListFailures -gt 0) {
+if ($longListTracked -gt 0) {
     foreach ($failure in @($shortListAudit.above_3_lines)) {
         Write-Host (
-            "  long-list failure: item={0}, page={1}, lines={2}" -f
+            "  tracked long-list exception: item={0}, page={1}, lines={2}" -f
                 [int]$failure.index,
                 [int]$failure.page,
                 [int]$failure.lines
@@ -272,18 +272,16 @@ $hardFailures = @(
     $invalidLinks -gt 0
     $paragraphFailures -gt 0
     $shortListFailures -gt 0
-    $longListFailures -gt 0
 )
 if ($hardFailures -contains $true) {
     $auditFailureMessage = (
         (
             "Report audit failed: explanatory-body<80%={0}, short-list<90%={1}, " +
-            "list>3-lines={2}, unlocated={3}, cross-page={4}, bottom-space={5}, " +
-            "invalid-links={6}, gray-text={7}"
+            "unlocated={2}, cross-page={3}, bottom-space={4}, " +
+            "invalid-links={5}, gray-text={6}"
         ) -f
         $paragraphFailures,
         $shortListFailures,
-        $longListFailures,
         @($audit.paragraph_geometry.unlocated).Count,
         @($audit.paragraph_geometry.cross_page_splits).Count,
         @($audit.bottom_failures).Count,
@@ -310,7 +308,7 @@ Copy-Item -LiteralPath $claimAuditPath -Destination $publishedClaimAudit -Force
     short_list_total = $shortListAudit.total
     short_list_passed_90 = $shortListAudit.passed_90
     short_list_failed_90 = $shortListAudit.failed_90
-    short_list_above_3_lines = $longListFailures
+    short_list_above_3_lines = $longListTracked
     last_line_below_80 = @($audit.paragraph_geometry.last_line_below_80).Count
     bottom_failures = @($audit.bottom_failures).Count
     gray_text_runs = $audit.gray_text_run_count

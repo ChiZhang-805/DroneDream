@@ -17,37 +17,106 @@ path, and SHA-256; it does not copy them.
 The software chain is:
 
 - branch: `codex/software`
-- subject: `742b12467efc9b37b7e4a2fa3ac73b7578f21385`
-- evidence publication/head: `1bf83ccd83913c5e66c2916e5250ccf5b27cad6f`
+- cross-Job memory implementation: `abb9002746e061af44a164fe749243d68d098e10`
+- v9 software subject: `c1222c9215e01a56351f6588af0d2b8694bca831`
+- v9 receipt-only evidence head: `8102ffecb37b1f1b0e25c80d6b02db05325ca986`
+- online-routing implementation: `aeffaae01a8106f74ff811b39ec26d9d2203d1f6`
+- multi-tool budget source: `136a1e3293efa6e53f3648e21fa8f7c6b5158d6f`
+- current software/evidence head: `15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8`
+- physical-campaign subject: `86273db6d827a790cb0a8b1472256b23e0a629d2`
+- physical-campaign evidence head: `3b09951bbea2e5f1c64197b0347a0ed529172192`
 
 The website chain is:
 
-- subject: `a64f995093e13c74318219cd0f91ad2d03016f31`
-- attestation: `943f3b65187247fe67eed76bc698b262adb06994`
-- prerequisite: [Draft PR #88](https://github.com/ChiZhang-805/DroneDream/pull/88)
+- release-truth source: `fd7e7702dd2e8d86cedda86790b5d93b048463da`
+- release-truth receipt-only attestation: `87e049cc426bec0f16ace8130bac672dbb778f22`
+- latest typography source: `87105531e0f591662c724dcbbe96f3adbfa4a321`
+- latest receipt-only attestation: `96aba5de2ff20ebe8f201f958c996c5685189619`
 
-PR #88 must merge before the report PR may merge.
+The report has no mutable cross-branch merge prerequisite; it consumes both
+chains only through immutable commit/path/SHA references.
 
 ## Evidence boundary
 
-The frozen backend receipt records 1,147 tests in 788.78 seconds on the exact
-software subject commit and explicitly sets `exact_final_commit_run=true`.
-An 81-check focused supplement passed in 151.96 seconds on the same subject;
-the receipt states that it supplements, rather than bridges from, the exact
-full run. It does not receipt Ruff, mypy, or the Windows Rust desktop gate.
+The frozen backend receipt records 1,204 tests on the exact software subject
+commit and explicitly sets `exact_final_commit_run=true`. The pytest log records
+854.71 seconds while the receipt wall interval is 864.488 seconds. A 28-check
+focused supplement records 6.98 seconds in its pytest log and 8.451 seconds in
+the receipt; it supplements, rather than bridges from, the exact full run. The
+receipt does not cover Ruff, mypy, or the Windows Rust desktop gate.
 The Rust gate was not run because Visual Studio C++ Build Tools and `link.exe`
 were unavailable.
 
-The v7 routing evidence preserves all three Evidence 2.7 provider freezes.
+Evidence v9 publishes the current Evidence 2.8 / Prompt 1.7 / Decision Trace
+1.4 cross-Job memory contract. Its deterministic in-memory SQLite evaluation
+passes 10/10 fixtures: two positive retrievals and eight isolation/lifecycle
+negatives, with zero provider, network, or simulator calls and zero
+provider-identifier leaks. Only terminal `verified_complete` decision/cohort
+evidence may materialize; retrieval remains within one authenticated user,
+across a different source Job, and within the exact structural task family.
+Retention is 90 days, revocation and deletion cascade are enforced, contract
+or receipt drift fails closed, and at most six anonymous closed-structure
+observations reach the provider projection. This is
+`observational_not_causal`, not evidence of provider effect, optimizer gain,
+physical fidelity, real-aircraft performance, or safety improvement.
+
+The current online-routing freeze binds Evidence 2.8 / Prompt 1.7 / Tool 2.1,
+`gpt-4.1-2025-04-14`, temperature 0, top-p 1, seed 20260728, and 24 provider
+calls. Independent regrading finds 23/24 acceptable selections (95.83%) and
+one retained failure, `tight_budget_expensive_matrix`, which selected TuRBO
+instead of multi-fidelity MOBO or the optimizer portfolio. The result qualifies
+the exact current development contract: it exceeds the 75% overall threshold,
+the 15-percentage-point lift threshold by recording 37.5 percentage points
+over the best constant, and the two-thirds category threshold. It does not
+show causal prompt lift, provider determinism from the seed, optimizer gain,
+simulator or flight improvement, or broad model generalization.
+
+Evidence v9 also preserves all three older Evidence 2.7 provider freezes as
+archived (`contract_current=false`) observations.
 The two Prompt 1.5 freezes independently regrade to 19/24 (unqualified) and
-21/24 (qualified); the current Prompt 1.6 freeze regrades to 24/24. These are
-unpaired stochastic calls. The current result qualifies the frozen
+21/24 (qualified); the Prompt 1.6 freeze regrades to 24/24. These are unpaired
+stochastic calls. The archived result qualifies only the historical
 development-routing contract and is not a causal prompt-lift estimate or a
 simulator-outcome claim.
 
-The website receipt records 322/322 frontend tests, typecheck, lint, build,
-nine deployment-contract tests, and deterministic 117-file output across two
-builds.
+Evidence 2.9 is a separate offline equal-budget, multi-tool plan-history and
+accounting closure. Across three scripted seed blocks it records six arm runs,
+six verified generations including three multi-tool generations, and 12/12
+decision/accounted calls. It uses `MockSimulator`, zero provider/network calls,
+and no real credentials. The retained first repository-root attempt failed with
+`ModuleNotFoundError(app)` before producing any Job or external call; source
+`136a1e3293efa6e53f3648e21fa8f7c6b5158d6f` fixed and regression-locked the CLI.
+This evidence does not measure real-LLM planning quality, optimizer superiority,
+physical fidelity, flight performance, or a causal Harness benefit.
+
+The dedicated physical campaign records 6/6 successful and passing x500
+PX4/Gazebo Trials across two seeds and nominal, steady-wind, and
+static-obstacle scenarios. It binds the exact Runtime and environment,
+RMSE/max-error/coverage ranges, two wind read-backs, two obstacle-create
+acknowledgements, 598 inventoried source files, 154 retained files, and four
+chronological failure probes. This proves the retained execution matrix and
+scenario injection only. It does not prove optimizer superiority, broad
+reliability, collision avoidance, signed customer-Runtime acceptance,
+real-aircraft safety, or sim-to-real transfer.
+
+The physical manifest and receipt embed exporter/observer identifier
+`5f0f62c789680e5e2d34c6513727199fabbd50d0`, while the handoff names
+`c373dc9e4964301a051d14d8e76d249481719c96`; neither resolves in the fetched
+repository. The verifier instead binds the reachable source chain
+`c373dc992d43ff921ea8a1db07fcc26591955576` to
+`5f0f62c707c541aed7918e56a0170a7f67bd6ffb` to the evidence head, and
+retains the non-resolving declarations as a provenance defect.
+
+The latest typography receipt records 13/13 focused PublicSite checks, 325/325
+frontend tests across 50 files, typecheck, lint, application and shared builds,
+11/11 deployment tests with 22/22 subtests, and 5/5 performance routes. Desktop
+English and Chinese download copy each occupies two lines with final-line fills
+of 0.895 and 0.835; the mobile layout-only audit reports zero violations. Its
+subject explicitly binds the preceding release-truth receipt, which separately
+records 100/100 four-browser checks and 118 checksum entries across 119
+shared-artifact files. No deployment occurred. TLS, dual-target publication,
+production Supabase/payment, and the two different unsigned public installer
+bytes remain external gates.
 
 Verify both dependency chains without checking out or copying their raw
 evidence:
@@ -79,6 +148,12 @@ The build requires XeLaTeX, Pandoc, Poppler (`pdftoppm`), and Python with
 the script resolves the actual bundled Poppler executable from that wrapper's
 dependency root; `-PdfToPpm <path>` remains available for an explicit override.
 
+The A4 layout uses a 10-point body with 12-point leading, 24 mm side margins,
+and a 25 mm top / 20 mm bottom geometry. The first-page hierarchy, upper-left
+brand lockup, rounded abstract frame, and body rhythm were quantitatively
+checked against the JoyAI-RA 0.1 report while preserving DroneDream's purple
+identity and a roomier 18-page evidence narrative.
+
 From the repository root:
 
 ```powershell
@@ -89,15 +164,17 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 The script regenerates Figures 2--6 from the frozen evidence bundle in an
 ignored build directory and requires their rendered pixels to match the
 tracked PNGs. It then performs two XeLaTeX passes, rejects warning gates,
-renders all 14 pages, runs the structural/paragraph/link audit, and publishes
+renders all 18 pages, runs the structural/paragraph/link audit, and publishes
 the validated PDF, layout audit, and claim-evidence audit to
 `technical-report/output/`.
 The claim gate fails the build when a declared report projection drifts from
 its frozen JSON pointer, source assertion, or computed phase-role count. The
 paragraph gate requires all explanatory prose, including the abstract, to end
 with a rendered line at least 80% as wide as its usable body line. Short list
-items are audited separately: every item must remain within three rendered
-lines and its final line must fill at least 90% of the usable list width.
+items of no more than three rendered lines are audited separately, and their
+final lines must fill at least 90% of the usable list width. Longer explanatory
+list items remain visible in a separate exception inventory instead of being
+misclassified as short-list failures.
 The page-bottom gate independently requires the lowest rendered body content
 on every page to finish within one 12-point body line of the audited bottom
 target; substantive technical explanation, table spacing, and figure sizing
@@ -110,7 +187,7 @@ with body prose. Intermediate files remain under the ignored
 
 The audit and receipt writers emit UTF-8 JSON with LF newlines as exact bytes,
 independent of the host operating system. After visually reviewing the final
-14-page render, create the artifact-layer receipt:
+18-page render, create the artifact-layer receipt:
 
 ```powershell
 python technical-report/scripts/create_report_validation_receipt.py `
@@ -162,9 +239,14 @@ The release uses two layers to avoid self-reference:
 2. Build from that source commit, then commit the final PDF, audit artifacts,
    and validation receipt that names and hashes the source commit.
 
-Any integration of this report must retain software subject
-`742b12467efc9b37b7e4a2fa3ac73b7578f21385` and evidence head
-`1bf83ccd83913c5e66c2916e5250ccf5b27cad6f` as immutable dependencies.
+Any integration of this report must retain v9 software subject
+`c1222c9215e01a56351f6588af0d2b8694bca831`, v9 receipt head
+`8102ffecb37b1f1b0e25c80d6b02db05325ca986`, online-routing implementation
+`aeffaae01a8106f74ff811b39ec26d9d2203d1f6`, multi-tool source
+`136a1e3293efa6e53f3648e21fa8f7c6b5158d6f`, current evidence head
+`15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8`, physical-campaign subject
+`86273db6d827a790cb0a8b1472256b23e0a629d2`, and physical evidence head
+`3b09951bbea2e5f1c64197b0347a0ed529172192` as immutable dependencies.
 
 ## Website handoff
 

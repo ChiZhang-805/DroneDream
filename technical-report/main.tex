@@ -1,6 +1,6 @@
 \documentclass[10pt,a4paper]{article}
 
-\usepackage[a4paper,top=15mm,bottom=14mm,left=19mm,right=19mm]{geometry}
+\usepackage[a4paper,top=25mm,bottom=20mm,left=24mm,right=24mm]{geometry}
 \usepackage{fontspec}
 \usepackage{newunicodechar}
 \usepackage{microtype}
@@ -14,7 +14,7 @@
 \usepackage{titlesec}
 \usepackage{hyperref}
 \usepackage{etoolbox}
-\usepackage{mdframed}
+\usepackage[framemethod=tikz]{mdframed}
 \usepackage{fancyhdr}
 \usepackage{needspace}
 \usepackage{ragged2e}
@@ -98,23 +98,23 @@
 \newmdenv[
   linecolor=DDMagenta,
   linewidth=0.65pt,
-  roundcorner=8pt,
+  roundcorner=10pt,
   backgroundcolor=white,
-  innerleftmargin=3.2mm,
-  innerrightmargin=3.2mm,
-  innertopmargin=2mm,
-  innerbottommargin=2mm,
-  skipabove=0.55em,
-  skipbelow=0.55em,
+  innerleftmargin=8mm,
+  innerrightmargin=8mm,
+  innertopmargin=4.6mm,
+  innerbottommargin=4.2mm,
+  skipabove=0.75em,
+  skipbelow=0.75em,
   nobreak=true
 ]{ddabstractframe}
 
 \newenvironment{ddabstract}{%
   \begin{ddabstractframe}
-  \begin{center}
-  {\sffamily\bfseries\fontsize{12.5}{14.5}\selectfont\color{DDPrint}Abstract}
-  \end{center}
-  \small
+  {\centering
+  \sffamily\bfseries\fontsize{13}{15}\selectfont\color{DDPrint}Abstract\par}
+  \vspace{0.72em}
+  \normalsize
 }{%
   \end{ddabstractframe}
 }

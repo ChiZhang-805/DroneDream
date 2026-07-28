@@ -15,34 +15,173 @@
   },
   "software": {
     "branch": "codex/software",
-    "subject_commit": "742b12467efc9b37b7e4a2fa3ac73b7578f21385",
-    "provenance_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
-    "branch_head": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+    "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+    "provenance_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+    "branch_head": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+    "cross_job_memory": {
+      "implementation_commit": "abb9002746e061af44a164fe749243d68d098e10",
+      "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+      "receipt_head": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+      "evidence_schema_version": "2.8",
+      "prompt_template_version": "1.7",
+      "trace_schema_version": "1.4",
+      "retention_days": 90,
+      "claim_class": "observational_not_causal"
+    },
+    "online_routing": {
+      "implementation_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+      "evidence_head": "ef00362927475b2fc411a4d82084bbbae8846582",
+      "evidence_schema_version": "2.8",
+      "prompt_template_version": "1.7",
+      "tool_registry_version": "2.1",
+      "model_snapshot": "gpt-4.1-2025-04-14",
+      "provider_calls": 24,
+      "claim_class": "current_contract_development_routing_qualification"
+    },
+    "multi_tool_budget": {
+      "source_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+      "evidence_head": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+      "generated_at": "2026-07-28T17:53:02Z",
+      "evidence_schema_version": "2.9",
+      "tool_registry_version": "2.1",
+      "seed_blocks": 3,
+      "arm_runs": 6,
+      "accounted_calls": 12,
+      "provider_calls": 0,
+      "network_calls": 0,
+      "simulator_backend": "mock",
+      "claim_class": "offline_scripted_mock_equal_budget_plan_history_and_accounting_contract"
+    },
+    "physical_campaign": {
+      "subject_commit": "86273db6d827a790cb0a8b1472256b23e0a629d2",
+      "reachable_implementation_commit": "c373dc992d43ff921ea8a1db07fcc26591955576",
+      "reachable_runtime_observation_commit": "5f0f62c707c541aed7918e56a0170a7f67bd6ffb",
+      "evidence_head": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+      "handoff_declared_exporter_verifier_commit": "c373dc9e4964301a051d14d8e76d249481719c96",
+      "embedded_exporter_observer_commit": "5f0f62c789680e5e2d34c6513727199fabbd50d0",
+      "declared_commit_resolution": "unresolvable_in_fetched_repository",
+      "verified_binding_scope": "frozen_artifact_bytes_and_reachable_source_chain",
+      "tree_file_count": 159,
+      "tree_object_mismatch_count": 0
+    },
     "artifacts": [
       {
         "id": "technical_report_evidence_bundle",
-        "path": "artifacts/technical-report/evidence-v7.json",
-        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
-        "file_sha256": "93232a2f0027503c24cfe4a8a1768d518f436cd35a3db72e788fc42f5eb45c55",
-        "canonical_sha256": "a0432d092d5e751a6f414ba4d0cb6b91cb7e9117b6fead109ef2a1c805ad8522"
+        "path": "artifacts/technical-report/evidence-v9.json",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "a2bed29533b321fa00086bf901f7c5ebbf35ab503e50cde4de568b3420e0a08a",
+        "canonical_sha256": "d33c308ce3b47138572c86bf7f45aa8e4a37901a0248a5d5e0d3cd71ce2bfa8a"
       },
       {
         "id": "technical_report_evidence_manifest",
-        "path": "artifacts/technical-report/evidence-v7.manifest.json",
-        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
-        "file_sha256": "0702abb2e5d1aedb999c4158feaab78b25f6dc2ab7dcc07b5bcefad2b30324d2"
+        "path": "artifacts/technical-report/evidence-v9.manifest.json",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "3bc7bd0eac65cf5e8f9ef7e05c0f5e62403a7cf23c5be4f0905ae4b503847fc9"
       },
       {
-        "id": "backend_1147_test_receipt",
-        "path": "artifacts/test-runs/aurora-software-742b124-receipt.json",
-        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
-        "file_sha256": "cd5a9890ab6ff679d522a7fc05a2d509d94b3e8ce702d6187fd315937d9716dd",
-        "internal_receipt_sha256": "ec1a757cfbb6d6ccbc2e186ecd43e9e2656b2d7c9826643f703f296adc285108",
-        "full_log_sha256": "bf7be380922ff94db7ace78912b1aed376fce1c606317b191559e959bc79e869",
-        "focused_log_sha256": "ee6e599d97ec67aabe3f9569709b5a41d444df7bcbf000712a2d715e9a0305d5"
+        "id": "backend_1204_test_receipt",
+        "path": "artifacts/test-runs/aurora-software-c1222c9-receipt.json",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "6bd9290fcd58a8210531405ce8959d6ef029b261a85aca409a2915c60eb07fb2",
+        "internal_receipt_sha256": "9d3b0cfd9c99a32ee9055741448797d3e5c72f894e0207650e37bd31da9eff9d",
+        "full_log_sha256": "e12a1503ebde1400c882a90f1b49d4fb5fb274300f4f193db9e3a051c70d6e5f",
+        "focused_log_sha256": "571ded85369e1747d9ae02f8dadb4b499e887168b8a5ca686edddc2248f10bbf"
+      },
+      {
+        "id": "cross_job_memory_contract_artifact",
+        "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.json",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "aa1f22e72039e367991aec55ea7ad143994f0a5d6ed7f73bef9c5e5523e28281",
+        "canonical_sha256": "e1abf46c2aa44e9be3f37b92ae2d41213235179f16dd7b9b7d794d850938c01a"
+      },
+      {
+        "id": "cross_job_memory_contract_manifest",
+        "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.manifest.json",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "95d36063f94b8c9280d84db028a97d0b0da03687d67465da5979917f06b5efa7",
+        "canonical_sha256": "b8d55e358d5642cb01be331f5318e4a048b871ccfe4606664202eeba4109ec85"
+      },
+      {
+        "id": "current_online_routing_artifact",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.json",
+        "ref_commit": "ef00362927475b2fc411a4d82084bbbae8846582",
+        "file_sha256": "d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4"
+      },
+      {
+        "id": "current_online_routing_manifest",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.manifest.json",
+        "ref_commit": "ef00362927475b2fc411a4d82084bbbae8846582",
+        "file_sha256": "6b625b8c0a6aa60282fa7c7be2f6b0ad8277b4610feb09c6c5e4b44222329307",
+        "canonical_sha256": "3ab3830ecf798b3e12845e249a07cde36add0ddcb34b727806f30eb34af4ed37"
+      },
+      {
+        "id": "multi_tool_budget_artifact",
+        "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.json",
+        "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+        "file_sha256": "b20060eb76bfe4b0e5fbbbbcfe6484126a469bcc552b47c0a51cfc76a436ea5d",
+        "canonical_sha256": "e5c27308a9be35a276ce845e872e186e613f5421c459bcddec726a461e480ef3"
+      },
+      {
+        "id": "multi_tool_budget_manifest",
+        "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.manifest.json",
+        "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+        "file_sha256": "db78d1c8c99938608dc27116138d3eef15788cd6da4461d0f530db7f9369226d",
+        "canonical_sha256": "3c49e2b96b3fffdd92383d6b978d4679f16e012e2a4a43e1c50b8b8a402aca72"
+      },
+      {
+        "id": "multi_tool_budget_csv",
+        "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.csv",
+        "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+        "file_sha256": "3911632e6dfe61056dae58852f1e9723a4beb3b953468c9ecf70263610a206a3"
+      },
+      {
+        "id": "multi_tool_budget_generation_receipt",
+        "path": "artifacts/test-runs/harness-multi-tool-budget-evaluation-v1-generation-receipt.json",
+        "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+        "file_sha256": "611783c9388bfda9b21a47e02ab3e8147eec96a7219202859cdc97b63198b6da"
+      },
+      {
+        "id": "px4_physical_campaign_manifest",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.manifest.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "4ac760428ead1506fb41ef4928df486a1b0983517a6aee846c2444e882090eda",
+        "canonical_sha256": "9440bb24f25dbf07149144c39ea9fc54d373a6c1145d9630a6f53216a9608941"
+      },
+      {
+        "id": "px4_physical_campaign_receipt",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.receipt.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "8f7e1c953338ae87154b25822bf7c781921473cbcd76fd5874d79c178ef73dee",
+        "internal_receipt_sha256": "4746dd220583d64babc5640b3bea12e607b9ca22c940ca462768be0dc1158b71"
+      },
+      {
+        "id": "px4_physical_runtime_manifest",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/runtime/runtime-manifest.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "244475ddb22217c9400c2bb3ef27fb4105a4121f1fa09267b36c04e827865d34"
+      },
+      {
+        "id": "px4_physical_runtime_observation",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/runtime/runtime-observation.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "a450d22ecf186088417f5c950c9b07592437d2e82f3c730d06edb6052e6ae849"
       }
     ],
     "source_references": [
+      {
+        "id": "multi_tool_budget_evaluator",
+        "path": "backend/scripts/evaluate_harness_multi_tool_budget.py",
+        "ref_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+        "file_sha256": "fd1e4e017109d39000ce8fb91738779d0e0e7c7efb7a9111a9f4db6aaae23cdb",
+        "evidence_role": "Source-bound offline evaluator and repository-root CLI fix for the Evidence 2.9 equal-budget scripted/mock closure."
+      },
+      {
+        "id": "multi_tool_budget_evaluator_tests",
+        "path": "backend/tests/test_harness_multi_tool_budget_evaluation.py",
+        "ref_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+        "file_sha256": "bdcb4bedc0d45f3d8832ff8cb6adfcfa8e4e8681e648b832fc07bdb4f4bc7eb1",
+        "evidence_role": "Exact-source regression coverage for deterministic generation, accounting, check mode, and repository-root CLI execution."
+      },
       {
         "id": "px4_gazebo_evidence_boundary",
         "path": "docs/08-px4-gazebo.md",
@@ -74,9 +213,65 @@
       {
         "id": "technical_report_evaluation_protocol",
         "path": "docs/20-technical-report-evaluation.md",
-        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
-        "file_sha256": "a3c6fa971ba097c028af8dd7262c8503b25146c03547a9dc1b759c4b00ecbf65",
-        "evidence_role": "Frozen evaluation-unit separation, result boundaries, and publication protocol."
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "e3d805c2155a54b64e0a6ab6e48a542d2ef993c615933416276e1b8f094795e3",
+        "evidence_role": "Current evaluation-unit separation, Evidence v9 export boundaries, and publication protocol."
+      },
+      {
+        "id": "technical_report_evidence_v9_digest",
+        "path": "artifacts/technical-report/evidence-v9.sha256",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "a51663279617db3d40221134f24822486a0e13e72475723b0b9e27a1647587fe",
+        "evidence_role": "Read-only digest binding the Evidence v9 bundle and manifest file hashes."
+      },
+      {
+        "id": "backend_1204_full_log",
+        "path": "artifacts/test-runs/aurora-software-c1222c9-pytest.log",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "e12a1503ebde1400c882a90f1b49d4fb5fb274300f4f193db9e3a051c70d6e5f",
+        "evidence_role": "Exact-source backend full-suite log; its pytest summary distinguishes 854.71 seconds from the receipt wall interval."
+      },
+      {
+        "id": "backend_28_focused_log",
+        "path": "artifacts/test-runs/aurora-software-c1222c9-focused.log",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "571ded85369e1747d9ae02f8dadb4b499e887168b8a5ca686edddc2248f10bbf",
+        "evidence_role": "Exact-source focused log for cross-Job memory, routing holdout, and Evidence v9 export checks."
+      },
+      {
+        "id": "cross_job_memory_implementation",
+        "path": "backend/app/orchestration/experience_memory.py",
+        "ref_commit": "abb9002746e061af44a164fe749243d68d098e10",
+        "file_sha256": "22fdef212d46d94a0f20481aa3108ee683102c34064e053a05132fe05c437db3",
+        "evidence_role": "Reachable implementation of eligibility, retention, revocation, exact-family retrieval, and provider-safe projection."
+      },
+      {
+        "id": "cross_job_memory_evaluator",
+        "path": "backend/app/orchestration/harness_cross_job_memory_evaluation.py",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "5bc6a787ac3a2ca1d1283eb4a7dffeade5693c080443441edbc17ec8d5ef5243",
+        "evidence_role": "Deterministic in-memory SQLite evaluator for the ten frozen cross-Job contract fixtures."
+      },
+      {
+        "id": "cross_job_memory_source_tests",
+        "path": "backend/tests/test_harness_experience_memory.py",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "a8f1471cba27de5b90ea8ddc96be1b4c1def31d275a47a3d34ca7cee58667c81",
+        "evidence_role": "Exact-source implementation tests for admission, retrieval, revocation, deletion cascade, and fail-closed drift behavior."
+      },
+      {
+        "id": "cross_job_memory_evaluation_tests",
+        "path": "backend/tests/test_harness_cross_job_memory_evaluation.py",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "561469d9c1ca3036d9ca002e919039721dcc9ed91cdbbdcc21788bc202125052",
+        "evidence_role": "Exact-source tests for deterministic export, isolation cases, provider projection, and canonical hashes."
+      },
+      {
+        "id": "technical_report_evidence_v9_exporter",
+        "path": "backend/scripts/export_technical_report_evidence.py",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "150e84e452564499aba7ea55d971f7084df1c526a620875f39c22953d91442ba",
+        "evidence_role": "Exact-source exporter that binds Evidence v9 to 25 frozen source objects."
       },
       {
         "id": "harness_contract_ablation_raw",
@@ -121,36 +316,141 @@
         "evidence_role": "Read-only second Prompt 1.5 provider freeze; independently regraded at 21/24 and qualified."
       },
       {
-        "id": "routing_prompt_1_6_current_raw",
+        "id": "routing_prompt_1_6_archived_raw",
         "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
-        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
         "file_sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4",
-        "evidence_role": "Read-only current Prompt 1.6 provider freeze; independently regraded at 24/24 as development-routing qualification, not causal prompt lift."
+        "evidence_role": "Read-only archived Evidence 2.7 / Prompt 1.6 provider freeze; independently regraded at 24/24 as historical development-routing qualification, not causal prompt lift and not Evidence 2.8."
+      },
+      {
+        "id": "online_routing_provider_client",
+        "path": "backend/app/orchestration/llm_parameter_proposer.py",
+        "ref_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+        "file_sha256": "257fd6a96e2dbc5a98b775e22f08b0fec37730217db261b2135145b41103fed7",
+        "evidence_role": "Exact-source OpenAI client path that forwards the frozen temperature, top_p, and seed controls; the seed is not treated as a provider determinism guarantee."
+      },
+      {
+        "id": "online_routing_campaign_runner",
+        "path": "backend/scripts/run_harness_routing_campaign.py",
+        "ref_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+        "file_sha256": "811c8a2096196e41ea51217e598206dbffc73834e62dd84d3751be198211b106",
+        "evidence_role": "Exact-source 24-call campaign runner that writes the frozen current-contract prediction artifact."
+      },
+      {
+        "id": "online_routing_campaign_tests",
+        "path": "backend/tests/test_harness_routing_campaign.py",
+        "ref_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+        "file_sha256": "bf76be3e364802c39a481594fce5b96cb77fb13333da77c07c37d54b01db6fb9",
+        "evidence_role": "Exact-source campaign tests for generation-control forwarding, output handling, and frozen-contract validation."
+      },
+      {
+        "id": "online_routing_qualification_contract",
+        "path": "backend/app/orchestration/harness_evaluation.py",
+        "ref_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+        "file_sha256": "79e8bd62a99b375cdcb59e1f56d8c88a6c83ece5dd945bed1b96982f1a49e58b",
+        "evidence_role": "Exact-source qualification rule: at least 75 percent overall, 15 percentage points over the best constant, and two-thirds in every routing category."
+      },
+      {
+        "id": "px4_physical_campaign_digest",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.sha256",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "a9cc7b89f9ffea22d5dfe4257b5ccfb8ec8f39d7620a641eb3f531b8de996b51",
+        "evidence_role": "Read-only digest binding the physical campaign manifest and receipt file hashes."
+      },
+      {
+        "id": "px4_physical_wind_seed_41001_applied",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/wind-north-2mps-seed-41001/scenario_effects.applied.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "2eba69493b1ab348e787b1abf21ec1144d09420e5311dffbe9cfce92abf5d943",
+        "evidence_role": "Read-only seed-41001 steady-wind effect read-back with exact Gazebo ENU vector and generated-world SDF binding."
+      },
+      {
+        "id": "px4_physical_wind_seed_41002_applied",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/wind-north-2mps-seed-41002/scenario_effects.applied.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "cec3663d6a5ec035a8bcc8178af4d119bc3b32127f05b0c2690ad28d9e525ba0",
+        "evidence_role": "Read-only seed-41002 steady-wind effect read-back with exact Gazebo ENU vector and generated-world SDF binding."
+      },
+      {
+        "id": "px4_physical_obstacle_seed_41001_applied",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/obstacle-box-seed-41001/scenario_effects.applied.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "248afedf045ed69678d048cd5fe86fd64035375bf3e895514374501e08a6c95d",
+        "evidence_role": "Read-only seed-41001 static-obstacle entity-creation acknowledgement and SDF hash."
+      },
+      {
+        "id": "px4_physical_obstacle_seed_41002_applied",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/obstacle-box-seed-41002/scenario_effects.applied.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "bf0651c813d12403459e75013d226a2cf93c7c40d07dc5ac5f4331d842d9154a",
+        "evidence_role": "Read-only seed-41002 static-obstacle entity-creation acknowledgement and SDF hash."
+      },
+      {
+        "id": "px4_physical_campaign_core",
+        "path": "backend/app/simulator/physical_campaign_evidence.py",
+        "ref_commit": "c373dc992d43ff921ea8a1db07fcc26591955576",
+        "file_sha256": "f9b5c5c98117ec6e84b4a1cb91f54b4c027e79c61d7521ab8b117caf07c1f79d",
+        "evidence_role": "Reachable implementation source for export, retention, and offline verification of the physical campaign."
+      },
+      {
+        "id": "px4_physical_campaign_export_cli",
+        "path": "backend/scripts/export_physical_campaign_evidence.py",
+        "ref_commit": "c373dc992d43ff921ea8a1db07fcc26591955576",
+        "file_sha256": "b0bb0c5c3a0daf8189956d5ab76e77ad9736349b18e7d2928f1e4df0b3689e97",
+        "evidence_role": "Reachable exporter CLI source used by the physical campaign publication chain."
+      },
+      {
+        "id": "px4_physical_runtime_observer_source",
+        "path": "backend/scripts/observe_px4_runtime.py",
+        "ref_commit": "5f0f62c707c541aed7918e56a0170a7f67bd6ffb",
+        "file_sha256": "251e8d7f8f6049aafe93b38b2f0821beac9d26594d1196e9fef8a5fcc1d9ca96",
+        "evidence_role": "Reachable Runtime observation source after host-name omission correction."
+      },
+      {
+        "id": "px4_physical_campaign_source_tests",
+        "path": "backend/tests/test_physical_campaign_evidence.py",
+        "ref_commit": "c373dc992d43ff921ea8a1db07fcc26591955576",
+        "file_sha256": "d60affeab92e6489e25a7a03771a5f4b78abfa877578942dcb391949b3e9645c",
+        "evidence_role": "Reachable focused source tests for deterministic Runtime observation, retention, failures, and attempt-4 diagnostic classification."
+      },
+      {
+        "id": "px4_physical_campaign_bundle_verifier",
+        "path": "backend/tests/test_physical_campaign_evidence_bundle.py",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "b2c6ed7acd4941a13ce02316713ae814f8fc6474f1243d6799b9783420862d0d",
+        "evidence_role": "Exact-source offline artifact verifier test at the physical evidence head."
       }
     ]
   },
   "website": {
-    "branch": "codex/website-finish-20260728",
-    "subject_commit": "a64f995093e13c74318219cd0f91ad2d03016f31",
-    "attestation_commit": "943f3b65187247fe67eed76bc698b262adb06994",
+    "branch": "codex/website",
+    "subject_commit": "87105531e0f591662c724dcbbe96f3adbfa4a321",
+    "attestation_commit": "96aba5de2ff20ebe8f201f958c996c5685189619",
     "artifacts": [
       {
-        "id": "website_validation_receipt",
-        "path": "website/validation-receipts/a64f995093e13c74318219cd0f91ad2d03016f31.json",
-        "ref_commit": "943f3b65187247fe67eed76bc698b262adb06994",
-        "file_sha256": "6f0fc8bafb092cee5f1f05c484f60d9f73a88ba1d7f0b4e16f564a65506569f9",
-        "summary_sha256": "681c188d98a1447f0cdccb22c136762e15c2b0b0a880abff9c3846fc188bca34"
+        "id": "website_release_truth_validation_receipt",
+        "path": "website/validation-receipts/website-release-truth-manual-validation-fd7e770.json",
+        "ref_commit": "87e049cc426bec0f16ace8130bac672dbb778f22",
+        "subject_commit": "fd7e7702dd2e8d86cedda86790b5d93b048463da",
+        "file_sha256": "034ef134858fe906cdb3c97aa263fa7c36c63a2c59b0216cb5f41ceebdd566f1",
+        "file_bytes": 12188,
+        "shared_build_manifest_sha256": "de5b462b9a975dd8c8015ad570b58edb45d8b85d128083ae3d942d48a074fbae",
+        "shared_sha256sums_sha256": "51e520a74fec34bd929d21d4daddf4438ad7b411fe7874b19e693cb38dfc2f19"
+      },
+      {
+        "id": "website_typography_validation_receipt",
+        "path": "website/validation-receipts/website-download-copy-typography-validation-8710553.json",
+        "ref_commit": "96aba5de2ff20ebe8f201f958c996c5685189619",
+        "subject_commit": "87105531e0f591662c724dcbbe96f3adbfa4a321",
+        "file_sha256": "bcfc6c50920ffce913161eb59d2a4805c34869be33edd85926c37a009c5725d6",
+        "file_bytes": 9278,
+        "previous_receipt_sha256": "034ef134858fe906cdb3c97aa263fa7c36c63a2c59b0216cb5f41ceebdd566f1",
+        "shared_build_manifest_sha256": "c90541a88623451cf144ab96ccfe21b25173c26242fbf5ea132a2eb08456a926",
+        "shared_sha256sums_sha256": "5a8700c587fc8601099bc0258e4b0a8a32ca4c63ace4150295c6cb620946ac00"
       }
     ]
   },
-  "merge_prerequisites": [
-    {
-      "repository": "ChiZhang-805/DroneDream",
-      "pull_request": 88,
-      "url": "https://github.com/ChiZhang-805/DroneDream/pull/88",
-      "required_before_report_merge": true
-    }
-  ],
+  "merge_prerequisites": [],
   "migration_provenance": {
     "external_source_read_only": true,
     "external_source_root": "C:/Users/zju20/Documents/Codex/2026-07-25/files-mentioned-by-the-user-drone/work/technical-report-latex",
@@ -160,14 +460,14 @@
         "source_sha256": "2878e1bef3b2142b72d453b8791b8132df53084506ff73a93ce6b2e362a26594",
           "modified_after_migration": true,
           "current_hash_serialization": "utf8_lf",
-          "current_sha256": "252c9f2cb39e7ead580b6e9348190160eab382e79b6e080d76c5a6cabb761d86"
+          "current_sha256": "6981361b0475add3f53c8d917720f7d32243843107a8830ad7368f80d3146ccd"
       },
       {
         "path": "body.tex",
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
           "modified_after_migration": true,
           "current_hash_serialization": "utf8_lf",
-          "current_sha256": "96c83d0e6dd29b434308a71e451f9930d8755d529a905de443ec09e640225b9d"
+          "current_sha256": "6dab12076d7e84593e99d23e14558415f2f803d98362f195a2bec41dae74add7"
       },
       {
         "path": "media/github-mark.png",
@@ -191,9 +491,9 @@
         "path": "media/media/image4.png",
         "source_sha256": "ad6bc5cdd1ed798a7796bc9271ad13209a8995add77164b63df68480dbcd752b",
         "modified_after_migration": true,
-        "current_sha256": "fe6d4165036b884c6473c75865363e6287fef341f25dc57a57214a42e1daf683",
+        "current_sha256": "59f102ce6fa9234a0994261f8eb7459b1f9fb5426ce922e3659f03a9af6557e5",
         "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
+        "reason": "Regenerated from the current online-routing freeze and the frozen v9 archive to compare current 23/24 and archived 24/24 selection rates without a causal prompt claim."
       },
       {
         "path": "media/media/image5.png",
@@ -201,15 +501,15 @@
         "modified_after_migration": true,
         "current_sha256": "7f0a2e57270d1a268cf973061de61fe2822ecce15a53aca35c50dda667c28d54",
         "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen v7 evidence bundle with a taller repository-owned layout that prevents Figure 3 label crowding."
+        "reason": "Regenerated from the frozen v9 evidence bundle with a taller repository-owned layout that prevents Figure 3 label crowding; its provider rows remain historical."
       },
       {
         "path": "media/media/image6.png",
           "source_sha256": "2675fc9964d7f24a0fcdc892ad758d33151772fcc5a1339603435f0f71ff18f5",
           "modified_after_migration": true,
-          "current_sha256": "4b9ee0257fda7b3e8011c25f6ee8973444258c4d82c9c081108eb891db158eef",
+          "current_sha256": "3b47710123838dcc8e1cde273d454f459421a15fa208eebe27aed96cd2915966",
           "generator": "technical-report/scripts/generate_data_figures.py",
-          "reason": "Regenerated from the frozen v7 evidence bundle with larger tool labels and a taller report-owned layout."
+          "reason": "Regenerated from the current 24-call online-routing freeze with larger tool labels and a taller report-owned layout."
       },
       {
         "path": "media/media/image7.png",
@@ -217,7 +517,7 @@
           "modified_after_migration": true,
           "current_sha256": "b272974682f66d95ec013fc2bf98c8bbe01d27b9d1c6e5ce1a9396c4406c086f",
           "generator": "technical-report/scripts/generate_data_figures.py",
-          "reason": "Regenerated from the frozen v7 evidence bundle with larger scenario labels and preserved chart spacing."
+          "reason": "Regenerated from the frozen v9 evidence bundle with larger scenario labels and preserved chart spacing."
       },
       {
         "path": "media/media/image8.png",
@@ -225,7 +525,7 @@
           "modified_after_migration": true,
           "current_sha256": "46f2b6f6242545582a22bb46ea9ed069ac08360cae596c8920484bfee5531661",
           "generator": "technical-report/scripts/generate_data_figures.py",
-          "reason": "Regenerated from the frozen v7 evidence bundle with larger cell, axis, and colorbar labels and no overlap."
+          "reason": "Regenerated from the frozen v9 evidence bundle with larger cell, axis, and colorbar labels and no overlap."
       },
       {
         "path": "scripts/audit_latex_report.py",
@@ -233,7 +533,7 @@
         "source_sha256": "15dca6941e5eb191fbcee42941824475ba39b26c44b7b79ccf084784792c858c",
           "modified_after_migration": true,
           "current_hash_serialization": "utf8_lf",
-          "current_sha256": "59c7e970c9a5232142154903de698b616e1da4186fc14b7a82e4b8cf768ccbbd"
+          "current_sha256": "da3ae4f2dc84508780c2e8c719b20eccf636f7107e81acbf498b29d7e6ab518e"
       }
     ]
   }

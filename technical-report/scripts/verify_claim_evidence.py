@@ -454,7 +454,10 @@ def verified_source(
         raise ValueError(
             f"source SHA-256 expected {entry['file_sha256']}, found {actual_sha256}"
         )
-    text = payload.decode("utf-8")
+    if payload.startswith((b"\xff\xfe", b"\xfe\xff")):
+        text = payload.decode("utf-16")
+    else:
+        text = payload.decode("utf-8")
     parsed: Any = None
     if str(entry["path"]).endswith(".json"):
         parsed = json.loads(text)

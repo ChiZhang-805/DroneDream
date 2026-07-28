@@ -17,27 +17,43 @@
     },
     {
       "literal": "1,139/1,139",
-      "reason": "The v7 exact-final software receipt supersedes the earlier pre-commit count."
+      "reason": "The v9 exact-source software receipt supersedes the earlier pre-commit count."
     },
     {
       "literal": "759.17 seconds",
-      "reason": "The v7 exact-final software receipt supersedes the earlier duration."
+      "reason": "The v9 exact-source software receipt supersedes the earlier duration."
     },
     {
       "literal": "evidence bundle v6",
-      "reason": "Publication-facing references must resolve to the frozen v7 bundle."
+      "reason": "Publication-facing references must resolve to the frozen v9 bundle."
     },
     {
-      "literal": "Archived AURORA router & 24/24",
-      "reason": "Table 1 must distinguish both Prompt 1.5 histories from the current Prompt 1.6 freeze."
+      "literal": "Prompt 1.6 current freeze",
+      "reason": "Evidence v9 marks the Evidence 2.7 / Prompt 1.6 provider freeze archived and contract_current=false."
     },
     {
       "literal": "Evidence 2.4 / Prompt 1.1 only",
-      "reason": "Figures and tables now report the current Evidence 2.7 / Prompt 1.6 freeze."
+      "reason": "Figures preserve the archived Evidence 2.7 / Prompt 1.6 freeze, while the current software contract is Evidence 2.8 / Prompt 1.7."
     },
     {
       "literal": "Prompt 1.5 require a fresh online provider freeze",
-      "reason": "The v7 evidence set contains current Prompt 1.6 qualification and both Prompt 1.5 histories."
+      "reason": "Evidence v9 preserves Prompt 1.6 and both Prompt 1.5 histories as archived, unpaired provider observations."
+    },
+    {
+      "literal": "1,147/1,147",
+      "reason": "The exact-source v9 backend receipt supersedes the older v7 test total."
+    },
+    {
+      "literal": "788.78 seconds",
+      "reason": "The exact-source v9 pytest log supersedes the older v7 result duration."
+    },
+    {
+      "literal": "81-check",
+      "reason": "The v9 focused supplement contains 28 checks."
+    },
+    {
+      "literal": "evidence bundle v7",
+      "reason": "The current publication ledger is Evidence v9; Evidence 2.7 remains only an archived provider/data contract label."
     }
   ],
   "claims": [
@@ -48,61 +64,216 @@
         "Section 8",
         "Table 6"
       ],
-      "source_id": "technical_report_evidence_bundle",
+      "source_id": "backend_1204_test_receipt",
       "assertions": [
         {
           "kind": "json_equals",
-          "pointer": "/backend_tests/full_suite/result/passed",
-          "expected": 1147
+          "pointer": "/full_suite/result/passed",
+          "expected": 1204
         },
         {
           "kind": "json_equals",
-          "pointer": "/backend_tests/full_suite/result/failed",
+          "pointer": "/full_suite/result/failed",
           "expected": 0
         },
         {
           "kind": "json_equals",
-          "pointer": "/backend_tests/full_suite/duration_seconds",
-          "expected": 788.78
+          "pointer": "/full_suite/duration_seconds",
+          "expected": 864.488
         },
         {
           "kind": "json_equals",
-          "pointer": "/backend_tests/full_suite/tested_state/exact_final_commit_run",
+          "pointer": "/full_suite/tested_state/exact_final_commit_run",
           "expected": true
         },
         {
           "kind": "json_equals",
-          "pointer": "/backend_tests/receipt_sha256",
-          "expected": "ec1a757cfbb6d6ccbc2e186ecd43e9e2656b2d7c9826643f703f296adc285108"
+          "pointer": "/receipt_sha256",
+          "expected": "9d3b0cfd9c99a32ee9055741448797d3e5c72f894e0207650e37bd31da9eff9d"
         },
         {
           "kind": "json_equals",
-          "pointer": "/backend_tests/full_suite/log/sha256",
-          "expected": "bf7be380922ff94db7ace78912b1aed376fce1c606317b191559e959bc79e869"
+          "pointer": "/full_suite/log/sha256",
+          "expected": "e12a1503ebde1400c882a90f1b49d4fb5fb274300f4f193db9e3a051c70d6e5f"
         },
         {
           "kind": "json_equals",
-          "pointer": "/backend_tests/focused_checks/0/result/passed",
-          "expected": 81
+          "pointer": "/focused_checks/0/result/passed",
+          "expected": 28
         },
         {
           "kind": "json_equals",
-          "pointer": "/backend_tests/focused_checks/0/result/failed",
+          "pointer": "/focused_checks/0/result/failed",
           "expected": 0
         },
         {
           "kind": "json_equals",
-          "pointer": "/backend_tests/focused_checks/0/duration_seconds",
-          "expected": 151.96
+          "pointer": "/focused_checks/0/duration_seconds",
+          "expected": 8.451
         }
       ],
       "body_contains": [
-        "1,147/1,147 tests in",
-        "788.78 seconds on the exact software subject commit",
-        "81-check focused supplement",
-        "151.96 seconds",
-        "Subject-focused supplement & 81 & 81",
+        "1,204/1,204 tests in",
+        "receipt wall intervals are 864.488 and 8.451 seconds",
+        "Subject-focused supplement & 28 & 28",
+        "Backend validation receipt & 1,204 & 1,204",
         "Windows Rust was not run"
+      ]
+    },
+    {
+      "id": "backend-full-pytest-result",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "backend_1204_full_log",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "1204 passed in 854.71s"
+        }
+      ],
+      "body_contains": [
+        "1,204/1,204 tests in 854.71 seconds"
+      ]
+    },
+    {
+      "id": "backend-focused-pytest-result",
+      "report_locations": [
+        "Abstract",
+        "Section 8",
+        "Table 6"
+      ],
+      "source_id": "backend_28_focused_log",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "28 passed in 6.98s"
+        }
+      ],
+      "body_contains": [
+        "28 focused checks in",
+        "28/28 focused checks in",
+        "6.98 seconds"
+      ]
+    },
+    {
+      "id": "cross-job-memory-evaluation",
+      "report_locations": [
+        "Section 3.2",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Table 9"
+      ],
+      "source_id": "cross_job_memory_contract_artifact",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/case_count",
+          "expected": 10
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/passed_count",
+          "expected": 10
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/failed_count",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/retrieval_positive_count",
+          "expected": 2
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/retrieval_negative_count",
+          "expected": 8
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/provider_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/network_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/simulator_runs",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/provider_identifier_leak_count",
+          "expected": 0
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/case_rows",
+          "expected": 10
+        }
+      ],
+      "body_contains": [
+        "evaluation passes 10/10 fixtures",
+        "two positive retrievals and eight",
+        "zero provider-identifier leaks",
+        "Cross-Job memory contract & 10/10",
+        "online provider effect",
+        "safety improvement"
+      ]
+    },
+    {
+      "id": "cross-job-memory-contract",
+      "report_locations": [
+        "Abstract",
+        "Section 3.2",
+        "Section 8",
+        "Appendix A.3",
+        "Appendix A.5"
+      ],
+      "source_id": "cross_job_memory_contract_manifest",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/contracts/evidence_schema_version",
+          "expected": "2.8"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/contracts/prompt_template_version",
+          "expected": "1.7"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/contracts/trace_schema_version",
+          "expected": "1.4"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/contracts/retention_days",
+          "expected": 90
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime/database",
+          "expected": "sqlite_in_memory"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime/real_credentials_used",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "Evidence 2.8 / Prompt 1.7 / Decision Trace 1.4",
+        "90-day TTL",
+        "at most six anonymous",
+        "observational\\_not\\_causal"
       ]
     },
     {
@@ -111,43 +282,304 @@
         "Section 8",
         "Table 6"
       ],
-      "source_id": "website_validation_receipt",
+      "source_id": "website_release_truth_validation_receipt",
       "assertions": [
         {
           "kind": "json_equals",
-          "pointer": "/summary/checks/frontendTests/tests",
-          "expected": "322/322"
+          "pointer": "/subject/sourceCommit",
+          "expected": "fd7e7702dd2e8d86cedda86790b5d93b048463da"
         },
         {
           "kind": "json_equals",
-          "pointer": "/summary/checks/deploymentContract/tests",
-          "expected": "9/9"
+          "pointer": "/automatedValidation/focusedPublicSiteTests/passed",
+          "expected": 13
         },
         {
           "kind": "json_equals",
-          "pointer": "/summary/checks/sharedSiteBuild/runs",
+          "pointer": "/automatedValidation/frontendTests/testFiles",
+          "expected": 50
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/automatedValidation/frontendTests/passed",
+          "expected": 325
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/automatedValidation/deploymentContract/tests",
+          "expected": 11
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/automatedValidation/deploymentContract/subtests",
+          "expected": 22
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/publicSiteBrowserValidation/matrix/passed",
+          "expected": 100
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/sharedWebsiteArtifact/buildManifestSha256",
+          "expected": "de5b462b9a975dd8c8015ad570b58edb45d8b85d128083ae3d942d48a074fbae"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/sharedWebsiteArtifact/sha256SumsSha256",
+          "expected": "51e520a74fec34bd929d21d4daddf4438ad7b411fe7874b19e693cb38dfc2f19"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/sharedWebsiteArtifact/verifiedSha256SumsEntries",
+          "expected": 118
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/sharedWebsiteArtifact/artifactFilesIncludingSha256Sums",
+          "expected": 119
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/environment/deploymentPerformed",
+          "expected": false
+        },
+        {
+          "kind": "text_contains",
+          "expected": "No GitHub Pages deployment was triggered."
+        },
+        {
+          "kind": "text_contains",
+          "expected": "The currently public GitHub and Alibaba installer bytes remain different and both are unsigned"
+        }
+      ],
+      "body_contains": [
+        "325/325 frontend tests",
+        "11/11 deployment tests with 22/22 subtests",
+        "100/100 browser checks",
+        "118 checksum entries across",
+        "No deployment occurred",
+        "Frontend validation receipt & 325 & 325"
+      ]
+    },
+    {
+      "id": "website-latest-typography-validation",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "website_typography_validation_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/subject/sourceCommit",
+          "expected": "87105531e0f591662c724dcbbe96f3adbfa4a321"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/subject/previousWebsiteReceiptSha256",
+          "expected": "034ef134858fe906cdb3c97aa263fa7c36c63a2c59b0216cb5f41ceebdd566f1"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/automatedValidation/frontendTests/passed",
+          "expected": 325
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/automatedValidation/performance/passed",
+          "expected": 5
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/desktopTypography/downloadBody/english/lines",
           "expected": 2
         },
         {
           "kind": "json_equals",
-          "pointer": "/summary/artifact/fileCount",
-          "expected": 117
+          "pointer": "/desktopTypography/downloadBody/english/finalLineFill",
+          "expected": 0.895
         },
         {
           "kind": "json_equals",
-          "pointer": "/summary/artifact/deterministicAcrossTwoBuilds",
-          "expected": true
+          "pointer": "/desktopTypography/downloadBody/simplifiedChinese/lines",
+          "expected": 2
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/desktopTypography/downloadBody/simplifiedChinese/finalLineFill",
+          "expected": 0.835
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/mobileLayout/layoutViolations",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/environment/deploymentPerformed",
+          "expected": false
         }
       ],
       "body_contains": [
-        "322/322 tests",
-        "nine deployment tests",
-        "117-file output across two builds",
-        "Frontend validation receipt & 322 & 322"
+        "Latest website source",
+        "8710553",
+        "96aba5d",
+        "5/5 performance routes",
+        "final-line fills 0.895",
+        "mobile layout-only audit reports zero violations",
+        "Website validation chain & 325 tests; 5 routes"
       ]
     },
     {
-      "id": "current-provider-routing",
+      "id": "current-online-routing-predictions",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Figure 2",
+        "Figure 4",
+        "Table 1",
+        "Section 8",
+        "Table 9"
+      ],
+      "source_id": "current_online_routing_artifact",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/evidence_schema_version",
+          "expected": "2.8"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/prompt_template_version",
+          "expected": "1.7"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/tool_registry_version",
+          "expected": "2.1"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/model_snapshot",
+          "expected": "gpt-4.1-2025-04-14"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/generation_config/temperature",
+          "expected": 0.0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/generation_config/top_p",
+          "expected": 1.0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/generation_config/seed",
+          "expected": 20260728
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/prompt_suite_sha256",
+          "expected": "81b3cae64b16f6b8294ef05acd9792f5d86c36e6d9e2afecf2f60d4d4db41903"
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/predictions",
+          "expected": 24
+        },
+        {
+          "kind": "routing_prediction_grade",
+          "predictions_pointer": "/predictions",
+          "corpus_source_id": "routing_development_corpus_raw",
+          "related_source_ids": [
+            "routing_development_corpus_raw"
+          ],
+          "expected_cases": 24,
+          "expected_passed": 23,
+          "expected_failed_case_ids": [
+            "tight_budget_expensive_matrix"
+          ]
+        }
+      ],
+      "body_contains": [
+        "Current Prompt 1.7 online freeze & 23/24 & Qualified",
+        "tight\\_budget\\_expensive\\_matrix",
+        "gpt-4.1-2025-04-14",
+        "23/24 current-contract qualification"
+      ]
+    },
+    {
+      "id": "current-online-routing-campaign",
+      "report_locations": [
+        "Section 4.1",
+        "Section 8",
+        "Section 9",
+        "Table 9"
+      ],
+      "source_id": "current_online_routing_manifest",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/manifest_sha256",
+          "expected": "3ab3830ecf798b3e12845e249a07cde36add0ddcb34b727806f30eb34af4ed37"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/campaign/source_commit",
+          "expected": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/campaign/provider_calls",
+          "expected": 24
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/campaign/duration_seconds",
+          "expected": 77.8
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/passed_count",
+          "expected": 23
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/case_count",
+          "expected": 24
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/qualified",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/minimum_category_pass_rate",
+          "expected": 0.6666666666666666
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/failed_cases/0/case_id",
+          "expected": "tight_budget_expensive_matrix"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/failed_cases/0/selected_tool",
+          "expected": "turbo"
+        }
+      ],
+      "body_contains": [
+        "24 provider calls",
+        "37.5 percentage points",
+        "minimums of 75\\% overall",
+        "77.8 seconds",
+        "seed does not make provider output deterministic"
+      ]
+    },
+    {
+      "id": "archived-provider-routing",
       "report_locations": [
         "Abstract",
         "Section 4.1",
@@ -170,12 +602,12 @@
         {
           "kind": "json_equals",
           "pointer": "/routing/contract_current",
-          "expected": true
+          "expected": false
         },
         {
           "kind": "json_equals",
           "pointer": "/routing/qualification_scope",
-          "expected": "current_evidence_2_7_prompt_1_6"
+          "expected": "archived_evidence_2_7_prompt_1_6"
         },
         {
           "kind": "json_equals",
@@ -237,7 +669,8 @@
         "14/24",
         "5.625/24",
         "Evidence 2.7 / Prompt 1.6",
-        "not a causal prompt-lift estimate"
+        "contract\\_current=false",
+        "archived provider artifact"
       ]
     },
     {
@@ -345,7 +778,7 @@
       ]
     },
     {
-      "id": "prompt-1-6-current-routing-freeze",
+      "id": "prompt-1-6-archived-routing-freeze",
       "report_locations": [
         "Abstract",
         "Section 4.1",
@@ -353,7 +786,7 @@
         "Figure 2",
         "Figure 4"
       ],
-      "source_id": "routing_prompt_1_6_current_raw",
+      "source_id": "routing_prompt_1_6_archived_raw",
       "assertions": [
         {
           "kind": "json_equals",
@@ -388,8 +821,8 @@
         }
       ],
       "body_contains": [
-        "Prompt 1.6 current freeze & 24/24 & Current development qualification",
-        "do not identify a causal prompt effect"
+        "Prompt 1.6 archived freeze & 24/24 & Historical development",
+        "archived calls identify neither"
       ]
     },
     {
@@ -575,7 +1008,6 @@
     {
       "id": "component-outcome-ablation",
       "report_locations": [
-        "Abstract",
         "Section 7",
         "Table 7",
         "Table 9"
@@ -686,9 +1118,9 @@
         }
       ],
       "body_contains": [
-        "20 Jobs and 554 Trials",
-        "five expose an observed protocol difference and ten show no observed",
-        "five receipt-only-memory isolations remain explicitly inconclusive"
+        "20 Jobs persist 554 Trials",
+        "Five of 15 paired comparisons show a protocol difference; ten",
+        "Five receipt-only-memory isolations remain inconclusive"
       ]
     },
     {
@@ -813,26 +1245,60 @@
       ]
     },
     {
-      "id": "frozen-contract-versions",
+      "id": "current-memory-contract-versions",
       "report_locations": [
-        "Section 3.1",
+        "Abstract",
+        "Section 3.2",
         "Section 8",
         "Appendix A.5"
       ],
-      "source_id": "harness_contract_design",
+      "source_id": "cross_job_memory_contract_manifest",
       "assertions": [
         {
-          "kind": "text_contains",
-          "expected": "Evidence 2.7"
+          "kind": "json_equals",
+          "pointer": "/contracts/evidence_schema_version",
+          "expected": "2.8"
         },
         {
-          "kind": "text_contains",
-          "expected": "Prompt Template 1.6"
+          "kind": "json_equals",
+          "pointer": "/contracts/prompt_template_version",
+          "expected": "1.7"
         },
         {
-          "kind": "text_contains",
-          "expected": "Decision Trace 1.3"
+          "kind": "json_equals",
+          "pointer": "/contracts/trace_schema_version",
+          "expected": "1.4"
         },
+        {
+          "kind": "json_equals",
+          "pointer": "/contracts/memory_schema_version",
+          "expected": "1.0"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/contracts/eligibility_policy_version",
+          "expected": "1.1"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/contracts/retrieval_policy_version",
+          "expected": "1.0"
+        }
+      ],
+      "body_contains": [
+        "Evidence 2.8",
+        "Prompt 1.7",
+        "Decision Trace 1.4"
+      ]
+    },
+    {
+      "id": "execution-gate-versions",
+      "report_locations": [
+        "Section 3.1",
+        "Section 8"
+      ],
+      "source_id": "harness_contract_design",
+      "assertions": [
         {
           "kind": "text_contains",
           "expected": "Execution Claim Gate 1.1"
@@ -847,9 +1313,6 @@
         }
       ],
       "body_contains": [
-        "Evidence 2.7",
-        "Prompt 1.6",
-        "Decision Trace 1.3",
         "Execution Claim Gate 1.1",
         "Outcome Contract 2.20",
         "Scheduling Gate 1.0"
@@ -904,37 +1367,320 @@
       ]
     },
     {
-      "id": "px4-gazebo-wind-acceptance-boundary",
+      "id": "px4-physical-campaign-matrix",
       "report_locations": [
-        "Section 4.8"
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9"
       ],
-      "source_id": "px4_gazebo_evidence_boundary",
+      "source_id": "px4_physical_campaign_manifest",
       "assertions": [
         {
-          "kind": "text_contains",
-          "expected": "constant horizontal wind has a bundled source implementation"
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.px4-physical-campaign-evidence.v1"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/subject_commit",
+          "expected": "86273db6d827a790cb0a8b1472256b23e0a629d2"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/manifest_sha256",
+          "expected": "9440bb24f25dbf07149144c39ea9fc54d373a6c1145d9630a6f53216a9608941"
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/trials",
+          "expected": 6
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/failure_history/attempts",
+          "expected": 4
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/success_count",
+          "expected": 6
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/pass_count",
+          "expected": 6
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/rmse_m_min",
+          "expected": 0.332254
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/rmse_m_max",
+          "expected": 0.444452
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/evaluation_track_coverage_min",
+          "expected": 0.949113
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/evaluation_track_coverage_max",
+          "expected": 0.981456
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/source_file_count",
+          "expected": 598
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/source_bytes",
+          "expected": 248354595
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/retained_file_count",
+          "expected": 154
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/retained_bytes",
+          "expected": 49237750
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime_identity/runtime_id",
+          "expected": "5e15a7a5-f943-5c38-a284-1bdcc9cd528f"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime_identity/gazebo_sim_version_observed",
+          "expected": "8.14.0"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime_identity/gazebo_harmonic_package_observed",
+          "expected": "1.0.0-1~noble"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime_identity/mavsdk_version_observed",
+          "expected": "3.15.3"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime_identity/pyulog_version_observed",
+          "expected": "1.2.3"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime_identity/ubuntu_version_observed",
+          "expected": "24.04"
         },
         {
           "kind": "text_contains",
-          "expected": "6ea3539157ca358c70a515878b77077af7d4611d"
+          "expected": "post-fix-parser-diagnostic-not-success-trial"
         },
         {
           "kind": "text_contains",
-          "expected": "Gazebo 8.14.0"
-        },
-        {
-          "kind": "text_contains",
-          "expected": "`verified_applied` evidence"
-        },
-        {
-          "kind": "text_contains",
-          "expected": "signed installer Runtime must still repeat this acceptance gate"
+          "expected": "after the NumPy scalar fix"
         }
       ],
       "body_contains": [
-        "6ea3539157ca358c70a515878b77077af7d4611d",
-        "Gazebo 8.14.0",
-        "signed installer Runtime has not yet passed this acceptance campaign"
+        "RMSE 0.332254--0.444452 m",
+        "maximum error 1.496354--1.498899 m",
+        "coverage 0.949113--0.981456",
+        "post-fix ULog diagnostic only",
+        "6 Trials; 4 probes",
+        "first-party frozen evidence rather than third-party validation"
+      ]
+    },
+    {
+      "id": "px4-physical-campaign-receipt",
+      "report_locations": [
+        "Section 4.8",
+        "Section 8"
+      ],
+      "source_id": "px4_physical_campaign_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/subject_commit",
+          "expected": "86273db6d827a790cb0a8b1472256b23e0a629d2"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/receipt_sha256",
+          "expected": "4746dd220583d64babc5640b3bea12e607b9ca22c940ca462768be0dc1158b71"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/manifest/sha256",
+          "expected": "4ac760428ead1506fb41ef4928df486a1b0983517a6aee846c2444e882090eda"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/trial_count",
+          "expected": 6
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/passed",
+          "expected": 6
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/retained_failure_probes",
+          "expected": 4
+        }
+      ],
+      "body_contains": [
+        "6/6",
+        "4746dd220583d64b",
+        "4ac760428ead1506"
+      ]
+    },
+    {
+      "id": "px4-physical-wind-readback",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8"
+      ],
+      "source_id": "px4_physical_wind_seed_41001_applied",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/verification/observations/0/source",
+          "expected": "/world/default/wind_info"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/verification/observations/0/value/enable_wind",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/verification/observations/0/value/linear_velocity_mps/y",
+          "expected": 2.0
+        }
+      ],
+      "body_contains": [
+        "Both steady-wind",
+        "ENU $(0,2,0)$ m/s read-back"
+      ]
+    },
+    {
+      "id": "px4-physical-obstacle-create",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8"
+      ],
+      "source_id": "px4_physical_obstacle_seed_41001_applied",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/created_entities/0/service",
+          "expected": "/world/default/create"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/created_entities/0/response_data",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/created_entities/0/sdf_sha256",
+          "expected": "9824260767a952b16c5fa1fe191de86a0dc1a43f8b6f5fe2bbba4bb8bf700d23"
+        }
+      ],
+      "body_contains": [
+        "static-obstacle Trials bind",
+        "/world/default/create=true",
+        "injection, not collision avoidance"
+      ]
+    },
+    {
+      "id": "px4-physical-wind-readback-seed-41002",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "px4_physical_wind_seed_41002_applied",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/verification/observations/0/source",
+          "expected": "/world/default/wind_info"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/verification/observations/0/value/enable_wind",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/verification/observations/0/value/linear_velocity_mps/y",
+          "expected": 2.0
+        }
+      ],
+      "body_contains": [
+        "Both steady-wind",
+        "ENU $(0,2,0)$ m/s read-back"
+      ]
+    },
+    {
+      "id": "px4-physical-obstacle-create-seed-41002",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "px4_physical_obstacle_seed_41002_applied",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/created_entities/0/service",
+          "expected": "/world/default/create"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/created_entities/0/response_data",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effects/0/evidence/created_entities/0/sdf_sha256",
+          "expected": "9824260767a952b16c5fa1fe191de86a0dc1a43f8b6f5fe2bbba4bb8bf700d23"
+        }
+      ],
+      "body_contains": [
+        "Both",
+        "static-obstacle Trials bind",
+        "/world/default/create=true"
+      ]
+    },
+    {
+      "id": "px4-physical-provenance-discrepancy",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "px4_physical_campaign_manifest",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/exporter_commit",
+          "expected": "5f0f62c789680e5e2d34c6513727199fabbd50d0"
+        }
+      ],
+      "body_contains": [
+        "5f0f62c789680e5e",
+        "c373dc9e4964301a",
+        "do not resolve as",
+        "source-binding defect as an explicit provenance limitation"
       ]
     },
     {
@@ -951,6 +1697,170 @@
       ],
       "body_contains": [
         "6ea3539157ca358c70a515878b77077af7d4611d"
+      ]
+    },
+    {
+      "id": "multi-tool-budget-contract",
+      "report_locations": [
+        "Section 4.5",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Table 9"
+      ],
+      "source_id": "multi_tool_budget_artifact",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/contracts/evidence_schema_version",
+          "expected": "2.9"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/source_commit",
+          "expected": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/block_count",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/arm_run_count",
+          "expected": 6
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/configured_budget_parity_count",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/scripted_verified_generation_count",
+          "expected": 6
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/scripted_multi_tool_generation_count",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/scripted_accounted_provider_call_count",
+          "expected": 12
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/scripted_decision_call_count",
+          "expected": 12
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/real_provider_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/network_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/real_credentials_used",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_fidelity",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/llm_quality_claim_permitted",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/optimizer_superiority_claim_permitted",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/causal_harness_benefit_claim_permitted",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "Evidence 2.9 closes an offline budget-and-accounting contract",
+        "All 3/3 blocks preserve configured",
+        "budget parity across six arm runs",
+        "12/12 decision calls",
+        "zero provider and network calls",
+        "does not measure real LLM planning quality",
+        "Multi-tool budget accounting & 3 blocks; 6 arms; 12 calls & Evidence 2.9"
+      ]
+    },
+    {
+      "id": "multi-tool-budget-generation-history",
+      "report_locations": [
+        "Section 4.5",
+        "Section 8"
+      ],
+      "source_id": "multi_tool_budget_generation_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/failed_attempt/exit_code",
+          "expected": 1
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/failed_attempt/error_type",
+          "expected": "ModuleNotFoundError"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/failed_attempt/jobs_started",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/failed_attempt/provider_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/failed_attempt/network_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/failed_attempt/simulator_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/successful_attempt/source_commit",
+          "expected": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/successful_attempt/artifact_file_sha256",
+          "expected": "b20060eb76bfe4b0e5fbbbbcfe6484126a469bcc552b47c0a51cfc76a436ea5d"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/verification/exit_code",
+          "expected": 0
+        }
+      ],
+      "body_contains": [
+        "ModuleNotFoundError(app)",
+        "before starting a Job or contacting a",
+        "provider, network, or simulator",
+        "source-bound CLI fix",
+        "611783c9388b"
       ]
     }
   ]

@@ -106,6 +106,8 @@ def main() -> None:
             "dronedream.technical-report-validation-receipt.v2",
             "dronedream.technical-report-validation-receipt.v3",
             "dronedream.technical-report-validation-receipt.v4",
+            "dronedream.technical-report-validation-receipt.v5",
+            "dronedream.technical-report-validation-receipt.v6",
         },
         "unsupported receipt schema",
     )
@@ -148,6 +150,8 @@ def main() -> None:
     if schema_version in {
         "dronedream.technical-report-validation-receipt.v3",
         "dronedream.technical-report-validation-receipt.v4",
+        "dronedream.technical-report-validation-receipt.v5",
+        "dronedream.technical-report-validation-receipt.v6",
     }:
         claim_record = receipt["claim_evidence"]
         ledger_record = claim_record["ledger"]
@@ -203,11 +207,15 @@ def main() -> None:
         len(pdf_bytes) == pdf_record["bytes"],
         "committed PDF byte count mismatch",
     )
-    expected_pages = (
-        14
-        if schema_version == "dronedream.technical-report-validation-receipt.v4"
-        else 13
-    )
+    if schema_version == "dronedream.technical-report-validation-receipt.v6":
+        expected_pages = 18
+    elif schema_version in {
+        "dronedream.technical-report-validation-receipt.v4",
+        "dronedream.technical-report-validation-receipt.v5",
+    }:
+        expected_pages = 14
+    else:
+        expected_pages = 13
     require(
         len(PdfReader(io.BytesIO(pdf_bytes)).pages)
         == pdf_record["pages"]
@@ -223,26 +231,40 @@ def main() -> None:
         "committed audit hash mismatch",
     )
     policy = audit["paragraph_policy"]["explanatory_body"]
-    expected_body = (
-        41
-        if schema_version == "dronedream.technical-report-validation-receipt.v4"
-        else 40
-    )
+    if schema_version == "dronedream.technical-report-validation-receipt.v6":
+        expected_body = 54
+    elif schema_version == "dronedream.technical-report-validation-receipt.v4":
+        expected_body = 41
+    else:
+        expected_body = 40
     require(
         policy["total"] == expected_body
         and policy["passed"] == expected_body
         and policy["failed"] == 0,
         "committed audit does not pass the explanatory-body gate",
     )
-    if schema_version == "dronedream.technical-report-validation-receipt.v4":
+    if schema_version in {
+        "dronedream.technical-report-validation-receipt.v4",
+        "dronedream.technical-report-validation-receipt.v5",
+        "dronedream.technical-report-validation-receipt.v6",
+    }:
         short_list_policy = audit["paragraph_policy"]["short_list_items"]
-        require(
-            short_list_policy["total"] == 29
-            and short_list_policy["passed"] == 29
-            and short_list_policy["failed"] == 0
-            and not short_list_policy["above_3_lines"],
-            "committed audit does not pass the 29/29 short-list gate",
-        )
+        if schema_version == "dronedream.technical-report-validation-receipt.v6":
+            require(
+                short_list_policy["total"] == 12
+                and short_list_policy["passed"] == 12
+                and short_list_policy["failed"] == 0
+                and len(short_list_policy["above_3_lines"]) == 20,
+                "committed audit does not pass the 12/12 short-list gate",
+            )
+        else:
+            require(
+                short_list_policy["total"] == 29
+                and short_list_policy["passed"] == 29
+                and short_list_policy["failed"] == 0
+                and not short_list_policy["above_3_lines"],
+                "committed audit does not pass the 29/29 short-list gate",
+            )
     require(not audit["bottom_failures"], "committed audit has bottom failures")
     require(
         not audit["paragraph_geometry"]["unlocated"],
@@ -264,7 +286,11 @@ def main() -> None:
         "pages": len(PdfReader(io.BytesIO(pdf_bytes)).pages),
         "explanatory_body_passed_80": policy["passed"],
     }
-    if schema_version == "dronedream.technical-report-validation-receipt.v4":
+    if schema_version in {
+        "dronedream.technical-report-validation-receipt.v4",
+        "dronedream.technical-report-validation-receipt.v5",
+        "dronedream.technical-report-validation-receipt.v6",
+    }:
         result["short_list_items_passed_90"] = short_list_policy["passed"]
     if claim_summary is not None:
         result.update(claim_summary)
