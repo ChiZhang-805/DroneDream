@@ -27,6 +27,25 @@ from app.orchestration.experience_memory import (
     materialize_verified_terminal_job_experiences,
     retrieve_cross_job_memory,
 )
+from app.orchestration.harness_budget_planner import (
+    HARNESS_BUDGET_POLICY_VERSION,
+    HARNESS_BUDGET_PROMPT_VERSION,
+    HARNESS_PLAN_REVISION_PROMPT_VERSION,
+    HarnessBudgetOpportunity,
+    HarnessCompiledGenerationPlan,
+    HarnessPlanValidation,
+    HarnessProposalSummary,
+    HarnessRevisionValidation,
+    build_budget_plan_messages,
+    build_plan_revision_messages,
+    compile_generation_plan,
+    deterministic_fallback_plan,
+    deterministic_revision_fallback,
+    generation_plan_schema,
+    plan_revision_schema,
+    validate_generation_plan,
+    validate_plan_revision,
+)
 from app.orchestration.harness_context import (
     HARNESS_DECISION_TRACE_SCHEMA_VERSION,
     HARNESS_EVIDENCE_SCHEMA_VERSION,
@@ -117,6 +136,42 @@ class HarnessDecision:
     evidence_schema_version: str = HARNESS_EVIDENCE_SCHEMA_VERSION
     tool_registry_version: str = HARNESS_TOOL_REGISTRY_VERSION
     prompt_template_version: str = HARNESS_PROMPT_TEMPLATE_VERSION
+
+
+@dataclass(frozen=True)
+class HarnessBudgetPlanDecision:
+    """One accepted multi-tool plan or an explicitly attributed fallback."""
+
+    decision_id: str
+    generation: int
+    compiled_plan: HarnessCompiledGenerationPlan | None
+    stop_reason: str | None
+    source: HarnessDecisionSource
+    model: str | None
+    evidence_sha256: str
+    prompt_sha256: str | None = None
+    fallback_reason: str | None = None
+    validation: HarnessPlanValidation | None = None
+    budget_policy_version: str = HARNESS_BUDGET_POLICY_VERSION
+    plan_prompt_version: str = HARNESS_BUDGET_PROMPT_VERSION
+    evidence_schema_version: str = HARNESS_EVIDENCE_SCHEMA_VERSION
+    tool_registry_version: str = HARNESS_TOOL_REGISTRY_VERSION
+
+
+@dataclass(frozen=True)
+class HarnessPlanRevisionDecision:
+    """The sole bounded post-tool selection turn for one compiled plan."""
+
+    revision_id: str
+    decision_id: str
+    selected_proposal_refs: tuple[str, ...]
+    abandoned: bool
+    source: HarnessDecisionSource
+    model: str | None
+    prompt_sha256: str | None
+    fallback_reason: str | None
+    validation: HarnessRevisionValidation
+    revision_prompt_version: str = HARNESS_PLAN_REVISION_PROMPT_VERSION
 
 
 @dataclass(frozen=True)
@@ -580,6 +635,497 @@ def _fallback(
     )
 
 
+def _budget_plan_fallback(
+    db: Session,
+    job: models.Job,
+    *,
+    decision_id: str,
+    generation: int,
+    opportunity: HarnessBudgetOpportunity,
+    reason: str,
+    evidence_sha256: str,
+    model: str | None,
+    prompt_sha256: str | None = None,
+    validation: HarnessPlanValidation | None = None,
+    error_type: str | None = None,
+) -> HarnessBudgetPlanDecision:
+    compiled = deterministic_fallback_plan(opportunity)
+    payload: dict[str, Any] = {
+        "decision_id": decision_id,
+        "generation": generation,
+        "reason": reason,
+        "model": model,
+        "source": "deterministic_fallback",
+        "compiled_plan_sha256": compiled.plan_sha256,
+        "projected_candidate_count": compiled.projected_candidate_count,
+        "projected_trial_upper_bound": compiled.projected_trial_upper_bound,
+        "projected_critical_path_latency_budget_ms": (
+            compiled.projected_critical_path_latency_budget_ms
+        ),
+        "projected_cpu_budget_ms": compiled.projected_cpu_budget_ms,
+        "evidence_sha256": evidence_sha256,
+        "budget_policy_version": HARNESS_BUDGET_POLICY_VERSION,
+        "plan_prompt_version": HARNESS_BUDGET_PROMPT_VERSION,
+        "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+        "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+    }
+    if prompt_sha256 is not None:
+        payload["prompt_sha256"] = prompt_sha256
+    if validation is not None:
+        payload["validation"] = validation.model_dump(mode="json")
+    if error_type is not None:
+        payload["error_type"] = error_type[:128]
+    record_event(db, job.id, "harness_budget_plan_fallback", payload)
+    return HarnessBudgetPlanDecision(
+        decision_id=decision_id,
+        generation=generation,
+        compiled_plan=compiled,
+        stop_reason=None,
+        source="deterministic_fallback",
+        model=model,
+        evidence_sha256=evidence_sha256,
+        prompt_sha256=prompt_sha256,
+        fallback_reason=reason,
+        validation=validation,
+    )
+
+
+def select_optimizer_budget_plan(
+    db: Session,
+    job: models.Job,
+    *,
+    opportunity: HarnessBudgetOpportunity,
+    client: OpenAIClientLike | None = None,
+) -> HarnessBudgetPlanDecision:
+    """Select, validate, and compile one multi-tool plan without executing it."""
+
+    decision_id = uuid.uuid4().hex
+    generation = job.current_generation + 1
+    if opportunity.generation != generation:
+        raise ValueError("budget opportunity generation does not match the Job")
+    recent_decision_events = _recent_harness_decision_events(db, job)
+    verified_started_decision_ids = frozenset(
+        verified_id
+        for event in recent_decision_events
+        if (verified_id := _verified_started_decision_id(event)) is not None
+    )
+    evidence_snapshot, has_scored_evidence = build_harness_evidence(
+        job,
+        execution_events=recent_decision_events,
+        verified_started_decision_ids=verified_started_decision_ids,
+    )
+    evidence_snapshot = _compile_cross_job_memory(
+        db,
+        current_job=job,
+        current_snapshot=evidence_snapshot,
+    )
+    evidence = evidence_snapshot.model_dump(mode="json", exclude_none=True)
+    evidence_sha256 = _sha256_text(_canonical_json(evidence))
+    provider = job.llm_provider or "openai"
+    configured_model = job.openai_model
+    chosen_model = configured_model or _DEFAULT_MODEL
+    opportunity_tools = tuple(item.tool_id for item in opportunity.tool_budgets)
+    selectable_tools = selectable_harness_tools(evidence_snapshot)
+    if any(tool_id not in selectable_tools for tool_id in opportunity_tools):
+        return _budget_plan_fallback(
+            db,
+            job,
+            decision_id=decision_id,
+            generation=generation,
+            opportunity=opportunity,
+            reason="opportunity_contract_mismatch",
+            evidence_sha256=evidence_sha256,
+            model=chosen_model,
+        )
+    if configured_model is None and provider != "openai":
+        return _budget_plan_fallback(
+            db,
+            job,
+            decision_id=decision_id,
+            generation=generation,
+            opportunity=opportunity,
+            reason="missing_model",
+            evidence_sha256=evidence_sha256,
+            model=None,
+        )
+    if not has_scored_evidence:
+        return _budget_plan_fallback(
+            db,
+            job,
+            decision_id=decision_id,
+            generation=generation,
+            opportunity=opportunity,
+            reason="insufficient_evidence",
+            evidence_sha256=evidence_sha256,
+            model=chosen_model,
+        )
+
+    tool_manifest = provider_tool_manifest(opportunity_tools)
+    system, user = build_budget_plan_messages(
+        evidence_snapshot=evidence,
+        opportunity=opportunity,
+        tool_manifest=tool_manifest,
+    )
+    settings = get_settings()
+    if len(user.encode("utf-8")) > settings.llm_max_prompt_bytes:
+        return _budget_plan_fallback(
+            db,
+            job,
+            decision_id=decision_id,
+            generation=generation,
+            opportunity=opportunity,
+            reason="prompt_too_large",
+            evidence_sha256=evidence_sha256,
+            model=chosen_model,
+        )
+    prompt_sha256 = _sha256_text(f"{system}\n{user}")
+    effective_client = client
+    if effective_client is None:
+        api_key = load_job_api_key(db, job)
+        if api_key is None:
+            return _budget_plan_fallback(
+                db,
+                job,
+                decision_id=decision_id,
+                generation=generation,
+                opportunity=opportunity,
+                reason="missing_api_key",
+                evidence_sha256=evidence_sha256,
+                prompt_sha256=prompt_sha256,
+                model=chosen_model,
+            )
+        effective_client = OpenAIJsonClient(
+            api_key,
+            proposal_schema=generation_plan_schema(opportunity),
+            base_url=job.llm_base_url,
+            timeout_seconds=settings.llm_request_timeout_seconds,
+            max_retries=settings.llm_max_retries,
+            max_response_bytes=settings.llm_max_response_bytes,
+        )
+
+    record_event(
+        db,
+        job.id,
+        "harness_budget_plan_started",
+        {
+            "decision_id": decision_id,
+            "generation": generation,
+            "model": chosen_model,
+            "provider": provider,
+            "evidence_sha256": evidence_sha256,
+            "prompt_sha256": prompt_sha256,
+            "opportunity": opportunity.model_dump(mode="json"),
+            "budget_policy_version": HARNESS_BUDGET_POLICY_VERSION,
+            "plan_prompt_version": HARNESS_BUDGET_PROMPT_VERSION,
+            "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+            "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+        },
+    )
+    try:
+        raw = effective_client.generate(
+            model=chosen_model,
+            system=system,
+            user=user,
+        )
+    except Exception as exc:
+        logger.warning(
+            "harness budget plan call failed for job %s (error_type=%s)",
+            job.id,
+            type(exc).__name__,
+        )
+        return _budget_plan_fallback(
+            db,
+            job,
+            decision_id=decision_id,
+            generation=generation,
+            opportunity=opportunity,
+            reason="client_error",
+            error_type=type(exc).__name__,
+            evidence_sha256=evidence_sha256,
+            prompt_sha256=prompt_sha256,
+            model=chosen_model,
+        )
+
+    plan, validation = validate_generation_plan(raw, opportunity)
+    if plan is None:
+        return _budget_plan_fallback(
+            db,
+            job,
+            decision_id=decision_id,
+            generation=generation,
+            opportunity=opportunity,
+            reason="invalid_plan",
+            evidence_sha256=evidence_sha256,
+            prompt_sha256=prompt_sha256,
+            model=chosen_model,
+            validation=validation,
+        )
+    if plan.decision == "stop":
+        stop_reason = plan.stop.reason_code
+        if stop_reason is None:
+            raise RuntimeError("accepted stop plan is missing its reason")
+        record_event(
+            db,
+            job.id,
+            "harness_budget_plan_stop_accepted",
+            {
+                "decision_id": decision_id,
+                "generation": generation,
+                "model": chosen_model,
+                "stop_reason": stop_reason,
+                "evidence_sha256": evidence_sha256,
+                "prompt_sha256": prompt_sha256,
+                "validation": validation.model_dump(mode="json"),
+                "budget_policy_version": HARNESS_BUDGET_POLICY_VERSION,
+                "plan_prompt_version": HARNESS_BUDGET_PROMPT_VERSION,
+            },
+        )
+        return HarnessBudgetPlanDecision(
+            decision_id=decision_id,
+            generation=generation,
+            compiled_plan=None,
+            stop_reason=stop_reason,
+            source="model",
+            model=chosen_model,
+            evidence_sha256=evidence_sha256,
+            prompt_sha256=prompt_sha256,
+            validation=validation,
+        )
+
+    compiled = compile_generation_plan(plan, opportunity)
+    record_event(
+        db,
+        job.id,
+        "harness_budget_plan_accepted",
+        {
+            "decision_id": decision_id,
+            "generation": generation,
+            "model": chosen_model,
+            "compiled_plan": compiled.model_dump(mode="json"),
+            "evidence_sha256": evidence_sha256,
+            "prompt_sha256": prompt_sha256,
+            "validation": validation.model_dump(mode="json"),
+            "budget_policy_version": HARNESS_BUDGET_POLICY_VERSION,
+            "plan_prompt_version": HARNESS_BUDGET_PROMPT_VERSION,
+        },
+    )
+    return HarnessBudgetPlanDecision(
+        decision_id=decision_id,
+        generation=generation,
+        compiled_plan=compiled,
+        stop_reason=None,
+        source="model",
+        model=chosen_model,
+        evidence_sha256=evidence_sha256,
+        prompt_sha256=prompt_sha256,
+        validation=validation,
+    )
+
+
+def _revision_fallback(
+    db: Session,
+    job: models.Job,
+    *,
+    decision_id: str,
+    revision_id: str,
+    proposals: tuple[HarnessProposalSummary, ...],
+    maximum_dispatch_candidates: int,
+    reason: str,
+    model: str | None,
+    prompt_sha256: str | None = None,
+    error_type: str | None = None,
+) -> HarnessPlanRevisionDecision:
+    validation = deterministic_revision_fallback(
+        proposals,
+        maximum_dispatch_candidates=maximum_dispatch_candidates,
+        rejection_code=reason,
+    )
+    payload: dict[str, Any] = {
+        "decision_id": decision_id,
+        "revision_id": revision_id,
+        "reason": reason,
+        "source": "deterministic_fallback",
+        "model": model,
+        "selected_proposal_refs": list(validation.selected_proposal_refs),
+        "revision_prompt_version": HARNESS_PLAN_REVISION_PROMPT_VERSION,
+    }
+    if prompt_sha256 is not None:
+        payload["prompt_sha256"] = prompt_sha256
+    if error_type is not None:
+        payload["error_type"] = error_type[:128]
+    record_event(db, job.id, "harness_plan_revision_fallback", payload)
+    return HarnessPlanRevisionDecision(
+        revision_id=revision_id,
+        decision_id=decision_id,
+        selected_proposal_refs=validation.selected_proposal_refs,
+        abandoned=False,
+        source="deterministic_fallback",
+        model=model,
+        prompt_sha256=prompt_sha256,
+        fallback_reason=reason,
+        validation=validation,
+    )
+
+
+def select_plan_revision(
+    db: Session,
+    job: models.Job,
+    *,
+    plan_decision: HarnessBudgetPlanDecision,
+    proposals: tuple[HarnessProposalSummary, ...],
+    maximum_dispatch_candidates: int,
+    client: OpenAIClientLike | None = None,
+    allow_abandon: bool = False,
+) -> HarnessPlanRevisionDecision:
+    """Run at most one provider turn after pure proposal tools return."""
+
+    revision_id = uuid.uuid4().hex
+    compiled = plan_decision.compiled_plan
+    if compiled is None:
+        raise ValueError("a plan revision requires a compiled continue plan")
+    if compiled.generation != job.current_generation + 1:
+        raise ValueError("compiled plan generation drifted before revision")
+    if not proposals:
+        return _revision_fallback(
+            db,
+            job,
+            decision_id=plan_decision.decision_id,
+            revision_id=revision_id,
+            proposals=proposals,
+            maximum_dispatch_candidates=maximum_dispatch_candidates,
+            reason="no_usable_proposals",
+            model=plan_decision.model,
+        )
+    system, user = build_plan_revision_messages(
+        compiled_plan=compiled,
+        proposals=proposals,
+        maximum_dispatch_candidates=maximum_dispatch_candidates,
+    )
+    settings = get_settings()
+    if len(user.encode("utf-8")) > settings.llm_max_prompt_bytes:
+        return _revision_fallback(
+            db,
+            job,
+            decision_id=plan_decision.decision_id,
+            revision_id=revision_id,
+            proposals=proposals,
+            maximum_dispatch_candidates=maximum_dispatch_candidates,
+            reason="prompt_too_large",
+            model=plan_decision.model,
+        )
+    prompt_sha256 = _sha256_text(f"{system}\n{user}")
+    effective_client = client
+    if effective_client is None:
+        api_key = load_job_api_key(db, job)
+        if api_key is None:
+            return _revision_fallback(
+                db,
+                job,
+                decision_id=plan_decision.decision_id,
+                revision_id=revision_id,
+                proposals=proposals,
+                maximum_dispatch_candidates=maximum_dispatch_candidates,
+                reason="missing_api_key",
+                prompt_sha256=prompt_sha256,
+                model=plan_decision.model,
+            )
+        effective_client = OpenAIJsonClient(
+            api_key,
+            proposal_schema=plan_revision_schema(
+                proposals,
+                maximum_dispatch_candidates=maximum_dispatch_candidates,
+            ),
+            base_url=job.llm_base_url,
+            timeout_seconds=settings.llm_request_timeout_seconds,
+            max_retries=settings.llm_max_retries,
+            max_response_bytes=settings.llm_max_response_bytes,
+        )
+    record_event(
+        db,
+        job.id,
+        "harness_plan_revision_started",
+        {
+            "decision_id": plan_decision.decision_id,
+            "revision_id": revision_id,
+            "generation": compiled.generation,
+            "model": plan_decision.model,
+            "prompt_sha256": prompt_sha256,
+            "compiled_plan_sha256": compiled.plan_sha256,
+            "proposal_count": len(proposals),
+            "maximum_dispatch_candidates": maximum_dispatch_candidates,
+            "revision_prompt_version": HARNESS_PLAN_REVISION_PROMPT_VERSION,
+        },
+    )
+    try:
+        raw = effective_client.generate(
+            model=plan_decision.model or _DEFAULT_MODEL,
+            system=system,
+            user=user,
+        )
+    except Exception as exc:
+        logger.warning(
+            "harness plan revision call failed for job %s (error_type=%s)",
+            job.id,
+            type(exc).__name__,
+        )
+        return _revision_fallback(
+            db,
+            job,
+            decision_id=plan_decision.decision_id,
+            revision_id=revision_id,
+            proposals=proposals,
+            maximum_dispatch_candidates=maximum_dispatch_candidates,
+            reason="client_error",
+            prompt_sha256=prompt_sha256,
+            model=plan_decision.model,
+            error_type=type(exc).__name__,
+        )
+    revision, validation = validate_plan_revision(
+        raw,
+        proposals=proposals,
+        maximum_dispatch_candidates=maximum_dispatch_candidates,
+        allow_abandon=allow_abandon,
+    )
+    if revision is None:
+        return _revision_fallback(
+            db,
+            job,
+            decision_id=plan_decision.decision_id,
+            revision_id=revision_id,
+            proposals=proposals,
+            maximum_dispatch_candidates=maximum_dispatch_candidates,
+            reason=validation.rejection_code or "invalid_revision",
+            prompt_sha256=prompt_sha256,
+            model=plan_decision.model,
+        )
+    record_event(
+        db,
+        job.id,
+        "harness_plan_revision_accepted",
+        {
+            "decision_id": plan_decision.decision_id,
+            "revision_id": revision_id,
+            "generation": compiled.generation,
+            "model": plan_decision.model,
+            "prompt_sha256": prompt_sha256,
+            "decision": revision.decision,
+            "selected_proposal_refs": list(revision.selected_proposal_refs),
+            "revision_prompt_version": HARNESS_PLAN_REVISION_PROMPT_VERSION,
+        },
+    )
+    return HarnessPlanRevisionDecision(
+        revision_id=revision_id,
+        decision_id=plan_decision.decision_id,
+        selected_proposal_refs=revision.selected_proposal_refs,
+        abandoned=revision.decision == "abandon",
+        source="model",
+        model=plan_decision.model,
+        prompt_sha256=prompt_sha256,
+        fallback_reason=None,
+        validation=validation,
+    )
+
+
 def select_optimizer_tool(
     db: Session,
     job: models.Job,
@@ -797,14 +1343,18 @@ __all__ = [
     "HARNESS_FALLBACK_TOOL",
     "HARNESS_PROMPT_TEMPLATE_VERSION",
     "HARNESS_TOOL_REGISTRY",
+    "HarnessBudgetPlanDecision",
     "HarnessDecision",
     "HarnessDecisionTraceVerification",
     "HarnessDispatchStrategy",
+    "HarnessPlanRevisionDecision",
     "as_experimental_strategy",
     "build_decision_messages",
     "decision_schema_for_snapshot",
     "is_experimental_harness_tool",
+    "select_optimizer_budget_plan",
     "select_optimizer_tool",
+    "select_plan_revision",
     "validate_harness_decision_response",
     "verify_harness_decision_trace",
 ]

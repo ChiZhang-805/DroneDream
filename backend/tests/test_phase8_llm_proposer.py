@@ -51,6 +51,7 @@ def llm_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     import app.models as models_module  # type: ignore[import-not-found]
     import app.orchestration.acceptance as acceptance_module  # type: ignore[import-not-found]
     import app.orchestration.decision_harness as decision_harness_module  # type: ignore[import-not-found]
+    import app.orchestration.harness_budget_planner as budget_planner_module  # type: ignore[import-not-found]
     import app.orchestration.harness_context as harness_context_module  # type: ignore[import-not-found]
     import app.orchestration.job_manager as job_manager_module  # type: ignore[import-not-found]
     import app.orchestration.llm_parameter_proposer as proposer_module  # type: ignore[import-not-found]
@@ -64,6 +65,7 @@ def llm_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
         "schemas": __import__("app.schemas", fromlist=["*"]),
         "jobs_service": jobs_service_module,
         "acceptance": acceptance_module,
+        "budget_planner": budget_planner_module,
         "decision_harness": decision_harness_module,
         "harness_context": harness_context_module,
         "job_manager": job_manager_module,
@@ -1178,6 +1180,266 @@ def test_harness_rejects_registered_but_context_ineligible_tool(llm_ctx):
     assert decision.tool_id == "optimizer_portfolio"
     assert decision.source == "deterministic_fallback"
     assert decision.fallback_reason == "invalid_response"
+
+
+def _budget_opportunity(ctx: dict[str, object], **overrides: object):
+    values = {
+        "generation": 1,
+        "remaining_trials": 12,
+        "full_trials_per_candidate": 2,
+        "candidate_capacity": 2,
+        "allowed_tools": ("cma_es", "optimizer_portfolio"),
+        "generation_latency_budget_ms": 20_000,
+        "generation_cpu_budget_ms": 30_000,
+    }
+    values.update(overrides)
+    return ctx["budget_planner"].build_budget_opportunity(**values)
+
+
+def _valid_budget_plan() -> dict[str, object]:
+    return {
+        "schema_version": "1.0",
+        "decision": "continue",
+        "generation_goal": "Pair a bounded search seed with the strong portfolio.",
+        "tool_calls": [
+            {
+                "tool_id": "cma_es",
+                "allocation": 1,
+                "fidelity_mode": "force_full",
+                "focus": ["verification"],
+            },
+            {
+                "tool_id": "optimizer_portfolio",
+                "allocation": 1,
+                "fidelity_mode": "auto",
+                "focus": ["diversity"],
+            },
+        ],
+        "stop": {"recommended": False, "reason_code": None},
+        "uncertainty": {
+            "level": "medium",
+            "missing_evidence": ["tool_cost_history"],
+        },
+    }
+
+
+def test_harness_accepts_and_compiles_bounded_multi_tool_plan(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+    fake = FakeOpenAIClient(_valid_budget_plan())
+
+    with ctx["db_module"].SessionLocal() as db:
+        _seed_harness_evidence(ctx, db, job_id)
+        job = db.get(ctx["models"].Job, job_id)
+        decision = ctx["decision_harness"].select_optimizer_budget_plan(
+            db,
+            job,
+            opportunity=_budget_opportunity(ctx),
+            client=fake,
+        )
+        db.flush()
+        event_types = [event.event_type for event in job.events]
+
+    assert decision.source == "model"
+    assert decision.fallback_reason is None
+    assert decision.compiled_plan is not None
+    assert [item.tool_id for item in decision.compiled_plan.calls] == [
+        "cma_es",
+        "optimizer_portfolio",
+    ]
+    assert decision.compiled_plan.projected_candidate_count == 2
+    assert decision.compiled_plan.projected_trial_upper_bound == 4
+    assert decision.validation is not None and decision.validation.accepted is True
+    assert "harness_budget_plan_started" in event_types
+    assert "harness_budget_plan_accepted" in event_types
+    assert "harness_budget_plan_fallback" not in event_types
+    provider_payload = json.loads(fake.calls[0]["user"])
+    assert provider_payload["budget_opportunity"]["candidate_capacity"] == 2
+    assert [item["tool_id"] for item in provider_payload["budget_opportunity"]["tool_budgets"]] == [
+        "cma_es",
+        "optimizer_portfolio",
+    ]
+    assert "sk-test-unit" not in fake.calls[0]["user"]
+    assert "job_id" not in fake.calls[0]["user"]
+
+
+def test_harness_budget_plan_overrun_falls_back_to_strong_portfolio(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+    response = _valid_budget_plan()
+    response["tool_calls"][1]["allocation"] = 2  # type: ignore[index]
+    fake = FakeOpenAIClient(response)
+
+    with ctx["db_module"].SessionLocal() as db:
+        _seed_harness_evidence(ctx, db, job_id)
+        job = db.get(ctx["models"].Job, job_id)
+        decision = ctx["decision_harness"].select_optimizer_budget_plan(
+            db,
+            job,
+            opportunity=_budget_opportunity(ctx),
+            client=fake,
+        )
+        db.flush()
+        fallback = next(
+            event
+            for event in job.events
+            if event.event_type == "harness_budget_plan_fallback"
+        )
+
+    assert decision.source == "deterministic_fallback"
+    assert decision.fallback_reason == "invalid_plan"
+    assert decision.compiled_plan is not None
+    assert [item.tool_id for item in decision.compiled_plan.calls] == [
+        "optimizer_portfolio"
+    ]
+    assert decision.validation is not None and decision.validation.accepted is False
+    assert fallback.payload_json["validation"]["accepted"] is False
+    assert "allocation_exceeds_budget" in {
+        item["code"]
+        for item in fallback.payload_json["validation"]["rule_results"]
+        if not item["passed"]
+    }
+
+
+def test_harness_budget_stop_requires_and_records_deterministic_authority(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+    fake = FakeOpenAIClient(
+        {
+            "schema_version": "1.0",
+            "decision": "stop",
+            "generation_goal": "Stop after the deterministic convergence gate.",
+            "tool_calls": [],
+            "stop": {"recommended": True, "reason_code": "converged"},
+            "uncertainty": {"level": "low", "missing_evidence": []},
+        }
+    )
+
+    with ctx["db_module"].SessionLocal() as db:
+        _seed_harness_evidence(ctx, db, job_id)
+        job = db.get(ctx["models"].Job, job_id)
+        decision = ctx["decision_harness"].select_optimizer_budget_plan(
+            db,
+            job,
+            opportunity=_budget_opportunity(ctx, stop_reasons=("converged",)),
+            client=fake,
+        )
+        db.flush()
+        event_types = [event.event_type for event in job.events]
+
+    assert decision.source == "model"
+    assert decision.compiled_plan is None
+    assert decision.stop_reason == "converged"
+    assert "harness_budget_plan_stop_accepted" in event_types
+    assert "harness_budget_plan_fallback" not in event_types
+
+
+def _proposal_summaries(ctx: dict[str, object]):
+    return (
+        ctx["budget_planner"].proposal_summary(
+            proposal_ref="proposal_0",
+            tool_id="cma_es",
+            tool_candidate_ordinal=0,
+            requested_fidelity=1.0,
+            effective_fidelity=1.0,
+            normalized_distance_from_incumbent=0.2,
+        ),
+        ctx["budget_planner"].proposal_summary(
+            proposal_ref="proposal_1",
+            tool_id="optimizer_portfolio",
+            tool_candidate_ordinal=0,
+            requested_fidelity=0.5,
+            effective_fidelity=0.5,
+            normalized_distance_from_incumbent=0.4,
+        ),
+    )
+
+
+def _compiled_budget_decision(ctx: dict[str, object], db, job):
+    return ctx["decision_harness"].select_optimizer_budget_plan(
+        db,
+        job,
+        opportunity=_budget_opportunity(ctx),
+        client=FakeOpenAIClient(_valid_budget_plan()),
+    )
+
+
+def test_harness_accepts_one_bounded_post_tool_revision(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+    fake = FakeOpenAIClient(
+        {
+            "schema_version": "1.0",
+            "decision": "dispatch",
+            "selected_proposal_refs": ["proposal_1"],
+            "rationale": "Dispatch the complementary portfolio proposal.",
+        }
+    )
+
+    with ctx["db_module"].SessionLocal() as db:
+        _seed_harness_evidence(ctx, db, job_id)
+        job = db.get(ctx["models"].Job, job_id)
+        plan_decision = _compiled_budget_decision(ctx, db, job)
+        revision = ctx["decision_harness"].select_plan_revision(
+            db,
+            job,
+            plan_decision=plan_decision,
+            proposals=_proposal_summaries(ctx),
+            maximum_dispatch_candidates=1,
+            client=fake,
+        )
+        db.flush()
+        event_types = [event.event_type for event in job.events]
+
+    assert revision.source == "model"
+    assert revision.selected_proposal_refs == ("proposal_1",)
+    assert revision.abandoned is False
+    assert revision.validation.accepted is True
+    assert "harness_plan_revision_started" in event_types
+    assert "harness_plan_revision_accepted" in event_types
+    provider_payload = json.loads(fake.calls[0]["user"])
+    assert provider_payload["maximum_dispatch_candidates"] == 1
+    assert all("parameters" not in item for item in provider_payload["proposals"])
+    assert "sk-test-unit" not in fake.calls[0]["user"]
+    assert "job_id" not in fake.calls[0]["user"]
+
+
+def test_harness_invalid_revision_uses_canonical_bounded_fallback(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+    fake = FakeOpenAIClient(
+        {
+            "schema_version": "1.0",
+            "decision": "dispatch",
+            "selected_proposal_refs": ["proposal_9"],
+            "rationale": "Select an unavailable reference.",
+        }
+    )
+
+    with ctx["db_module"].SessionLocal() as db:
+        _seed_harness_evidence(ctx, db, job_id)
+        job = db.get(ctx["models"].Job, job_id)
+        plan_decision = _compiled_budget_decision(ctx, db, job)
+        revision = ctx["decision_harness"].select_plan_revision(
+            db,
+            job,
+            plan_decision=plan_decision,
+            proposals=_proposal_summaries(ctx),
+            maximum_dispatch_candidates=1,
+            client=fake,
+        )
+        db.flush()
+        fallback = next(
+            event
+            for event in job.events
+            if event.event_type == "harness_plan_revision_fallback"
+        )
+
+    assert revision.source == "deterministic_fallback"
+    assert revision.fallback_reason == "unknown_proposal_reference"
+    assert revision.selected_proposal_refs == ("proposal_0",)
+    assert revision.validation.fallback_used is True
+    assert fallback.payload_json["selected_proposal_refs"] == ["proposal_0"]
 
 
 def test_harness_context_compiles_budget_progress_scenarios_and_tool_memory(
