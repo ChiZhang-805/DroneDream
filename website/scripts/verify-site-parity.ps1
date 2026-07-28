@@ -72,6 +72,7 @@ try {
     }
 
     $verifiedPaths = @()
+    $verifiedReleaseMetadata = @{}
     foreach ($line in Get-Content `
         -LiteralPath $snapshots.global.IntegrityManifestPath -Encoding UTF8) {
         if ($line -notmatch '^([0-9a-f]{64})  (.+)$') {
@@ -82,7 +83,8 @@ try {
         if ($relativePath -notmatch (
                 '^(?:index|site|404)\.html$|' +
                 '^(?:assets|console/assets)/.+\.(?:js|css)$|' +
-                '^console/index\.html$'
+                '^console/index\.html$|' +
+                '^downloads/latest\.json$'
             )) {
             continue
         }
@@ -98,17 +100,42 @@ try {
             if ($actualHash -cne $expectedHash) {
                 throw "$originName differs from the shared artifact: $relativePath"
             }
+            if ($relativePath -ceq 'downloads/latest.json') {
+                $metadata = Get-Content -LiteralPath $downloadPath `
+                    -Raw -Encoding UTF8 | ConvertFrom-Json
+                $release = $snapshots[$originName].BuildManifest.release
+                $releaseTag = [string]$release.releaseTag
+                $fileName = [string]$release.fileName
+                $expectedDownloadUrl =
+                    "https://github.com/ChiZhang-805/DroneDream/releases/download/" +
+                    "$releaseTag/$fileName"
+                if ([string]$metadata.version -cne [string]$release.version -or
+                    [string]$metadata.fileName -cne $fileName -or
+                    ([string]$metadata.sha256).ToLowerInvariant() -cne
+                        ([string]$release.sha256).ToLowerInvariant() -or
+                    [long]$metadata.sizeBytes -ne [long]$release.sizeBytes -or
+                    [string]$metadata.publishedAt -cne
+                        [string]$release.publishedAt -or
+                    [string]$metadata.downloadUrl -cne $expectedDownloadUrl -or
+                    [string]$metadata.checksumUrl -cne
+                        "$expectedDownloadUrl.sha256") {
+                    throw "$originName downloads/latest.json does not match the shared release metadata."
+                }
+                $verifiedReleaseMetadata[$originName] = $metadata
+            }
         }
         $verifiedPaths += $relativePath
     }
-    if ($verifiedPaths.Count -lt 4) {
-        throw "Parity verification covered too few HTML, JavaScript, and CSS files."
+    if ($verifiedPaths.Count -lt 5 -or
+        'downloads/latest.json' -notin $verifiedPaths -or
+        $verifiedReleaseMetadata.Count -ne $originUris.Count) {
+        throw "Parity verification did not cover enough HTML, JavaScript, CSS, and release metadata files."
     }
 
     $sourceCommit = [string]$snapshots.global.BuildManifest.sourceCommit
     Write-Host "Global and mirror manifests are identical."
     Write-Host "Source commit: $sourceCommit"
-    Write-Host "Verified $($verifiedPaths.Count) HTML, JavaScript, and CSS files on both origins."
+    Write-Host "Verified $($verifiedPaths.Count) HTML, JavaScript, CSS, and release metadata files on both origins."
 } finally {
     if (Test-Path -LiteralPath $temporaryRoot) {
         Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

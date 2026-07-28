@@ -189,6 +189,37 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("dronedream-site-${{ github.sha }}", workflow)
         self.assertIn("include-hidden-files: true", workflow)
 
+    def test_parity_verifies_public_release_metadata_on_both_origins(self) -> None:
+        parity = self.read("website/scripts/verify-site-parity.ps1")
+        readme = self.read("website/README.md")
+
+        self.assertIn("'^downloads/latest\\.json$'", parity)
+        self.assertIn(
+            "if ($relativePath -ceq 'downloads/latest.json')",
+            parity,
+        )
+        self.assertIn("$verifiedReleaseMetadata[$originName]", parity)
+        self.assertIn(
+            "$verifiedReleaseMetadata.Count -ne $originUris.Count",
+            parity,
+        )
+        for field in (
+            "version",
+            "fileName",
+            "sha256",
+            "sizeBytes",
+            "publishedAt",
+            "downloadUrl",
+            "checksumUrl",
+        ):
+            with self.subTest(field=field):
+                self.assertIn(f"metadata.{field}", parity)
+        self.assertIn(
+            "downloads/latest.json does not match the shared release metadata",
+            parity,
+        )
+        self.assertIn("downloads/latest.json", readme)
+
     def test_pages_build_verifies_policy_source_and_compiled_policy_links(self) -> None:
         builder = self.read("website/scripts/build-pages-site.ps1")
         policy = self.read("CODE_SIGNING_POLICY.md")

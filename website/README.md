@@ -182,9 +182,10 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 The wrapper does not rebuild. It validates every local artifact hash, source
 commit, origin contract, release URL, installer bytes and checksum; uploads the
 archive through a private staging directory; and verifies the mirror's
-`SHA256SUMS` plus public HTML, JavaScript, and CSS byte-for-byte. Targets are
-fixed in `website/deployment-targets.json`, so the SSH destination, public host,
-root URI, and artifact directory cannot silently drift apart. It uses
+`SHA256SUMS` plus public HTML, JavaScript, CSS, and `downloads/latest.json`
+byte-for-byte. Targets are fixed in `website/deployment-targets.json`, so the
+SSH destination, public host, root URI, and artifact directory cannot silently
+drift apart. It uses
 `BatchMode=yes` and `StrictHostKeyChecking=yes`; connect once manually and
 verify the server fingerprint before the first automated run.
 
