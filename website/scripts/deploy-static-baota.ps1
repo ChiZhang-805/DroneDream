@@ -49,6 +49,10 @@ function Test-SiteIntegrityManifest {
         }
         $expectedHash = $Matches[1]
         $relativePath = $Matches[2]
+        if ($manifestRelativePaths -ccontains $relativePath) {
+            throw "SHA256SUMS contains a duplicate path: $relativePath"
+        }
+        $manifestRelativePaths += $relativePath
         if ([IO.Path]::IsPathRooted($relativePath) -or
             $relativePath.Contains('\') -or
             $relativePath -match '(^|/)\.\.(/|$)') {
@@ -388,10 +392,6 @@ try {
         }
         $expectedHash = $Matches[1]
         $relativePath = $Matches[2]
-        if ($manifestRelativePaths -ccontains $relativePath) {
-            throw "SHA256SUMS contains a duplicate path: $relativePath"
-        }
-        $manifestRelativePaths += $relativePath
         if ($relativePath -notmatch (
                 '^(?:index|site|404)\.html$|' +
                 '^(?:assets|console/assets)/.+\.(?:js|css)$|' +
