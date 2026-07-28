@@ -7,11 +7,11 @@
   },
   "evidence_reference_manifest": {
     "path": "technical-report/evidence-reference-manifest.json",
-    "sha256": "a54c13e812d9831bd3c03b646c126fc0c59efdd08ef3f500f03bd52bbc7e4c96"
+    "sha256": "59866cffa2a3ed5c55ecf06f357da573a2575d3518c8a6b79845fb1ac38b20f9"
   },
   "report_source": {
     "path": "technical-report/body.tex",
-    "sha256": "5909b04e799487b24d59b20cafd4bb053c004600cd17bff93bca99e2ed392d05"
+    "sha256": "ca70e50e3e7ae89cad98354c5f15df6a40525fc11b3ccbdafae07267402e7cc8"
   },
   "claim_total": 16,
   "claim_passed": 16,

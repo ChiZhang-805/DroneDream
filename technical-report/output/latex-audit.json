@@ -115,15 +115,15 @@
         "page": 2,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.8185,
+        "lines": 7,
+        "last_line_ratio": 0.9005,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "artifacts. Each stage narrows authority, so fluent output cannot bypass an executable contract or test.",
+        "last_line_text": "trace records the selected tool together with every filtered alternative and its rejection basis during later replay.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": false,
+        "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "AURORA IS A CONSTRAINED DECISION SYSTEM AROUND SIMULATION. Context binds parameters, scenarios, history, budgets, and failures. Capability eligibility removes incompatible tools, while a phase gate exposes only methods suited to exploration, recovery, refinement, diversification, or verification. The router ranks that executable surface and the optimizer proposes Candidates. Verification forces every reduced-fidelity strategy to fidelity 1.0 before acceptance. Provenance-bound memory admits trusted outcomes, while the final gate freezes holdout results and rejects incomplete artifacts. Each stage narrows authority, so fluent output cannot bypass an executable contract or test."
+        "text": "AURORA IS A CONSTRAINED DECISION SYSTEM AROUND SIMULATION. Context binds parameters, scenarios, history, budgets, and failures. Capability eligibility removes incompatible tools, while a phase gate exposes only methods suited to exploration, recovery, refinement, diversification, or verification. The router ranks that executable surface and the optimizer proposes Candidates. Verification forces every reduced-fidelity strategy to fidelity 1.0 before acceptance. Provenance-bound memory admits trusted outcomes, while the final gate freezes holdout results and rejects incomplete artifacts. Each stage narrows authority, so fluent output cannot bypass an executable contract or test. The retained decision trace records the selected tool together with every filtered alternative and its rejection basis during later replay."
       },
       {
         "index": 9,
@@ -250,15 +250,15 @@
         "page": 3,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.8016,
+        "lines": 9,
+        "last_line_ratio": 0.9368,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "replay identical candidate sequences across machines before any provider decision receives credit.",
+        "last_line_text": "keeping numerical implementation drift separate from evidence drift during independent replay and release review.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": false,
+        "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "REPRODUCIBILITY EXTENDS BELOW THE RANDOM SEED. A non-unique eigenvector factor can rotate an identical seeded normal sample when another BLAS kernel resolves repeated covariance eigenvalues differently. DroneDream instead uses the unique symmetric positive-definite covariance square root and canonical unit-vector spelling before discrete projection. The frozen optimizer transcript hashes executed candidates, losses, feasibility, route, fidelity, and cohort position, while non-causal GP/CMA diagnostic matrices remain outside that decision hash [. This boundary lets supported machines replay identical candidate sequences across machines before any provider decision receives credit."
+        "text": "REPRODUCIBILITY EXTENDS BELOW THE RANDOM SEED. A non-unique eigenvector factor can rotate an identical seeded normal sample when another BLAS kernel resolves repeated covariance eigenvalues differently. DroneDream instead uses the unique symmetric positive-definite covariance square root and canonical unit-vector spelling before discrete projection. The frozen optimizer transcript hashes executed candidates, losses, feasibility, route, fidelity, and cohort position, while non-causal GP/CMA diagnostic matrices remain outside that decision hash [. This boundary lets supported machines replay identical candidate sequences across machines before any provider decision receives credit. The transcript is compared at the executed-Candidate boundary rather than against optimizer diagnostics that may vary by library implementation. A replay mismatch therefore identifies a decision-relevant divergence before a provider route or reported observation is accepted, keeping numerical implementation drift separate from evidence drift during independent replay and release review."
       },
       {
         "index": 18,
@@ -370,15 +370,15 @@
         "page": 5,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.8015,
+        "lines": 9,
+        "last_line_ratio": 0.9323,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "and does not measure optimizer quality, simulated control performance, flight safety, or readiness.",
+        "last_line_text": "boundary is reached in customer workloads or how much any optimizer improves a controller in release decisions.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": false,
+        "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "The ablation suite asks a narrow question: whether each named source guard changes an otherwise identical deterministic decision at the boundary it is designed to protect. For every guard, the production contract and one intentionally weakened comparator receive the same fixed probes, expected result, and scoring rule. Production satisfies 25/25 probes, whereas the matched weakened variants satisfy 6/25 after their designated protection is removed. This construction demonstrates enforceable behavior for fallback, provider trust, outcome isolation, and tool eligibility; it is not a statistical effect estimate and does not measure optimizer quality, simulated control performance, flight safety, or readiness."
+        "text": "The ablation suite asks a narrow question: whether each named source guard changes an otherwise identical deterministic decision at the boundary it is designed to protect. For every guard, the production contract and one intentionally weakened comparator receive the same fixed probes, expected result, and scoring rule. Production satisfies 25/25 probes, whereas the matched weakened variants satisfy 6/25 after their designated protection is removed. This construction demonstrates enforceable behavior for fallback, provider trust, outcome isolation, and tool eligibility; it is not a statistical effect estimate and does not measure optimizer quality, simulated control performance, flight safety, or readiness. The comparison is diagnostic because each weakened arm changes one named admission rule while leaving inputs and expected outputs fixed. A failed probe therefore localizes enforcement coverage at the source boundary; it does not estimate how frequently that boundary is reached in customer workloads or how much any optimizer improves a controller in release decisions."
       },
       {
         "index": 26,
@@ -655,15 +655,15 @@
         "page": 9,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 9,
-        "last_line_ratio": 0.9409,
+        "lines": 11,
+        "last_line_ratio": 0.8695,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "success to satisfy a fresh launch or conceal the newly failing dependency under the same receipted probe sequence.",
+        "last_line_text": "one tested environment rather than becoming a generic assertion of platform health after repair or upgrade.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": true,
+        "last_line_pass_90": false,
         "line_policy_passed": true,
-        "text": "The desktop readiness gate is part of the product’s technical contract. The progress bar may report completion only after every check that DroneDream can perform at launch has reached a terminal pass state. The entry action must not become visible while a required check is pending or failed. After entry, runtime failures still need explicit diagnostics because network loss, disk damage, permission changes, and external service changes cannot be permanently prevented. The gate therefore certifies a timestamped launch snapshot rather than promising an error-free future session, and post-entry faults must remain recoverable, attributable, and visible without silently invalidating prior work for every affected run. Its receipt should preserve probe timestamps, dependency versions, the service endpoint, account disposition, and the first failing stage. Recovery verification should replay install, upgrade, repair, offline, and damaged-cache paths without allowing stale success to satisfy a fresh launch or conceal the newly failing dependency under the same receipted probe sequence."
+        "text": "The desktop readiness gate is part of the product’s technical contract. The progress bar may report completion only after every check that DroneDream can perform at launch has reached a terminal pass state. The entry action must not become visible while a required check is pending or failed. After entry, runtime failures still need explicit diagnostics because network loss, disk damage, permission changes, and external service changes cannot be permanently prevented. The gate therefore certifies a timestamped launch snapshot rather than promising an error-free future session, and post-entry faults must remain recoverable, attributable, and visible without silently invalidating prior work for every affected run. Its receipt should preserve probe timestamps, dependency versions, the service endpoint, account disposition, and the first failing stage. Recovery verification should replay install, upgrade, repair, offline, and damaged-cache paths without allowing stale success to satisfy a fresh launch or conceal the newly failing dependency under the same receipted probe sequence. The receipt must also retain the exact recovery action and the first post-recovery probe so a green launcher state remains attributable to one tested environment rather than becoming a generic assertion of platform health after repair or upgrade."
       },
       {
         "index": 45,
@@ -955,15 +955,15 @@
         "page": 11,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 12,
-        "last_line_ratio": 0.8308,
+        "lines": 15,
+        "last_line_ratio": 0.9968,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "bytes and reject missing objects before comparing presentation-layer bytes or customer-facing claims.",
+        "last_line_text": "either object. Any mismatch remains a new report revision rather than an editorial substitution during independent review.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": false,
+        "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "Execution Claim Gate 1.1 and Outcome Contract 2.20 bind the Trial/Candidate/Job snapshot and authorized scenario matrix; drift fails closed before evidence admission. Concurrent claims retain one accepted physical attempt, while least-served per-Job scheduling prevents queue monopolization. Prompt Schema 2.3 assigns same-type training cases provider-safe aliases while sealing raw case IDs and holdout evidence. Evidence 2.7 and Prompt 1.6 add verified observational reflection; the current provider freeze passes 24/24, while Prompt 1.5 histories remain visible at 19/24 and 21/24. This is development-routing qualification, not causal prompt evidence. The deterministic eligibility artifact passes 16/16 policy-holdout cases without network or model calls, and the fallback campaign matches the direct arm in 10/10 frozen comparisons across 15 Jobs and 579 Trials. The audit retains source hashes, reproduction commands, qualification scope, and artifact provenance for independent regeneration, replay, and release review against the two frozen dependency chains and their signed receipts [. Release review additionally binds the receipt schema, artifact serialization, and verifier version, so a later rebuild cannot silently accept a different evidence contract. Independent replay must recompute declared counts and hashes from Git object bytes and reject missing objects before comparing presentation-layer bytes or customer-facing claims."
+        "text": "Execution Claim Gate 1.1 and Outcome Contract 2.20 bind the Trial/Candidate/Job snapshot and authorized scenario matrix; drift fails closed before evidence admission. Concurrent claims retain one accepted physical attempt, while least-served per-Job scheduling prevents queue monopolization. Prompt Schema 2.3 assigns same-type training cases provider-safe aliases while sealing raw case IDs and holdout evidence. Evidence 2.7 and Prompt 1.6 add verified observational reflection; the current provider freeze passes 24/24, while Prompt 1.5 histories remain visible at 19/24 and 21/24. This is development-routing qualification, not causal prompt evidence. The deterministic eligibility artifact passes 16/16 policy-holdout cases without network or model calls, and the fallback campaign matches the direct arm in 10/10 frozen comparisons across 15 Jobs and 579 Trials. The audit retains source hashes, reproduction commands, qualification scope, and artifact provenance for independent regeneration, replay, and release review against the two frozen dependency chains and their signed receipts [. Release review additionally binds the receipt schema, artifact serialization, and verifier version, so a later rebuild cannot silently accept a different evidence contract. Independent replay must recompute declared counts and hashes from Git object bytes and reject missing objects before comparing presentation-layer bytes or customer-facing claims. This two-commit publication pattern prevents a receipt from authenticating bytes that did not exist at the source freeze. Reviewers can rebuild the source subject, compare its hashes, and inspect the later artifact commit without trusting the working tree that produced either object. Any mismatch remains a new report revision rather than an editorial substitution during independent review."
       },
       {
         "index": 65,
@@ -1045,15 +1045,15 @@
         "page": 14,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.8378,
+        "lines": 15,
+        "last_line_ratio": 0.8516,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "it. At release, the ledger also binds the generated PDF, layout audit, claim audit, and validation receipt",
+        "last_line_text": "revision, and product release as separately reviewable events under the same auditable release boundary.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": false,
         "line_policy_passed": true,
-        "text": "A machine-checked ledger binds every displayed count, rate, scenario row, contract version, phase count, and Runtime boundary to immutable Git bytes and fails the build on drift. Router rows authorize eligibility claims only; mock campaigns authorize bounded software and synthetic-response claims; component ablations authorize observed differences under their frozen offline router. Backend and frontend receipts validate software, not provider, PX4/Gazebo, or flight behavior. Each reproducible value remains paired with the stronger unauthorized conclusion and the future experiment needed to support it. At release, the ledger also binds the generated PDF, layout audit, claim audit, and validation receipt to a source commit without self-reference. A verifier reads those bytes from Git objects, rechecks serialization and page-level gates, and fails if any dependency SHA, figure, assertion, or receipt field drifts. This keeps the website handoff limited to the final PDF and its hash while preserving source, scripts, manifests, and receipts under report ownership. That separation lets the website cite the artifact without acquiring authority to regenerate, alter, or reinterpret the report’s evidence chain; any revised PDF requires a new report source commit, complete build, visual review, and validation receipt."
+        "text": "A machine-checked ledger binds every displayed count, rate, scenario row, contract version, phase count, and Runtime boundary to immutable Git bytes and fails the build on drift. Router rows authorize eligibility claims only; mock campaigns authorize bounded software and synthetic-response claims; component ablations authorize observed differences under their frozen offline router. Backend and frontend receipts validate software, not provider, PX4/Gazebo, or flight behavior. Each reproducible value remains paired with the stronger unauthorized conclusion and the future experiment needed to support it. At release, the ledger also binds the generated PDF, layout audit, claim audit, and validation receipt to a source commit without self-reference. A verifier reads those bytes from Git objects, rechecks serialization and page-level gates, and fails if any dependency SHA, figure, assertion, or receipt field drifts. This keeps the website handoff limited to the final PDF and its hash while preserving source, scripts, manifests, and receipts under report ownership. That separation lets the website cite the artifact without acquiring authority to regenerate, alter, or reinterpret the report’s evidence chain; any revised PDF requires a new report source commit, complete build, visual review, and validation receipt. The ledger also separates regeneration from interpretation: reproducing the same artifact does not authorize a reader to widen the claim boundary attached to any row. A changed source, dependency, or conclusion must receive a new subject commit, regenerated figures, and a fresh receipt instead of inheriting the prior report’s validation status. This lifecycle keeps editorial revision, evidence revision, and product release as separately reviewable events under the same auditable release boundary."
       }
     ],
     "audited": 70,
@@ -1123,6 +1123,12 @@
       }
     }
   },
+  "page_bottom_policy": {
+    "definition": "Rendered body content on every page must end within one 12-point body line of the audited bottom target.",
+    "body_bottom_margin_mm": 16.0,
+    "baseline_points": 12.0,
+    "maximum_unused_body_lines": 1.0
+  },
   "bottoms": [
     {
       "page": 1,
@@ -1135,23 +1141,23 @@
     {
       "page": 2,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 780.25,
-      "gap_to_body_bottom_points": 16.29,
-      "gap_to_body_bottom_lines": 1.357,
+      "content_bottom_points": 792.2,
+      "gap_to_body_bottom_points": 4.33,
+      "gap_to_body_bottom_lines": 0.361,
       "passed_bottom_line": true
     },
     {
       "page": 3,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 758.37,
-      "gap_to_body_bottom_points": 38.17,
-      "gap_to_body_bottom_lines": 3.18,
+      "content_bottom_points": 794.23,
+      "gap_to_body_bottom_points": 2.3,
+      "gap_to_body_bottom_lines": 0.192,
       "passed_bottom_line": true
     },
     {
       "page": 4,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 798.75,
+      "content_bottom_points": 803.58,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -1159,41 +1165,41 @@
     {
       "page": 5,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 757.73,
-      "gap_to_body_bottom_points": 38.8,
-      "gap_to_body_bottom_lines": 3.234,
+      "content_bottom_points": 793.6,
+      "gap_to_body_bottom_points": 2.94,
+      "gap_to_body_bottom_lines": 0.245,
       "passed_bottom_line": true
     },
     {
       "page": 6,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 765.03,
-      "gap_to_body_bottom_points": 31.5,
-      "gap_to_body_bottom_lines": 2.625,
+      "content_bottom_points": 788.94,
+      "gap_to_body_bottom_points": 7.59,
+      "gap_to_body_bottom_lines": 0.633,
       "passed_bottom_line": true
     },
     {
       "page": 7,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 776.52,
-      "gap_to_body_bottom_points": 20.01,
-      "gap_to_body_bottom_lines": 1.668,
+      "content_bottom_points": 785.62,
+      "gap_to_body_bottom_points": 10.91,
+      "gap_to_body_bottom_lines": 0.909,
       "passed_bottom_line": true
     },
     {
       "page": 8,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 781.48,
-      "gap_to_body_bottom_points": 15.06,
-      "gap_to_body_bottom_lines": 1.255,
+      "content_bottom_points": 788.68,
+      "gap_to_body_bottom_points": 7.85,
+      "gap_to_body_bottom_lines": 0.654,
       "passed_bottom_line": true
     },
     {
       "page": 9,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 765.06,
-      "gap_to_body_bottom_points": 31.48,
-      "gap_to_body_bottom_lines": 2.623,
+      "content_bottom_points": 788.97,
+      "gap_to_body_bottom_points": 7.57,
+      "gap_to_body_bottom_lines": 0.631,
       "passed_bottom_line": true
     },
     {
@@ -1207,9 +1213,9 @@
     {
       "page": 11,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 761.43,
-      "gap_to_body_bottom_points": 35.11,
-      "gap_to_body_bottom_lines": 2.926,
+      "content_bottom_points": 797.29,
+      "gap_to_body_bottom_points": 0.0,
+      "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
     },
     {
@@ -1231,9 +1237,9 @@
     {
       "page": 14,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 762.41,
-      "gap_to_body_bottom_points": 34.13,
-      "gap_to_body_bottom_lines": 2.844,
+      "content_bottom_points": 792.55,
+      "gap_to_body_bottom_points": 3.99,
+      "gap_to_body_bottom_lines": 0.332,
       "passed_bottom_line": true
     }
   ],
