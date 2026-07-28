@@ -15,6 +15,27 @@ const baseUrl = new URL(baseUrlRaw.endsWith("/") ? baseUrlRaw : `${baseUrlRaw}/`
 const outputDirectory = resolve(outputRaw || "website-ui-audit");
 mkdirSync(outputDirectory, { recursive: true });
 
+const discoverSupabaseAuthStorageKeys = async () => {
+  const keys = new Set(["sb-local-preview-auth-token"]);
+  try {
+    const html = await (await fetch(new URL("site.html", baseUrl))).text();
+    const scriptUrls = [...html.matchAll(/<script[^>]+src="([^"]+)"/giu)]
+      .map((match) => new URL(match[1], baseUrl));
+    for (const scriptUrl of scriptUrls) {
+      const script = await (await fetch(scriptUrl)).text();
+      for (const match of script.matchAll(/https:\/\/([a-z0-9-]+)\.supabase\.co/giu)) {
+        keys.add(`sb-${match[1]}-auth-token`);
+      }
+    }
+  } catch {
+    // The local Vite source server does not expose a compiled bundle. Its
+    // documented audit configuration uses the local-preview fallback above.
+  }
+  return [...keys];
+};
+
+const authStorageKeys = await discoverSupabaseAuthStorageKeys();
+
 const edgeCandidates = [
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
   "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
@@ -116,7 +137,7 @@ const browser = await chromium.launch({
 });
 
 const installApiRoutes = async (context) => {
-  await context.route("https://local-preview.invalid/**", async (route) => {
+  const fulfillApiRoute = async (route) => {
     const url = new URL(route.request().url());
     const headers = {
       "access-control-allow-origin": baseUrl.origin,
@@ -140,7 +161,9 @@ const installApiRoutes = async (context) => {
       return;
     }
     await route.fulfill({ status: 404, headers, body: JSON.stringify({ message: "audit stub" }) });
-  });
+  };
+  await context.route("**/auth/v1/**", fulfillApiRoute);
+  await context.route("**/rest/v1/rpc/**", fulfillApiRoute);
 };
 
 const settle = async (page) => {
@@ -177,10 +200,14 @@ try {
         reducedMotion: "reduce",
         serviceWorkers: "block",
       });
-      await context.addInitScript(({ activeLocale, session }) => {
+      await context.addInitScript(({ activeLocale, session, storageKeys }) => {
         localStorage.setItem("drone-dream:locale", activeLocale);
-        localStorage.setItem("sb-local-preview-auth-token", JSON.stringify(session));
-      }, { activeLocale: locale, session: auditSession });
+        storageKeys.forEach((key) => localStorage.setItem(key, JSON.stringify(session)));
+      }, {
+        activeLocale: locale,
+        session: auditSession,
+        storageKeys: authStorageKeys,
+      });
       await installApiRoutes(context);
       const page = await context.newPage();
       const failures = [];
