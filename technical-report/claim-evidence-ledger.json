@@ -1700,6 +1700,314 @@
       ]
     },
     {
+      "id": "advanced-physics-real-px4-campaign",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9"
+      ],
+      "source_id": "advanced_physics_manifest",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.advanced-physics-real-px4-manifest.v1"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/subject_commit",
+          "expected": "26b957efd985d0ac37702a8d2518e87ab65347c3"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/exporter_commit",
+          "expected": "06cfdeb4438be59a24510738ab135b06fdde373a"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/manifest_sha256",
+          "expected": "0cae86ded8d92c6c008ca89873d3234c9c98d745768f92d1142b12b1471e85ca"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/evidence_class",
+          "expected": "REAL_PX4_GAZEBO_ADVANCED_PHYSICS"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_fidelity",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/real_aircraft_fidelity",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/protocol/campaign_seed",
+          "expected": 42001
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/protocol/successful_flight_effects",
+          "expected": [
+            "battery.mass_payload_kg",
+            "scenario_type.actuator_delay",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "wind_gusts"
+          ]
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/protocol/gps_readiness_boundary_effects",
+          "expected": [
+            "battery.mass_payload_kg",
+            "scenario_type.actuator_delay",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.gps_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "wind_gusts"
+          ]
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime_identity/px4_commit",
+          "expected": "6ea3539157ca358c70a515878b77077af7d4611d"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime_identity/px4_version",
+          "expected": "v1.16"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/runtime_identity/gazebo_version_claimed",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/attempt_count",
+          "expected": 6
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/successful_flight_count",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/passing_flight_count",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/gps_readiness_boundary_count",
+          "expected": 2
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/file_backed_preflight_failure_count",
+          "expected": 1
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/terminal_only_preflight_count",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/source_file_count",
+          "expected": 1205
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/source_bytes",
+          "expected": 305040238
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/retained_file_count",
+          "expected": 111
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/retained_bytes",
+          "expected": 8994710
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/full_source_inventory_sha256",
+          "expected": "125463206a7965b3a1d1a524c7181b38c3c877202e65165fbec5351fe3acaded"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempts/1/metrics/rmse_m",
+          "expected": 0.37425
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempts/2/metrics/rmse_m",
+          "expected": 0.368624
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempts/3/metrics/rmse_m",
+          "expected": 0.37141
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempts/3/effect_evidence/verification_status",
+          "expected": "verified_applied"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempts/5/success",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempts/5/pass_flag",
+          "expected": null
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempts/5/metrics",
+          "expected": null
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/attempts/5/effect_evidence/verification_status",
+          "expected": "verified_applied"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/terminal_only_preflights/attempts/1/recorded_at",
+          "expected": null
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/terminal_only_preflights/attempts/2/machine_verified",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/remaining_runtime_extensions",
+          "expected": [
+            "probabilistic GPS dropout",
+            "battery initial state and voltage sag",
+            "hard actuator failure beyond the bounded first-order delay profile"
+          ]
+        }
+      ],
+      "body_contains": [
+        "three passing same-seed trajectories",
+        "RMSE is 0.368624--0.374250 m",
+        "Two additional attempts add GPS position noise",
+        "PX4 readiness times out after 30.0 seconds",
+        "not successful GPS-noise flight",
+        "three non-machine-verified terminal preflights",
+        "cannot be pooled with the six-Trial scenario matrix",
+        "Probabilistic GPS dropout",
+        "Advanced-physics PX4/Gazebo & 3 passing; 2 readiness timeouts; 1 file failure"
+      ]
+    },
+    {
+      "id": "advanced-physics-real-px4-receipt",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/subject_commit",
+          "expected": "26b957efd985d0ac37702a8d2518e87ab65347c3"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/exporter_commit",
+          "expected": "06cfdeb4438be59a24510738ab135b06fdde373a"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/receipt_sha256",
+          "expected": "0e83d002587590f349ed698710c265bf432a9eec4a9e3307851967ef9ecfd789"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/manifest/sha256",
+          "expected": "599c2b8b89bedb525a36c00837e8f09e7b4598c4825a01cff2942c6c5825a923"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/successful_flights",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/gps_readiness_boundaries",
+          "expected": 2
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/file_backed_preflight_failures",
+          "expected": 1
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/terminal_only_preflights",
+          "expected": 3
+        }
+      ],
+      "body_contains": [
+        "599c2b8b89bedb52",
+        "0cae86ded8d92c6c",
+        "99e257fb56d46d92",
+        "0e83d002587590f3"
+      ]
+    },
+    {
+      "id": "advanced-physics-gps-readiness-wait",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 9"
+      ],
+      "source_id": "advanced_physics_gps_boundary_stdout",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "Waiting 30s for PX4 readiness"
+        }
+      ],
+      "body_contains": [
+        "30.0-second PX4 readiness timeout"
+      ]
+    },
+    {
+      "id": "advanced-physics-gps-readiness-timeout",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "advanced_physics_gps_boundary_stderr",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "PX4 readiness timeout after 30.0s"
+        }
+      ],
+      "body_contains": [
+        "PX4 readiness times out after 30.0 seconds"
+      ]
+    },
+    {
       "id": "multi-tool-budget-contract",
       "report_locations": [
         "Section 4.5",

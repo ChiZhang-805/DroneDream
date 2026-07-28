@@ -48,6 +48,22 @@ def canonical_json_sha256(value: dict[str, Any], excluded_key: str) -> str:
     return sha256(payload)
 
 
+def canonical_value_sha256(value: object) -> str:
+    payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return sha256(payload)
+
+
+def git_blob_oid(payload: bytes) -> str:
+    header = f"blob {len(payload)}\0".encode("ascii")
+    return hashlib.sha1(header + payload).hexdigest()
+
+
 def sha256_current_file(path: Path, serialization: str | None) -> str:
     payload = path.read_bytes()
     if serialization is None:
@@ -161,6 +177,7 @@ def main() -> int:
     software = manifest["software"]
     website = manifest["website"]
     physical = software["physical_campaign"]
+    advanced = software["advanced_physics"]
     cross_job = software["cross_job_memory"]
     online_routing = software["online_routing"]
     multi_tool_budget = software["multi_tool_budget"]
@@ -179,6 +196,9 @@ def main() -> int:
         physical["reachable_implementation_commit"],
         physical["reachable_runtime_observation_commit"],
         physical["evidence_head"],
+        advanced["subject_commit"],
+        advanced["exporter_commit"],
+        advanced["evidence_head"],
         website["subject_commit"],
         website["attestation_commit"],
     ]
@@ -233,9 +253,10 @@ def main() -> int:
         multi_tool_budget["evidence_head"],
         failures,
     )
-    require(
-        multi_tool_budget["evidence_head"] == software["branch_head"],
-        "Evidence 2.9 evidence head must bind the latest software head",
+    verify_ancestor(
+        repo,
+        multi_tool_budget["evidence_head"],
+        software["branch_head"],
         failures,
     )
     verify_ancestor(
@@ -260,6 +281,23 @@ def main() -> int:
         repo,
         physical["evidence_head"],
         software["branch_head"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        advanced["subject_commit"],
+        advanced["exporter_commit"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        advanced["exporter_commit"],
+        advanced["evidence_head"],
+        failures,
+    )
+    require(
+        advanced["evidence_head"] == software["branch_head"],
+        "advanced-physics evidence head must bind the latest software head",
         failures,
     )
     require(
@@ -618,6 +656,479 @@ def main() -> int:
         len(retained_items) == 156
         and object_mismatches == physical["tree_object_mismatch_count"] == 0,
         "physical retained-object inventory mismatch",
+        failures,
+    )
+
+    advanced_manifest_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "advanced_physics_manifest"
+    )
+    advanced_receipt_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "advanced_physics_receipt"
+    )
+    advanced_digest_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "advanced_physics_digest"
+    )
+    advanced_manifest = software_json.get("advanced_physics_manifest", {})
+    advanced_receipt = software_json.get("advanced_physics_receipt", {})
+    require(
+        advanced_manifest.get("schema_version")
+        == "dronedream.advanced-physics-real-px4-manifest.v1"
+        and advanced_manifest.get("subject_commit") == advanced["subject_commit"]
+        and advanced_manifest.get("exporter_commit") == advanced["exporter_commit"]
+        and advanced_manifest.get("generated_at") == advanced["generated_at"]
+        and advanced_manifest.get("evidence_class") == advanced["evidence_class"]
+        and advanced_manifest.get("claim_label") == "PHYSICAL_SIMULATION"
+        and advanced_manifest.get("physical_fidelity") is True
+        and advanced_manifest.get("real_aircraft_fidelity") is False
+        and advanced_manifest.get("network_calls") == 0
+        and advanced_manifest.get("real_credentials_used") is False,
+        "advanced-physics manifest identity or claim boundary drifted",
+        failures,
+    )
+    require(
+        advanced_manifest.get("manifest_sha256")
+        == advanced_manifest_entry["canonical_sha256"]
+        == canonical_json_sha256(advanced_manifest, "manifest_sha256"),
+        "advanced-physics canonical manifest SHA-256 mismatch",
+        failures,
+    )
+    require(
+        advanced_receipt.get("schema_version")
+        == "dronedream.advanced-physics-real-px4-receipt.v1"
+        and advanced_receipt.get("subject_commit") == advanced["subject_commit"]
+        and advanced_receipt.get("exporter_commit") == advanced["exporter_commit"]
+        and advanced_receipt.get("receipt_sha256")
+        == advanced_receipt_entry["internal_receipt_sha256"]
+        == canonical_json_sha256(advanced_receipt, "receipt_sha256"),
+        "advanced-physics canonical receipt or source binding mismatch",
+        failures,
+    )
+    advanced_receipt_manifest = advanced_receipt.get("manifest", {})
+    require(
+        advanced_receipt_manifest
+        == {
+            "bytes": 446837,
+            "manifest_sha256": advanced_manifest_entry["canonical_sha256"],
+            "path": "advanced-physics-real-px4-v1.manifest.json",
+            "sha256": advanced_manifest_entry["file_sha256"],
+        },
+        "advanced-physics receipt-to-manifest binding mismatch",
+        failures,
+    )
+    require(
+        advanced_receipt.get("result")
+        == {
+            "attempt_count": 6,
+            "file_backed_preflight_failures": 1,
+            "gps_readiness_boundaries": 2,
+            "passing_flights": 3,
+            "status": "passed",
+            "successful_flights": 3,
+            "terminal_only_preflights": 3,
+        }
+        and advanced_receipt.get("px4_commit")
+        == "6ea3539157ca358c70a515878b77077af7d4611d"
+        and advanced_receipt.get("network_calls") == 0
+        and advanced_receipt.get("real_credentials_used") is False,
+        "advanced-physics receipt result drifted",
+        failures,
+    )
+    advanced_summary = advanced_manifest.get("summary", {})
+    require(
+        advanced_summary
+        == {
+            "attempt_count": 6,
+            "authoritative_boundary_directory": "gps-readiness-boundary-attempt-2",
+            "authoritative_success_directory": "success-five-effects-attempt-4",
+            "file_backed_preflight_failure_count": 1,
+            "full_source_inventory_sha256": (
+                "125463206a7965b3a1d1a524c7181b38c3c877202e65165fbec5351fe3acaded"
+            ),
+            "gps_readiness_boundary_count": 2,
+            "passing_flight_count": 3,
+            "retained_bytes": advanced["retained_bytes"],
+            "retained_file_count": advanced["retained_file_count"],
+            "source_bytes": advanced["source_bytes"],
+            "source_file_count": advanced["source_file_count"],
+            "successful_flight_count": 3,
+            "terminal_only_preflight_count": 3,
+        },
+        "advanced-physics summary drifted",
+        failures,
+    )
+    success_effects = [
+        "battery.mass_payload_kg",
+        "scenario_type.actuator_delay",
+        "sensor_degradation.baro_noise_m",
+        "sensor_degradation.imu_noise_scale",
+        "wind_gusts",
+    ]
+    gps_effects = [
+        "battery.mass_payload_kg",
+        "scenario_type.actuator_delay",
+        "sensor_degradation.baro_noise_m",
+        "sensor_degradation.gps_noise_m",
+        "sensor_degradation.imu_noise_scale",
+        "wind_gusts",
+    ]
+    advanced_protocol = advanced_manifest.get("protocol", {})
+    require(
+        advanced_protocol
+        == {
+            "campaign_seed": 42001,
+            "candidate_id": "baseline-mpc-xy-p-0.95",
+            "gps_readiness_boundary_effects": gps_effects,
+            "job_id": "advanced-physics-real-px4-26b957e",
+            "simulator": "px4_gazebo",
+            "successful_flight_effects": success_effects,
+            "unsupported_effects_included": False,
+            "vehicle": "x500",
+            "world": "default",
+        },
+        "advanced-physics protocol drifted",
+        failures,
+    )
+    advanced_runtime = advanced_manifest.get("runtime_identity", {})
+    require(
+        advanced_runtime
+        == {
+            "gazebo_version_claimed": False,
+            "identity_source": (
+                "per-Trial firmware Git readback plus authoritative execution windows"
+            ),
+            "px4_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+            "px4_version": "v1.16",
+            "runtime_user": "dronedream",
+            "wsl_runtime_id_claimed": False,
+        },
+        "advanced-physics Runtime identity drifted",
+        failures,
+    )
+    require(
+        advanced_manifest.get("remaining_runtime_extensions")
+        == [
+            "probabilistic GPS dropout",
+            "battery initial state and voltage sag",
+            "hard actuator failure beyond the bounded first-order delay profile",
+        ],
+        "advanced-physics remaining Runtime extensions drifted",
+        failures,
+    )
+    terminal_preflights = advanced_manifest.get("terminal_only_preflights", {})
+    require(
+        terminal_preflights.get("attempts")
+        == [
+            {
+                "failure": "windows_to_wsl_command_marshalling",
+                "machine_verified": False,
+                "raw_artifact_available": False,
+                "recorded_at": "2026-07-28T20:09:24Z",
+                "sequence": 1,
+            },
+            {
+                "failure": "wsl_git_could_not_parse_windows_worktree_pointer",
+                "machine_verified": False,
+                "raw_artifact_available": False,
+                "recorded_at": None,
+                "sequence": 2,
+            },
+            {
+                "failure": "process_probe_false_positive_from_path_text",
+                "machine_verified": False,
+                "raw_artifact_available": False,
+                "recorded_at": None,
+                "sequence": 3,
+            },
+        ]
+        and "no invented hashes" in terminal_preflights.get("claim", ""),
+        "advanced-physics terminal-only preflight history drifted",
+        failures,
+    )
+    advanced_attempts = advanced_manifest.get("attempts", [])
+    require(
+        len(advanced_attempts) == 6
+        and [row.get("directory") for row in advanced_attempts]
+        == [
+            "success-five-effects",
+            "success-five-effects-attempt-2",
+            "success-five-effects-attempt-3",
+            "success-five-effects-attempt-4",
+            "gps-readiness-boundary",
+            "gps-readiness-boundary-attempt-2",
+        ]
+        and [row.get("role") for row in advanced_attempts]
+        == [
+            "file_backed_preflight_failure",
+            "repeat_success",
+            "repeat_success",
+            "authoritative_success",
+            "repeat_gps_readiness_boundary",
+            "authoritative_gps_readiness_boundary",
+        ],
+        "advanced-physics attempt chronology drifted",
+        failures,
+    )
+    advanced_successes = [row for row in advanced_attempts if row.get("success") is True]
+    advanced_boundaries = [
+        row for row in advanced_attempts if "gps_readiness_boundary" in row.get("role", "")
+    ]
+    require(
+        len(advanced_successes) == 3
+        and all(row.get("pass_flag") is True for row in advanced_successes)
+        and [row.get("metrics") for row in advanced_successes]
+        == [
+            {
+                "completion_time_s": 21.064,
+                "evaluation_track_coverage": 0.952893,
+                "max_error_m": 1.496421,
+                "rmse_m": 0.37425,
+                "score": 2.175661,
+            },
+            {
+                "completion_time_s": 20.96,
+                "evaluation_track_coverage": 0.953049,
+                "max_error_m": 1.499264,
+                "rmse_m": 0.368624,
+                "score": 2.166256,
+            },
+            {
+                "completion_time_s": 20.976,
+                "evaluation_track_coverage": 0.954955,
+                "max_error_m": 1.499631,
+                "rmse_m": 0.37141,
+                "score": 2.170025,
+            },
+        ]
+        and all(
+            row.get("effect_evidence", {}).get("requested_effects") == success_effects
+            and row.get("effect_evidence", {}).get("applied_effects") == success_effects
+            and row.get("effect_evidence", {}).get("verification_status")
+            == "verified_applied"
+            for row in advanced_successes
+        ),
+        "advanced-physics successful trajectory evidence drifted",
+        failures,
+    )
+    require(
+        len(advanced_boundaries) == 2
+        and all(row.get("success") is False for row in advanced_boundaries)
+        and all(row.get("pass_flag") is None for row in advanced_boundaries)
+        and all(row.get("metrics") is None for row in advanced_boundaries)
+        and all(
+            row.get("effect_evidence", {}).get("requested_effects") == gps_effects
+            and row.get("effect_evidence", {}).get("applied_effects") == gps_effects
+            and row.get("effect_evidence", {}).get("verification_status")
+            == "verified_applied"
+            for row in advanced_boundaries
+        ),
+        "advanced-physics GPS readiness boundary drifted",
+        failures,
+    )
+    require(
+        advanced_attempts[0].get("failure_code") == "SIMULATION_FAILED"
+        and "detected dubious ownership" in advanced_attempts[0].get("failure_reason", "")
+        and advanced_attempts[3].get("authoritative") is True
+        and advanced_attempts[3].get("execution_window")
+        == {
+            "duration_seconds": 82,
+            "ended_at": "2026-07-28T20:21:16Z",
+            "preexisting_process_count": 0,
+            "present": True,
+            "residual_process_count": 0,
+            "runner_exit_code": 0,
+            "runtime_user": "dronedream",
+            "source_preflight": "windows_git_head_and_tracked_diff",
+            "started_at": "2026-07-28T20:19:54Z",
+        }
+        and advanced_attempts[5].get("authoritative") is True
+        and advanced_attempts[5].get("execution_window")
+        == {
+            "duration_seconds": 74,
+            "ended_at": "2026-07-28T20:22:52Z",
+            "preexisting_process_count": 0,
+            "present": True,
+            "residual_process_count": 0,
+            "runner_exit_code": 0,
+            "runtime_user": "dronedream",
+            "source_preflight": "windows_git_head_and_tracked_diff",
+            "started_at": "2026-07-28T20:21:38Z",
+        },
+        "advanced-physics file-backed failure or execution windows drifted",
+        failures,
+    )
+    full_source_inventory: list[dict[str, Any]] = []
+    advanced_retained: list[dict[str, Any]] = []
+    for attempt in advanced_attempts:
+        source_inventory = attempt.get("source_inventory", [])
+        projected = [
+            {
+                "source_path": row["source_path"],
+                "source_bytes": row["source_bytes"],
+                "source_sha256": row["source_sha256"],
+            }
+            for row in source_inventory
+        ]
+        require(
+            canonical_value_sha256(projected) == attempt.get("source_inventory_sha256"),
+            f"advanced-physics attempt inventory hash drifted: {attempt.get('directory')}",
+            failures,
+        )
+        full_source_inventory.extend(
+            {
+                **row,
+                "source_path": f"{attempt['directory']}/{row['source_path']}",
+            }
+            for row in source_inventory
+        )
+        advanced_retained.extend(
+            row for row in source_inventory if row.get("retained") is True
+        )
+    full_inventory_projection = [
+        {
+            "source_path": row["source_path"],
+            "source_bytes": row["source_bytes"],
+            "source_sha256": row["source_sha256"],
+        }
+        for row in full_source_inventory
+    ]
+    require(
+        len(full_source_inventory) == advanced["source_file_count"]
+        and sum(row["source_bytes"] for row in full_source_inventory)
+        == advanced["source_bytes"]
+        and canonical_value_sha256(full_inventory_projection)
+        == advanced_summary["full_source_inventory_sha256"],
+        "advanced-physics full source inventory drifted",
+        failures,
+    )
+    advanced_root = (
+        "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e"
+    )
+    advanced_object_mismatches = 0
+    for item in advanced_retained:
+        path = f"{advanced_root}/{item['retained_path']}"
+        try:
+            payload = run_git(repo, "show", f"{advanced['evidence_head']}:{path}")
+        except subprocess.CalledProcessError:
+            advanced_object_mismatches += 1
+            continue
+        if (
+            len(payload) != item["retained_bytes"]
+            or sha256(payload) != item["retained_sha256"]
+        ):
+            advanced_object_mismatches += 1
+    require(
+        len(advanced_retained) == advanced["retained_file_count"]
+        and sum(item["retained_bytes"] for item in advanced_retained)
+        == advanced["retained_bytes"]
+        and advanced_object_mismatches == 0,
+        "advanced-physics retained-object inventory mismatch",
+        failures,
+    )
+    tree_lines = [
+        line
+        for line in run_git(
+            repo,
+            "ls-tree",
+            "-r",
+            "-l",
+            advanced["evidence_head"],
+            "--",
+            advanced_root,
+        )
+        .decode("utf-8")
+        .splitlines()
+        if line
+    ]
+    advanced_tree_bytes = 0
+    tree_object_mismatches = 0
+    for line in tree_lines:
+        left, path = line.split("\t", 1)
+        _, object_type, object_id, object_bytes = left.split()
+        advanced_tree_bytes += int(object_bytes)
+        if object_type != "blob":
+            tree_object_mismatches += 1
+            continue
+        try:
+            payload = run_git(repo, "show", f"{advanced['evidence_head']}:{path}")
+        except subprocess.CalledProcessError:
+            tree_object_mismatches += 1
+            continue
+        if git_blob_oid(payload) != object_id:
+            tree_object_mismatches += 1
+    require(
+        len(tree_lines) == advanced["tree_file_count"] == 114
+        and advanced_tree_bytes == advanced["tree_bytes"] == 9442999
+        and tree_object_mismatches
+        == advanced["tree_object_mismatch_count"]
+        == 0,
+        "advanced-physics Git tree or blob inventory mismatch",
+        failures,
+    )
+    advanced_manifest_payload = run_git(
+        repo,
+        "show",
+        f"{advanced['evidence_head']}:{advanced_manifest_entry['path']}",
+    )
+    advanced_receipt_payload = run_git(
+        repo,
+        "show",
+        f"{advanced['evidence_head']}:{advanced_receipt_entry['path']}",
+    )
+    expected_digest = (
+        f"{sha256(advanced_manifest_payload)}  advanced-physics-real-px4-v1.manifest.json\n"
+        f"{sha256(advanced_receipt_payload)}  advanced-physics-real-px4-v1.receipt.json\n"
+    ).encode("ascii")
+    actual_digest = run_git(
+        repo,
+        "show",
+        f"{advanced['evidence_head']}:{advanced_digest_entry['path']}",
+    )
+    require(
+        actual_digest == expected_digest,
+        "advanced-physics sidecar binding drifted",
+        failures,
+    )
+    authoritative_ulog = next(
+        item
+        for item in advanced_retained
+        if item.get("retained_path", "").endswith(
+            "success-five-effects-attempt-4/px4_source.ulg.gz"
+        )
+    )
+    ulog_payload = run_git(
+        repo,
+        "show",
+        f"{advanced['evidence_head']}:{advanced_root}/{authoritative_ulog['retained_path']}",
+    )
+    require(
+        authoritative_ulog.get("compression") == "gzip-level-9-mtime-0"
+        and ulog_payload[:3] == b"\x1f\x8b\x08"
+        and ulog_payload[4:8] == b"\x00\x00\x00\x00",
+        "advanced-physics authoritative ULog compression drifted",
+        failures,
+    )
+    gps_stdout_entry = reference_by_id["advanced_physics_gps_boundary_stdout"]
+    gps_stdout = run_git(
+        repo,
+        "show",
+        f"{gps_stdout_entry['ref_commit']}:{gps_stdout_entry['path']}",
+    ).decode("utf-8")
+    gps_stderr_entry = reference_by_id["advanced_physics_gps_boundary_stderr"]
+    gps_stderr = run_git(
+        repo,
+        "show",
+        f"{gps_stderr_entry['ref_commit']}:{gps_stderr_entry['path']}",
+    ).decode("utf-8")
+    require(
+        "Waiting 30s for PX4 readiness" in gps_stdout
+        and "PX4 readiness timeout after 30.0s" in gps_stderr,
+        "advanced-physics GPS readiness timeout boundary drifted",
         failures,
     )
 

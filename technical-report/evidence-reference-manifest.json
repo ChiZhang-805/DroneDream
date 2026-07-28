@@ -17,7 +17,7 @@
     "branch": "codex/software",
     "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
     "provenance_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
-    "branch_head": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+    "branch_head": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
     "cross_job_memory": {
       "implementation_commit": "abb9002746e061af44a164fe749243d68d098e10",
       "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
@@ -63,6 +63,21 @@
       "verified_binding_scope": "frozen_artifact_bytes_and_reachable_source_chain",
       "tree_file_count": 159,
       "tree_object_mismatch_count": 0
+    },
+    "advanced_physics": {
+      "subject_commit": "26b957efd985d0ac37702a8d2518e87ab65347c3",
+      "exporter_commit": "06cfdeb4438be59a24510738ab135b06fdde373a",
+      "evidence_head": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "generated_at": "2026-07-28T20:39:54Z",
+      "evidence_class": "REAL_PX4_GAZEBO_ADVANCED_PHYSICS",
+      "claim_class": "dedicated_runtime_effect_injection_readback_and_three_successful_trajectories",
+      "tree_file_count": 114,
+      "tree_bytes": 9442999,
+      "tree_object_mismatch_count": 0,
+      "source_file_count": 1205,
+      "source_bytes": 305040238,
+      "retained_file_count": 111,
+      "retained_bytes": 8994710
     },
     "artifacts": [
       {
@@ -165,6 +180,26 @@
         "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/runtime/runtime-observation.json",
         "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
         "file_sha256": "a450d22ecf186088417f5c950c9b07592437d2e82f3c730d06edb6052e6ae849"
+      },
+      {
+        "id": "advanced_physics_manifest",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.manifest.json",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "599c2b8b89bedb525a36c00837e8f09e7b4598c4825a01cff2942c6c5825a923",
+        "canonical_sha256": "0cae86ded8d92c6c008ca89873d3234c9c98d745768f92d1142b12b1471e85ca"
+      },
+      {
+        "id": "advanced_physics_receipt",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.receipt.json",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "99e257fb56d46d9293ba9365ccae604ddd697802370b877360541628ebd1354f",
+        "internal_receipt_sha256": "0e83d002587590f349ed698710c265bf432a9eec4a9e3307851967ef9ecfd789"
+      },
+      {
+        "id": "advanced_physics_digest",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.sha256",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "35b84b7a6d85617e389aa860e5ba5ad30847a88b60265eeeaf8d6281a2f07d20"
       }
     ],
     "source_references": [
@@ -419,6 +454,41 @@
         "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
         "file_sha256": "b2c6ed7acd4941a13ce02316713ae814f8fc6474f1243d6799b9783420862d0d",
         "evidence_role": "Exact-source offline artifact verifier test at the physical evidence head."
+      },
+      {
+        "id": "advanced_physics_evidence_core",
+        "path": "backend/app/simulator/advanced_physics_evidence.py",
+        "ref_commit": "06cfdeb4438be59a24510738ab135b06fdde373a",
+        "file_sha256": "6c9c495d984a9fd6baee0338053f7e7676abb0ce923acd245e69fbe6cb6d20d8",
+        "evidence_role": "Exact exporter and verifier implementation for the retained advanced-physics real-PX4 bundle, inventory, canonical hashes, and failure boundaries."
+      },
+      {
+        "id": "advanced_physics_export_cli",
+        "path": "backend/scripts/export_advanced_physics_evidence.py",
+        "ref_commit": "06cfdeb4438be59a24510738ab135b06fdde373a",
+        "file_sha256": "f1f3eaf652fb4e4d8e5692565fa2da65d807196ff303f7ccf44461034e8755c2",
+        "evidence_role": "Exact-source deterministic export, check, and verify CLI for the advanced-physics evidence bundle."
+      },
+      {
+        "id": "advanced_physics_source_tests",
+        "path": "backend/tests/test_advanced_physics_evidence.py",
+        "ref_commit": "06cfdeb4438be59a24510738ab135b06fdde373a",
+        "file_sha256": "b0714f411fd0762d36351958ff38eec1d653eb07f2609786dbe1a9297180a5cc",
+        "evidence_role": "Exact-source focused tests for the advanced-physics attempt matrix, retention, deterministic export, and boundary validation."
+      },
+      {
+        "id": "advanced_physics_gps_boundary_stdout",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stdout.log",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "2be653eba84ba88e4fffbd2da2b577709e9e0d749517361277036a8ae05c4e70",
+        "evidence_role": "Authoritative file-backed GPS readiness-boundary stdout retaining the fixed 30-second readiness wait."
+      },
+      {
+        "id": "advanced_physics_gps_boundary_stderr",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stderr.log",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "63e463e8965212091b5b1ec8ca6364ad4cf77f9b8fe251e9672325f2486aacc9",
+        "evidence_role": "Authoritative file-backed GPS readiness-boundary stderr retaining the exact 30.0-second PX4 readiness timeout."
       }
     ]
   },
@@ -467,7 +537,7 @@
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
           "modified_after_migration": true,
           "current_hash_serialization": "utf8_lf",
-          "current_sha256": "6dab12076d7e84593e99d23e14558415f2f803d98362f195a2bec41dae74add7"
+          "current_sha256": "41a563a6ae258da828a1e68eb7fbb892309743b1d92fdeb2370d6f444525ad38"
       },
       {
         "path": "media/github-mark.png",

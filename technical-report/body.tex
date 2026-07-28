@@ -29,10 +29,15 @@ across two seeds and nominal, steady-wind, and static-obstacle scenarios,
 with RMSE 0.332254--0.444452 m and track coverage
 0.949113--0.981456. Wind read-back and obstacle creation are retained for
 both affected scenarios. These results establish the exercised
-contracts, routes, and injections---not optimizer superiority, broad
-simulator quality, obstacle avoidance, real-aircraft safety,
-simulation-to-reality transfer, or statistical generalization. Claims
-bind to frozen commits and hashes; Windows Rust was not run.
+contracts, routes, and injections. A separate same-seed advanced-effects
+subset records three passing trajectories after five requested effects
+were applied and verified. Two GPS-noise boundary attempts verify six
+effect injections but end at a 30.0-second PX4 readiness timeout; they
+are failures, not successful GPS-noise flights. Neither campaign proves
+optimizer superiority, broad simulator quality, obstacle avoidance,
+real-aircraft safety, simulation-to-reality transfer, or statistical
+generalization. Claims bind to frozen commits and hashes; Windows Rust
+was not run.
 
 \vspace{0.35em}
 \href{https://github.com/ChiZhang-805/DroneDream}{
@@ -59,6 +64,18 @@ but still assume a correctly formed experiment. They neither translate
 engineering intent into an auditable program nor prove that its declared
 conditions were executed as declared in its persisted manifest or
 reconciled to the retained evidence ledger.
+
+This report therefore treats each frozen physical campaign as its own
+evidence unit. The two-seed scenario matrix varies nominal, steady-wind,
+and static-obstacle conditions; the later advanced-effects campaign
+instead repeats one seed under a fixed five-effect profile and records
+separate GPS readiness failures. Their numerators, failures, environments,
+and permissible claims remain distinct. That separation allows additional
+Runtime evidence to strengthen implementation coverage without converting
+heterogeneous Trials into a pooled reliability estimate or an optimizer
+comparison. Reviewers can therefore reproduce each denominator without
+inferring that a new disturbance profile enlarges the earlier matrix or
+supplies missing independent seeds for broader inference.
 
 Foundation models provide a useful interface layer, but not experimental
 authority. Tool-using agent systems show that model reasoning becomes
@@ -172,7 +189,10 @@ It uses model reasoning only to interpret intent and rank eligible
 tools; deterministic software retains authority over experiment
 construction, simulator execution, evidence admission, final selection,
 release, and rollback through every audited product transition and later
-replay.
+replay. This division is essential because semantic competence cannot
+substitute for execution identity, effect read-back, or retained terminal
+evidence during each independent replay, release, and publication review
+by an external reviewer.
 
 \textbf{Data scale and benchmark breadth have advanced faster than
 evidence semantics.} Open X-Embodiment, BridgeData V2, DROID, and AgiBot
@@ -364,7 +384,8 @@ unsealed and ineligible for learning, routing memory, or final selection
 auditability across both current and migration-era experiment histories
 and their later replay without retroactive reinterpretation or an
 unverifiable score entering routing or model-mediated recovery across
-release boundaries.
+release boundaries, including later evidence migrations, rollback reviews,
+and independently recomputed campaign exports after release.
 
 Reflection is compiled from verified outcomes rather than free-form
 model self-report. Evidence 2.8 retains the bounded
@@ -543,7 +564,8 @@ The zero-activity record is part of the claim: it proves the holdout
 evaluator did not call a provider, launch a simulator, or write feedback
 while resolving labels. A future change that introduces any of those side
 effects would invalidate comparison with this frozen artifact and require
-a new protocol version.
+a new protocol version. That version must disclose changed labels, side
+effects, and development exposure.
 \looseness=-1
 
 \begin{center}
@@ -800,6 +822,21 @@ final evidence admission during replay, release review, or customer
 qualification under an independently accepted Runtime and frozen release
 receipt.
 
+The concurrency fixtures and the synthetic objective remain separate even
+when they share one Job ledger. Scheduling evidence answers who may claim
+the next Trial and whether retries conserve identity; synthetic outcomes
+answer whether the persisted mock campaign recomputes under its frozen
+coefficients. A valid export must therefore reproduce both the
+state-transition history and the objective rows without using throughput
+as an outcome proxy. This separation also keeps a recovered infrastructure
+attempt from being counted as an additional optimizer observation or from
+silently replacing the failure that justified recovery.
+The same receipt must preserve the failed attempt, recovered attempt, and
+accounting identity so later reviewers can distinguish a valid retry from
+an extra Trial. It must also reconcile queue events with persisted outcome
+rows before either surface is summarized in a release table or customer
+review package for independent audit at the frozen source boundary.
+
 \noindent\makebox[\linewidth][c]{%
 \includegraphics[width=5.15000in]{media/media/image7.png}}
 
@@ -903,8 +940,32 @@ read-back; both static-obstacle Trials bind
 \texttt{/world/default/create=true} and SDF SHA-256 prefix
 \texttt{9824260767a952b1}. The obstacle sits outside the nominal track to
 exercise entity injection, not collision avoidance. The signed installer
-Runtime and advanced effects remain unaccepted.
+Runtime remains unaccepted, and this matrix remains a six-Trial
+non-comparative execution record.
 \looseness=-1
+
+The separately frozen advanced-physics campaign uses the same pinned PX4
+SITL v1.16 commit, x500, the default Gazebo world, seed 42001, and Candidate
+\texttt{baseline-mpc-xy-p-0.95}. Its three repeated successful-flight
+attempts all apply and verify payload mass, first-order actuator delay,
+barometer noise, scaled IMU noise, and wind gust effects. All three pass:
+RMSE is 0.368624--0.374250 m, maximum error is
+1.496421--1.499631 m, and track coverage is 0.952893--0.954955. The
+bundle does not claim a Gazebo version or WSL Runtime identifier, and
+three repeats of one seed do not establish a reliability distribution.
+They are a repetition check within one configured condition, not three
+independent campaign units or evidence for repeatability across accepted
+customer installations.
+
+Two additional attempts add GPS position noise to those five effects.
+Both retain six requested, applied, and verified effect records, but PX4
+readiness times out after 30.0 seconds; each has
+\texttt{success=false}, no pass flag, and no trajectory metrics. They
+prove injection and read-back before readiness failure, not successful
+GPS-noise flight. One earlier file-backed attempt failed on PX4 dubious
+ownership. Three still earlier operator-observed preflights have no raw
+files and remain explicitly non-machine-verified narrative history
+without invented hashes or timestamps.
 
 \begin{itemize}
 \item
@@ -914,6 +975,18 @@ Runtime and advanced effects remain unaccepted.
   optimizer advantage, released customer-performance claim, or
   cross-scenario reliability estimate across independently repeated
   installations and audits.
+\item
+  Advanced-effects boundary --- the three passing same-seed trajectories
+  authorize only the five exercised effect applications and their
+  retained metrics; they do not enlarge the two-seed scenario matrix,
+  establish an optimizer comparison, or support a broad stability,
+  safety, customer-Runtime, real-aircraft, or sim-to-real claim.
+\item
+  GPS boundary --- the two failed readiness attempts preserve their
+  timeout denominator and prove only six-effect injection/read-back. They
+  are excluded from the three successful trajectories and from every
+  performance statistic because neither produced a successful
+  GPS-noise flight, admissible trajectory outcome, or frozen pass flag.
 \item
   Injection boundary --- both wind runs retain ENU $(0,2,0)$ m/s
   read-back, and both obstacle runs retain successful create replies plus
@@ -1022,6 +1095,15 @@ registry remains exploratory and cannot enter customer qualification or
 any released comparative study. Its receipt must name the registry
 digest and the exact planned and realized cell inventory for audit.
 
+Independent recomputation must begin from that inventory rather than from
+a summary table. The reviewer should recover every planned cell, resolve
+its terminal disposition, recompute each admissible metric, and verify
+that exclusions follow the frozen policy before aggregating an arm. A
+receipt that lists only successful rows cannot support a comparative
+claim because it cannot distinguish an intended omission from missing
+evidence, a timeout, or a post-outcome deletion. The same rule applies to
+appendix tables and customer-facing exports.
+
 \section{\texorpdfstring{\textbf{6. Product reliability and
 operations}}{6. Product reliability and operations}}\label{product-reliability-and-operations}
 
@@ -1077,8 +1159,9 @@ audit of account state and quota events.
 experiments}}{7. Limitations and next experiments}}\label{limitations-and-next-experiments}
 
 AURORA's present evidence establishes enforceable software boundaries,
-reproducible mock-campaign behavior, and one dedicated 6-Trial
-PX4/Gazebo execution matrix. It does not establish broad optimization
+reproducible mock-campaign behavior, one dedicated 6-Trial PX4/Gazebo
+scenario matrix, and a separate same-seed advanced-effects campaign. It
+does not establish broad optimization
 superiority or accepted customer-Runtime physical-simulator performance.
 The distinctions below are active claim constraints, not generic
 future-work disclaimers: each identifies a missing evidence unit,
@@ -1090,7 +1173,8 @@ next experiments therefore prioritize frozen matched budgets,
 independent recomputation, signed Runtime acceptance, and scenario-level
 uncertainty over time under independently rebuilt deployments with
 retained failure histories and audit replay before any result advances
-toward customer acceptance.
+toward customer acceptance or publication without a separately bound
+deployment receipt.
 
 \begin{itemize}
 \item
@@ -1163,6 +1247,19 @@ toward customer acceptance.
   reliability, customer acceptance, or statistical generalization across
   installations.
 \item
+  The advanced-effects success subset contains three repeats of seed
+  42001, not independent seed blocks. Two GPS-noise attempts end at the
+  30.0-second readiness boundary, one file-backed attempt fails on PX4
+  ownership, and three earlier preflights lack machine artifacts. These
+  records cannot be pooled with the six-Trial scenario matrix or recast
+  as a larger success rate, and the bundle claims no Gazebo version.
+\item
+  Probabilistic GPS dropout, battery initial state and voltage sag, and
+  hard actuator failure beyond the bounded first-order delay profile
+  remain Runtime extensions. Their absence prevents dropout endurance,
+  depleted-battery, hard-failure recovery, or combined-fault claims under
+  the present physical-simulation evidence or qualification.
+\item
   Optimizer comparison, physical component ablation, confidence
   intervals, cost/latency measurement, and UX telemetry remain pending.
   Each requires matched budgets, retained failures, frozen manifests, and
@@ -1230,8 +1327,9 @@ audit.
 
 External validity is bounded by controller, vehicle, world, and
 disturbance combinations actually executed. Many Trials in one x500
-setup do not cover fixed-wing vehicles, payload changes, actuator
-saturation, estimator faults, or other controller structures. A broader
+setup do not cover fixed-wing vehicles, broader payload geometries,
+actuator saturation or hard failure, estimator dropout, battery voltage
+sag, or other controller structures. A broader
 benchmark therefore needs a declared scenario matrix with held-out
 combinations, not a convenient collection of worlds. Every cell must
 explain its distinct operating condition, mutable parameters, and
@@ -1239,7 +1337,9 @@ invariant feasibility constraints. Results must be aggregated within and
 across vehicle families so a strong
 mean cannot conceal a systematic failure in one operationally important
 subgroup or declared scenario family under final evaluation before a
-broader cross-platform claim is admitted or published.
+broader cross-platform claim is admitted or published across all
+preregistered vehicle, disturbance, energy, and fault families in
+external review.
 
 Measurement validity requires more than scalar holdout loss: retain
 trajectory error, settling time, overshoot, control effort, saturation,
@@ -1332,6 +1432,20 @@ reachable source while retaining the source-binding defect as an explicit
 provenance limitation for external reviewers, customer acceptance, and
 downstream release claims during independent replay.
 
+The advanced-physics campaign is independently bound to subject
+\texttt{26b957e}, exporter \texttt{06cfdeb}, and evidence head
+\texttt{d14bf9c}. Its 114 committed files total 9,442,999 bytes.
+Manifest prefixes are file \texttt{599c2b8b89bedb52} and canonical
+\texttt{0cae86ded8d92c6c}. Receipt prefixes are file
+\texttt{99e257fb56d46d92} and canonical \texttt{0e83d002587590f3}. The
+manifest inventories 1,205 source files
+and 305,040,238 bytes, retains 111 files and 8,994,710 bytes, and binds
+the full inventory with prefix \texttt{125463206a7965b3}. Its three
+successful trajectories, two GPS readiness boundaries, one file-backed
+preflight failure, and three non-machine-verified terminal preflights
+remain separate evidence classes and denominators. This separation
+prevents a failed readiness probe from becoming flight evidence.
+
 Execution Claim Gate 1.1 and Outcome Contract 2.20 bind each
 Trial/Candidate/Job snapshot and scenario matrix before evidence
 admission. Evidence 2.8 / Prompt 1.7 / Decision Trace 1.4 binds the
@@ -1343,7 +1457,10 @@ unpaired observations are not causal prompt evidence. Policy holdout passes 16/1
 and the fallback campaign matches the direct arm in 10/10 comparisons
 across 15 Jobs and 579 Trials. The non-comparative physical matrix records
 6/6 passing Trials across two seeds and three scenarios and retains four
-failure probes. Latest website source \texttt{8710553} to receipt-only head
+failure probes. The advanced-physics subset separately records three
+same-seed passing trajectories under five verified effects; its two
+GPS-noise attempts terminate at readiness and are not performance runs.
+Latest website source \texttt{8710553} to receipt-only head
 \texttt{96aba5d} records 13/13 focused checks, 325/325 frontend tests,
 typecheck, lint, application and shared builds, 11/11 deployment tests
 with 22/22 subtests, and 5/5 performance routes. Its desktop English and
@@ -1360,7 +1477,7 @@ boundary across later audits, releases, publications, customer
 communications, acceptance decisions, or independently repeated
 qualification reviews under the frozen source ledger, and never
 authorizes an absent claim, substituted artifact, later source, or
-unrecorded execution
+unrecorded execution in any downstream release
 {[}\protect\hyperlink{ref_1}{\emph{1}}{]}.
 
 \section{\texorpdfstring{\textbf{9.
@@ -1389,6 +1506,15 @@ A dedicated Runtime
 also records a fixed two-seed, three-scenario PX4/Gazebo matrix with 6/6
 passing Trials and verified wind and obstacle injection under its fixed
 campaign, environment, and retained receipts.
+
+The separately frozen advanced-physics evidence adds three passing
+same-seed trajectories with verified payload, actuator-delay, barometer,
+IMU, and gust effects. Its two GPS-noise injections terminate at the
+30.0-second readiness boundary and remain failed non-performance
+attempts. One file-backed ownership failure and three non-machine-verified
+preflights remain visible rather than being removed from the history. This
+retained history constrains every later success-rate calculation across
+every subsequent release, acceptance record, and audit cycle.
 
 Neither evidence
 class establishes optimizer superiority, broad stability, collision
@@ -1422,9 +1548,9 @@ the final registry.
 \setlength{\parskip}{0.18em}
 
 \protect\hypertarget{ref_1}{}{}{[}1{]} DroneDream, ``Release evidence
-ledger,'' ver. 1.2, evidence bundle v9, current online-routing freeze, and
-offline multi-tool budget closure, software evidence head
-\texttt{15603c6}, Jul. 2026.
+ledger,'' ver. 1.2, evidence bundle v9, current online-routing freeze,
+offline multi-tool budget closure, and real-PX4 physical campaign
+receipts, software evidence head \texttt{d14bf9c}, Jul. 2026.
 
 {\RaggedRight
 \protect\hypertarget{ref_2}{}{}{[}2{]} PX4 Development Team,
@@ -1672,7 +1798,10 @@ online routing freeze qualifies 23/24 exact-contract selections. The
 archived Prompt 1.6 freeze records 24/24 and Prompt 1.5 histories at
 19/24 and 21/24; none supports a causal provider-effect comparison. The physical matrix qualifies six x500 executions and retained
 wind/obstacle injections, not optimizer superiority or broad
-generalization. Customer qualification still needs matched arms, wider
+generalization. The advanced-physics campaign separately qualifies three
+same-seed trajectories under five verified effects; its two GPS
+readiness timeouts prove injection only and are not successful flights.
+Customer qualification still needs matched arms, wider
 seed blocks, signed-Runtime repetition, retained failures, and independent
 recomputation; flight safety and sim-to-real transfer remain unclaimed.
 \looseness=-1
@@ -1793,6 +1922,8 @@ Coverage v3 / gen.\ v1 &
 Seed and mixed-shift reporting\tabularnewline
 PX4/Gazebo scenario matrix & 6 Trials; 4 probes & Physical campaign v1 &
 Dedicated-Runtime execution only\tabularnewline
+Advanced-physics PX4/Gazebo & 3 passing; 2 readiness timeouts; 1 file failure &
+Advanced physics v1 & Five-effect trajectories; GPS injection boundary\tabularnewline
 Website validation chain & 325 tests; 5 routes & Typography receipt v1 &
 Local validation only; no deployment\tabularnewline
 \bottomrule
@@ -1938,6 +2069,73 @@ claim ledger, text extraction, or visual-review receipt. It uses the same
 font, line width, and keep rules as the target page; smaller or hidden
 tokens are invalid because they understate capacity and bypass visual
 review.
+
+\subsection{\texorpdfstring{\textbf{A.12 Advanced-physics evidence
+verification}}{A.12 Advanced-physics evidence verification}}\label{a.12-advanced-physics-evidence-verification}
+
+The advanced-physics verifier begins from subject \texttt{26b957e},
+exporter \texttt{06cfdeb}, and evidence head \texttt{d14bf9c}. It proves the subject
+and exporter are ancestors of that head, reads the manifest, receipt, and
+sidecar from their committed paths, and independently recomputes both
+internal canonical JSON digests. File hashes and canonical hashes are
+checked separately so a valid transport digest cannot conceal changed
+semantic content.
+
+Inventory verification recomputes the six attempt-level source inventories
+before the aggregate total of 1,205 files and 305,040,238 bytes. It then
+checks all 111 retained files and 8,994,710 retained bytes against their
+source hashes. Each of the 114 committed bundle objects is also rebuilt
+with Git's blob framing and compared with
+\texttt{hash-object --no-filters}; the result is zero mismatches across
+9,442,999 committed bytes. The authoritative attempt-4 ULog is verified
+as a deterministic gzip member with modification time zero. None of these
+upstream files is copied into the report tree.
+
+Outcome verification preserves the full denominator rather than selecting
+only successful rows. Three same-seed trajectories pass under the five
+requested, applied, and verified effects. Two further attempts add GPS
+position noise but terminate at the 30.0-second readiness boundary; their
+retained stdout and stderr prove the wait and timeout, while the absence
+of a pass flag and trajectory metrics prevents either from entering the
+successful-flight numerator. One earlier file-backed attempt records PX4
+dubious ownership. Three still earlier terminal-only preflights remain
+non-machine-verified narrative history because no raw files exist.
+
+The admissible statement is consequently narrow: this dedicated Runtime
+applied and read back the five exercised effects during three successful
+PX4/Gazebo trajectories, and separately applied and read back GPS noise
+before two readiness failures. The bundle does not establish a Gazebo
+version, a WSL Runtime identifier, optimizer superiority, broad
+reliability, real-aircraft safety, or simulation-to-reality transfer.
+Probabilistic GPS dropout, battery initial state and voltage sag, and hard
+actuator failure beyond bounded first-order delay remain unimplemented
+Runtime extensions.
+
+This separation is enforced mechanically. The verifier asserts the exact
+authority names, common Candidate and seed, all three successful metric
+triples, and the absence of performance fields from both timeout attempts.
+It keeps the file-backed ownership failure distinct from terminal-only
+history and rejects any invented timestamp or hash for entries lacking raw
+files. A later exporter therefore cannot increase the numerator by
+relabeling readiness, removing a retained failure, or inferring machine
+evidence from an operator note. Any future campaign that exercises the
+remaining extensions needs a new subject, manifest, receipt, inventory,
+and independently audited denominator before entering this report or
+customer qualification. The new receipt must also state its vehicle,
+world, controller, fault semantics, Runtime identity, and whether each
+attempted flight reached readiness before any aggregate is formed.
+That receipt must enumerate the same success, timeout, file-backed
+failure, and terminal-only categories before any rate is calculated, so
+the raw denominator and admissible subset remain reconstructible without
+consulting mutable branch state or operator memory during later review.
+No category may disappear merely because a later attempt succeeds.
+The verifier also rejects any summary that pools this subset with the
+older nominal/wind/obstacle matrix, because their scenario design, seed
+structure, effect profile, and admissible denominators are not
+exchangeable experimental units. This rule is evaluated before any rate,
+interval, table, abstract statement, conclusion, or customer-facing
+evidence summary is accepted from either campaign for publication or
+release.
 
 \endgroup
 

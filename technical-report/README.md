@@ -22,9 +22,12 @@ The software chain is:
 - v9 receipt-only evidence head: `8102ffecb37b1f1b0e25c80d6b02db05325ca986`
 - online-routing implementation: `aeffaae01a8106f74ff811b39ec26d9d2203d1f6`
 - multi-tool budget source: `136a1e3293efa6e53f3648e21fa8f7c6b5158d6f`
-- current software/evidence head: `15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8`
+- current software/evidence head: `d14bf9c0d453599b2bc9733be8c4159fef67c220`
 - physical-campaign subject: `86273db6d827a790cb0a8b1472256b23e0a629d2`
 - physical-campaign evidence head: `3b09951bbea2e5f1c64197b0347a0ed529172192`
+- advanced-physics subject: `26b957efd985d0ac37702a8d2518e87ab65347c3`
+- advanced-physics exporter: `06cfdeb4438be59a24510738ab135b06fdde373a`
+- advanced-physics evidence head: `d14bf9c0d453599b2bc9733be8c4159fef67c220`
 
 The website chain is:
 
@@ -107,6 +110,29 @@ repository. The verifier instead binds the reachable source chain
 `5f0f62c707c541aed7918e56a0170a7f67bd6ffb` to the evidence head, and
 retains the non-resolving declarations as a provenance defect.
 
+The separate advanced-physics bundle records three successful and passing
+same-seed x500 trajectories after five effects were requested, applied, and
+verified: payload mass, first-order actuator delay, barometer noise, scaled IMU
+noise, and wind gusts. Two additional GPS-noise attempts apply and verify all
+six requested effects but end at a 30.0-second PX4 readiness timeout; they prove
+injection/read-back only and remain failed, metric-free boundary attempts. One
+file-backed attempt retains the PX4 dubious-ownership failure. Three still
+earlier terminal preflights have no raw files and remain explicitly
+non-machine-verified narrative history.
+
+The bundle references 114 committed files / 9,442,999 bytes while its manifest
+inventories 1,205 source files / 305,040,238 bytes and retains the minimum
+sufficient 111 files / 8,994,710 bytes. Every retained file, internal canonical
+hash, sidecar line, Git blob, and the deterministic `mtime=0` gzip ULog is
+rechecked by the report verifier. The bundle claims PX4 SITL v1.16 at commit
+`6ea3539157ca358c70a515878b77077af7d4611d`, x500, and the default world; it
+does not claim a Gazebo version or WSL Runtime identifier. Its three same-seed
+successes do not establish broad reliability, safety, real-aircraft behavior,
+sim-to-real transfer, customer acceptance, or optimizer superiority. Remaining
+Runtime extensions are probabilistic GPS dropout, battery initial state and
+voltage sag, and hard actuator failure beyond the bounded first-order delay
+profile.
+
 The latest typography receipt records 13/13 focused PublicSite checks, 325/325
 frontend tests across 50 files, typecheck, lint, application and shared builds,
 11/11 deployment tests with 22/22 subtests, and 5/5 performance routes. Desktop
@@ -152,7 +178,7 @@ The A4 layout uses a 10-point body with 12-point leading, 24 mm side margins,
 and a 25 mm top / 20 mm bottom geometry. The first-page hierarchy, upper-left
 brand lockup, rounded abstract frame, and body rhythm were quantitatively
 checked against the JoyAI-RA 0.1 report while preserving DroneDream's purple
-identity and a roomier 18-page evidence narrative.
+identity and a roomier 20-page evidence narrative.
 
 From the repository root:
 
@@ -164,7 +190,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 The script regenerates Figures 2--6 from the frozen evidence bundle in an
 ignored build directory and requires their rendered pixels to match the
 tracked PNGs. It then performs two XeLaTeX passes, rejects warning gates,
-renders all 18 pages, runs the structural/paragraph/link audit, and publishes
+renders all 20 pages, runs the structural/paragraph/link audit, and publishes
 the validated PDF, layout audit, and claim-evidence audit to
 `technical-report/output/`.
 The claim gate fails the build when a declared report projection drifts from
@@ -187,7 +213,7 @@ with body prose. Intermediate files remain under the ignored
 
 The audit and receipt writers emit UTF-8 JSON with LF newlines as exact bytes,
 independent of the host operating system. After visually reviewing the final
-18-page render, create the artifact-layer receipt:
+20-page render, create the artifact-layer receipt:
 
 ```powershell
 python technical-report/scripts/create_report_validation_receipt.py `
