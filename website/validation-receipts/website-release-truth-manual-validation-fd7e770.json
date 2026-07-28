@@ -1,0 +1,231 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-release-truth-manual-validation",
+  "generatedAtUtc": "2026-07-28T14:59:57.6623225Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "fd7e7702dd2e8d86cedda86790b5d93b048463da",
+    "sourceParent": "7713527266e3e044e2be8ac7b6811f1996ee171a",
+    "sourceStateDuringValidation": "clean; source commit was one commit ahead of origin/codex/website during validation",
+    "attestationRule": "This receipt validates the source commit only. Its later receipt-only commit is not self-attested.",
+    "previousWebsiteReceipt": "website/validation-receipts/website-history-long-id-joint-validation-3e58802.json",
+    "previousWebsiteReceiptSha256": "b480ad3c59e5c9b9f873fb2af8c95b1e636cabbeb3f110b7e5c78751d6ba5a9a"
+  },
+  "scope": {
+    "publicSite": "English and Simplified Chinese download surfaces now identify the current Windows asset as an unsigned preview candidate rather than a signed or formal release.",
+    "privacy": "PRIVACY.md no longer calls the current desktop application signed.",
+    "manuals": "The long-form English and Chinese Markdown and downloadable PDFs state the current unsigned-preview truth and the immutable-release rule: changed installer bytes require a newly approved version, versioned file name, SHA-256, and latest.json; an existing versioned URL must never be overwritten.",
+    "reproduciblePdfSource": "The committed Markdown sources, XeLaTeX template, build README, and website/scripts/build_manual_pdf.py replace the obsolete short-form generator and reproduce the complete 19-page English and 17-page Chinese manuals.",
+    "excluded": "No software-line installer bytes, backend source, technical-report source, software evidence artifact, production configuration, release, DNS, TLS, server, or deployment target was changed."
+  },
+  "environment": {
+    "operatingSystem": "Microsoft Windows NT 10.0.26200.0",
+    "node": "v24.14.1",
+    "npm": "11.11.0",
+    "python": "Python 3.13.0",
+    "powershell": "5.1.26100.8875",
+    "pandoc": "pandoc.exe 1.19.2.1",
+    "xelatex": "MiKTeX-XeTeX 4.11 (MiKTeX 24.4 Portable)",
+    "pdfinfo": "24.04.0",
+    "environmentLogSha256": "342feb4aad7a48c758edfa7dc87012ceb0748026b14c96b22f7f675bfde9365a",
+    "environmentLogBytes": 538,
+    "productionAccountUsed": false,
+    "githubRepositoryVariablesReadOnly": true,
+    "productionSupabaseChanged": false,
+    "deploymentPerformed": false
+  },
+  "automatedValidation": {
+    "focusedPublicSiteTests": {
+      "command": "npm test -- --run src/__tests__/PublicSite.test.tsx",
+      "testFiles": 1,
+      "tests": 13,
+      "passed": 13,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "ff8479bd96777082467476d9de1cf43c286887ebbdf6bbdc28f36ee60e3cc066",
+      "logBytes": 686
+    },
+    "frontendTests": {
+      "command": "npm test -- --run --maxWorkers=4",
+      "testFiles": 50,
+      "tests": 325,
+      "passed": 325,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "d60f9593e8e332aca5e08956bf30a70b5d5f0797a3169dd11f062e76aed89c73",
+      "logBytes": 662
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "pass",
+      "logSha256": "70b3c3927615afdf5f5a277b682ce10528f9baed352029eb1ad9b1146db47acd",
+      "logBytes": 128
+    },
+    "lint": {
+      "command": "npm run lint",
+      "result": "pass",
+      "logSha256": "0a0909db1fb8b2a2edb14bdc5a7992cbb6d02839f44caf6fdd98bd1d27c4afed",
+      "logBytes": 104
+    },
+    "applicationBuild": {
+      "command": "npm run build",
+      "result": "pass",
+      "exitCode": 0,
+      "stdoutSha256": "cf845f234c63cc371966b3fd487129801ffdefdc70ecef56c014ba6653593b78",
+      "stdoutBytes": 1661,
+      "stderrSha256": "b0b8f733927fd321879ae5b3a4b4f2f085de75d1278c725f31026d4c3569b19f",
+      "stderrBytes": 342,
+      "note": "Vite emitted its existing greater-than-510-kB chunk advisory on stderr; the process completed successfully with exit code 0."
+    },
+    "deploymentContract": {
+      "command": "python -m pytest runtime/tests/test_website_deployment.py -q",
+      "tests": 11,
+      "subtests": 22,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "ccddcb5533ba53c42a7c4b5bfb35210f3825f400a1100b71dba99800b2c48ddd",
+      "logBytes": 200
+    },
+    "diffAndSourceState": {
+      "command": "git diff --check; git status --porcelain",
+      "result": "pass",
+      "worktreeClean": true,
+      "logSha256": "a7fe835d44cb5d58ad1dcaa42deb7ac9c3ffbaa0ceb744e56350c6d57acf807f",
+      "logBytes": 310
+    }
+  },
+  "manualPdfValidation": {
+    "command": "python website/scripts/build_manual_pdf.py --locale all --verify-deterministic",
+    "result": "pass",
+    "independentBuildsPerLocale": 2,
+    "deterministic": true,
+    "logSha256": "245eba38a0d034beea747d82af728714ec60c9e71b018862e83f2caac445c9b8",
+    "logBytes": 846,
+    "inputs": {
+      "englishMarkdownSha256": "86f7dee32b7df11fb1252b1e336ec9892e9fa502ef4975bc086fcfa9f040b3e7",
+      "chineseMarkdownSha256": "8f03181b9a71653488694d36b9a75a073577428e3af6678ba0cb0c00d17f9049",
+      "templateSha256": "8feef9d02dbad5579d9156c9cd8749ddb5dc5fed9003e159a1d071060d971e49",
+      "builderSha256": "2f90f519dd56c59e96c0e07bec1e8b5d0064650adadafbf4b28ba3da02ea0509"
+    },
+    "outputs": {
+      "english": {
+        "path": "frontend/public/docs/downloads/DroneDream-Manual-en.pdf",
+        "pages": 19,
+        "bytes": 1298676,
+        "sha256": "0eed64c5047e5c57b240fc926516bc8595a548325769fa031730b63e29329149"
+      },
+      "chinese": {
+        "path": "frontend/public/docs/downloads/DroneDream-Manual-zh-CN.pdf",
+        "pages": 17,
+        "bytes": 1456839,
+        "sha256": "d4b6b73088aa6b9cddadd792024ceb13a24d041f67279cac9fafebaa33cb3633"
+      }
+    },
+    "extractedTextTruthCheck": {
+      "result": "pass",
+      "englishRequiredPhrases": "4/4",
+      "chineseRequiredPhrases": "4/4",
+      "obsoletePublicPhrases": 0,
+      "logSha256": "fef6c7d26a109a1b18fcf1d6e42d4bd421db446a0e26c63073e071190928577a",
+      "logBytes": 220
+    },
+    "visualValidation": {
+      "renderedPages": 36,
+      "pageScreenshotManifestSha256": "2f38a8af2130fc33eeb036d822d07baadf2ace3f2dd13885db575d0d4904864b",
+      "pageScreenshotManifestBytes": 2736,
+      "visualReview": "All 19 English and 17 Chinese rendered pages were inspected in seven contact sheets. The truth statement pages and Appendix C/D boundaries were also inspected at full rendered resolution. Covers, tables, screenshots, headings, headers, footers, page breaks, and body text showed no clipping, overlap, horizontal escape, accidental blank page, or broken glyph."
+    }
+  },
+  "publicSiteBrowserValidation": {
+    "servedArtifactSourceCommit": "fd7e7702dd2e8d86cedda86790b5d93b048463da",
+    "focusedDownloadScreenshots": {
+      "cases": [
+        "Edge 1440x1000 English",
+        "Edge 1440x1000 Simplified Chinese",
+        "Edge 390x844 English",
+        "Edge 390x844 Simplified Chinese"
+      ],
+      "count": 4,
+      "manifestSha256": "c158248e54b07e884cc4c258a6f6b2fecc73bec476240c79062f07c9382785c6",
+      "manifestBytes": 378,
+      "visualReview": "All four download-section screenshots were inspected at original resolution. Preview labels, unsigned-candidate warnings, CTA text, metadata cards, navigation, wrapping, and mobile stacking were visible without clipping or overflow. A suspected Chinese desktop crop was checked against the original pixels and document-width measurement; the brand, copy, metadata cards, and right boundary were all inside the 1440-pixel canvas."
+    },
+    "matrix": {
+      "command": "node website/scripts/audit-browser-matrix.mjs http://127.0.0.1:4174/ <ignored-cache>/all-browser-matrix.json edge,chrome,lenovo,firefox",
+      "profilesAndLocales": "EN/ZH across 1440x1000, 390x844, and Edge 2048x1280 plus 125% scale, covering home, pricing, manual, community, and console",
+      "checks": 100,
+      "passed": 100,
+      "failed": 0,
+      "externalWarnings": 0,
+      "unavailableBrowsers": 0,
+      "browserVersions": {
+        "edge": "150.0.4078.99",
+        "chrome": "129.0.6668.59",
+        "lenovo": "9.0.8.5161",
+        "firefox": "151.0"
+      },
+      "reportSha256": "74c54fcf6413b04d37ddb6037de0f966cb4ebfba8dddd35f26b6847360a62c1b",
+      "reportBytes": 64107,
+      "screenshotCount": 52,
+      "screenshotManifestSha256": "5d68bcd6a34bb577b7be57525a05ed225f528d75b505a756bc42e63f20d00936",
+      "screenshotManifestBytes": 6508
+    }
+  },
+  "sharedWebsiteArtifact": {
+    "command": "website/scripts/build-pages-site.ps1",
+    "result": "pass",
+    "exitCode": 0,
+    "sourceCommit": "fd7e7702dd2e8d86cedda86790b5d93b048463da",
+    "artifactKind": "dronedream-shared-static-site",
+    "artifactDirectory": "frontend/site-dist",
+    "githubPagesAndBaotaUseTheSameArtifact": true,
+    "githubActionsVariablePresence": {
+      "VITE_SUPABASE_URL": true,
+      "VITE_SUPABASE_PUBLISHABLE_KEY": true,
+      "VITE_TURNSTILE_SITE_KEY": false
+    },
+    "stdoutSha256": "e4b89926bdf8444f9832cc46b790df900723f476b3b753b08bf62421dbc21c01",
+    "stdoutBytes": 5000,
+    "stderrSha256": "b0b8f733927fd321879ae5b3a4b4f2f085de75d1278c725f31026d4c3569b19f",
+    "stderrBytes": 342,
+    "buildManifestSha256": "de5b462b9a975dd8c8015ad570b58edb45d8b85d128083ae3d942d48a074fbae",
+    "buildManifestBytes": 717,
+    "sha256SumsSha256": "51e520a74fec34bd929d21d4daddf4438ad7b411fe7874b19e693cb38dfc2f19",
+    "sha256SumsBytes": 13046,
+    "verifiedSha256SumsEntries": 118,
+    "artifactFilesIncludingSha256Sums": 119,
+    "latestJsonSha256": "8538f17340e9a8b5d5b01baba1bb9dd65f872f99d62cabaa478c60c378269990",
+    "latestJsonBytes": 521,
+    "localIntegrityResult": "pass",
+    "localIntegrityLogSha256": "93c941ace56d2a9967b6ae5ed0f3286343df3a4dbe09d01af3a531b73817895c",
+    "localIntegrityLogBytes": 852,
+    "releaseMetadata": {
+      "version": "1.0.0",
+      "releaseTag": "signpath-candidate-v1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "installerSha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+      "installerSizeBytes": 5526509,
+      "downloadUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe"
+    },
+    "note": "This proves one local commit-pinned artifact is ready for both configured deployment targets. It does not claim either public origin has been updated."
+  },
+  "currentReleaseTruth": {
+    "websiteClaim": "The currently configured Windows asset is an unsigned preview candidate and must be hash-verified before installation.",
+    "noFalseRemediationClaim": "This source does not claim Authenticode signing or cross-origin installer parity has been fixed.",
+    "immutableFutureRule": "Any changed installer bytes require a newly approved version, new versioned file name, new SHA-256, and new latest.json. An existing versioned URL must not be overwritten."
+  },
+  "actionsNotPerformed": [
+    "No GitHub Pages deployment was triggered.",
+    "No Alibaba Cloud or BaoTa upload was performed.",
+    "No GitHub Release asset, installer, checksum, DNS, TLS, certificate, server, payment, or production Supabase setting was changed."
+  ],
+  "remainingExternalGates": [
+    "Obtain explicit release authorization, then deploy the exact commit-pinned shared artifact to GitHub Pages and Alibaba Cloud/BaoTa without rebuilding either target independently.",
+    "Correct the GitHub Pages custom-domain certificate state, enforce HTTPS, and verify the certificate hostname for getdronedream.com.",
+    "After deployment, require identical build-manifest.json, SHA256SUMS, downloads/latest.json, selected HTML/JS/CSS bytes, and installer metadata across both public origins.",
+    "The currently public GitHub and Alibaba installer bytes remain different and both are unsigned; a release-authorized software/signing line must produce a new immutable signed candidate before either can be described as fixed.",
+    "Complete real two-account production Supabase community/RLS validation without recording credentials.",
+    "Complete real merchant and payment validation only under production authorization."
+  ]
+}
