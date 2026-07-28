@@ -7,13 +7,20 @@
 </p>
 
 <p align="center">
+  <img alt="AURORA · evidence-gated" src="https://img.shields.io/badge/AURORA-evidence--gated-7C3AED?style=for-the-badge" />
+  <img alt="PX4 and Gazebo · simulation-first" src="https://img.shields.io/badge/PX4%20%2B%20Gazebo-simulation--first-2563EB?style=for-the-badge" />
+  <img alt="Windows desktop and WSL2 Runtime" src="https://img.shields.io/badge/Windows-Desktop%20%2B%20WSL2-8B5CF6?style=for-the-badge&logo=windows11&logoColor=white" />
+  <img alt="Receipted evidence" src="https://img.shields.io/badge/Evidence-receipted-EC4899?style=for-the-badge" />
+</p>
+
+<p align="center">
   <a href="https://getdronedream.com/">Website</a> ·
   <a href="https://github.com/ChiZhang-805/DroneDream/releases">Releases</a> ·
   <a href="docs/README.md">Documentation</a> ·
   <a href="https://github.com/ChiZhang-805/DroneDream/blob/codex/technical-report/technical-report/output/DroneDream_AURORA_Technical_Report.pdf">Technical report</a>
 </p>
 
-## What DroneDream is
+## ✦ What DroneDream is
 
 DroneDream is an engineering workspace for designing, running, and explaining
 PX4 controller-tuning experiments in Gazebo. It brings flight-task definition,
@@ -24,7 +31,7 @@ The project is built around a simple principle: an attractive result is not
 enough. Every recommendation should remain connected to the experiment that
 produced it, the evidence that supports it, and the limits that still apply.
 
-## One continuous experiment journey
+## 🧭 One continuous experiment journey
 
 Users can begin with a natural-language tuning conversation or configure a
 study manually. DroneDream turns that intent into a reviewable five-step
@@ -36,7 +43,7 @@ The Windows application adds guided setup for its isolated WSL2 Runtime, while
 the browser console and public website extend the same visual and product
 language across the rest of the experience.
 
-## The project in three focused tracks
+## 🧩 The project in three focused tracks
 
 | Track | Purpose | Branch |
 | --- | --- | --- |
@@ -47,7 +54,7 @@ language across the rest of the experience.
 These tracks share the DroneDream identity and may consume frozen outputs from
 one another, but each keeps authority over its own deliverables.
 
-## AURORA, the technical core
+## 🧠 AURORA, the technical core
 
 **AURORA — Agentic UAV Refinement through Optimization, Reflection, and
 Assurance —** is DroneDream’s evidence-gated optimization harness. It gives a
@@ -60,7 +67,7 @@ TuRBO, SAASBO, surrogate-assisted and BIPOP CMA-ES, and an adaptive optimizer
 portfolio. The model coordinates tools; it does not replace the simulator,
 rewrite safety bounds, or independently approve a controller.
 
-## Evidence before claims
+## 🛡️ Evidence before claims
 
 DroneDream distinguishes deterministic mock campaigns, PX4/Gazebo SITL
 execution, retained telemetry, source-contract checks, and publication evidence.
@@ -72,7 +79,7 @@ The product is simulation-first. A selected parameter set is an experiment
 result, not an authorization to fly real hardware; independent SITL
 reproduction and engineering review remain necessary.
 
-## Explore DroneDream
+## 🚀 Explore DroneDream
 
 - Visit the [product website](https://getdronedream.com/) for the public
   introduction, manuals, community, and release experience.
