@@ -17,7 +17,11 @@ const args = new Map(
   }),
 );
 const expectOverflow = args.has("--expect-overflow");
-const label = String(args.get("--label") || (expectOverflow ? "before" : "after"));
+const expectJobIdCollision = args.has("--expect-job-id-collision");
+const label = String(
+  args.get("--label")
+    || (expectOverflow || expectJobIdCollision ? "before" : "after"),
+);
 const outputRoot = path.resolve(
   repoRoot,
   String(
@@ -41,7 +45,7 @@ const cases = [
 
 const jobs = [
   {
-    id: "job_history_alpha_20260728",
+    id: "job_history_alpha_20260728_reflection_causal_intervention_online_evaluation_subject_65a33bbd70f999962afd1bea1e374dcd5e9de460",
     control_version: 4,
     display_name: "Aurora constrained MOBO validation",
     track_type: "circle",
@@ -96,17 +100,29 @@ async function sha256(relativePath) {
 
 async function measure(page) {
   return page.evaluate(() => {
+    const rect = (element) => {
+      if (!(element instanceof Element)) return null;
+      const bounds = element.getBoundingClientRect();
+      return {
+        top: Number(bounds.top.toFixed(2)),
+        bottom: Number(bounds.bottom.toFixed(2)),
+        left: Number(bounds.left.toFixed(2)),
+        right: Number(bounds.right.toFixed(2)),
+        width: Number(bounds.width.toFixed(2)),
+        height: Number(bounds.height.toFixed(2)),
+      };
+    };
     const box = (selector) => {
       const element = document.querySelector(selector);
       if (!(element instanceof HTMLElement)) return null;
-      const rect = element.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
       const style = getComputedStyle(element);
       return {
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,
-        left: Number(rect.left.toFixed(2)),
-        right: Number(rect.right.toFixed(2)),
-        width: Number(rect.width.toFixed(2)),
+        left: Number(bounds.left.toFixed(2)),
+        right: Number(bounds.right.toFixed(2)),
+        width: Number(bounds.width.toFixed(2)),
         minWidth: style.minWidth,
         overflowX: style.overflowX,
       };
@@ -137,6 +153,53 @@ async function measure(page) {
       };
     };
 
+    const firstRow = document.querySelector(
+      ".history-results tbody tr:first-child",
+    );
+    const jobIdCell = firstRow?.querySelector("td:nth-child(3)");
+    const jobIdLink = jobIdCell?.querySelector(".history-job-id-link");
+    const jobIdCode = jobIdLink?.querySelector("code");
+    const trackTypeCell = firstRow?.querySelector("td:nth-child(4)");
+    const jobIdCellRect = rect(jobIdCell);
+    const jobIdLinkRect = rect(jobIdLink);
+    const jobIdCodeRect = rect(jobIdCode);
+    const trackTypeCellRect = rect(trackTypeCell);
+    const verticalOverlap =
+      jobIdCodeRect
+      && trackTypeCellRect
+      && jobIdCodeRect.bottom > trackTypeCellRect.top
+      && jobIdCodeRect.top < trackTypeCellRect.bottom;
+    const jobIdCollision = {
+      fullText: jobIdCode?.textContent ?? null,
+      cell: jobIdCellRect,
+      link: jobIdLinkRect,
+      code: jobIdCodeRect,
+      trackTypeCell: trackTypeCellRect,
+      codeDisplay:
+        jobIdCode instanceof HTMLElement
+          ? getComputedStyle(jobIdCode).display
+          : null,
+      codeOverflowX:
+        jobIdCode instanceof HTMLElement
+          ? getComputedStyle(jobIdCode).overflowX
+          : null,
+      codeTextOverflow:
+        jobIdCode instanceof HTMLElement
+          ? getComputedStyle(jobIdCode).textOverflow
+          : null,
+      codeWhiteSpace:
+        jobIdCode instanceof HTMLElement
+          ? getComputedStyle(jobIdCode).whiteSpace
+          : null,
+      containedInJobIdCell:
+        Boolean(jobIdCellRect && jobIdCodeRect)
+        && jobIdCodeRect.left >= jobIdCellRect.left - 1
+        && jobIdCodeRect.right <= jobIdCellRect.right + 1,
+      overlapsTrackTypeCell:
+        Boolean(jobIdCodeRect && trackTypeCellRect && verticalOverlap)
+        && jobIdCodeRect.right > trackTypeCellRect.left + 1,
+    };
+
     const documentWidth = {
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
@@ -157,6 +220,7 @@ async function measure(page) {
       ),
       historyResults: box(".history-results"),
       historyTable: box(".history-results > table"),
+      jobIdCollision,
       actions: [
         action("history navigation", '.app-nav a[href$="/history"]'),
         action("application settings", ".app-header .launcher-settings-button"),
@@ -339,6 +403,14 @@ try {
       && unsafeRequests.length === 0
       && consoleErrors.length === 0
       && pageErrors.length === 0;
+    const jobIdCollisionReproduced =
+      initial.jobIdCollision.fullText === jobs[0].id
+      && initial.jobIdCollision.overlapsTrackTypeCell
+      && !initial.jobIdCollision.containedInJobIdCell;
+    const jobIdContained =
+      initial.jobIdCollision.fullText === jobs[0].id
+      && initial.jobIdCollision.containedInJobIdCell
+      && !initial.jobIdCollision.overlapsTrackTypeCell;
     const overflowReproduced =
       violations.length > 0
       && !resultsOwnOverflow
@@ -353,11 +425,22 @@ try {
       && rightEdge.deleteFocused;
     const passed =
       commonChecksPassed
-      && (expectOverflow ? overflowReproduced : overflowContained);
+      && (
+        expectOverflow
+          ? overflowReproduced
+          : expectJobIdCollision
+            ? overflowContained && jobIdCollisionReproduced
+            : overflowContained && jobIdContained
+      );
 
     results.push({
       ...testCase,
-      expected: expectOverflow ? "overflow reproduced" : "overflow contained",
+      expected:
+        expectOverflow
+          ? "overflow reproduced"
+          : expectJobIdCollision
+            ? "history overflow contained; long Job ID collision reproduced"
+            : "history overflow and long Job ID contained",
       passed,
       containmentViolations: violations,
       initial,
@@ -379,7 +462,12 @@ const finishedAt = new Date().toISOString();
 const evidence = {
   schemaVersion: 1,
   label,
-  expected: expectOverflow ? "overflow reproduced" : "overflow contained",
+  expected:
+    expectOverflow
+      ? "overflow reproduced"
+      : expectJobIdCollision
+        ? "history overflow contained; long Job ID collision reproduced"
+        : "history overflow and long Job ID contained",
   sourceCommit: git("rev-parse", "HEAD"),
   sourceDirty: git("status", "--short") !== "",
   sourceChanges: git("status", "--short").split(/\r?\n/).filter(Boolean),
@@ -389,7 +477,7 @@ const evidence = {
   ),
   command: `npm run test:history-layout -- --label=${label}${
     expectOverflow ? " --expect-overflow" : ""
-  }`,
+  }${expectJobIdCollision ? " --expect-job-id-collision" : ""}`,
   browser: {
     name: "Microsoft Edge",
     version: browser?.version() ?? null,

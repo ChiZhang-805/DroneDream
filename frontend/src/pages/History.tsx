@@ -75,7 +75,11 @@ function buildColumns(t: Translator): Column<Job>[] {
     key: "id",
     header: t("history.jobId"),
     render: (j) => (
-      <Link to={`/jobs/${j.id}`}>
+      <Link
+        className="history-job-id-link"
+        title={j.id}
+        to={`/jobs/${j.id}`}
+      >
         <code>{j.id}</code>
       </Link>
     ),

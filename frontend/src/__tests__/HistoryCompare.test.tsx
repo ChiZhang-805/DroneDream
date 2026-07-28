@@ -102,7 +102,10 @@ describe("History compare selection", () => {
     } as never);
     renderPage();
 
-    expect(await screen.findByText("job_real")).toBeVisible();
+    const jobId = await screen.findByText("job_real");
+    expect(jobId).toBeVisible();
+    expect(jobId.closest("a")).toHaveClass("history-job-id-link");
+    expect(jobId.closest("a")).toHaveAttribute("title", "job_real");
     expect(screen.getByText("job_mock")).toBeVisible();
 
     fireEvent.change(screen.getByLabelText("Search"), { target: { value: "Alpha" } });
