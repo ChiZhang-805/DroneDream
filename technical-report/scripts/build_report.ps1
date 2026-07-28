@@ -43,10 +43,11 @@ $reportRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $reportRoot ".."))
 $buildRoot = [IO.Path]::GetFullPath((Join-Path $reportRoot "build"))
 $renderRoot = [IO.Path]::GetFullPath((Join-Path $buildRoot "rendered"))
+$generatedMediaRoot = [IO.Path]::GetFullPath((Join-Path $buildRoot "generated-media"))
 $outputRoot = [IO.Path]::GetFullPath((Join-Path $reportRoot "output"))
 $pdfToPpmCommand = Resolve-PdfToPpmCommand $PdfToPpm
 
-foreach ($path in @($buildRoot, $renderRoot, $outputRoot)) {
+foreach ($path in @($buildRoot, $renderRoot, $generatedMediaRoot, $outputRoot)) {
     if (-not $path.StartsWith($reportRoot, [StringComparison]::OrdinalIgnoreCase)) {
         throw "Output path escaped report root: $path"
     }
@@ -57,6 +58,20 @@ if (Test-Path -LiteralPath $renderRoot) {
     Remove-Item -LiteralPath $renderRoot -Recurse -Force
 }
 New-Item -ItemType Directory -Path $renderRoot | Out-Null
+if (Test-Path -LiteralPath $generatedMediaRoot) {
+    Remove-Item -LiteralPath $generatedMediaRoot -Recurse -Force
+}
+New-Item -ItemType Directory -Path $generatedMediaRoot | Out-Null
+
+& $Python `
+    (Join-Path $reportRoot "scripts\generate_data_figures.py") `
+    --repository $repositoryRoot `
+    --manifest (Join-Path $reportRoot "evidence-reference-manifest.json") `
+    --output-directory $generatedMediaRoot `
+    --compare-directory (Join-Path $reportRoot "media\media")
+if ($LASTEXITCODE -ne 0) {
+    throw "Data-figure regeneration or pixel comparison failed with exit code $LASTEXITCODE"
+}
 
 $sourceDateEpoch = (
     & git -C $repositoryRoot log -1 --format=%ct HEAD

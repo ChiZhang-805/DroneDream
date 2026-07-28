@@ -24,7 +24,7 @@ verifies claim receipt v3 and Outcome Contract 2.20, isolates fault and
 holdout evidence, and freezes final selection only after deterministic
 checks pass. Models may propose and route work; software contracts retain
 authority over parameter domains, state transitions, evidence admission,
-and completion. Evidence 2.7 additionally compiles one bounded
+and completion. Evidence 2.7 additionally compiles a bounded
 observational reflection from each verified decision cohort. It admits
 accepted work, optimizer-learning Trials, domain failures, feasibility,
 incumbent change, and observed improvement only when the execution
@@ -47,8 +47,8 @@ prove general optimizer superiority, physical simulator quality,
 real-aircraft safety, or simulation-to-reality transfer. A fresh online
 provider freeze for Evidence 2.7 and Prompt 1.5 and a matched multi-seed
 PX4/Gazebo outcome campaign remain explicit qualification gates before
-either optimization quality or simulator fidelity can be claimed in
-customer deployment.
+either optimization quality or simulator fidelity can support a
+customer deployment or release decision.
 
 \vspace{0.35em}
 \href{https://github.com/ChiZhang-805/DroneDream}{
@@ -283,7 +283,7 @@ or test.
 \textbf{Claim-time inputs are immutable before launch.} Schema
 \textbf{dronedream.trial-execution-attempt-claim/v3} and digest
 \textbf{execution\_input\_sha256} bind Trial, Candidate, and Job inputs
-in one snapshot. Outcome Contract 2.20 authorizes the scenario matrix
+in an immutable snapshot. Outcome Contract 2.20 authorizes the scenario matrix
 and constructs \textbf{TrialContext} without rereading mutable rows.
 Checks classify changed inputs as \textbf{INPUT\_EVIDENCE\_DRIFT},
 coordinated rewrites as \textbf{OUTCOME\_CONTRACT\_DRIFT}, and
@@ -296,11 +296,11 @@ same claim boundary.
 \textbf{Physical claims are concurrency-safe and fairly scheduled.}
 Execution Claim Gate 1.1 combines PostgreSQL FOR UPDATE SKIP LOCKED, a
 conditional lease update, bounded retries, and an attempt-count fence.
-Eight concurrent workers yield one physical execution and one accepted
-outcome for a logical Trial, with no duplicate evidence in an
-eight-Trial pool. Scheduling Gate 1.0 chooses the least-served eligible
-Job and preserves FIFO within it. A two-Job regression makes six
-sequential claims alternate, preventing
+Concurrent workers converge on a unique physical execution and accepted
+outcome for each logical Trial, with no duplicate evidence across the
+exercised pool. Scheduling Gate 1.0 chooses the least-served eligible
+Job and preserves FIFO within it. A paired-Job regression alternates
+sequential claims, preventing
 desktop-lane monopoly; hosted priority and resource-cost scheduling
 remain outside the current local scheduling contract, audit replay, and
 evidence envelope for hosted work.
@@ -333,7 +333,7 @@ machines replay identical candidate sequences across machines before any
 provider decision receives credit.
 
 \textbf{Feedback is verified again at the model boundary.} Optimizers,
-the closed-tool router, and direct proposer share one training-feedback
+the closed-tool router, and direct proposer share a training-feedback
 compiler. It reconstructs canonical Trial rows and checks the
 content-addressed outcome against Candidate identity, generation,
 parameters, and Trial evidence before exposing a score. Sibling fields
@@ -343,10 +343,11 @@ explicitly
 unsealed and ineligible for learning, routing memory, or final selection
 {[}\protect\hyperlink{ref_1}{\emph{1}}{]}. The rule preserves
 auditability across both current and migration-era experiment histories
-and their later replay without retroactive reinterpretation.
+and their later replay without retroactive reinterpretation across
+release boundaries.
 
 Reflection is compiled from verified outcomes rather than free-form
-model self-report. Evidence 2.7 joins one accepted execution receipt to
+model self-report. Evidence 2.7 joins the accepted execution receipt to
 the exact optimizer Candidate cohort for that generation, then requires
 every Candidate to carry a current v2 evidence receipt and verified
 training feedback. Prompt 1.5 and Decision Trace 1.3 also bind the exact
@@ -623,12 +624,12 @@ Execution Claim Gate 1.1 binds each authorized Trial to a
 content-addressed snapshot, while Scheduling Gate 1.0 admits the
 least-served eligible Job's next FIFO Trial. Regressions cover
 concurrent claimants, physical-attempt accounting, retry ownership, and
-six alternating claims across two Jobs. These checks do not improve the
+alternating claims across paired Jobs. These checks do not improve the
 proxy objective; they prevent reported budgets and cohort comparisons
 from being distorted by duplicate execution, starvation, or
 shared-Runtime queue monopolization. The ledger retains every authorized
 claim and terminal disposition for independent replay after every
-failure, retry, and recovery.
+failure, retry, recovery, and ownership transition.
 
 \includegraphics[width=5.00000in,height=2.41445in]{media/media/image7.png}
 
@@ -804,7 +805,7 @@ without evidence.
 operations}}{6. Product reliability and operations}}\label{product-reliability-and-operations}
 
 The desktop readiness gate is part of the product's technical contract.
-The progress bar may reach 100\% only after every check that DroneDream
+The progress bar may report completion only after every check that DroneDream
 can perform at launch has reached a terminal pass state. The entry
 action must not become visible while a required check is pending or
 failed. After entry, runtime failures still need explicit diagnostics
@@ -820,7 +821,7 @@ launcher requires a fresh supported-system probe, one owned and
 compatible Runtime, a healthy local service, no mandatory update, and an
 account accepted by the local API. Missing, stale, mismatched,
 unreachable, or still-checking states remain blocking. Only the current
-gate may set the bar to 100\%, change the environment badge to CHECKED,
+gate may mark readiness complete, change the environment badge to CHECKED,
 and reveal the entry action. Quantitative release evidence still needs
 time-to-ready
 p50/p95, false-ready rate, and a clean Windows/upgrade matrix across
@@ -997,7 +998,7 @@ pinned dependency commits.
 Execution Claim Gate 1.1 and Outcome Contract 2.20 bind the
 Trial/Candidate/Job snapshot and
 authorized scenario matrix; drift fails closed before evidence
-admission. Concurrent claims retain one accepted physical attempt, and
+admission. Concurrent claims retain a unique accepted physical attempt, and
 least-served per-Job scheduling prevents large-experiment queue
 monopolization. Prompt Schema 2.3 gives same-type training cases
 separate provider-safe aliases while sealing raw case IDs and holdout
@@ -1234,19 +1235,16 @@ verification}}{Appendix A. Release-contract verification}}\label{appendix-a.-rel
 \setlength{\LTpre}{0.35em}
 \setlength{\LTpost}{0.35em}
 
-The verification matrix separates executable software evidence from
-broader product claims. It covers protected state mutations,
-authenticated report export and watermark behavior, frontend command
-wiring, rendered layout, and Python static checks. Every count describes
-the checked release contract at this source boundary; none measures
-controller quality, physical simulator fidelity, real-flight safety, or
-causal optimization benefit. The matrix also gives reviewers a compact
-map from each reported count to the narrow claim it can support.
-It therefore separates release verification from every physical or
-optimizer-performance conclusion and related claim in the report.
-Unsupported cells remain unavailable instead of being normalized into a
-passing result or presented as verified engineering evidence at this
-release boundary.
+The verification matrix separates receipted software checks from broader
+product claims. Protected mutation and report-export contracts are
+described in A.1 and A.2; the table reports only frozen validation
+receipts and the report's recomputed layout contract. Every count remains
+limited to its checked source boundary and does not measure controller
+quality, physical-simulator fidelity, real-flight safety, or causal
+optimization benefit. This compact map prevents release verification
+from being mistaken for a physical or optimizer-performance conclusion.
+Unsupported cells remain unavailable rather than being normalized into a
+passing result or presented as verified engineering evidence at this boundary.
 
 \begin{longtable}[]{@{}L{0.28\linewidth}C{0.12\linewidth}C{0.12\linewidth}L{0.38\linewidth}@{}}
 \caption{Release-contract verification matrix}\tabularnewline
@@ -1260,10 +1258,8 @@ release boundary.
 \textbf{Claim boundary}\tabularnewline
 \midrule
 \endhead
-State-version fence & 5 & 5 & Protected Job/Batch
-mutations\tabularnewline
-Report export contract & 51 & 51 & Tier, watermark, iteration
-trace\tabularnewline
+Subject-focused bridge & 59 & 59 & Outcome/report/evidence
+paths\tabularnewline
 Frontend validation receipt & 322 & 322 & Tests plus
 typecheck/lint/build\tabularnewline
 Report layout contract & Recomputed & Required & Rendered body/list
@@ -1307,18 +1303,19 @@ retained ledger. The result is a portable audit view of the completed
 campaign, including its failed and unavailable observations, rather than a detached narrative of success.
 \looseness=-1
 
-For Free accounts, the renderer places one native vector seal on every
-page after pagination is final. The seal is drawn with the DroneDream
-violet-magenta identity at eighteen percent opacity, intersects the body
+For Free accounts, the renderer places a native vector seal on each page
+after pagination is final. The seal uses the DroneDream violet-magenta
+identity at low opacity, intersects the body
 without covering it, and remains present after ordinary PDF extraction
 or printing. Plus and Pro exports omit the mark only when the server-side
 entitlement snapshot authorizes unwatermarked bytes. Redirect URLs,
 stale desktop state, or a modified client request cannot change that
-decision. Fifty-one contract cases cover tier resolution, watermark
+decision. The export contract defines tier resolution, watermark
 cardinality, iteration trace, missing-evidence behavior, and stable byte
-generation. Their authority ends at export correctness; they do not
+generation. Its authority ends at export correctness; it does not
 qualify controller quality, simulator performance, or real-aircraft
-behavior under any simulated or physical evaluation.
+behavior in any simulated or physical study reported here or in
+downstream release claims.
 
 \subsection{\texorpdfstring{\textbf{A.3 Qualification
 handoff}}{A.3 Qualification handoff}}\label{a.3-qualification-handoff}

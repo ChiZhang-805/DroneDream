@@ -65,7 +65,8 @@ python technical-report/scripts/verify_claim_evidence.py `
 ## Build and audit
 
 The build requires XeLaTeX, Pandoc, Poppler (`pdftoppm`), and Python with
-`pdfplumber` and `pypdf`. When a Codex runtime `pdftoppm` wrapper is present,
+`matplotlib`, `numpy`, `Pillow`, `pdfplumber`, and `pypdf`. When a Codex runtime
+`pdftoppm` wrapper is present,
 the script resolves the actual bundled Poppler executable from that wrapper's
 dependency root; `-PdfToPpm <path>` remains available for an explicit override.
 
@@ -76,9 +77,12 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -File technical-report/scripts/build_report.ps1
 ```
 
-The script performs two XeLaTeX passes, rejects warning gates, renders all 13
-pages, runs the structural/paragraph/link audit, and publishes the validated
-PDF, layout audit, and claim-evidence audit to `technical-report/output/`.
+The script regenerates Figures 2--6 from the frozen evidence bundle in an
+ignored build directory and requires their rendered pixels to match the
+tracked PNGs. It then performs two XeLaTeX passes, rejects warning gates,
+renders all 13 pages, runs the structural/paragraph/link audit, and publishes
+the validated PDF, layout audit, and claim-evidence audit to
+`technical-report/output/`.
 The claim gate fails the build when a declared report projection drifts from
 its frozen JSON pointer, source assertion, or computed phase-role count. The
 paragraph gate requires all explanatory prose, including the abstract, to end
@@ -122,6 +126,16 @@ or topology change:
 ```powershell
 python technical-report/scripts/generate_architecture_figure.py `
   --output technical-report/media/media/image3.png
+```
+
+Regenerate the five evidence-backed charts only when their frozen data or
+presentation contract changes:
+
+```powershell
+python technical-report/scripts/generate_data_figures.py `
+  --repository . `
+  --manifest technical-report/evidence-reference-manifest.json `
+  --output-directory technical-report/media/media
 ```
 
 ## Commit layering

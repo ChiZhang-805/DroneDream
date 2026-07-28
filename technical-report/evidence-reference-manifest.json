@@ -74,6 +74,27 @@
         "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
         "file_sha256": "ecf884e295e05fe49d6862fa5ddafd506fbb7d623fa38dcaced0deafebb720b9",
         "evidence_role": "Frozen evaluation-unit separation, result boundaries, and publication protocol."
+      },
+      {
+        "id": "harness_contract_ablation_raw",
+        "path": "backend/evaluation_artifacts/harness-contract-ablation-v1.json",
+        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+        "file_sha256": "738e8110302e09fffe161ebd3f2558b68eb8ef4b53ec5ad40d6e48b8c8185226",
+        "evidence_role": "Read-only frozen row source for Table 3; the report neither owns nor copies this software evidence."
+      },
+      {
+        "id": "harness_fallback_outcome_campaign_raw",
+        "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+        "file_sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d",
+        "evidence_role": "Read-only frozen row source for Table 4; the report neither owns nor copies this software evidence."
+      },
+      {
+        "id": "harness_component_outcome_ablation_raw",
+        "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v1.json",
+        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+        "file_sha256": "3d354307b479c1a44ba5d5abad26bef2562f028b4a09c059174b8a3b5c284da9",
+        "evidence_role": "Read-only frozen row source for Table 7; the report neither owns nor copies this software evidence."
       }
     ]
   },
@@ -115,7 +136,7 @@
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
         "modified_after_migration": true,
         "current_hash_serialization": "utf8_lf",
-        "current_sha256": "210327d03a32c02514ca6380089b024cd7cd6e297c5dcc09e9214313a7b5ef91"
+        "current_sha256": "75818dcbaa7e5f713094a93ca67c7b6d25e406bb30781329f25cbd8d89a9371e"
       },
       {
         "path": "media/github-mark.png",
@@ -138,27 +159,42 @@
       {
         "path": "media/media/image4.png",
         "source_sha256": "ad6bc5cdd1ed798a7796bc9271ad13209a8995add77164b63df68480dbcd752b",
-        "modified_after_migration": false
+        "modified_after_migration": true,
+        "current_sha256": "8854f527170536a3eaada969ecab87cc09d0fd620121aa94e8722ae68edad902",
+        "generator": "technical-report/scripts/generate_data_figures.py",
+        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "media/media/image5.png",
         "source_sha256": "b82ba193787bb56f860988f087e18ae96ecee11526093ab911c15408a56889d4",
-        "modified_after_migration": false
+        "modified_after_migration": true,
+        "current_sha256": "f1999c3ee2e5255e05057153ffd188899def0b7ae36bbae6ad8e387fa4a0d3ea",
+        "generator": "technical-report/scripts/generate_data_figures.py",
+        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "media/media/image6.png",
         "source_sha256": "2675fc9964d7f24a0fcdc892ad758d33151772fcc5a1339603435f0f71ff18f5",
-        "modified_after_migration": false
+        "modified_after_migration": true,
+        "current_sha256": "5be564c7faebb29e764746f302aa1166d63140e24f6ac59d194d51a4a2d78d06",
+        "generator": "technical-report/scripts/generate_data_figures.py",
+        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "media/media/image7.png",
         "source_sha256": "60d29c9551538c2926d61a631ecd44e2eb7ad819a5074d21301673afd76888b2",
-        "modified_after_migration": false
+        "modified_after_migration": true,
+        "current_sha256": "d289ad647bb92a4df8cfc12e6edc12c2bf4628bd0fac0be57794876c2b788f12",
+        "generator": "technical-report/scripts/generate_data_figures.py",
+        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "media/media/image8.png",
         "source_sha256": "23c4ee6cb0ffd2779b9851ce9a43068aba37ebb56cc3defedd9157e889a67c55",
-        "modified_after_migration": false
+        "modified_after_migration": true,
+        "current_sha256": "ff7e41c1d91f3cd5e07bc461cd045bc8c3c3558112e91a9880e56346162898e9",
+        "generator": "technical-report/scripts/generate_data_figures.py",
+        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "scripts/audit_latex_report.py",

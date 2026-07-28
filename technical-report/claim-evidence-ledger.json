@@ -2,6 +2,20 @@
   "schema_version": "dronedream.technical-report-claim-evidence-ledger.v1",
   "report_source": "technical-report/body.tex",
   "evidence_reference_manifest": "technical-report/evidence-reference-manifest.json",
+  "prohibited_report_literals": [
+    {
+      "literal": "State-version fence & 5 & 5",
+      "reason": "No frozen row-level receipt supports this granular count."
+    },
+    {
+      "literal": "Report export contract & 51 & 51",
+      "reason": "No frozen row-level receipt supports this granular count."
+    },
+    {
+      "literal": "Fifty-one contract cases",
+      "reason": "The report may describe the export contract but not assert an unreceipted count."
+    }
+  ],
   "claims": [
     {
       "id": "backend-validation-boundary",
@@ -47,6 +61,7 @@
         "1,139/1,139 tests in",
         "759.17 seconds on a pre-commit worktree",
         "59-check subject bridge",
+        "Subject-focused bridge & 59 & 59",
         "Windows Rust was not run"
       ]
     },
@@ -87,7 +102,8 @@
       "body_contains": [
         "322/322 tests",
         "nine deployment tests",
-        "117-file output across two builds"
+        "117-file output across two builds",
+        "Frontend validation receipt & 322 & 322"
       ]
     },
     {
@@ -144,6 +160,11 @@
           "pointer": "/routing/tool_selection_rows",
           "field": "selected_count",
           "expected": 24
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/routing/category_rows",
+          "expected": 8
         }
       ],
       "body_contains": [
@@ -209,32 +230,44 @@
         "Table 3",
         "Table 9"
       ],
-      "source_id": "technical_report_evidence_bundle",
+      "source_id": "harness_contract_ablation_raw",
       "assertions": [
         {
           "kind": "json_equals",
-          "pointer": "/harness_ablations/summary/probe_count",
+          "pointer": "/summary/probe_count",
           "expected": 25
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_ablations/summary/full_contract_correct_count",
+          "pointer": "/summary/full_contract_correct_count",
           "expected": 25
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_ablations/summary/ablated_contract_correct_count",
+          "pointer": "/summary/ablated_contract_correct_count",
           "expected": 6
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_ablations/causal_claim_permitted",
+          "pointer": "/causal_claim_permitted",
           "expected": false
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_ablations/physical_fidelity",
+          "pointer": "/physical_fidelity",
           "expected": false
+        },
+        {
+          "kind": "latex_ablation_rows",
+          "pointer": "/component_rows",
+          "expected_rows": 5,
+          "row_labels": {
+            "deterministic_fallback": "deterministic",
+            "provider_trust_filter": "provider trust",
+            "scenario_and_outcome_isolation": "scenario/outcome",
+            "scenario_profile_context": "scenario profile",
+            "tool_eligibility_gate": "tool eligibility"
+          }
         }
       ],
       "body_contains": [
@@ -250,47 +283,64 @@
         "Table 4",
         "Table 9"
       ],
-      "source_id": "technical_report_evidence_bundle",
+      "source_id": "harness_fallback_outcome_campaign_raw",
       "assertions": [
         {
           "kind": "json_equals",
-          "pointer": "/harness_outcome_campaign/summary/arm_run_count",
+          "pointer": "/summary/arm_run_count",
           "expected": 15
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_outcome_campaign/summary/total_persisted_trials",
+          "pointer": "/summary/total_persisted_trials",
           "expected": 579
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_outcome_campaign/summary/fallback_comparison_count",
+          "pointer": "/summary/fallback_comparison_count",
           "expected": 10
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_outcome_campaign/summary/exact_outcome_match_count",
+          "pointer": "/summary/exact_outcome_match_count",
           "expected": 10
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_outcome_campaign/summary/all_evidence_complete",
+          "pointer": "/summary/all_evidence_complete",
           "expected": true
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_outcome_campaign/network_calls",
+          "pointer": "/network_calls",
           "expected": 0
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_outcome_campaign/physical_fidelity",
+          "pointer": "/physical_fidelity",
           "expected": false
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_outcome_campaign/harness_causal_benefit_claim_permitted",
+          "pointer": "/harness_causal_benefit_claim_permitted",
           "expected": false
+        },
+        {
+          "kind": "latex_fallback_arm_rows",
+          "blocks_pointer": "/block_rows",
+          "comparisons_pointer": "/comparison_rows",
+          "arms": {
+            "direct_portfolio": {
+              "label": "Direct deterministic portfolio",
+              "finding": "Reference arm"
+            },
+            "provider_error_fallback": {
+              "label": "Provider-error fallback"
+            },
+            "invalid_response_fallback": {
+              "label": "Invalid-response fallback"
+            }
+          }
         }
       ],
       "body_contains": [
@@ -307,47 +357,99 @@
         "Table 7",
         "Table 9"
       ],
-      "source_id": "technical_report_evidence_bundle",
+      "source_id": "harness_component_outcome_ablation_raw",
       "assertions": [
         {
           "kind": "json_equals",
-          "pointer": "/harness_component_outcome_ablation/summary/arm_run_count",
+          "pointer": "/summary/arm_run_count",
           "expected": 20
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_component_outcome_ablation/summary/total_persisted_trials",
+          "pointer": "/summary/total_persisted_trials",
           "expected": 554
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_component_outcome_ablation/summary/comparison_count",
+          "pointer": "/summary/comparison_count",
           "expected": 15
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_component_outcome_ablation/summary/interpretation_status_counts/observed_protocol_difference",
+          "pointer": "/summary/interpretation_status_counts/observed_protocol_difference",
           "expected": 5
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_component_outcome_ablation/summary/interpretation_status_counts/no_observed_protocol_difference",
+          "pointer": "/summary/interpretation_status_counts/no_observed_protocol_difference",
           "expected": 10
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_component_outcome_ablation/summary/inconclusive_component_isolation_count",
+          "pointer": "/summary/inconclusive_component_isolation_count",
           "expected": 5
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_component_outcome_ablation/network_calls",
+          "pointer": "/network_calls",
           "expected": 0
         },
         {
           "kind": "json_equals",
-          "pointer": "/harness_component_outcome_ablation/general_causal_claim_permitted",
+          "pointer": "/general_causal_claim_permitted",
           "expected": false
+        },
+        {
+          "kind": "latex_component_arm_rows",
+          "blocks_pointer": "/block_rows",
+          "comparisons_pointer": "/comparison_rows",
+          "isolation_pointer": "/component_isolation_rows",
+          "arms": {
+            "full_aurora": {
+              "label": "Full AURORA",
+              "tool_sequence": [
+                "constrained_mobo",
+                "turbo"
+              ],
+              "display_sequence": "constrained MOBO to TuRBO",
+              "finding": "Reference"
+            },
+            "no_decision_memory": {
+              "label": "No decision memory",
+              "tool_sequence": [
+                "constrained_mobo",
+                "optimizer_portfolio"
+              ],
+              "display_sequence": "constrained MOBO to portfolio",
+              "result_status": "no_observed_protocol_difference",
+              "finding": "No observed difference"
+            },
+            "no_observed_outcome_reflection": {
+              "label": "No outcome reflection",
+              "tool_sequence": [
+                "constrained_mobo",
+                "optimizer_portfolio"
+              ],
+              "display_sequence": "constrained MOBO to portfolio",
+              "result_status": "no_observed_protocol_difference",
+              "finding": "No observed difference"
+            },
+            "fixed_deterministic_portfolio": {
+              "label": "Fixed portfolio",
+              "tool_sequence": [
+                "optimizer_portfolio",
+                "optimizer_portfolio"
+              ],
+              "display_sequence": "portfolio to portfolio",
+              "result_status": "observed_protocol_difference",
+              "finding": "Observed difference"
+            }
+          },
+          "isolation": {
+            "label": "Receipt-only isolation",
+            "display_sequence": "matched route and outcome",
+            "finding": "Inconclusive"
+          }
         }
       ],
       "body_contains": [
