@@ -14,87 +14,118 @@
     ]
   },
   "software": {
-    "branch": "codex/aurora-completion-20260728",
-    "subject_commit": "0429b4244fc1fd912bd211e80821ebdbabb8ae5d",
-    "provenance_commit": "738157c586561ec1e5466a997cd04758263c967b",
-    "branch_head": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+    "branch": "codex/software",
+    "subject_commit": "742b12467efc9b37b7e4a2fa3ac73b7578f21385",
+    "provenance_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+    "branch_head": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
     "artifacts": [
       {
         "id": "technical_report_evidence_bundle",
-        "path": "artifacts/technical-report/evidence.json",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
-        "file_sha256": "99eeeb9c87e2b14b67b54d2af35d16ea001d6ae987bff1a91ad426783d8cdfb7",
-        "canonical_sha256": "bd99720f50a63d282287b7ed2ee7b4692e416bc00db218a864ebc462f8298258"
+        "path": "artifacts/technical-report/evidence-v7.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "93232a2f0027503c24cfe4a8a1768d518f436cd35a3db72e788fc42f5eb45c55",
+        "canonical_sha256": "a0432d092d5e751a6f414ba4d0cb6b91cb7e9117b6fead109ef2a1c805ad8522"
       },
       {
         "id": "technical_report_evidence_manifest",
-        "path": "artifacts/technical-report/evidence.manifest.json",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
-        "file_sha256": "142aba582ef51141c90b2e1066a747548aa9cf3504d8a09bba9ad07172b377ed"
+        "path": "artifacts/technical-report/evidence-v7.manifest.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "0702abb2e5d1aedb999c4158feaab78b25f6dc2ab7dcc07b5bcefad2b30324d2"
       },
       {
-        "id": "backend_1139_test_receipt",
-        "path": "artifacts/test-runs/aurora-backend-1139-receipt.json",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
-        "file_sha256": "bc86ed4ba9d67c3c14e699142ad6d79a0eba6ca0c1980549c069c80e7991c74b"
+        "id": "backend_1147_test_receipt",
+        "path": "artifacts/test-runs/aurora-software-742b124-receipt.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "cd5a9890ab6ff679d522a7fc05a2d509d94b3e8ce702d6187fd315937d9716dd",
+        "internal_receipt_sha256": "ec1a757cfbb6d6ccbc2e186ecd43e9e2656b2d7c9826643f703f296adc285108",
+        "full_log_sha256": "bf7be380922ff94db7ace78912b1aed376fce1c606317b191559e959bc79e869",
+        "focused_log_sha256": "ee6e599d97ec67aabe3f9569709b5a41d444df7bcbf000712a2d715e9a0305d5"
       }
     ],
     "source_references": [
       {
         "id": "px4_gazebo_evidence_boundary",
         "path": "docs/08-px4-gazebo.md",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
         "file_sha256": "b8c58164b0efee355d90ac53cbded031e441d39cfc20a374f192db06212700fd",
         "evidence_role": "Pinned PX4/Gazebo implementation, smoke evidence, and customer-Runtime qualification boundary."
       },
       {
         "id": "harness_contract_design",
         "path": "docs/19-llm-tool-orchestration-harness.md",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
-        "file_sha256": "05c17b0f1663d637939adbd2a708f575db2b2bbd25803a6b0b7413bbf3b0f664",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "129676c4e6d58bb8f61fdd335da31d4c55c04cf89e4c27dcc21bce8adbe5c267",
         "evidence_role": "Frozen contract versions, authority boundaries, and phase-qualified execution design."
       },
       {
         "id": "harness_phase_registry",
         "path": "backend/app/orchestration/harness_context.py",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
-        "file_sha256": "0dab5fae5b19b76bd18a205d83cd7abff3c2160083082751c676017e2a3a5aa3",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "f081a8c12bf50dc330a4aad509bd3454999af519c1dc4ecaf9a03df3db0e1376",
         "evidence_role": "Executable tool-role registry and deterministic phase compatibility matrix."
       },
       {
         "id": "runtime_dependency_pins",
         "path": "runtime/pins.env",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
         "file_sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5",
         "evidence_role": "Pinned PX4 and simulator dependency identities."
       },
       {
         "id": "technical_report_evaluation_protocol",
         "path": "docs/20-technical-report-evaluation.md",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
-        "file_sha256": "ecf884e295e05fe49d6862fa5ddafd506fbb7d623fa38dcaced0deafebb720b9",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "a3c6fa971ba097c028af8dd7262c8503b25146c03547a9dc1b759c4b00ecbf65",
         "evidence_role": "Frozen evaluation-unit separation, result boundaries, and publication protocol."
       },
       {
         "id": "harness_contract_ablation_raw",
-        "path": "backend/evaluation_artifacts/harness-contract-ablation-v1.json",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
-        "file_sha256": "738e8110302e09fffe161ebd3f2558b68eb8ef4b53ec5ad40d6e48b8c8185226",
+        "path": "backend/evaluation_artifacts/harness-contract-ablation-v2.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "8fc1340179d10c974ca9f53b0a8d97e4459c54bc39932518ee6c8c66fa3ab88a",
         "evidence_role": "Read-only frozen row source for Table 3; the report neither owns nor copies this software evidence."
       },
       {
         "id": "harness_fallback_outcome_campaign_raw",
         "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
         "file_sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d",
         "evidence_role": "Read-only frozen row source for Table 4; the report neither owns nor copies this software evidence."
       },
       {
         "id": "harness_component_outcome_ablation_raw",
-        "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v1.json",
-        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
-        "file_sha256": "3d354307b479c1a44ba5d5abad26bef2562f028b4a09c059174b8a3b5c284da9",
+        "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82",
         "evidence_role": "Read-only frozen row source for Table 7; the report neither owns nor copies this software evidence."
+      },
+      {
+        "id": "routing_development_corpus_raw",
+        "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1",
+        "evidence_role": "Read-only acceptable-tool corpus used to independently regrade the three preserved provider freezes."
+      },
+      {
+        "id": "routing_prompt_1_5_first_raw",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-20260728.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf",
+        "evidence_role": "Read-only first Prompt 1.5 provider freeze; independently regraded at 19/24 and unqualified."
+      },
+      {
+        "id": "routing_prompt_1_5_rerun_raw",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.5-rerun-20260728.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571",
+        "evidence_role": "Read-only second Prompt 1.5 provider freeze; independently regraded at 21/24 and qualified."
+      },
+      {
+        "id": "routing_prompt_1_6_current_raw",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4",
+        "evidence_role": "Read-only current Prompt 1.6 provider freeze; independently regraded at 24/24 as development-routing qualification, not causal prompt lift."
       }
     ]
   },
@@ -129,14 +160,14 @@
         "source_sha256": "2878e1bef3b2142b72d453b8791b8132df53084506ff73a93ce6b2e362a26594",
         "modified_after_migration": true,
         "current_hash_serialization": "utf8_lf",
-        "current_sha256": "f3f5fd4bf2d1c76add2c1d8f15a8646d3bc55c1aca8509604143c1e233ee679a"
+      "current_sha256": "07701f15bdf00ba3aa64f77f6f093c75f3781435dcdcbd0ffa6fcee98252a4f4"
       },
       {
         "path": "body.tex",
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
         "modified_after_migration": true,
         "current_hash_serialization": "utf8_lf",
-        "current_sha256": "75818dcbaa7e5f713094a93ca67c7b6d25e406bb30781329f25cbd8d89a9371e"
+      "current_sha256": "4cc8c0077ffbf2580a6bc93df7d634691940e0253ccaaf6f81a2a0525ec8845e"
       },
       {
         "path": "media/github-mark.png",
@@ -160,9 +191,9 @@
         "path": "media/media/image4.png",
         "source_sha256": "ad6bc5cdd1ed798a7796bc9271ad13209a8995add77164b63df68480dbcd752b",
         "modified_after_migration": true,
-        "current_sha256": "8854f527170536a3eaada969ecab87cc09d0fd620121aa94e8722ae68edad902",
+        "current_sha256": "fe6d4165036b884c6473c75865363e6287fef341f25dc57a57214a42e1daf683",
         "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
+        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "media/media/image5.png",
@@ -170,15 +201,15 @@
         "modified_after_migration": true,
         "current_sha256": "f1999c3ee2e5255e05057153ffd188899def0b7ae36bbae6ad8e387fa4a0d3ea",
         "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
+        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "media/media/image6.png",
         "source_sha256": "2675fc9964d7f24a0fcdc892ad758d33151772fcc5a1339603435f0f71ff18f5",
         "modified_after_migration": true,
-        "current_sha256": "5be564c7faebb29e764746f302aa1166d63140e24f6ac59d194d51a4a2d78d06",
+        "current_sha256": "57f871b1c90a14e915bb4b8b8d66ac0d589c7fb507191e93e8c26fb183b1c600",
         "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
+        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "media/media/image7.png",
@@ -186,7 +217,7 @@
         "modified_after_migration": true,
         "current_sha256": "d289ad647bb92a4df8cfc12e6edc12c2bf4628bd0fac0be57794876c2b788f12",
         "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
+        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "media/media/image8.png",
@@ -194,7 +225,7 @@
         "modified_after_migration": true,
         "current_sha256": "ff7e41c1d91f3cd5e07bc461cd045bc8c3c3558112e91a9880e56346162898e9",
         "generator": "technical-report/scripts/generate_data_figures.py",
-        "reason": "Regenerated from the frozen evidence bundle under the repository-owned chart contract."
+        "reason": "Regenerated from the frozen v7 evidence bundle under the repository-owned chart contract."
       },
       {
         "path": "scripts/audit_latex_report.py",

@@ -16,9 +16,9 @@ path, and SHA-256; it does not copy them.
 
 The software chain is:
 
-- subject: `0429b4244fc1fd912bd211e80821ebdbabb8ae5d`
-- provenance: `738157c586561ec1e5466a997cd04758263c967b`
-- branch head: `a0040d49e9f089513b30b24e807a8f39c3bbf458`
+- branch: `codex/software`
+- subject: `742b12467efc9b37b7e4a2fa3ac73b7578f21385`
+- evidence publication/head: `1bf83ccd83913c5e66c2916e5250ccf5b27cad6f`
 
 The website chain is:
 
@@ -30,11 +30,20 @@ PR #88 must merge before the report PR may merge.
 
 ## Evidence boundary
 
-The frozen backend receipt records 1,139 tests in 759.17 seconds on a
-pre-commit worktree and explicitly sets `exact_final_commit_run=false`. It
-also records a 59-check focused bridge on the software subject commit. It does
-not receipt Ruff, mypy, or the Windows Rust desktop gate. The Rust gate was
-not run because Visual Studio C++ Build Tools and `link.exe` were unavailable.
+The frozen backend receipt records 1,147 tests in 788.78 seconds on the exact
+software subject commit and explicitly sets `exact_final_commit_run=true`.
+An 81-check focused supplement passed in 151.96 seconds on the same subject;
+the receipt states that it supplements, rather than bridges from, the exact
+full run. It does not receipt Ruff, mypy, or the Windows Rust desktop gate.
+The Rust gate was not run because Visual Studio C++ Build Tools and `link.exe`
+were unavailable.
+
+The v7 routing evidence preserves all three Evidence 2.7 provider freezes.
+The two Prompt 1.5 freezes independently regrade to 19/24 (unqualified) and
+21/24 (qualified); the current Prompt 1.6 freeze regrades to 24/24. These are
+unpaired stochastic calls. The current result qualifies the frozen
+development-routing contract and is not a causal prompt-lift estimate or a
+simulator-outcome claim.
 
 The website receipt records 322/322 frontend tests, typecheck, lint, build,
 nine deployment-contract tests, and deterministic 117-file output across two
@@ -146,4 +155,12 @@ The release uses two layers to avoid self-reference:
 2. Build from that source commit, then commit the final PDF, audit artifacts,
    and validation receipt that names and hashes the source commit.
 
-The report PR targets `codex/aurora-completion-20260728`, not `main`.
+Any integration of this report must retain software subject
+`742b12467efc9b37b7e4a2fa3ac73b7578f21385` and evidence head
+`1bf83ccd83913c5e66c2916e5250ccf5b27cad6f` as immutable dependencies.
+
+## Website handoff
+
+The website receives only the final validated PDF and its SHA-256. Report
+source, generators, manifests, ledgers, audits, and receipts remain owned by
+`technical-report/` and must not be copied into the website branch.

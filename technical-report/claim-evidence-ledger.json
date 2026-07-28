@@ -14,6 +14,30 @@
     {
       "literal": "Fifty-one contract cases",
       "reason": "The report may describe the export contract but not assert an unreceipted count."
+    },
+    {
+      "literal": "1,139/1,139",
+      "reason": "The v7 exact-final software receipt supersedes the earlier pre-commit count."
+    },
+    {
+      "literal": "759.17 seconds",
+      "reason": "The v7 exact-final software receipt supersedes the earlier duration."
+    },
+    {
+      "literal": "evidence bundle v6",
+      "reason": "Publication-facing references must resolve to the frozen v7 bundle."
+    },
+    {
+      "literal": "Archived AURORA router & 24/24",
+      "reason": "Table 1 must distinguish both Prompt 1.5 histories from the current Prompt 1.6 freeze."
+    },
+    {
+      "literal": "Evidence 2.4 / Prompt 1.1 only",
+      "reason": "Figures and tables now report the current Evidence 2.7 / Prompt 1.6 freeze."
+    },
+    {
+      "literal": "Prompt 1.5 require a fresh online provider freeze",
+      "reason": "The v7 evidence set contains current Prompt 1.6 qualification and both Prompt 1.5 histories."
     }
   ],
   "claims": [
@@ -29,7 +53,7 @@
         {
           "kind": "json_equals",
           "pointer": "/backend_tests/full_suite/result/passed",
-          "expected": 1139
+          "expected": 1147
         },
         {
           "kind": "json_equals",
@@ -39,29 +63,45 @@
         {
           "kind": "json_equals",
           "pointer": "/backend_tests/full_suite/duration_seconds",
-          "expected": 759.17
+          "expected": 788.78
         },
         {
           "kind": "json_equals",
           "pointer": "/backend_tests/full_suite/tested_state/exact_final_commit_run",
-          "expected": false
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/backend_tests/receipt_sha256",
+          "expected": "ec1a757cfbb6d6ccbc2e186ecd43e9e2656b2d7c9826643f703f296adc285108"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/backend_tests/full_suite/log/sha256",
+          "expected": "bf7be380922ff94db7ace78912b1aed376fce1c606317b191559e959bc79e869"
         },
         {
           "kind": "json_equals",
           "pointer": "/backend_tests/focused_checks/0/result/passed",
-          "expected": 59
+          "expected": 81
         },
         {
           "kind": "json_equals",
           "pointer": "/backend_tests/focused_checks/0/result/failed",
           "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/backend_tests/focused_checks/0/duration_seconds",
+          "expected": 151.96
         }
       ],
       "body_contains": [
-        "1,139/1,139 tests in",
-        "759.17 seconds on a pre-commit worktree",
-        "59-check subject bridge",
-        "Subject-focused bridge & 59 & 59",
+        "1,147/1,147 tests in",
+        "788.78 seconds on the exact software subject commit",
+        "81-check focused supplement",
+        "151.96 seconds",
+        "Subject-focused supplement & 81 & 81",
         "Windows Rust was not run"
       ]
     },
@@ -107,7 +147,7 @@
       ]
     },
     {
-      "id": "archived-provider-routing",
+      "id": "current-provider-routing",
       "report_locations": [
         "Abstract",
         "Section 4.1",
@@ -130,12 +170,37 @@
         {
           "kind": "json_equals",
           "pointer": "/routing/contract_current",
-          "expected": false
+          "expected": true
         },
         {
           "kind": "json_equals",
           "pointer": "/routing/qualification_scope",
-          "expected": "archived_evidence_2_4_prompt_1_1"
+          "expected": "current_evidence_2_7_prompt_1_6"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/evidence_schema_version",
+          "expected": "2.7"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/prompt_template_version",
+          "expected": "1.6"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/qualified",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/prompt_suite_sha256",
+          "expected": "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/stochasticity_boundary",
+          "expected": "The frozen provider response is graded deterministically. A fresh model call is a stochastic rerun, not causal proof of a prompt change."
         },
         {
           "kind": "json_product_approx",
@@ -168,10 +233,163 @@
         }
       ],
       "body_contains": [
-        "24/24 from persisted per-case",
+        "24/24 acceptable selections",
         "14/24",
         "5.625/24",
-        "Evidence 2.4 / Prompt 1.1 only"
+        "Evidence 2.7 / Prompt 1.6",
+        "not a causal prompt-lift estimate"
+      ]
+    },
+    {
+      "id": "prompt-1-5-first-routing-history",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Table 1",
+        "Section 7"
+      ],
+      "source_id": "routing_prompt_1_5_first_raw",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/evidence_schema_version",
+          "expected": "2.7"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/prompt_template_version",
+          "expected": "1.5"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/prompt_suite_sha256",
+          "expected": "76b31e43c687ee50a441679e5f63819d07f1ad997303cc862e274dab1221c93d"
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/predictions",
+          "expected": 24
+        },
+        {
+          "kind": "routing_prediction_grade",
+          "predictions_pointer": "/predictions",
+          "corpus_source_id": "routing_development_corpus_raw",
+          "related_source_ids": [
+            "routing_development_corpus_raw"
+          ],
+          "expected_cases": 24,
+          "expected_passed": 19,
+          "expected_failed_case_ids": [
+            "high_dimension_sparse_history_wins",
+            "local_progress_surrogate_leads",
+            "local_progress_turbo_leads",
+            "mixed_history_surrogate_clear_winner",
+            "tight_budget_one_full_matrix_left"
+          ]
+        }
+      ],
+      "body_contains": [
+        "Prompt 1.5 first freeze & 19/24 & Unqualified",
+        "first Prompt 1.5 freeze scored 19/24"
+      ]
+    },
+    {
+      "id": "prompt-1-5-repeat-routing-history",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Table 1",
+        "Section 7"
+      ],
+      "source_id": "routing_prompt_1_5_rerun_raw",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/evidence_schema_version",
+          "expected": "2.7"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/prompt_template_version",
+          "expected": "1.5"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/prompt_suite_sha256",
+          "expected": "76b31e43c687ee50a441679e5f63819d07f1ad997303cc862e274dab1221c93d"
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/predictions",
+          "expected": 24
+        },
+        {
+          "kind": "routing_prediction_grade",
+          "predictions_pointer": "/predictions",
+          "corpus_source_id": "routing_development_corpus_raw",
+          "related_source_ids": [
+            "routing_development_corpus_raw"
+          ],
+          "expected_cases": 24,
+          "expected_passed": 21,
+          "expected_failed_case_ids": [
+            "local_progress_surrogate_leads",
+            "mixed_history_surrogate_clear_winner",
+            "tight_budget_one_full_matrix_left"
+          ]
+        }
+      ],
+      "body_contains": [
+        "Prompt 1.5 repeat freeze & 21/24 & Qualified",
+        "second freeze under the same Prompt 1.5 template scored 21/24"
+      ]
+    },
+    {
+      "id": "prompt-1-6-current-routing-freeze",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Table 1",
+        "Figure 2",
+        "Figure 4"
+      ],
+      "source_id": "routing_prompt_1_6_current_raw",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/evidence_schema_version",
+          "expected": "2.7"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/prompt_template_version",
+          "expected": "1.6"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/prompt_suite_sha256",
+          "expected": "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/predictions",
+          "expected": 24
+        },
+        {
+          "kind": "routing_prediction_grade",
+          "predictions_pointer": "/predictions",
+          "corpus_source_id": "routing_development_corpus_raw",
+          "related_source_ids": [
+            "routing_development_corpus_raw"
+          ],
+          "expected_cases": 24,
+          "expected_passed": 24,
+          "expected_failed_case_ids": []
+        }
+      ],
+      "body_contains": [
+        "Prompt 1.6 current freeze & 24/24 & Current development qualification",
+        "do not identify a causal prompt effect"
       ]
     },
     {
@@ -256,6 +474,11 @@
           "kind": "json_equals",
           "pointer": "/physical_fidelity",
           "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/contract_versions/prompt_template",
+          "expected": "1.6"
         },
         {
           "kind": "latex_ablation_rows",
@@ -398,6 +621,16 @@
           "kind": "json_equals",
           "pointer": "/general_causal_claim_permitted",
           "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/artifact_sha256",
+          "expected": "6dc2e2219e2cbd47b8da0837ef12c6b3a26f5badb15fc09861af8497f2e19b0a"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/manifest_sha256",
+          "expected": "28092e9a5114bd4a02c297246cde8467014e22553d93c028a19b08db678a5072"
         },
         {
           "kind": "latex_component_arm_rows",
@@ -575,7 +808,7 @@
       ],
       "body_contains": [
         "2 $\\times$ 61 Candidates",
-        "Coverage v3 / generalization",
+        "Coverage v3 / gen.\\ v1",
         "Seed and mixed-shift reporting"
       ]
     },
@@ -594,7 +827,7 @@
         },
         {
           "kind": "text_contains",
-          "expected": "Prompt Template 1.5"
+          "expected": "Prompt Template 1.6"
         },
         {
           "kind": "text_contains",
@@ -615,7 +848,7 @@
       ],
       "body_contains": [
         "Evidence 2.7",
-        "Prompt 1.5",
+        "Prompt 1.6",
         "Decision Trace 1.3",
         "Execution Claim Gate 1.1",
         "Outcome Contract 2.20",

@@ -101,6 +101,7 @@ try {
 $logPath = Join-Path $buildRoot "main.log"
 $warningPatterns = @(
     "Overfull",
+    "Underfull",
     "LaTeX Warning",
     "Package .* Warning",
     "undefined control sequence",

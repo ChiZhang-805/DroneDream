@@ -172,6 +172,7 @@ def verify_assertion(
     text: str,
     body: str,
     phase_counts: dict[str, int] | None,
+    related_sources: dict[str, dict[str, Any]],
 ) -> None:
     kind = assertion["kind"]
     if kind == "json_equals":
@@ -217,6 +218,56 @@ def verify_assertion(
             raise ValueError(
                 f"len({assertion['pointer']}) expected "
                 f"{assertion['expected']!r}, found {actual!r}"
+            )
+        return
+    if kind == "routing_prediction_grade":
+        corpus_source_id = str(assertion["corpus_source_id"])
+        corpus_source = related_sources.get(corpus_source_id)
+        if corpus_source is None:
+            raise ValueError(
+                f"routing grade lacks related corpus source {corpus_source_id!r}"
+            )
+        corpus_rows = [
+            json.loads(line)
+            for line in corpus_source["text"].splitlines()
+            if line.strip()
+        ]
+        predictions = json_pointer(parsed, assertion["predictions_pointer"])
+        if not isinstance(predictions, dict):
+            raise ValueError("routing predictions must be a case-id object")
+        expected_case_ids = {str(row["case_id"]) for row in corpus_rows}
+        actual_case_ids = {str(case_id) for case_id in predictions}
+        if actual_case_ids != expected_case_ids:
+            raise ValueError(
+                "routing prediction case ids drifted: "
+                f"missing={sorted(expected_case_ids - actual_case_ids)}, "
+                f"extra={sorted(actual_case_ids - expected_case_ids)}"
+            )
+        failures: list[str] = []
+        for row in corpus_rows:
+            case_id = str(row["case_id"])
+            selected = str(predictions[case_id]["selected_tool"])
+            acceptable = {str(tool_id) for tool_id in row["acceptable_tools"]}
+            if selected not in acceptable:
+                failures.append(case_id)
+        passed = len(corpus_rows) - len(failures)
+        if len(corpus_rows) != assertion["expected_cases"]:
+            raise ValueError(
+                f"routing case count expected {assertion['expected_cases']}, "
+                f"found {len(corpus_rows)}"
+            )
+        if passed != assertion["expected_passed"]:
+            raise ValueError(
+                f"routing pass count expected {assertion['expected_passed']}, "
+                f"found {passed}"
+            )
+        expected_failures = sorted(
+            str(case_id) for case_id in assertion["expected_failed_case_ids"]
+        )
+        if sorted(failures) != expected_failures:
+            raise ValueError(
+                f"routing failures expected {expected_failures}, "
+                f"found {sorted(failures)}"
             )
         return
     if kind == "text_contains":
@@ -380,6 +431,54 @@ def verify_assertion(
     raise ValueError(f"unsupported assertion kind: {kind}")
 
 
+def verified_source(
+    repo: Path,
+    source_id: str,
+    available_sources: dict[str, dict[str, Any]],
+    source_cache: dict[str, dict[str, Any]],
+    source_results: list[dict[str, Any]],
+) -> dict[str, Any]:
+    cached = source_cache.get(source_id)
+    if cached is not None:
+        return cached
+    entry = available_sources.get(source_id)
+    if entry is None:
+        raise ValueError(f"unknown source id: {source_id}")
+    payload = git_bytes(
+        repo,
+        "show",
+        f"{entry['ref_commit']}:{entry['path']}",
+    )
+    actual_sha256 = sha256_bytes(payload)
+    if actual_sha256 != entry["file_sha256"]:
+        raise ValueError(
+            f"source SHA-256 expected {entry['file_sha256']}, found {actual_sha256}"
+        )
+    text = payload.decode("utf-8")
+    parsed: Any = None
+    if str(entry["path"]).endswith(".json"):
+        parsed = json.loads(text)
+    phase_counts = (
+        phase_role_counts(text) if source_id == "harness_phase_registry" else None
+    )
+    source = {
+        "payload": payload,
+        "text": text,
+        "parsed": parsed,
+        "phase_counts": phase_counts,
+    }
+    source_cache[source_id] = source
+    source_results.append(
+        {
+            "id": source_id,
+            "ref_commit": entry["ref_commit"],
+            "path": entry["path"],
+            "sha256": actual_sha256,
+        }
+    )
+    return source
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", type=Path, required=True)
@@ -424,60 +523,57 @@ def main() -> None:
         if entry is None:
             claim_failures.append(f"unknown source id: {source_id}")
         else:
-            if source_id not in source_cache:
-                try:
-                    payload = git_bytes(
-                        repo,
-                        "show",
-                        f"{entry['ref_commit']}:{entry['path']}",
-                    )
-                    actual_sha256 = sha256_bytes(payload)
-                    if actual_sha256 != entry["file_sha256"]:
-                        raise ValueError(
-                            f"source SHA-256 expected {entry['file_sha256']}, found {actual_sha256}"
-                        )
-                    text = payload.decode("utf-8")
-                    parsed: Any = None
-                    if str(entry["path"]).endswith(".json"):
-                        parsed = json.loads(text)
-                    phase_counts = (
-                        phase_role_counts(text) if source_id == "harness_phase_registry" else None
-                    )
-                    source_cache[source_id] = {
-                        "payload": payload,
-                        "text": text,
-                        "parsed": parsed,
-                        "phase_counts": phase_counts,
-                    }
-                    source_results.append(
-                        {
-                            "id": source_id,
-                            "ref_commit": entry["ref_commit"],
-                            "path": entry["path"],
-                            "sha256": actual_sha256,
-                        }
-                    )
-                except (
-                    OSError,
-                    UnicodeDecodeError,
-                    json.JSONDecodeError,
-                    subprocess.CalledProcessError,
-                    ValueError,
-                ) as exc:
-                    claim_failures.append(f"source verification failed: {exc}")
-            source = source_cache.get(source_id)
+            try:
+                source = verified_source(
+                    repo,
+                    source_id,
+                    available_sources,
+                    source_cache,
+                    source_results,
+                )
+            except (
+                OSError,
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+                subprocess.CalledProcessError,
+                ValueError,
+            ) as exc:
+                source = None
+                claim_failures.append(f"source verification failed: {exc}")
             if source is not None:
                 for assertion_index, assertion in enumerate(claim["assertions"], 1):
                     assertion_total += 1
                     try:
+                        related_sources = {
+                            related_source_id: verified_source(
+                                repo,
+                                related_source_id,
+                                available_sources,
+                                source_cache,
+                                source_results,
+                            )
+                            for related_source_id in assertion.get(
+                                "related_source_ids", []
+                            )
+                        }
                         verify_assertion(
                             assertion,
                             source["parsed"],
                             source["text"],
                             body,
                             source["phase_counts"],
+                            related_sources,
                         )
-                    except (KeyError, IndexError, TypeError, ValueError) as exc:
+                    except (
+                        KeyError,
+                        IndexError,
+                        OSError,
+                        TypeError,
+                        UnicodeDecodeError,
+                        json.JSONDecodeError,
+                        subprocess.CalledProcessError,
+                        ValueError,
+                    ) as exc:
                         claim_failures.append(
                             f"assertion {assertion_index} ({assertion['kind']}): {exc}"
                         )

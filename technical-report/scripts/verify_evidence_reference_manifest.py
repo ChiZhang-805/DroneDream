@@ -239,6 +239,11 @@ def main() -> int:
         "bundle source_commit mismatch",
         failures,
     )
+    require(
+        bundle.get("schema_version") == "dronedream.technical-report-evidence.v7",
+        "software evidence bundle is not v7",
+        failures,
+    )
 
     software_manifest = software_json.get("technical_report_evidence_manifest", {})
     require(
@@ -252,36 +257,120 @@ def main() -> int:
         "software manifest canonical bundle SHA-256 mismatch",
         failures,
     )
+    require(
+        software_manifest.get("bundle", {}).get("file_sha256")
+        == bundle_entry["file_sha256"],
+        "software manifest bundle file SHA-256 mismatch",
+        failures,
+    )
+    require(
+        software_manifest.get("generated_at") == "2026-07-28T07:53:56Z"
+        and bundle.get("generated_at") == software_manifest.get("generated_at"),
+        "software v7 generation timestamp mismatch",
+        failures,
+    )
+    manifest_sources = software_manifest.get("sources", {})
+    reference_by_id = {
+        str(item["id"]): item for item in software.get("source_references", [])
+    }
+    source_bindings = {
+        "harness_ablations": "harness_contract_ablation_raw",
+        "harness_outcome_campaign": "harness_fallback_outcome_campaign_raw",
+        "harness_component_outcome_ablation": (
+            "harness_component_outcome_ablation_raw"
+        ),
+        "routing_corpus": "routing_development_corpus_raw",
+        "routing_predictions": "routing_prompt_1_6_current_raw",
+    }
+    for manifest_id, reference_id in source_bindings.items():
+        declared = manifest_sources.get(manifest_id, {})
+        reference = reference_by_id.get(reference_id, {})
+        require(
+            declared.get("path") == reference.get("path")
+            and declared.get("sha256") == reference.get("file_sha256"),
+            f"software v7 source binding mismatch: {manifest_id}",
+            failures,
+        )
 
-    backend_receipt = software_json.get("backend_1139_test_receipt", {})
+    backend_entry = next(
+        item for item in software["artifacts"] if item["id"] == "backend_1147_test_receipt"
+    )
+    backend_source = manifest_sources.get("backend_test_receipt", {})
+    require(
+        backend_source.get("path") == backend_entry["path"]
+        and backend_source.get("sha256") == backend_entry["file_sha256"],
+        "software v7 backend receipt source binding mismatch",
+        failures,
+    )
+    backend_receipt = software_json.get("backend_1147_test_receipt", {})
     require(
         backend_receipt.get("source_commit") == software["subject_commit"],
         "backend receipt source_commit mismatch",
         failures,
     )
+    require(
+        backend_receipt.get("receipt_sha256")
+        == backend_entry["internal_receipt_sha256"],
+        "backend internal receipt SHA-256 mismatch",
+        failures,
+    )
     full_suite = backend_receipt.get("full_suite", {})
     require(
-        full_suite.get("result", {}).get("passed") == 1139
+        full_suite.get("result", {}).get("passed") == 1147
         and full_suite.get("result", {}).get("failed") == 0,
         "backend full-suite count mismatch",
         failures,
     )
     require(
-        full_suite.get("duration_seconds") == 759.17,
+        full_suite.get("duration_seconds") == 788.78,
         "backend full-suite duration mismatch",
         failures,
     )
     require(
-        full_suite.get("tested_state", {}).get("exact_final_commit_run") is False,
-        "backend receipt must preserve exact_final_commit_run=false",
+        full_suite.get("tested_state", {}).get("exact_final_commit_run") is True
+        and full_suite.get("tested_state", {}).get("base_commit")
+        == software["subject_commit"],
+        "backend receipt must bind an exact final-commit run",
+        failures,
+    )
+    require(
+        full_suite.get("log", {}).get("sha256")
+        == backend_entry["full_log_sha256"],
+        "backend full-suite log SHA-256 mismatch",
         failures,
     )
     focused = backend_receipt.get("focused_checks", [])
     require(
         len(focused) == 1
-        and focused[0].get("result", {}).get("passed") == 59
+        and focused[0].get("result", {}).get("passed") == 81
         and focused[0].get("result", {}).get("failed") == 0,
-        "backend focused bridge mismatch",
+        "backend focused supplement mismatch",
+        failures,
+    )
+    require(
+        len(focused) == 1 and focused[0].get("duration_seconds") == 151.96,
+        "backend focused duration mismatch",
+        failures,
+    )
+    require(
+        len(focused) == 1
+        and focused[0].get("log", {}).get("sha256")
+        == backend_entry["focused_log_sha256"],
+        "backend focused log SHA-256 mismatch",
+        failures,
+    )
+    require(
+        backend_receipt.get("validation_bridge", {}).get("full_suite_rerun_performed")
+        is True
+        and backend_receipt.get("validation_bridge", {}).get(
+            "focused_rerun_performed"
+        )
+        is True
+        and backend_receipt.get("validation_bridge", {}).get(
+            "focused_rerun_required"
+        )
+        is False,
+        "backend exact-run validation relationship mismatch",
         failures,
     )
 

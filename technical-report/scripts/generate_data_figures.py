@@ -64,7 +64,14 @@ def evidence_bundle(
             "frozen evidence bundle SHA-256 drifted: "
             f"expected {entry['file_sha256']}, found {actual_sha256}"
         )
-    return json.loads(payload.decode("utf-8")), entry
+    evidence = json.loads(payload.decode("utf-8"))
+    if evidence.get("schema_version") != "dronedream.technical-report-evidence.v7":
+        raise ValueError("data figures require the frozen v7 evidence bundle")
+    if evidence.get("source_commit") != manifest["software"]["subject_commit"]:
+        raise ValueError("data-figure bundle source commit drifted")
+    if evidence.get("bundle_sha256") != entry["canonical_sha256"]:
+        raise ValueError("data-figure canonical bundle SHA-256 drifted")
+    return evidence, entry
 
 
 def chart_style() -> None:
@@ -101,8 +108,15 @@ def pad_top(path: Path, target_height: int) -> None:
 
 def make_routing_bar(evidence: dict[str, Any], path: Path) -> None:
     routing = evidence["routing"]
+    if (
+        routing.get("evidence_schema_version") != "2.7"
+        or routing.get("prompt_template_version") != "1.6"
+        or routing.get("qualification_scope") != "current_evidence_2_7_prompt_1_6"
+        or routing.get("qualified") is not True
+    ):
+        raise ValueError("routing figure requires current Evidence 2.7 / Prompt 1.6")
     labels = [
-        "Archived AURORA\nrouter (2.4 / 1.1)",
+        "Current AURORA\nrouter (2.7 / 1.6)",
         "Best constant\npolicy",
         "Uniform random\nexpectation",
     ]
