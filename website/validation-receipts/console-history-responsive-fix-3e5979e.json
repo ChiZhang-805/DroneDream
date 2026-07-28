@@ -1,0 +1,169 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-independent-cross-line-verification",
+  "generatedAtUtc": "2026-07-28T08:52:54.311Z",
+  "subject": {
+    "ownerBranch": "codex/software",
+    "sourceCommit": "3e5979e0f36ed830000fb2ff0d66a20eb3abb762",
+    "evidenceCommit": "1972c0539ee77b692458613995482fc1d63b4bb5",
+    "modifiedWebsiteBranch": false
+  },
+  "upstreamEvidence": {
+    "receiptPath": "artifacts/test-runs/history-responsive-overflow/history-responsive-overflow-fix-receipt.json",
+    "receiptSha256": "927633591f3a92be5481b314b45d1c172a037610c0bb179f95fb261218df2d09",
+    "canonicalMeasurementsPath": "artifacts/test-runs/history-responsive-overflow/after-3e5979e/measurements.json",
+    "canonicalMeasurementsSha256": "b92861a08afb060fdbae1b8afafe18332d23b7778312621afdf1b8a09067adf3",
+    "subjectStylesSha256": "3352af5909dff6655eeadbbedae279cb06164efdc14df7c00170d0b7a2a0680c",
+    "rawBytesVerifiedWithGitArchive": true
+  },
+  "websiteVerifier": {
+    "branch": "codex/website",
+    "commit": "63bede4bdb3195f2b28943a2a73dbd1c28759c6b",
+    "script": "website/scripts/audit-browser-matrix.mjs",
+    "scriptSha256": "ae527f27ec30ba0f27a722f50b1c1483123821e85e55b429deec3add493edf73",
+    "command": "node website/scripts/audit-browser-matrix.mjs http://127.0.0.1:4189/ <temporary-report.json> edge http://127.0.0.1:4194/console/",
+    "reportSha256": "2600c5dfacfc3a702f1cefba1dacdc8a2292b884d5404236ae1b49c085dd2707",
+    "sourceState": "clean and upstream-aligned before execution",
+    "softwareSourceExecution": "git archive export to a non-repository system temporary directory",
+    "browser": "Microsoft Edge 150.0.4078.99",
+    "checks": 56,
+    "passed": 56,
+    "failed": 0,
+    "externalWarnings": 0
+  },
+  "requiredFourCaseMeasurements": [
+    {
+      "profile": "desktop-100",
+      "locale": "en",
+      "document": "1440/1440",
+      "appMain": "1200/1200",
+      "historyPage": "1157/1157",
+      "historyResults": "1116/1280",
+      "rightEdge": "164/164",
+      "rightmostHeaderVisible": true,
+      "resultsFocusable": true,
+      "reachableActions": "5/5",
+      "errors": 0
+    },
+    {
+      "profile": "desktop-100",
+      "locale": "zh-CN",
+      "document": "1440/1440",
+      "appMain": "1200/1200",
+      "historyPage": "1157/1157",
+      "historyResults": "1116/1280",
+      "rightEdge": "164/164",
+      "rightmostHeaderVisible": true,
+      "resultsFocusable": true,
+      "reachableActions": "5/5",
+      "errors": 0
+    },
+    {
+      "profile": "mobile-100",
+      "locale": "en",
+      "document": "390/390",
+      "appMain": "390/390",
+      "historyPage": "347/347",
+      "historyResults": "306/1280",
+      "rightEdge": "974/974",
+      "rightmostHeaderVisible": true,
+      "resultsFocusable": true,
+      "reachableActions": "5/5",
+      "errors": 0
+    },
+    {
+      "profile": "mobile-100",
+      "locale": "zh-CN",
+      "document": "390/390",
+      "appMain": "390/390",
+      "historyPage": "347/347",
+      "historyResults": "306/1280",
+      "rightEdge": "974/974",
+      "rightmostHeaderVisible": true,
+      "resultsFocusable": true,
+      "reachableActions": "5/5",
+      "errors": 0
+    }
+  ],
+  "additionalProfiles": [
+    {
+      "profile": "wide-100",
+      "physicalViewport": "2048x1280",
+      "localesPassed": [
+        "en",
+        "zh-CN"
+      ],
+      "note": "The 1280px table fits without horizontal scrolling."
+    },
+    {
+      "profile": "desktop-125",
+      "physicalViewport": "1440x1000",
+      "cssViewport": "1152x800",
+      "deviceScaleFactor": 1.25,
+      "localesPassed": [
+        "en",
+        "zh-CN"
+      ]
+    }
+  ],
+  "screenshotHashes": [
+    {
+      "profile": "desktop-100",
+      "locale": "en",
+      "sha256": "5586003cf8bec0a70da7a4e8b6f701a37b51a514dd3c78c43cc71171fd45cca8"
+    },
+    {
+      "profile": "desktop-100",
+      "locale": "zh-CN",
+      "sha256": "e5ffdb6c2c8257ff71b6badb25b82a7972878abafb94eba3b233100a8a5d2d61"
+    },
+    {
+      "profile": "wide-100",
+      "locale": "en",
+      "sha256": "a1d34b7cb661ab7532c9cb18bbad6301e50b42dffea91f88eebd6ebd2b2476e7"
+    },
+    {
+      "profile": "wide-100",
+      "locale": "zh-CN",
+      "sha256": "4cb705cb4471ed04dcf72d371cfbe034b5513ede4bdf3e0a873142e348d0a0ff"
+    },
+    {
+      "profile": "desktop-125",
+      "locale": "en",
+      "sha256": "94d9ce7aa61014756fceb1f9b423aa24ea705e31c170193854789f09f4409207"
+    },
+    {
+      "profile": "desktop-125",
+      "locale": "zh-CN",
+      "sha256": "e14bae07cc33eb40866582d4b7f41a800df08aae376e866407e59b07833ab58b"
+    },
+    {
+      "profile": "mobile-100",
+      "locale": "en",
+      "sha256": "86e3801c30444b224bc0b9d17ff67405ecaf24619ec3f19dc7520e158dd17ccc"
+    },
+    {
+      "profile": "mobile-100",
+      "locale": "zh-CN",
+      "sha256": "6e60855ed1c795db089bc0ff88c13b94ff42333bd719459ffd3b59054a67ec41"
+    }
+  ],
+  "safetyAndErrors": {
+    "unsafeApiRequests": 0,
+    "pageErrors": 0,
+    "applicationConsoleErrors": 0,
+    "failedRequests": 0,
+    "temporaryPreviewNoise": "One /favicon.ico 404 from the minimal Vite archive was identified by URL and excluded as non-application preview noise.",
+    "productionAccountUsed": false,
+    "productionSupabaseChanged": false,
+    "deploymentPerformed": false
+  },
+  "websiteTestOwnershipFinding": {
+    "softwareBranchFailure": "PublicSite billing availability fetch expectation",
+    "websiteBranchCommit": "b1f1b346c3c70836a540c4f9cee30c55763a1da2",
+    "websiteBranchResult": "50 files and 323 tests passed",
+    "reproducedOnWebsiteBranch": false,
+    "conclusion": "The software branch used an older website baseline; no additional website fix is required."
+  },
+  "conclusion": "pass"
+}
