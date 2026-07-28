@@ -1162,3 +1162,41 @@ binding. Its 10/10 result proves those enumerated software contracts only; it
 does not prove optimizer benefit, LLM superiority, PX4/Gazebo fidelity, or
 real-flight safety. The previous 554-Trial Evidence 2.7 component ablation
 remains a byte-frozen legacy result and is not relabeled as Evidence 2.8.
+
+### Evidence 2.9 bounded multi-tool execution and cost memory
+
+Evidence 2.9 upgrades `llm_harness` from a single selected optimizer to one
+strict generation plan with at most four allowlisted proposal-tool calls. The
+provider may allocate only the server-issued candidate, Trial, latency, and CPU
+ceilings. Deterministic code recompiles the plan, derives stable plan/call
+hashes, preserves a full verification matrix when required, runs only explicitly
+parallel-safe numerical calls concurrently, and keeps the portfolio in the
+serial lane. Parameter values, Trial creation, seeds, simulator access, and stop
+authority remain outside the provider.
+
+After pure proposal tools return, one bounded revision turn sees anonymous
+proposal references, tool IDs, effective fidelity, and normalized distance
+only. It cannot increase the frozen budget or invent a proposal. The final
+dispatch fence runs after both provider turns and every tool call, so a stale
+finalizer cannot create Candidate or Trial rows. Each dispatched Candidate binds
+the plan, call, tool allocation, revision, and fidelity receipt.
+
+The next planning snapshot includes at most eight verified
+`generation_plan_history` rows. A row exposes only de-identified plan source,
+revision source, terminal status, candidate/Trial counts, per-tool allocation
+and completion status, and bounded wall/CPU accounting. Decision IDs, revision
+IDs, call IDs, proposal references, parameters, model prose, credentials, and
+raw errors are absent. A result enters the snapshot only when its started,
+accepted/fallback, revision, compiled-plan hash, canonical call ledger, and
+result events form one unique ordered chain. Orphans, duplicates, future
+generations, version drift, hash drift, budget drift, and cost-total drift fail
+closed.
+
+`evaluate_harness_multi_tool_budget.py` provides the matching offline
+equal-configured-budget protocol. It compares direct portfolio execution with a
+schema-valid scripted multi-tool arm on `MockSimulatorAdapter`, records realized
+Trial use and local wall/CPU cost, blocks network connections, and uses no real
+credential or provider. It is dispatcher/provenance/accounting evidence only;
+it does not establish LLM quality, optimizer superiority, physical fidelity, or
+causal Harness benefit. The previous 554-Trial and Evidence 2.8 provider/memory
+artifacts remain historical freezes and are not relabeled as Evidence 2.9.

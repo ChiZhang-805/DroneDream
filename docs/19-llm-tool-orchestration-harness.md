@@ -1,9 +1,9 @@
 # LLM Tool-Orchestrated Optimization Harness
 
-Status: approved target design; trusted Evidence 2.8 user-isolated cross-Job memory plus scenario-profile, observational-reflection, and one-generation receding-plan gates implemented; current-version online provider rerun gated<br>
+Status: approved target design; Evidence 2.9 bounded multi-tool planning, execution, cost memory, and offline equal-budget evaluation implemented; current-version online provider rerun gated<br>
 Audience: backend, optimization, simulation, security, evaluation, and course-review stakeholders<br>
 Scope: DroneDream's automated PX4/Gazebo tuning loop<br>
-Last reviewed: 2026-07-27
+Last reviewed: 2026-07-28
 
 ## 1. Executive decision
 
@@ -8990,3 +8990,42 @@ freezes remain historical evidence; they are not evidence for the new memory
 channel. A new current-version provider campaign is still required before any
 claim about routing behavior, and an equal-budget outcome study is required
 before any optimization-benefit claim.
+
+## 32. Evidence 2.9 multi-tool plan and accounting boundary
+
+The production `llm_harness` dispatcher now accepts one closed generation plan
+instead of reducing every turn to one optimizer name. The immutable opportunity
+contains candidate capacity, remaining Trials, per-tool allocation ceilings,
+parallel-safety declarations, and generation latency/CPU ceilings. Local code
+validates and canonically recompiles the provider JSON, derives the plan hash and
+call identities, and rejects any plan that exceeds the Trial, candidate, call,
+latency, CPU, eligibility, or stop policy.
+
+Pure numerical calls are prepared before execution. Parallel-safe calls may run
+concurrently; the optimizer portfolio remains serial. Each call enforces its
+actual wall and CPU envelope, and an exception or overrun yields no proposal.
+One optional revision turn can select only anonymous proposal references already
+returned by those tools. Candidate/Trial creation happens only after a final
+lease fence. The provider never receives parameter values and never receives a
+callable simulator, database, shell, filesystem, or credential.
+
+Evidence 2.9 adds `generation_plan_history` to the next provider snapshot. The
+compiler requires a unique, ordered chain of plan start, accepted or
+deterministic-fallback plan, canonical compiled-plan hash, revision start and
+accepted/fallback decision when applicable, and one final execution result. It
+recompiles the stored plan against the exact opportunity and checks every tool
+ledger row and cost total. Missing companions, duplicates, generation replay,
+hash/version drift, selected-reference drift, and accounting drift exclude the
+whole generation. The projection contains aggregate source/status/count/cost
+facts only; all opaque IDs, proposal references, parameters, model prose,
+credentials, and raw errors are removed.
+
+The offline `harness-multi-tool-budget-evaluation-v1` protocol gives direct
+portfolio and scripted multi-tool arms identical `max_iterations` and
+`max_total_trials`, uses `MockSimulatorAdapter`, records realized Trial use and
+the live plan/revision/tool wall and CPU receipts, and blocks all socket
+connections. Scripted schema-valid decisions are not real model calls.
+Consequently this evaluation can support dispatcher, provenance, concurrency,
+and accounting claims only. It cannot support LLM-quality, optimizer-superiority,
+PX4/Gazebo, real-flight, or causal-benefit claims. Any real Evidence 2.9 model
+campaign remains subject to the separate per-run API approval gate.

@@ -425,10 +425,10 @@ source-controlled software-contract evidence; generated files under
 `artifacts/technical-report/` are frozen report inputs and are not
 physical-performance evidence.
 
-### Evidence 2.8 cross-Job memory contract
+### Frozen Evidence 2.8 cross-Job memory contract
 
-The current software contract is Evidence 2.8 / Prompt Template 1.7 / Decision
-Trace 1.4. Its new `harness-cross-job-memory-contract-v1` bundle contains 10
+The v9 frozen software contract is Evidence 2.8 / Prompt Template 1.7 /
+Decision Trace 1.4. Its `harness-cross-job-memory-contract-v1` bundle contains 10
 deterministic in-memory SQLite cases: two compatible same-user retrievals and
 eight negative isolation/lifecycle cases covering cross-user, anonymous,
 task-family, catalog-version, revocation, expiry, contract-version, and
@@ -441,3 +441,30 @@ Evidence 2.7 / Prompt 1.6 historical freezes. They must stay byte-identical and
 must not be cited as validation of the cross-Job memory channel. A new
 current-version provider run and an equal-budget outcome comparison remain
 separate gates.
+
+### Current Evidence 2.9 multi-tool dispatcher contract
+
+The current runtime contract is Evidence 2.9. It adds a bounded multi-tool
+generation plan, one anonymous proposal-revision turn, per-tool wall/CPU
+enforcement, finalization fences, and a verified de-identified
+`generation_plan_history`. Every history row must recompile from the persisted
+opportunity to the same plan hash and must match its revision and final tool
+ledger. Orphan, duplicate, replayed, version-drifted, hash-drifted, and
+cost-drifted rows are excluded instead of repaired by event adjacency.
+
+`backend/scripts/evaluate_harness_multi_tool_budget.py` is the source-owned
+offline evidence generator. It gives the direct portfolio and scripted
+multi-tool arm the same configured two-generation, 40-Trial ceiling on
+`MockSimulatorAdapter`; records realized Trial use plus plan, revision, tool
+wall, and tool CPU measurements; verifies each multi-tool result through the
+Evidence 2.9 history compiler; and blocks all network connections. The scripted
+policy makes zero real provider calls and reads no credential.
+
+This evidence is classified `SYNTHETIC_MOCK`. It can establish execution,
+provenance, fail-closed history, concurrency, and accounting behavior under the
+enumerated fixtures. It cannot establish LLM routing quality, optimizer
+superiority, PX4/Gazebo fidelity, physical-flight improvement, safety, or causal
+Harness benefit. The Evidence 2.8 online routing artifact and prior component
+ablations remain immutable historical freezes. A real Evidence 2.9 provider
+campaign requires a new, single-use user approval for its stated call count and
+possible cost.
