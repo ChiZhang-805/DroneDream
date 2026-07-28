@@ -7,12 +7,19 @@
 </p>
 
 <p align="center">
+  <img alt="XeLaTeX publication" src="https://img.shields.io/badge/XeLaTeX-publication-7C3AED?style=for-the-badge&logo=latex&logoColor=white" />
+  <img alt="Thirteen-page report" src="https://img.shields.io/badge/Report-13%20pages-2563EB?style=for-the-badge" />
+  <img alt="Claim-evidence ledger" src="https://img.shields.io/badge/Claims-evidence%20ledger-8B5CF6?style=for-the-badge" />
+  <img alt="SHA-256 validation receipts" src="https://img.shields.io/badge/Validation-SHA--256%20receipts-EC4899?style=for-the-badge" />
+</p>
+
+<p align="center">
   <a href="technical-report/output/DroneDream_AURORA_Technical_Report.pdf">Read the PDF</a> ·
   <a href="technical-report/README.md">Report provenance</a> ·
   <a href="https://github.com/ChiZhang-805/DroneDream/tree/codex/software">Software evidence source</a>
 </p>
 
-## The report track
+## 📄 The report track
 
 This branch owns the publication source and validation boundary for
 **“AURORA: Agentic UAV Refinement through Optimization, Reflection, and
@@ -24,7 +31,7 @@ The report is not a second software tree. It reads frozen software and website
 evidence by commit and hash, while keeping its LaTeX, figures, claim ledger,
 reference manifest, audits, and finished PDF under `technical-report/`.
 
-## The question it investigates
+## ❓ The question it investigates
 
 Controller tuning is often described as a search for better gains. The report
 asks a harder question: how can an agent coordinate optimization tools while
@@ -37,7 +44,7 @@ deterministic numerical optimizers and an evidence verifier. The model may
 select and reflect within that surface, but it cannot redefine the simulator,
 silently weaken policy, or promote unverified outcomes.
 
-## What the report contains
+## 🧩 What the report contains
 
 The paper moves from product scope and related work into the AURORA system
 design, then evaluates several distinct evidence classes:
@@ -52,7 +59,7 @@ design, then evaluates several distinct evidence classes:
 Architecture and data figures are generated or verified from bound source
 artifacts rather than being treated as untracked illustrations.
 
-## How evidence is governed
+## 🔐 How evidence is governed
 
 Every material claim is mapped through a claim-evidence ledger to a frozen
 source in the evidence-reference manifest. The validation pipeline checks
@@ -63,7 +70,7 @@ Software-owned evidence stays on the software line; website validation stays on
 the website line. The report records their paths, commits, and hashes instead
 of copying and silently modifying the underlying evidence.
 
-## What the results do—and do not—show
+## ⚖️ What the results do—and do not—show
 
 The report supports conclusions about policy eligibility, fail-closed behavior,
 reproducible routing measurements, synthetic optimizer integration, and the
@@ -75,7 +82,7 @@ unverified wind, sensor, battery, payload, or actuator effects were physically
 applied. Broader provider comparisons and full scenario-complete PX4/Gazebo
 campaigns remain future experimental gates.
 
-## Read the report
+## 📖 Read the report
 
 - Open the
   [DroneDream AURORA Technical Report](technical-report/output/DroneDream_AURORA_Technical_Report.pdf).
