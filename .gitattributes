@@ -38,3 +38,4 @@ backend/evaluation_artifacts/*.sha256 text eol=lf
 # Frozen evidence is content-addressed over exact bytes.
 /artifacts/technical-report/* -text -diff
 /artifacts/test-runs/* -text -diff
+/artifacts/test-runs/** -text -diff
