@@ -5,11 +5,16 @@ import { createRequire } from "node:module";
 const frontendRequire = createRequire(new URL("../../frontend/package.json", import.meta.url));
 const { chromium, firefox } = frontendRequire("playwright");
 
-const [baseUrlRaw, outputRaw = "", browserListRaw = "edge,chrome,lenovo,firefox"] =
-  process.argv.slice(2);
+const [
+  baseUrlRaw,
+  outputRaw = "",
+  browserListRaw = "edge,chrome,lenovo,firefox",
+  consolePreviewUrlRaw = "",
+] = process.argv.slice(2);
 if (!baseUrlRaw) {
   console.error(
-    "Usage: node audit-browser-matrix.mjs <base-url> [output.json] [edge,chrome,lenovo,firefox]",
+    "Usage: node audit-browser-matrix.mjs <base-url> [output.json] "
+      + "[edge,chrome,lenovo,firefox] [console-preview-url]",
   );
   process.exit(2);
 }
@@ -17,6 +22,17 @@ if (!baseUrlRaw) {
 const baseUrl = new URL(baseUrlRaw.endsWith("/") ? baseUrlRaw : `${baseUrlRaw}/`);
 if (!["http:", "https:"].includes(baseUrl.protocol)) {
   throw new Error("The matrix base URL must use HTTP or HTTPS.");
+}
+const consolePreviewUrl = consolePreviewUrlRaw
+  ? new URL(
+    consolePreviewUrlRaw.endsWith("/") ? consolePreviewUrlRaw : `${consolePreviewUrlRaw}/`,
+  )
+  : null;
+if (
+  consolePreviewUrl
+  && !["http:", "https:"].includes(consolePreviewUrl.protocol)
+) {
+  throw new Error("The console preview URL must use HTTP or HTTPS.");
 }
 
 const browserCandidates = {
@@ -65,6 +81,26 @@ const routes = [
   { name: "community", path: "/community/", root: "#site-root > .dd-site" },
   { name: "console", path: "/console/", root: "#root > .app-shell" },
 ];
+if (consolePreviewUrl) {
+  routes.push(
+    {
+      name: "console-assistant-preview",
+      path: "assistant?docsPreview=1",
+      expectedPath: "/console/assistant",
+      root: "#root > .app-shell",
+      baseUrl: consolePreviewUrl,
+      consolePreview: true,
+    },
+    {
+      name: "console-history-preview",
+      path: "history?docsPreview=1",
+      expectedPath: "/console/history",
+      root: ".history-page",
+      baseUrl: consolePreviewUrl,
+      consolePreview: true,
+    },
+  );
+}
 const locales = ["en", "zh-CN"];
 const standardProfiles = [
   {
@@ -103,9 +139,9 @@ const screenshotDirectory = outputPath
   : "";
 if (screenshotDirectory) mkdirSync(screenshotDirectory, { recursive: true });
 
-const sameOrigin = (value) => {
+const sameOrigin = (value, routeBaseUrl) => {
   try {
-    return new URL(value).origin === baseUrl.origin;
+    return new URL(value).origin === routeBaseUrl.origin;
   } catch {
     return false;
   }
@@ -492,6 +528,52 @@ const checkHomeKeyboard = async (page) => {
   return issues;
 };
 
+const checkConsolePreview = async (page, routeName) => page.evaluate((activeRoute) => {
+  const visible = (node) => {
+    if (!(node instanceof Element)) return false;
+    const style = getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    return style.display !== "none"
+      && style.visibility !== "hidden"
+      && rect.width > 0
+      && rect.height > 0;
+  };
+  const issues = [];
+  const accountName = document.querySelector(".app-account-copy strong")?.textContent?.trim();
+  if (accountName !== "DroneDream Pilot") {
+    issues.push(`docs preview account is not active (${accountName || "missing"})`);
+  }
+  const sidebar = document.querySelector(".app-sidebar");
+  if (!visible(sidebar)) issues.push("application sidebar is not visible");
+  const nav = document.querySelector(".app-nav");
+  if (!visible(nav) || nav.querySelectorAll("a").length < 4) {
+    issues.push("application navigation is incomplete");
+  }
+  const activeNav = nav?.querySelector("a.active");
+  if (!visible(activeNav)) issues.push("active application navigation item is missing");
+  const blockingDialog = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')]
+    .find(visible);
+  if (blockingDialog) issues.push("authenticated preview is blocked by a modal dialog");
+
+  if (activeRoute === "console-history-preview") {
+    const history = document.querySelector(".history-page");
+    const scroller = document.querySelector(".history-results");
+    const table = scroller?.querySelector("table");
+    if (!visible(history)) issues.push("history page is not visible");
+    if (!visible(scroller)) issues.push("history results scroller is not visible");
+    if (!visible(table)) issues.push("history table is not visible");
+    if (
+      scroller
+      && table
+      && table.scrollWidth > scroller.clientWidth + 2
+      && !["auto", "scroll"].includes(getComputedStyle(scroller).overflowX)
+    ) {
+      issues.push("wide history table is not owned by a horizontal scroll container");
+    }
+  }
+  return issues;
+}, routeName);
+
 const results = [];
 const unavailable = [];
 for (const browserName of requestedBrowsers) {
@@ -532,23 +614,24 @@ for (const browserName of requestedBrowsers) {
             const page = await context.newPage();
             const errors = [];
             const externalWarnings = [];
+            const routeBaseUrl = route.baseUrl ?? baseUrl;
             page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
             page.on("requestfailed", (request) => {
               const message = `${request.method()} ${request.url()}: ${
                 request.failure()?.errorText ?? "request failed"
               }`;
               if (request.failure()?.errorText === "net::ERR_ABORTED") return;
-              if (sameOrigin(request.url())) errors.push(message);
+              if (sameOrigin(request.url(), routeBaseUrl)) errors.push(message);
               else externalWarnings.push(message);
             });
             page.on("response", (response) => {
               if (response.status() < 400) return;
               const message = `${response.status()} ${response.request().method()} ${response.url()}`;
-              if (sameOrigin(response.url())) errors.push(message);
+              if (sameOrigin(response.url(), routeBaseUrl)) errors.push(message);
               else externalWarnings.push(message);
             });
 
-            const url = new URL(route.path, baseUrl).href;
+            const url = new URL(route.path, routeBaseUrl).href;
             await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
             await page.waitForSelector(route.root, { state: "visible", timeout: 60_000 });
             await page.evaluate(async () => {
@@ -560,7 +643,8 @@ for (const browserName of requestedBrowsers) {
             await page.waitForTimeout(250);
 
             const layout = await collectLayout(page, route.name);
-            const expectedPath = route.name === "console" ? "/console/" : route.path;
+            const expectedPath = route.expectedPath
+              ?? (route.name === "console" ? "/console/" : route.path);
             if (
               route.name === "console"
                 ? !layout.path.startsWith(expectedPath)
@@ -574,10 +658,19 @@ for (const browserName of requestedBrowsers) {
               if (profile.viewport.width <= 1050) errors.push(...await checkMobileMenu(page));
             }
             if (route.name === "home") errors.push(...await checkHomeKeyboard(page));
+            if (route.consolePreview) {
+              errors.push(...await checkConsolePreview(page, route.name));
+            }
 
             const shouldCapture = browserName === "edge" || route.name === "home";
             let screenshot = "";
             if (screenshotDirectory && shouldCapture) {
+              await page.evaluate(async () => {
+                window.scrollTo(0, 0);
+                await new Promise((resolveFrame) => {
+                  requestAnimationFrame(() => requestAnimationFrame(resolveFrame));
+                });
+              });
               screenshot = join(
                 screenshotDirectory,
                 `${browserName}-${profile.name}-${locale}-${route.name}.png`,
@@ -619,6 +712,7 @@ const failures = results.filter((result) => result.errors.length > 0);
 const report = {
   generatedAt: new Date().toISOString(),
   baseUrl: baseUrl.href,
+  consolePreviewUrl: consolePreviewUrl?.href ?? null,
   requestedBrowsers,
   unavailable,
   summary: {

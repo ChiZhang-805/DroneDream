@@ -1,0 +1,152 @@
+{
+  "receiptSchemaVersion": 1,
+  "generatedAtUtc": "2026-07-28T08:24:29.932Z",
+  "receiptKind": "cross-line-responsive-failure-baseline",
+  "subject_commit": "ceaab92b9816ce76b95a597d20100b1a7fefe6c9",
+  "subjectScope": {
+    "consoleSource": "Vite development server at the subject commit",
+    "productionArtifactSourceCommit": "05b523882148f782ed51b846ecf57ef1d1c451a5",
+    "workingTreeChangesDuringMeasurement": [
+      "website/README.md",
+      "website/scripts/audit-browser-matrix.mjs"
+    ],
+    "softwareOwnedSourceModified": false
+  },
+  "environment": {
+    "os": "Windows",
+    "browser": "Microsoft Edge",
+    "browserVersion": "150.0.4078.99",
+    "consoleMode": "Vite development-only docsPreview identity",
+    "productionAccountUsed": false,
+    "productionSupabaseChanged": false,
+    "backendWritePerformed": false
+  },
+  "audit": {
+    "command": "node website/scripts/audit-browser-matrix.mjs http://127.0.0.1:4189/ %TEMP%\\dronedream-browser-matrix-console-baseline.json edge http://127.0.0.1:4191/console/",
+    "scriptSha256": "6cb3e37e78a7e0bf3b0edb38c152a8cdb6ba650d2b10794e5b44765edd0631fb",
+    "fullReportSha256": "3a8cec1cfe56401c3ee2132f2328b22f7f7333df38bfb4f85c63d436e816323f",
+    "fullReportRetention": "temporary local file; canonical failure measurements are frozen below",
+    "checks": 56,
+    "passed": 50,
+    "failed": 6,
+    "externalWarnings": 0
+  },
+  "consoleHistoryMeasurements": [
+    {
+      "profile": "desktop-100",
+      "physicalViewport": "1440x1000",
+      "cssViewport": "1440x1000",
+      "deviceScaleFactor": 1,
+      "locale": "en",
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "failure": "main-content clips 142px horizontally",
+      "screenshotSha256": "97d403f9914ec69d4fd0536b52d41772fde621d6d4c37904ce320368b8bdc7cc"
+    },
+    {
+      "profile": "desktop-100",
+      "physicalViewport": "1440x1000",
+      "cssViewport": "1440x1000",
+      "deviceScaleFactor": 1,
+      "locale": "zh-CN",
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "failure": "main-content clips 142px horizontally",
+      "screenshotSha256": "946feb6c995299496955a5bbf96dbbfc2bd8d97499bc8ef12cfdb744b277c6b5"
+    },
+    {
+      "profile": "wide-100",
+      "physicalViewport": "2048x1280",
+      "cssViewport": "2048x1280",
+      "deviceScaleFactor": 1,
+      "locale": "en",
+      "documentWidth": 2048,
+      "viewportWidth": 2048,
+      "failure": null,
+      "screenshotSha256": "a1d34b7cb661ab7532c9cb18bbad6301e50b42dffea91f88eebd6ebd2b2476e7"
+    },
+    {
+      "profile": "wide-100",
+      "physicalViewport": "2048x1280",
+      "cssViewport": "2048x1280",
+      "deviceScaleFactor": 1,
+      "locale": "zh-CN",
+      "documentWidth": 2048,
+      "viewportWidth": 2048,
+      "failure": null,
+      "screenshotSha256": "4cb705cb4471ed04dcf72d371cfbe034b5513ede4bdf3e0a873142e348d0a0ff"
+    },
+    {
+      "profile": "desktop-125",
+      "physicalViewport": "1440x1000",
+      "cssViewport": "1152x800",
+      "deviceScaleFactor": 1.25,
+      "locale": "en",
+      "documentWidth": 1152,
+      "viewportWidth": 1152,
+      "failure": "main-content clips 430px horizontally",
+      "screenshotSha256": "f6a3954d46bb2533d26649a17abf60e8ebe314c5d9861e1613dc10bea0fa74cf"
+    },
+    {
+      "profile": "desktop-125",
+      "physicalViewport": "1440x1000",
+      "cssViewport": "1152x800",
+      "deviceScaleFactor": 1.25,
+      "locale": "zh-CN",
+      "documentWidth": 1152,
+      "viewportWidth": 1152,
+      "failure": "main-content clips 430px horizontally",
+      "screenshotSha256": "a32e0d52bcba0ed3592df0a846318f8ef37ca7b86424d4ed6b523635421e868d"
+    },
+    {
+      "profile": "mobile-100",
+      "physicalViewport": "390x844",
+      "cssViewport": "390x844",
+      "deviceScaleFactor": 1,
+      "locale": "en",
+      "documentWidth": 1342,
+      "viewportWidth": 390,
+      "failure": "document horizontal overflow 952px",
+      "screenshotSha256": "61e57c458e6d779753e66f3523462d9a521a51d2913071d92848bbd8ba002d34"
+    },
+    {
+      "profile": "mobile-100",
+      "physicalViewport": "390x844",
+      "cssViewport": "390x844",
+      "deviceScaleFactor": 1,
+      "locale": "zh-CN",
+      "documentWidth": 1342,
+      "viewportWidth": 390,
+      "failure": "document horizontal overflow 952px",
+      "screenshotSha256": "c093185fdd39014fbcca164b0d2fa8e0206745672d3c4a358214e9e9f72ecec9"
+    }
+  ],
+  "rootCauseEvidence": {
+    "historyBodyDisplay": "grid",
+    "historyBodyComputedColumnWidth": 1320.78,
+    "historyTableMinWidth": 1280,
+    "historyResultsOverflowX": "auto",
+    "historyGridItemMinWidth": "auto",
+    "conclusion": "The table min-content width expands the grid item before the intended history-results scroll container can constrain it."
+  },
+  "ownership": {
+    "requiredFixPath": "frontend/src/styles.css",
+    "ownerBranch": "codex/software",
+    "websiteBranchWillModifyFixPath": false,
+    "crossLineHandoffSent": true
+  },
+  "fixAcceptanceGate": {
+    "requiredCombinations": [
+      "1440x1000 en",
+      "1440x1000 zh-CN",
+      "390x844 en",
+      "390x844 zh-CN"
+    ],
+    "conditions": [
+      "document scrollWidth equals clientWidth",
+      "history-results owns any table horizontal overflow",
+      "history table remains horizontally scrollable inside history-results",
+      "sidebar, page heading, filters, and active navigation remain reachable"
+    ]
+  }
+}

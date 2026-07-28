@@ -53,7 +53,7 @@ describe it as a preview rather than a signed production release.
 For local review:
 
 ```powershell
-npm.cmd --prefix frontend run site:preview
+python -m http.server 4174 --bind 127.0.0.1 --directory frontend/site-dist
 ```
 
 Open `http://127.0.0.1:4174/`.
@@ -80,6 +80,36 @@ mobile layouts in every browser, plus 2048x1280 and a 125%-scaled 1440x1000
 profile in Edge. Missing requested browsers, page errors, overflow, clipped
 copy, unnamed controls, broken landmarks, dialog focus, mobile-menu focus, or
 keyboard interaction failures make the command fail.
+
+The production `/console/` route correctly exercises its signed-out account
+gate. To add the authenticated console sidebar, assistant, and run-history
+surfaces without using a production account, start the development-only
+`docsPreview` console in a second terminal:
+
+```powershell
+Push-Location frontend
+$env:VITE_SUPABASE_URL = "https://local-preview.invalid"
+$env:VITE_SUPABASE_PUBLISHABLE_KEY = "local-preview-only"
+npm.cmd exec -- vite --config vite.console.config.ts `
+  --host 127.0.0.1 --port 4191 --strictPort
+```
+
+Then pass its base URL as the optional fourth matrix argument:
+
+```powershell
+node website/scripts/audit-browser-matrix.mjs `
+  http://127.0.0.1:4174/ `
+  work/website-browser-matrix.json `
+  edge,chrome,lenovo,firefox `
+  http://127.0.0.1:4191/console/
+```
+
+The development identity is local and ephemeral, makes no production Supabase
+change, and is unavailable in built production assets. The added checks require
+the console sidebar, active navigation, preview account, assistant, and history
+table to remain visible in both languages and every configured viewport. A wide
+history table must scroll inside its own results container rather than widening
+or clipping the document.
 
 Use the stricter copy-fit audit for supported desktop review sizes and the
 layout-only mode for mobile, where English and Chinese line counts are expected
