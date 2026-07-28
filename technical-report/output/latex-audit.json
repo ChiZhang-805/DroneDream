@@ -10,13 +10,13 @@
         "page": 1,
         "style": "abstract",
         "policy_category": "explanatory_body",
-        "lines": 21,
-        "last_line_ratio": 0.872,
-        "last_line_text": "qualification gates before either optimization quality or simulator fidelity can be claimed in customer deployment.",
+        "lines": 20,
+        "last_line_ratio": 1.0,
+        "last_line_text": "outcomes under frozen conditions, with retained failures and independent recomputation before any deployment or release decision.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "UAV controller tuning in simulation is often framed as gain search, yet a credible experiment must also bind every Candidate to an intended scenario, finite budget, objective and constraint policy, trustworthy execution, and holdout boundary. Foundation models can interpret intent and coordinate methods, but a fluent response cannot prove that the declared experiment actually ran. AURORA—AGENTIC UAV REFINEMENT THROUGH OPTIMIZATION, REFLECTION, AND ASSURANCE—is the evidence-gated Harness inside DroneDream 1.0. It compiles bounded context, filters tool eligibility before routing, selects versioned optimizers or deterministic fallbacks, executes from an immutable Trial, Candidate, and Job snapshot, verifies claim receipt v3 and Outcome Contract 2.20, isolates fault and holdout evidence, and freezes final selection only after deterministic checks pass. Models may propose and route work; software contracts retain authority over parameter domains, state transitions, evidence admission, and completion. Evidence 2.7 additionally compiles one bounded observational reflection from each verified decision cohort. It admits accepted work, optimizer-learning Trials, domain failures, feasibility, incumbent change, and observed improvement only when the execution receipt and every modern Candidate receipt agree; any incomplete, legacy, or drifted cohort makes the entire block unavailable, and no association becomes causal tool credit. Frozen evidence records 1,139 backend tests in 759.17 seconds; its receipt marks the full suite as a pre-commit run and binds a 59-check focused bridge to the software subject commit. The separate Windows Rust gate was not run. Current software evidence records 16/16 deterministic policy-holdout checks, 25/25 source-contract probes versus 6/25 with weakened guards, and 10/10 matched fallback comparisons across a 15-Job, 579-Trial synthetic campaign. A separate frozen four-arm component ablation spans 20 Jobs and 554 Trials with complete evidence and zero network access; its receipt-only-memory isolation is explicitly inconclusive in 5/5 seed blocks. The archived 24/24 provider-routing result remains valid only for Evidence 2.4 and Prompt 1.1. These results validate exercised routing, provenance, reflection, and recovery contracts; they do not prove general optimizer superiority, physical simulator quality, real-aircraft safety, or simulation-to-reality transfer. A fresh online provider freeze for Evidence 2.7 and Prompt 1.5 and a matched multi-seed PX4/Gazebo outcome campaign remain explicit qualification gates before either optimization quality or simulator fidelity can be claimed in customer deployment."
+        "text": "UAV controller tuning in simulation is often framed as gain search, yet a credible experiment must also bind every Candidate to an intended scenario, finite budget, objective and constraint policy, trustworthy execution, and holdout boundary. Foundation models can interpret intent and coordinate methods, but a fluent response cannot prove that the declared experiment actually ran. AURORA—AGENTIC UAV REFINEMENT THROUGH OPTIMIZATION, REFLECTION, AND ASSURANCE—is the evidence-gated Harness inside DroneDream 1.0. It compiles bounded context, filters tool eligibility before routing, selects versioned optimizers or deterministic fallbacks, executes from an immutable Trial, Candidate, and Job snapshot, verifies claim receipt v3 and Outcome Contract 2.20, isolates fault and holdout evidence, and freezes final selection only after deterministic checks pass. Models may propose and route work; software contracts retain authority over parameter domains, state transitions, evidence admission, and completion. Evidence 2.7 additionally compiles a bounded observational reflection from each verified decision cohort. It admits accepted work, optimizer-learning Trials, domain failures, feasibility, incumbent change, and observed improvement only when the execution receipt and every modern Candidate receipt agree; any incomplete, legacy, or drifted cohort makes the entire block unavailable, and no association becomes causal tool credit. Exact-commit evidence records 1,147 backend tests in 788.78 seconds plus an 81-check focused supplement on the same software subject; Windows Rust was not run. Frozen software artifacts further record 16/16 deterministic policy-holdout checks, 25/25 guarded source-contract probes versus 6/25 weakened, and 10/10 matched fallback comparisons over 15 Jobs and 579 Trials. A network-free four-arm ablation spans 20 Jobs and 554 Trials, while its receipt-only-memory isolation remains inconclusive in 5/5 seed blocks. The current Evidence 2.7 / Prompt 1.6 provider freeze grades 24/24; Prompt 1.5 histories grade 19/24 (unqualified) and 21/24 (qualified), exposing unpaired stochastic variation rather than causal prompt lift. These results validate exercised routing, provenance, reflection, and recovery contracts, not general optimizer superiority, physical simulator quality, real-aircraft safety, or simulation-to-reality transfer. Customer qualification still requires matched multi-seed PX4/Gazebo outcomes under frozen conditions, with retained failures and independent recomputation before any deployment or release decision."
       },
       {
         "index": 2,
@@ -98,6 +98,19 @@
       },
       {
         "index": 8,
+        "page": 2,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 6,
+        "last_line_ratio": 0.8185,
+        "last_line_text": "artifacts. Each stage narrows authority, so fluent output cannot bypass an executable contract or test.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "line_policy_passed": true,
+        "text": "AURORA IS A CONSTRAINED DECISION SYSTEM AROUND SIMULATION. Context binds parameters, scenarios, history, budgets, and failures. Capability eligibility removes incompatible tools, while a phase gate exposes only methods suited to exploration, recovery, refinement, diversification, or verification. The router ranks that executable surface and the optimizer proposes Candidates. Verification forces every reduced-fidelity strategy to fidelity 1.0 before acceptance. Provenance-bound memory admits trusted outcomes, while the final gate freezes holdout results and rejects incomplete artifacts. Each stage narrows authority, so fluent output cannot bypass an executable contract or test."
+      },
+      {
+        "index": 9,
         "page": 3,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -110,7 +123,7 @@
         "text": "Desktop boundary — readiness, user input, progress, settings, and safe exit; entry remains hidden while any required launch check is pending or failed across every required readiness stage."
       },
       {
-        "index": 9,
+        "index": 10,
         "page": 3,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -123,7 +136,7 @@
         "text": "Backend boundary — drafts, jobs, orchestration, APIs, and artifacts; only validated state transitions and stable failure codes are accepted before persistence, dispatch, or artifact publication."
       },
       {
-        "index": 10,
+        "index": 11,
         "page": 3,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -136,7 +149,7 @@
         "text": "AURORA authority — context, eligibility, routing, reflection, and evidence memory; only provenance-complete evidence may influence a decision during routing and final selection."
       },
       {
-        "index": 11,
+        "index": 12,
         "page": 3,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -149,7 +162,7 @@
         "text": "Runtime boundary — PX4/Gazebo and pinned dependencies; declared versions are insufficient without effect and source evidence from the launched process, accepted customer Runtime, and published release ledger."
       },
       {
-        "index": 12,
+        "index": 13,
         "page": 3,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -162,30 +175,17 @@
         "text": "Cloud boundary — authentication, community data, quota ledger, and model gateway; provider secrets remain server-side and never enter desktop logs or artifacts under any subscription tier."
       },
       {
-        "index": 13,
-        "page": 3,
-        "style": "body",
-        "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.8185,
-        "last_line_text": "artifacts. Each stage narrows authority, so fluent output cannot bypass an executable contract or test.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "line_policy_passed": true,
-        "text": "AURORA IS A CONSTRAINED DECISION SYSTEM AROUND SIMULATION. Context binds parameters, scenarios, history, budgets, and failures. Capability eligibility removes incompatible tools, while a phase gate exposes only methods suited to exploration, recovery, refinement, diversification, or verification. The router ranks that executable surface and the optimizer proposes Candidates. Verification forces every reduced-fidelity strategy to fidelity 1.0 before acceptance. Provenance-bound memory admits trusted outcomes, while the final gate freezes holdout results and rejects incomplete artifacts. Each stage narrows authority, so fluent output cannot bypass an executable contract or test."
-      },
-      {
         "index": 14,
         "page": 3,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 6,
-        "last_line_ratio": 0.8005,
-        "last_line_text": "use v3, and the original projection stays available for audit replay under the same claim boundary.",
+        "last_line_ratio": 0.8958,
+        "last_line_text": "new claims use v3, and the original projection stays available for audit replay under the same claim boundary.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "CLAIM-TIME INPUTS ARE IMMUTABLE BEFORE LAUNCH. Schema DRONEDREAM.TRIAL-EXECUTION-ATTEMPT-CLAIM/V3 and digest EXECUTION_INPUT_SHA256 bind Trial, Candidate, and Job inputs in one snapshot. Outcome Contract 2.20 authorizes the scenario matrix and constructs TRIALCONTEXT without rereading mutable rows. Checks classify changed inputs as INPUT_EVIDENCE_DRIFT, coordinated rewrites as OUTCOME_CONTRACT_DRIFT, and unauthorized fields as SCENARIO_CONTRACT_DRIFT. Completion locks Job before Trial; historical receipts remain verifiable, new claims use v3, and the original projection stays available for audit replay under the same claim boundary."
+        "text": "CLAIM-TIME INPUTS ARE IMMUTABLE BEFORE LAUNCH. Schema DRONEDREAM.TRIAL-EXECUTION-ATTEMPT-CLAIM/V3 and digest EXECUTION_INPUT_SHA256 bind Trial, Candidate, and Job inputs in an immutable snapshot. Outcome Contract 2.20 authorizes the scenario matrix and constructs TRIALCONTEXT without rereading mutable rows. Checks classify changed inputs as INPUT_EVIDENCE_DRIFT, coordinated rewrites as OUTCOME_CONTRACT_DRIFT, and unauthorized fields as SCENARIO_CONTRACT_DRIFT. Completion locks Job before Trial; historical receipts remain verifiable, new claims use v3, and the original projection stays available for audit replay under the same claim boundary."
       },
       {
         "index": 15,
@@ -193,12 +193,12 @@
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 6,
-        "last_line_ratio": 0.8615,
+        "last_line_ratio": 0.8651,
         "last_line_text": "remain outside the current local scheduling contract, audit replay, and evidence envelope for hosted work.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "PHYSICAL CLAIMS ARE CONCURRENCY-SAFE AND FAIRLY SCHEDULED. Execution Claim Gate 1.1 combines PostgreSQL FOR UPDATE SKIP LOCKED, a conditional lease update, bounded retries, and an attempt-count fence. Eight concurrent workers yield one physical execution and one accepted outcome for a logical Trial, with no duplicate evidence in an eight-Trial pool. Scheduling Gate 1.0 chooses the least-served eligible Job and preserves FIFO within it. A two-Job regression makes six sequential claims alternate, preventing desktop-lane monopoly; hosted priority and resource-cost scheduling remain outside the current local scheduling contract, audit replay, and evidence envelope for hosted work."
+        "text": "PHYSICAL CLAIMS ARE CONCURRENCY-SAFE AND FAIRLY SCHEDULED. Execution Claim Gate 1.1 combines PostgreSQL FOR UPDATE SKIP LOCKED, a conditional lease update, bounded retries, and an attempt-count fence. Concurrent workers converge on a unique physical execution and accepted outcome for each logical Trial, with no duplicate evidence across the exercised pool. Scheduling Gate 1.0 chooses the least-served eligible Job and preserves FIFO within it. A paired-Job regression alternates sequential claims, preventing desktop-lane monopoly; hosted priority and resource-cost scheduling remain outside the current local scheduling contract, audit replay, and evidence envelope for hosted work."
       },
       {
         "index": 16,
@@ -228,16 +228,16 @@
       },
       {
         "index": 18,
-        "page": 4,
+        "page": 3,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 6,
-        "last_line_ratio": 0.8502,
-        "last_line_text": "current and migration-era experiment histories and their later replay without retroactive reinterpretation.",
+        "last_line_ratio": 0.9628,
+        "last_line_text": "migration-era experiment histories and their later replay without retroactive reinterpretation across release boundaries.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "FEEDBACK IS VERIFIED AGAIN AT THE MODEL BOUNDARY. Optimizers, the closed-tool router, and direct proposer share one training-feedback compiler. It reconstructs canonical Trial rows and checks the content-addressed outcome against Candidate identity, generation, parameters, and Trial evidence before exposing a score. Sibling fields cannot override those values. Divergence is quarantined rather than turned into a bad-parameter penalty; migration-era rows remain explicitly unsealed and ineligible for learning, routing memory, or final selection [. The rule preserves auditability across both current and migration-era experiment histories and their later replay without retroactive reinterpretation."
+        "text": "FEEDBACK IS VERIFIED AGAIN AT THE MODEL BOUNDARY. Optimizers, the closed-tool router, and direct proposer share a training-feedback compiler. It reconstructs canonical Trial rows and checks the content-addressed outcome against Candidate identity, generation, parameters, and Trial evidence before exposing a score. Sibling fields cannot override those values. Divergence is quarantined rather than turned into a bad-parameter penalty; migration-era rows remain explicitly unsealed and ineligible for learning, routing memory, or final selection [. The rule preserves auditability across both current and migration-era experiment histories and their later replay without retroactive reinterpretation across release boundaries."
       },
       {
         "index": 19,
@@ -310,12 +310,12 @@
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 6,
-        "last_line_ratio": 0.9782,
-        "last_line_text": "learned baseline, or generalization to unseen tasks, vehicles, scenarios, provider outputs, or the revised prompt contract.",
+        "last_line_ratio": 0.8692,
+        "last_line_text": "revision. A controlled paired study is therefore required before any wording change receives causal credit.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "The archived 24-case artifact spans eight routing categories and binds its corpus, Evidence 2.4 inputs, Prompt 1.1, model snapshot, parser, and scoring rule. Every case declares an acceptable selection set before execution, and the report recomputes 24/24 from persisted per-case records. The artifact therefore remains valid historical development evidence for that exact contract, but it is not current qualification for Evidence 2.7 and Prompt 1.5, which add verified observed-outcome reflection. This result establishes bounded internal consistency; it does not establish lower simulator loss, superiority to a learned baseline, or generalization to unseen tasks, vehicles, scenarios, provider outputs, or the revised prompt contract."
+        "text": "The failure sets expose where qualification changed. The first Prompt 1.5 freeze missed five cases: two local-progress choices, one sparse-history choice, one mixed-history choice, and one tight-budget choice. The 21/24 repeat retained the local-progress, mixed-history, and tight-budget errors, so three misses persisted across both calls. Prompt 1.6 selected acceptable tools for all 24 current cases after making the loss direction explicit. Because model calls, ordering, and random effects were not paired, this sequence localizes observed routing weaknesses but cannot attribute their removal to the prompt revision. A controlled paired study is therefore required before any wording change receives causal credit."
       },
       {
         "index": 25,
@@ -335,13 +335,13 @@
         "page": 6,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.8441,
-        "last_line_text": "current routing qualification or the relative optimization quality of those methods in this release lineage",
+        "lines": 12,
+        "last_line_ratio": 0.845,
+        "last_line_text": "seed, and execution budget, and it cannot establish repeatability beyond the frozen routing corpus itself.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "ELIGIBILITY IS COMPUTED BEFORE ROUTING. CMA-ES and the deterministic portfolio remain general fallbacks. Constrained multi-objective BO is admitted only for constrained or multi-objective tasks; multi-fidelity BO requires reducible replicates; TuRBO and surrogate CMA-ES require scored feasible history; and SAASBO or BIPOP CMA-ES require their respective high-dimensional or restart preconditions. A missing precondition removes the tool rather than asking the model to reason around it. The archived 24-case distribution therefore describes routing coverage under Evidence 2.4 and Prompt 1.1, not current routing qualification or the relative optimization quality of those methods in this release lineage [, , , ."
+        "text": "ELIGIBILITY IS COMPUTED BEFORE ROUTING. CMA-ES and the deterministic portfolio remain general fallbacks. Constrained multi-objective BO is admitted only for constrained or multi-objective tasks; multi-fidelity BO requires reducible replicates; TuRBO and surrogate CMA-ES require scored feasible history; and SAASBO or BIPOP CMA-ES require their respective high-dimensional or restart preconditions. A missing precondition removes the tool rather than asking the model to reason around it. The current 24-case distribution therefore describes qualified routing coverage under Evidence 2.7 and Prompt 1.6, not the relative optimization quality of those methods or a causal improvement over earlier prompt freezes [, , , . Its frozen selections are portfolio 10, TuRBO 5, constrained MOBO 3, surrogate CMA-ES 2, BIPOP-CMA-ES 2, SAASBO 1, and multi-fidelity MOBO 1. These are route frequencies, not tool-quality estimates; every response is checked against the phase-qualified manifest before dispatch, and no method-specific superiority follows without physical outcomes. Figure 4 is therefore a coverage diagnostic for the validated router surface, not an empirical ranking or outcome comparison among the seven selected method families; it does not measure how any method changes controller behavior under a shared scenario, seed, and execution budget, and it cannot establish repeatability beyond the frozen routing corpus itself."
       },
       {
         "index": 27,
@@ -349,12 +349,12 @@
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 6,
-        "last_line_ratio": 0.8449,
-        "last_line_text": "authorized claim and terminal disposition for independent replay after every failure, retry, and recovery.",
+        "last_line_ratio": 0.9308,
+        "last_line_text": "claim and terminal disposition for independent replay after every failure, retry, recovery, and ownership transition.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "Simulation-queue behavior is also an experimental-validity concern. Execution Claim Gate 1.1 binds each authorized Trial to a content-addressed snapshot, while Scheduling Gate 1.0 admits the least-served eligible Job’s next FIFO Trial. Regressions cover concurrent claimants, physical-attempt accounting, retry ownership, and six alternating claims across two Jobs. These checks do not improve the proxy objective; they prevent reported budgets and cohort comparisons from being distorted by duplicate execution, starvation, or shared-Runtime queue monopolization. The ledger retains every authorized claim and terminal disposition for independent replay after every failure, retry, and recovery."
+        "text": "Simulation-queue behavior is also an experimental-validity concern. Execution Claim Gate 1.1 binds each authorized Trial to a content-addressed snapshot, while Scheduling Gate 1.0 admits the least-served eligible Job’s next FIFO Trial. Regressions cover concurrent claimants, physical-attempt accounting, retry ownership, and alternating claims across paired Jobs. These checks do not improve the proxy objective; they prevent reported budgets and cohort comparisons from being distorted by duplicate execution, starvation, or shared-Runtime queue monopolization. The ledger retains every authorized claim and terminal disposition for independent replay after every failure, retry, recovery, and ownership transition."
       },
       {
         "index": 28,
@@ -449,6 +449,32 @@
       },
       {
         "index": 35,
+        "page": 8,
+        "style": "bullet",
+        "policy_category": "exception_list",
+        "lines": 3,
+        "last_line_ratio": 0.417,
+        "last_line_text": "any physical-performance result enters the ledger.",
+        "last_line_pass_50": false,
+        "last_line_pass_80": false,
+        "line_policy_passed": true,
+        "text": "Qualification receipt — pin the customer Runtime, PX4/Gazebo commits, vehicle and world assets, controller schema, disturbance parameters, seeds, budgets, baseline arms, failure taxonomy, and independently recomputed outcomes before any physical-performance result enters the ledger."
+      },
+      {
+        "index": 36,
+        "page": 8,
+        "style": "bullet",
+        "policy_category": "exception_list",
+        "lines": 2,
+        "last_line_ratio": 0.2235,
+        "last_line_text": "as a safe or successful run.",
+        "last_line_pass_50": false,
+        "last_line_pass_80": false,
+        "line_policy_passed": true,
+        "text": "Denominator rule — retain every timeout and failed Trial; a missing receipt stays unavailable rather than being interpreted as a safe or successful run."
+      },
+      {
+        "index": 37,
         "page": 9,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -461,7 +487,7 @@
         "text": "The main benchmark will compare methods under the same pinned Runtime, controller catalog, starting design, train/holdout split, trial budget, failure thresholds, and blocked randomization schedule. Final-test manifests must be frozen before any arm observes their outcomes. The benchmark ledger must bind the Runtime image, simulator and controller commits, scenario files, parameter domains, seed blocks, initial design, stopping rule, failure-code mapping, and metric implementation. Each arm receives equal access to training outcomes and identical terminal accounting, while the final-test partition remains write-protected. Reported aggregates must be independently recomputed from persisted Trials with uncertainty, effect size, and failures retained in the denominator. The same ledger must retain every excluded run and the exact reason its result remained ineligible during external recomputation and final publication stage."
       },
       {
-        "index": 36,
+        "index": 38,
         "page": 9,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -474,7 +500,7 @@
         "text": "The controlled comparison should progress from a default deterministic policy to fixed CMA-ES, a specialist chosen before the final test, the deterministic portfolio, an AURORA arm with recovery memory disabled, and the complete AURORA system. Every arm must share the same scenario set, initialization, trial budget, and terminal accounting. Specialist selection must be frozen before final-test outcomes are visible, portfolio comparisons require a matched exploration budget, and the memory ablation must retain identical routing inputs. This sequence isolates increasingly specific system contributions without treating a method-name difference as causal evidence or attributing it to AURORA without evidence."
       },
       {
-        "index": 37,
+        "index": 39,
         "page": 9,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -487,7 +513,7 @@
         "text": "Primary outcomes: frozen holdout loss, feasible-campaign rate, baseline improvement, time-to-target, and terminal failure rate with uncertainty for every reported arm and seed block."
       },
       {
-        "index": 38,
+        "index": 40,
         "page": 9,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -500,7 +526,7 @@
         "text": "Secondary outcomes: wall time, model tokens and cost, router latency, recovery success, scenario-wise regret, and artifact completeness for every frozen comparison arm and seed block."
       },
       {
-        "index": 39,
+        "index": 41,
         "page": 9,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -513,7 +539,7 @@
         "text": "Use at least five independent seeds for engineering diagnostics and preferably ten for report-level comparisons across every reported arm before any superiority claim is published."
       },
       {
-        "index": 40,
+        "index": 42,
         "page": 9,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -526,7 +552,7 @@
         "text": "Keep failures in the denominator; do not impute a successful loss."
       },
       {
-        "index": 41,
+        "index": 43,
         "page": 9,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -539,33 +565,33 @@
         "text": "Report uncertainty and effect sizes; never publish superiority from one seed or one track."
       },
       {
-        "index": 42,
-        "page": 9,
-        "style": "body",
-        "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.8117,
-        "last_line_text": "recoverable, attributable, and visible without silently invalidating prior work for every affected run.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "line_policy_passed": true,
-        "text": "The desktop readiness gate is part of the product’s technical contract. The progress bar may reach 100% only after every check that DroneDream can perform at launch has reached a terminal pass state. The entry action must not become visible while a required check is pending or failed. After entry, runtime failures still need explicit diagnostics because network loss, disk damage, permission changes, and external service changes cannot be permanently prevented. The gate therefore certifies a timestamped launch snapshot rather than promising an error-free future session, and post-entry faults must remain recoverable, attributable, and visible without silently invalidating prior work for every affected run."
-      },
-      {
-        "index": 43,
-        "page": 9,
-        "style": "body",
-        "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.8739,
-        "last_line_text": "download paths before any release is accepted for public distribution on a supported Windows architecture.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "line_policy_passed": true,
-        "text": "READINESS IS A CONJUNCTION, NOT A PROGRESS ANIMATION. The launcher requires a fresh supported-system probe, one owned and compatible Runtime, a healthy local service, no mandatory update, and an account accepted by the local API. Missing, stale, mismatched, unreachable, or still-checking states remain blocking. Only the current gate may set the bar to 100%, change the environment badge to CHECKED, and reveal the entry action. Quantitative release evidence still needs time-to-ready p50/p95, false-ready rate, and a clean Windows/upgrade matrix across fresh install, upgrade, repair, and duplicate-download paths before any release is accepted for public distribution on a supported Windows architecture."
-      },
-      {
         "index": 44,
+        "page": 9,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 6,
+        "last_line_ratio": 0.9185,
+        "last_line_text": "must remain recoverable, attributable, and visible without silently invalidating prior work for every affected run.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "line_policy_passed": true,
+        "text": "The desktop readiness gate is part of the product’s technical contract. The progress bar may report completion only after every check that DroneDream can perform at launch has reached a terminal pass state. The entry action must not become visible while a required check is pending or failed. After entry, runtime failures still need explicit diagnostics because network loss, disk damage, permission changes, and external service changes cannot be permanently prevented. The gate therefore certifies a timestamped launch snapshot rather than promising an error-free future session, and post-entry faults must remain recoverable, attributable, and visible without silently invalidating prior work for every affected run."
+      },
+      {
+        "index": 45,
+        "page": 9,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 6,
+        "last_line_ratio": 0.9897,
+        "last_line_text": "and duplicate-download paths before any release is accepted for public distribution on a supported Windows architecture.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "line_policy_passed": true,
+        "text": "READINESS IS A CONJUNCTION, NOT A PROGRESS ANIMATION. The launcher requires a fresh supported-system probe, one owned and compatible Runtime, a healthy local service, no mandatory update, and an account accepted by the local API. Missing, stale, mismatched, unreachable, or still-checking states remain blocking. Only the current gate may mark readiness complete, change the environment badge to CHECKED, and reveal the entry action. Quantitative release evidence still needs time-to-ready p50/p95, false-ready rate, and a clean Windows/upgrade matrix across fresh install, upgrade, repair, and duplicate-download paths before any release is accepted for public distribution on a supported Windows architecture."
+      },
+      {
+        "index": 46,
         "page": 9,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -578,7 +604,7 @@
         "text": "EXIT AND ACCOUNT OPERATIONS USE THE SAME RECOVERABILITY PRINCIPLE. Closing warns about an active simulation or unsaved draft, stops work that cannot survive process termination, and preserves a recoverable draft whenever possible without trapping the user in the application. Managed-model usage consumes the included quota through a server-side ledger before BYOK is required; provider receipts must later be reconciled against that ledger. Remaining evidence therefore concerns draft-recovery and exit success rates plus quota-receipt consistency, not a new product capability claim, across every managed-provider transaction, recovery path, and audit replay retained by the service ledger."
       },
       {
-        "index": 45,
+        "index": 47,
         "page": 9,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -591,7 +617,7 @@
         "text": "AURORA’s present evidence establishes enforceable software boundaries and reproducible mock-campaign behavior, but it does not yet establish broad optimization superiority or customer-Runtime physical-simulator performance. The distinctions below are active claim constraints, not generic future-work disclaimers: each one identifies the evidence unit that is missing, the confounder that remains uncontrolled, or the environment that has not been accepted. Keeping those boundaries explicit prevents development routing accuracy, deterministic guard probes, and synthetic proxy gains from being combined into a stronger conclusion than their protocols support. The next experiments are therefore ordered around frozen matched budgets, independent recomputation, signed Runtime acceptance, and scenario-level uncertainty over time."
       },
       {
-        "index": 46,
+        "index": 48,
         "page": 9,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -604,21 +630,21 @@
         "text": "No result in this report establishes real-aircraft safety, certification, or direct sim-to-real transfer."
       },
       {
-        "index": 47,
+        "index": 49,
         "page": 9,
         "style": "bullet",
         "policy_category": "exception_list",
-        "lines": 2,
-        "last_line_ratio": 0.9118,
-        "last_line_text": "require a fresh online provider freeze before current routing qualification against the revised prompt schema.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
+        "lines": 3,
+        "last_line_ratio": 0.2009,
+        "last_line_text": "simulator-quality claim.",
+        "last_line_pass_50": false,
+        "last_line_pass_80": false,
         "line_policy_passed": true,
-        "text": "The archived 24-case online routing corpus qualifies Evidence 2.4 and Prompt 1.1 only; Evidence 2.7 and Prompt 1.5 require a fresh online provider freeze before current routing qualification against the revised prompt schema."
+        "text": "The current 24-case Evidence 2.7 / Prompt 1.6 freeze qualifies development routing only. The preserved Prompt 1.5 results of 19/24 and 21/24 expose stochastic spread; these unpaired freezes cannot support a causal prompt-lift or simulator-quality claim."
       },
       {
-        "index": 48,
-        "page": 9,
+        "index": 50,
+        "page": 10,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 2,
@@ -630,7 +656,7 @@
         "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels."
       },
       {
-        "index": 49,
+        "index": 51,
         "page": 10,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -643,7 +669,7 @@
         "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift."
       },
       {
-        "index": 50,
+        "index": 52,
         "page": 10,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -656,7 +682,7 @@
         "text": "The frozen four-arm mock ablation changes protocol-level behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive under the scripted policy and do not authorize a general causal or optimizer-superiority claim across broader optimizer families or deployment conditions."
       },
       {
-        "index": 51,
+        "index": 53,
         "page": 10,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -669,7 +695,7 @@
         "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution."
       },
       {
-        "index": 52,
+        "index": 54,
         "page": 10,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -682,7 +708,7 @@
         "text": "The ten-scenario campaign is synthetic mock evidence, not physical scenario coverage."
       },
       {
-        "index": 53,
+        "index": 55,
         "page": 10,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -695,7 +721,7 @@
         "text": "The pinned steady-wind result is not yet accepted in the signed customer Runtime."
       },
       {
-        "index": 54,
+        "index": 56,
         "page": 10,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -708,7 +734,7 @@
         "text": "Publication-grade optimizer comparisons, physical component ablations, multi-seed confidence intervals, cost/latency measurements, and UX telemetry remain pending before customer qualification."
       },
       {
-        "index": 55,
+        "index": 57,
         "page": 10,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -721,7 +747,7 @@
         "text": "External baselines such as expert manual tuning or PX4 AutoTune must be included only when controller, vehicle, track, budget, metrics, and failure accounting are genuinely aligned."
       },
       {
-        "index": 56,
+        "index": 58,
         "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -734,7 +760,7 @@
         "text": "The report’s evidence units answer different questions and cannot be pooled into one score. Routing cases measure tool eligibility; source probes test whether named guards reject constructed violations; fallback arms measure recovery equivalence; and synthetic scenarios measure a deterministic proxy. Substituting one unit for another creates a construct-validity error even when all recorded values are correct. Because the same implementation sometimes generates, executes, and verifies an artifact, the next campaign also requires independent recomputation, immutable manifests, negative controls, and failure injection before an optimization-quality comparison is described as causal in publication."
       },
       {
-        "index": 57,
+        "index": 59,
         "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -747,7 +773,7 @@
         "text": "Statistical validity requires the scenario, not an optimizer Trial, to remain the primary comparison unit. Trials in one trajectory share initialization, history, stopping conditions, and candidate ancestry, so treating them as independent understates uncertainty. A publication result must freeze seed blocks, report paired scenario-wise differences, retain terminal failures in the denominator, and present effect sizes with intervals rather than one aggregate percentage. Hyperparameters, method choice, and stopping rules must be fixed before the final partition opens; exploratory findings remain useful but cannot replace the frozen confirmatory comparison across every arm or its reported causal estimate."
       },
       {
-        "index": 58,
+        "index": 60,
         "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -760,7 +786,7 @@
         "text": "Operational reproducibility requires more than code and a controller vector. A repeatable run must bind the owned Runtime image, PX4/Gazebo commits, vehicle and world assets, controller schema, scenario manifest, optimizer settings, seeds, environment, and evidence verifier. It must retain cancellations, timeouts, rejected callbacks, and post-launch changes rather than successful Trials alone. The ledger already supplies the source commit, test totals, digests, and reproduction command; the remaining gap is a signed customer-Runtime campaign executable on another machine without repository-specific state, hidden assumptions, operator interpretation, or independent auditability during replay."
       },
       {
-        "index": 59,
+        "index": 61,
         "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -773,7 +799,7 @@
         "text": "External validity is bounded by controller, vehicle, world, and disturbance combinations actually executed. Many Trials in one x500 setup do not cover fixed-wing vehicles, payload changes, actuator saturation, estimator faults, or other controller structures. A broader benchmark therefore needs a declared scenario matrix with held-out combinations, not a convenient collection of worlds. Every cell must explain its distinct operating condition, mutable parameters, and invariant feasibility constraints. Results must be aggregated within and across vehicle families so a strong mean cannot conceal a systematic failure in one operationally important subgroup or declared scenario family under final evaluation."
       },
       {
-        "index": 60,
+        "index": 62,
         "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -786,46 +812,33 @@
         "text": "Measurement validity also requires more than scalar holdout loss. The protocol must retain trajectory error, settling time, overshoot, control effort, saturation, constraint violations, termination cause, and wall-clock cost, with units, sampling rules, preprocessing versions, and direction of improvement. A controller can lower an aggregate score by accepting oscillation or excessive actuator demand, so feasibility remains a gate rather than a narrative caveat. Primary metrics and admissibility rules must be registered before optimization, while diagnostics remain visible for failure analysis; post-hoc metric choice cannot redefine a failed campaign as successful after execution once final outcomes become visible."
       },
       {
-        "index": 61,
-        "page": 10,
-        "style": "body",
-        "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.8042,
-        "last_line_text": "ledger must also show which planned comparisons never executed and why in the retained receipt.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "line_policy_passed": true,
-        "text": "The next campaign prioritizes fixed-budget PX4/Gazebo outcomes, physical component-level AURORA ablations, failure injection, and the readiness/exit matrix. It freezes the Runtime, controller catalog, scenario manifests, seed blocks, budgets, eligibility policy, and terminal taxonomy before any final arm runs. Matched baselines include fixed CMA-ES, a preselected specialist, the deterministic portfolio, and isolated AURORA variants. Signed JSON and CSV artifacts will replace planned result sections without hiding failures or inflating evidence beyond its physical and statistical boundaries. The retained ledger must also show which planned comparisons never executed and why in the retained receipt."
-      },
-      {
-        "index": 62,
-        "page": 10,
-        "style": "body",
-        "policy_category": "explanatory_body",
-        "lines": 8,
-        "last_line_ratio": 0.8099,
-        "last_line_text": "audits, and reproduction commands for independent review under the pinned dependency commits.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "line_policy_passed": true,
-        "text": "Figures 2–6 trace to evidence bundle v6, canonical SHA-256 prefix bd99720f50a63d28; Figure 1 is a schematic. The bundle binds software subject 0429b42, provenance 738157c, and head a0040d4. Its backend receipt records 1,139/1,139 tests in 759.17 seconds on a pre-commit worktree, not an exact-final run; 59 affected checks passed on the subject. Ruff and mypy are unreceipted, and Windows Rust was not run. The website receipt links a64f995 to 943f3b6 and records 322/322 tests, typecheck, lint, build, nine deployment tests, and deterministic 117-file output across two builds. The reference manifest pins both chains without copying raw evidence. Its claim audit resolves reported counts, rates, scenario rows, contract versions, phase counts, and Runtime boundaries to immutable Git bytes; the companion receipt binds source, PDF, audits, and reproduction commands for independent review under the pinned dependency commits."
-      },
-      {
         "index": 63,
-        "page": 11,
+        "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 10,
-        "last_line_ratio": 0.8739,
-        "last_line_text": "from the frozen release artifact and its independently verified claim boundary for replay and release review",
+        "lines": 11,
+        "last_line_ratio": 0.9997,
+        "last_line_text": "released audit artifact must preserve every paired case, call order, and response disposition for independent recomputation.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "Execution Claim Gate 1.1 and Outcome Contract 2.20 bind the Trial/Candidate/Job snapshot and authorized scenario matrix; drift fails closed before evidence admission. Concurrent claims retain one accepted physical attempt, and least-served per-Job scheduling prevents large-experiment queue monopolization. Prompt Schema 2.3 gives same-type training cases separate provider-safe aliases while sealing raw case IDs and holdout evidence. Evidence 2.7 and Prompt 1.5 add verified observational outcome reflection, while the archived online artifact passed 24/24 only under Evidence 2.4 and Prompt 1.1. The current deterministic eligibility artifact passed 16/16 policy-holdout cases without network or model calls; a fresh online provider freeze is still required for the revised contract. The fallback campaign persisted 579 Trials across 15 Jobs and matched the direct arm in 10/10 frozen block comparisons. The accompanying machine-readable audit retains source hashes, reproduction commands, qualification scope, and per-artifact provenance required for independent regeneration from the frozen release artifact and its independently verified claim boundary for replay and release review [."
+        "text": "The next campaign prioritizes fixed-budget PX4/Gazebo outcomes, physical component-level AURORA ablations, failure injection, and the readiness/exit matrix. It freezes the Runtime, controller catalog, scenario manifests, seed blocks, budgets, eligibility policy, and terminal taxonomy before any final arm runs. Matched baselines include fixed CMA-ES, a preselected specialist, the deterministic portfolio, and isolated AURORA variants. Signed JSON and CSV artifacts will replace planned result sections without hiding failures or inflating evidence beyond its physical and statistical boundaries. The retained ledger must also show which planned comparisons never executed and why in the retained receipt. A causal provider-prompt study must also pair Prompt 1.5 and Prompt 1.6 calls on identical cases, model snapshot, call order, budget, and scoring rule; retain every raw response; and report paired category changes with uncertainty instead of selecting the best freeze. That design separates the current routing qualification from any future causal prompt-lift claim. The causal estimator must use paired case-level contrasts and retain category-specific disagreements, refusals, and parse failures in the denominator. The released audit artifact must preserve every paired case, call order, and response disposition for independent recomputation."
       },
       {
         "index": 64,
+        "page": 11,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 9,
+        "last_line_ratio": 0.9966,
+        "last_line_text": "for independent regeneration, replay, and release review against the two frozen dependency chains and their signed receipts",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "line_policy_passed": true,
+        "text": "Execution Claim Gate 1.1 and Outcome Contract 2.20 bind the Trial/Candidate/Job snapshot and authorized scenario matrix; drift fails closed before evidence admission. Concurrent claims retain one accepted physical attempt, while least-served per-Job scheduling prevents queue monopolization. Prompt Schema 2.3 assigns same-type training cases provider-safe aliases while sealing raw case IDs and holdout evidence. Evidence 2.7 and Prompt 1.6 add verified observational reflection; the current provider freeze passes 24/24, while Prompt 1.5 histories remain visible at 19/24 and 21/24. This is development-routing qualification, not causal prompt evidence. The deterministic eligibility artifact passes 16/16 policy-holdout cases without network or model calls, and the fallback campaign matches the direct arm in 10/10 frozen comparisons across 15 Jobs and 579 Trials. The audit retains source hashes, reproduction commands, qualification scope, and artifact provenance for independent regeneration, replay, and release review against the two frozen dependency chains and their signed receipts [."
+      },
+      {
+        "index": 65,
         "page": 11,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -838,7 +851,7 @@
         "text": "DroneDream 1.0 positions AURORA as an evidence-gated Harness for UAV controller optimization in simulation: model reasoning interprets intent and coordinates eligible methods, while deterministic contracts retain authority over inputs, execution, evidence admission, and completion. The frozen release demonstrates the exercised software boundaries through routing, holdout-policy, guard-ablation, fallback-equivalence, claim-receipt, and case-separated feedback checks; it does not convert those checks into a claim of real-aircraft safety or general simulator superiority. The next decisive step is a signed customer-Runtime PX4/Gazebo campaign with frozen scenario manifests, matched budgets, paired seeds, retained failures, and independent recomputation. That campaign can test optimization quality and operational reproducibility without weakening the provenance and leakage boundaries already enforced by AURORA in later studies."
       },
       {
-        "index": 65,
+        "index": 66,
         "page": 11,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -851,46 +864,20 @@
         "text": "The current release therefore changes what future experiments can safely assert before it changes the empirical flight result itself. Claim v3, Outcome Contract 2.20, input/outcome/scenario drift rejection, and cross-Job fair scheduling make concurrent attempt counts, parameter provenance, and scenario eligibility independently auditable. A decisive external campaign must still freeze PX4/Gazebo versions, manifests, seed blocks, budgets, metrics, and baseline arms before execution; retain every timeout and failed Trial; and recompute signed outcomes outside the application process. This separation keeps AURORA’s demonstrated software assurances distinct from the optimization-quality claims that only the next physical simulator study can establish under the frozen evaluation protocol without ambiguity."
       },
       {
-        "index": 66,
-        "page": 12,
-        "style": "body",
-        "policy_category": "explanatory_body",
-        "lines": 7,
-        "last_line_ratio": 0.8357,
-        "last_line_text": "normalized into a passing result or presented as verified engineering evidence at this release boundary.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "line_policy_passed": true,
-        "text": "The verification matrix separates executable software evidence from broader product claims. It covers protected state mutations, authenticated report export and watermark behavior, frontend command wiring, rendered layout, and Python static checks. Every count describes the checked release contract at this source boundary; none measures controller quality, physical simulator fidelity, real-flight safety, or causal optimization benefit. The matrix also gives reviewers a compact map from each reported count to the narrow claim it can support. It therefore separates release verification from every physical or optimizer-performance conclusion and related claim in the report. Unsupported cells remain unavailable instead of being normalized into a passing result or presented as verified engineering evidence at this release boundary."
-      },
-      {
         "index": 67,
         "page": 12,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 7,
-        "last_line_ratio": 1.0,
-        "last_line_text": "holdout values stay sealed, zero-dispatch decisions remain not applicable, and observations never become causal tool credit.",
+        "lines": 5,
+        "last_line_ratio": 0.8828,
+        "last_line_text": "unavailable, never normalized into passing engineering evidence or any public customer qualification claim.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "line_policy_passed": true,
-        "text": "A downloadable tuning report is a projection of retained experiment evidence, not a newly inferred narrative. It retains generation ancestry, parameter deltas, metrics, terminal Trial counts, and proposal rationale; missing lineage remains unavailable instead of being reconstructed from a favorable outcome. The authenticated server snapshot resolves export tier and prevents redirect-based entitlement bypass. Reflection follows the same fail-closed rule: an execution receipt must match the exact modern Candidate cohort before AURORA exposes completion, accepted work, domain failures, feasibility, incumbent change, or observed improvement. Any legacy, incomplete, or drifted cohort makes the block unavailable; holdout values stay sealed, zero-dispatch decisions remain not applicable, and observations never become causal tool credit."
+        "line_policy_passed": false,
+        "text": "The matrix separates receipted software checks from product claims. A.1 and A.2 define protected mutation and report-export contracts; Table 6 reports frozen receipts and the recomputed layout contract. Each count is source-bound and measures neither controller quality, physical-simulator fidelity, real-flight safety, nor causal optimization benefit. The map prevents software release verification from being mistaken for physical or optimizer performance; unsupported cells remain unavailable, never normalized into passing engineering evidence or any public customer qualification claim."
       },
       {
         "index": 68,
-        "page": 12,
-        "style": "body",
-        "policy_category": "explanatory_body",
-        "lines": 7,
-        "last_line_ratio": 0.8152,
-        "last_line_text": "quality, simulator performance, or real-aircraft behavior under any simulated or physical evaluation.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "line_policy_passed": true,
-        "text": "For Free accounts, the renderer places one native vector seal on every page after pagination is final. The seal is drawn with the DroneDream violet-magenta identity at eighteen percent opacity, intersects the body without covering it, and remains present after ordinary PDF extraction or printing. Plus and Pro exports omit the mark only when the server-side entitlement snapshot authorizes unwatermarked bytes. Redirect URLs, stale desktop state, or a modified client request cannot change that decision. Fifty-one contract cases cover tier resolution, watermark cardinality, iteration trace, missing-evidence behavior, and stable byte generation. Their authority ends at export correctness; they do not qualify controller quality, simulator performance, or real-aircraft behavior under any simulated or physical evaluation."
-      },
-      {
-        "index": 69,
         "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -900,10 +887,10 @@
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "line_policy_passed": true,
-        "text": "Capability eligibility answers whether a tool can honor the declared Job shape; the phase policy independently answers whether that tool should be executable now. Evidence 2.7 intersects the capability-qualified set with the receding-plan phase before schema generation, provider manifest construction, response validation, trace verification, or dispatch. Prompt 1.5 and Decision Trace 1.3 therefore persist the exact surface shown to the model. Every phase retains the deterministic portfolio fallback, and a response naming any filtered tool is rejected rather than repaired into an executable decision. The retained trace therefore explains every admitted and excluded tool during later replay and independent review."
+        "text": "Capability eligibility answers whether a tool can honor the declared Job shape; the phase policy independently answers whether that tool should be executable now. Evidence 2.7 intersects the capability-qualified set with the receding-plan phase before schema generation, provider manifest construction, response validation, trace verification, or dispatch. Prompt 1.6 and Decision Trace 1.3 therefore persist the exact surface shown to the model. Every phase retains the deterministic portfolio fallback, and a response naming any filtered tool is rejected rather than repaired into an executable decision. The retained trace therefore explains every admitted and excluded tool during later replay and independent review."
       },
       {
-        "index": 70,
+        "index": 69,
         "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -914,53 +901,47 @@
         "last_line_pass_80": true,
         "line_policy_passed": true,
         "text": "Fidelity remains a separate execution contract. Multi-fidelity methods may screen Candidates below full fidelity during exploration or diversification, but a verification decision forces every reduced-fidelity-capable strategy to fidelity 1.0. The final generation and last available capacity also preserve a full-fidelity path, while the ordinary acceptance, claim-receipt, scenario, and holdout gates remain unchanged. This prevents an inexpensive screening outcome from becoming the final winner merely because its optimizer was otherwise eligible for the current Job and scenario profile. The receipt must therefore record both screening fidelity and the full-fidelity verification used for terminal selection."
-      },
-      {
-        "index": 71,
-        "page": 13,
-        "style": "body",
-        "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.9913,
-        "last_line_text": "under the declared evidence boundary and which future experiment is required to authorize it with reproducible evidence.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "line_policy_passed": true,
-        "text": "A machine-checked ledger binds every displayed count, rate, scenario row, contract version, phase count, and Runtime boundary to immutable Git bytes and fails the build on drift. Router rows support eligibility claims only; mock campaigns support bounded software and synthetic-response claims; component ablations support observed protocol differences under their frozen offline router. Backend and frontend receipts establish software validation, not provider, PX4/Gazebo, or real-flight qualification. Reviewers can reproduce each value while seeing which stronger conclusion remains unauthorized under the declared evidence boundary and which future experiment is required to authorize it with reproducible evidence."
       }
     ],
-    "audited": 71,
+    "audited": 69,
     "unlocated": [],
     "cross_page_splits": [],
-    "last_line_below_50": [],
+    "last_line_below_50": [
+      35,
+      36,
+      49
+    ],
     "last_line_below_80": [
-      8,
       9,
       10,
       11,
       12,
+      13,
       20,
       21,
       32,
       33,
-      37,
-      38,
+      35,
+      36,
       39,
-      48,
+      40,
+      41,
+      49,
       50,
-      51,
-      54,
-      55
+      52,
+      53,
+      56,
+      57
     ],
     "explanatory_body": {
-      "total": 44,
-      "passed_80": 44,
+      "total": 40,
+      "passed_80": 40,
       "failed_80": 0,
       "failures": []
     },
     "exceptions": {
       "categories": {
-        "exception_list": 27,
+        "exception_list": 29,
         "exception_caption": 0,
         "exception_other": 0
       },
@@ -970,15 +951,17 @@
         "exception_other": "Headings, formulas, code, and references are excluded before geometry matching or categorized here."
       }
     },
-    "body_below_6_lines": [],
+    "body_below_6_lines": [
+      67
+    ],
     "bullets_above_3_lines": []
   },
   "paragraph_policy": {
     "explanatory_body": {
       "definition": "Abstract and prose paragraphs that explain a claim, method, result, limitation, or evidence boundary.",
       "last_line_target_ratio": 0.8,
-      "total": 44,
-      "passed": 44,
+      "total": 40,
+      "passed": 40,
       "failed": 0,
       "failure_locations": []
     },
@@ -986,7 +969,7 @@
       "definition": "Headings, list items, display formulas, code blocks, figure captions, table captions, and references do not use the explanatory-body last-line gate.",
       "inventory": {
         "headings": 28,
-        "list_items": 27,
+        "list_items": 29,
         "display_formulas": 0,
         "code_blocks": 0,
         "figure_captions": 6,
@@ -999,7 +982,7 @@
     {
       "page": 1,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 802.21,
+      "content_bottom_points": 796.6,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -1007,25 +990,25 @@
     {
       "page": 2,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 804.36,
-      "gap_to_body_bottom_points": 0.0,
-      "gap_to_body_bottom_lines": 0.0,
+      "content_bottom_points": 780.25,
+      "gap_to_body_bottom_points": 16.29,
+      "gap_to_body_bottom_lines": 1.357,
       "passed_bottom_line": true
     },
     {
       "page": 3,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 804.36,
-      "gap_to_body_bottom_points": 0.0,
-      "gap_to_body_bottom_lines": 0.0,
+      "content_bottom_points": 775.11,
+      "gap_to_body_bottom_points": 21.43,
+      "gap_to_body_bottom_lines": 1.786,
       "passed_bottom_line": true
     },
     {
       "page": 4,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 798.14,
-      "gap_to_body_bottom_points": 0.0,
-      "gap_to_body_bottom_lines": 0.0,
+      "content_bottom_points": 777.7,
+      "gap_to_body_bottom_points": 18.84,
+      "gap_to_body_bottom_lines": 1.57,
       "passed_bottom_line": true
     },
     {
@@ -1039,9 +1022,9 @@
     {
       "page": 6,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 804.36,
-      "gap_to_body_bottom_points": 0.0,
-      "gap_to_body_bottom_lines": 0.0,
+      "content_bottom_points": 779.58,
+      "gap_to_body_bottom_points": 16.95,
+      "gap_to_body_bottom_lines": 1.413,
       "passed_bottom_line": true
     },
     {
@@ -1055,39 +1038,39 @@
     {
       "page": 8,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 789.66,
-      "gap_to_body_bottom_points": 6.87,
-      "gap_to_body_bottom_lines": 0.573,
+      "content_bottom_points": 765.79,
+      "gap_to_body_bottom_points": 30.75,
+      "gap_to_body_bottom_lines": 2.562,
       "passed_bottom_line": true
     },
     {
       "page": 9,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 804.36,
-      "gap_to_body_bottom_points": 0.0,
-      "gap_to_body_bottom_lines": 0.0,
+      "content_bottom_points": 786.52,
+      "gap_to_body_bottom_points": 10.02,
+      "gap_to_body_bottom_lines": 0.835,
       "passed_bottom_line": true
     },
     {
       "page": 10,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 804.36,
-      "gap_to_body_bottom_points": 0.0,
-      "gap_to_body_bottom_lines": 0.0,
+      "content_bottom_points": 768.66,
+      "gap_to_body_bottom_points": 27.88,
+      "gap_to_body_bottom_lines": 2.323,
       "passed_bottom_line": true
     },
     {
       "page": 11,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 795.15,
-      "gap_to_body_bottom_points": 1.38,
-      "gap_to_body_bottom_lines": 0.115,
+      "content_bottom_points": 798.36,
+      "gap_to_body_bottom_points": 0.0,
+      "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
     },
     {
       "page": 12,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 804.36,
+      "content_bottom_points": 802.21,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -1095,9 +1078,9 @@
     {
       "page": 13,
       "body_bottom_target_points": 796.54,
-      "content_bottom_points": 788.83,
-      "gap_to_body_bottom_points": 7.71,
-      "gap_to_body_bottom_lines": 0.642,
+      "content_bottom_points": 774.29,
+      "gap_to_body_bottom_points": 22.25,
+      "gap_to_body_bottom_lines": 1.854,
       "passed_bottom_line": true
     }
   ],

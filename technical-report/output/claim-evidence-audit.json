@@ -3,50 +3,93 @@
   "status": "passed",
   "ledger": {
     "path": "technical-report/claim-evidence-ledger.json",
-    "sha256": "99cf20a817af38e18ec932f63c32451fdce23162beccc1db7ef8295546e4b3d4"
+    "sha256": "d2fa4a51e9a4021949c1473f78c0ec9197cc7004ed778329f77baa6fc943eb21"
   },
   "evidence_reference_manifest": {
     "path": "technical-report/evidence-reference-manifest.json",
-    "sha256": "4d0e7a420b60372a483c5afd34252b8aed81c7275fa7836943bc42cc02908a9f"
+    "sha256": "f0347cbe7e56c9785771ae970c7617ccd90a58debae85d680f1ae3ed9432331e"
   },
   "report_source": {
     "path": "technical-report/body.tex",
-    "sha256": "476d2fb5c8ea8f00a420e79b775d4ba22566a26e32c45f3ba7d1473dc62ede06"
+    "sha256": "0c77c9c43d6cac9a87f7e239872a3c0ff5566f423965e17c74519bdd2d5b8b01"
   },
-  "claim_total": 13,
-  "claim_passed": 13,
+  "claim_total": 16,
+  "claim_passed": 16,
   "claim_failed": 0,
-  "assertion_total": 80,
+  "assertion_total": 110,
+  "prohibited_literal_checks": 9,
   "verified_sources": [
     {
+      "id": "harness_component_outcome_ablation_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+      "sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82"
+    },
+    {
+      "id": "harness_contract_ablation_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-contract-ablation-v2.json",
+      "sha256": "8fc1340179d10c974ca9f53b0a8d97e4459c54bc39932518ee6c8c66fa3ab88a"
+    },
+    {
       "id": "harness_contract_design",
-      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
       "path": "docs/19-llm-tool-orchestration-harness.md",
-      "sha256": "05c17b0f1663d637939adbd2a708f575db2b2bbd25803a6b0b7413bbf3b0f664"
+      "sha256": "129676c4e6d58bb8f61fdd335da31d4c55c04cf89e4c27dcc21bce8adbe5c267"
+    },
+    {
+      "id": "harness_fallback_outcome_campaign_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+      "sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d"
     },
     {
       "id": "harness_phase_registry",
-      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
       "path": "backend/app/orchestration/harness_context.py",
-      "sha256": "0dab5fae5b19b76bd18a205d83cd7abff3c2160083082751c676017e2a3a5aa3"
+      "sha256": "f081a8c12bf50dc330a4aad509bd3454999af519c1dc4ecaf9a03df3db0e1376"
     },
     {
       "id": "px4_gazebo_evidence_boundary",
-      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
       "path": "docs/08-px4-gazebo.md",
       "sha256": "b8c58164b0efee355d90ac53cbded031e441d39cfc20a374f192db06212700fd"
     },
     {
+      "id": "routing_development_corpus_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+      "sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1"
+    },
+    {
+      "id": "routing_prompt_1_5_first_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-20260728.json",
+      "sha256": "fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf"
+    },
+    {
+      "id": "routing_prompt_1_5_rerun_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.5-rerun-20260728.json",
+      "sha256": "9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571"
+    },
+    {
+      "id": "routing_prompt_1_6_current_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
+      "sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4"
+    },
+    {
       "id": "runtime_dependency_pins",
-      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
       "path": "runtime/pins.env",
       "sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5"
     },
     {
       "id": "technical_report_evidence_bundle",
-      "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
-      "path": "artifacts/technical-report/evidence.json",
-      "sha256": "99eeeb9c87e2b14b67b54d2af35d16ea001d6ae987bff1a91ad426783d8cdfb7"
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "artifacts/technical-report/evidence-v7.json",
+      "sha256": "93232a2f0027503c24cfe4a8a1768d518f436cd35a3db72e788fc42f5eb45c55"
     },
     {
       "id": "website_validation_receipt",
@@ -64,8 +107,8 @@
         "Table 6"
       ],
       "source_id": "technical_report_evidence_bundle",
-      "assertions": 6,
-      "body_literals": 4,
+      "assertions": 9,
+      "body_literals": 6,
       "status": "passed",
       "failures": []
     },
@@ -77,12 +120,12 @@
       ],
       "source_id": "website_validation_receipt",
       "assertions": 5,
-      "body_literals": 3,
+      "body_literals": 4,
       "status": "passed",
       "failures": []
     },
     {
-      "id": "archived-provider-routing",
+      "id": "current-provider-routing",
       "report_locations": [
         "Abstract",
         "Section 4.1",
@@ -91,8 +134,51 @@
         "Table 1"
       ],
       "source_id": "technical_report_evidence_bundle",
-      "assertions": 7,
-      "body_literals": 4,
+      "assertions": 13,
+      "body_literals": 5,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "prompt-1-5-first-routing-history",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Table 1",
+        "Section 7"
+      ],
+      "source_id": "routing_prompt_1_5_first_raw",
+      "assertions": 5,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "prompt-1-5-repeat-routing-history",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Table 1",
+        "Section 7"
+      ],
+      "source_id": "routing_prompt_1_5_rerun_raw",
+      "assertions": 5,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "prompt-1-6-current-routing-freeze",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Table 1",
+        "Figure 2",
+        "Figure 4"
+      ],
+      "source_id": "routing_prompt_1_6_current_raw",
+      "assertions": 5,
+      "body_literals": 2,
       "status": "passed",
       "failures": []
     },
@@ -119,8 +205,8 @@
         "Table 3",
         "Table 9"
       ],
-      "source_id": "technical_report_evidence_bundle",
-      "assertions": 5,
+      "source_id": "harness_contract_ablation_raw",
+      "assertions": 7,
       "body_literals": 2,
       "status": "passed",
       "failures": []
@@ -133,8 +219,8 @@
         "Table 4",
         "Table 9"
       ],
-      "source_id": "technical_report_evidence_bundle",
-      "assertions": 8,
+      "source_id": "harness_fallback_outcome_campaign_raw",
+      "assertions": 9,
       "body_literals": 3,
       "status": "passed",
       "failures": []
@@ -147,8 +233,8 @@
         "Table 7",
         "Table 9"
       ],
-      "source_id": "technical_report_evidence_bundle",
-      "assertions": 8,
+      "source_id": "harness_component_outcome_ablation_raw",
+      "assertions": 11,
       "body_literals": 3,
       "status": "passed",
       "failures": []
