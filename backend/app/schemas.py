@@ -907,8 +907,69 @@ class Trial(TrialSummary):
     finished_at: datetime | None = None
 
 
+class GeneralizationObjectiveGapMetrics(BaseModel):
+    metric: str
+    direction: Literal["minimize", "maximize"]
+    training_value: float
+    validation_value: float
+    signed_degradation: float
+    relative_degradation: float | None = None
+    degraded: bool
+    improved: bool
+
+
+class CandidateGeneralizationMetrics(BaseModel):
+    schema_id: Literal["dronedream.validation-generalization-evidence/v1"]
+    evidence_id: str
+    role: Literal["validation_report_only_no_adaptive_feedback"]
+    outcome_contract_id: str | None = None
+    scenario_suite_sha256: str
+    validation_status: Literal["passed", "failed", "incomplete", "error"]
+    evidence_complete: bool
+    qualified: bool
+    assessment: Literal[
+        "not_assessable",
+        "failed_validation",
+        "qualified_improved_or_equal",
+        "qualified_with_degradation",
+    ]
+    claim_scope: Literal[
+        "repeatability",
+        "seed_robustness",
+        "configuration_robustness",
+        "scenario_type_robustness",
+        "mixed_shift_robustness",
+    ]
+    shift_axes: list[
+        Literal[
+            "replicated_validation",
+            "seed_shift",
+            "configuration_shift",
+            "scenario_type_shift",
+        ]
+    ]
+    training_case_count: int
+    validation_case_count: int
+    validation_replicate_count: int
+    validation_trial_count: int
+    validation_completed_trial_count: int
+    novel_scenario_type_case_count: int
+    configuration_shift_case_count: int
+    disjoint_seed_case_count: int
+    training_validation_seed_overlap_count: int
+    objective_gaps: list[GeneralizationObjectiveGapMetrics]
+    degraded_objective_count: int
+    improved_objective_count: int
+    observed_shift: Literal["improved_or_equal", "degraded", "mixed"] | None = None
+    training_scalar_loss: float | None = None
+    validation_scalar_loss: float | None = None
+    scalar_loss_degradation: float | None = None
+    scalar_loss_relative_degradation: float | None = None
+
+
 class HoldoutValidationMetrics(BaseModel):
     validation_status: Literal["passed", "failed", "incomplete", "error"]
+    expected_trial_count: int | None = None
     feasible: bool
     objective_feasible: bool | None = None
     trial_count: int
@@ -918,6 +979,7 @@ class HoldoutValidationMetrics(BaseModel):
     completion_rate: float
     failure_rate: float
     pass_rate: float
+    generalization_evidence: CandidateGeneralizationMetrics | None = None
 
 
 class AggregatedMetrics(BaseModel):

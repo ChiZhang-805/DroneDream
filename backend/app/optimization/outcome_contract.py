@@ -17,7 +17,7 @@ from app.optimization.outcome_evidence import (
 )
 
 OUTCOME_CONTRACT_SCHEMA = "dronedream.optimization-outcome/v1"
-OUTCOME_CONTRACT_COMPILER_VERSION = "2.9"
+OUTCOME_CONTRACT_COMPILER_VERSION = "3.0"
 SELECTION_KEY_SCHEMA_VERSION = "1.0"
 OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT = 0.5
 PORTFOLIO_REWARD_SCALE = 1.0
@@ -281,6 +281,15 @@ class OutcomePromotionPolicy(_FrozenModel):
     require_hard_feasible: Literal[True] = True
     require_complete_holdout_matrix_when_configured: Literal[True] = True
     require_every_holdout_trial_pass_when_configured: Literal[True] = True
+    validation_generalization_evidence_schema: Literal[
+        "dronedream.validation-generalization-evidence/v1"
+    ] = "dronedream.validation-generalization-evidence/v1"
+    validation_generalization_usage_policy: Literal[
+        "report_and_promotion_only_no_adaptive_feedback"
+    ] = "report_and_promotion_only_no_adaptive_feedback"
+    validation_generalization_shift_policy: Literal[
+        "direction_aware_train_to_validation_objective_gap"
+    ] = "direction_aware_train_to_validation_objective_gap"
     target_rmse_decimal: str | None
     target_max_error_decimal: str | None
     min_pass_rate_decimal: str
@@ -288,7 +297,7 @@ class OutcomePromotionPolicy(_FrozenModel):
 
 class OptimizationOutcomeContractV1(_FrozenModel):
     schema_id: Literal["dronedream.optimization-outcome/v1"] = "dronedream.optimization-outcome/v1"
-    compiler_version: Literal["2.9"] = "2.9"
+    compiler_version: Literal["3.0"] = "3.0"
     contract_id: str
     metric_admission_policy: Literal["registered_metrics_only"] = "registered_metrics_only"
     metric_dependency_policy: Literal["reject_known_alias_complement_and_composite_overlap"] = (

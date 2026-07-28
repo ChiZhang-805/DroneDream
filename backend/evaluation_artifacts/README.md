@@ -19,14 +19,17 @@ These artifacts qualify routing discrimination only. They do not establish that
 LLM routing improves final simulation outcomes over a budget-matched
 deterministic optimizer campaign.
 
-`simulation-coverage-mock-v2.json` is a separate deterministic outcome
-campaign. It runs the production optimizer portfolio against all ten mock
-scenario types, evaluates disjoint holdout seeds, and compares the selected
-candidate with an exhaustive 2,430-point finite-grid oracle. The artifact
-explicitly records `physical_fidelity: false`; it validates synthetic search,
-scenario routing, and holdout logic, not PX4/Gazebo physics or sim-to-real
-transfer. Its transcript hash binds executed candidate order, parameters,
-losses, feasibility, optimizer route, fidelity, and CMA cohort position.
+`simulation-coverage-mock-v3.json` is the current separate deterministic
+outcome campaign; v2 remains an immutable historical freeze. The v3 campaign
+runs the production optimizer portfolio against all ten mock scenario types,
+evaluates disjoint holdout seeds, and compares the selected candidate with an
+exhaustive 2,430-point finite-grid oracle. It also carries a content-addressed
+report-only generalization receipt that binds the expected, materialized, and
+completed validation matrices plus direction-aware train-to-validation gaps.
+The artifact explicitly records `physical_fidelity: false`; it validates
+synthetic search, scenario routing, and holdout logic, not PX4/Gazebo physics
+or sim-to-real transfer. Its transcript hash binds executed candidate order,
+parameters, losses, feasibility, optimizer route, fidelity, and CMA cohort position.
 Floating GP/CMA diagnostic matrices remain available in runtime metadata but
 are deliberately excluded from the freeze hash because equivalent BLAS kernels
 may spell those non-causal internals differently.
@@ -39,5 +42,23 @@ reviewable successor without overwriting the committed freeze:
 ```powershell
 cd backend
 .venv\Scripts\python.exe scripts\run_simulation_coverage_campaign.py `
-  --output evaluation_artifacts\simulation-coverage-mock-v2.next.json
+  --output evaluation_artifacts\simulation-coverage-mock-v3.next.json
+```
+
+`scenario-generalization-mock-v1.json` is a separate immutable mixed-shift
+campaign. The production optimizer sees only five training cases. After its
+61-candidate transcript and selected parameters are fixed, a report-only
+matrix evaluates five stronger configurations of known scenario types and
+five scenario types absent from training, all on disjoint seeds. The artifact
+binds the complete Scenario Suite, training-only transcript, both exact
+2,430-point finite-grid oracles, and the content-addressed generalization
+receipt. Its measured train-to-validation degradation is retained rather than
+hidden. It remains `physical_fidelity: false` and cannot support a PX4/Gazebo,
+flight, sim-to-real, or open-world claim. Generate a successor without
+overwriting the committed freeze:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe scripts\run_scenario_generalization_campaign.py `
+  --output evaluation_artifacts\scenario-generalization-mock-v1.next.json
 ```

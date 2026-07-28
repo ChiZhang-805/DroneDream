@@ -1,0 +1,58 @@
+{
+  "environment": {
+    "platform": "test-platform",
+    "pytest": "9.1.0",
+    "python": "3.13.0"
+  },
+  "focused_checks": [
+    {
+      "command": "python -m pytest -q focused",
+      "duration_seconds": 1.0,
+      "finished_at": "2026-07-28T00:13:01Z",
+      "log": {
+        "path": "backend/tests/fixtures/test_run_receipt_v1.log",
+        "sha256": "2e6a7c1dcdde2074ff8e4a114283a324d1bedbf639aa6a703debe9e4ee9f4f11",
+        "size_bytes": 113
+      },
+      "result": {
+        "failed": 0,
+        "passed": 1,
+        "status": "passed"
+      },
+      "started_at": "2026-07-28T00:13:00Z",
+      "working_directory": "backend"
+    }
+  ],
+  "full_suite": {
+    "command": "python -m pytest -q",
+    "duration_seconds": 759.17,
+    "finished_at": "2026-07-28T00:12:39Z",
+    "log": {
+      "path": "backend/tests/fixtures/test_run_receipt_v1.log",
+      "sha256": "2e6a7c1dcdde2074ff8e4a114283a324d1bedbf639aa6a703debe9e4ee9f4f11",
+      "size_bytes": 113
+    },
+    "result": {
+      "failed": 0,
+      "passed": 1139,
+      "status": "passed"
+    },
+    "started_at": "2026-07-28T00:00:00Z",
+    "tested_state": {
+      "base_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "exact_final_commit_run": false,
+      "kind": "pre_commit_worktree"
+    },
+    "working_directory": "backend"
+  },
+  "generated_at": "2026-07-28T00:00:00Z",
+  "receipt_sha256": "6434f4ecf0052a2aa4ff65b1d326111e4640add3190aa86faa20efe83dc8a7f2",
+  "schema_version": "dronedream.test-run-receipt.v1",
+  "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "validation_bridge": {
+    "focused_rerun_performed": true,
+    "focused_rerun_required": true,
+    "full_suite_rerun_performed": false,
+    "reason": "Fixture verifies deterministic receipt binding."
+  }
+}

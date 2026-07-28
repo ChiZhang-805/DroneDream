@@ -208,9 +208,7 @@ def test_outcome_contract_drift_is_rejected_before_candidate_dispatch(
         assert job.latest_error_code == "OUTCOME_CONTRACT_DRIFT"
         assert list(job.candidates) == []
         assert list(job.trials) == []
-        failure = next(
-            event for event in job.events if event.event_type == "job_failed"
-        )
+        failure = next(event for event in job.events if event.event_type == "job_failed")
         assert failure.payload_json["code"] == "OUTCOME_CONTRACT_DRIFT"
 
 
@@ -467,7 +465,11 @@ def test_holdout_results_never_influence_candidate_selection(orchestration_ctx):
             raw_metric_json={},
         )
 
-    def aggregate(holdout_rmse: float) -> tuple[SimpleNamespace, dict]:
+    def aggregate(
+        holdout_rmse: float,
+        *,
+        configured_suite=suite,
+    ) -> tuple[SimpleNamespace, dict]:
         candidate = SimpleNamespace(
             is_baseline=False,
             trial_count=0,
@@ -496,7 +498,7 @@ def test_holdout_results_never_influence_candidate_selection(orchestration_ctx):
             candidate,
             trials,
             objective_config=objective,
-            scenario_suite=suite,
+            scenario_suite=configured_suite,
         )
         assert result is not None
         return candidate, result
@@ -511,7 +513,39 @@ def test_holdout_results_never_influence_candidate_selection(orchestration_ctx):
     assert excellent_metrics["training_completed_trial_count"] == 1
     assert excellent_metrics["holdout"]["objective_values"]["rmse"] == 0.01
     assert failed_metrics["holdout"]["objective_values"]["rmse"] == 100.0
+    excellent_generalization = excellent_metrics["holdout"]["generalization_evidence"]
+    failed_generalization = failed_metrics["holdout"]["generalization_evidence"]
+    assert excellent_generalization["role"] == "validation_report_only_no_adaptive_feedback"
+    assert excellent_generalization["qualified"] is True
+    assert excellent_generalization["assessment"] == "qualified_improved_or_equal"
+    assert failed_generalization["qualified"] is False
+    assert failed_generalization["assessment"] == "failed_validation"
+    assert excellent_generalization["evidence_id"] != failed_generalization["evidence_id"]
     assert ctx["aggregation"]._is_eligible(excellent_holdout) is True
+
+    truncated_suite = schemas.ScenarioSuiteConfig(
+        cases=[
+            schemas.ScenarioCaseConfig(id="training", seeds=[1]),
+            schemas.ScenarioCaseConfig(
+                id="validation",
+                seeds=[2, 3],
+                holdout=True,
+            ),
+        ]
+    )
+    truncated_holdout, truncated_metrics = aggregate(
+        0.01,
+        configured_suite=truncated_suite,
+    )
+    truncated_validation = truncated_metrics["holdout"]
+    assert truncated_validation["expected_trial_count"] == 2
+    assert truncated_validation["trial_count"] == 1
+    assert truncated_validation["completed_trial_count"] == 1
+    assert truncated_validation["validation_status"] == "incomplete"
+    assert truncated_validation["feasible"] is False
+    assert truncated_validation["generalization_evidence"]["qualified"] is False
+    assert truncated_validation["generalization_evidence"]["assessment"] == "not_assessable"
+    assert ctx["aggregation"]._is_eligible(truncated_holdout) is False
 
 
 def test_start_queued_jobs_skips_non_queued(orchestration_ctx):
@@ -619,9 +653,7 @@ def test_claim_time_input_snapshot_fails_closed_before_simulator_on_drift(
                     "kp_xy": 9.0,
                     "nested": {"mutated": True},
                 }
-                other_trial.job.vehicle_profile_json = {
-                    "vehicle_type": "mutated-after-claim"
-                }
+                other_trial.job.vehicle_profile_json = {"vehicle_type": "mutated-after-claim"}
                 other_db.commit()
         return original_record_event(db, job_id, event_type, payload)
 
@@ -671,13 +703,9 @@ def test_claim_time_input_snapshot_fails_closed_before_simulator_on_drift(
         assert trial.metric is None
         attempt = trial.accepted_attempt
         assert attempt is not None
-        claim = ctx["attempt_evidence"].verify_trial_attempt_claim(
-            attempt.claim_evidence_json
-        )
+        claim = ctx["attempt_evidence"].verify_trial_attempt_claim(attempt.claim_evidence_json)
         assert claim is not None
-        assert claim.schema_id == (
-            "dronedream.trial-execution-attempt-claim/v3"
-        )
+        assert claim.schema_id == ("dronedream.trial-execution-attempt-claim/v3")
         assert claim.execution_input_sha256 is not None
         assert claim.candidate_contract_sha256 is not None
         assert claim.scenario_contract_sha256 is not None
@@ -806,9 +834,7 @@ def test_legacy_attempt_claim_without_combined_input_hash_still_verifies(
     }
     verified = module.verify_trial_attempt_claim(evidence)
     assert verified is not None
-    assert verified.schema_id == (
-        "dronedream.trial-execution-attempt-claim/v1"
-    )
+    assert verified.schema_id == ("dronedream.trial-execution-attempt-claim/v1")
     assert not hasattr(verified, "execution_input_sha256")
 
 
@@ -839,9 +865,7 @@ def test_legacy_v1_claim_remains_accepted_end_to_end(
         assert attempt is not None
         outcome = attempt.outcome
         assert outcome is not None
-        current_claim = module.verify_trial_attempt_claim(
-            attempt.claim_evidence_json
-        )
+        current_claim = module.verify_trial_attempt_claim(attempt.claim_evidence_json)
         assert current_claim is not None
         claim_payload = current_claim.model_dump(mode="json")
         claim_payload.pop("evidence_id")
@@ -853,24 +877,16 @@ def test_legacy_v1_claim_remains_accepted_end_to_end(
             job=trial.job,
             candidate=trial.candidate,
         )
-        claim_payload["parameter_sha256"] = module._sha256_id(
-            legacy_inputs["candidate_parameters"]
-        )
+        claim_payload["parameter_sha256"] = module._sha256_id(legacy_inputs["candidate_parameters"])
         claim_payload["scenario_sha256"] = module._sha256_id(
             {
                 "seed": legacy_inputs["trial"]["seed"],
                 "scenario_type": legacy_inputs["trial"]["scenario_type"],
-                "scenario_config": legacy_inputs["trial"][
-                    "scenario_config"
-                ],
+                "scenario_config": legacy_inputs["trial"]["scenario_config"],
             }
         )
-        claim_payload["job_config_sha256"] = module._sha256_id(
-            legacy_inputs["job_config"]
-        )
-        claim_payload["schema_id"] = (
-            "dronedream.trial-execution-attempt-claim/v1"
-        )
+        claim_payload["job_config_sha256"] = module._sha256_id(legacy_inputs["job_config"])
+        claim_payload["schema_id"] = "dronedream.trial-execution-attempt-claim/v1"
         legacy_claim_id = module._sha256_id(claim_payload)
         attempt.claim_evidence_id = legacy_claim_id
         attempt.claim_evidence_json = {
@@ -939,9 +955,7 @@ def test_legacy_v2_claim_remains_accepted_end_to_end(
         assert attempt is not None
         outcome = attempt.outcome
         assert outcome is not None
-        current_claim = module.verify_trial_attempt_claim(
-            attempt.claim_evidence_json
-        )
+        current_claim = module.verify_trial_attempt_claim(attempt.claim_evidence_json)
         assert current_claim is not None
         legacy_inputs = module._snapshot_trial_attempt_inputs_v2(
             trial=trial,
@@ -952,27 +966,17 @@ def test_legacy_v2_claim_remains_accepted_end_to_end(
         claim_payload.pop("evidence_id")
         claim_payload.pop("candidate_contract_sha256")
         claim_payload.pop("scenario_contract_sha256")
-        claim_payload["schema_id"] = (
-            "dronedream.trial-execution-attempt-claim/v2"
-        )
-        claim_payload["parameter_sha256"] = module._sha256_id(
-            legacy_inputs["candidate_parameters"]
-        )
+        claim_payload["schema_id"] = "dronedream.trial-execution-attempt-claim/v2"
+        claim_payload["parameter_sha256"] = module._sha256_id(legacy_inputs["candidate_parameters"])
         claim_payload["scenario_sha256"] = module._sha256_id(
             {
                 "seed": legacy_inputs["trial"]["seed"],
                 "scenario_type": legacy_inputs["trial"]["scenario_type"],
-                "scenario_config": legacy_inputs["trial"][
-                    "scenario_config"
-                ],
+                "scenario_config": legacy_inputs["trial"]["scenario_config"],
             }
         )
-        claim_payload["job_config_sha256"] = module._sha256_id(
-            legacy_inputs["job_config"]
-        )
-        claim_payload["execution_input_sha256"] = module._sha256_id(
-            legacy_inputs
-        )
+        claim_payload["job_config_sha256"] = module._sha256_id(legacy_inputs["job_config"])
+        claim_payload["execution_input_sha256"] = module._sha256_id(legacy_inputs)
         legacy_claim_id = module._sha256_id(claim_payload)
         attempt.claim_evidence_id = legacy_claim_id
         attempt.claim_evidence_json = {
@@ -1041,9 +1045,7 @@ def test_configured_scenario_contract_is_checked_before_simulator(
         job_id = job.id
     with ctx["db_module"].SessionLocal() as db:
         assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
-        trial = db.scalar(
-            select(models.Trial).where(models.Trial.job_id == job_id)
-        )
+        trial = db.scalar(select(models.Trial).where(models.Trial.job_id == job_id))
         assert trial is not None
         payload = dict(trial.scenario_config_json or {})
         payload["scenario_weight"] = 99.0
@@ -1090,10 +1092,7 @@ def test_configured_scenario_contract_is_checked_before_simulator(
         assert trial.failure_code == "SCENARIO_CONTRACT_DRIFT"
         assert trial.accepted_attempt is not None
         assert trial.accepted_attempt.outcome is not None
-        assert (
-            trial.accepted_attempt.outcome.outcome_class
-            == "invalid_evidence"
-        )
+        assert trial.accepted_attempt.outcome.outcome_class == "invalid_evidence"
 
 
 def test_valid_configured_scenario_contract_executes_normally(
@@ -1132,9 +1131,7 @@ def test_valid_configured_scenario_contract_executes_normally(
         job_id = job.id
     with ctx["db_module"].SessionLocal() as db:
         assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
-        trial = db.scalar(
-            select(models.Trial).where(models.Trial.job_id == job_id)
-        )
+        trial = db.scalar(select(models.Trial).where(models.Trial.job_id == job_id))
         assert trial is not None
         trial_id = trial.id
     with ctx["db_module"].SessionLocal() as db:
@@ -1156,9 +1153,7 @@ def test_valid_configured_scenario_contract_executes_normally(
             trial.accepted_attempt.claim_evidence_json
         )
         assert claim is not None
-        assert claim.schema_id == (
-            "dronedream.trial-execution-attempt-claim/v3"
-        )
+        assert claim.schema_id == ("dronedream.trial-execution-attempt-claim/v3")
 
 
 def test_trial_gate_rejects_coordinated_job_and_scenario_rewrite(
@@ -1191,14 +1186,10 @@ def test_trial_gate_rejects_coordinated_job_and_scenario_rewrite(
         assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
         job = db.get(models.Job, job_id)
         assert job is not None
-        trial = db.scalar(
-            select(models.Trial).where(models.Trial.job_id == job_id)
-        )
+        trial = db.scalar(select(models.Trial).where(models.Trial.job_id == job_id))
         assert trial is not None
         rewritten_suite = dict(job.scenario_suite_json or {})
-        rewritten_cases = [
-            dict(case) for case in rewritten_suite.get("cases", [])
-        ]
+        rewritten_cases = [dict(case) for case in rewritten_suite.get("cases", [])]
         rewritten_cases[0]["weight"] = 3.0
         rewritten_suite["cases"] = rewritten_cases
         job.scenario_suite_json = rewritten_suite
@@ -1236,10 +1227,7 @@ def test_trial_gate_rejects_coordinated_job_and_scenario_rewrite(
         assert trial.failure_code == "OUTCOME_CONTRACT_DRIFT"
         assert trial.accepted_attempt is not None
         assert trial.accepted_attempt.outcome is not None
-        assert (
-            trial.accepted_attempt.outcome.outcome_class
-            == "invalid_evidence"
-        )
+        assert trial.accepted_attempt.outcome.outcome_class == "invalid_evidence"
 
 
 def test_claim_v3_detects_candidate_contract_drift(
@@ -1260,9 +1248,7 @@ def test_claim_v3_detects_candidate_contract_drift(
                 assert trial is not None
                 trial.candidate.generation_index = 12
                 trial.candidate.source_type = "optimizer"
-                trial.candidate.optimizer_metadata_json = {
-                    "fidelity": 0.5
-                }
+                trial.candidate.optimizer_metadata_json = {"fidelity": 0.5}
                 other_db.commit()
         return original_record_event(db, job_id, event_type, payload)
 
@@ -1287,13 +1273,9 @@ def test_claim_v3_detects_candidate_contract_drift(
         assert trial.failure_code == "INPUT_EVIDENCE_DRIFT"
         attempt = trial.accepted_attempt
         assert attempt is not None
-        claim = ctx["attempt_evidence"].verify_trial_attempt_claim(
-            attempt.claim_evidence_json
-        )
+        claim = ctx["attempt_evidence"].verify_trial_attempt_claim(attempt.claim_evidence_json)
         assert claim is not None
-        assert claim.schema_id == (
-            "dronedream.trial-execution-attempt-claim/v3"
-        )
+        assert claim.schema_id == ("dronedream.trial-execution-attempt-claim/v3")
 
 
 def test_completion_fence_locks_job_before_updating_trial(
@@ -1309,9 +1291,7 @@ def test_completion_fence_locks_job_before_updating_trial(
         trial.status = "RUNNING"
         trial.worker_id = "worker-lock-order"
         trial.lease_owner = "worker-lock-order"
-        trial.lease_expires_at = datetime.now(timezone.utc) + timedelta(
-            minutes=5
-        )
+        trial.lease_expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
         trial.attempt_count = 1
         db.commit()
 
@@ -1333,9 +1313,7 @@ def test_completion_fence_locks_job_before_updating_trial(
             capture_statement,
         )
         try:
-            acquired = ctx[
-                "trial_executor"
-            ]._acquire_completion_fence(
+            acquired = ctx["trial_executor"]._acquire_completion_fence(
                 db,
                 ctx["trial_executor"]._TrialLeaseToken(
                     trial_id=trial_id,
@@ -1355,8 +1333,7 @@ def test_completion_fence_locks_job_before_updating_trial(
         job_lock_index = next(
             index
             for index, statement in enumerate(statements)
-            if statement.startswith("select")
-            and " from jobs " in f" {statement} "
+            if statement.startswith("select") and " from jobs " in f" {statement} "
         )
         trial_update_index = next(
             index
@@ -1458,9 +1435,7 @@ def test_pending_trial_claims_are_fair_across_jobs(orchestration_ctx):
     with ctx["db_module"].SessionLocal() as db:
         job_by_trial = {
             trial.id: trial.job_id
-            for trial in db.scalars(
-                select(models.Trial).where(models.Trial.id.in_(all_trial_ids))
-            )
+            for trial in db.scalars(select(models.Trial).where(models.Trial.id.in_(all_trial_ids)))
         }
 
     claimed_job_ids = [job_by_trial[trial_id] for trial_id in claimed_trial_ids]
@@ -1561,9 +1536,7 @@ def test_simultaneous_workers_create_one_physical_attempt(orchestration_ctx):
         assert attempt.outcome.accepted is True
         assert attempt.outcome.terminal_status == "COMPLETED"
         assert attempt.outcome.outcome_class == "success"
-        claim_events = [
-            event for event in trial.job.events if event.event_type == "trial_claimed"
-        ]
+        claim_events = [event for event in trial.job.events if event.event_type == "trial_claimed"]
         assert len(claim_events) == 1
 
 
@@ -1637,9 +1610,7 @@ def test_simultaneous_workers_drain_distinct_pending_pool(orchestration_ctx):
 
     models = ctx["models"]
     with ctx["db_module"].SessionLocal() as db:
-        trials = list(
-            db.scalars(select(models.Trial).where(models.Trial.id.in_(trial_ids)))
-        )
+        trials = list(db.scalars(select(models.Trial).where(models.Trial.id.in_(trial_ids))))
         assert len(trials) == worker_count
         assert all(trial.status == "COMPLETED" for trial in trials)
         assert all(trial.attempt_count == 1 for trial in trials)
@@ -1808,10 +1779,7 @@ def test_reclaimed_attempt_fences_stale_result_persistence(orchestration_ctx):
         assert stale_attempt.outcome is not None
         assert stale_attempt.outcome.accepted is False
         assert stale_attempt.outcome.terminal_status == "SUPERSEDED"
-        assert (
-            stale_attempt.outcome.evidence_json["superseded_by_attempt_count"]
-            == 2
-        )
+        assert stale_attempt.outcome.evidence_json["superseded_by_attempt_count"] == 2
 
 
 def test_interrupted_attempt_is_superseded_and_reclaim_is_accepted(
@@ -1824,9 +1792,12 @@ def test_interrupted_attempt_is_superseded_and_reclaim_is_accepted(
         def cleanup(self, _trial_ctx: TrialContext) -> None:
             raise SystemExit(41)
 
-    with ctx["db_module"].SessionLocal() as db, pytest.raises(
-        SystemExit,
-        match="41",
+    with (
+        ctx["db_module"].SessionLocal() as db,
+        pytest.raises(
+            SystemExit,
+            match="41",
+        ),
     ):
         ctx["trial_executor"].claim_and_run_one_pending_trial(
             db,
@@ -1839,9 +1810,7 @@ def test_interrupted_attempt_is_superseded_and_reclaim_is_accepted(
         assert trial is not None
         assert len(trial.execution_attempts) == 1
         assert trial.execution_attempts[0].outcome is None
-        trial.lease_expires_at = datetime.now(timezone.utc) - timedelta(
-            seconds=1
-        )
+        trial.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
         db.commit()
 
     with ctx["db_module"].SessionLocal() as db:
@@ -1960,10 +1929,7 @@ def test_attempt_ledger_rows_and_accepted_pointer_are_append_only(
         with pytest.raises(DatabaseError):
             db.execute(
                 update(models.TrialExecutionAttemptOutcome)
-                .where(
-                    models.TrialExecutionAttemptOutcome.id
-                    == attempt.outcome.id
-                )
+                .where(models.TrialExecutionAttemptOutcome.id == attempt.outcome.id)
                 .values(outcome_class="tampered")
             )
             db.commit()
@@ -2038,9 +2004,12 @@ def test_cancel_job_seals_an_open_physical_attempt(orchestration_ctx) -> None:
         def cleanup(self, _trial_ctx: TrialContext) -> None:
             raise SystemExit(52)
 
-    with ctx["db_module"].SessionLocal() as db, pytest.raises(
-        SystemExit,
-        match="52",
+    with (
+        ctx["db_module"].SessionLocal() as db,
+        pytest.raises(
+            SystemExit,
+            match="52",
+        ),
     ):
         ctx["trial_executor"].claim_and_run_one_pending_trial(
             db,
@@ -2112,10 +2081,7 @@ def test_real_cli_artifacts_are_persisted_before_transient_run_cleanup(
                 assert str(trial.attempt_count) in stored.parts
                 assert artifact.integrity_policy == "sha256-v1"
                 assert artifact.digest_receipt is not None
-                assert (
-                    artifact.digest_receipt.content_size_bytes
-                    == stored.stat().st_size
-                )
+                assert artifact.digest_receipt.content_size_bytes == stored.stat().st_size
 
         transient_dir = run_root / "jobs" / trial.job_id / "trials" / trial_id
         assert not transient_dir.exists()

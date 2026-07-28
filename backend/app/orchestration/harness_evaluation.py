@@ -26,14 +26,18 @@ from app.orchestration.harness_context import (
     HARNESS_TOOL_REGISTRY_VERSION,
     HarnessBudgetEvidence,
     HarnessCandidateEvidence,
+    HarnessEnvironmentEvidence,
     HarnessEvidenceSnapshot,
     HarnessExecutionMemory,
     HarnessGenerationBest,
     HarnessJobEvidence,
     HarnessScenarioEvidence,
+    HarnessScenarioType,
     HarnessSearchSummary,
     HarnessToolHistory,
     HarnessToolId,
+    HarnessTrainingScenarioProfile,
+    compile_harness_plan,
 )
 
 HARNESS_ROUTING_EVAL_SCHEMA_VERSION = "1.0"
@@ -82,6 +86,28 @@ class HarnessEvalToolHistory(_ClosedModel):
         return self
 
 
+class HarnessEvalTrainingCase(_ClosedModel):
+    scenario_type: HarnessScenarioType
+    replicate_count: int = Field(ge=1, le=100)
+    weight: float = Field(gt=0.0, le=1000.0)
+    safe_perturbations: dict[str, float] = Field(default_factory=dict)
+
+
+def _default_environment() -> HarnessEnvironmentEvidence:
+    return HarnessEnvironmentEvidence(
+        steady_wind_component_l1_mps=0.0,
+        sensor_noise_level="medium",
+        advanced_config_present=False,
+        obstacle_count=0,
+        gps_noise_m=0.0,
+        baro_noise_m=0.0,
+        imu_noise_scale=1.0,
+        sensor_dropout_rate=0.0,
+        battery_initial_percent=100.0,
+        voltage_sag=False,
+    )
+
+
 class HarnessRoutingStimulus(_ClosedModel):
     parameter_count: int = Field(ge=1, le=64)
     objective_count: int = Field(default=1, ge=1, le=16)
@@ -100,6 +126,8 @@ class HarnessRoutingStimulus(_ClosedModel):
     trailing_stagnant_generations: int = Field(default=0, ge=0, le=1000)
     tool_history: tuple[HarnessEvalToolHistory, ...] = ()
     last_execution: HarnessExecutionMemory | None = None
+    training_cases: tuple[HarnessEvalTrainingCase, ...] = Field(default=(), max_length=64)
+    environment: HarnessEnvironmentEvidence = Field(default_factory=_default_environment)
 
     @model_validator(mode="after")
     def _validate_counts_and_budget(self) -> HarnessRoutingStimulus:
@@ -107,6 +135,14 @@ class HarnessRoutingStimulus(_ClosedModel):
             raise ValueError("current_generation cannot exceed max_iterations")
         if self.feasible_candidate_count > self.scored_candidate_count:
             raise ValueError("feasible_candidate_count cannot exceed scored_candidate_count")
+        if self.training_replicate_count < self.training_case_count:
+            raise ValueError("each training case requires at least one replicate")
+        if self.training_cases and (
+            len(self.training_cases) != self.training_case_count
+            or sum(case.replicate_count for case in self.training_cases)
+            != self.training_replicate_count
+        ):
+            raise ValueError("explicit training cases must match aggregate scenario counts")
         return self
 
 
@@ -408,6 +444,85 @@ def compile_routing_eval_snapshot(
     relative_score_gap = (
         score_gap / abs(ordered_scores[0]) if abs(ordered_scores[0]) > 1e-12 else None
     )
+    if stimulus.training_cases:
+        eval_training_cases = stimulus.training_cases
+    else:
+        base_replicates, remainder = divmod(
+            stimulus.training_replicate_count,
+            stimulus.training_case_count,
+        )
+        eval_training_cases = tuple(
+            HarnessEvalTrainingCase(
+                scenario_type="nominal",
+                replicate_count=base_replicates + (1 if index < remainder else 0),
+                weight=1.0,
+            )
+            for index in range(stimulus.training_case_count)
+        )
+    total_training_weight = sum(case.weight for case in eval_training_cases)
+    training_case_profiles = tuple(
+        HarnessTrainingScenarioProfile(
+            case_alias=f"training_case_{index + 1}",
+            scenario_type=case.scenario_type,
+            replicate_count=case.replicate_count,
+            weight_share=case.weight / total_training_weight,
+            safe_perturbations=case.safe_perturbations,
+        )
+        for index, case in enumerate(eval_training_cases)
+    )
+    training_type_counts: dict[str, int] = {
+        str(scenario_type): count
+        for scenario_type, count in sorted(
+            Counter(case.scenario_type for case in eval_training_cases).items()
+        )
+    }
+    replicate_counts = [case.replicate_count for case in training_case_profiles]
+    weight_shares = [case.weight_share for case in training_case_profiles]
+    budget = HarnessBudgetEvidence(
+        current_generation=stimulus.current_generation,
+        max_iterations=stimulus.max_iterations,
+        remaining_generations=(stimulus.max_iterations - stimulus.current_generation),
+        used_trials=used_trials,
+        max_total_trials=max_total_trials,
+        remaining_trials=stimulus.remaining_trials,
+        full_trials_per_candidate=stimulus.trials_per_candidate,
+        remaining_full_candidate_capacity=(
+            stimulus.remaining_trials // stimulus.trials_per_candidate
+        ),
+    )
+    search = HarnessSearchSummary(
+        candidate_count=stimulus.scored_candidate_count,
+        scored_candidate_count=stimulus.scored_candidate_count,
+        completed_candidate_count=stimulus.scored_candidate_count,
+        incomplete_candidate_count=0,
+        completed_candidate_rate=1.0,
+        feasibility_observed_candidate_count=(stimulus.scored_candidate_count),
+        feasible_candidate_count=stimulus.feasible_candidate_count,
+        feasible_candidate_rate=(
+            stimulus.feasible_candidate_count / stimulus.scored_candidate_count
+        ),
+        total_trial_count=(stimulus.scored_candidate_count * stimulus.trials_per_candidate),
+        failed_trial_count=round(
+            stimulus.observed_failure_rate
+            * stimulus.scored_candidate_count
+            * stimulus.trials_per_candidate
+        ),
+        observed_failure_rate=stimulus.observed_failure_rate,
+        baseline_score=stimulus.baseline_score,
+        best_score=observed_best_score,
+        relative_improvement_from_baseline=relative_improvement,
+        score_gap_to_runner_up=score_gap,
+        relative_score_gap_to_runner_up=relative_score_gap,
+        trailing_stagnant_generations=(stimulus.trailing_stagnant_generations),
+        best_score_by_generation=tuple(generation_best),
+    )
+    decision_memory = (stimulus.last_execution,) if stimulus.last_execution is not None else ()
+    plan = compile_harness_plan(
+        parameter_count=stimulus.parameter_count,
+        budget=budget,
+        search=search,
+        decision_memory=decision_memory,
+    )
     return HarnessEvidenceSnapshot(
         job=HarnessJobEvidence(
             objective_profile="robust",
@@ -418,54 +533,25 @@ def compile_routing_eval_snapshot(
             constraint_count=stimulus.constraint_count,
             robust_aggregation="mean",
         ),
-        budget=HarnessBudgetEvidence(
-            current_generation=stimulus.current_generation,
-            max_iterations=stimulus.max_iterations,
-            remaining_generations=(stimulus.max_iterations - stimulus.current_generation),
-            used_trials=used_trials,
-            max_total_trials=max_total_trials,
-            remaining_trials=stimulus.remaining_trials,
-            full_trials_per_candidate=stimulus.trials_per_candidate,
-            remaining_full_candidate_capacity=(
-                stimulus.remaining_trials // stimulus.trials_per_candidate
-            ),
-        ),
+        budget=budget,
+        plan=plan,
         scenarios=HarnessScenarioEvidence(
             training_case_count=stimulus.training_case_count,
             validation_case_count=1,
             training_replicate_count=stimulus.training_replicate_count,
             validation_replicate_count=1,
-            training_type_counts={},
+            training_type_counts=training_type_counts,
+            training_replicate_min=min(replicate_counts),
+            training_replicate_max=max(replicate_counts),
+            training_weight_concentration=max(weight_shares),
+            effective_training_case_count=(1.0 / sum(share**2 for share in weight_shares)),
+            training_cases=training_case_profiles,
+            environment=stimulus.environment,
             common_random_numbers=True,
         ),
-        search=HarnessSearchSummary(
-            candidate_count=stimulus.scored_candidate_count,
-            scored_candidate_count=stimulus.scored_candidate_count,
-            completed_candidate_count=stimulus.scored_candidate_count,
-            incomplete_candidate_count=0,
-            completed_candidate_rate=1.0,
-            feasibility_observed_candidate_count=(stimulus.scored_candidate_count),
-            feasible_candidate_count=stimulus.feasible_candidate_count,
-            feasible_candidate_rate=(
-                stimulus.feasible_candidate_count / stimulus.scored_candidate_count
-            ),
-            total_trial_count=(stimulus.scored_candidate_count * stimulus.trials_per_candidate),
-            failed_trial_count=round(
-                stimulus.observed_failure_rate
-                * stimulus.scored_candidate_count
-                * stimulus.trials_per_candidate
-            ),
-            observed_failure_rate=stimulus.observed_failure_rate,
-            baseline_score=stimulus.baseline_score,
-            best_score=observed_best_score,
-            relative_improvement_from_baseline=relative_improvement,
-            score_gap_to_runner_up=score_gap,
-            relative_score_gap_to_runner_up=relative_score_gap,
-            trailing_stagnant_generations=(stimulus.trailing_stagnant_generations),
-            best_score_by_generation=tuple(generation_best),
-        ),
+        search=search,
         tool_history=tool_history,
-        decision_memory=((stimulus.last_execution,) if stimulus.last_execution is not None else ()),
+        decision_memory=decision_memory,
         candidates=candidates,
         candidate_history_total=stimulus.scored_candidate_count,
         candidate_history_included=len(candidates),

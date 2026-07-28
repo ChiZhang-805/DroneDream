@@ -33,19 +33,22 @@ def test_harness_ablation_is_deterministic_and_claim_bounded() -> None:
 
     summary = first["summary"]
     assert summary == {
-        "component_count": 4,
-        "probe_count": 20,
-        "full_contract_correct_count": 20,
+        "component_count": 5,
+        "probe_count": 25,
+        "full_contract_correct_count": 25,
         "ablated_contract_correct_count": 6,
         "full_contract_correct_rate": 1.0,
-        "ablated_contract_correct_rate": 0.3,
-        "absolute_contract_delta": 0.7,
+        "ablated_contract_correct_rate": 0.24,
+        "absolute_contract_delta": 0.76,
     }
     by_component = {row["component"]: row for row in first["component_rows"]}
     assert by_component["provider_trust_filter"]["ablated_contract_correct_count"] == 2
     assert by_component["tool_eligibility_gate"]["ablated_contract_correct_count"] == 1
     assert by_component["deterministic_fallback"]["ablated_contract_correct_count"] == 1
     assert by_component["scenario_and_outcome_isolation"]["ablated_contract_correct_count"] == 2
+    assert by_component["scenario_profile_context"]["probe_count"] == 5
+    assert by_component["scenario_profile_context"]["full_contract_correct_rate"] == 1.0
+    assert by_component["scenario_profile_context"]["ablated_contract_correct_rate"] == 0.0
 
 
 def test_harness_ablation_rejects_hash_or_claim_upgrade() -> None:
@@ -105,7 +108,7 @@ def test_harness_ablation_writer_supports_reproducible_check_mode(
 
     assert first == second
     csv_lines = csv_path.read_text(encoding="utf-8").splitlines()
-    assert len(csv_lines) == 21
+    assert len(csv_lines) == 26
 
     csv_path.write_text("stale\n", encoding="utf-8")
     with pytest.raises(ValueError, match="stale"):

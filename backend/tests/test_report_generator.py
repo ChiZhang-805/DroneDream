@@ -147,14 +147,8 @@ def test_summary_text_covers_baseline_and_optimized(ctx):
     # winner fallback. The "No failure or instability flags" branch is what
     # we expect for a fully successful mock run.
     assert "Baseline achieved aggregated score" in text
-    assert (
-        "Optimizer candidate" in text
-        or "No optimizer candidate beat the baseline" in text
-    )
-    assert (
-        "No failure or instability flags" in text
-        or "Watch-outs" in text
-    )
+    assert "Optimizer candidate" in text or "No optimizer candidate beat the baseline" in text
+    assert "No failure or instability flags" in text or "Watch-outs" in text
 
 
 def test_bound_report_projection_seals_compatibility_and_evidence_fields(
@@ -169,42 +163,29 @@ def test_bound_report_projection_seals_compatibility_and_evidence_fields(
         job = db.get(ctx["models"].Job, job_id)
         assert job is not None
         best = next(
-            candidate
-            for candidate in job.candidates
-            if candidate.id == job.best_candidate_id
+            candidate for candidate in job.candidates if candidate.id == job.best_candidate_id
         )
-        aggregate = json.loads(
-            json.dumps(best.aggregated_metric_json)
-        )
+        aggregate = json.loads(json.dumps(best.aggregated_metric_json))
         aggregate["rmse"] = 999.0
         with pytest.raises(rg.ReportEvidenceError):
             rg._authoritative_report_aggregate(best, aggregate)  # noqa: SLF001
 
-        aggregate = json.loads(
-            json.dumps(best.aggregated_metric_json)
-        )
+        aggregate = json.loads(json.dumps(best.aggregated_metric_json))
         aggregate["candidate_report_evidence"]["projection"]["rmse"] = 999.0
         with pytest.raises(rg.ReportEvidenceError):
             rg._authoritative_report_aggregate(best, aggregate)  # noqa: SLF001
 
         baseline = next(
-            candidate
-            for candidate in job.candidates
-            if candidate.id == job.baseline_candidate_id
+            candidate for candidate in job.candidates if candidate.id == job.baseline_candidate_id
         )
         nonwinner = next(
             candidate
             for candidate in job.candidates
             if candidate.id not in {baseline.id, best.id}
-            and "candidate_report_evidence"
-            in (candidate.aggregated_metric_json or {})
+            and "candidate_report_evidence" in (candidate.aggregated_metric_json or {})
         )
-        nonwinner_aggregate = json.loads(
-            json.dumps(nonwinner.aggregated_metric_json)
-        )
-        nonwinner_aggregate["candidate_report_evidence"]["projection"][
-            "rmse"
-        ] = 999.0
+        nonwinner_aggregate = json.loads(json.dumps(nonwinner.aggregated_metric_json))
+        nonwinner_aggregate["candidate_report_evidence"]["projection"]["rmse"] = 999.0
         nonwinner.aggregated_metric_json = nonwinner_aggregate
         with pytest.raises(rg.ReportEvidenceError):
             rg.generate_and_persist_report(
@@ -227,20 +208,15 @@ def test_report_refuses_winner_that_diverges_from_selection_evidence(ctx):
         assert job is not None
         assert job.report is not None
         original_best = next(
-            candidate
-            for candidate in job.candidates
-            if candidate.id == job.best_candidate_id
+            candidate for candidate in job.candidates if candidate.id == job.best_candidate_id
         )
         alternate = next(
             candidate
             for candidate in job.candidates
-            if candidate.id != original_best.id
-            and candidate.aggregated_metric_json is not None
+            if candidate.id != original_best.id and candidate.aggregated_metric_json is not None
         )
         baseline = next(
-            candidate
-            for candidate in job.candidates
-            if candidate.id == job.baseline_candidate_id
+            candidate for candidate in job.candidates if candidate.id == job.baseline_candidate_id
         )
 
         job.best_candidate_id = alternate.id
@@ -308,12 +284,7 @@ def test_winner_freeze_is_idempotent_but_rejects_mutation_and_late_rebuild(
         db.rollback()
 
     with ctx["db_module"].SessionLocal() as db:
-        db.execute(
-            text(
-                "DROP TRIGGER IF EXISTS "
-                "trg_winner_freeze_receipts_no_delete"
-            )
-        )
+        db.execute(text("DROP TRIGGER IF EXISTS trg_winner_freeze_receipts_no_delete"))
         job = db.get(ctx["models"].Job, job_id)
         assert job is not None
         assert job.winner_freeze is not None
@@ -510,11 +481,7 @@ def test_ensure_job_artifacts_is_idempotent(ctx):
         assert len(first) == 4
         assert second == []
 
-        rows = (
-            db.query(models.Artifact)
-            .filter(models.Artifact.owner_id == job.id)
-            .all()
-        )
+        rows = db.query(models.Artifact).filter(models.Artifact.owner_id == job.id).all()
         assert len(rows) == 4
 
 
@@ -648,13 +615,7 @@ def test_real_cli_artifact_regeneration_mismatch_preserves_verified_bytes(
         )
         db.commit()
 
-        report_path = (
-            tmp_path
-            / "jobs"
-            / job.id
-            / "job_artifacts"
-            / "report.json"
-        )
+        report_path = tmp_path / "jobs" / job.id / "job_artifacts" / "report.json"
         sealed_bytes = report_path.read_bytes()
         report_row = (
             db.query(models.Artifact)
@@ -1018,9 +979,7 @@ def test_generate_job_pdf_report_paginates_and_includes_all_candidates_trials(ct
                 completed_trial_count=3,
                 is_baseline=is_baseline,
                 is_best=idx == 20,
-                proposal_reason=(
-                    "Candidate rationale " * 15 if not is_baseline else "Baseline"
-                ),
+                proposal_reason=("Candidate rationale " * 15 if not is_baseline else "Baseline"),
                 created_at=base_time + timedelta(seconds=idx),
                 updated_at=base_time + timedelta(seconds=idx),
             )
@@ -1087,6 +1046,7 @@ def test_generate_job_pdf_report_paginates_and_includes_all_candidates_trials(ct
         assert path.exists()
         assert path.name == f"{job.id} report.pdf"
         assert body.startswith(b"%PDF")
+
         def pdf_text(value: str) -> bytes:
             return value.encode("utf-16-be").hex().upper().encode("ascii")
 
@@ -1200,25 +1160,14 @@ def test_repro_manifest_generated_for_mock_job(ctx):
         payload = json.loads(Path(artifact.storage_path).read_text(encoding="utf-8"))
         assert payload["job"]["job_id"] == job_id
         assert payload["optimizer"]["best_candidate_id"] == job.best_candidate_id
-        winner_evidence = payload["optimizer"][
-            "winner_selection_evidence"
-        ]
+        winner_evidence = payload["optimizer"]["winner_selection_evidence"]
         assert isinstance(winner_evidence, dict)
-        assert (
-            winner_evidence["winner_candidate_id"]
-            == job.best_candidate_id
-        )
-        assert (
-            winner_evidence["evidence_id"]
-            == job.report.winner_evidence_json["evidence_id"]
-        )
+        assert winner_evidence["winner_candidate_id"] == job.best_candidate_id
+        assert winner_evidence["evidence_id"] == job.report.winner_evidence_json["evidence_id"]
         winner_freeze = payload["optimizer"]["winner_freeze_receipt"]
         assert isinstance(winner_freeze, dict)
         assert winner_freeze["receipt_id"] == job.winner_freeze.id
-        assert (
-            winner_freeze["evidence_id"]
-            == winner_evidence["evidence_id"]
-        )
+        assert winner_freeze["evidence_id"] == winner_evidence["evidence_id"]
         assert isinstance(payload["trials"], list)
         assert payload["trials"]
         assert "track_type" in payload["job"]
@@ -1227,10 +1176,7 @@ def test_repro_manifest_generated_for_mock_job(ctx):
         candidate_summary = payload["optimizer"]["candidate_summaries"][0]
         assert "parameters" in candidate_summary
         assert "aggregated_feedback" in candidate_summary
-        assert (
-            "candidate_report_evidence_id"
-            in candidate_summary["aggregated_feedback"]
-        )
+        assert "candidate_report_evidence_id" in candidate_summary["aggregated_feedback"]
 
 
 def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
@@ -1271,12 +1217,8 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
                     "maximum": 1.3,
                 }
             ],
-            objective_config_json={
-                "objectives": [{"metric": "rmse", "direction": "minimize"}]
-            },
-            scenario_suite_json={
-                "cases": [{"scenario_type": "wind", "seeds": [101]}]
-            },
+            objective_config_json={"objectives": [{"metric": "rmse", "direction": "minimize"}]},
+            scenario_suite_json={"cases": [{"scenario_type": "wind", "seeds": [101]}]},
             advanced_scenario_config_json={
                 "wind_gusts": {"enabled": True},
                 "service_token": "should-not-appear",
@@ -1445,6 +1387,14 @@ def test_build_job_report_lines_includes_new_sections(ctx):
                     "trial_count": 2,
                     "pass_rate": 0.5,
                     "failure_rate": 0.5,
+                    "generalization_evidence": {
+                        "assessment": "not_assessable",
+                        "claim_scope": "seed_robustness",
+                        "observed_shift": None,
+                        "shift_axes": ["seed_shift"],
+                        "scalar_loss_relative_degradation": None,
+                        "objective_gaps": [],
+                    },
                 },
             },
             is_best=True,
@@ -1500,6 +1450,7 @@ def test_build_job_report_lines_includes_new_sections(ctx):
         assert "evaluator=max_error_above_target" in text
         assert "worst_max_error=4.000" in text
         assert "Holdout validation: status=incomplete" in text
+        assert ("Generalization evidence: assessment=not_assessable, scope=seed_robustness") in text
         assert "never-print" not in text
 
 
@@ -1525,23 +1476,15 @@ def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
         job = db.get(ctx["models"].Job, job_id)
         assert job is not None
         assert job.report is not None
-        expected_evidence_id = job.report.winner_evidence_json[
-            "evidence_id"
-        ]
+        expected_evidence_id = job.report.winner_evidence_json["evidence_id"]
         expected_receipt_id = job.winner_freeze.id
 
     with TestClient(main_module.app) as client:
         response = client.get(f"/api/v1/jobs/{job_id}/report")
 
     assert response.status_code == 200
-    assert (
-        response.json()["data"]["winner_evidence_id"]
-        == expected_evidence_id
-    )
-    assert (
-        response.json()["data"]["winner_freeze_receipt_id"]
-        == expected_receipt_id
-    )
+    assert response.json()["data"]["winner_evidence_id"] == expected_evidence_id
+    assert response.json()["data"]["winner_freeze_receipt_id"] == expected_receipt_id
 
 
 def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
@@ -1563,12 +1506,7 @@ def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
         job = db.get(ctx["models"].Job, job_id)
         assert job is not None
         assert job.winner_freeze is not None
-        db.execute(
-            text(
-                "DROP TRIGGER IF EXISTS "
-                "trg_winner_freeze_receipts_no_update"
-            )
-        )
+        db.execute(text("DROP TRIGGER IF EXISTS trg_winner_freeze_receipts_no_update"))
         job.winner_freeze.winner_candidate_id = "cand_tampered"
         db.commit()
 

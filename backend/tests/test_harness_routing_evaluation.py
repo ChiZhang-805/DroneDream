@@ -15,6 +15,7 @@ from app.orchestration.harness_context import (
     HarnessObservedDecisionOutcome,
     HarnessToolId,
     eligible_harness_tools,
+    selectable_harness_tools,
 )
 from app.orchestration.harness_evaluation import (
     build_routing_eval_report,
@@ -51,7 +52,7 @@ def test_routing_eval_corpus_is_broad_unique_and_schema_valid() -> None:
     }
     for case in cases:
         assert set(case.acceptable_tools) <= set(HARNESS_TOOL_DEFINITIONS)
-        eligible = set(eligible_harness_tools(compile_routing_eval_snapshot(case)))
+        eligible = set(selectable_harness_tools(compile_routing_eval_snapshot(case)))
         assert set(case.acceptable_tools) & eligible
 
 
@@ -61,7 +62,7 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
     for case in cases:
         snapshot = compile_routing_eval_snapshot(case)
         system, user = build_decision_messages(snapshot)
-        assert snapshot.schema_version == "2.5"
+        assert snapshot.schema_version == "2.7"
         assert case.case_id not in system
         assert case.case_id not in user
         assert case.rationale not in system
@@ -69,11 +70,11 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
         assert "acceptable_tools" not in user
         assert '"case_id"' not in user
         assert '"registry_version":"2.1"' in user
-        assert '"schema_version":"2.5"' in user
+        assert '"schema_version":"2.7"' in user
         payload = json.loads(user)
         assert tuple(
             tool["tool_id"] for tool in payload["tool_manifest"]["tools"]
-        ) == eligible_harness_tools(snapshot)
+        ) == selectable_harness_tools(snapshot)
 
 
 def test_routing_eval_grades_complete_predictions_by_category() -> None:
@@ -149,9 +150,9 @@ def test_prediction_artifact_binds_corpus_prompts_versions_and_model(
         "schema_version": "1.0",
         "corpus_sha256": routing_corpus_sha256(cases),
         "prompt_suite_sha256": routing_prompt_suite_sha256(cases),
-        "evidence_schema_version": "2.5",
+        "evidence_schema_version": "2.7",
         "tool_registry_version": "2.1",
-        "prompt_template_version": "1.2",
+        "prompt_template_version": "1.5",
         "provider": "openai",
         "model_snapshot": "gpt-test-snapshot",
         "generation_config": {
@@ -247,8 +248,11 @@ def test_routing_eval_prompt_preserves_verified_observational_reflection() -> No
         generation=1,
         tool_id="optimizer_portfolio",
         decision_source="model",
+        plan_phase="balanced",
+        batch_policy="balanced",
         status="dispatched",
         dispatched_candidates=4,
+        planned_candidates=4,
         reflection_status="verified_complete",
         observed_outcome=outcome,
     )
@@ -287,8 +291,11 @@ def test_eight_verified_reflections_remain_bounded() -> None:
             generation=generation,
             tool_id="optimizer_portfolio",
             decision_source="deterministic_fallback",
+            plan_phase="balanced",
+            batch_policy="balanced",
             status="dispatched",
             dispatched_candidates=4,
+            planned_candidates=4,
             fallback_reason="missing_api_key",
             reflection_status="verified_complete",
             observed_outcome=HarnessObservedDecisionOutcome(
@@ -308,9 +315,7 @@ def test_eight_verified_reflections_remain_bounded() -> None:
         for generation in range(1, 9)
     )
 
-    system, user = build_decision_messages(
-        snapshot.model_copy(update={"decision_memory": memory})
-    )
+    system, user = build_decision_messages(snapshot.model_copy(update={"decision_memory": memory}))
 
     assert len((system + user).encode("utf-8")) < 32_768
     assert user.count("dronedream.harness-decision-observed-outcome/v1") == 8

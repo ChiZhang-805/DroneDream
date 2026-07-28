@@ -250,7 +250,7 @@ def test_outcome_contract_is_content_addressed_and_seals_holdout_identity() -> N
         "hard_feasible",
         "hard_constraint_violation",
     )
-    assert first.compiler_version == "2.9"
+    assert first.compiler_version == "3.0"
     assert first.metric_admission_policy == "registered_metrics_only"
     assert first.metric_dependency_policy == "reject_known_alias_complement_and_composite_overlap"
     assert (

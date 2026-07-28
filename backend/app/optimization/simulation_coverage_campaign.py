@@ -27,15 +27,24 @@ from app.optimization.experimental_types import (
     OptimizerRequest,
     canonical_optimizer_seed_value,
 )
-from app.schemas import ScenarioCaseConfig, ScenarioSuiteConfig
+from app.optimization.generalization_evidence import (
+    CandidateGeneralizationEvidence,
+    compile_candidate_generalization_evidence,
+)
+from app.schemas import (
+    ObjectiveConfig,
+    ObjectiveSpec,
+    ScenarioCaseConfig,
+    ScenarioSuiteConfig,
+)
 from app.simulator import JobConfig, MockSimulatorAdapter, TrialContext
 
-SIMULATION_COVERAGE_SCHEMA_VERSION: Literal[
-    "dronedream.simulation-coverage-campaign.v1"
-] = "dronedream.simulation-coverage-campaign.v1"
-MOCK_LANDSCAPE_SCHEMA_VERSION: Literal[
+SIMULATION_COVERAGE_SCHEMA_VERSION: Literal["dronedream.simulation-coverage-campaign.v2"] = (
+    "dronedream.simulation-coverage-campaign.v2"
+)
+MOCK_LANDSCAPE_SCHEMA_VERSION: Literal["dronedream.mock.synthetic.v2"] = (
     "dronedream.mock.synthetic.v2"
-] = "dronedream.mock.synthetic.v2"
+)
 _OPTIMIZER_SEED = 12_345
 _INITIAL_DESIGN_SIZE = 13
 _GENERATION_COUNT = 8
@@ -119,7 +128,7 @@ class SimulationCoveragePoint(_FrozenModel):
 
 
 class SimulationCoverageArtifact(_FrozenModel):
-    schema_version: Literal["dronedream.simulation-coverage-campaign.v1"]
+    schema_version: Literal["dronedream.simulation-coverage-campaign.v2"]
     simulator_backend: Literal["mock"]
     mock_landscape_schema: Literal["dronedream.mock.synthetic.v2"]
     physical_fidelity: Literal[False]
@@ -144,6 +153,7 @@ class SimulationCoverageArtifact(_FrozenModel):
     holdout_oracle_regret: float
     baseline_to_selected_improvement_rate: float
     holdout_improvement_by_scenario: dict[str, float]
+    generalization_evidence: CandidateGeneralizationEvidence
     all_scenarios_improved: bool
     qualified: bool
     failed_requirements: tuple[str, ...]
@@ -259,9 +269,7 @@ def _campaign_spec() -> dict[str, object]:
         "initial_design_size": _INITIAL_DESIGN_SIZE,
         "generation_count": _GENERATION_COUNT,
         "batch_size": _BATCH_SIZE,
-        "parameter_choices": {
-            name: list(values) for name, values in _PARAMETER_CHOICES.items()
-        },
+        "parameter_choices": {name: list(values) for name, values in _PARAMETER_CHOICES.items()},
         "baseline_parameters": _BASELINE_PARAMETERS,
         "scenario_suite": suite.model_dump(mode="json"),
         "job_config": {
@@ -311,9 +319,7 @@ def _evaluate_parameters(
                 )
             )
             if not result.success or result.metrics is None:
-                raise RuntimeError(
-                    f"mock scenario campaign failed for {case.id} seed {seed}"
-                )
+                raise RuntimeError(f"mock scenario campaign failed for {case.id} seed {seed}")
             raw = result.metrics.raw_metric_json
             if (
                 raw.get("mock_landscape_schema") != MOCK_LANDSCAPE_SCHEMA_VERSION
@@ -434,9 +440,7 @@ def _optimizer_search(
         )
         proposals = propose_evolutionary_candidates(space, request)
         if len(proposals) != _BATCH_SIZE:
-            raise RuntimeError(
-                "optimizer portfolio did not fill the fixed campaign batch"
-            )
+            raise RuntimeError("optimizer portfolio did not fill the fixed campaign batch")
         for index, proposal in enumerate(proposals):
             record(
                 candidate_id=f"generation-{generation_index:02d}-{index:02d}",
@@ -521,15 +525,27 @@ def run_simulation_coverage_campaign() -> SimulationCoverageArtifact:
         if case.enabled and not case.holdout
     }
     holdout_seeds: dict[str, int] = {
-        case.scenario_type: case.seeds[0]
-        for case in suite.cases
-        if case.enabled and case.holdout
+        case.scenario_type: case.seeds[0] for case in suite.cases if case.enabled and case.holdout
     }
+    validation_trial_count = sum(
+        len(case.seeds) for case in suite.cases if case.enabled and case.holdout
+    )
+    generalization_evidence = compile_candidate_generalization_evidence(
+        objective_config=ObjectiveConfig(
+            objectives=[ObjectiveSpec(metric="score", direction="minimize")]
+        ),
+        scenario_suite=suite,
+        validation_status="passed" if selected.holdout_all_pass else "failed",
+        validation_trial_count=validation_trial_count,
+        validation_completed_trial_count=validation_trial_count,
+        training_objectives={"score": selected.training_loss},
+        validation_objectives={"score": selected.holdout_loss},
+        training_scalar_loss=selected.training_loss,
+        validation_scalar_loss=selected.holdout_loss,
+    )
     candidate_budget = _INITIAL_DESIGN_SIZE + _GENERATION_COUNT * _BATCH_SIZE
     failed_requirements: list[str] = []
-    if set(training_seeds) != set(_SCENARIO_TYPES) or set(holdout_seeds) != set(
-        _SCENARIO_TYPES
-    ):
+    if set(training_seeds) != set(_SCENARIO_TYPES) or set(holdout_seeds) != set(_SCENARIO_TYPES):
         failed_requirements.append("complete_scenario_matrix")
     if set(training_seeds.values()) & set(holdout_seeds.values()):
         failed_requirements.append("disjoint_holdout_seeds")
@@ -545,6 +561,13 @@ def run_simulation_coverage_campaign() -> SimulationCoverageArtifact:
         failed_requirements.append("holdout_improvement_at_least_20_percent")
     if not all_scenarios_improved:
         failed_requirements.append("every_holdout_scenario_improves")
+    if (
+        generalization_evidence.role != "validation_report_only_no_adaptive_feedback"
+        or not generalization_evidence.qualified
+        or generalization_evidence.claim_scope != "seed_robustness"
+        or generalization_evidence.shift_axes != ("seed_shift",)
+    ):
+        failed_requirements.append("content_addressed_seed_shift_evidence")
 
     return SimulationCoverageArtifact(
         schema_version=SIMULATION_COVERAGE_SCHEMA_VERSION,
@@ -572,6 +595,7 @@ def run_simulation_coverage_campaign() -> SimulationCoverageArtifact:
         holdout_oracle_regret=holdout_regret,
         baseline_to_selected_improvement_rate=improvement_rate,
         holdout_improvement_by_scenario=scenario_improvements,
+        generalization_evidence=generalization_evidence,
         all_scenarios_improved=all_scenarios_improved,
         qualified=not failed_requirements,
         failed_requirements=tuple(failed_requirements),
@@ -586,9 +610,7 @@ def write_frozen_simulation_coverage_artifact(
 
     destination = path.resolve()
     if not destination.parent.is_dir():
-        raise FileNotFoundError(
-            f"artifact parent directory does not exist: {destination.parent}"
-        )
+        raise FileNotFoundError(f"artifact parent directory does not exist: {destination.parent}")
     payload = (
         json.dumps(
             artifact.model_dump(mode="json"),

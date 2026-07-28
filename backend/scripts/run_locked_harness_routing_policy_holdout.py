@@ -32,7 +32,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=FIXTURES / "harness_routing_policy_holdout_v2.manifest.json",
+        default=FIXTURES / "harness_routing_policy_holdout_v3.manifest.json",
     )
     parser.add_argument(
         "--development-corpus",

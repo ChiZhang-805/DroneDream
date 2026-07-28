@@ -19,3 +19,8 @@ scenario_and_outcome_isolation,unmatched_success,quarantine_from_optimizer_learn
 scenario_and_outcome_isolation,training_infrastructure_failure,quarantine_from_optimizer_learning,quarantined,included,True,False
 scenario_and_outcome_isolation,training_domain_failure,include_in_optimizer_learning,included,included,True,True
 scenario_and_outcome_isolation,training_unknown_failure,quarantine_from_optimizer_learning,quarantined,included,True,False
+scenario_profile_context,weighted_training_profile,compile_anonymous_weighted_training_cases,2_cases_weight_concentration_0.75,aggregate_counts_only,True,False
+scenario_profile_context,scenario_specific_allowlist,exclude_incompatible_training_perturbation,"{""wind_mps"":6.0}","{""dropout_rate"":0.9,""wind_mps"":6.0}",True,False
+scenario_profile_context,out_of_range_perturbation,exclude_out_of_range_training_perturbation,{},"{""wind_mps"":31.0}",True,False
+scenario_profile_context,holdout_content_noninterference,holdout_details_do_not_change_provider_scenario_evidence,identical,raw_holdout_configs_differ,True,False
+scenario_profile_context,bounded_environment_summary,compile_job_wide_environment_without_raw_geometry,"{""advanced_config_present"":true,""baro_noise_m"":0.4,""battery_initial_percent"":70.0,""gps_noise_m"":1.5,""gust_magnitude_mps"":7.5,""gust_period_s"":12.0,""imu_noise_scale"":1.3,""mass_payload_kg"":1.2,""obstacle_count"":0,""sensor_dropout_rate"":0.1,""sensor_noise_level"":""high"",""steady_wind_component_l1_mps"":1.5,""voltage_sag"":true}",environment_omitted,True,False

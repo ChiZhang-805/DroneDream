@@ -1,6 +1,6 @@
 {
   "ablation_comparator": "Constructed non-production comparator that removes exactly the named guard for contract diagnostics.",
-  "artifact_sha256": "f6831a281e0647281dca2293aceb7d36031f294bac8ba8ae6b72d575a2915d3d",
+  "artifact_sha256": "477da3d70cbd061f6b9f790fd7af962221f38f26fa8d4713130173e793e8e847",
   "causal_claim_permitted": false,
   "claim_boundary": "Paired deterministic software-contract probes under constructed inputs. They measure guard behavior only; they do not measure optimizer quality, simulator performance, user outcomes, causal component contribution, or real-flight safety.",
   "component_rows": [
@@ -32,6 +32,15 @@
       "probe_count": 6
     },
     {
+      "ablated_contract_correct_count": 0,
+      "ablated_contract_correct_rate": 0.0,
+      "absolute_contract_delta": 1.0,
+      "component": "scenario_profile_context",
+      "full_contract_correct_count": 5,
+      "full_contract_correct_rate": 1.0,
+      "probe_count": 5
+    },
+    {
       "ablated_contract_correct_count": 1,
       "ablated_contract_correct_rate": 0.2,
       "absolute_contract_delta": 0.8,
@@ -42,8 +51,8 @@
     }
   ],
   "contract_versions": {
-    "harness_evidence_schema": "2.5",
-    "prompt_template": "1.2",
+    "harness_evidence_schema": "2.7",
+    "prompt_template": "1.5",
     "tool_eligibility_policy": "1.1",
     "tool_registry": "2.1",
     "trial_outcome_taxonomy": "dronedream.trial-outcome-taxonomy/v1"
@@ -231,17 +240,62 @@
       "expectation": "quarantine_from_optimizer_learning",
       "full_contract_correct": true,
       "full_observation": "quarantined"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "aggregate_counts_only",
+      "case_id": "weighted_training_profile",
+      "component": "scenario_profile_context",
+      "expectation": "compile_anonymous_weighted_training_cases",
+      "full_contract_correct": true,
+      "full_observation": "2_cases_weight_concentration_0.75"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "{\"dropout_rate\":0.9,\"wind_mps\":6.0}",
+      "case_id": "scenario_specific_allowlist",
+      "component": "scenario_profile_context",
+      "expectation": "exclude_incompatible_training_perturbation",
+      "full_contract_correct": true,
+      "full_observation": "{\"wind_mps\":6.0}"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "{\"wind_mps\":31.0}",
+      "case_id": "out_of_range_perturbation",
+      "component": "scenario_profile_context",
+      "expectation": "exclude_out_of_range_training_perturbation",
+      "full_contract_correct": true,
+      "full_observation": "{}"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "raw_holdout_configs_differ",
+      "case_id": "holdout_content_noninterference",
+      "component": "scenario_profile_context",
+      "expectation": "holdout_details_do_not_change_provider_scenario_evidence",
+      "full_contract_correct": true,
+      "full_observation": "identical"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "environment_omitted",
+      "case_id": "bounded_environment_summary",
+      "component": "scenario_profile_context",
+      "expectation": "compile_job_wide_environment_without_raw_geometry",
+      "full_contract_correct": true,
+      "full_observation": "{\"advanced_config_present\":true,\"baro_noise_m\":0.4,\"battery_initial_percent\":70.0,\"gps_noise_m\":1.5,\"gust_magnitude_mps\":7.5,\"gust_period_s\":12.0,\"imu_noise_scale\":1.3,\"mass_payload_kg\":1.2,\"obstacle_count\":0,\"sensor_dropout_rate\":0.1,\"sensor_noise_level\":\"high\",\"steady_wind_component_l1_mps\":1.5,\"voltage_sag\":true}"
     }
   ],
   "schema_version": "dronedream.harness-contract-ablation/v1",
   "simulator_runs": false,
   "summary": {
     "ablated_contract_correct_count": 6,
-    "ablated_contract_correct_rate": 0.3,
-    "absolute_contract_delta": 0.7,
-    "component_count": 4,
-    "full_contract_correct_count": 20,
+    "ablated_contract_correct_rate": 0.24,
+    "absolute_contract_delta": 0.76,
+    "component_count": 5,
+    "full_contract_correct_count": 25,
     "full_contract_correct_rate": 1.0,
-    "probe_count": 20
+    "probe_count": 25
   }
 }

@@ -24,10 +24,10 @@ from app.orchestration.harness_routing_holdout import (
 
 FIXTURES = Path(__file__).parent / "fixtures"
 CORPUS = FIXTURES / "harness_routing_policy_holdout_v1.jsonl"
-MANIFEST = FIXTURES / "harness_routing_policy_holdout_v2.manifest.json"
+MANIFEST = FIXTURES / "harness_routing_policy_holdout_v3.manifest.json"
 DEVELOPMENT = FIXTURES / "harness_routing_eval_v1.jsonl"
 RESULT = (
-    Path(__file__).parents[1] / "evaluation_artifacts" / "harness-routing-policy-holdout-v2.json"
+    Path(__file__).parents[1] / "evaluation_artifacts" / "harness-routing-policy-holdout-v3.json"
 )
 
 

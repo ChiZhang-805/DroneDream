@@ -38,7 +38,7 @@
     "no_decision_memory": "replace the provider-visible decision_memory tuple with empty",
     "no_observed_outcome_reflection": "preserve decision receipts but replace verified reflection with unavailable and remove observed_outcome"
   },
-  "manifest_sha256": "05221ad1cd0e320f53ea4b88c78996dcf8ba12b0010ee1e0041a289eb71b91c7",
+  "manifest_sha256": "8c4a9e015a0f7a579bf6e04d7f7811122420f766bbf6a27431d732df94ba043d",
   "metrics": [
     "holdout_loss",
     "optimizer_feasible_rate",
@@ -66,7 +66,7 @@
     "robust_aggregation": "mean"
   },
   "runtime_contract": {
-    "evidence_schema_version": "2.5",
+    "evidence_schema_version": "2.7",
     "live_model_calls": false,
     "network_connect_guard": [
       "socket.connect",
@@ -74,7 +74,7 @@
       "socket.create_connection"
     ],
     "physical_fidelity": false,
-    "prompt_template_version": "1.2",
+    "prompt_template_version": "1.5",
     "real_credentials_used": false,
     "simulator_backend": "mock",
     "tool_registry_version": "2.1"

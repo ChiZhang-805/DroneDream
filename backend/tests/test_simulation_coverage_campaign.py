@@ -5,6 +5,9 @@ from pathlib import Path
 
 import pytest
 
+from app.optimization.generalization_evidence import (
+    verify_candidate_generalization_evidence,
+)
 from app.optimization.simulation_coverage_campaign import (
     SimulationCoverageArtifact,
     _canonical_sha256,
@@ -16,7 +19,7 @@ from app.optimization.simulation_coverage_campaign import (
 _ARTIFACT_PATH = (
     Path(__file__).resolve().parents[1]
     / "evaluation_artifacts"
-    / "simulation-coverage-mock-v2.json"
+    / "simulation-coverage-mock-v3.json"
 )
 
 
@@ -44,6 +47,13 @@ def test_committed_simulation_coverage_freeze_matches_current_campaign(
     assert campaign.baseline_to_selected_improvement_rate >= 0.20
     assert campaign.all_scenarios_improved is True
     assert campaign.selected.holdout_all_pass is True
+    evidence = verify_candidate_generalization_evidence(campaign.generalization_evidence)
+    assert evidence is not None
+    assert evidence.role == "validation_report_only_no_adaptive_feedback"
+    assert evidence.claim_scope == "seed_robustness"
+    assert evidence.shift_axes == ("seed_shift",)
+    assert evidence.validation_replicate_count == 10
+    assert evidence.qualified is True
 
 
 def test_campaign_transcript_hash_ignores_cross_runtime_ulp_noise() -> None:
@@ -74,16 +84,14 @@ def test_campaign_transcript_hash_binds_causal_execution_not_blas_diagnostics() 
         }
     ]
     equivalent_diagnostics = json.loads(json.dumps(baseline))
-    equivalent_diagnostics[0]["optimizer_metadata"]["mahalanobis_squared"] = (  # type: ignore[index]
-        7.025120301676976
-    )
-    equivalent_diagnostics[0]["optimizer_metadata"]["cma_state"] = {  # type: ignore[index]
+    equivalent_diagnostics[0]["optimizer_metadata"]["mahalanobis_squared"] = 7.025120301676976
+    equivalent_diagnostics[0]["optimizer_metadata"]["cma_state"] = {
         "covariance": [[1.0, -1e-16], [-1e-16, 1.0]]
     }
     changed_candidate = json.loads(json.dumps(baseline))
-    changed_candidate[0]["parameters"]["kp"] = 1.3  # type: ignore[index]
+    changed_candidate[0]["parameters"]["kp"] = 1.3
     changed_route = json.loads(json.dumps(baseline))
-    changed_route[0]["optimizer_metadata"]["child_strategy"] = "turbo"  # type: ignore[index]
+    changed_route[0]["optimizer_metadata"]["child_strategy"] = "turbo"
 
     baseline_hash = _optimizer_transcript_sha256(baseline)
     assert _optimizer_transcript_sha256(equivalent_diagnostics) == baseline_hash

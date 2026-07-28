@@ -2,10 +2,10 @@
   "case_count": 16,
   "case_ids_sha256": "943dfc29d847a91f93740f7ee4d1b968fa54145af7440c07328c5853fdb126cb",
   "corpus_sha256": "61be87c173407328078e8ddf6332908e13bab4eb1845fe64a3a1deeef06335c5",
-  "development_corpus_sha256": "52be8987e156838b2db0327fecc8cd1ea11e003fd5ec2887d12d71b83f57c978",
+  "development_corpus_sha256": "98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89",
   "eligibility_policy_version": "1.1",
   "evidence_class": "deterministic_router_policy_holdout",
-  "evidence_schema_version": "2.6",
+  "evidence_schema_version": "2.7",
   "exact_match_required": true,
   "grades": [
     {
@@ -251,10 +251,10 @@
       "passed": true
     }
   ],
-  "manifest_sha256": "7c9d119d7e71c68685d75054b714e08be4c81700457d3d97fcbdd70f53d6ba0d",
+  "manifest_sha256": "966df36688fb310d2ee05d482c519af72696f91bd179b23358b210832117c68a",
   "pass_rate": 1.0,
   "passed_count": 16,
-  "policy_input_suite_sha256": "17fb2c1f1966a7ff5f3d901c313e236fbc2c7e34da7a8a4bbbf445e13e7ea673",
+  "policy_input_suite_sha256": "29e937ea2d69453056b75a8f1ebf19afba8eabeab185e0cc0d012ffaeedc15d7",
   "qualified": true,
   "result_destination": "evaluation_artifact",
   "schema_version": "1.0",

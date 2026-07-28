@@ -169,8 +169,7 @@ def _paginate_lines(wrapped_lines: list[str], lines_per_page: int = 52) -> list[
     if not wrapped_lines:
         return [[]]
     return [
-        wrapped_lines[i : i + lines_per_page]
-        for i in range(0, len(wrapped_lines), lines_per_page)
+        wrapped_lines[i : i + lines_per_page] for i in range(0, len(wrapped_lines), lines_per_page)
     ]
 
 
@@ -268,11 +267,7 @@ def _build_page_stream(
     if free_tier_watermark:
         stream_lines.extend(_free_report_watermark_stream())
     stream = b"\n".join(stream_lines)
-    return (
-        f"<< /Length {len(stream)} >>\nstream\n".encode()
-        + stream
-        + b"\nendstream"
-    )
+    return f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"\nendstream"
 
 
 def _build_pdf(lines: list[str], *, free_tier_watermark: bool = False) -> bytes:
@@ -328,8 +323,7 @@ def _build_pdf(lines: list[str], *, free_tier_watermark: bool = False) -> bytes:
         out.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
 
     trailer = (
-        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
-        f"startxref\n{xref_start}\n%%EOF\n"
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_start}\n%%EOF\n"
     )
     out.extend(trailer.encode("ascii"))
     return bytes(out)
@@ -358,32 +352,22 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     baseline = next((c for c in job.candidates if c.id == job.baseline_candidate_id), None)
     baseline_agg = {}
     if baseline is not None:
-        baseline_agg = require_authoritative_candidate_report_projection(
-            baseline
-        )
+        baseline_agg = require_authoritative_candidate_report_projection(baseline)
     best = next((c for c in job.candidates if c.id == job.best_candidate_id), None)
-    best_agg = (
-        require_authoritative_candidate_report_projection(best)
-        if best is not None
-        else {}
-    )
+    best_agg = require_authoritative_candidate_report_projection(best) if best is not None else {}
 
     add("")
     add("2) Executive summary")
     add(f"- Job status: {job.status}")
     add(f"- Optimization outcome: {job.optimization_outcome or '—'}")
-    add(
-        "- Best candidate: "
-        f"{(best.label if best else '—')} / {(best.id if best else '—')}"
-    )
+    add(f"- Best candidate: {(best.label if best else '—')} / {(best.id if best else '—')}")
     verified_winner = (
         require_winner_freeze_receipt(
             report.winner_freeze_receipt,
             job=job,
             evidence=report.winner_evidence_json,
         )
-        if report is not None
-        and report.winner_freeze_receipt is not None
+        if report is not None and report.winner_freeze_receipt is not None
         else None
     )
     winner_evidence = (
@@ -391,24 +375,19 @@ def build_job_report_lines(job: models.Job) -> list[str]:
         if verified_winner is not None
         else (
             report.winner_evidence_json
-            if report is not None
-            and isinstance(report.winner_evidence_json, dict)
+            if report is not None and isinstance(report.winner_evidence_json, dict)
             else {}
         )
     )
     add(
-        "- Winner selection evidence: "
-        f"{winner_evidence.get('evidence_id', 'legacy / unavailable')}"
+        f"- Winner selection evidence: {winner_evidence.get('evidence_id', 'legacy / unavailable')}"
     )
     winner_freeze_receipt_id = (
         report.winner_freeze_receipt_id
         if report is not None and report.winner_freeze_receipt_id
         else "legacy / unavailable"
     )
-    add(
-        "- Winner freeze receipt: "
-        f"{winner_freeze_receipt_id}"
-    )
+    add(f"- Winner freeze receipt: {winner_freeze_receipt_id}")
     add(
         "- Baseline vs best RMSE change: "
         f"{_pct_change(baseline_agg.get('rmse'), best_agg.get('rmse'))}"
@@ -476,9 +455,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- target_rmse: {_fmt_num(job.target_rmse, digits=3)}")
     add(f"- target_max_error: {_fmt_num(job.target_max_error, digits=3)}")
     add(f"- min_pass_rate: {_fmt_num(job.min_pass_rate, digits=3)}")
-    acceptance = (
-        evaluate_candidate(best, criteria_for_job(job)) if best is not None else None
-    )
+    acceptance = evaluate_candidate(best, criteria_for_job(job)) if best is not None else None
     add(
         "- Best candidate meets acceptance: "
         f"{'yes' if acceptance is not None and acceptance.passed else 'no'}"
@@ -502,6 +479,46 @@ def build_job_report_lines(job: models.Job) -> list[str]:
             f"pass_rate={_fmt_num(holdout.get('pass_rate'), digits=3)}, "
             f"failure_rate={_fmt_num(holdout.get('failure_rate'), digits=3)}"
         )
+        generalization = holdout.get("generalization_evidence")
+        if isinstance(generalization, dict):
+            shift_axes = generalization.get("shift_axes")
+            axes_text = (
+                ", ".join(str(item) for item in shift_axes)
+                if isinstance(shift_axes, list)
+                else "unknown"
+            )
+            relative_gap = generalization.get("scalar_loss_relative_degradation")
+            relative_gap_text = (
+                f"{_fmt_num(float(relative_gap) * 100.0, digits=2)}%"
+                if isinstance(relative_gap, int | float) and not isinstance(relative_gap, bool)
+                else "—"
+            )
+            add(
+                "- Generalization evidence: "
+                f"assessment={generalization.get('assessment', 'unknown')}, "
+                f"scope={generalization.get('claim_scope', 'unknown')}, "
+                f"shift={generalization.get('observed_shift', 'not_assessable')}, "
+                f"axes={axes_text}, "
+                f"scalar_loss_degradation={relative_gap_text}"
+            )
+            objective_gaps = generalization.get("objective_gaps")
+            if isinstance(objective_gaps, list):
+                for item in objective_gaps:
+                    if not isinstance(item, dict):
+                        continue
+                    relative = item.get("relative_degradation")
+                    relative_text = (
+                        f"{_fmt_num(float(relative) * 100.0, digits=2)}%"
+                        if isinstance(relative, int | float) and not isinstance(relative, bool)
+                        else "—"
+                    )
+                    add(
+                        "  - "
+                        f"{item.get('metric', 'unknown')}: "
+                        f"training={_fmt_num(item.get('training_value'), digits=4)}, "
+                        f"validation={_fmt_num(item.get('validation_value'), digits=4)}, "
+                        f"directional_degradation={relative_text}"
+                    )
 
     add("")
     add("5) Baseline metrics")
@@ -595,10 +612,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
             f"failed={candidate.failed_trial_count}"
         )
         rationale = _truncate(candidate.proposal_reason, limit=200)
-        add(
-            "  recorded proposal rationale (not inferred by the report): "
-            f"{rationale or '—'}"
-        )
+        add(f"  recorded proposal rationale (not inferred by the report): {rationale or '—'}")
 
     add("")
     add("7) Trial summary")
@@ -704,10 +718,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     if repro_artifact is None:
         add("- Reproducibility manifest artifact: —")
     else:
-        add(
-            "- Reproducibility manifest artifact available: "
-            f"{repro_artifact.display_name or '—'}"
-        )
+        add(f"- Reproducibility manifest artifact available: {repro_artifact.display_name or '—'}")
         add("- Download from artifact list; PDF omits full manifest payload by design.")
 
     fallback = (

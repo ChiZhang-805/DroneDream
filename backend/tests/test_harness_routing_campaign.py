@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from app.orchestration.harness_context import eligible_harness_tools
+from app.orchestration.harness_context import selectable_harness_tools
 from app.orchestration.harness_evaluation import (
     HarnessRoutingGenerationConfig,
     compile_routing_eval_snapshot,
@@ -53,10 +53,13 @@ def test_campaign_runs_exact_prompts_and_creates_loadable_artifact(
         schemas.append(schema)
         case = cases[case_index]
         case_index += 1
+        selectable = set(selectable_harness_tools(compile_routing_eval_snapshot(case)))
         return _FakeClient(
             {
                 "decision": {
-                    "tool_id": case.acceptable_tools[0],
+                    "tool_id": next(
+                        tool_id for tool_id in case.acceptable_tools if tool_id in selectable
+                    ),
                     "rationale": "Frozen provider campaign decision.",
                 }
             }
@@ -77,7 +80,7 @@ def test_campaign_runs_exact_prompts_and_creates_loadable_artifact(
     assert len(schemas) == len(cases)
     for case, schema in zip(cases, schemas, strict=True):
         enum = schema["properties"]["decision"]["properties"]["tool_id"]["enum"]
-        assert tuple(enum) == eligible_harness_tools(compile_routing_eval_snapshot(case))
+        assert tuple(enum) == selectable_harness_tools(compile_routing_eval_snapshot(case))
     assert json.loads(output.read_text(encoding="utf-8"))["predictions"]
 
 

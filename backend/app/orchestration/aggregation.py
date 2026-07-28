@@ -47,6 +47,9 @@ from app.optimization.candidate_evidence_ledger import (
     record_candidate_evidence_receipt,
 )
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
+from app.optimization.generalization_evidence import (
+    compile_candidate_generalization_evidence,
+)
 from app.optimization.outcome_contract import (
     OptimizationOutcomeContractV1,
     build_selection_key,
@@ -151,8 +154,7 @@ def _renew_finalization_claim(
                     models.Job.finalization_lease_expires_at > now,
                 )
                 .values(
-                    finalization_lease_expires_at=now
-                    + timedelta(seconds=lease_seconds),
+                    finalization_lease_expires_at=now + timedelta(seconds=lease_seconds),
                 )
                 .execution_options(synchronize_session=False)
             ),
@@ -232,9 +234,7 @@ def _acquire_finalization_commit_fence(
         lease_seconds=get_settings().finalization_lease_seconds,
     ):
         db.rollback()
-        raise FinalizationClaimLost(
-            f"finalization claim for {claim.job_id} was reclaimed"
-        )
+        raise FinalizationClaimLost(f"finalization claim for {claim.job_id} was reclaimed")
 
 
 def _candidate_fidelity(candidate: object) -> float:
@@ -1146,6 +1146,8 @@ def _aggregate_candidate(
         holdout_trials = [trial for trial in trials if trial_is_holdout(trial)]
         if holdout_trials:
             holdout_rates = _rate_summary(holdout_trials)
+            validation_objectives: dict[str, float] | None = None
+            validation_scalar_loss: float | None = None
             holdout_payload: dict[str, Any] = {
                 "trial_count": int(holdout_rates["trial_count"]),
                 "completed_trial_count": int(holdout_rates["completed_trial_count"]),
@@ -1183,11 +1185,28 @@ def _aggregate_candidate(
                     )
                 else:
                     holdout_evaluation, _holdout_summary = holdout_result
+                    validation_objectives = dict(holdout_evaluation.objectives)
+                    validation_scalar_loss = float(holdout_evaluation.scalar_loss)
                     trial_count = int(holdout_rates["trial_count"])
                     completed_count = int(holdout_rates["completed_trial_count"])
                     passing_count = int(holdout_rates["passing_trial_count"])
-                    execution_complete = completed_count == trial_count
-                    all_trials_passed = passing_count == trial_count
+                    expected_trial_count = (
+                        sum(
+                            len(case.seeds)
+                            for case in scenario_suite.cases
+                            if case.enabled and case.holdout
+                        )
+                        if scenario_suite is not None
+                        else trial_count
+                    )
+                    execution_complete = (
+                        trial_count == expected_trial_count
+                        and completed_count == expected_trial_count
+                    )
+                    all_trials_passed = (
+                        passing_count == expected_trial_count
+                        and trial_count == expected_trial_count
+                    )
                     validation_feasible = (
                         holdout_evaluation.feasible and execution_complete and all_trials_passed
                     )
@@ -1199,6 +1218,7 @@ def _aggregate_candidate(
                         validation_status = "passed"
                     holdout_payload.update(
                         {
+                            "expected_trial_count": expected_trial_count,
                             "objective_values": holdout_evaluation.objectives,
                             "constraint_values": holdout_evaluation.constraint_values,
                             "constraint_violations": holdout_evaluation.violations,
@@ -1216,6 +1236,29 @@ def _aggregate_candidate(
                             "scalar_loss": holdout_evaluation.scalar_loss,
                         }
                     )
+            if scenario_suite is not None:
+                generalization_evidence = compile_candidate_generalization_evidence(
+                    objective_config=objective_config,
+                    scenario_suite=scenario_suite,
+                    validation_status=str(holdout_payload.get("validation_status", "error")),
+                    validation_trial_count=int(holdout_rates["trial_count"]),
+                    validation_completed_trial_count=int(holdout_rates["completed_trial_count"]),
+                    training_objectives=evaluation.objectives,
+                    validation_objectives=validation_objectives,
+                    training_scalar_loss=evaluation.scalar_loss,
+                    validation_scalar_loss=validation_scalar_loss,
+                    outcome_contract_id=(
+                        outcome_contract.contract_id if outcome_contract is not None else None
+                    ),
+                    scenario_suite_sha256=(
+                        outcome_contract.scenario_suite_sha256
+                        if outcome_contract is not None
+                        else None
+                    ),
+                )
+                holdout_payload["generalization_evidence"] = generalization_evidence.model_dump(
+                    mode="json"
+                )
             agg["holdout"] = holdout_payload
         if outcome_contract is not None:
             ordered_training_trials = sorted(
@@ -1404,13 +1447,10 @@ def finalize_job_if_ready(
         return False
     if (
         job.finalization_claim_token != finalization_claim.token
-        or job.finalization_claim_generation
-        != finalization_claim.generation
+        or job.finalization_claim_generation != finalization_claim.generation
         or job.current_generation != finalization_claim.generation
     ):
-        raise FinalizationClaimLost(
-            f"finalization claim for {job.id} no longer matches the Job"
-        )
+        raise FinalizationClaimLost(f"finalization claim for {job.id} no longer matches the Job")
 
     trials = list(job.trials)
     if not trials:
@@ -1922,9 +1962,7 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
         # could make a later claim stale the instant it is committed.
         claim_time = _now()
         settings = get_settings()
-        stale_before = claim_time - timedelta(
-            seconds=settings.finalization_lease_seconds
-        )
+        stale_before = claim_time - timedelta(seconds=settings.finalization_lease_seconds)
         legacy_or_malformed_stale_claim = and_(
             models.Job.updated_at <= stale_before,
             or_(
@@ -1938,8 +1976,7 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
             and_(
                 models.Job.status == "FINALIZING",
                 or_(
-                    models.Job.finalization_lease_expires_at
-                    <= claim_time,
+                    models.Job.finalization_lease_expires_at <= claim_time,
                     legacy_or_malformed_stale_claim,
                 ),
             ),

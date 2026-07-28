@@ -12,6 +12,7 @@ import json
 import math
 from collections import Counter
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from app.optimization.outcome_taxonomy import TRIAL_OUTCOME_TAXONOMY_SCHEMA
@@ -26,6 +27,7 @@ from app.orchestration.harness_context import (
     HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION,
     HARNESS_TOOL_REGISTRY_VERSION,
     HarnessEvidenceSnapshot,
+    compile_harness_scenario_evidence,
     compile_provider_safe_metric,
     optimizer_learning_outcome_for_trial,
 )
@@ -360,6 +362,172 @@ def _scenario_isolation_rows() -> list[dict[str, Any]]:
     return rows
 
 
+def _scenario_profile_evidence(
+    *,
+    cases: list[dict[str, Any]],
+    advanced: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    job: Any = SimpleNamespace(
+        trials_per_candidate=2,
+        wind_north=1.0,
+        wind_east=0.5,
+        wind_south=0.0,
+        wind_west=0.0,
+        sensor_noise_level="high",
+        advanced_scenario_config_json=advanced,
+        scenario_suite_json={
+            "cases": cases,
+            "common_random_numbers": True,
+        },
+    )
+    return compile_harness_scenario_evidence(job).model_dump(
+        mode="json",
+        exclude_none=True,
+    )
+
+
+def _scenario_profile_rows() -> list[dict[str, Any]]:
+    training_cases = [
+        {
+            "id": "private-wind",
+            "scenario_type": "wind_perturbed",
+            "seeds": [101, 102],
+            "weight": 1.0,
+            "enabled": True,
+            "holdout": False,
+            "config": {"wind_mps": 6.0, "dropout_rate": 0.9},
+        },
+        {
+            "id": "private-dropout",
+            "scenario_type": "gps_dropout",
+            "seeds": [201],
+            "weight": 3.0,
+            "enabled": True,
+            "holdout": False,
+            "config": {"dropout_rate": 0.25},
+        },
+    ]
+    holdout_a = {
+        "id": "sealed-a",
+        "scenario_type": "combined_perturbed",
+        "seeds": [901],
+        "weight": 2.0,
+        "enabled": True,
+        "holdout": True,
+        "config": {"wind_mps": 29.0, "dropout_rate": 0.8},
+    }
+    holdout_b = {
+        "id": "sealed-b",
+        "scenario_type": "battery_degraded",
+        "seeds": [902],
+        "weight": 999.0,
+        "enabled": True,
+        "holdout": True,
+        "config": {"mass_payload_kg": 20.0},
+    }
+    profile = _scenario_profile_evidence(cases=[*training_cases, holdout_a])
+    training_profiles = profile["training_cases"]
+    assert isinstance(training_profiles, list)
+    first_safe = training_profiles[0]["safe_perturbations"]
+    holdout_variant = _scenario_profile_evidence(cases=[*training_cases, holdout_b])
+
+    out_of_range = _scenario_profile_evidence(
+        cases=[
+            {
+                **training_cases[0],
+                "config": {"wind_mps": 31.0},
+            },
+            training_cases[1],
+            holdout_a,
+        ]
+    )
+    out_of_range_profiles = out_of_range["training_cases"]
+    assert isinstance(out_of_range_profiles, list)
+
+    advanced = _scenario_profile_evidence(
+        cases=[*training_cases, holdout_a],
+        advanced={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 7.5,
+                "direction_deg": 45.0,
+                "period_s": 12.0,
+            },
+            "obstacles": [],
+            "sensor_degradation": {
+                "gps_noise_m": 1.5,
+                "baro_noise_m": 0.4,
+                "imu_noise_scale": 1.3,
+                "dropout_rate": 0.1,
+            },
+            "battery": {
+                "initial_percent": 70.0,
+                "voltage_sag": True,
+                "mass_payload_kg": 1.2,
+            },
+        },
+    )
+
+    return [
+        _probe_row(
+            component="scenario_profile_context",
+            case_id="weighted_training_profile",
+            expectation="compile_anonymous_weighted_training_cases",
+            full_observation=(
+                f"{len(training_profiles)}_cases_"
+                f"weight_concentration_{profile['training_weight_concentration']}"
+            ),
+            ablated_observation="aggregate_counts_only",
+            full_contract_correct=(
+                profile["training_replicate_min"] == 1
+                and profile["training_replicate_max"] == 2
+                and profile["training_weight_concentration"] == 0.75
+            ),
+            ablated_contract_correct=False,
+        ),
+        _probe_row(
+            component="scenario_profile_context",
+            case_id="scenario_specific_allowlist",
+            expectation="exclude_incompatible_training_perturbation",
+            full_observation=_canonical_json(first_safe),
+            ablated_observation='{"dropout_rate":0.9,"wind_mps":6.0}',
+            full_contract_correct=first_safe == {"wind_mps": 6.0},
+            ablated_contract_correct=False,
+        ),
+        _probe_row(
+            component="scenario_profile_context",
+            case_id="out_of_range_perturbation",
+            expectation="exclude_out_of_range_training_perturbation",
+            full_observation=_canonical_json(out_of_range_profiles[0]["safe_perturbations"]),
+            ablated_observation='{"wind_mps":31.0}',
+            full_contract_correct=(out_of_range_profiles[0]["safe_perturbations"] == {}),
+            ablated_contract_correct=False,
+        ),
+        _probe_row(
+            component="scenario_profile_context",
+            case_id="holdout_content_noninterference",
+            expectation="holdout_details_do_not_change_provider_scenario_evidence",
+            full_observation=("identical" if profile == holdout_variant else "different"),
+            ablated_observation="raw_holdout_configs_differ",
+            full_contract_correct=profile == holdout_variant,
+            ablated_contract_correct=False,
+        ),
+        _probe_row(
+            component="scenario_profile_context",
+            case_id="bounded_environment_summary",
+            expectation="compile_job_wide_environment_without_raw_geometry",
+            full_observation=_canonical_json(advanced["environment"]),
+            ablated_observation="environment_omitted",
+            full_contract_correct=(
+                advanced["environment"]["gust_magnitude_mps"] == 7.5
+                and advanced["environment"]["sensor_dropout_rate"] == 0.1
+                and advanced["environment"]["mass_payload_kg"] == 1.2
+            ),
+            ablated_contract_correct=False,
+        ),
+    ]
+
+
 def build_harness_ablation_artifact() -> dict[str, Any]:
     """Build the current deterministic source-contract ablation artifact."""
 
@@ -368,6 +536,7 @@ def build_harness_ablation_artifact() -> dict[str, Any]:
         *_tool_eligibility_rows(),
         *_fallback_rows(),
         *_scenario_isolation_rows(),
+        *_scenario_profile_rows(),
     ]
     component_totals = Counter(str(row["component"]) for row in probe_rows)
     full_correct = Counter(

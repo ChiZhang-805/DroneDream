@@ -58,13 +58,13 @@ def test_committed_component_ablation_is_offline_matched_and_claim_bounded() -> 
         "seed_block_count": 5,
         "arm_count": 4,
         "arm_run_count": 20,
-        "total_persisted_trials": 764,
+        "total_persisted_trials": 554,
         "comparison_count": 15,
         "component_isolation_count": 5,
         "inconclusive_component_isolation_count": 5,
         "interpretation_status_counts": {
-            "observed_protocol_difference": 15,
-            "no_observed_protocol_difference": 0,
+            "observed_protocol_difference": 5,
+            "no_observed_protocol_difference": 10,
             "inconclusive_intervention_not_activated": 0,
         },
         "all_network_calls_blocked": True,
@@ -74,13 +74,10 @@ def test_committed_component_ablation_is_offline_matched_and_claim_bounded() -> 
         HARNESS_COMPONENT_ABLATION_SEED_BLOCKS
     )
     for block in artifact["block_rows"]:
-        assert [arm["arm"] for arm in block["arms"]] == list(
-            HARNESS_COMPONENT_ABLATION_ARMS
-        )
+        assert [arm["arm"] for arm in block["arms"]] == list(HARNESS_COMPONENT_ABLATION_ARMS)
         assert len({tuple(arm["tool_sequence"]) for arm in block["arms"]}) >= 3
         assert all(
-            arm["result_metrics"]["evidence_completeness_rate"] == 1.0
-            for arm in block["arms"]
+            arm["result_metrics"]["evidence_completeness_rate"] == 1.0 for arm in block["arms"]
         )
         assert all(
             arm["result_metrics"]["terminal_failure_trials"]
@@ -89,8 +86,7 @@ def test_committed_component_ablation_is_offline_matched_and_claim_bounded() -> 
             for arm in block["arms"]
         )
     assert all(
-        row["result_status"]
-        == "inconclusive_component_not_decision_relevant_under_policy"
+        row["result_status"] == "inconclusive_component_not_decision_relevant_under_policy"
         for row in artifact["component_isolation_rows"]
     )
 
@@ -118,24 +114,11 @@ def test_ablation_really_removes_memory_and_reflection_before_routing() -> None:
             "optimizer_portfolio",
             "optimizer_portfolio",
         ]
+        assert no_memory["component_activation"]["removed_memory_count"] == 1
+        assert no_memory["component_activation"]["provider_visible_intervention_activated"] is True
+        assert no_reflection["component_activation"]["removed_reflection_count"] == 1
         assert (
-            no_memory["component_activation"]["removed_memory_count"] == 1
-        )
-        assert (
-            no_memory["component_activation"][
-                "provider_visible_intervention_activated"
-            ]
-            is True
-        )
-        assert (
-            no_reflection["component_activation"]["removed_reflection_count"]
-            == 1
-        )
-        assert (
-            no_reflection["component_activation"][
-                "provider_visible_intervention_activated"
-            ]
-            is True
+            no_reflection["component_activation"]["provider_visible_intervention_activated"] is True
         )
 
 
@@ -147,11 +130,7 @@ def test_committed_component_ablation_matches_current_production_contracts() -> 
 def test_component_ablation_rejects_claim_or_metric_tamper() -> None:
     artifact = json.loads(JSON_ARTIFACT.read_text(encoding="utf-8"))
     artifact["physical_fidelity"] = True
-    unsigned = {
-        key: value
-        for key, value in artifact.items()
-        if key != "artifact_sha256"
-    }
+    unsigned = {key: value for key, value in artifact.items() if key != "artifact_sha256"}
     artifact["artifact_sha256"] = hashlib.sha256(
         json.dumps(
             unsigned,
@@ -180,11 +159,7 @@ def test_component_ablation_rejects_claim_or_metric_tamper() -> None:
     arm["decision_trace"][1]["tool_id"] = "optimizer_portfolio"
     arm["tool_sequence"][1] = "optimizer_portfolio"
     arm["scripted_router_trace"][1]["selected_tool"] = "optimizer_portfolio"
-    unsigned = {
-        key: value
-        for key, value in artifact.items()
-        if key != "artifact_sha256"
-    }
+    unsigned = {key: value for key, value in artifact.items() if key != "artifact_sha256"}
     artifact["artifact_sha256"] = hashlib.sha256(
         json.dumps(
             unsigned,
@@ -238,10 +213,7 @@ def test_component_ablation_files_and_check_mode_are_reproducible(
     assert sha256_path.read_text(encoding="ascii").splitlines() == [
         f"{hashlib.sha256(json_path.read_bytes()).hexdigest()}  {json_path.name}",
         f"{hashlib.sha256(csv_path.read_bytes()).hexdigest()}  {csv_path.name}",
-        (
-            f"{hashlib.sha256(manifest_path.read_bytes()).hexdigest()}  "
-            f"{manifest_path.name}"
-        ),
+        (f"{hashlib.sha256(manifest_path.read_bytes()).hexdigest()}  {manifest_path.name}"),
     ]
 
 
