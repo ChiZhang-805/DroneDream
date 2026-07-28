@@ -276,9 +276,9 @@ New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 try {
     $verifiedInstallerPath = Join-Path $temporaryRoot $installerName
     $verifiedChecksumPath = "$verifiedInstallerPath.sha256"
-    Invoke-WebRequest -Uri "$expectedDownloadUrl?sha256=$installerSha256" `
+    Invoke-WebRequest -Uri "${expectedDownloadUrl}?sha256=$installerSha256" `
         -UseBasicParsing -OutFile $verifiedInstallerPath -TimeoutSec 120
-    Invoke-WebRequest -Uri "$expectedChecksumUrl?sha256=$installerSha256" `
+    Invoke-WebRequest -Uri "${expectedChecksumUrl}?sha256=$installerSha256" `
         -UseBasicParsing -OutFile $verifiedChecksumPath -TimeoutSec 30
     $verifiedInstaller = Get-Item -LiteralPath $verifiedInstallerPath
     $verifiedInstallerSha256 = (Get-FileHash -LiteralPath $verifiedInstallerPath `

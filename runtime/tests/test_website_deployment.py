@@ -134,6 +134,8 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("dronedream-shared-static-site", wrapper)
         self.assertIn("public-SHA256SUMS", wrapper)
         self.assertIn("Verified the versioned GitHub release asset", wrapper)
+        self.assertIn('"${expectedDownloadUrl}?sha256=$installerSha256"', wrapper)
+        self.assertIn('"${expectedChecksumUrl}?sha256=$installerSha256"', wrapper)
         self.assertIn("verify-site-parity.ps1", self.read("website/README.md"))
         self.assertIn("max-age=31536000", wrapper)
         self.assertNotRegex(wrapper, re.compile(r"(?i)private[-_ ]?key\s*=\s*['\"]"))
