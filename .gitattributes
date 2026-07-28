@@ -31,3 +31,10 @@ backend/evaluation_artifacts/*.sha256 text eol=lf
 /desktop/scripts/*.ps1 text eol=lf
 /desktop/src-tauri/nsis/*.nsi text eol=lf
 /desktop/src-tauri/nsis/*.nsh text eol=lf
+
+# The locked corpus hash is defined over the committed LF byte stream.
+/backend/tests/fixtures/harness_routing_policy_holdout_v1.jsonl text eol=lf
+
+# Frozen evidence is content-addressed over exact bytes.
+/artifacts/technical-report/* -text -diff
+/artifacts/test-runs/* -text -diff
