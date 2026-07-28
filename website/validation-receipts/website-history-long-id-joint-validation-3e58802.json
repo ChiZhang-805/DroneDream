@@ -1,0 +1,212 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-history-long-id-joint-validation",
+  "generatedAtUtc": "2026-07-28T13:43:05.5989820Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "3e58802e98d1181289e507bb3e6e5818f9c547b4",
+    "sourceParent": "0ef4d80da285cc6937eec9a24bc3ac52599f2264",
+    "attestationRule": "This receipt validates the subject commit only. Its later receipt-only commit is not self-attested.",
+    "sourceStateDuringValidation": "clean; aligned with origin/codex/website",
+    "previousWebsiteReceipt": "website/validation-receipts/website-parity-release-metadata-validation-ea4dc4c.json",
+    "previousWebsiteReceiptSha256": "20183f0ca76e92a360031dce5659b8cd17779fc56f4da10758be148ad32fc22a"
+  },
+  "integrationProvenance": {
+    "originalSoftwareSourceCommit": "1dc8a1d6bc3d71a078d24eeb85a4286a4cdb7d1b",
+    "websiteIntegrationCommit": "3e58802e98d1181289e507bb3e6e5818f9c547b4",
+    "integratedPaths": [
+      "frontend/scripts/verify-history-layout.mjs",
+      "frontend/src/__tests__/HistoryCompare.test.tsx",
+      "frontend/src/pages/History.tsx",
+      "frontend/src/styles.css"
+    ],
+    "scope": "Long History Job IDs are constrained inside the Job ID cell while the History results container remains the sole owner of table overflow."
+  },
+  "environment": {
+    "operatingSystem": "Microsoft Windows NT 10.0.26200.0",
+    "node": "v24.14.1",
+    "npm": "11.11.0",
+    "python": "Python 3.13.0",
+    "powershell": "5.1.26100.8875",
+    "browser": "Microsoft Edge 150.0.4078.99",
+    "productionAccountUsed": false,
+    "productionSupabaseChanged": false,
+    "deploymentPerformed": false
+  },
+  "authenticatedConsoleHistory": {
+    "command": "npm run test:history-layout -- --output=<ignored-cache>/history-long-id-3e58802 --label=website-long-id-integrated-3e58802 --port=5191",
+    "sourceCommit": "3e58802e98d1181289e507bb3e6e5818f9c547b4",
+    "sourceDirty": false,
+    "result": "pass",
+    "cases": [
+      {
+        "id": "desktop-en",
+        "locale": "en",
+        "viewport": "1440x1000",
+        "documentWidth": "1440/1440",
+        "historyResultsWidth": "1116/1280",
+        "jobIdContained": true,
+        "jobIdOverlapsTrackType": false,
+        "jobIdComputedStyle": "block|hidden|ellipsis|nowrap",
+        "rightEdgeReached": true,
+        "lastHeaderVisible": true,
+        "lastDeleteVisible": true,
+        "deleteFocused": true,
+        "unsafeRequests": 0,
+        "consoleErrors": 0,
+        "pageErrors": 0
+      },
+      {
+        "id": "desktop-zh",
+        "locale": "zh-CN",
+        "viewport": "1440x1000",
+        "documentWidth": "1440/1440",
+        "historyResultsWidth": "1116/1280",
+        "jobIdContained": true,
+        "jobIdOverlapsTrackType": false,
+        "jobIdComputedStyle": "block|hidden|ellipsis|nowrap",
+        "rightEdgeReached": true,
+        "lastHeaderVisible": true,
+        "lastDeleteVisible": true,
+        "deleteFocused": true,
+        "unsafeRequests": 0,
+        "consoleErrors": 0,
+        "pageErrors": 0
+      },
+      {
+        "id": "mobile-en",
+        "locale": "en",
+        "viewport": "390x844",
+        "documentWidth": "390/390",
+        "historyResultsWidth": "306/1280",
+        "jobIdContained": true,
+        "jobIdOverlapsTrackType": false,
+        "jobIdComputedStyle": "block|hidden|ellipsis|nowrap",
+        "rightEdgeReached": true,
+        "lastHeaderVisible": true,
+        "lastDeleteVisible": true,
+        "deleteFocused": true,
+        "unsafeRequests": 0,
+        "consoleErrors": 0,
+        "pageErrors": 0
+      },
+      {
+        "id": "mobile-zh",
+        "locale": "zh-CN",
+        "viewport": "390x844",
+        "documentWidth": "390/390",
+        "historyResultsWidth": "306/1280",
+        "jobIdContained": true,
+        "jobIdOverlapsTrackType": false,
+        "jobIdComputedStyle": "block|hidden|ellipsis|nowrap",
+        "rightEdgeReached": true,
+        "lastHeaderVisible": true,
+        "lastDeleteVisible": true,
+        "deleteFocused": true,
+        "unsafeRequests": 0,
+        "consoleErrors": 0,
+        "pageErrors": 0
+      }
+    ],
+    "measurementsSha256": "d6c77d4fb949dc5e53135c5f63f12f74abe1e113c9c493e1a4edc6bfdd38970b",
+    "measurementsBytes": 28516,
+    "screenshotCount": 8,
+    "screenshotManifestSha256": "a2ac7853e800cd6be5a45d7c61e0bb2f18df7304328719336733de7208817a11",
+    "visualReview": "All eight Edge screenshots were inspected. Desktop English and Chinese Job IDs remain visibly separated from Track type; the rightmost action and Delete columns remain reachable. Mobile English and Chinese retain document-width parity and a contained, locally scrollable results table."
+  },
+  "automatedValidation": {
+    "frontendTests": {
+      "command": "npm test -- --run --maxWorkers=4",
+      "testFiles": 50,
+      "tests": 325,
+      "passed": 325,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "aadb1f3c429a990932ef0ba644079c557c969c9b3854f971e4b9eb80a54a6590",
+      "logBytes": 330
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "pass",
+      "logSha256": "16fd4e84b2de8adb54335c9f050b3673d1ea44039c9017b48ead2cf836a66f6d",
+      "logBytes": 63
+    },
+    "lint": {
+      "command": "npm run lint",
+      "result": "pass",
+      "logSha256": "96a5998dd54433ab44d4448c1c41155863e5dd045842d8ce4e591ac8d90bc8bf",
+      "logBytes": 51
+    },
+    "applicationBuild": {
+      "command": "npm run build",
+      "result": "pass",
+      "exitCode": 0,
+      "logSha256": "ce5c19ecb750e4d5686a69992182153afc23c79becc0b77d24421ce9da9f0d00",
+      "logBytes": 2025,
+      "stdoutSha256": "fa57d9c38bf5bc81675ece688b33e89035188449c37e1aa37303bf3871c7f792",
+      "stderrSha256": "b0b8f733927fd321879ae5b3a4b4f2f085de75d1278c725f31026d4c3569b19f",
+      "note": "Vite emitted its existing greater-than-510-kB chunk advisory on stderr; the build completed with exit code 0."
+    },
+    "deploymentContract": {
+      "command": "python -m pytest runtime/tests/test_website_deployment.py -q",
+      "tests": 11,
+      "subtests": 22,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "4ebee5b1c6f208c4e6743611f2153b82841ffc13f9afd284a5ad1e398c959717",
+      "logBytes": 99
+    },
+    "diffCheck": {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  },
+  "sharedWebsiteArtifact": {
+    "command": ".\\website\\scripts\\build-pages-site.ps1",
+    "result": "pass",
+    "exitCode": 0,
+    "sourceCommit": "3e58802e98d1181289e507bb3e6e5818f9c547b4",
+    "artifactKind": "dronedream-shared-static-site",
+    "artifactDirectory": "frontend/site-dist",
+    "githubPagesAndBaotaUseTheSameArtifact": true,
+    "githubActionsVariablePresence": {
+      "VITE_SUPABASE_URL": true,
+      "VITE_SUPABASE_PUBLISHABLE_KEY": true,
+      "VITE_TURNSTILE_SITE_KEY": false
+    },
+    "logSha256": "e61cce141e85111a781c7df3af66a155a964a10d6a0ff54de66639d48cc7f6ed",
+    "logBytes": 5364,
+    "stdoutSha256": "52ba47486b0f2489d60a7b5a7c6cdf9f2732468062eee4312bfab69dde047808",
+    "stderrSha256": "b0b8f733927fd321879ae5b3a4b4f2f085de75d1278c725f31026d4c3569b19f",
+    "buildManifestSha256": "0320b241adb23d432df38003862da2f1bb9e8486990fd6cde22b0c1b190ce5eb",
+    "buildManifestBytes": 717,
+    "sha256SumsSha256": "5baf6caaccdceca69fb6230dafbdc2cfbf4f919a1b13498d1c0c52f424efeddb",
+    "sha256SumsBytes": 13046,
+    "sha256SumsEntries": 118,
+    "artifactFilesIncludingSha256Sums": 119,
+    "latestJsonSha256": "8538f17340e9a8b5d5b01baba1bb9dd65f872f99d62cabaa478c60c378269990",
+    "latestJsonBytes": 521,
+    "release": {
+      "installerSha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+      "installerSizeBytes": 5526509
+    },
+    "note": "This proves one local commit-pinned artifact was built for both deployment targets. No deployment was performed."
+  },
+  "browserCoverageDecision": {
+    "changedSurface": "The integrated source change is scoped to authenticated console History rendering, its focused test, verifier, and History-scoped CSS.",
+    "currentRerun": "The affected EN/ZH x desktop/mobile authenticated History matrix was rerun and passed 4/4.",
+    "publicSiteMatrix": "The previously attested 100-state four-browser public-site matrix was not re-claimed for this subject because the public website source and assets were unchanged."
+  },
+  "excludedWork": {
+    "tlsAuditDraft": "The uncommitted TLS audit draft was hash-backed up under an ignored frontend/node_modules cache and removed from the working tree before validation. It is not part of the subject or this receipt-only attestation."
+  },
+  "remainingExternalGates": [
+    "Obtain explicit deployment authorization, then deploy this exact commit-pinned artifact to GitHub Pages and Alibaba Cloud/BaoTa without rebuilding either target independently.",
+    "Correct the GitHub Pages custom-domain DNS and certificate state, enforce HTTPS, and verify the public certificate for getdronedream.com.",
+    "Run post-deployment build-manifest.json, SHA256SUMS, downloads/latest.json, content, and installer-byte parity checks across both public origins.",
+    "Complete real two-account production Supabase community/RLS validation without recording credentials.",
+    "Complete real merchant/payment validation under production authorization.",
+    "Publish a new immutable installer only if installer bytes change, then update and verify its checksum and latest.json metadata."
+  ]
+}
