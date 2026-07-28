@@ -52,7 +52,9 @@ _COMMANDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     ("ubuntu_release", ("cat", "/etc/os-release")),
     ("gazebo_harmonic_package", ("dpkg-query", "-W", "gz-harmonic")),
-    ("kernel", ("uname", "-a")),
+    # Exclude the host name: kernel/release/architecture are relevant evidence,
+    # while a local machine name is neither required nor appropriate to freeze.
+    ("kernel", ("uname", "-srmo")),
 )
 
 
