@@ -109,7 +109,11 @@ change, and is unavailable in built production assets. The added checks require
 the console sidebar, active navigation, preview account, assistant, and history
 table to remain visible in both languages and every configured viewport. A wide
 history table must scroll inside its own results container rather than widening
-or clipping the document.
+or clipping the document. The matrix moves that container to its exact right
+edge, confirms the final table header remains inside the visible scrollport,
+checks that the scrollport can receive focus, and verifies the active History
+navigation, Settings, New experiment, Clear filters, and Compare selected
+controls remain reachable.
 
 Use the stricter copy-fit audit for supported desktop review sizes and the
 layout-only mode for mobile, where English and Chinese line counts are expected

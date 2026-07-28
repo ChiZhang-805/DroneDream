@@ -559,6 +559,7 @@ const checkConsolePreview = async (page, routeName) => page.evaluate((activeRout
     const history = document.querySelector(".history-page");
     const scroller = document.querySelector(".history-results");
     const table = scroller?.querySelector("table");
+    const rightmostHeader = table?.querySelector("th:last-child");
     if (!visible(history)) issues.push("history page is not visible");
     if (!visible(scroller)) issues.push("history results scroller is not visible");
     if (!visible(table)) issues.push("history table is not visible");
@@ -569,6 +570,44 @@ const checkConsolePreview = async (page, routeName) => page.evaluate((activeRout
       && !["auto", "scroll"].includes(getComputedStyle(scroller).overflowX)
     ) {
       issues.push("wide history table is not owned by a horizontal scroll container");
+    }
+    if (scroller && table && rightmostHeader) {
+      const previousScrollLeft = scroller.scrollLeft;
+      const maxScrollLeft = scroller.scrollWidth - scroller.clientWidth;
+      const tableNeedsScrolling = table.scrollWidth > scroller.clientWidth + 2;
+      if (tableNeedsScrolling) scroller.scrollLeft = scroller.scrollWidth;
+      const scrollerRect = scroller.getBoundingClientRect();
+      const headerRect = rightmostHeader.getBoundingClientRect();
+      if (
+        headerRect.left < scrollerRect.left - 2
+        || headerRect.right > scrollerRect.right + 2
+      ) {
+        issues.push("rightmost history header is not visible at the scroll boundary");
+      }
+      if (tableNeedsScrolling) {
+        if (maxScrollLeft <= 0 || scroller.scrollLeft !== maxScrollLeft) {
+          issues.push(
+            `history results did not reach its right edge (${scroller.scrollLeft}/${maxScrollLeft})`,
+          );
+        }
+        scroller.focus({ preventScroll: true });
+        if (document.activeElement !== scroller) {
+          issues.push("history results scroller cannot receive keyboard focus");
+        }
+      }
+      scroller.scrollLeft = previousScrollLeft;
+    }
+
+    const reachableActions = [
+      [".app-nav a.active", "active History navigation"],
+      [".launcher-settings-button", "Settings"],
+      [".page-header-actions a", "New experiment"],
+      [".history-clear-filters", "Clear filters"],
+      [".history-compare-button", "Compare selected"],
+    ];
+    for (const [selector, label] of reachableActions) {
+      const action = document.querySelector(selector);
+      if (!visible(action)) issues.push(`${label} action is not visible`);
     }
   }
   return issues;
