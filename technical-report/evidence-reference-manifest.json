@@ -167,7 +167,7 @@
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
         "modified_after_migration": true,
         "current_hash_serialization": "utf8_lf",
-        "current_sha256": "b5ceb8698414f952bb8bf4c083d4fa96f3a00c9510752beba606e83a21054f25"
+        "current_sha256": "bb98c93410769ec4cf7a9d9f5e3770b7cb0d5f810651ceca1ce53a66afc51078"
       },
       {
         "path": "media/github-mark.png",
