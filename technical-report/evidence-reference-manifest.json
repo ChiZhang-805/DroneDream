@@ -1,0 +1,133 @@
+{
+  "schema_version": "dronedream.technical-report-evidence-reference-manifest.v1",
+  "ownership": {
+    "report_owned_prefix": "technical-report/",
+    "raw_evidence_copied": false,
+    "software_owned_prefixes": [
+      "backend/",
+      "artifacts/technical-report/",
+      "artifacts/test-runs/"
+    ],
+    "website_owned_prefixes": [
+      "frontend/",
+      "website/"
+    ]
+  },
+  "software": {
+    "branch": "codex/aurora-completion-20260728",
+    "subject_commit": "0429b4244fc1fd912bd211e80821ebdbabb8ae5d",
+    "provenance_commit": "738157c586561ec1e5466a997cd04758263c967b",
+    "branch_head": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+    "artifacts": [
+      {
+        "id": "technical_report_evidence_bundle",
+        "path": "artifacts/technical-report/evidence.json",
+        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+        "file_sha256": "99eeeb9c87e2b14b67b54d2af35d16ea001d6ae987bff1a91ad426783d8cdfb7",
+        "canonical_sha256": "bd99720f50a63d282287b7ed2ee7b4692e416bc00db218a864ebc462f8298258"
+      },
+      {
+        "id": "technical_report_evidence_manifest",
+        "path": "artifacts/technical-report/evidence.manifest.json",
+        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+        "file_sha256": "142aba582ef51141c90b2e1066a747548aa9cf3504d8a09bba9ad07172b377ed"
+      },
+      {
+        "id": "backend_1139_test_receipt",
+        "path": "artifacts/test-runs/aurora-backend-1139-receipt.json",
+        "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+        "file_sha256": "bc86ed4ba9d67c3c14e699142ad6d79a0eba6ca0c1980549c069c80e7991c74b"
+      }
+    ]
+  },
+  "website": {
+    "branch": "codex/website-finish-20260728",
+    "subject_commit": "a64f995093e13c74318219cd0f91ad2d03016f31",
+    "attestation_commit": "943f3b65187247fe67eed76bc698b262adb06994",
+    "artifacts": [
+      {
+        "id": "website_validation_receipt",
+        "path": "website/validation-receipts/a64f995093e13c74318219cd0f91ad2d03016f31.json",
+        "ref_commit": "943f3b65187247fe67eed76bc698b262adb06994",
+        "file_sha256": "6f0fc8bafb092cee5f1f05c484f60d9f73a88ba1d7f0b4e16f564a65506569f9",
+        "summary_sha256": "681c188d98a1447f0cdccb22c136762e15c2b0b0a880abff9c3846fc188bca34"
+      }
+    ]
+  },
+  "merge_prerequisites": [
+    {
+      "repository": "ChiZhang-805/DroneDream",
+      "pull_request": 88,
+      "url": "https://github.com/ChiZhang-805/DroneDream/pull/88",
+      "required_before_report_merge": true
+    }
+  ],
+  "migration_provenance": {
+    "external_source_read_only": true,
+    "external_source_root": "C:/Users/zju20/Documents/Codex/2026-07-25/files-mentioned-by-the-user-drone/work/technical-report-latex",
+    "initial_byte_verification": [
+      {
+        "path": "main.tex",
+        "source_sha256": "2878e1bef3b2142b72d453b8791b8132df53084506ff73a93ce6b2e362a26594",
+        "modified_after_migration": true,
+        "current_sha256": "f3f5fd4bf2d1c76add2c1d8f15a8646d3bc55c1aca8509604143c1e233ee679a"
+      },
+      {
+        "path": "body.tex",
+        "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
+        "modified_after_migration": true,
+        "current_sha256": "d2db568ceb36d810ba1f2e95fc3d9f830dcac594d69b632aa33501d919708e14"
+      },
+      {
+        "path": "media/github-mark.png",
+        "source_sha256": "581c35d9f3c3a10bba201f63a43ac59173e7b89b0bd2ff9070179205e2ffc26f",
+        "modified_after_migration": false
+      },
+      {
+        "path": "media/media/image1.png",
+        "source_sha256": "6294b431f37fcf05590bf499bd77d57631c417f12333da2ff74a076e788b7672",
+        "modified_after_migration": false
+      },
+      {
+        "path": "media/media/image3.png",
+        "source_sha256": "9620414d6481a8604f2e7ac3abbd4465ce8e4965b2534a80aafb594fc3f14c53",
+        "modified_after_migration": true,
+        "current_sha256": "336b360a0f3f4295c426a40d30a17a2f04db192da4c5d2fe569543bc1ac50fbd",
+        "generator": "technical-report/scripts/generate_architecture_figure.py",
+        "reason": "Regenerated to remove clipped Outcome Memory label."
+      },
+      {
+        "path": "media/media/image4.png",
+        "source_sha256": "ad6bc5cdd1ed798a7796bc9271ad13209a8995add77164b63df68480dbcd752b",
+        "modified_after_migration": false
+      },
+      {
+        "path": "media/media/image5.png",
+        "source_sha256": "b82ba193787bb56f860988f087e18ae96ecee11526093ab911c15408a56889d4",
+        "modified_after_migration": false
+      },
+      {
+        "path": "media/media/image6.png",
+        "source_sha256": "2675fc9964d7f24a0fcdc892ad758d33151772fcc5a1339603435f0f71ff18f5",
+        "modified_after_migration": false
+      },
+      {
+        "path": "media/media/image7.png",
+        "source_sha256": "60d29c9551538c2926d61a631ecd44e2eb7ad819a5074d21301673afd76888b2",
+        "modified_after_migration": false
+      },
+      {
+        "path": "media/media/image8.png",
+        "source_sha256": "23c4ee6cb0ffd2779b9851ce9a43068aba37ebb56cc3defedd9157e889a67c55",
+        "modified_after_migration": false
+      },
+      {
+        "path": "scripts/audit_latex_report.py",
+        "external_source_path": "C:/Users/zju20/Documents/Codex/2026-07-25/files-mentioned-by-the-user-drone/work/audit_latex_report.py",
+        "source_sha256": "15dca6941e5eb191fbcee42941824475ba39b26c44b7b79ccf084784792c858c",
+        "modified_after_migration": true,
+        "current_sha256": "b6bd51fcf21cdaf6d9bb2b46bc6dcefa2a47cedf8f626ae5421dae2eedfb1c15"
+      }
+    ]
+  }
+}

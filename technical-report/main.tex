@@ -1,0 +1,136 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[a4paper,top=15mm,bottom=14mm,left=19mm,right=19mm]{geometry}
+\usepackage{fontspec}
+\usepackage{newunicodechar}
+\usepackage{microtype}
+\usepackage[table]{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{calc}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{multicol}
+\usepackage{etoolbox}
+\usepackage{mdframed}
+\usepackage{fancyhdr}
+\usepackage{needspace}
+\usepackage{ragged2e}
+
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+
+\definecolor{DDViolet}{HTML}{6847FF}
+\definecolor{DDMagenta}{HTML}{C33DE2}
+\definecolor{DDRose}{HTML}{F04B9A}
+\definecolor{DDPrint}{HTML}{5730B8}
+\definecolor{DDInk}{HTML}{1A1423}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=DDPrint,
+  citecolor=DDPrint,
+  urlcolor=DDPrint,
+  pdfauthor={Chi Zhang},
+  pdftitle={AURORA: Agentic UAV Refinement through Optimization, Reflection, and Assurance}
+}
+
+\color{DDInk}
+\newunicodechar{蟺}{\ensuremath{\pi}}
+\renewcommand{\nobreakspace}{\space}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.48em plus 0.42em minus 0.12em}
+\setlength{\emergencystretch}{2em}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.06}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}m{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\textfraction}{0.04}
+\clubpenalty=10000
+\widowpenalty=10000
+\displaywidowpenalty=10000
+\interlinepenalty=10000
+\flushbottom
+
+\titleformat{\section}
+  {\sffamily\bfseries\fontsize{15}{17}\selectfont\color{DDPrint}}
+  {}{0pt}{}
+\titleformat{\subsection}
+  {\sffamily\bfseries\fontsize{12.5}{14.5}\selectfont\color{DDPrint}}
+  {}{0pt}{}
+\titleformat{\subsubsection}
+  {\sffamily\bfseries\fontsize{11}{13}\selectfont\color{DDPrint}}
+  {}{0pt}{}
+\titlespacing*{\section}{0pt}{0.72em plus 0.24em minus 0.1em}{0.26em}
+\titlespacing*{\subsection}{0pt}{0.60em plus 0.18em minus 0.08em}{0.20em}
+\titlespacing*{\subsubsection}{0pt}{0.48em}{0.16em}
+\pretocmd{\section}{\Needspace{8\baselineskip}}{}{}
+\pretocmd{\subsection}{\Needspace{5\baselineskip}}{}{}
+\pretocmd{\subsubsection}{\Needspace{6\baselineskip}}{}{}
+
+\setlist[itemize]{
+  leftmargin=1.25em,
+  itemsep=0.18em plus 0.08em,
+  topsep=0.22em,
+  parsep=0pt,
+  partopsep=0pt
+}
+\renewcommand{\labelitemi}{\textcolor{DDPrint}{\small\textbullet}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[C]{\sffamily\footnotesize\thepage}
+\setlength{\footskip}{10mm}
+
+\newcommand{\ddtitle}[1]{%
+  \par\noindent
+  {\color{DDPrint}\rule{\linewidth}{0.55pt}}\par
+  \vspace{0.45em}
+  {\sffamily\bfseries\fontsize{18.5}{21}\selectfont\color{DDPrint}#1\par}
+  \vspace{0.45em}
+  {\color{DDPrint}\rule{\linewidth}{0.55pt}}\par
+}
+
+\newmdenv[
+  linecolor=DDMagenta,
+  linewidth=0.65pt,
+  roundcorner=8pt,
+  backgroundcolor=white,
+  innerleftmargin=3.2mm,
+  innerrightmargin=3.2mm,
+  innertopmargin=2mm,
+  innerbottommargin=2mm,
+  skipabove=0.55em,
+  skipbelow=0.55em,
+  nobreak=true
+]{ddabstractframe}
+
+\newenvironment{ddabstract}{%
+  \begin{ddabstractframe}
+  \begin{center}
+  {\sffamily\bfseries\color{DDPrint}Abstract}
+  \end{center}
+  \small
+}{%
+  \end{ddabstractframe}
+}
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0.18em}%
+  \setlength{\parskip}{0pt}%
+}
+
+\AtBeginEnvironment{longtable}{%
+  \small
+  \arrayrulecolor{DDPrint}
+}
+
+\begin{document}
+\input{body.tex}
+\end{document}
