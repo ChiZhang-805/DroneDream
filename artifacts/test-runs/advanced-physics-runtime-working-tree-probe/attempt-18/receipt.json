@@ -1,0 +1,162 @@
+{
+  "schema_version": "dronedream.advanced-physics-runtime-receipt/v1",
+  "subject_commit": "fdf1250398567c6658ad5148efc1c302dede4a17",
+  "source_inventory_sha256": "2baeba5c2c8acb968e1f6cb6ebbc0ff932953ee048f599a9c6a68912c1637869",
+  "source_inventory": {
+    "backend/app/simulator/scenario_effects.py": "4ed47705289e81c8a1d424a50abf22103d3da5b05444df7b30acf2e500e1cfd1",
+    "scripts/simulators/local_px4_launch_wrapper.py": "63422d0cb151297d630120abe802ecd4de7e1864c94c8aaf35b140024c6ba025",
+    "scripts/simulators/px4_offboard_track_executor.py": "e6b4d3000597f0499465f0346124971735f95033991aa61d6cf15e416f81b104"
+  },
+  "physical_run": {
+    "command": "wsl.exe -d DroneDreamRuntime -- bash /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/run-probe.sh",
+    "started_at_utc": "2026-07-28T22:44:33Z",
+    "ended_at_utc": "2026-07-28T22:45:49Z",
+    "duration_seconds": 76,
+    "runner_exit_code": 0,
+    "acceptance_exit_code": 0,
+    "trial_success": true,
+    "final_evidence_present": true,
+    "preexisting_process_count": 0,
+    "residual_process_count": 0,
+    "openai_api_key_used": false,
+    "environment": {
+      "runtime": "DroneDreamRuntime",
+      "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "python_version": "3.12.3",
+      "px4_version": "v1.16",
+      "px4_firmware_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+      "vehicle": "x500",
+      "world": "default",
+      "headless": true
+    }
+  },
+  "effect_result": {
+    "verification_status": "verified_applied",
+    "applied_effects": [
+      "battery.initial_percent",
+      "battery.voltage_sag",
+      "sensor_degradation.dropout_rate"
+    ],
+    "schedule_algorithm": "sha256-ranked-fixed-duty-v1",
+    "requested_dropout_rate": 0.2,
+    "tick_count": 29,
+    "off_tick_count": 6,
+    "realized_dropout_rate": 0.20689655172413793,
+    "transition_count": 13,
+    "gps_control_parameter": "SIM_GPS_USED",
+    "gps_baseline_value": 10,
+    "gps_dropout_value": 0,
+    "gps_restore_verified": true,
+    "battery_track_start": {
+      "remaining_percent": 92.0,
+      "voltage_v": 16.020000457763672
+    },
+    "battery_track_end": {
+      "remaining_percent": 80.0,
+      "voltage_v": 15.825000762939453
+    },
+    "battery_nonincrease_verified": true
+  },
+  "independent_ulog_review": {
+    "dataset": "sensor_gps",
+    "sample_count": 56,
+    "observed_fix_types": [
+      0,
+      3
+    ],
+    "observed_satellites_used": [
+      0,
+      10
+    ],
+    "no_gps_sample_count": 7,
+    "fix_3d_sample_count": 49,
+    "physical_transition_verified": true
+  },
+  "outcome": {
+    "pass_flag": false,
+    "crash_flag": false,
+    "timeout_flag": false,
+    "instability_flag": true,
+    "instability_reasons": [
+      "position_speed_exceeded"
+    ],
+    "maximum_observed_position_speed_mps": 31.211302,
+    "policy_limit_position_speed_mps": 25.0,
+    "rmse_m": 0.345207,
+    "max_error_m": 1.498568,
+    "track_coverage": 0.983807,
+    "interpretation": "The requested physical effects were verified and the trial completed, but the controller outcome correctly failed the stability policy under this deterministic dropout schedule."
+  },
+  "focused_test_receipt": {
+    "command": "python -m pytest backend/tests/test_experimental_optimizer_benchmark.py backend/tests/test_experimental_optimizer_orchestration.py backend/tests/test_px4_offboard_track_executor.py backend/tests/test_local_px4_launch_wrapper.py backend/tests/test_scenario_effects.py backend/tests/test_capabilities.py -q --junitxml=artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/focused-tests.xml",
+    "source_commit": "fdf1250398567c6658ad5148efc1c302dede4a17",
+    "started_at": "2026-07-29T06:46:54.665758+08:00",
+    "duration_seconds": 114.202,
+    "tests": 159,
+    "passed": 159,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.13.0",
+    "openai_api_key_used": false,
+    "junit_xml": {
+      "bytes": 24103,
+      "sha256": "67d614764b213408833f50be63c0490e27c99dbcca41f349ab6281b605fc6b8c"
+    }
+  },
+  "artifacts": {
+    "trial-input.json": {
+      "bytes": 1727,
+      "sha256": "8573155d8ccc23132f1dc5543c4b08b8df1f9cf37096be13daab08be04225b8d"
+    },
+    "source-inventory.sha256": {
+      "bytes": 337,
+      "sha256": "2baeba5c2c8acb968e1f6cb6ebbc0ff932953ee048f599a9c6a68912c1637869"
+    },
+    "execution-window.json": {
+      "bytes": 549,
+      "sha256": "77740cc4bbae42b88e2e0440e5da258043f602802a03cde8caca5940a15dcbc3"
+    },
+    "scenario_effects.request.json": {
+      "bytes": 2556,
+      "sha256": "4031bfcde529b1fb85ce5824cf19cf7a67fefd90b810c8f5dd7f11080dba0ba0"
+    },
+    "scenario_effects.runtime.json": {
+      "bytes": 23735,
+      "sha256": "5ea5bfb7ea52969cd34f75d97bb3ed67676c204fac76c872e239727c3fa45eff"
+    },
+    "scenario_effects.applied.json": {
+      "bytes": 23064,
+      "sha256": "7973680f267b2643690b998b84111ffb3887f1efc2cf556b09acd1d73a24846a"
+    },
+    "simulator_runtime_manifest.json": {
+      "bytes": 28420,
+      "sha256": "11f3b01e00db7a02b08eb25185b498b0d51e2e49ea5c500ab2d9933f3f5f7563"
+    },
+    "trial-result.json": {
+      "bytes": 45029,
+      "sha256": "e26a013e33559197b0f6ae85a2813485e13c451022b4d74c6f07b4358ccc02e3"
+    },
+    "px4_source.ulg": {
+      "bytes": 16803366,
+      "sha256": "dc3b156e6ae6144263e493ec59b566ba3d7772a5ffdca8345c66218afec07f90"
+    },
+    "telemetry.json": {
+      "bytes": 2295696,
+      "sha256": "0d43e7055a080cecad05e0614751d970f922b344afccfc71d7335dad225a0855"
+    },
+    "trajectory.json": {
+      "bytes": 890185,
+      "sha256": "926c17d8b98722dfb8b6b3a4fa88ec088850891b041434d71409445d15002bc3"
+    },
+    "offboard_timing.json": {
+      "bytes": 279,
+      "sha256": "c0217bca0a35b3ed028e9bceb116bada845a18f54af3f0fe1ce96b88a75b2e11"
+    },
+    "focused-tests.xml": {
+      "bytes": 24103,
+      "sha256": "67d614764b213408833f50be63c0490e27c99dbcca41f349ab6281b605fc6b8c"
+    }
+  }
+}

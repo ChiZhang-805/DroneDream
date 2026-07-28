@@ -1,0 +1,15 @@
+{
+  "schema_version": "dronedream.advanced-physics-working-tree-probe/v1",
+  "subject_head": "fdf1250398567c6658ad5148efc1c302dede4a17",
+  "source_inventory_sha256": "2baeba5c2c8acb968e1f6cb6ebbc0ff932953ee048f599a9c6a68912c1637869",
+  "started_at": "2026-07-28T22:44:33Z",
+  "ended_at": "2026-07-28T22:45:49Z",
+  "duration_seconds": 76,
+  "runner_exit_code": 0,
+  "trial_success": true,
+  "final_evidence_present": true,
+  "acceptance_exit_code": 0,
+  "preexisting_process_count": 0,
+  "residual_process_count": 0,
+  "openai_api_key_used": false
+}
