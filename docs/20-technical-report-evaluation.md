@@ -212,9 +212,14 @@ development corpus, or a hidden oracle diagnostic.
 
 The exporter currently produces:
 
-- 24/24 acceptable choices on eight three-case routing categories, compared
-  with a best constant policy of 14/24 and a uniform-random expectation of
-  5.625/24. This is `DEV_ROUTING`, not simulator quality.
+- 24/24 acceptable choices on eight three-case routing categories from the
+  current Evidence 2.7 / Prompt Template 1.6 provider freeze, compared with a
+  best constant policy of 14/24 and a uniform-random expectation of 5.625/24.
+  The Artifact SHA-256 is
+  `2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`.
+  Two preserved Prompt 1.5 runs scored 19/24 and 21/24, so the current result is
+  `DEV_ROUTING` qualification and not a causal prompt comparison or simulator
+  quality claim.
 - a 61-candidate synthetic campaign over ten named scenario types whose
   holdout loss changes from `0.82811` to `0.58525` (29.327%); all ten scenario
   losses improve. This is `SYNTHETIC_MOCK`, with

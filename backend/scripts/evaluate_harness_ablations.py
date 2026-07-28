@@ -18,10 +18,10 @@ from app.orchestration.harness_ablation import (  # noqa: E402
     build_harness_ablation_artifact,
 )
 
-DEFAULT_JSON_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v1.json"
-DEFAULT_CSV_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v1.csv"
+DEFAULT_JSON_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v2.json"
+DEFAULT_CSV_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v2.csv"
 DEFAULT_SHA256_OUTPUT = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v1.sha256"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v2.sha256"
 )
 
 CSV_FIELDS = (

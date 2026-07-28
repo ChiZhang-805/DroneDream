@@ -14,9 +14,9 @@ from app.orchestration.harness_ablation import (
 from scripts.evaluate_harness_ablations import write_harness_ablation_files
 
 ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "evaluation_artifacts"
-JSON_ARTIFACT = ARTIFACT_ROOT / "harness-contract-ablation-v1.json"
-CSV_ARTIFACT = ARTIFACT_ROOT / "harness-contract-ablation-v1.csv"
-SHA256_ARTIFACT = ARTIFACT_ROOT / "harness-contract-ablation-v1.sha256"
+JSON_ARTIFACT = ARTIFACT_ROOT / "harness-contract-ablation-v2.json"
+CSV_ARTIFACT = ARTIFACT_ROOT / "harness-contract-ablation-v2.csv"
+SHA256_ARTIFACT = ARTIFACT_ROOT / "harness-contract-ablation-v2.sha256"
 
 
 def test_harness_ablation_is_deterministic_and_claim_bounded() -> None:

@@ -18,7 +18,7 @@ import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = BACKEND_ROOT.parent
@@ -38,12 +38,11 @@ from app.orchestration.harness_component_ablation import (  # noqa: E402
 from app.orchestration.harness_context import (  # noqa: E402
     HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_PROMPT_TEMPLATE_VERSION,
-    HARNESS_TOOL_DEFINITIONS,
-    HarnessToolId,
 )
 from app.orchestration.harness_evaluation import (  # noqa: E402
-    build_routing_eval_report,
+    grade_routing_prediction_artifact,
     load_routing_eval_cases,
+    load_routing_prediction_artifact,
 )
 from app.orchestration.harness_outcome_campaign import (  # noqa: E402
     load_harness_outcome_campaign,
@@ -53,16 +52,14 @@ from app.orchestration.harness_routing_holdout import (  # noqa: E402
     load_locked_routing_policy_result,
 )
 
-REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v6"
+REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v7"
 REPORT_EVIDENCE_MANIFEST_SCHEMA_VERSION = "dronedream.technical-report-evidence-manifest.v1"
 TEST_RUN_RECEIPT_SCHEMA_VERSION = "dronedream.test-run-receipt.v1"
-ARCHIVED_ROUTING_CORPUS_SHA256 = "4968b0a9639d59474c00402dcd261a241377bdb57a6273554f4d6ad0d1172625"
-ARCHIVED_ROUTING_PROMPT_SUITE_SHA256 = (
-    "d300d0516378974fb57be896b155ef1a537278594b03c0ecbdceff9ade26dc59"
-)
 DEFAULT_ROUTING_CORPUS = BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_eval_v1.jsonl"
 DEFAULT_ROUTING_PREDICTIONS = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-routing-gpt-4.1-2025-04-14.json"
+    BACKEND_ROOT
+    / "evaluation_artifacts"
+    / "harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json"
 )
 DEFAULT_SIMULATION_COVERAGE = (
     BACKEND_ROOT / "evaluation_artifacts" / "simulation-coverage-mock-v3.json"
@@ -71,19 +68,19 @@ DEFAULT_SCENARIO_GENERALIZATION = (
     BACKEND_ROOT / "evaluation_artifacts" / "scenario-generalization-mock-v1.json"
 )
 DEFAULT_HARNESS_ABLATIONS = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v1.json"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v2.json"
 )
 DEFAULT_HARNESS_OUTCOME_CAMPAIGN = (
     BACKEND_ROOT / "evaluation_artifacts" / "harness-fallback-outcome-campaign-v1.json"
 )
 DEFAULT_HARNESS_COMPONENT_ABLATION = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v1.json"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v2.json"
 )
 DEFAULT_HARNESS_COMPONENT_ABLATION_MANIFEST = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v1.manifest.json"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v2.manifest.json"
 )
 DEFAULT_HARNESS_COMPONENT_ABLATION_CSV = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v1.csv"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v2.csv"
 )
 DEFAULT_ROUTING_HOLDOUT_CORPUS = (
     BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_policy_holdout_v1.jsonl"
@@ -237,42 +234,6 @@ def _load_backend_test_receipt(
         if not isinstance(check_result, dict) or check_result.get("status") != "passed":
             raise ValueError("backend test receipt requires passing focused checks")
     return payload
-
-
-def _load_archived_routing_predictions(
-    path: Path,
-    *,
-    case_ids: set[str],
-) -> tuple[dict[str, HarnessToolId], dict[str, Any]]:
-    """Validate the historical 2.4/1.1 freeze without relabeling it current."""
-
-    payload = _load_json_object(path)
-    expected = {
-        "schema_version": "1.0",
-        "corpus_sha256": ARCHIVED_ROUTING_CORPUS_SHA256,
-        "prompt_suite_sha256": ARCHIVED_ROUTING_PROMPT_SUITE_SHA256,
-        "evidence_schema_version": "2.4",
-        "tool_registry_version": "2.1",
-        "prompt_template_version": "1.1",
-    }
-    for key, expected_value in expected.items():
-        if payload.get(key) != expected_value:
-            raise ValueError(f"archived routing artifact {key} does not match frozen contract")
-    raw_predictions = payload.get("predictions")
-    if not isinstance(raw_predictions, dict) or set(raw_predictions) != case_ids:
-        raise ValueError("archived routing predictions must exactly cover the development corpus")
-    predictions: dict[str, HarnessToolId] = {}
-    for case_id, raw in raw_predictions.items():
-        if not isinstance(raw, dict) or set(raw) != {"rationale", "selected_tool"}:
-            raise ValueError("archived routing prediction has an invalid closed shape")
-        tool_id = raw.get("selected_tool")
-        rationale = raw.get("rationale")
-        if tool_id not in HARNESS_TOOL_DEFINITIONS:
-            raise ValueError("archived routing prediction selected an unknown tool")
-        if not isinstance(rationale, str) or not rationale.strip():
-            raise ValueError("archived routing prediction requires a rationale")
-        predictions[case_id] = cast(HarnessToolId, tool_id)
-    return predictions, payload
 
 
 def summarize_simulation_coverage(payload: dict[str, Any]) -> dict[str, Any]:
@@ -611,12 +572,14 @@ def build_report_evidence_bundle(
     source_commit = _validate_source_commit(source_commit)
     generated_at = _validate_generated_at(generated_at)
     cases = load_routing_eval_cases(routing_corpus_path)
-    predictions, archived_artifact = _load_archived_routing_predictions(
+    routing_artifact = load_routing_prediction_artifact(
         routing_predictions_path,
-        case_ids={case.case_id for case in cases},
+        cases,
     )
-    routing_report = build_routing_eval_report(cases, predictions)
-    prediction_counts = Counter(predictions.values())
+    routing_report = grade_routing_prediction_artifact(routing_artifact, cases)
+    prediction_counts = Counter(
+        prediction.selected_tool for prediction in routing_artifact.predictions.values()
+    )
 
     routing = {
         "evidence_class": "development_routing_corpus",
@@ -624,12 +587,22 @@ def build_report_evidence_bundle(
             "Measures acceptable optimizer-tool selection on a versioned "
             "development corpus; it is not a simulator outcome benchmark."
         ),
-        "contract_current": False,
-        "qualification_scope": "archived_evidence_2_4_prompt_1_1",
+        "stochasticity_boundary": (
+            "The frozen provider response is graded deterministically. A fresh "
+            "model call is a stochastic rerun, not causal proof of a prompt change."
+        ),
+        "contract_current": True,
+        "qualification_scope": "current_evidence_2_7_prompt_1_6",
         "current_evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
         "current_prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
-        "model_snapshot": archived_artifact["model_snapshot"],
-        "provider": archived_artifact["provider"],
+        "evidence_schema_version": routing_artifact.evidence_schema_version,
+        "tool_registry_version": routing_artifact.tool_registry_version,
+        "prompt_template_version": routing_artifact.prompt_template_version,
+        "corpus_sha256": routing_artifact.corpus_sha256,
+        "prompt_suite_sha256": routing_artifact.prompt_suite_sha256,
+        "model_snapshot": routing_artifact.model_snapshot,
+        "provider": routing_artifact.provider,
+        "generation_config": routing_artifact.generation_config.model_dump(mode="json"),
         "case_count": routing_report.predictions.case_count,
         "passed_count": routing_report.predictions.passed_count,
         "pass_rate": routing_report.predictions.pass_rate,

@@ -32,17 +32,32 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     second = _build_bundle()
 
     assert first == second
-    assert first["schema_version"] == "dronedream.technical-report-evidence.v6"
+    assert first["schema_version"] == "dronedream.technical-report-evidence.v7"
     assert first["source_commit"] == _TEST_SOURCE_COMMIT
     assert first["generated_at"] == _TEST_GENERATED_AT
     assert len(first["bundle_sha256"]) == 64
 
     routing = first["routing"]
     assert routing["evidence_class"] == "development_routing_corpus"
-    assert routing["contract_current"] is False
-    assert routing["qualification_scope"] == "archived_evidence_2_4_prompt_1_1"
+    assert routing["contract_current"] is True
+    assert routing["qualification_scope"] == "current_evidence_2_7_prompt_1_6"
     assert routing["current_evidence_schema_version"] == "2.7"
-    assert routing["current_prompt_template_version"] == "1.5"
+    assert routing["current_prompt_template_version"] == "1.6"
+    assert routing["evidence_schema_version"] == "2.7"
+    assert routing["tool_registry_version"] == "2.1"
+    assert routing["prompt_template_version"] == "1.6"
+    assert routing["corpus_sha256"] == (
+        "98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89"
+    )
+    assert routing["prompt_suite_sha256"] == (
+        "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
+    )
+    assert routing["generation_config"] == {
+        "temperature": None,
+        "top_p": None,
+        "seed": None,
+        "response_format": "json_schema",
+    }
     assert routing["case_count"] == 24
     assert routing["passed_count"] == 24
     assert routing["pass_rate"] == 1.0
@@ -50,6 +65,12 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     assert routing["uniform_random_expected_pass_rate"] == pytest.approx(5.625 / 24)
     assert routing["qualified"] is True
     assert len(routing["category_rows"]) == 8
+    assert first["sources"]["routing_predictions"]["path"].endswith(
+        "harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json"
+    )
+    assert first["sources"]["routing_predictions"]["sha256"] == (
+        "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4"
+    )
 
     coverage = first["simulation_coverage"]
     assert coverage["evidence_class"] == "synthetic_mock_campaign"

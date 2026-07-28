@@ -19,6 +19,32 @@ These artifacts qualify routing discrimination only. They do not establish that
 LLM routing improves final simulation outcomes over a budget-matched
 deterministic optimizer campaign.
 
+## Current and historical Harness freezes
+
+The current provider Artifact is
+`harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json`.
+It binds corpus SHA-256
+`98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89`
+and prompt-suite SHA-256
+`93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77`.
+Its file SHA-256 is
+`2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`;
+independent grading gives 24/24 and 3/3 in every category.
+
+Two Prompt 1.5 provider runs are intentionally retained. The first scored
+19/24 and is unqualified (SHA-256
+`fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf`);
+the rerun scored 21/24 and meets the declared routing thresholds (SHA-256
+`9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571`).
+Their variation prevents treating the later Prompt 1.6 result as a causal
+prompt-lift estimate. The original Evidence 2.4 / Prompt 1.1 Artifact is also
+historical and is rejected by the current loader.
+
+The `harness-contract-ablation-v2.*` and
+`harness-component-outcome-ablation-v2.*` files are current-contract
+successors. Their `v1` counterparts remain immutable historical freezes; the
+version bump prevents a Prompt/Evidence upgrade from overwriting prior bytes.
+
 `simulation-coverage-mock-v3.json` is the current separate deterministic
 outcome campaign; v2 remains an immutable historical freeze. The v3 campaign
 runs the production optimizer portfolio against all ten mock scenario types,

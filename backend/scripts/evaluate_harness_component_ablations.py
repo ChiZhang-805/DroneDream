@@ -22,15 +22,11 @@ from app.orchestration.harness_component_ablation import (  # noqa: E402
     verify_harness_component_ablation_manifest,
 )
 
-_STEM = "harness-component-outcome-ablation-v1"
+_STEM = "harness-component-outcome-ablation-v2"
 DEFAULT_JSON_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / f"{_STEM}.json"
 DEFAULT_CSV_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / f"{_STEM}.csv"
-DEFAULT_MANIFEST_OUTPUT = (
-    BACKEND_ROOT / "evaluation_artifacts" / f"{_STEM}.manifest.json"
-)
-DEFAULT_SHA256_OUTPUT = (
-    BACKEND_ROOT / "evaluation_artifacts" / f"{_STEM}.sha256"
-)
+DEFAULT_MANIFEST_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / f"{_STEM}.manifest.json"
+DEFAULT_SHA256_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / f"{_STEM}.sha256"
 
 CSV_FIELDS = (
     "block_id",
@@ -93,34 +89,24 @@ def _csv_rows(artifact: dict[str, Any]) -> list[dict[str, Any]]:
                     "provider_calls": arm["provider_calls"],
                     "network_calls": arm["network_calls"],
                     "intervention_component": activation["component"],
-                    "intervention_activated": activation[
-                        "provider_visible_intervention_activated"
-                    ],
+                    "intervention_activated": activation["provider_visible_intervention_activated"],
                     "holdout_loss": metrics["holdout_loss"],
-                    "optimizer_candidate_count": metrics[
-                        "optimizer_candidate_count"
-                    ],
+                    "optimizer_candidate_count": metrics["optimizer_candidate_count"],
                     "feasible_optimizer_candidate_count": metrics[
                         "feasible_optimizer_candidate_count"
                     ],
-                    "optimizer_feasible_rate": metrics[
-                        "optimizer_feasible_rate"
-                    ],
+                    "optimizer_feasible_rate": metrics["optimizer_feasible_rate"],
                     "target_reached": metrics["target_reached"],
                     "target_generation": metrics["target_generation"],
                     "trials_to_target": metrics["trials_to_target"],
                     "right_censor_trials": metrics["right_censor_trials"],
                     "total_trials": metrics["total_trials"],
                     "completed_trials": metrics["completed_trials"],
-                    "terminal_failure_trials": metrics[
-                        "terminal_failure_trials"
-                    ],
+                    "terminal_failure_trials": metrics["terminal_failure_trials"],
                     "recovered_trials": metrics["recovered_trials"],
                     "failure_rate": metrics["failure_rate"],
                     "recovery_rate": metrics["recovery_rate"],
-                    "evidence_completeness_rate": metrics[
-                        "evidence_completeness_rate"
-                    ],
+                    "evidence_completeness_rate": metrics["evidence_completeness_rate"],
                     "result_metrics_sha256": arm["result_metrics_sha256"],
                     "outcome_sha256": arm["outcome_sha256"],
                 }
@@ -201,8 +187,7 @@ def write_harness_component_ablation_files(
         ]
         if mismatches:
             raise ValueError(
-                "Harness component-ablation artifacts are stale: "
-                + ", ".join(mismatches)
+                "Harness component-ablation artifacts are stale: " + ", ".join(mismatches)
             )
     else:
         for path, payload in outputs:

@@ -22,7 +22,7 @@ from scripts.evaluate_harness_component_ablations import (
 )
 
 ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "evaluation_artifacts"
-STEM = "harness-component-outcome-ablation-v1"
+STEM = "harness-component-outcome-ablation-v2"
 JSON_ARTIFACT = ARTIFACT_ROOT / f"{STEM}.json"
 CSV_ARTIFACT = ARTIFACT_ROOT / f"{STEM}.csv"
 MANIFEST_ARTIFACT = ARTIFACT_ROOT / f"{STEM}.manifest.json"

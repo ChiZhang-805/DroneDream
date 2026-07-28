@@ -1,0 +1,301 @@
+{
+  "ablation_comparator": "Constructed non-production comparator that removes exactly the named guard for contract diagnostics.",
+  "artifact_sha256": "f91a848c84d1766fd728968f4d82d49a9bc3af7fc2cc036da5b99efed62bb8f2",
+  "causal_claim_permitted": false,
+  "claim_boundary": "Paired deterministic software-contract probes under constructed inputs. They measure guard behavior only; they do not measure optimizer quality, simulator performance, user outcomes, causal component contribution, or real-flight safety.",
+  "component_rows": [
+    {
+      "ablated_contract_correct_count": 1,
+      "ablated_contract_correct_rate": 0.25,
+      "absolute_contract_delta": 0.75,
+      "component": "deterministic_fallback",
+      "full_contract_correct_count": 4,
+      "full_contract_correct_rate": 1.0,
+      "probe_count": 4
+    },
+    {
+      "ablated_contract_correct_count": 2,
+      "ablated_contract_correct_rate": 0.4,
+      "absolute_contract_delta": 0.6,
+      "component": "provider_trust_filter",
+      "full_contract_correct_count": 5,
+      "full_contract_correct_rate": 1.0,
+      "probe_count": 5
+    },
+    {
+      "ablated_contract_correct_count": 2,
+      "ablated_contract_correct_rate": 0.3333333333333333,
+      "absolute_contract_delta": 0.6666666666666667,
+      "component": "scenario_and_outcome_isolation",
+      "full_contract_correct_count": 6,
+      "full_contract_correct_rate": 1.0,
+      "probe_count": 6
+    },
+    {
+      "ablated_contract_correct_count": 0,
+      "ablated_contract_correct_rate": 0.0,
+      "absolute_contract_delta": 1.0,
+      "component": "scenario_profile_context",
+      "full_contract_correct_count": 5,
+      "full_contract_correct_rate": 1.0,
+      "probe_count": 5
+    },
+    {
+      "ablated_contract_correct_count": 1,
+      "ablated_contract_correct_rate": 0.2,
+      "absolute_contract_delta": 0.8,
+      "component": "tool_eligibility_gate",
+      "full_contract_correct_count": 5,
+      "full_contract_correct_rate": 1.0,
+      "probe_count": 5
+    }
+  ],
+  "contract_versions": {
+    "harness_evidence_schema": "2.7",
+    "prompt_template": "1.6",
+    "tool_eligibility_policy": "1.1",
+    "tool_registry": "2.1",
+    "trial_outcome_taxonomy": "dronedream.trial-outcome-taxonomy/v1"
+  },
+  "evidence_class": "source_contract_ablation",
+  "live_model_calls": false,
+  "physical_fidelity": false,
+  "probe_rows": [
+    {
+      "ablated_contract_correct": true,
+      "ablated_observation": "included",
+      "case_id": "finite_scalar",
+      "component": "provider_trust_filter",
+      "expectation": "include",
+      "full_contract_correct": true,
+      "full_observation": "included"
+    },
+    {
+      "ablated_contract_correct": true,
+      "ablated_observation": "included",
+      "case_id": "bounded_scalar_list",
+      "component": "provider_trust_filter",
+      "expectation": "include",
+      "full_contract_correct": true,
+      "full_observation": "included"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "included",
+      "case_id": "prompt_injection_string",
+      "component": "provider_trust_filter",
+      "expectation": "quarantine",
+      "full_contract_correct": true,
+      "full_observation": "quarantined"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "included",
+      "case_id": "nested_mapping",
+      "component": "provider_trust_filter",
+      "expectation": "quarantine",
+      "full_contract_correct": true,
+      "full_observation": "quarantined"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "included",
+      "case_id": "non_finite_number",
+      "component": "provider_trust_filter",
+      "expectation": "quarantine",
+      "full_contract_correct": true,
+      "full_observation": "quarantined"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "accepted",
+      "case_id": "single_seed_has_no_reduced_fidelity",
+      "component": "tool_eligibility_gate",
+      "expectation": "reject",
+      "full_contract_correct": true,
+      "full_observation": "rejected"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "accepted",
+      "case_id": "low_dimension_rejects_sparse_axis",
+      "component": "tool_eligibility_gate",
+      "expectation": "reject",
+      "full_contract_correct": true,
+      "full_observation": "rejected"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "accepted",
+      "case_id": "insufficient_history_rejects_trust_region",
+      "component": "tool_eligibility_gate",
+      "expectation": "reject",
+      "full_contract_correct": true,
+      "full_observation": "rejected"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "accepted",
+      "case_id": "single_objective_unconstrained_rejects_constrained_mobo",
+      "component": "tool_eligibility_gate",
+      "expectation": "reject",
+      "full_contract_correct": true,
+      "full_observation": "rejected"
+    },
+    {
+      "ablated_contract_correct": true,
+      "ablated_observation": "accepted",
+      "case_id": "replicates_expose_reduced_fidelity",
+      "component": "tool_eligibility_gate",
+      "expectation": "accept",
+      "full_contract_correct": true,
+      "full_observation": "accepted"
+    },
+    {
+      "ablated_contract_correct": true,
+      "ablated_observation": "effective_tool:cma_es",
+      "case_id": "valid_decision",
+      "component": "deterministic_fallback",
+      "expectation": "effective_tool:cma_es",
+      "full_contract_correct": true,
+      "full_observation": "effective_tool:cma_es"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "no_effective_decision",
+      "case_id": "unknown_tool",
+      "component": "deterministic_fallback",
+      "expectation": "effective_tool:optimizer_portfolio",
+      "full_contract_correct": true,
+      "full_observation": "effective_tool:optimizer_portfolio"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "no_effective_decision",
+      "case_id": "malformed_shape",
+      "component": "deterministic_fallback",
+      "expectation": "effective_tool:optimizer_portfolio",
+      "full_contract_correct": true,
+      "full_observation": "effective_tool:optimizer_portfolio"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "no_effective_decision",
+      "case_id": "oversized_rationale",
+      "component": "deterministic_fallback",
+      "expectation": "effective_tool:optimizer_portfolio",
+      "full_contract_correct": true,
+      "full_observation": "effective_tool:optimizer_portfolio"
+    },
+    {
+      "ablated_contract_correct": true,
+      "ablated_observation": "included",
+      "case_id": "training_success",
+      "component": "scenario_and_outcome_isolation",
+      "expectation": "include_in_optimizer_learning",
+      "full_contract_correct": true,
+      "full_observation": "included"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "included",
+      "case_id": "holdout_success",
+      "component": "scenario_and_outcome_isolation",
+      "expectation": "quarantine_from_optimizer_learning",
+      "full_contract_correct": true,
+      "full_observation": "quarantined"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "included",
+      "case_id": "unmatched_success",
+      "component": "scenario_and_outcome_isolation",
+      "expectation": "quarantine_from_optimizer_learning",
+      "full_contract_correct": true,
+      "full_observation": "quarantined"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "included",
+      "case_id": "training_infrastructure_failure",
+      "component": "scenario_and_outcome_isolation",
+      "expectation": "quarantine_from_optimizer_learning",
+      "full_contract_correct": true,
+      "full_observation": "quarantined"
+    },
+    {
+      "ablated_contract_correct": true,
+      "ablated_observation": "included",
+      "case_id": "training_domain_failure",
+      "component": "scenario_and_outcome_isolation",
+      "expectation": "include_in_optimizer_learning",
+      "full_contract_correct": true,
+      "full_observation": "included"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "included",
+      "case_id": "training_unknown_failure",
+      "component": "scenario_and_outcome_isolation",
+      "expectation": "quarantine_from_optimizer_learning",
+      "full_contract_correct": true,
+      "full_observation": "quarantined"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "aggregate_counts_only",
+      "case_id": "weighted_training_profile",
+      "component": "scenario_profile_context",
+      "expectation": "compile_anonymous_weighted_training_cases",
+      "full_contract_correct": true,
+      "full_observation": "2_cases_weight_concentration_0.75"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "{\"dropout_rate\":0.9,\"wind_mps\":6.0}",
+      "case_id": "scenario_specific_allowlist",
+      "component": "scenario_profile_context",
+      "expectation": "exclude_incompatible_training_perturbation",
+      "full_contract_correct": true,
+      "full_observation": "{\"wind_mps\":6.0}"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "{\"wind_mps\":31.0}",
+      "case_id": "out_of_range_perturbation",
+      "component": "scenario_profile_context",
+      "expectation": "exclude_out_of_range_training_perturbation",
+      "full_contract_correct": true,
+      "full_observation": "{}"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "raw_holdout_configs_differ",
+      "case_id": "holdout_content_noninterference",
+      "component": "scenario_profile_context",
+      "expectation": "holdout_details_do_not_change_provider_scenario_evidence",
+      "full_contract_correct": true,
+      "full_observation": "identical"
+    },
+    {
+      "ablated_contract_correct": false,
+      "ablated_observation": "environment_omitted",
+      "case_id": "bounded_environment_summary",
+      "component": "scenario_profile_context",
+      "expectation": "compile_job_wide_environment_without_raw_geometry",
+      "full_contract_correct": true,
+      "full_observation": "{\"advanced_config_present\":true,\"baro_noise_m\":0.4,\"battery_initial_percent\":70.0,\"gps_noise_m\":1.5,\"gust_magnitude_mps\":7.5,\"gust_period_s\":12.0,\"imu_noise_scale\":1.3,\"mass_payload_kg\":1.2,\"obstacle_count\":0,\"sensor_dropout_rate\":0.1,\"sensor_noise_level\":\"high\",\"steady_wind_component_l1_mps\":1.5,\"voltage_sag\":true}"
+    }
+  ],
+  "schema_version": "dronedream.harness-contract-ablation/v1",
+  "simulator_runs": false,
+  "summary": {
+    "ablated_contract_correct_count": 6,
+    "ablated_contract_correct_rate": 0.24,
+    "absolute_contract_delta": 0.76,
+    "component_count": 5,
+    "full_contract_correct_count": 25,
+    "full_contract_correct_rate": 1.0,
+    "probe_count": 25
+  }
+}

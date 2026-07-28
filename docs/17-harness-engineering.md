@@ -848,7 +848,7 @@ discarded.
 The snapshot additionally reports minimum and maximum training replicates,
 maximum normalized case weight, and the effective number of weighted training
 cases. These are descriptive facts, not a fabricated scalar difficulty score.
-The current Prompt Template 1.5 requires the router to compare training-case
+The current Prompt Template 1.6 requires the router to compare training-case
 heterogeneity, replicate cost, weight concentration, and safe perturbation
 magnitudes while treating validation counts as cost only. A paired regression
 changes holdout IDs, types, seeds, weights, and configuration while preserving
@@ -856,17 +856,31 @@ counts and requires provider-visible scenario evidence to remain identical;
 another regression proves that meaningful training profiles change the frozen
 prompt.
 
-The prior 24/24 online-provider Artifact was generated under Evidence 2.4 and
-Prompt Template 1.1. It remains an archived historical result, but current
-loaders reject it as stale; a fresh online provider freeze is required before
-claiming current-version model-routing qualification.
+The prior 24/24 online-provider Artifact generated under Evidence 2.4 and
+Prompt Template 1.1 remains archived, and current loaders correctly reject it
+as stale. The current Evidence 2.7 campaign first retained a Prompt Template
+1.5 failure at 19/24 and a second 1.5 run at 21/24. That three-decision spread
+under the same template is direct evidence that provider reruns are stochastic,
+so it must not be hidden or used as a causal prompt comparison.
+
+Prompt Template 1.6 makes the deterministic aggregate-loss direction explicit:
+smaller finite baseline, incumbent, cohort, candidate, and tool-history scores
+are better. Its frozen `gpt-4.1-2025-04-14` Artifact independently reloads and
+grades at 24/24, 3/3 in all eight categories, with SHA-256
+`2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`.
+This qualifies the current development routing contract only. It is not a
+paired causal estimate of the 1.6 wording and does not prove simulator outcome
+improvement.
 
 `backend/scripts/run_harness_routing_campaign.py` runs the entire corpus through
 an online provider using the exact production prompt and per-case response
 schema. It accepts credentials only from the environment, redacts provider
 error bodies, validates every result locally, and publishes no output until all
 cases complete. The final Artifact is created atomically and cannot replace a
-prior freeze.
+prior freeze. Both the campaign and offline evaluator pin `backend/` to the
+front of `sys.path` and fail closed if `app` resolves outside the selected
+worktree; CLI regressions invoke them from the repository root to prevent a
+neighbouring worktree from silently supplying the prompt.
 
 It is a regression tool, not evidence that model routing outperforms the
 deterministic portfolio; that claim still requires the frozen simulator campaign.

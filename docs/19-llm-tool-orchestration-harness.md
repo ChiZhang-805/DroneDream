@@ -8674,14 +8674,14 @@ cd backend
 24 cases; 8 categories; 8 registered tools
 uniform-random expectation: 5.625/24 (23.4375%)
 best constant tool: optimizer_portfolio, 14/24 (58.3333%)
-archived provider-call traces: Evidence 2.4, Tool Manifest 2.1,
-Prompt Template 1.1, Decision Trace 1.1
+current provider freeze: Evidence 2.7, Tool Manifest 2.1,
+Prompt Template 1.6
 strict offline predictions: Prediction Artifact 1.0 bound to the printed
 corpus_sha256 and prompt_suite_sha256
 current corpus_sha256:
-4968b0a9639d59474c00402dcd261a241377bdb57a6273554f4d6ad0d1172625
+98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89
 current prompt_suite_sha256:
-d300d0516378974fb57be896b155ef1a537278594b03c0ecbdceff9ade26dc59
+93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77
 ```
 
 The content-addressed receipt at
@@ -8697,18 +8697,29 @@ run. The Windows Rust desktop gate was not run on this host because Visual
 Studio C++ Build Tools and `link.exe` were unavailable, so the backend receipt
 does not satisfy that separate release gate.
 
-The first complete online-provider freeze used
-`gpt-4.1-2025-04-14` with native strict JSON Schema and no requested
-temperature, top-p, or seed override. Independent reload and grading produced
-24/24 acceptable decisions, 3/3 in every category, a 41.67-point lift over
-the best constant policy, and `qualified=true`. The 12,829-byte Prediction
-Artifact SHA-256 is
-`8a6531580243f1fa1493f68570b01e965231995f6b754290aca9d6f285d4575b`.
-This proves the archived Evidence 2.4 / Prompt Template 1.1 model and tool gate
-could discriminate the development cases; it does not qualify the current
-Evidence 2.7 / Prompt Template 1.5 contract, prove lower final simulation loss,
-or replace a blocked, budget-matched simulator campaign. Current loaders reject
-that Artifact as stale until a fresh online provider freeze is run.
+The archived Evidence 2.4 / Prompt Template 1.1 freeze remains a historical
+24/24 result, but current loaders reject it. The Evidence 2.7 campaign preserves
+all three subsequent `gpt-4.1-2025-04-14` outcomes rather than selecting only
+the best run. The first Prompt Template 1.5 run scored 19/24 and failed the
+local-progress category threshold; its SHA-256 is
+`fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf`.
+A second 1.5 run scored 21/24 and passed the declared qualification thresholds;
+its SHA-256 is
+`9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571`.
+The spread under an unchanged template demonstrates provider stochasticity.
+
+Prompt Template 1.6 explicitly defines every provider-visible aggregate score
+as lower-is-better loss. The current 12,819-byte freeze used native strict JSON
+Schema with no requested temperature, top-p, or seed override. Independent
+reload and grading produced 24/24 acceptable decisions, 3/3 in every category,
+a 41.67-point lift over the best constant policy, and `qualified=true`. Its
+SHA-256 is
+`2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`.
+This qualifies the current development routing contract. Because the 1.5 and
+1.6 calls are unpaired stochastic runs, it is not a causal prompt-lift estimate
+and still does not prove lower final simulator loss. Campaign and evaluator
+CLIs now pin the selected worktree's `backend/` import root and fail closed
+against neighbouring checkout contamination.
 
 ### 30.15 Evidence 2.5 observed-outcome reflection
 
@@ -8740,7 +8751,7 @@ case counts.
 The compiler does not expose arbitrary scenario JSON, IDs, seeds, labels,
 instructions, out-of-range values, or incompatible perturbation keys. Holdout
 details remain sealed; only validation case and replicate counts contribute to
-cost. Current Prompt Template 1.5 explicitly prohibits inferring validation
+cost. Current Prompt Template 1.6 explicitly prohibits inferring validation
 types, conditions, or results. Paired tests require two jobs with identical
 training inputs and counts but different holdout IDs, types, seeds, weights,
 and configs to produce identical provider-visible scenario evidence.
@@ -8763,7 +8774,7 @@ count and never permits the provider to enlarge it. The decision and execution
 events must agree on phase and policy, and the execution's planned count must
 cover the dispatched count before that record may enter future memory.
 
-Prompt Template 1.5 exposes the bounded plan but explicitly forbids a later
+Prompt Template 1.6 exposes the bounded plan but explicitly forbids a later
 open-loop schedule. Decision Trace 1.3 hashes the complete plan with the
 provider-safe snapshot and exact prompt. Unit and integration regressions cover
 all six phases, phase-policy mismatch, safe cohort sizing, real dispatch
