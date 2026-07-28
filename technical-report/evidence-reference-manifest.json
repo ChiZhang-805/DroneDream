@@ -160,14 +160,14 @@
         "source_sha256": "2878e1bef3b2142b72d453b8791b8132df53084506ff73a93ce6b2e362a26594",
         "modified_after_migration": true,
         "current_hash_serialization": "utf8_lf",
-      "current_sha256": "07701f15bdf00ba3aa64f77f6f093c75f3781435dcdcbd0ffa6fcee98252a4f4"
+        "current_sha256": "07701f15bdf00ba3aa64f77f6f093c75f3781435dcdcbd0ffa6fcee98252a4f4"
       },
       {
         "path": "body.tex",
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
         "modified_after_migration": true,
         "current_hash_serialization": "utf8_lf",
-      "current_sha256": "4cc8c0077ffbf2580a6bc93df7d634691940e0253ccaaf6f81a2a0525ec8845e"
+        "current_sha256": "b5ceb8698414f952bb8bf4c083d4fa96f3a00c9510752beba606e83a21054f25"
       },
       {
         "path": "media/github-mark.png",

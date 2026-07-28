@@ -213,8 +213,8 @@ def main() -> None:
     )
     policy = audit["paragraph_policy"]["explanatory_body"]
     require(
-        policy["total"] == 44 and policy["passed"] == 44 and policy["failed"] == 0,
-        "committed audit does not pass the 44/44 explanatory-body gate",
+        policy["total"] == 40 and policy["passed"] == 40 and policy["failed"] == 0,
+        "committed audit does not pass the 40/40 explanatory-body gate",
     )
     require(not audit["bottom_failures"], "committed audit has bottom failures")
     require(

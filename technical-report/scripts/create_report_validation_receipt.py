@@ -157,8 +157,8 @@ def main() -> None:
     policy = audit["paragraph_policy"]["explanatory_body"]
     require(pages == 13 and audit["pages"] == 13, "report must contain 13 pages")
     require(
-        policy["total"] == 44 and policy["passed"] == 44 and policy["failed"] == 0,
-        "explanatory-body last-line policy did not pass 44/44",
+        policy["total"] == 40 and policy["passed"] == 40 and policy["failed"] == 0,
+        "explanatory-body last-line policy did not pass 40/40",
     )
     require(not audit["paragraph_geometry"]["unlocated"], "unlocated paragraphs")
     require(
