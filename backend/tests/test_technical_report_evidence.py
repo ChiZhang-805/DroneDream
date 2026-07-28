@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts.export_technical_report_evidence import (
+    _read_test_log_text,
     build_report_evidence_bundle,
     summarize_scenario_generalization,
     summarize_simulation_coverage,
@@ -263,6 +264,13 @@ def test_report_evidence_rejects_receipt_log_count_mismatch(tmp_path: Path) -> N
             generated_at=_TEST_GENERATED_AT,
             backend_test_receipt_path=receipt_path,
         )
+
+
+def test_report_evidence_decodes_powershell_utf16le_pytest_logs(tmp_path: Path) -> None:
+    log_path = tmp_path / "pytest.log"
+    log_path.write_bytes("1147 passed in 788.78s (0:13:08)\r\n".encode("utf-16-le"))
+
+    assert "1147 passed in 788.78s" in _read_test_log_text(log_path)
 
 
 def test_report_evidence_writes_chart_ready_csv(tmp_path: Path) -> None:

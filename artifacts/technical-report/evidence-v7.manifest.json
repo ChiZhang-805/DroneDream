@@ -1,0 +1,64 @@
+{
+  "bundle": {
+    "bundle_sha256": "a0432d092d5e751a6f414ba4d0cb6b91cb7e9117b6fead109ef2a1c805ad8522",
+    "file_sha256": "93232a2f0027503c24cfe4a8a1768d518f436cd35a3db72e788fc42f5eb45c55",
+    "path": "evidence-v7.json"
+  },
+  "generated_at": "2026-07-28T07:53:56Z",
+  "schema_version": "dronedream.technical-report-evidence-manifest.v1",
+  "source_commit": "742b12467efc9b37b7e4a2fa3ac73b7578f21385",
+  "sources": {
+    "backend_test_receipt": {
+      "path": "artifacts/test-runs/aurora-software-742b124-receipt.json",
+      "sha256": "cd5a9890ab6ff679d522a7fc05a2d509d94b3e8ce702d6187fd315937d9716dd"
+    },
+    "harness_ablations": {
+      "path": "backend/evaluation_artifacts/harness-contract-ablation-v2.json",
+      "sha256": "8fc1340179d10c974ca9f53b0a8d97e4459c54bc39932518ee6c8c66fa3ab88a"
+    },
+    "harness_component_outcome_ablation": {
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+      "sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82"
+    },
+    "harness_component_outcome_ablation_csv": {
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.csv",
+      "sha256": "f2f34b4ccfd9fa21ca14d71db72de36f7489608e834d53dfbdd56357ea0d1c2f"
+    },
+    "harness_component_outcome_ablation_manifest": {
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.manifest.json",
+      "sha256": "a490e9c69e3b2b1b092341d215b1afe9cdd567373709eba24396f3cb0004e77a"
+    },
+    "harness_outcome_campaign": {
+      "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+      "sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d"
+    },
+    "routing_corpus": {
+      "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+      "sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1"
+    },
+    "routing_policy_holdout_corpus": {
+      "path": "backend/tests/fixtures/harness_routing_policy_holdout_v1.jsonl",
+      "sha256": "d98d11773187efc225edcda2c38b9cf6c1ab6d7fe4df01f977589de65ec39179"
+    },
+    "routing_policy_holdout_manifest": {
+      "path": "backend/tests/fixtures/harness_routing_policy_holdout_v3.manifest.json",
+      "sha256": "5a0795ffc7a2a342cc0faf3edca29a54f3b1e72d5cf2842f5e8d16b7c2c0ef78"
+    },
+    "routing_policy_holdout_result": {
+      "path": "backend/evaluation_artifacts/harness-routing-policy-holdout-v3.json",
+      "sha256": "c10941ab0af221bc53d0c4f2d37eb7605c7a1a045b83b3775966cb9573bac2da"
+    },
+    "routing_predictions": {
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
+      "sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4"
+    },
+    "scenario_generalization": {
+      "path": "backend/evaluation_artifacts/scenario-generalization-mock-v1.json",
+      "sha256": "a2ab40d2962ac9f883281f24b0f3e8fb0f5316847f71ea3734ec9370ad858030"
+    },
+    "simulation_coverage": {
+      "path": "backend/evaluation_artifacts/simulation-coverage-mock-v3.json",
+      "sha256": "f7523608ae3e7752fed04a789978c58b7546f89bd43098ea041e7ddfa9fbdf12"
+    }
+  }
+}

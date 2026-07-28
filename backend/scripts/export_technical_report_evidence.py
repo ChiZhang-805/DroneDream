@@ -139,6 +139,18 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     return value
 
 
+def _read_test_log_text(path: Path) -> str:
+    """Decode a hash-bound pytest log without assuming the host shell encoding."""
+
+    raw = path.read_bytes()
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        return raw.decode("utf-16")
+    sample = raw[:512]
+    if len(raw) % 2 == 0 and sample and sample[1::2].count(0) >= max(1, len(sample[1::2]) * 3 // 4):
+        return raw.decode("utf-16-le")
+    return raw.decode("utf-8", errors="replace")
+
+
 def _validate_source_commit(value: str) -> str:
     if re.fullmatch(r"[0-9a-f]{40}", value) is None:
         raise ValueError("source_commit must be a full lowercase Git SHA")
@@ -225,10 +237,7 @@ def _load_backend_test_receipt(
         ):
             raise ValueError("backend test receipt log binding does not recompute")
         verified_logs.append(resolved_log)
-    if f"{result['passed']} passed in" not in verified_logs[0].read_text(
-        encoding="utf-8",
-        errors="replace",
-    ):
+    if f"{result['passed']} passed in" not in _read_test_log_text(verified_logs[0]):
         raise ValueError("backend full-suite log does not contain the declared result")
     if not focused_checks:
         raise ValueError("backend test receipt requires passing focused checks")

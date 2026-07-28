@@ -1,0 +1,58 @@
+{
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "pytest": "9.1.1",
+    "python": "3.13.0"
+  },
+  "focused_checks": [
+    {
+      "command": "Z:\\DroneDream\\backend\\.venv\\Scripts\\python.exe -m pytest -q tests/test_capabilities.py tests/test_phase8_llm_proposer.py tests/test_harness_routing_campaign.py tests/test_harness_routing_evaluation.py tests/test_harness_routing_freezes.py tests/test_harness_ablation.py tests/test_harness_component_ablation.py tests/test_technical_report_evidence.py tests/test_test_run_receipt.py",
+      "duration_seconds": 151.96,
+      "finished_at": "2026-07-28T07:53:14.564Z",
+      "log": {
+        "path": "artifacts/test-runs/aurora-software-742b124-focused.log",
+        "sha256": "ee6e599d97ec67aabe3f9569709b5a41d444df7bcbf000712a2d715e9a0305d5",
+        "size_bytes": 390
+      },
+      "result": {
+        "failed": 0,
+        "passed": 81,
+        "status": "passed"
+      },
+      "started_at": "2026-07-28T07:50:38.779Z",
+      "working_directory": "backend"
+    }
+  ],
+  "full_suite": {
+    "command": "Z:\\DroneDream\\backend\\.venv\\Scripts\\python.exe -m pytest -q",
+    "duration_seconds": 788.78,
+    "finished_at": "2026-07-28T07:50:16.844Z",
+    "log": {
+      "path": "artifacts/test-runs/aurora-software-742b124-pytest.log",
+      "sha256": "bf7be380922ff94db7ace78912b1aed376fce1c606317b191559e959bc79e869",
+      "size_bytes": 2662
+    },
+    "result": {
+      "failed": 0,
+      "passed": 1147,
+      "status": "passed"
+    },
+    "started_at": "2026-07-28T07:36:55.252Z",
+    "tested_state": {
+      "base_commit": "742b12467efc9b37b7e4a2fa3ac73b7578f21385",
+      "exact_final_commit_run": true,
+      "kind": "commit"
+    },
+    "working_directory": "backend"
+  },
+  "generated_at": "2026-07-28T07:53:56Z",
+  "receipt_sha256": "ec1a757cfbb6d6ccbc2e186ecd43e9e2656b2d7c9826643f703f296adc285108",
+  "schema_version": "dronedream.test-run-receipt.v2",
+  "source_commit": "742b12467efc9b37b7e4a2fa3ac73b7578f21385",
+  "validation_bridge": {
+    "focused_rerun_performed": true,
+    "focused_rerun_required": false,
+    "full_suite_rerun_performed": true,
+    "reason": "Full and focused suites ran from clean source_commit 742b12467efc9b37b7e4a2fa3ac73b7578f21385; the focused run supplements, and does not bridge from, the exact full run."
+  }
+}

@@ -8667,7 +8667,7 @@ Current frozen backend validation:
 cd backend
 .venv/Scripts/python.exe -m pytest -q
 
-1139 passed in 759.17s
+1147 passed in 788.78s
 
 .venv/Scripts/python.exe scripts/evaluate_harness_router.py
 
@@ -8685,17 +8685,17 @@ current prompt_suite_sha256:
 ```
 
 The content-addressed receipt at
-`artifacts/test-runs/aurora-backend-1139-receipt.json` binds the command,
+`artifacts/test-runs/aurora-software-742b124-receipt.json` binds the command,
 Windows/Python/pytest environment, start and finish times, result, full log
 SHA-256, and software source commit
-`0429b4244fc1fd912bd211e80821ebdbabb8ae5d`. The full suite ran on the
-pre-commit AURORA worktree, so it is explicitly marked
-`exact_final_commit_run=false`. After formatter-only and evidence-contract
-changes, 59 directly affected tests passed in 65.67 seconds on the bound source
-commit; the receipt does not misrepresent that focused bridge as a second full
-run. The Windows Rust desktop gate was not run on this host because Visual
-Studio C++ Build Tools and `link.exe` were unavailable, so the backend receipt
-does not satisfy that separate release gate.
+`742b12467efc9b37b7e4a2fa3ac73b7578f21385`. The full 1,147-test suite ran
+from that clean commit and is marked `exact_final_commit_run=true`; 81 directly
+affected checks also passed in 151.96 seconds as a supplement, not a bridge
+from a different source state. The raw full-suite log SHA-256 is
+`bf7be380922ff94db7ace78912b1aed376fce1c606317b191559e959bc79e869`.
+The Windows Rust desktop gate was not run on this host because Visual Studio
+C++ Build Tools and `link.exe` were unavailable, so the backend receipt does
+not satisfy that separate release gate.
 
 The archived Evidence 2.4 / Prompt Template 1.1 freeze remains a historical
 24/24 result, but current loaders reject it. The Evidence 2.7 campaign preserves
