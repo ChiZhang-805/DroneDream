@@ -137,6 +137,44 @@ def _gpt_proposal(kp: float) -> dict[str, Any]:
     }
 
 
+def _harness_plan_response() -> dict[str, Any]:
+    return {
+        "schema_version": "1.0",
+        "decision": "continue",
+        "generation_goal": "Run one bounded portfolio proposal.",
+        "tool_calls": [
+            {
+                "tool_id": "optimizer_portfolio",
+                "allocation": 1,
+                "fidelity_mode": "force_full",
+                "focus": ["verification"],
+            }
+        ],
+        "stop": {"recommended": False, "reason_code": None},
+        "uncertainty": {
+            "level": "medium",
+            "missing_evidence": ["tool_cost_history"],
+        },
+    }
+
+
+def _harness_revision_response() -> dict[str, Any]:
+    return {
+        "schema_version": "1.0",
+        "decision": "dispatch",
+        "selected_proposal_refs": ["proposal_0"],
+        "rationale": "Dispatch the single bounded proposal.",
+    }
+
+
+def _harness_response_for_prompt(user: str) -> dict[str, Any]:
+    return (
+        _harness_plan_response()
+        if '"budget_opportunity"' in user
+        else _harness_revision_response()
+    )
+
+
 def test_gpt_loop_dispatches_generation_after_baseline(gpt_ctx):
     ctx = gpt_ctx
     job_id = _create_job(ctx, strategy="gpt", target_rmse=0.01, max_iterations=2)
@@ -171,14 +209,7 @@ def test_llm_harness_selects_and_executes_registered_tool_after_baseline(gpt_ctx
         max_iterations=1,
     )
     client = FakeOpenAIClient(
-        [
-            {
-                "decision": {
-                    "tool_id": "cma_es",
-                    "rationale": "Use bounded evolutionary search after the baseline.",
-                }
-            }
-        ]
+        [_harness_plan_response(), _harness_revision_response()]
     )
     status = _drive(ctx, job_id, client=client, max_ticks=80)
     assert status == "COMPLETED"
@@ -191,9 +222,10 @@ def test_llm_harness_selects_and_executes_registered_tool_after_baseline(gpt_ctx
             for candidate in job.candidates
         )
         event_types = [event.event_type for event in job.events]
-        assert "harness_decision_started" in event_types
-        assert "harness_decision_accepted" in event_types
-        assert "harness_tool_execution_result" in event_types
+        assert "harness_budget_plan_started" in event_types
+        assert "harness_budget_plan_accepted" in event_types
+        assert "harness_plan_revision_accepted" in event_types
+        assert "harness_multi_tool_execution_result" in event_types
         assert "generation_dispatched" in event_types
 
 
@@ -318,15 +350,11 @@ def test_llm_harness_concurrent_finalizers_dispatch_one_generation(gpt_ctx) -> N
         def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
             with self._lock:
                 self.calls += 1
+                call_number = self.calls
             entered.set()
-            if not release.wait(timeout=10):
+            if call_number == 1 and not release.wait(timeout=10):
                 raise TimeoutError("test did not release provider call")
-            return {
-                "decision": {
-                    "tool_id": "cma_es",
-                    "rationale": "Use bounded evolutionary search.",
-                }
-            }
+            return _harness_response_for_prompt(user)
 
     client = BlockingClient()
     errors: list[BaseException] = []
@@ -370,8 +398,9 @@ def test_llm_harness_concurrent_finalizers_dispatch_one_generation(gpt_ctx) -> N
         assert job.finalization_claim_token is None
         event_types = [event.event_type for event in job.events]
         assert event_types.count("generation_dispatched") == 1
-        assert event_types.count("harness_decision_accepted") == 1
-        assert event_types.count("harness_tool_execution_result") == 1
+        assert event_types.count("harness_budget_plan_accepted") == 1
+        assert event_types.count("harness_multi_tool_execution_result") == 1
+        assert client.calls == 2
 
 
 def test_llm_harness_expired_claim_cannot_duplicate_generation(
@@ -414,12 +443,7 @@ def test_llm_harness_expired_claim_cannot_duplicate_generation(
                 first_call_entered.set()
                 if not release_first_call.wait(timeout=10):
                     raise TimeoutError("test did not release stale provider call")
-            return {
-                "decision": {
-                    "tool_id": "cma_es",
-                    "rationale": "Use bounded evolutionary search.",
-                }
-            }
+            return _harness_response_for_prompt(user)
 
     class DisabledHeartbeat:
         def __init__(self, *args: object, **kwargs: object) -> None:
@@ -462,7 +486,7 @@ def test_llm_harness_expired_claim_cannot_duplicate_generation(
 
         with ctx["db_module"].SessionLocal() as db:
             assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == []
-        assert client.calls == 2
+        assert client.calls == 3
 
         release_first_call.set()
         stale_worker.join(timeout=10)
@@ -491,8 +515,9 @@ def test_llm_harness_expired_claim_cannot_duplicate_generation(
         )
         event_types = [event.event_type for event in job.events]
         assert event_types.count("generation_dispatched") == 1
-        assert event_types.count("harness_decision_accepted") == 1
-        assert event_types.count("harness_tool_execution_result") == 1
+        assert event_types.count("harness_budget_plan_accepted") == 1
+        assert event_types.count("harness_multi_tool_execution_result") == 1
+        assert client.calls == 3
         assert "job_failed" not in event_types
 
 
@@ -531,14 +556,11 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
         def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
             self.calls += 1
             entered.set()
-            if not release.wait(timeout=provider_wait_timeout_seconds):
+            if self.calls == 1 and not release.wait(
+                timeout=provider_wait_timeout_seconds
+            ):
                 raise TimeoutError("test did not release provider call")
-            return {
-                "decision": {
-                    "tool_id": "cma_es",
-                    "rationale": "Use bounded evolutionary search.",
-                }
-            }
+            return _harness_response_for_prompt(user)
 
     client = BlockingClient()
     errors: list[BaseException] = []
@@ -596,7 +618,8 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
         assert job.finalization_claim_token is None
         event_types = [event.event_type for event in job.events]
         assert event_types.count("generation_dispatched") == 1
-        assert event_types.count("harness_tool_execution_result") == 1
+        assert event_types.count("harness_multi_tool_execution_result") == 1
+        assert client.calls == 2
 
 
 def test_stale_terminal_finalizer_cannot_publish_report_or_events(

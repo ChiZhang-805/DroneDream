@@ -1815,6 +1815,7 @@ def _try_continue_iterative_optimizer(
             "budget_exhausted",
             "max_iterations_reached",
             "search_space_exhausted",
+            "stop_accepted",
         }:
             return False
     elif job.optimizer_strategy == "cma_es":

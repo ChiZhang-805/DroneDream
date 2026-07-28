@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, cast
@@ -33,10 +35,28 @@ from app.orchestration.aggregation import candidate_is_publishable
 from app.orchestration.cma_es_optimizer import propose_next_generation
 from app.orchestration.events import record_event
 from app.orchestration.experimental_optimizer import (
+    PreparedExperimentalGeneration,
+    execute_prepared_experimental_generation,
     is_experimental_strategy,
+    prepare_experimental_generation,
     propose_experimental_generation,
+    search_space_for_job,
 )
-from app.orchestration.harness_context import HarnessBatchPolicy, HarnessPlanPhase
+from app.orchestration.harness_budget_planner import (
+    HarnessBudgetOpportunity,
+    HarnessCompiledGenerationPlan,
+    HarnessCompiledToolCall,
+    HarnessProposalSummary,
+    HarnessStopReason,
+    build_budget_opportunity,
+    proposal_summary,
+)
+from app.orchestration.harness_context import (
+    HarnessBatchPolicy,
+    HarnessPlanPhase,
+    build_harness_evidence,
+    selectable_harness_tools,
+)
 from app.orchestration.llm_parameter_proposer import (
     LlmProposal,
     OpenAIClientLike,
@@ -77,6 +97,22 @@ class AdaptiveDispatchResult:
     status: str
     dispatched_candidates: int = 0
     planned_candidates: int = 0
+
+
+@dataclass(frozen=True)
+class _PreparedHarnessToolCall:
+    call: HarnessCompiledToolCall
+    prepared: PreparedExperimentalGeneration
+
+
+@dataclass(frozen=True)
+class _HarnessToolCallResult:
+    call: HarnessCompiledToolCall
+    proposals: tuple[CandidateProposal, ...]
+    status: str
+    elapsed_ms: float
+    cpu_ms: float
+    error_type: str | None = None
 
 
 def _now() -> datetime:
@@ -1352,6 +1388,314 @@ def dispatch_next_experimental_generation(
     )
 
 
+def _harness_budget_context(
+    job: models.Job,
+    *,
+    generation_index: int,
+    remaining_trials: int,
+    full_trials_per_candidate: int,
+) -> tuple[HarnessBudgetOpportunity, HarnessPlanPhase]:
+    """Compile the trusted per-generation budget and deterministic stop gate."""
+
+    snapshot, _ = build_harness_evidence(job, execution_events=job.events)
+    selectable = tuple(
+        tool_id
+        for tool_id in selectable_harness_tools(snapshot)
+        if tool_id != "cma_es"
+    )
+    if not selectable:
+        raise RuntimeError("multi-tool Harness requires an experimental fallback")
+    full_capacity = remaining_trials // full_trials_per_candidate
+    has_full_optimizer_evidence = _has_successful_full_fidelity_optimizer_evidence(job)
+    candidate_capacity = min(4, full_capacity)
+    if (
+        not has_full_optimizer_evidence
+        and generation_index < job.max_iterations
+        and candidate_capacity > 1
+    ):
+        # Preserve one complete matrix for a later verification generation.
+        candidate_capacity -= 1
+    stop_reasons: tuple[HarnessStopReason, ...] = ()
+    if (
+        has_full_optimizer_evidence
+        and job.current_generation >= 3
+        and snapshot.search.trailing_stagnant_generations >= 3
+    ):
+        stop_reasons = ("budget_efficiency_stalled",)
+    opportunity = build_budget_opportunity(
+        generation=generation_index,
+        remaining_trials=remaining_trials,
+        full_trials_per_candidate=full_trials_per_candidate,
+        candidate_capacity=candidate_capacity,
+        allowed_tools=selectable,
+        stop_reasons=stop_reasons,
+        maximum_tool_calls=min(4, len(selectable)),
+    )
+    return opportunity, snapshot.plan.phase
+
+
+def _prepare_harness_tool_calls(
+    *,
+    job: models.Job,
+    plan: HarnessCompiledGenerationPlan,
+    configured_runs: list[ScenarioRun] | None,
+    full_trials_per_candidate: int,
+    plan_phase: HarnessPlanPhase,
+) -> tuple[_PreparedHarnessToolCall, ...]:
+    """Prepare every numerical request before any worker thread is created."""
+
+    fidelity_mapping = _effective_fidelity_mapping(
+        configured_runs,
+        full_trials_per_candidate=full_trials_per_candidate,
+    )
+    candidates = list(job.candidates)
+    baseline_parameters = _baseline_parameters_for_job(job)
+    has_full_optimizer_evidence = _has_successful_full_fidelity_optimizer_evidence(job)
+    prepared_calls: list[_PreparedHarnessToolCall] = []
+    for call in plan.calls:
+        strategy = cast(ExperimentalOptimizerStrategy, call.tool_id)
+        can_schedule_reduced_fidelity = strategy in {
+            "multi_fidelity_mobo",
+            "optimizer_portfolio",
+        }
+        required_fidelity = (
+            1.0
+            if call.fidelity_mode == "force_full"
+            else _required_fidelity_for_plan(
+                can_schedule_reduced_fidelity=can_schedule_reduced_fidelity,
+                plan_phase=plan_phase,
+                has_full_optimizer_evidence=has_full_optimizer_evidence,
+                generation_index=plan.generation,
+                max_iterations=job.max_iterations,
+                full_candidate_capacity=plan.projected_candidate_count,
+            )
+        )
+        prepared = prepare_experimental_generation(
+            job=job,
+            candidates=candidates,
+            baseline_parameters=baseline_parameters,
+            generation_index=plan.generation,
+            batch_size=call.allocation,
+            fidelity_mapping=fidelity_mapping,
+            required_fidelity=required_fidelity,
+            strategy_override=strategy,
+        )
+        if prepared is None:
+            raise RuntimeError("compiled Harness tool call produced no numerical request")
+        prepared_calls.append(_PreparedHarnessToolCall(call=call, prepared=prepared))
+    return tuple(prepared_calls)
+
+
+def _run_harness_tool_call(
+    prepared_call: _PreparedHarnessToolCall,
+) -> _HarnessToolCallResult:
+    """Execute one pure numerical request and enforce its local cost envelope."""
+
+    wall_started = time.perf_counter_ns()
+    thread_clock = getattr(time, "thread_time_ns", time.process_time_ns)
+    cpu_started = thread_clock()
+    error_type: str | None = None
+    proposals: tuple[CandidateProposal, ...] = ()
+    try:
+        proposals = tuple(
+            execute_prepared_experimental_generation(prepared_call.prepared)
+        )
+    except Exception as exc:
+        error_type = type(exc).__name__[:128]
+        logger.warning(
+            "Harness tool call failed (call_id=%s, tool_id=%s, error_type=%s)",
+            prepared_call.call.call_id,
+            prepared_call.call.tool_id,
+            error_type,
+        )
+    elapsed_ms = (time.perf_counter_ns() - wall_started) / 1_000_000
+    cpu_ms = (thread_clock() - cpu_started) / 1_000_000
+    if error_type is not None:
+        status = "tool_error"
+    elif (
+        elapsed_ms > prepared_call.call.latency_budget_ms
+        or cpu_ms > prepared_call.call.cpu_budget_ms
+    ):
+        status = "cost_budget_exceeded"
+        proposals = ()
+    else:
+        status = "completed"
+    return _HarnessToolCallResult(
+        call=prepared_call.call,
+        proposals=proposals,
+        status=status,
+        elapsed_ms=elapsed_ms,
+        cpu_ms=cpu_ms,
+        error_type=error_type,
+    )
+
+
+def _execute_harness_tool_calls(
+    prepared_calls: tuple[_PreparedHarnessToolCall, ...],
+) -> tuple[_HarnessToolCallResult, ...]:
+    """Execute parallel-safe requests concurrently and serial-lane calls in order."""
+
+    results: dict[int, _HarnessToolCallResult] = {}
+    parallel_calls = tuple(item for item in prepared_calls if item.call.parallel_safe)
+    serial_calls = tuple(item for item in prepared_calls if not item.call.parallel_safe)
+    if parallel_calls:
+        with ThreadPoolExecutor(
+            max_workers=len(parallel_calls),
+            thread_name_prefix="harness-tool",
+        ) as executor:
+            future_calls = {
+                executor.submit(_run_harness_tool_call, item): item
+                for item in parallel_calls
+            }
+            for future in as_completed(future_calls):
+                item = future_calls[future]
+                results[item.call.ordinal] = future.result()
+    for item in serial_calls:
+        results[item.call.ordinal] = _run_harness_tool_call(item)
+    return tuple(results[index] for index in sorted(results))
+
+
+def _harness_incumbent_parameters(job: models.Job) -> dict[str, float]:
+    scored = [
+        candidate
+        for candidate in job.candidates
+        if not isinstance(candidate.aggregated_score, bool)
+        and isinstance(candidate.aggregated_score, int | float)
+        and math.isfinite(float(candidate.aggregated_score))
+        and isinstance(candidate.parameter_json, dict)
+    ]
+    if scored:
+        incumbent = min(
+            scored,
+            key=lambda item: (
+                float(cast(int | float, item.aggregated_score)),
+                item.generation_index,
+                item.id,
+            ),
+        )
+        return {
+            str(name): float(value)
+            for name, value in incumbent.parameter_json.items()
+            if not isinstance(value, bool)
+            and isinstance(value, int | float)
+            and math.isfinite(float(value))
+        }
+    return _baseline_parameters_for_job(job)
+
+
+def _summarize_harness_proposals(
+    db: Session,
+    job: models.Job,
+    *,
+    tool_results: tuple[_HarnessToolCallResult, ...],
+) -> tuple[
+    tuple[HarnessProposalSummary, ...],
+    dict[str, tuple[CandidateProposal, _HarnessToolCallResult]],
+]:
+    """Deduplicate and anonymize tool outputs for the sole post-tool model turn."""
+
+    search_space = search_space_for_job(
+        job,
+        baseline_parameters=_baseline_parameters_for_job(job),
+    )
+    incumbent = _harness_incumbent_parameters(job)
+    summaries: list[HarnessProposalSummary] = []
+    proposal_by_ref: dict[str, tuple[CandidateProposal, _HarnessToolCallResult]] = {}
+    seen_batch_identities: set[ProposalIdentity] = set()
+    for tool_result in tool_results:
+        if tool_result.status != "completed":
+            continue
+        for tool_candidate_ordinal, proposal in enumerate(tool_result.proposals):
+            resolved = proposal
+            identity = _proposal_identity(
+                job,
+                resolved.parameters,
+                resolved.metadata,
+            )
+            reason: str | None = None
+            if identity is None:
+                reason = "invalid_parameter_fingerprint"
+            elif identity in seen_batch_identities:
+                reason = "duplicate_in_generation"
+            elif _is_duplicate_proposal(
+                job,
+                resolved.parameters,
+                optimizer_metadata=resolved.metadata,
+            ):
+                reason = "duplicate_parameters_and_fidelity"
+            if reason is not None:
+                record_event(
+                    db,
+                    job.id,
+                    "optimizer_candidate_skipped",
+                    {
+                        "reason": reason,
+                        "strategy": tool_result.call.tool_id,
+                        "generation_index": resolved.generation_index,
+                        "label": resolved.label,
+                        "harness_call_id": tool_result.call.call_id,
+                    },
+                )
+                continue
+            assert identity is not None
+            seen_batch_identities.add(identity)
+            proposal_ref = f"proposal_{len(summaries)}"
+            requested_fidelity = _optimizer_requested_fidelity(resolved.metadata)
+            effective_fidelity = _optimizer_fidelity(resolved.metadata)
+            distance = search_space.normalized_distance(
+                resolved.parameters,
+                incumbent,
+            )
+            summary = proposal_summary(
+                proposal_ref=proposal_ref,
+                tool_id=tool_result.call.tool_id,
+                tool_candidate_ordinal=tool_candidate_ordinal,
+                requested_fidelity=requested_fidelity,
+                effective_fidelity=effective_fidelity,
+                normalized_distance_from_incumbent=max(0.0, min(1.0, distance)),
+            )
+            summaries.append(summary)
+            proposal_by_ref[proposal_ref] = (resolved, tool_result)
+    return tuple(summaries), proposal_by_ref
+
+
+def _harness_candidate_proposal(
+    proposal: CandidateProposal,
+    *,
+    summary: HarnessProposalSummary,
+    tool_result: _HarnessToolCallResult,
+    plan_decision_id: str,
+    plan: HarnessCompiledGenerationPlan,
+    revision_id: str,
+    revision_source: str,
+) -> CandidateProposal:
+    metadata = dict(proposal.metadata)
+    metadata["harness_orchestration"] = {
+        "schema_id": "dronedream.harness-candidate-orchestration/v1",
+        "decision_id": plan_decision_id,
+        "revision_id": revision_id,
+        "revision_source": revision_source,
+        "plan_sha256": plan.plan_sha256,
+        "call_id": tool_result.call.call_id,
+        "call_ordinal": tool_result.call.ordinal,
+        "tool_id": tool_result.call.tool_id,
+        "allocation": tool_result.call.allocation,
+        "allocation_authority": tool_result.call.allocation_authority,
+        "fidelity_mode": tool_result.call.fidelity_mode,
+        "proposal_ref": summary.proposal_ref,
+        "tool_candidate_ordinal": summary.tool_candidate_ordinal,
+        "tool_elapsed_ms": round(tool_result.elapsed_ms, 3),
+        "tool_cpu_ms": round(tool_result.cpu_ms, 3),
+    }
+    return CandidateProposal(
+        generation_index=proposal.generation_index,
+        label=proposal.label,
+        strategy=proposal.strategy,
+        parameters=dict(proposal.parameters),
+        metadata=metadata,
+    )
+
+
 def dispatch_next_harness_generation(
     db: Session,
     job: models.Job,
@@ -1359,12 +1703,7 @@ def dispatch_next_harness_generation(
     client: OpenAIClientLike | None = None,
     before_dispatch: Callable[[], None] | None = None,
 ) -> AdaptiveDispatchResult:
-    """Let the bounded planner select and dispatch one registered optimizer.
-
-    The planner can only return a registry identifier. This function remains
-    the authority boundary: it maps that identifier to trusted in-process
-    optimizer code without mutating the job's persisted ``llm_harness`` mode.
-    """
+    """Plan, execute, revise, and dispatch one bounded multi-tool generation."""
 
     _require_current_outcome_contract(db, job)
     generation_index = job.current_generation + 1
@@ -1410,53 +1749,262 @@ def dispatch_next_harness_generation(
         return AdaptiveDispatchResult(status="budget_exhausted")
 
     from app.orchestration.decision_harness import (
-        as_experimental_strategy,
-        select_optimizer_tool,
+        select_optimizer_budget_plan,
+        select_plan_revision,
     )
 
-    decision = select_optimizer_tool(db, job, client=client)
-    # Provider I/O happens outside a long write transaction. The caller's
-    # compare-and-swap hook converts the still-live persistent finalization
-    # claim into a commit fence before any Candidate/Trial rows are created.
+    opportunity, plan_phase = _harness_budget_context(
+        job,
+        generation_index=generation_index,
+        remaining_trials=remaining_trials,
+        full_trials_per_candidate=full_trials_per_candidate,
+    )
+    plan_decision_started = time.perf_counter_ns()
+    decision = select_optimizer_budget_plan(
+        db,
+        job,
+        opportunity=opportunity,
+        client=client,
+    )
+    plan_decision_wall_ms = (
+        time.perf_counter_ns() - plan_decision_started
+    ) / 1_000_000
+    if decision.generation != generation_index:
+        raise RuntimeError("Harness budget decision generation drifted")
+    if decision.compiled_plan is None:
+        record_event(
+            db,
+            job.id,
+            "harness_multi_tool_execution_result",
+            {
+                "decision_id": decision.decision_id,
+                "generation": generation_index,
+                "status": "stop_accepted",
+                "stop_reason": decision.stop_reason,
+                "decision_source": decision.source,
+                "plan_decision_wall_ms": round(plan_decision_wall_ms, 3),
+                "evidence_sha256": decision.evidence_sha256,
+                "prompt_sha256": decision.prompt_sha256,
+                "budget_policy_version": decision.budget_policy_version,
+                "plan_prompt_version": decision.plan_prompt_version,
+            },
+        )
+        return AdaptiveDispatchResult(status="stop_accepted")
+
+    plan = decision.compiled_plan
+    # Renew/fence immediately after the first external turn. A finalizer whose
+    # lease was reclaimed while the provider was responding must not spend CPU
+    # on tools or issue the optional second provider request.
     if before_dispatch is not None:
         before_dispatch()
-    if decision.generation != generation_index:
-        raise RuntimeError("Harness decision generation drifted before trusted dispatch")
-    if decision.tool_id == "cma_es":
-        result = dispatch_next_cma_es_generation(db, job)
-    else:
-        result = dispatch_next_experimental_generation(
+    prepared_calls = _prepare_harness_tool_calls(
+        job=job,
+        plan=plan,
+        configured_runs=configured_runs,
+        full_trials_per_candidate=full_trials_per_candidate,
+        plan_phase=plan_phase,
+    )
+    execution_started = time.perf_counter_ns()
+    tool_results = _execute_harness_tool_calls(prepared_calls)
+    tool_execution_wall_ms = (time.perf_counter_ns() - execution_started) / 1_000_000
+    summaries, proposal_by_ref = _summarize_harness_proposals(
+        db,
+        job,
+        tool_results=tool_results,
+    )
+    revision_started = time.perf_counter_ns()
+    revision = select_plan_revision(
+        db,
+        job,
+        plan_decision=decision,
+        proposals=summaries,
+        maximum_dispatch_candidates=min(
+            opportunity.candidate_capacity,
+            len(summaries),
+        )
+        if summaries
+        else 1,
+        client=client,
+    )
+    revision_wall_ms = (time.perf_counter_ns() - revision_started) / 1_000_000
+    selected_refs = revision.selected_proposal_refs
+    if not summaries or not selected_refs or revision.abandoned:
+        status = "search_space_exhausted"
+        record_event(
+            db,
+            job.id,
+            "harness_multi_tool_execution_result",
+            {
+                "decision_id": decision.decision_id,
+                "revision_id": revision.revision_id,
+                "generation": generation_index,
+                "plan_sha256": plan.plan_sha256,
+                "status": status,
+                "decision_source": decision.source,
+                "revision_source": revision.source,
+                "plan_decision_wall_ms": round(plan_decision_wall_ms, 3),
+                "revision_wall_ms": round(revision_wall_ms, 3),
+                "planned_candidates": plan.projected_candidate_count,
+                "usable_proposal_count": len(summaries),
+                "tool_execution_wall_ms": round(tool_execution_wall_ms, 3),
+                "tool_calls": [
+                    {
+                        "call_id": result.call.call_id,
+                        "tool_id": result.call.tool_id,
+                        "status": result.status,
+                        "allocation": result.call.allocation,
+                        "proposal_count": len(result.proposals),
+                        "elapsed_ms": round(result.elapsed_ms, 3),
+                        "cpu_ms": round(result.cpu_ms, 3),
+                        "latency_budget_ms": result.call.latency_budget_ms,
+                        "cpu_budget_ms": result.call.cpu_budget_ms,
+                        "error_type": result.error_type,
+                    }
+                    for result in tool_results
+                ],
+            },
+        )
+        return AdaptiveDispatchResult(
+            status=status,
+            planned_candidates=plan.projected_candidate_count,
+        )
+
+    # Both provider turns and every pure numerical call are complete. The
+    # caller's compare-and-swap hook now converts the still-live finalization
+    # claim into a commit fence before Candidate/Trial rows are created.
+    if before_dispatch is not None:
+        before_dispatch()
+    if job.current_generation + 1 != generation_index:
+        raise RuntimeError("Harness generation drifted before trusted dispatch")
+
+    summary_by_ref = {summary.proposal_ref: summary for summary in summaries}
+    dispatched_candidates = 0
+    dispatched_trials = 0
+    for proposal_ref in selected_refs:
+        proposal, tool_result = proposal_by_ref[proposal_ref]
+        compiled_proposal = _harness_candidate_proposal(
+            proposal,
+            summary=summary_by_ref[proposal_ref],
+            tool_result=tool_result,
+            plan_decision_id=decision.decision_id,
+            plan=plan,
+            revision_id=revision.revision_id,
+            revision_source=revision.source,
+        )
+        candidate = _create_optimizer_candidate(
             db,
             job,
-            strategy_override=as_experimental_strategy(decision.tool_id),
-            batch_policy=decision.batch_policy,
-            plan_phase=decision.plan_phase,
+            compiled_proposal,
+            trial_count=0,
         )
+        trials = _dispatch_optimizer_trials(
+            db,
+            job,
+            candidate,
+            trials_per_candidate=full_trials_per_candidate,
+        )
+        if dispatched_trials + len(trials) > remaining_trials:
+            raise RuntimeError("Harness dispatch exceeded the remaining Trial budget")
+        dispatched_candidates += 1
+        dispatched_trials += len(trials)
+    if dispatched_candidates == 0:
+        return AdaptiveDispatchResult(
+            status="search_space_exhausted",
+            planned_candidates=plan.projected_candidate_count,
+        )
+
+    job.current_generation = generation_index
+    job.current_phase = f"candidate_generation_{generation_index}"
+    job.progress_total_trials += dispatched_trials
+    tool_call_ledger = [
+        {
+            "call_id": result.call.call_id,
+            "tool_id": result.call.tool_id,
+            "status": result.status,
+            "allocation": result.call.allocation,
+            "parallel_safe": result.call.parallel_safe,
+            "proposal_count": len(result.proposals),
+            "elapsed_ms": round(result.elapsed_ms, 3),
+            "cpu_ms": round(result.cpu_ms, 3),
+            "latency_budget_ms": result.call.latency_budget_ms,
+            "cpu_budget_ms": result.call.cpu_budget_ms,
+            "error_type": result.error_type,
+        }
+        for result in tool_results
+    ]
     record_event(
         db,
         job.id,
-        "harness_tool_execution_result",
+        "harness_multi_tool_execution_result",
         {
             "decision_id": decision.decision_id,
-            # Preserve the intended generation even when a bounded optimizer
-            # returns search_space_exhausted without incrementing Job state.
+            "revision_id": revision.revision_id,
             "generation": generation_index,
-            "tool_id": decision.tool_id,
+            "plan_sha256": plan.plan_sha256,
+            "status": "dispatched",
             "decision_source": decision.source,
-            "plan_phase": decision.plan_phase,
-            "batch_policy": decision.batch_policy,
-            "status": result.status,
-            "dispatched_candidates": result.dispatched_candidates,
-            "planned_candidates": result.planned_candidates,
+            "revision_source": revision.source,
+            "plan_decision_wall_ms": round(plan_decision_wall_ms, 3),
+            "revision_wall_ms": round(revision_wall_ms, 3),
+            "provider_call_count": int(
+                decision.source == "model"
+                or decision.fallback_reason in {"client_error", "invalid_plan"}
+            )
+            + int(
+                revision.source == "model"
+                or revision.fallback_reason
+                in {
+                    "client_error",
+                    "invalid_schema",
+                    "unknown_proposal_reference",
+                    "dispatch_capacity_exceeded",
+                    "abandon_not_authorized",
+                }
+            ),
+            "selected_proposal_refs": list(selected_refs),
+            "dispatched_candidates": dispatched_candidates,
+            "dispatched_trials": dispatched_trials,
+            "planned_candidates": plan.projected_candidate_count,
+            "projected_trial_upper_bound": plan.projected_trial_upper_bound,
+            "projected_critical_path_latency_budget_ms": (
+                plan.projected_critical_path_latency_budget_ms
+            ),
+            "projected_cpu_budget_ms": plan.projected_cpu_budget_ms,
+            "tool_execution_wall_ms": round(tool_execution_wall_ms, 3),
+            "actual_tool_cpu_ms": round(
+                sum(result.cpu_ms for result in tool_results),
+                3,
+            ),
+            "tool_calls": tool_call_ledger,
             "evidence_sha256": decision.evidence_sha256,
             "prompt_sha256": decision.prompt_sha256,
             "fallback_reason": decision.fallback_reason,
             "evidence_schema_version": decision.evidence_schema_version,
             "tool_registry_version": decision.tool_registry_version,
-            "prompt_template_version": decision.prompt_template_version,
+            "budget_policy_version": decision.budget_policy_version,
+            "plan_prompt_version": decision.plan_prompt_version,
+            "revision_prompt_version": revision.revision_prompt_version,
         },
     )
-    return result
+    record_event(
+        db,
+        job.id,
+        "generation_dispatched",
+        {
+            "generation_index": generation_index,
+            "candidate_count": dispatched_candidates,
+            "trial_count": dispatched_trials,
+            "strategy": "llm_harness",
+            "plan_sha256": plan.plan_sha256,
+            "decision_id": decision.decision_id,
+            "revision_id": revision.revision_id,
+        },
+    )
+    return AdaptiveDispatchResult(
+        status="dispatched",
+        dispatched_candidates=dispatched_candidates,
+        planned_candidates=plan.projected_candidate_count,
+    )
 
 
 def _fail_job_initialization(

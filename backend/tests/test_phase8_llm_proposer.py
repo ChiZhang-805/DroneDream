@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -25,6 +26,23 @@ class FakeOpenAIClient:
         if isinstance(self._response, Exception):
             raise self._response
         return self._response
+
+
+class SequenceOpenAIClient:
+    """Provider double for workflows that intentionally use two bounded turns."""
+
+    def __init__(self, responses: list[dict[str, Any] | Exception]) -> None:
+        self._responses = list(responses)
+        self.calls: list[dict[str, str]] = []
+
+    def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
+        self.calls.append({"model": model, "system": system, "user": user})
+        if not self._responses:
+            raise RuntimeError("SequenceOpenAIClient ran out of responses")
+        response = self._responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 @pytest.fixture()
@@ -2702,71 +2720,151 @@ def test_harness_provider_failure_records_only_safe_error_type(llm_ctx, caplog):
     assert "error_type=RuntimeError" in caplog.text
 
 
-def test_harness_dispatch_routes_tool_without_mutating_job_mode(
+def test_harness_dispatches_revised_budget_plan_without_mutating_job_mode(
+    llm_ctx,
+):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+    manager = ctx["job_manager"]
+    client = SequenceOpenAIClient(
+        [
+            {
+                "schema_version": "1.0",
+                "decision": "continue",
+                "generation_goal": "Generate one deterministic portfolio proposal.",
+                "tool_calls": [
+                    {
+                        "tool_id": "optimizer_portfolio",
+                        "allocation": 1,
+                        "fidelity_mode": "force_full",
+                        "focus": ["diversity", "verification"],
+                    }
+                ],
+                "stop": {"recommended": False, "reason_code": None},
+                "uncertainty": {
+                    "level": "medium",
+                    "missing_evidence": ["tool_cost_history"],
+                },
+            },
+            {
+                "schema_version": "1.0",
+                "decision": "dispatch",
+                "selected_proposal_refs": ["proposal_0"],
+                "rationale": "Dispatch one bounded complementary proposal.",
+            },
+        ]
+    )
+
+    with ctx["db_module"].SessionLocal() as db:
+        _seed_harness_evidence(ctx, db, job_id)
+        job = db.get(ctx["models"].Job, job_id)
+        result = manager.dispatch_next_harness_generation(db, job, client=client)
+        db.flush()
+        assert job.optimizer_strategy == "llm_harness"
+        assert result.status == "dispatched", {
+            "result": result,
+            "events": [event.event_type for event in job.events],
+            "provider_calls": len(client.calls),
+        }
+        sa = __import__("sqlalchemy")
+        result_event = next(
+            event
+            for event in db.scalars(
+                sa.select(ctx["models"].JobEvent).where(
+                    ctx["models"].JobEvent.job_id == job.id
+                )
+            )
+            if event.event_type == "harness_multi_tool_execution_result"
+        )
+        dispatched = list(
+            db.scalars(
+                sa.select(ctx["models"].CandidateParameterSet).where(
+                    ctx["models"].CandidateParameterSet.job_id == job.id,
+                    ctx["models"].CandidateParameterSet.generation_index == 1,
+                )
+            )
+        )
+
+    assert result.dispatched_candidates == 1
+    assert len(dispatched) == 1
+    metadata = dispatched[0].optimizer_metadata_json["harness_orchestration"]
+    assert metadata["proposal_ref"] == "proposal_0"
+    assert metadata["tool_id"] == "optimizer_portfolio"
+    assert metadata["revision_source"] == "model"
+    assert result_event.payload_json["generation"] == 1
+    assert result_event.payload_json["decision_source"] == "model"
+    assert result_event.payload_json["revision_source"] == "model"
+    assert result_event.payload_json["selected_proposal_refs"] == ["proposal_0"]
+    assert result_event.payload_json["planned_candidates"] == 1
+    assert result_event.payload_json["provider_call_count"] == 2
+    assert len(client.calls) == 2
+
+
+def test_harness_parallel_safe_tool_calls_run_concurrently_in_canonical_order(
     llm_ctx,
     monkeypatch,
 ):
     ctx = llm_ctx
-    job_id = _create_harness_job(ctx)
-    decision_module = ctx["decision_harness"]
+    planner = ctx["budget_planner"]
     manager = ctx["job_manager"]
-    captured: dict[str, object] = {}
+    opportunity = planner.build_budget_opportunity(
+        generation=1,
+        remaining_trials=8,
+        full_trials_per_candidate=2,
+        candidate_capacity=2,
+        allowed_tools=("constrained_mobo", "turbo"),
+    )
+    plan, validation = planner.validate_generation_plan(
+        {
+            "schema_version": "1.0",
+            "decision": "continue",
+            "generation_goal": "Run complementary parallel-safe proposal tools.",
+            "tool_calls": [
+                {
+                    "tool_id": "turbo",
+                    "allocation": 1,
+                    "fidelity_mode": "auto",
+                    "focus": ["local_improvement"],
+                },
+                {
+                    "tool_id": "constrained_mobo",
+                    "allocation": 1,
+                    "fidelity_mode": "auto",
+                    "focus": ["constraints"],
+                },
+            ],
+            "stop": {"recommended": False, "reason_code": None},
+            "uncertainty": {"level": "medium", "missing_evidence": []},
+        },
+        opportunity,
+    )
+    assert plan is not None and validation.accepted
+    compiled = planner.compile_generation_plan(plan, opportunity)
+    prepared_calls = tuple(
+        manager._PreparedHarnessToolCall(call=call, prepared=None)
+        for call in compiled.calls
+    )
 
-    def fake_select(_db, _job, *, client=None):
-        del client
-        return decision_module.HarnessDecision(
-            decision_id="c" * 32,
-            generation=_job.current_generation + 1,
-            tool_id="saasbo",
-            rationale="Use sparse-axis search for the selected parameter space.",
-            source="model",
-            model="gpt-4.1",
-            evidence_sha256="a" * 64,
-            prompt_sha256="b" * 64,
+    def fake_run(prepared_call):
+        time.sleep(0.2)
+        return manager._HarnessToolCallResult(
+            call=prepared_call.call,
+            proposals=(),
+            status="completed",
+            elapsed_ms=200.0,
+            cpu_ms=1.0,
         )
 
-    def fake_dispatch(
-        _db,
-        _job,
-        *,
-        strategy_override=None,
-        batch_policy="broad",
-        plan_phase="balanced",
-    ):
-        captured["strategy"] = strategy_override
-        captured["batch_policy"] = batch_policy
-        captured["plan_phase"] = plan_phase
-        return manager.AdaptiveDispatchResult(
-            status="dispatched",
-            dispatched_candidates=2,
-            planned_candidates=2,
-        )
+    monkeypatch.setattr(manager, "_run_harness_tool_call", fake_run)
+    started = time.perf_counter()
+    results = manager._execute_harness_tool_calls(prepared_calls)
+    elapsed = time.perf_counter() - started
 
-    monkeypatch.setattr(decision_module, "select_optimizer_tool", fake_select)
-    monkeypatch.setattr(manager, "dispatch_next_experimental_generation", fake_dispatch)
-
-    with ctx["db_module"].SessionLocal() as db:
-        job = db.get(ctx["models"].Job, job_id)
-        result = manager.dispatch_next_harness_generation(db, job)
-        db.flush()
-        assert job.optimizer_strategy == "llm_harness"
-        result_event = next(
-            event for event in job.events if event.event_type == "harness_tool_execution_result"
-        )
-
-    assert captured["strategy"] == "saasbo"
-    assert captured["batch_policy"] == "balanced"
-    assert captured["plan_phase"] == "balanced"
-    assert result.status == "dispatched"
-    assert result.dispatched_candidates == 2
-    assert result_event.payload_json["tool_id"] == "saasbo"
-    assert result_event.payload_json["decision_id"] == "c" * 32
-    assert result_event.payload_json["generation"] == 1
-    assert result_event.payload_json["decision_source"] == "model"
-    assert result_event.payload_json["plan_phase"] == "balanced"
-    assert result_event.payload_json["batch_policy"] == "balanced"
-    assert result_event.payload_json["planned_candidates"] == 2
-    assert result_event.payload_json["prompt_template_version"] == "1.7"
+    assert elapsed < 0.34
+    assert [result.call.tool_id for result in results] == [
+        "constrained_mobo",
+        "turbo",
+    ]
 
 
 @pytest.mark.parametrize(

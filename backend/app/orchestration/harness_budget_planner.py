@@ -993,6 +993,7 @@ __all__ = [
     "HarnessProposalSummary",
     "HarnessRevisionValidation",
     "HarnessStopRecommendation",
+    "HarnessStopReason",
     "HarnessToolAllocation",
     "HarnessToolBudget",
     "build_budget_opportunity",

@@ -7,6 +7,7 @@ import json
 import math
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, cast
 
 from app import models, schemas
@@ -751,7 +752,19 @@ def _proposal_fidelity(value: object, *, field_name: str) -> float:
     return float(value)
 
 
-def propose_experimental_generation(
+@dataclass(frozen=True)
+class PreparedExperimentalGeneration:
+    """Database-free numerical request safe to execute outside the ORM thread."""
+
+    strategy: ExperimentalOptimizerStrategy
+    generation_index: int
+    batch_size: int
+    search_space: SearchSpace
+    request: OptimizerRequest
+    search_space_sha256: str
+
+
+def prepare_experimental_generation(
     *,
     job: models.Job,
     candidates: list[models.CandidateParameterSet],
@@ -761,14 +774,14 @@ def propose_experimental_generation(
     fidelity_mapping: tuple[tuple[float, float], ...] = (),
     required_fidelity: float | None = None,
     strategy_override: ExperimentalOptimizerStrategy | None = None,
-) -> list[CandidateProposal]:
-    """Generate a deterministic batch for one of the seven strategies."""
+) -> PreparedExperimentalGeneration | None:
+    """Compile one immutable numerical request while still on the ORM thread."""
 
     strategy_value = strategy_override or job.optimizer_strategy
     if not is_experimental_strategy(strategy_value):
         raise ValueError(f"unsupported experimental strategy: {strategy_value}")
     if batch_size < 1:
-        return []
+        return None
     search_space = search_space_for_job(job, baseline_parameters=baseline_parameters)
     observations = observations_for_job(
         job,
@@ -797,6 +810,31 @@ def propose_experimental_generation(
         fidelity_mapping=fidelity_mapping,
         required_fidelity=required_fidelity,
     )
+    return PreparedExperimentalGeneration(
+        strategy=strategy,
+        generation_index=generation_index,
+        batch_size=batch_size,
+        search_space=search_space,
+        request=request,
+        search_space_sha256=optimizer_search_space_sha256(
+            search_space,
+            validator_contract=validator_contract_for_job(job),
+        ),
+    )
+
+
+def execute_prepared_experimental_generation(
+    prepared: PreparedExperimentalGeneration,
+) -> list[CandidateProposal]:
+    """Run one prepared pure numerical optimizer request."""
+
+    strategy = prepared.strategy
+    generation_index = prepared.generation_index
+    batch_size = prepared.batch_size
+    search_space = prepared.search_space
+    request = prepared.request
+    fidelity_mapping = request.fidelity_mapping
+    required_fidelity = request.required_fidelity
     if strategy in _BAYESIAN_STRATEGIES:
         proposals = propose_bayesian_candidates(search_space, request)
     else:
@@ -910,10 +948,7 @@ def propose_experimental_generation(
             strategy=strategy,
             generation_index=generation_index,
             parameters=projected_parameters,
-            search_space_sha256=optimizer_search_space_sha256(
-                search_space,
-                validator_contract=validator_contract_for_job(job),
-            ),
+            search_space_sha256=prepared.search_space_sha256,
             metadata=metadata,
         )
         metadata[OPTIMIZER_SOURCE_EVIDENCE_REQUIRED_FIELD] = True
@@ -930,9 +965,42 @@ def propose_experimental_generation(
     return converted
 
 
+def propose_experimental_generation(
+    *,
+    job: models.Job,
+    candidates: list[models.CandidateParameterSet],
+    baseline_parameters: dict[str, Any],
+    generation_index: int,
+    batch_size: int,
+    fidelity_mapping: tuple[tuple[float, float], ...] = (),
+    required_fidelity: float | None = None,
+    strategy_override: ExperimentalOptimizerStrategy | None = None,
+) -> list[CandidateProposal]:
+    """Generate a deterministic batch for one of the seven strategies."""
+
+    prepared = prepare_experimental_generation(
+        job=job,
+        candidates=candidates,
+        baseline_parameters=baseline_parameters,
+        generation_index=generation_index,
+        batch_size=batch_size,
+        fidelity_mapping=fidelity_mapping,
+        required_fidelity=required_fidelity,
+        strategy_override=strategy_override,
+    )
+    return (
+        []
+        if prepared is None
+        else execute_prepared_experimental_generation(prepared)
+    )
+
+
 __all__ = [
+    "PreparedExperimentalGeneration",
+    "execute_prepared_experimental_generation",
     "is_experimental_strategy",
     "observations_for_job",
+    "prepare_experimental_generation",
     "propose_experimental_generation",
     "search_space_for_job",
 ]
