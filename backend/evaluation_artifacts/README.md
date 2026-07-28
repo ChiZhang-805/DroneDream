@@ -22,14 +22,27 @@ deterministic optimizer campaign.
 ## Current and historical Harness freezes
 
 The current provider Artifact is
-`harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json`.
+`harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.json`.
 It binds corpus SHA-256
 `98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89`
 and prompt-suite SHA-256
-`93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77`.
+`81b3cae64b16f6b8294ef05acd9792f5d86c36e6d9e2afecf2f60d4d4db41903`.
 Its file SHA-256 is
-`2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`;
-independent grading gives 24/24 and 3/3 in every category.
+`d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4`;
+independent grading gives 23/24, 95.83% overall, and the declared qualification
+passes. The retained miss is `tight_budget_expensive_matrix`: the provider
+selected `turbo`, while the frozen corpus accepts `multi_fidelity_mobo` or
+`optimizer_portfolio`. Its manifest SHA-256 is
+`3ab3830ecf798b3e12845e249a07cde36add0ddcb34b727806f30eb34af4ed37`;
+the manifest binds source commit, command, safe generation controls, duration,
+24 provider calls, exact artifact bytes, result, and claim boundary without
+persisting a credential or provider request ID.
+
+The Prompt 1.6 / Evidence 2.7 provider run remains an immutable archived freeze.
+It scored 24/24 and has SHA-256
+`2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`.
+Its perfect score is not silently carried forward across the Prompt 1.7 /
+Evidence 2.8 contract change.
 
 Two Prompt 1.5 provider runs are intentionally retained. The first scored
 19/24 and is unqualified (SHA-256
