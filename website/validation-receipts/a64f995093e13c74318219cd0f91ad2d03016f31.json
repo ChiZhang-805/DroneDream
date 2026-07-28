@@ -1,0 +1,87 @@
+{
+  "receiptSchemaVersion": 1,
+  "generatedAtUtc": "2026-07-28T04:46:56Z",
+  "subject_commit": "a64f995093e13c74318219cd0f91ad2d03016f31",
+  "summaryHashAlgorithm": "sha256",
+  "summaryCanonicalization": "UTF-8 encoding of PowerShell ConvertTo-Json -Depth 8 -Compress over the insertion-ordered summary object",
+  "summarySha256": "681c188d98a1447f0cdccb22c136762e15c2b0b0a880abff9c3846fc188bca34",
+  "summary": {
+    "schemaVersion": 1,
+    "validatedCommit": "a64f995093e13c74318219cd0f91ad2d03016f31",
+    "environment": {
+      "os": "Microsoft Windows 11 Home China 10.0.26200",
+      "powershell": "5.1.26100.8875",
+      "node": "v24.14.1",
+      "npm": "11.11.0",
+      "python": "3.13.0",
+      "git": "2.55.0.windows.2",
+      "vitest": "4.1.10",
+      "ciNode": "22"
+    },
+    "checks": {
+      "frontendTests": {
+        "command": "npm.cmd --prefix frontend test -- --no-file-parallelism --maxWorkers=1",
+        "result": "pass",
+        "files": "50/50",
+        "tests": "322/322"
+      },
+      "typecheck": {
+        "command": "npm.cmd --prefix frontend run typecheck",
+        "result": "pass"
+      },
+      "lint": {
+        "command": "npm.cmd --prefix frontend run lint",
+        "result": "pass"
+      },
+      "frontendBuild": {
+        "command": "npm.cmd --prefix frontend run build",
+        "result": "pass"
+      },
+      "sharedSiteBuild": {
+        "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-pages-site.ps1",
+        "result": "pass",
+        "runs": 2
+      },
+      "deploymentContract": {
+        "command": "python -m unittest runtime.tests.test_website_deployment",
+        "result": "pass",
+        "tests": "9/9"
+      },
+      "scriptSyntax": {
+        "result": "pass",
+        "powershellScripts": 4,
+        "bashScripts": 1
+      },
+      "diffCheck": {
+        "commands": [
+          "git diff HEAD --check",
+          "git diff --check"
+        ],
+        "result": "pass"
+      }
+    },
+    "artifact": {
+      "sourceCommit": "a64f995093e13c74318219cd0f91ad2d03016f31",
+      "fileCount": 117,
+      "sha256SumsFileSha256": "a2a6fb50bf3b10b851e5df07413e72410bfb1aa7470a8957b8b0f2549305bd55",
+      "buildManifestSha256": "d575b644e901abfe796b3b327d0745cf61544ded7b611a7c248dbbf5d399e083",
+      "deterministicAcrossTwoBuilds": true,
+      "globalOrigin": "https://getdronedream.com/",
+      "mirrorOrigin": "http://47.93.180.216/",
+      "installerSha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+      "installerSizeBytes": 5526509
+    },
+    "configuration": {
+      "supabaseVariablesSource": "GitHub Actions repository variables",
+      "turnstileRepositoryVariablePresent": false,
+      "turnstileBuildValue": "empty",
+      "secretValuesPrinted": false
+    },
+    "scope": {
+      "actualDeploymentPerformed": false,
+      "dnsChanged": false,
+      "certificateChanged": false,
+      "serverChanged": false
+    }
+  }
+}
