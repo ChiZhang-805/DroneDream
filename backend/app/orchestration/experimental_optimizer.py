@@ -707,6 +707,11 @@ def _optimizer_seed_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
         not in {
             OPTIMIZER_SOURCE_EVIDENCE_FIELD,
             OPTIMIZER_SOURCE_EVIDENCE_REQUIRED_FIELD,
+            # Harness execution identifiers and timings are provenance, not
+            # numerical optimizer history.  Keeping the random decision or
+            # revision IDs here would perturb the next generation seed even
+            # when the same deterministic fallback plan and outcomes repeat.
+            "harness_orchestration",
             "optimizer_source_role",
         }
     }

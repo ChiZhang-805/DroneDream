@@ -9,17 +9,26 @@ from typing import Any, cast
 
 import pytest
 
+from app.orchestration.harness_fallback_contract_campaign import (
+    HARNESS_FALLBACK_CONTRACT_ARMS,
+    HARNESS_FALLBACK_CONTRACT_CLAIM_BOUNDARY,
+    HARNESS_FALLBACK_CONTRACT_REFERENCE_ARM,
+    build_harness_fallback_contract_campaign,
+    verify_harness_fallback_contract_campaign,
+)
 from app.orchestration.harness_outcome_campaign import (
     HARNESS_OUTCOME_CAMPAIGN_ARMS,
     HARNESS_OUTCOME_CAMPAIGN_SEED_BLOCKS,
     SyntheticNetworkConnectBlocked,
     _drive_job,
     _network_connect_guard,
-    build_harness_outcome_campaign,
     load_harness_outcome_campaign,
     verify_harness_outcome_campaign,
 )
 from app.schemas import JobCreateRequest
+from scripts.evaluate_harness_fallback_contract_campaign import (
+    write_harness_fallback_contract_files,
+)
 from scripts.evaluate_harness_outcome_campaign import (
     write_harness_outcome_campaign_files,
 )
@@ -28,6 +37,13 @@ ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "evaluation_artifacts"
 JSON_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-outcome-campaign-v1.json"
 CSV_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-outcome-campaign-v1.csv"
 SHA256_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-outcome-campaign-v1.sha256"
+CURRENT_JSON_ARTIFACT = (
+    ARTIFACT_ROOT / "harness-fallback-contract-campaign-v2.json"
+)
+CURRENT_CSV_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-contract-campaign-v2.csv"
+CURRENT_SHA256_ARTIFACT = (
+    ARTIFACT_ROOT / "harness-fallback-contract-campaign-v2.sha256"
+)
 
 
 def test_committed_campaign_is_strictly_equivalent_and_claim_bounded() -> None:
@@ -65,10 +81,25 @@ def test_committed_campaign_is_strictly_equivalent_and_claim_bounded() -> None:
         )
 
 
-def test_committed_campaign_matches_current_production_contracts() -> None:
-    assert load_harness_outcome_campaign(
-        JSON_ARTIFACT
-    ) == build_harness_outcome_campaign()
+def test_current_fallback_campaign_matches_current_production_contracts() -> None:
+    current = verify_harness_fallback_contract_campaign(
+        json.loads(CURRENT_JSON_ARTIFACT.read_text(encoding="utf-8"))
+    )
+    assert current == build_harness_fallback_contract_campaign()
+    assert current["claim_boundary"] == HARNESS_FALLBACK_CONTRACT_CLAIM_BOUNDARY
+    assert current["methodology"]["reference_arm"] == (
+        HARNESS_FALLBACK_CONTRACT_REFERENCE_ARM
+    )
+    assert tuple(current["methodology"]["arms"]) == HARNESS_FALLBACK_CONTRACT_ARMS
+    assert current["summary"] == {
+        "seed_block_count": 5,
+        "arm_run_count": 15,
+        "total_persisted_trials": 474,
+        "fallback_comparison_count": 10,
+        "exact_outcome_match_count": 10,
+        "all_fallback_outcomes_match_deterministic_baseline": True,
+        "all_evidence_complete": True,
+    }
 
 
 def test_campaign_guard_blocks_and_counts_network_connects() -> None:
@@ -155,3 +186,36 @@ def test_campaign_files_and_check_mode_are_reproducible(tmp_path: Path) -> None:
         f"{hashlib.sha256(JSON_ARTIFACT.read_bytes()).hexdigest()}  {JSON_ARTIFACT.name}",
         f"{hashlib.sha256(CSV_ARTIFACT.read_bytes()).hexdigest()}  {CSV_ARTIFACT.name}",
     ]
+
+
+def test_current_campaign_files_and_check_mode_are_reproducible(
+    tmp_path: Path,
+) -> None:
+    artifact = verify_harness_fallback_contract_campaign(
+        json.loads(CURRENT_JSON_ARTIFACT.read_text(encoding="utf-8"))
+    )
+    json_path = tmp_path / CURRENT_JSON_ARTIFACT.name
+    csv_path = tmp_path / CURRENT_CSV_ARTIFACT.name
+    sha256_path = tmp_path / CURRENT_SHA256_ARTIFACT.name
+
+    first = write_harness_fallback_contract_files(
+        json_path=json_path,
+        csv_path=csv_path,
+        sha256_path=sha256_path,
+        artifact=artifact,
+    )
+    second = write_harness_fallback_contract_files(
+        json_path=json_path,
+        csv_path=csv_path,
+        sha256_path=sha256_path,
+        check=True,
+        artifact=artifact,
+    )
+
+    assert first == second
+    with csv_path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 15
+    assert all(
+        row["exact_match_to_deterministic_baseline"] == "True" for row in rows
+    )

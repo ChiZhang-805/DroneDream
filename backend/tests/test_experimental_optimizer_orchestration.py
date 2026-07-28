@@ -137,6 +137,14 @@ def test_source_evidence_schema_upgrade_preserves_numerical_seed_projection() ->
     }
     modern = {
         **legacy,
+        "harness_orchestration": {
+            "schema_id": "dronedream.harness-candidate-orchestration/v1",
+            "decision_id": "a" * 32,
+            "revision_id": "b" * 32,
+            "call_id": "call_" + "c" * 24,
+            "tool_elapsed_ms": 12.5,
+            "tool_cpu_ms": 7.25,
+        },
         "optimizer_source_role": "native_optimizer",
         "optimizer_source_evidence_required": True,
         "optimizer_source_evidence": {
