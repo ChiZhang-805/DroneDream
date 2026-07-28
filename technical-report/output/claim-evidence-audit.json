@@ -3,22 +3,46 @@
   "status": "passed",
   "ledger": {
     "path": "technical-report/claim-evidence-ledger.json",
-    "sha256": "579eddc5eafdaac94cb2b37cb854e74976997cf71ac7c6344c154febd48758b7"
+    "sha256": "927ffbae7299e94daf4cd70bf486d5af40fe2fce140a836e3c55e04a29367b46"
   },
   "evidence_reference_manifest": {
     "path": "technical-report/evidence-reference-manifest.json",
-    "sha256": "a80d57d34d501d39abb55cdd2d2bd2dfb505bae84b3d5f4139b1d145b785d8b9"
+    "sha256": "9b48ca3215dcab3eccd9e3eb0cbe52bafac992a6450cb4b204d77e1241daa3e4"
   },
   "report_source": {
     "path": "technical-report/body.tex",
-    "sha256": "4569732bb0afe2f1040a3007d058c5629a5b330893682f79d1a3c347ae5be7bb"
+    "sha256": "dda24c12fb0e76f2a7e9c70a574e49f2c8b7b8811444f27aad9797ede517e450"
   },
-  "claim_total": 32,
-  "claim_passed": 32,
+  "claim_total": 36,
+  "claim_passed": 36,
   "claim_failed": 0,
-  "assertion_total": 232,
+  "assertion_total": 277,
   "prohibited_literal_checks": 13,
   "verified_sources": [
+    {
+      "id": "advanced_physics_gps_boundary_stderr",
+      "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stderr.log",
+      "sha256": "63e463e8965212091b5b1ec8ca6364ad4cf77f9b8fe251e9672325f2486aacc9"
+    },
+    {
+      "id": "advanced_physics_gps_boundary_stdout",
+      "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stdout.log",
+      "sha256": "2be653eba84ba88e4fffbd2da2b577709e9e0d749517361277036a8ae05c4e70"
+    },
+    {
+      "id": "advanced_physics_manifest",
+      "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.manifest.json",
+      "sha256": "599c2b8b89bedb525a36c00837e8f09e7b4598c4825a01cff2942c6c5825a923"
+    },
+    {
+      "id": "advanced_physics_receipt",
+      "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.receipt.json",
+      "sha256": "99e257fb56d46d9293ba9365ccae604ddd697802370b877360541628ebd1354f"
+    },
     {
       "id": "backend_1204_full_log",
       "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
@@ -582,6 +606,59 @@
         "Section 4.8"
       ],
       "source_id": "runtime_dependency_pins",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-real-px4-campaign",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9"
+      ],
+      "source_id": "advanced_physics_manifest",
+      "assertions": 35,
+      "body_literals": 9,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-real-px4-receipt",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_receipt",
+      "assertions": 8,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-readiness-wait",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 9"
+      ],
+      "source_id": "advanced_physics_gps_boundary_stdout",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-readiness-timeout",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "advanced_physics_gps_boundary_stderr",
       "assertions": 1,
       "body_literals": 1,
       "status": "passed",
