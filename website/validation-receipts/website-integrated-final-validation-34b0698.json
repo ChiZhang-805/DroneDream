@@ -1,0 +1,357 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-integrated-final-validation",
+  "generatedAtUtc": "2026-07-28T12:59:57.6906795Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "34b06982c892d1fe8b949f1758a9f71d0ff170a4",
+    "attestationRule": "This receipt validates the subject commit only. Its later receipt-only commit is not self-attested.",
+    "worktree": "Z:\\DroneDream-worktrees\\website-20260728",
+    "sourceStateDuringValidation": "clean; aligned with origin/codex/website",
+    "previousWebsiteReceipt": "website/validation-receipts/website-final-local-validation-a604a02.json",
+    "previousWebsiteReceiptSha256": "0d1ec03f953206fb5ce7308647783ff053c76a0a2f9d3c425bbb12f56042597f"
+  },
+  "integrationProvenance": {
+    "originalSoftwareSourceCommit": "3e5979e0f36ed830000fb2ff0d66a20eb3abb762",
+    "websiteIntegrationCommit": "ae7a717111da13e0118daccc9aabe064380eae59",
+    "websiteIntegrationPaths": [
+      "frontend/package.json",
+      "frontend/scripts/verify-history-layout.mjs",
+      "frontend/src/styles.css"
+    ],
+    "websiteReadmeCommitAndSubjectHead": "34b06982c892d1fe8b949f1758a9f71d0ff170a4",
+    "provenanceScope": "The software patch was integrated onto the website baseline. This receipt does not claim that the complete final files are byte-identical to the files on the software branch; it validates the integrated website head directly.",
+    "sourceFixPresentAtSubject": true
+  },
+  "environment": {
+    "operatingSystem": "Microsoft Windows NT 10.0.26200",
+    "node": "v24.14.1",
+    "npm": "11.11.0",
+    "python": "3.13.0",
+    "powershell": "5.1.26100.8875",
+    "productionAccountUsed": false,
+    "productionSupabaseChanged": false,
+    "deploymentPerformed": false
+  },
+  "automatedValidation": {
+    "frontendTests": {
+      "command": "npm test -- --run --maxWorkers=4",
+      "testFiles": 50,
+      "tests": 325,
+      "passed": 325,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "948f602ca1a528528592b9da83b92080166f21f4a38132b2d8c1d01cc6459060",
+      "logBytes": 662
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "pass",
+      "logSha256": "70b3c3927615afdf5f5a277b682ce10528f9baed352029eb1ad9b1146db47acd",
+      "logBytes": 128
+    },
+    "lint": {
+      "command": "npm run lint",
+      "result": "pass",
+      "logSha256": "0a0909db1fb8b2a2edb14bdc5a7992cbb6d02839f44caf6fdd98bd1d27c4afed",
+      "logBytes": 104
+    },
+    "applicationBuild": {
+      "command": "npm run build",
+      "result": "pass",
+      "logSha256": "a350f6e129346b6f5a541c29840dd5635bb06a1e96d88bb63be300dd86ee781b",
+      "logBytes": 4648,
+      "note": "Vite emitted its existing greater-than-510-kB advisory; all independent route performance budgets passed."
+    },
+    "sharedWebsiteBuild": {
+      "command": ".\\website\\scripts\\build-pages-site.ps1",
+      "result": "pass",
+      "sourceCommit": "34b06982c892d1fe8b949f1758a9f71d0ff170a4",
+      "githubPagesAndBaotaArtifactDirectory": "frontend/site-dist",
+      "turnstileRepositoryVariablePresent": false,
+      "turnstileWorkflowEquivalentValue": "",
+      "installerSha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+      "logSha256": "4f7da9d4358b5a4bf0b95a84a82d0c7ae50f8b5e31483353fe62aeed7b268029",
+      "logBytes": 9026,
+      "captureDisclosure": "An attempted validation-only rerun that merged native stderr into a PowerShell pipeline promoted Vite's non-failing chunk advisory to a terminating NativeCommandError before artifact finalization. The authoritative rerun preserved CI stderr semantics, completed normally, and produced the log hash recorded here."
+    },
+    "deploymentContract": {
+      "command": "python -m pytest runtime/tests/test_website_deployment.py -q",
+      "tests": 10,
+      "subtests": 15,
+      "passed": 10,
+      "failed": 0,
+      "result": "pass",
+      "logSha256": "e3964d5132023d03701a87a0952b5c443d444dd38892cc9e37dab2eb40772940",
+      "logBytes": 214
+    },
+    "diffAndSyntax": {
+      "commands": [
+        "git diff --check",
+        "node --check website/scripts/audit-browser-matrix.mjs"
+      ],
+      "result": "pass"
+    }
+  },
+  "authenticatedConsoleHistory": {
+    "command": "npm run test:history-layout -- --output=<ignored-cache> --label=website-integrated-34b0698 --port=5191",
+    "sourceCommit": "34b06982c892d1fe8b949f1758a9f71d0ff170a4",
+    "sourceDirty": false,
+    "browser": {
+      "name": "Microsoft Edge",
+      "version": "150.0.4078.99"
+    },
+    "cases": [
+      {
+        "id": "desktop-en",
+        "documentWidth": "1440/1440",
+        "historyResultsWidth": "1116/1280",
+        "passed": true
+      },
+      {
+        "id": "desktop-zh",
+        "documentWidth": "1440/1440",
+        "historyResultsWidth": "1116/1280",
+        "passed": true
+      },
+      {
+        "id": "mobile-en",
+        "documentWidth": "390/390",
+        "historyResultsWidth": "306/1280",
+        "passed": true
+      },
+      {
+        "id": "mobile-zh",
+        "documentWidth": "390/390",
+        "historyResultsWidth": "306/1280",
+        "passed": true
+      }
+    ],
+    "gates": [
+      "document, application main, History page, card, and card body have no horizontal overflow",
+      "History results container owns the 1280-pixel table overflow",
+      "the right edge is reachable",
+      "the last header and Delete action are visible",
+      "the Delete action receives focus",
+      "navigation, settings, new experiment, clear filters, and compare remain reachable",
+      "unsafe API requests, console errors, and page errors are all zero"
+    ],
+    "measurementsSha256": "6bfc20269cb826042fe4eab83d7995fcad188b3a17c8099ef98ee20646790944",
+    "measurementsBytes": 23450,
+    "logSha256": "92a31fcd5476a53f1df9c080578b64e2c8c0f290de2567cb4fdc9230b38dedb0",
+    "logBytes": 1608,
+    "screenshotCount": 8,
+    "screenshotManifestSha256": "472c0d48ee1d4e55e269c0a67f330b8e804779b90c20154986c169da674caa46",
+    "result": "pass"
+  },
+  "browserMatrix": {
+    "command": "node website/scripts/audit-browser-matrix.mjs http://127.0.0.1:4195/ <ignored-cache>/browser-matrix-34b0698.json edge,chrome,lenovo,firefox",
+    "reportSha256": "5c1b0d4638394628d039330cc411b3972db2e6b9fe11561e3b9a6b3315b9667c",
+    "reportBytes": 63067,
+    "checks": 100,
+    "passed": 100,
+    "failed": 0,
+    "externalWarnings": 0,
+    "routes": [
+      "home",
+      "pricing",
+      "manual",
+      "community",
+      "console"
+    ],
+    "locales": [
+      "en",
+      "zh-CN"
+    ],
+    "profiles": [
+      "1440x1000 at 100%",
+      "390x844 at 100%",
+      "2048x1280 at 100% in Edge",
+      "1440x1000 physical at 125% in Edge"
+    ],
+    "browsers": [
+      {
+        "name": "Microsoft Edge",
+        "version": "150.0.4078.99",
+        "cases": 40
+      },
+      {
+        "name": "Google Chrome",
+        "version": "129.0.6668.59",
+        "cases": 20
+      },
+      {
+        "name": "Lenovo Browser",
+        "version": "9.0.8.5161",
+        "cases": 20
+      },
+      {
+        "name": "Firefox",
+        "version": "151.0",
+        "cases": 20
+      }
+    ],
+    "gates": [
+      "route and language correctness",
+      "document and container overflow",
+      "clipping and visible controls",
+      "one main landmark and non-empty document titles",
+      "image alternatives",
+      "explicit form labels rather than placeholder-only names",
+      "dialog and mobile-menu focus containment and restoration",
+      "home and pricing tab keyboard navigation",
+      "reduced-motion handling"
+    ],
+    "screenshotCount": 52,
+    "screenshotManifestSha256": "b7946552739c5608ffb20eea1214a5419d50cdb2fcd8a5f80e1485d88ca75cc5",
+    "result": "pass"
+  },
+  "visualReview": {
+    "manuallyInspectedScreenshots": 20,
+    "coverage": "Eight authenticated History screenshots plus twelve public-site and console screenshots spanning English, Chinese, desktop, and mobile were inspected.",
+    "stableChineseConsoleSignIn": {
+      "method": "Fresh Microsoft Edge context at 1440x1000, zh-CN initialized before navigation, network idle plus a three-second stability wait.",
+      "dialogWidth": 576,
+      "formWidth": 530.8125,
+      "inputWidth": 530.8125,
+      "buttonWidth": 530.8125,
+      "screenshotSha256": "3431ee8e7bc83c2e3864b646843c15a90baee25880190ad04ee637379a83a9c4",
+      "screenshotBytes": 157414,
+      "result": "pass"
+    },
+    "crossLineObservation": {
+      "status": "open",
+      "owner": "software line; History table rendering under frontend/src/styles.css and related console source",
+      "observation": "The containment and reachability fix passes, but the long synthetic Job IDs in the initial History screenshots visually collide with adjacent track-type text at desktop width. This is a separate cell-content presentation defect, not page-level overflow.",
+      "websiteAction": "Recorded and transferred without modifying software-owned source."
+    }
+  },
+  "typographyAndLayout": {
+    "desktopCommand": "node website/scripts/audit-site-typography.mjs http://127.0.0.1:4195/ 1440 1000 0.80 <ignored-cache>/typography-34b0698.json full",
+    "desktopReportSha256": "d7632a087bdb39c9fc90746d1784a8663200b906a421339f63f6dee33819671a",
+    "desktopReportBytes": 267671,
+    "desktopResult": "pass",
+    "mobileCommand": "node website/scripts/audit-site-typography.mjs http://127.0.0.1:4195/ 390 844 0.80 <ignored-cache>/mobile-layout-34b0698.json layout-only",
+    "mobileReportSha256": "41c30a38ee37de0dd1b2d25e436a5c2376a2a8970d8a4b4579e2224f9cde7b74",
+    "mobileReportBytes": 276794,
+    "mobileResult": "pass",
+    "result": "pass"
+  },
+  "performance": {
+    "command": "node website/scripts/audit-site-performance.mjs http://127.0.0.1:4195/ <ignored-cache>/performance-34b0698.json",
+    "reportSha256": "e15b3d248ba36254e3b9807e030312c174c8aaab4a3c166f4a98d3b7e7f56391",
+    "reportBytes": 17707,
+    "routes": 5,
+    "passed": 5,
+    "failed": 0,
+    "routeMeasurements": [
+      {
+        "route": "home",
+        "requests": 11,
+        "rawKiB": 1778,
+        "gzipKiB": 765
+      },
+      {
+        "route": "pricing",
+        "requests": 9,
+        "rawKiB": 1270,
+        "gzipKiB": 635
+      },
+      {
+        "route": "manual",
+        "requests": 12,
+        "rawKiB": 1628,
+        "gzipKiB": 850
+      },
+      {
+        "route": "community",
+        "requests": 9,
+        "rawKiB": 1270,
+        "gzipKiB": 635
+      },
+      {
+        "route": "console",
+        "requests": 6,
+        "rawKiB": 1282,
+        "gzipKiB": 425
+      }
+    ],
+    "result": "pass"
+  },
+  "sharedArtifactIntegrity": {
+    "sourceCommit": "34b06982c892d1fe8b949f1758a9f71d0ff170a4",
+    "artifactKind": "dronedream-shared-static-site",
+    "pagesArtifactDirectory": "frontend/site-dist",
+    "baotaArtifactDirectory": "frontend/site-dist",
+    "sameConfiguredArtifactDirectory": true,
+    "manifestEntriesChecked": 118,
+    "manifestEntriesPassed": 118,
+    "buildManifestSha256": "5be276be4d2b527e1252f07f15cdfc23bc3731fac479e9462c73b3ba8d099d87",
+    "sha256sumsSha256": "96c61683245e2c80a06d35f80d1e0c925eda1ae4fccb93b5030c362c59ade131",
+    "latestJsonSha256": "8538f17340e9a8b5d5b01baba1bb9dd65f872f99d62cabaa478c60c378269990",
+    "roundtripMethod": "Packed frontend/site-dist as the BaoTa upload archive, extracted it into an ignored local directory, and revalidated all SHA256SUMS entries.",
+    "roundtripArchiveSha256": "cb428c37833315196fabfd0693580630e5eaf71f487610b9f2c4f4f71f6505be",
+    "roundtripSha256sumsSha256": "96c61683245e2c80a06d35f80d1e0c925eda1ae4fccb93b5030c362c59ade131",
+    "roundtripIntegrityErrors": 0,
+    "roundtripLogSha256": "bda3a35b597e93e5f640053f715ad8dc74e3fa368da0534f46677d3e0847c8c9",
+    "roundtripLogBytes": 1374,
+    "result": "pass"
+  },
+  "readOnlyOnlineSnapshot": {
+    "capturedAtUtc": "2026-07-28T12:55:00Z",
+    "globalOrigin": {
+      "url": "https://getdronedream.com/",
+      "normalTlsResult": "fail: curl exit 60, SEC_E_WRONG_PRINCIPAL",
+      "insecureHttpStatus": 200,
+      "homeSha256": "f963a7a9a6caa4c49806696e64fcdc83dde875d338eb7ff3d211497459710070",
+      "buildManifestHttpStatus": 404,
+      "buildManifestIsSpaFallback": true,
+      "pagesDeploymentHead": "07cb1e6e4a9fa5bdc29d6fc1a1eab5e1deba107b",
+      "pagesRun": 30157396609,
+      "httpsEnforced": false,
+      "certificateSubject": "CN=*.github.io",
+      "certificateIssuer": "CN=YR2, O=Let's Encrypt, C=US",
+      "certificateNotAfterUtc": "2026-09-02T23:26:06.0000000Z",
+      "certificateContainsGetDroneDreamSan": false
+    },
+    "mirrorOrigin": {
+      "url": "http://47.93.180.216/",
+      "httpStatus": 200,
+      "homeSha256": "89a35678491f3c9edef29b3fff38b1408dceeff7e26f4887aa880f3806f08f90",
+      "buildManifestHttpStatus": 200,
+      "buildManifestIsSpaFallback": true
+    },
+    "latestJsonParity": {
+      "equal": false,
+      "globalJsonSha256": "46116e51fe20386499b48cf20c605c1fd65025297d661ce36d64c0761ec0d571",
+      "globalInstallerSha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+      "globalInstallerBytes": 5526509,
+      "mirrorJsonSha256": "427f9b86d52cbc8190f77598cff493e03bbe4f3e642d1de98b9161437343e904",
+      "mirrorInstallerSha256": "aad5a7fdb1196059ce2e15b33e2495830f77ed5f1070e56e5423796b9ca96b86",
+      "mirrorInstallerBytes": 9881226
+    },
+    "conclusion": "The two public origins remain old, different, and below the publication contract. No deployment was performed."
+  },
+  "publicationContract": {
+    "userRequirement": "GitHub Pages and the Alibaba Cloud bare-IP mirror must both be updated after local completion.",
+    "requiredArtifactRule": "Build once from one frozen commit and deploy the exact same commit-pinned artifact directory to both origins.",
+    "requiredPostDeploymentChecks": [
+      "both build-manifest.json files identify the frozen commit",
+      "both SHA256SUMS files are identical",
+      "public HTML, JavaScript, CSS, and downloads/latest.json hashes match",
+      "the versioned installer metadata and public re-download hash match the approved software release",
+      "getdronedream.com presents a valid hostname certificate and HTTPS is enforced"
+    ],
+    "deploymentAuthorizedAndPerformedInThisValidation": false
+  },
+  "remainingExternalOrCrossLineGates": [
+    "software-line correction and independent revalidation of the History long-Job-ID cell-content collision",
+    "a real Supabase two-account account/community/RLS E2E with production-changing authority",
+    "merchant/provider configuration and signed real-payment production acceptance",
+    "a new immutable installer release supplied by the software line when its bytes change",
+    "GitHub Pages custom-domain certificate issuance and Enforce HTTPS",
+    "authorized deployment of the exact shared artifact to both GitHub Pages and the Alibaba Cloud mirror",
+    "two-origin public hash parity verification after deployment"
+  ],
+  "conclusion": "The subject commit passes all executed local website-owned automated gates, contains the integrated History containment fix, and produces one verified artifact for both origins. The listed cross-line and external gates remain open, so public release is not complete and no deployment was performed."
+}
