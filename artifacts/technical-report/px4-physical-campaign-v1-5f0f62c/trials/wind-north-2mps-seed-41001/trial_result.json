@@ -1,0 +1,582 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "telemetry_json",
+      "display_name": "Telemetry",
+      "file_size_bytes": 2251397,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/telemetry.json"
+    },
+    {
+      "artifact_type": "reference_track_json",
+      "display_name": "Reference Track",
+      "file_size_bytes": 32498,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/reference_track.json"
+    },
+    {
+      "artifact_type": "scenario_config_json",
+      "display_name": "Scenario Configuration",
+      "file_size_bytes": 281,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_config.json"
+    },
+    {
+      "artifact_type": "scenario_effect_request_json",
+      "display_name": "Scenario Effect Request",
+      "file_size_bytes": 1076,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_effects.request.json"
+    },
+    {
+      "artifact_type": "scenario_effect_evidence_json",
+      "display_name": "Scenario Effect Evidence",
+      "file_size_bytes": 7373,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_effects.applied.json"
+    },
+    {
+      "artifact_type": "controller_parameters_json",
+      "display_name": "Controller Parameters",
+      "file_size_bytes": 125,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/controller_params.json"
+    },
+    {
+      "artifact_type": "px4_parameters_input_json",
+      "display_name": "PX4 Parameter Input",
+      "file_size_bytes": 22,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/px4_parameters.input.json"
+    },
+    {
+      "artifact_type": "simulator_launch_config_json",
+      "display_name": "Simulator Launch Configuration",
+      "file_size_bytes": 13474,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/launch_config.json"
+    },
+    {
+      "artifact_type": "simulator_runtime_manifest_json",
+      "display_name": "Simulator Runtime Manifest",
+      "file_size_bytes": 10222,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/simulator_runtime_manifest.json"
+    },
+    {
+      "artifact_type": "trajectory_json",
+      "display_name": "Trajectory Samples",
+      "file_size_bytes": 870757,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/trajectory.json"
+    },
+    {
+      "artifact_type": "px4_ulog",
+      "display_name": "Retained PX4 ULog",
+      "file_size_bytes": 16541906,
+      "mime_type": "application/octet-stream",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/px4_source.ulg"
+    },
+    {
+      "artifact_type": "worker_log",
+      "display_name": "Runner Log",
+      "file_size_bytes": 286,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/runner.log"
+    },
+    {
+      "artifact_type": "simulator_stdout",
+      "display_name": "Simulator stdout",
+      "file_size_bytes": 5495,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/stdout.log"
+    },
+    {
+      "artifact_type": "simulator_stderr",
+      "display_name": "Simulator stderr",
+      "file_size_bytes": 417,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/stderr.log"
+    },
+    {
+      "artifact_type": "offboard_executor_log",
+      "display_name": "Offboard Executor Log",
+      "file_size_bytes": 253,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/offboard_executor.log"
+    },
+    {
+      "artifact_type": "offboard_timing_json",
+      "display_name": "Offboard Timing",
+      "file_size_bytes": 285,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/offboard_timing.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Requested",
+      "file_size_bytes": 477,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/px4_parameters.requested.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Before",
+      "file_size_bytes": 495,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/px4_parameters.before.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Applied",
+      "file_size_bytes": 556,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/px4_parameters.applied.json"
+    }
+  ],
+  "backend": "px4_gazebo",
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-86273db6",
+    "seed": 41001,
+    "trial_id": "px4-wind-north-2mps-seed-41001"
+  },
+  "log_excerpt": "px4_gazebo_runner mode=real trial=px4-wind-north-2mps-seed-41001 rmse=0.441664 score=2.28458",
+  "metrics": {
+    "completion_time": 21.888,
+    "crash_flag": false,
+    "final_error": 1.644974,
+    "instability_flag": false,
+    "max_error": 1.497033,
+    "overshoot_count": 0,
+    "pass_flag": true,
+    "raw_metric_json": {
+      "advanced_scenario_summary": {
+        "applied_effects": [
+          "job_config.wind"
+        ],
+        "capabilities": [
+          {
+            "capability": {
+              "reason": "Gazebo wind_info matched the compiled ENU vector and generated runtime SDF proved x500_0/base_link WindMode",
+              "status": "available"
+            },
+            "effect_id": "job_config.wind",
+            "evidence": {
+              "compiled_wind": {
+                "aggregation": "vector_sum",
+                "components": [
+                  {
+                    "bearing_deg_clockwise_from_north": null,
+                    "direction_rule": "cardinal_components_to_gazebo_enu",
+                    "effect_id": "job_config.wind",
+                    "linear_velocity_mps": {
+                      "x": 0.0,
+                      "y": 2.0,
+                      "z": 0.0
+                    }
+                  }
+                ],
+                "coordinate_frame": "GAZEBO_WORLD_ENU",
+                "linear_velocity_mps": {
+                  "x": 0.0,
+                  "y": 2.0,
+                  "z": 0.0
+                },
+                "requested_effect_ids": [
+                  "job_config.wind"
+                ],
+                "speed_mps": 2.0
+              },
+              "requested_value_sha256": "c617abede21b242cd103b805b8165d9fb1315990a7d126350c14a40f62b5f007",
+              "verification": {
+                "method": "gazebo_wind_info_and_generated_world_sdf",
+                "observations": [
+                  {
+                    "kind": "readback",
+                    "sha256": "b56e85a72e970e06fa85d43ca48d30e8f3c21f571575b521c0123e565e77e081",
+                    "source": "/world/default/wind_info",
+                    "value": {
+                      "enable_wind": true,
+                      "linear_velocity_mps": {
+                        "x": 0.0,
+                        "y": 2.0,
+                        "z": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "sha256": "7d46f7dbeb5fa675b22213e1a2ac76e157774e17e5bcf4555f6aecc5761cec5e",
+                    "source": "/world/default/generate_world_sdf",
+                    "value": {
+                      "enable_wind": true,
+                      "link_name": "base_link",
+                      "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/generated_world.sdf",
+                      "sdf_sha256": "fa646b1d397c40f597f5b5acd214432f3b467ddedc2c3a579bb31cdbc16b12f9",
+                      "source_vehicle_model": "x500_base",
+                      "vehicle_model": "x500_0"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/world_sdf",
+                    "value": {
+                      "linear_velocity_mps": {
+                        "x": 0.0,
+                        "y": 2.0,
+                        "z": 0.0
+                      },
+                      "materialized_px4_system_plugins": [
+                        {
+                          "filename": "gz-sim-physics-system",
+                          "name": "gz::sim::systems::Physics"
+                        },
+                        {
+                          "filename": "gz-sim-user-commands-system",
+                          "name": "gz::sim::systems::UserCommands"
+                        },
+                        {
+                          "filename": "gz-sim-scene-broadcaster-system",
+                          "name": "gz::sim::systems::SceneBroadcaster"
+                        },
+                        {
+                          "filename": "gz-sim-contact-system",
+                          "name": "gz::sim::systems::Contact"
+                        },
+                        {
+                          "filename": "gz-sim-imu-system",
+                          "name": "gz::sim::systems::Imu"
+                        },
+                        {
+                          "filename": "gz-sim-air-pressure-system",
+                          "name": "gz::sim::systems::AirPressure"
+                        },
+                        {
+                          "filename": "gz-sim-air-speed-system",
+                          "name": "gz::sim::systems::AirSpeed"
+                        },
+                        {
+                          "filename": "gz-sim-apply-link-wrench-system",
+                          "name": "gz::sim::systems::ApplyLinkWrench"
+                        },
+                        {
+                          "filename": "gz-sim-navsat-system",
+                          "name": "gz::sim::systems::NavSat"
+                        },
+                        {
+                          "filename": "gz-sim-magnetometer-system",
+                          "name": "gz::sim::systems::Magnetometer"
+                        },
+                        {
+                          "filename": "gz-sim-sensors-system",
+                          "name": "gz::sim::systems::Sensors"
+                        },
+                        {
+                          "filename": "libOpticalFlowSystem.so",
+                          "name": "custom::OpticalFlowSystem"
+                        },
+                        {
+                          "filename": "libGstCameraSystem.so",
+                          "name": "custom::GstCameraSystem"
+                        }
+                      ],
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/worlds/default.sdf",
+                      "px4_server_config": {
+                        "path": "/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/server.config",
+                        "sha256": "60871c73e32ecde05e008aaf995e1b9c09906ca3dacb143c595522c68d399172"
+                      },
+                      "sha256": "77a7d154852d6ea5b8e31693fbc2b3840cbe6c21dab7ce5b11624d9366bd5fe6",
+                      "wind_effects_plugin": {
+                        "filename": "gz-sim-wind-effects-system",
+                        "name": "gz::sim::systems::WindEffects"
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_base_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/model.sdf",
+                      "sanitized_classic_material_scripts": 4,
+                      "sha256": "2d0aeb3ef6337e0a9b371a749b56f9cb2efb6f29ba3bc094fa244d582a793189",
+                      "wind_enabled_link": "x500_base/base_link"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/px4_gz_env",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/px4_rootfs/gz_env.sh",
+                      "rootfs_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/px4_rootfs",
+                      "sha256": "a496b964ac87da410b5bcebf784aa0259557e4ed11a36a41915eeb409f94e299",
+                      "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom"
+                    }
+                  }
+                ],
+                "status": "verified"
+              }
+            },
+            "mechanism": "gazebo_wind_effects",
+            "status": "applied"
+          }
+        ],
+        "dropout_rate": 0.0,
+        "enabled": true,
+        "failed_effects": [],
+        "obstacle_count": 0,
+        "pending_effects": [],
+        "requested_effects": [
+          "job_config.wind"
+        ],
+        "unsupported_effects": [],
+        "unverified_passthrough_enabled": false,
+        "verification_status": "verified_applied",
+        "wind_gust_enabled": false
+      },
+      "airframe": "x500",
+      "coverage_basis": "union_of_traversed_polyline_arc_length",
+      "crash_reason": "none",
+      "evaluation_backward_distance_m": 0.200617,
+      "evaluation_directed_progress_fraction": 0.942727,
+      "evaluation_direction_valid": true,
+      "evaluation_end_index": 6902,
+      "evaluation_end_t": 55.216,
+      "evaluation_endpoint_reached": true,
+      "evaluation_max_error_sample": {
+        "error": 1.497033,
+        "reference_x": 4.993419,
+        "reference_y": 0.241958,
+        "reference_z": 3.0,
+        "t": 33.328,
+        "track_progress_m": 0.242077,
+        "x": 3.499432,
+        "y": 0.163662,
+        "z": 2.945399
+      },
+      "evaluation_max_z": 3.048675,
+      "evaluation_min_z": 2.933925,
+      "evaluation_policy": {
+        "altitude_entry_fraction": 0.9,
+        "collapse_altitude_fraction": 0.5,
+        "consecutive_samples": 5,
+        "minimum_track_coverage": 0.9,
+        "near_track_threshold_m": 1.5,
+        "pass_max_error_m": 2.0,
+        "pass_rmse_m": 0.75,
+        "policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "schema_id": "dronedream.px4-evaluation-policy/v1"
+      },
+      "evaluation_progress_contract_ok": true,
+      "evaluation_progress_discontinuity_count": 0,
+      "evaluation_sample_count": 2737,
+      "evaluation_sampling": {
+        "duration_s": 21.888,
+        "end_time_s": 55.216,
+        "max_gap_limit_s": 0.5,
+        "max_gap_s": 0.008,
+        "median_interval_s": 0.008,
+        "minimum_sampling_coverage": 0.8,
+        "sample_count": 2737,
+        "sampling_coverage": 1.0,
+        "start_time_s": 33.328
+      },
+      "evaluation_start_index": 4166,
+      "evaluation_start_reached": true,
+      "evaluation_start_reason": "altitude_and_near_track",
+      "evaluation_start_t": 33.328,
+      "evaluation_track_coverage": 0.949113,
+      "evaluation_trimmed_landing_samples": 0,
+      "evaluation_trimmed_takeoff_samples": 4166,
+      "evaluation_window_evidence": {
+        "end_index": 6902,
+        "evidence_id": "sha256:77a40d17f333181cacee35b16cf30b66d571b410835bb2b44851f61d1e8d6a55",
+        "offboard_timing_sha256": "sha256:75835a2061154f7f98db29838d46eaab62222fa5ea464136a42edf6b06f71950",
+        "policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "raw_end_time_s": null,
+        "raw_source": "telemetry_derived",
+        "raw_start_time_s": null,
+        "reference_track_sha256": "sha256:34ad74eb4fd6c654c83e4a717c8f7956b0b715bbf7f41a1f128900bdca166a93",
+        "schema_id": "dronedream.px4-evaluation-window-evidence/v1",
+        "source": "telemetry_derived_refined",
+        "start_index": 4166,
+        "start_reason": "altitude_and_near_track",
+        "synthetic": false,
+        "telemetry_contract_id": "sha256:aed156ee8ba6561829fc50a27cd22488cf591012d0285ec6ca74dea7ebac145a",
+        "trimmed_landing_samples": 0,
+        "trimmed_takeoff_samples": 4166,
+        "verifier_revision": "px4-evaluation-window-verifier-1.0"
+      },
+      "evaluation_window_raw_source": "telemetry_derived",
+      "evaluation_window_source": "telemetry_derived_refined",
+      "full_log_max_error": 5.830649,
+      "full_log_rmse": 4.203883,
+      "mode": "real",
+      "pass_thresholds": {
+        "max_error": 2.0,
+        "min_track_coverage": 0.9,
+        "rmse": 0.75
+      },
+      "px4_core_metric_evidence": {
+        "evaluation_duration_s": 21.888,
+        "evaluation_end_index": 6902,
+        "evaluation_end_time_s": 55.216,
+        "evaluation_max_error_sample": {
+          "error": 1.497033,
+          "reference_x": 4.993419,
+          "reference_y": 0.241958,
+          "reference_z": 3.0,
+          "t": 33.328,
+          "track_progress_m": 0.242077,
+          "x": 3.499432,
+          "y": 0.163662,
+          "z": 2.945399
+        },
+        "evaluation_sample_count": 2737,
+        "evaluation_sampling": {
+          "duration_s": 21.888,
+          "end_time_s": 55.216,
+          "max_gap_limit_s": 0.5,
+          "max_gap_s": 0.008,
+          "median_interval_s": 0.008,
+          "minimum_sampling_coverage": 0.8,
+          "sample_count": 2737,
+          "sampling_coverage": 1.0,
+          "start_time_s": 33.328
+        },
+        "evaluation_start_index": 4166,
+        "evaluation_start_time_s": 33.328,
+        "evidence_id": "sha256:6be25def9207ddf65382ec1762d9f19c8922592514954e43e0413bde85f89991",
+        "final_error_m": 1.644974,
+        "full_log_max_error_m": 5.830649,
+        "full_log_rmse_m": 4.203883,
+        "max_error_m": 1.497033,
+        "overshoot_count": 0,
+        "projection_revision": "ordered-local-3d-segment-projection-1.0",
+        "reference_track_sha256": "sha256:34ad74eb4fd6c654c83e4a717c8f7956b0b715bbf7f41a1f128900bdca166a93",
+        "rmse_integration": "time_weighted_trapezoidal",
+        "rmse_m": 0.441664,
+        "schema_id": "dronedream.px4-core-metric-evidence/v1",
+        "synthetic": false,
+        "telemetry_contract_id": "sha256:aed156ee8ba6561829fc50a27cd22488cf591012d0285ec6ca74dea7ebac145a",
+        "total_sample_count": 6903,
+        "verifier_revision": "px4-core-metric-verifier-1.0"
+      },
+      "px4_outcome_evidence": {
+        "applied_effects": [
+          "job_config.wind"
+        ],
+        "core_metric_evidence_id": "sha256:6be25def9207ddf65382ec1762d9f19c8922592514954e43e0413bde85f89991",
+        "crash_flag": false,
+        "crash_reason": "none",
+        "crash_sample_index": null,
+        "evaluation_backward_distance_m": 0.200617,
+        "evaluation_directed_progress_fraction": 0.942727,
+        "evaluation_direction_valid": true,
+        "evaluation_endpoint_reached": true,
+        "evaluation_max_z_m": 3.048675,
+        "evaluation_min_z_m": 2.933925,
+        "evaluation_policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "evaluation_progress_contract_ok": true,
+        "evaluation_progress_discontinuity_count": 0,
+        "evaluation_start_reached": true,
+        "evaluation_track_coverage": 0.949113,
+        "evaluation_window_evidence_id": "sha256:77a40d17f333181cacee35b16cf30b66d571b410835bb2b44851f61d1e8d6a55",
+        "evidence_id": "sha256:90da6f7b14caa021e5588438f54cc7bc2da37cd87e4d50f29bea9a2ead5a5f34",
+        "full_track_coverage": 0.949113,
+        "instability_first_sample_index": null,
+        "instability_flag": false,
+        "instability_reasons": [],
+        "maximum_observed_position_speed_mps": 1.922074,
+        "outcome_policy_id": "sha256:c99b693fd3a8f920b16604c77a96420c9859aa53b2ad44ffc8ed23b0c3559de1",
+        "pass_flag": true,
+        "reference_track_sha256": "sha256:34ad74eb4fd6c654c83e4a717c8f7956b0b715bbf7f41a1f128900bdca166a93",
+        "requested_effects": [
+          "job_config.wind"
+        ],
+        "scenario_effect_evidence_sha256": "sha256:70a4676632b8382a35615024445b7335ff826e5d6f0bb10c53f901d26dd9039d",
+        "scenario_effect_request_sha256": "sha256:8e7c0403828e5ab561db2d889a9065dfbd0e9c061c30a5c72aa54cdd2a3ca905",
+        "scenario_effect_status": "verified_applied",
+        "scenario_effects_ready": true,
+        "schema_id": "dronedream.px4-outcome-evidence/v1",
+        "score": 2.28458,
+        "score_duration_component": 1.0944,
+        "score_max_error_component": 0.748516575903,
+        "score_penalty": 0.0,
+        "score_rmse_component": 0.44166372652,
+        "synthetic": false,
+        "telemetry_contract_id": "sha256:aed156ee8ba6561829fc50a27cd22488cf591012d0285ec6ca74dea7ebac145a",
+        "timeout_flag": false,
+        "track_is_closed": true,
+        "track_length_3d_m": 31.414332,
+        "verifier_revision": "px4-outcome-verifier-1.0"
+      },
+      "px4_outcome_policy": {
+        "backward_tolerance_m": 0.1,
+        "backward_tolerance_track_fraction": 0.02,
+        "crash_penalty": 100.0,
+        "duration_score_weight": 0.05,
+        "endpoint_tolerance_m": 0.25,
+        "endpoint_tolerance_track_fraction": 0.01,
+        "evaluation_policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "instability_penalty": 80.0,
+        "max_error_score_weight": 0.5,
+        "maximum_position_speed_mps": 25.0,
+        "maximum_progress_step_fraction": 0.2,
+        "maximum_stable_track_error_m": 30.0,
+        "minimum_airborne_reference_altitude_m": 0.5,
+        "minimum_collapse_altitude_m": 0.2,
+        "minimum_progress_step_m": 0.25,
+        "policy_id": "sha256:c99b693fd3a8f920b16604c77a96420c9859aa53b2ad44ffc8ed23b0c3559de1",
+        "progress_offset_m": 0.1,
+        "progress_penalty": 20.0,
+        "progress_position_multiplier": 4.0,
+        "progress_revision": "directed-continuous-arc-coverage-1.0",
+        "schema_id": "dronedream.px4-outcome-policy/v1",
+        "score_revision": "rmse-plus-half-max-plus-duration-and-fixed-penalties-1.0",
+        "timeout_penalty": 120.0
+      },
+      "px4_version": "v1.16",
+      "raw_track_end_t": null,
+      "raw_track_start_t": null,
+      "rmse_integration": "time_weighted_trapezoidal",
+      "scenario_effect_evidence_sha256": "sha256:70a4676632b8382a35615024445b7335ff826e5d6f0bb10c53f901d26dd9039d",
+      "scenario_effect_request_sha256": "sha256:8e7c0403828e5ab561db2d889a9065dfbd0e9c061c30a5c72aa54cdd2a3ca905",
+      "scenario_effect_status": "verified_applied",
+      "scenario_effects_ready": true,
+      "simulator": "px4_gazebo",
+      "simulator_model": "x500",
+      "telemetry_coordinate_frame": "dronedream_local_cartesian_z_up",
+      "telemetry_position_unit": "m",
+      "telemetry_sampling": {
+        "duration_s": 55.216,
+        "end_time_s": 55.216,
+        "max_gap_limit_s": 0.5,
+        "max_gap_s": 0.012,
+        "median_interval_s": 0.008,
+        "minimum_sampling_coverage": 0.8,
+        "sample_count": 6903,
+        "sampling_coverage": 1.0,
+        "start_time_s": 0.0
+      },
+      "telemetry_semantic_contract_id": "sha256:aed156ee8ba6561829fc50a27cd22488cf591012d0285ec6ca74dea7ebac145a",
+      "telemetry_source_sha256": "sha256:e7f426ff310d3ed3becaf93ef34cac5c3b35c0d52aa3465f6866a7a98a9a8bbe",
+      "telemetry_time_unit": "s",
+      "telemetry_verifier_revision": "telemetry-semantic-verifier-1.0",
+      "total_sample_count": 6903,
+      "track_coverage": 0.949113,
+      "track_is_closed": true,
+      "track_length_3d_m": 31.414332,
+      "track_projection": "ordered_local_3d_segment_projection",
+      "track_projection_comparison_limit": 10000000,
+      "vehicle": "x500",
+      "world": "default"
+    },
+    "rmse": 0.441664,
+    "score": 2.28458,
+    "timeout_flag": false
+  },
+  "schema_version": "dronedream.trial_result.v2",
+  "success": true
+}

@@ -1,0 +1,88 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "reference_track_json",
+      "display_name": "Reference Track",
+      "file_size_bytes": 32498,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/reference_track.json"
+    },
+    {
+      "artifact_type": "scenario_config_json",
+      "display_name": "Scenario Configuration",
+      "file_size_bytes": 278,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/scenario_config.json"
+    },
+    {
+      "artifact_type": "scenario_effect_request_json",
+      "display_name": "Scenario Effect Request",
+      "file_size_bytes": 1012,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/scenario_effects.request.json"
+    },
+    {
+      "artifact_type": "controller_parameters_json",
+      "display_name": "Controller Parameters",
+      "file_size_bytes": 125,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/controller_params.json"
+    },
+    {
+      "artifact_type": "px4_parameters_input_json",
+      "display_name": "PX4 Parameter Input",
+      "file_size_bytes": 22,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/px4_parameters.input.json"
+    },
+    {
+      "artifact_type": "simulator_launch_config_json",
+      "display_name": "Simulator Launch Configuration",
+      "file_size_bytes": 3044,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/launch_config.json"
+    },
+    {
+      "artifact_type": "simulator_runtime_manifest_json",
+      "display_name": "Simulator Runtime Manifest",
+      "file_size_bytes": 3132,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/simulator_runtime_manifest.json"
+    },
+    {
+      "artifact_type": "worker_log",
+      "display_name": "Runner Log",
+      "file_size_bytes": 659,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/runner.log"
+    },
+    {
+      "artifact_type": "simulator_stdout",
+      "display_name": "Simulator stdout",
+      "file_size_bytes": 0,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/stdout.log"
+    },
+    {
+      "artifact_type": "simulator_stderr",
+      "display_name": "Simulator stderr",
+      "file_size_bytes": 197,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3/stderr.log"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 3,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-95c3367",
+    "seed": 41001,
+    "trial_id": "px4-probe-nominal-seed-41001-attempt-3"
+  },
+  "failure": {
+    "code": "UNSUPPORTED_SCENARIO_EFFECT",
+    "reason": "bundled PX4/Gazebo runner cannot verify requested advanced scenario effects: job_config.sensor_noise_level. Launcher evidence error: scenario effect evidence is missing. Configure a launcher that applies them, or explicitly set PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS=true for metadata-only passthrough (pass_flag will remain false)."
+  },
+  "log_excerpt": "px4_gazebo_runner unsupported scenario effect: bundled PX4/Gazebo runner cannot verify requested advanced scenario effects: job_config.sensor_noise_level. Launcher evidence error: scenario effect evidence is missing. Configure a launcher that applies them, or explicitly set PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS=true for metadata-only passthrough (pass_flag will remain false).",
+  "schema_version": "dronedream.trial_result.v2",
+  "success": false
+}

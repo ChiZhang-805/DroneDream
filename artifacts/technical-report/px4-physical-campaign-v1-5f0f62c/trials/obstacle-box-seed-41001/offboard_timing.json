@@ -1,0 +1,10 @@
+{
+  "land_start_t": 33.071024166,
+  "offboard_start_t": 1.8498315589999947,
+  "rate_hz": 10.0,
+  "setpoint_count": 309,
+  "takeoff_start_t": 1.83964536000002,
+  "time_base": "executor_relative_seconds",
+  "track_end_t": 32.95866681200002,
+  "track_start_t": 3.8727349800000184
+}

@@ -1,0 +1,36 @@
+{
+  "effects": [
+    {
+      "capability": {
+        "reason": "Gazebo acknowledged 1 static obstacle create request(s)",
+        "status": "available"
+      },
+      "effect_id": "obstacles",
+      "evidence": {
+        "created_entities": [
+          {
+            "entity_name": "dronedream_obstacle_000",
+            "response_data": true,
+            "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/scenario_obstacles/dronedream_obstacle_000.sdf",
+            "sdf_sha256": "9824260767a952b16c5fa1fe191de86a0dc1a43f8b6f5fe2bbba4bb8bf700d23",
+            "service": "/world/default/create",
+            "source_index": 0
+          }
+        ]
+      },
+      "mechanism": "gazebo_entity_factory",
+      "status": "applied"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-86273db6",
+    "seed": 41002,
+    "trial_id": "px4-obstacle-box-seed-41002"
+  },
+  "launcher": "local_px4_launch_wrapper",
+  "request_sha256": "7a98a32f5085f3ef65efd9bce9a2b3d0648e257ee8a1574ebbffc376adfb8e6e",
+  "schema_version": "dronedream.scenario_effect_evidence.v1",
+  "world": "default"
+}

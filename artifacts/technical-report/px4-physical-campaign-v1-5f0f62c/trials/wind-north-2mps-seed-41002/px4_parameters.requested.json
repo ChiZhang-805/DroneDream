@@ -1,0 +1,17 @@
+{
+  "captured_at": "2026-07-28T13:44:29.912042+00:00",
+  "catalog_version": "dronedream.px4.multicopter.2026-07-r2",
+  "context": {
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-86273db6",
+    "trial_id": "px4-wind-north-2mps-seed-41002"
+  },
+  "kind": "requested",
+  "px4_version": "v1.16",
+  "schema_version": "dronedream.px4_parameter_evidence.v1",
+  "status": "ok",
+  "transport": "environment",
+  "values": {
+    "MPC_XY_P": 0.95
+  }
+}

@@ -1,0 +1,2 @@
+# Frozen PX4 campaign evidence is content-addressed over exact retained bytes.
+px4-physical-campaign-v1-5f0f62c/** -text -diff

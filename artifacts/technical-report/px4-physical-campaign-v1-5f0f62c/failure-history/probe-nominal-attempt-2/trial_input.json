@@ -1,0 +1,55 @@
+{
+  "trial_id": "px4-probe-nominal-seed-41001-attempt-2",
+  "job_id": "px4-physical-campaign-95c3367",
+  "candidate_id": "baseline-mpc-xy-p-0.95",
+  "seed": 41001,
+  "attempt_count": 2,
+  "execution_identity": {
+    "trial_id": "px4-probe-nominal-seed-41001-attempt-2",
+    "job_id": "px4-physical-campaign-95c3367",
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "seed": 41001,
+    "attempt_count": 2
+  },
+  "scenario_type": "nominal",
+  "scenario_config": {},
+  "job_config": {
+    "track_type": "circle",
+    "start_point": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "altitude_m": 3.0,
+    "wind": {
+      "north": 0.0,
+      "east": 0.0,
+      "south": 0.0,
+      "west": 0.0
+    },
+    "sensor_noise_level": "low",
+    "objective_profile": "robust"
+  },
+  "parameters": {
+    "kp_xy": 1.0,
+    "kd_xy": 0.2,
+    "ki_xy": 0.05,
+    "vel_limit": 5.0,
+    "accel_limit": 4.0,
+    "disturbance_rejection": 0.5
+  },
+  "px4_parameters": {
+    "MPC_XY_P": 0.95
+  },
+  "vehicle_profile": {
+    "px4_version": "v1.16",
+    "firmware_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+    "vehicle_type": "multicopter",
+    "airframe": "x500",
+    "simulator_model": "x500",
+    "world": "default",
+    "headless": true,
+    "simulation_speed_factor": 1.0,
+    "instance_id": 0
+  },
+  "output_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-2/trial_result.json"
+}

@@ -1,0 +1,156 @@
+{
+  "PX4_AUTOPILOT_DIR": "/opt/PX4-Autopilot",
+  "PX4_ENABLE_OFFBOARD_EXECUTOR": true,
+  "PX4_GAZEBO_GUI_WINDOW_GEOMETRY": "",
+  "PX4_GAZEBO_GUI_WINDOW_HEIGHT": "",
+  "PX4_GAZEBO_GUI_WINDOW_MODE": "",
+  "PX4_GAZEBO_GUI_WINDOW_WIDTH": "",
+  "PX4_GAZEBO_RAW_GUI_COMMAND": "",
+  "PX4_OFFBOARD_CONNECTION": "udp://:14540",
+  "PX4_PARAMETER_TRANSPORT": "environment",
+  "PX4_SETUP_COMMANDS": "",
+  "advanced_scenario_config": {
+    "obstacles": [
+      {
+        "size_x": 1.0,
+        "size_y": 1.0,
+        "size_z": 1.0,
+        "type": "box",
+        "x": 0.0,
+        "y": 8.0,
+        "z": 0.5
+      }
+    ]
+  },
+  "airframe": "x500",
+  "extra_args": "",
+  "firmware_identity": {
+    "error": null,
+    "observed_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+    "observed_source": "git_head",
+    "px4_autopilot_dir": "/opt/PX4-Autopilot",
+    "requested_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+    "status": "verified"
+  },
+  "gui_client_enabled": false,
+  "gui_command": "/mnt/z/DroneDream-worktrees/aurora-20260728/scripts/simulators/gazebo_gui_client.sh",
+  "gui_require_client": false,
+  "gui_start_delay_seconds": 5.0,
+  "gui_wait_timeout_seconds": 15.0,
+  "headless": true,
+  "instance_id": 0,
+  "instance_management": "operator_managed",
+  "make_target": "gz_x500",
+  "parameter_catalog_version": null,
+  "paths": {
+    "gui_stderr_log": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/gui_stderr.log",
+    "gui_stdout_log": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/gui_stdout.log",
+    "input": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/trial_input.json",
+    "params": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/controller_params.json",
+    "px4_params": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/px4_parameters.input.json",
+    "run_dir": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002",
+    "stderr_log": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/stderr.log",
+    "stdout_log": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/stdout.log",
+    "telemetry": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/telemetry.json",
+    "track": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/reference_track.json",
+    "track_marker_stderr_log": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/track_marker_stderr.log",
+    "track_marker_stdout_log": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/track_marker_stdout.log"
+  },
+  "px4_parameter_names": [
+    "MPC_XY_P"
+  ],
+  "px4_version": "v1.16",
+  "scenario_effect_contract": {
+    "application_mode": "real_physics",
+    "applied_effects": [
+      "obstacles"
+    ],
+    "capabilities": [
+      {
+        "capability": {
+          "reason": "Gazebo acknowledged 1 static obstacle create request(s)",
+          "status": "available"
+        },
+        "effect_id": "obstacles",
+        "evidence": {
+          "created_entities": [
+            {
+              "entity_name": "dronedream_obstacle_000",
+              "response_data": true,
+              "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/scenario_obstacles/dronedream_obstacle_000.sdf",
+              "sdf_sha256": "9824260767a952b16c5fa1fe191de86a0dc1a43f8b6f5fe2bbba4bb8bf700d23",
+              "service": "/world/default/create",
+              "source_index": 0
+            }
+          ]
+        },
+        "mechanism": "gazebo_entity_factory",
+        "status": "applied"
+      }
+    ],
+    "evidence_schema_version": "dronedream.scenario_effect_evidence.v1",
+    "failed_effects": [],
+    "pending_effects": [],
+    "request_schema_version": "dronedream.scenario_effect_request.v1",
+    "request_sha256": "7a98a32f5085f3ef65efd9bce9a2b3d0648e257ee8a1574ebbffc376adfb8e6e",
+    "requested_effect_details": [
+      {
+        "capability": {
+          "reason": "the bundled launcher can create static obstacles through Gazebo /world/<world>/create and verifies the Boolean service response",
+          "status": "available"
+        },
+        "effect_id": "obstacles",
+        "launcher_input": {
+          "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+          "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+        },
+        "mechanism": "gazebo_entity_factory",
+        "requested_value": [
+          {
+            "size_x": 1.0,
+            "size_y": 1.0,
+            "size_z": 1.0,
+            "type": "box",
+            "x": 0.0,
+            "y": 8.0,
+            "z": 0.5
+          }
+        ],
+        "source": "advanced_scenario_config.obstacles"
+      }
+    ],
+    "requested_effects": [
+      "obstacles"
+    ],
+    "unsupported_effects": [],
+    "unverified_passthrough_enabled": false,
+    "verification_status": "verified_applied"
+  },
+  "scenario_effect_evidence": {
+    "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/scenario_effects.applied.json",
+    "required": true,
+    "schema_version": "dronedream.scenario_effect_evidence.v1",
+    "verification_status": "verified_applied"
+  },
+  "scenario_effect_request": {
+    "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/scenario_effects.request.json",
+    "request_sha256": "7a98a32f5085f3ef65efd9bce9a2b3d0648e257ee8a1574ebbffc376adfb8e6e",
+    "schema_version": "dronedream.scenario_effect_request.v1"
+  },
+  "scenario_type": "nominal",
+  "simulation_speed_factor": 1.0,
+  "simulator_model": "x500",
+  "timeout_base_1x_seconds": 300,
+  "timeout_effective_seconds": 300.0,
+  "timeout_slow_simulation_multiplier_cap": 10.0,
+  "track_marker_color": "0 0.8 1 1",
+  "track_marker_command": "/opt/dronedream/venv/bin/python3 /mnt/z/DroneDream-worktrees/aurora-20260728/scripts/simulators/gazebo_track_marker.py --track /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/obstacle-box-seed-41002/reference_track.json --world default --z-offset 0.03 --color '0 0.8 1 1' --line-width 0.08 --mode line_strip",
+  "track_marker_enabled": false,
+  "track_marker_line_width": 0.08,
+  "track_marker_mode": "line_strip",
+  "track_marker_require": false,
+  "track_marker_start_delay_seconds": 2.0,
+  "track_marker_z_offset": 0.03,
+  "vehicle": "x500",
+  "world": "default"
+}

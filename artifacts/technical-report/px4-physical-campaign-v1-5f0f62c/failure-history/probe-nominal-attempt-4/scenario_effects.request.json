@@ -1,0 +1,13 @@
+{
+  "effects": [],
+  "execution_identity": {
+    "attempt_count": 4,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-95c3367",
+    "seed": 41001,
+    "trial_id": "px4-probe-nominal-seed-41001-attempt-4"
+  },
+  "request_sha256": "b785a819e233e4b71437655f3a932241e17160cab03cc9d2f261f6738d253b77",
+  "scenario_type": "nominal",
+  "schema_version": "dronedream.scenario_effect_request.v1"
+}

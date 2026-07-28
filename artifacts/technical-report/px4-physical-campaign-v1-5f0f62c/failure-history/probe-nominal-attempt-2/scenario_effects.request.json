@@ -1,0 +1,28 @@
+{
+  "effects": [
+    {
+      "capability": {
+        "reason": "Gazebo sensor noise is configured in model SDF; the bundled runtime does not yet generate and verify a per-trial sensor model",
+        "status": "requires_runtime_extension"
+      },
+      "effect_id": "job_config.sensor_noise_level",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "sdformat_sensor_noise",
+      "requested_value": "low",
+      "source": "job_config.sensor_noise_level"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 2,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-95c3367",
+    "seed": 41001,
+    "trial_id": "px4-probe-nominal-seed-41001-attempt-2"
+  },
+  "request_sha256": "5cfce0a74430734d2c449484597e141f5cfdbb02a8dafd50cec8945b9a0d30b3",
+  "scenario_type": "nominal",
+  "schema_version": "dronedream.scenario_effect_request.v1"
+}

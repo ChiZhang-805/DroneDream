@@ -1,0 +1,38 @@
+{
+  "effects": [
+    {
+      "capability": {
+        "reason": "the bundled launcher can create static obstacles through Gazebo /world/<world>/create and verifies the Boolean service response",
+        "status": "available"
+      },
+      "effect_id": "obstacles",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "gazebo_entity_factory",
+      "requested_value": [
+        {
+          "size_x": 1.0,
+          "size_y": 1.0,
+          "size_z": 1.0,
+          "type": "box",
+          "x": 0.0,
+          "y": 8.0,
+          "z": 0.5
+        }
+      ],
+      "source": "advanced_scenario_config.obstacles"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-86273db6",
+    "seed": 41001,
+    "trial_id": "px4-obstacle-box-seed-41001"
+  },
+  "request_sha256": "5482275da3dabc899792b31c83263893d4c9303996bfc6bc0aee5354b63f4778",
+  "scenario_type": "nominal",
+  "schema_version": "dronedream.scenario_effect_request.v1"
+}
