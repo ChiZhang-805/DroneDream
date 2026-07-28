@@ -186,6 +186,10 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("build-manifest.json", builder)
         self.assertIn("SHA256SUMS", builder)
         self.assertIn("dronedream-shared-static-site", builder)
+        self.assertIn("DRONEDREAM_RELEASE_STAGING_DIRECTORY", builder)
+        self.assertIn("updaterSignature", builder)
+        self.assertIn("updaterManifest", builder)
+        self.assertIn("Publication file verification failed", builder)
         self.assertIn("dronedream-site-${{ github.sha }}", workflow)
         self.assertIn("include-hidden-files: true", workflow)
 

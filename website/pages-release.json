@@ -4,5 +4,23 @@
   "releaseTag": "signpath-candidate-v1.0.0",
   "sha256": "f35c7aad9006a29607395a0e14b74d150b82fbf25afe3ff65474bdd764e7cf92",
   "sizeBytes": 10386896,
-  "publishedAt": "2026-07-28"
+  "publishedAt": "2026-07-28",
+  "publicationFiles": {
+    "checksum": {
+      "fileName": "DroneDream_1.0.0_x64-setup.exe.sha256",
+      "sha256": "ac357908ca1c2874bc65dd21c95cfdf3c69b27c93d4ce1a5c7a1e4d5eb17b1eb",
+      "sizeBytes": 98
+    },
+    "updaterSignature": {
+      "fileName": "DroneDream_1.0.0_x64-setup.exe.sig",
+      "sha256": "f86d89bec2e02882a75ff4b8c45d55872308ceea1c559aa52c09b3adcc967431",
+      "sizeBytes": 420
+    },
+    "updaterManifest": {
+      "assetName": "latest.json",
+      "siteFileName": "tauri-latest.json",
+      "sha256": "32cf8914134fd34daea8d852e517dd704bc950395b1bec1c60e8db9680c0a4fe",
+      "sizeBytes": 913
+    }
+  }
 }

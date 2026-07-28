@@ -19,6 +19,21 @@ $releaseTag = [string]$release.releaseTag
 $sha256 = ([string]$release.sha256).ToLowerInvariant()
 $sizeBytes = [long]$release.sizeBytes
 $publishedAt = [string]$release.publishedAt
+$publicationFiles = $release.publicationFiles
+$checksumFileName = [string]$publicationFiles.checksum.fileName
+$checksumFileSha256 = ([string]$publicationFiles.checksum.sha256).ToLowerInvariant()
+$checksumFileSizeBytes = [long]$publicationFiles.checksum.sizeBytes
+$updaterSignatureFileName = [string]$publicationFiles.updaterSignature.fileName
+$updaterSignatureSha256 = (
+    [string]$publicationFiles.updaterSignature.sha256
+).ToLowerInvariant()
+$updaterSignatureSizeBytes = [long]$publicationFiles.updaterSignature.sizeBytes
+$updaterManifestAssetName = [string]$publicationFiles.updaterManifest.assetName
+$updaterManifestSiteFileName = [string]$publicationFiles.updaterManifest.siteFileName
+$updaterManifestSha256 = (
+    [string]$publicationFiles.updaterManifest.sha256
+).ToLowerInvariant()
+$updaterManifestSizeBytes = [long]$publicationFiles.updaterManifest.sizeBytes
 $expectedFileName = "DroneDream_${version}_x64-setup.exe"
 $globalTarget = $deploymentTargets.global
 $mirrorTarget = $deploymentTargets.mirror
@@ -44,6 +59,30 @@ if ($fileName -ne $expectedFileName) { throw "Pages release file name must be $e
 if ($releaseTag -notmatch '^[A-Za-z0-9._-]+$') { throw "Invalid GitHub release tag: $releaseTag" }
 if ($sha256 -notmatch '^[a-f0-9]{64}$') { throw "Invalid SHA-256 in $releaseConfigPath" }
 if ($sizeBytes -le 0) { throw "Pages release size must be positive." }
+if ($checksumFileName -cne "$fileName.sha256" -or
+    $updaterSignatureFileName -cne "$fileName.sig" -or
+    $updaterManifestAssetName -cne "latest.json" -or
+    $updaterManifestSiteFileName -cne "tauri-latest.json") {
+    throw "Pages publication file names do not match the approved release contract."
+}
+foreach ($publicationHash in @(
+    $checksumFileSha256,
+    $updaterSignatureSha256,
+    $updaterManifestSha256
+)) {
+    if ($publicationHash -notmatch '^[a-f0-9]{64}$') {
+        throw "Pages publication metadata contains an invalid SHA-256."
+    }
+}
+foreach ($publicationSize in @(
+    $checksumFileSizeBytes,
+    $updaterSignatureSizeBytes,
+    $updaterManifestSizeBytes
+)) {
+    if ($publicationSize -le 0) {
+        throw "Pages publication metadata contains an invalid file size."
+    }
+}
 foreach ($attribution in @(
     "SignPath.io",
     "SignPath Foundation"
@@ -136,6 +175,61 @@ Copy-Item -LiteralPath $siteHtml -Destination (Join-Path $outputDirectory "404.h
 $downloadsDirectory = Join-Path $outputDirectory "downloads"
 New-Item -ItemType Directory -Force -Path $downloadsDirectory | Out-Null
 
+$releaseStagingDirectory = ([string]$env:DRONEDREAM_RELEASE_STAGING_DIRECTORY).Trim()
+$publicationInputs = @(
+    [pscustomobject]@{
+        AssetName = $fileName
+        StagingFileName = $fileName
+        SiteFileName = $fileName
+        Sha256 = $sha256
+        SizeBytes = $sizeBytes
+    },
+    [pscustomobject]@{
+        AssetName = $checksumFileName
+        StagingFileName = $checksumFileName
+        SiteFileName = $checksumFileName
+        Sha256 = $checksumFileSha256
+        SizeBytes = $checksumFileSizeBytes
+    },
+    [pscustomobject]@{
+        AssetName = $updaterSignatureFileName
+        StagingFileName = $updaterSignatureFileName
+        SiteFileName = $updaterSignatureFileName
+        Sha256 = $updaterSignatureSha256
+        SizeBytes = $updaterSignatureSizeBytes
+    },
+    [pscustomobject]@{
+        AssetName = $updaterManifestAssetName
+        StagingFileName = "tauri-latest.json"
+        SiteFileName = $updaterManifestSiteFileName
+        Sha256 = $updaterManifestSha256
+        SizeBytes = $updaterManifestSizeBytes
+    }
+)
+foreach ($publicationInput in $publicationInputs) {
+    $destinationPath = Join-Path $downloadsDirectory $publicationInput.SiteFileName
+    if ([string]::IsNullOrWhiteSpace($releaseStagingDirectory)) {
+        Invoke-WebRequest -Uri (
+            "$assetBaseUrl/$($publicationInput.AssetName)" +
+            "?sha256=$($publicationInput.Sha256)"
+        ) -UseBasicParsing -OutFile $destinationPath -TimeoutSec 120
+    } else {
+        $sourcePath = Join-Path $releaseStagingDirectory $publicationInput.StagingFileName
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+            throw "The release staging directory is missing $($publicationInput.AssetName)."
+        }
+        Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+    }
+    $publishedFile = Get-Item -LiteralPath $destinationPath
+    $publishedFileSha256 = (
+        Get-FileHash -LiteralPath $destinationPath -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
+    if ($publishedFile.Length -ne [long]$publicationInput.SizeBytes -or
+        $publishedFileSha256 -cne [string]$publicationInput.Sha256) {
+        throw "Publication file verification failed: $($publicationInput.AssetName)"
+    }
+}
+
 $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
 $metadataJson = $metadata | ConvertTo-Json
 [IO.File]::WriteAllText(
@@ -163,6 +257,24 @@ $buildManifest = [ordered]@{
         sha256 = $sha256
         sizeBytes = $sizeBytes
         publishedAt = $publishedAt
+    }
+    publicationFiles = [ordered]@{
+        checksum = [ordered]@{
+            fileName = $checksumFileName
+            sha256 = $checksumFileSha256
+            sizeBytes = $checksumFileSizeBytes
+        }
+        updaterSignature = [ordered]@{
+            fileName = $updaterSignatureFileName
+            sha256 = $updaterSignatureSha256
+            sizeBytes = $updaterSignatureSizeBytes
+        }
+        updaterManifest = [ordered]@{
+            assetName = $updaterManifestAssetName
+            siteFileName = $updaterManifestSiteFileName
+            sha256 = $updaterManifestSha256
+            sizeBytes = $updaterManifestSizeBytes
+        }
     }
     origins = [ordered]@{
         global = [string]$globalTarget.publicBaseUri
