@@ -760,6 +760,7 @@ def _validate_trial_input(
         "payload_changed",
         "battery_degraded",
         "actuator_delay",
+        "actuator_failure",
         "custom",
     }
     if scenario_type not in supported_scenarios:
@@ -1148,6 +1149,7 @@ def _make_dry_run_telemetry(
         "payload_changed": 0.3,
         "battery_degraded": 0.35,
         "actuator_delay": 0.3,
+        "actuator_failure": 0.9,
         "custom": 0.2,
     }.get(meta["scenario_type"], 0.1)
     noise_penalty = {"low": 0.0, "medium": 0.05, "high": 0.12}.get(

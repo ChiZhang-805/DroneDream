@@ -41,6 +41,7 @@ ScenarioType = Literal[
     "payload_changed",
     "battery_degraded",
     "actuator_delay",
+    "actuator_failure",
     "custom",
 ]
 ReportStatus = Literal["PENDING", "READY", "FAILED"]

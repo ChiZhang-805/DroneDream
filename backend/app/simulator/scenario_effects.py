@@ -47,6 +47,7 @@ BUNDLED_SDF_PROFILE_EFFECT_IDS = frozenset(
         "battery.mass_payload_kg",
         "scenario_type.payload_changed",
         "scenario_type.actuator_delay",
+        "scenario_type.actuator_failure",
     }
 )
 BUNDLED_RUNTIME_EFFECT_IDS = frozenset(
@@ -64,6 +65,10 @@ DEFAULT_TURBULENCE_PEAK_MPS = 5.0
 DEFAULT_TURBULENCE_PERIOD_S = 5.0
 DEFAULT_PAYLOAD_MASS_KG = 1.0
 DEFAULT_ACTUATOR_DELAY_MS = 80.0
+DEFAULT_ACTUATOR_FAILURE_MODE = "stuck_stopped_at_launch"
+ACTUATOR_FAILURE_JOINT_STATE_TOPIC = "/dronedream/actuator_failure/joint_state"
+MAX_FAILED_MOTOR_ABS_VELOCITY_RAD_S = 0.05
+MIN_HEALTHY_MOTOR_ABS_VELOCITY_RAD_S = 1.0
 DEFAULT_GPS_DROPOUT_RATE = 0.2
 DEFAULT_BATTERY_INITIAL_PERCENT = 45.0
 DEFAULT_BATTERY_SAG_DRAIN_SECONDS = 300.0
@@ -212,6 +217,8 @@ def _mechanism_for(effect_id: str) -> str:
         return "px4_battery_simulation"
     if "actuator_delay" in effect_id:
         return "sdformat_actuator_dynamics"
+    if "actuator_failure" in effect_id:
+        return "sdformat_actuator_hard_stop"
     return "site_specific"
 
 
@@ -252,6 +259,13 @@ def _available_reason(effect_id: str) -> str:
             "the bundled launcher maps delay_ms to x500 motor first-order response time "
             "constants in Trial-local SDF and verifies every runtime motor plugin"
         )
+    if effect_id == "scenario_type.actuator_failure":
+        return (
+            "the bundled launcher hard-clamps one deterministic x500 motor to zero "
+            "maximum rotational velocity in Trial-local SDF, verifies generated runtime "
+            "SDF, and requires Gazebo joint-state proof that the failed rotor remains "
+            "stopped while at least one healthy rotor turns"
+        )
     if effect_id in {
         "sensor_degradation.dropout_rate",
         "scenario_config.dropout_rate",
@@ -287,6 +301,20 @@ def _seed_bearing_deg(execution_identity: dict[str, Any]) -> float:
     # A millidegree grid is deterministic across Python/platform versions and
     # covers every horizontal direction without importing a PRNG.
     return (int.from_bytes(digest[:8], "big") % 360_000) / 1000.0
+
+
+def _seed_motor_number(execution_identity: dict[str, Any]) -> int:
+    seed = execution_identity.get("seed")
+    seed_material: object
+    if isinstance(seed, int) and not isinstance(seed, bool):
+        seed_material = {"seed": seed, "purpose": "actuator_failure_motor"}
+    else:
+        seed_material = {
+            "execution_identity": execution_identity,
+            "purpose": "actuator_failure_motor",
+        }
+    digest = hashlib.sha256(_canonical_bytes(seed_material)).digest()
+    return int.from_bytes(digest[:8], "big") % 4
 
 
 def _wind_vector_from_bearing(magnitude_mps: float, bearing_deg: float) -> dict[str, float]:
@@ -610,6 +638,47 @@ def _compile_bundled_sdf_profile_unchecked(
             "time_constant_down_s": time_constant_s,
             "motor_numbers": [0, 1, 2, 3],
             "effect_ids": ["scenario_type.actuator_delay"],
+        }
+
+    actuator_failure_effect = by_id.get("scenario_type.actuator_failure")
+    if actuator_failure_effect is not None:
+        config = _scenario_marker_config(
+            actuator_failure_effect,
+            effect_id="scenario_type.actuator_failure",
+        )
+        motor_number_raw = config.get(
+            "motor_number",
+            _seed_motor_number(request.get("execution_identity", {})),
+        )
+        if (
+            isinstance(motor_number_raw, bool)
+            or not isinstance(motor_number_raw, int)
+            or not 0 <= motor_number_raw <= 3
+        ):
+            raise ScenarioEffectContractError(
+                "scenario_type.actuator_failure.config.motor_number must be an integer in [0, 3]"
+            )
+        failure_mode = config.get("failure_mode", DEFAULT_ACTUATOR_FAILURE_MODE)
+        if failure_mode != DEFAULT_ACTUATOR_FAILURE_MODE:
+            raise ScenarioEffectContractError(
+                "scenario_type.actuator_failure.config.failure_mode must be "
+                f"{DEFAULT_ACTUATOR_FAILURE_MODE!r}"
+            )
+        profile["actuator_failure"] = {
+            "failure_mode": failure_mode,
+            "failure_start": "launch",
+            "target_motor_number": motor_number_raw,
+            "target_joint_name": f"rotor_{motor_number_raw}_joint",
+            "max_rot_velocity_rad_s": 0.0,
+            "joint_state_topic": ACTUATOR_FAILURE_JOINT_STATE_TOPIC,
+            "joint_state_update_rate_hz": 20.0,
+            "max_failed_motor_abs_velocity_rad_s": (
+                MAX_FAILED_MOTOR_ABS_VELOCITY_RAD_S
+            ),
+            "min_healthy_motor_abs_velocity_rad_s": (
+                MIN_HEALTHY_MOTOR_ABS_VELOCITY_RAD_S
+            ),
+            "effect_ids": ["scenario_type.actuator_failure"],
         }
     return profile
 
@@ -1107,7 +1176,7 @@ def build_scenario_effect_request(
         if scenario_type == "gps_dropout" and not scenario:
             default_value = {"dropout_rate": 0.2, "source": "scenario_default"}
         add(f"scenario_type.{scenario_type}", "scenario_type", default_value)
-    elif scenario_type in {"actuator_delay", "custom"}:
+    elif scenario_type in {"actuator_delay", "actuator_failure", "custom"}:
         add(
             f"scenario_type.{scenario_type}",
             "scenario_type",
@@ -1467,6 +1536,7 @@ def _validate_bundled_sdf_profile_evidence(
             "sensor_noise",
             "payload",
             "actuator_dynamics",
+            "actuator_failure",
         )
         if section in expected
         and requested["effect_id"] in expected[section].get("effect_ids", [])
@@ -1484,6 +1554,67 @@ def _validate_bundled_sdf_profile_evidence(
             f"effect {requested['effect_id']} runtime SDF does not prove its exact "
             "x500 perturbation profile"
         )
+    if requested["effect_id"] == "scenario_type.actuator_failure":
+        expected_failure = expected.get("actuator_failure")
+        joint_readbacks = [
+            item
+            for item in observations
+            if item.get("kind") == "readback"
+            and item.get("source")
+            == (
+                expected_failure.get("joint_state_topic")
+                if isinstance(expected_failure, dict)
+                else None
+            )
+        ]
+        if len(joint_readbacks) != 1 or not isinstance(expected_failure, dict):
+            raise ScenarioEffectContractError(
+                "actuator failure evidence requires one exact Gazebo joint-state readback"
+            )
+        joint_value = joint_readbacks[0].get("value")
+        healthy_maxima = (
+            joint_value.get("healthy_joint_max_abs_velocity_rad_s")
+            if isinstance(joint_value, dict)
+            else None
+        )
+        target_max = (
+            joint_value.get("target_max_abs_velocity_rad_s")
+            if isinstance(joint_value, dict)
+            else None
+        )
+        if (
+            not isinstance(joint_value, dict)
+            or joint_value.get("target_motor_number")
+            != expected_failure["target_motor_number"]
+            or joint_value.get("target_joint_name")
+            != expected_failure["target_joint_name"]
+            or not isinstance(target_max, (int, float))
+            or isinstance(target_max, bool)
+            or not math.isfinite(float(target_max))
+            or float(target_max)
+            > float(expected_failure["max_failed_motor_abs_velocity_rad_s"])
+            or not isinstance(healthy_maxima, dict)
+            or set(healthy_maxima)
+            != {
+                f"rotor_{number}_joint"
+                for number in range(4)
+                if number != expected_failure["target_motor_number"]
+            }
+            or not all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and math.isfinite(float(value))
+                and float(value)
+                >= float(expected_failure["min_healthy_motor_abs_velocity_rad_s"])
+                for value in healthy_maxima.values()
+            )
+            or joint_value.get("hard_stop_verified") is not True
+            or joint_value.get("healthy_motion_verified") is not True
+        ):
+            raise ScenarioEffectContractError(
+                "actuator failure joint-state readback does not prove one stopped "
+                "target rotor and three moving healthy rotors"
+            )
 
 
 def _validate_bundled_runtime_evidence(
@@ -1845,6 +1976,7 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
         "schema_version": REQUEST_SCHEMA_VERSION,
         "physically_applied": [
             "actuator_first_order_delay",
+            "actuator_hard_failure",
             "battery_initial_state_and_voltage_sag",
             "deterministic_seeded_gps_dropout",
             "gust_and_turbulence",
@@ -1884,6 +2016,8 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
                 "sdformat_sensor_noise",
                 "sdformat_model_inertial",
                 "sdformat_actuator_dynamics",
+                "sdformat_actuator_hard_stop",
+                "gazebo_joint_state_publisher",
             ],
             "requires": [
                 "Gazebo /world/<world>/generate_world_sdf",
@@ -1912,9 +2046,7 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
                 "readback, physical GPS fix/satellite telemetry, and flight-timed battery telemetry"
             ),
         },
-        "requires_runtime_extension": [
-            "hard actuator failure beyond the bounded first-order delay profile",
-        ],
+        "requires_runtime_extension": [],
     }
 
 

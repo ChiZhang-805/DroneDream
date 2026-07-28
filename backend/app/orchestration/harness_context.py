@@ -57,6 +57,7 @@ HarnessScenarioType = Literal[
     "payload_changed",
     "battery_degraded",
     "actuator_delay",
+    "actuator_failure",
     "custom",
 ]
 HarnessSensorNoiseLevel = Literal["low", "medium", "high", "unknown"]
@@ -105,6 +106,7 @@ _ALLOWED_SCENARIO_TYPES = frozenset(
         "payload_changed",
         "battery_degraded",
         "actuator_delay",
+        "actuator_failure",
         "custom",
     }
 )
@@ -114,6 +116,7 @@ _SAFE_SCENARIO_PERTURBATION_RANGES: dict[str, tuple[float, float]] = {
     "dropout_rate": (0.0, 1.0),
     "mass_payload_kg": (0.0, 20.0),
     "delay_ms": (0.0, 250.0),
+    "motor_number": (0.0, 3.0),
     "intensity": (0.0, 2.0),
 }
 _SAFE_PERTURBATIONS_BY_SCENARIO_TYPE: dict[str, frozenset[str]] = {
@@ -121,6 +124,7 @@ _SAFE_PERTURBATIONS_BY_SCENARIO_TYPE: dict[str, frozenset[str]] = {
     "gps_dropout": frozenset({"dropout_rate"}),
     "payload_changed": frozenset({"mass_payload_kg"}),
     "actuator_delay": frozenset({"delay_ms"}),
+    "actuator_failure": frozenset({"motor_number"}),
     "turbulence": frozenset({"intensity"}),
     "combined_perturbed": frozenset(_SAFE_SCENARIO_PERTURBATION_RANGES),
 }

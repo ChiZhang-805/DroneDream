@@ -312,13 +312,25 @@ def test_runtime_profile_rejects_conflicting_dropout_sources() -> None:
             "actuator_dynamics",
             {"time_constant_up_s": 0.08, "time_constant_down_s": 0.08},
         ),
+        (
+            "actuator_failure",
+            {
+                "motor_number": 2,
+                "failure_mode": "stuck_stopped_at_launch",
+            },
+            "actuator_failure",
+            {
+                "target_motor_number": 2,
+                "max_rot_velocity_rad_s": 0.0,
+            },
+        ),
     ],
 )
 def test_scenario_markers_compile_to_concrete_sdf_profiles(
     scenario_type: str,
     config: dict[str, object],
     section: str,
-    expected: dict[str, float],
+    expected: dict[str, object],
 ) -> None:
     request = build_scenario_effect_request(
         execution_identity=_identity(),
@@ -336,6 +348,65 @@ def test_scenario_markers_compile_to_concrete_sdf_profiles(
     assert profile is not None
     for key, value in expected.items():
         assert profile[section][key] == value
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        ({"motor_number": True}, "motor_number must be an integer"),
+        ({"motor_number": -1}, "motor_number must be an integer"),
+        ({"motor_number": 4}, "motor_number must be an integer"),
+        (
+            {"failure_mode": "intermittent"},
+            "failure_mode must be 'stuck_stopped_at_launch'",
+        ),
+    ],
+)
+def test_actuator_failure_profile_rejects_unverifiable_modes(
+    config: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ScenarioEffectContractError, match=message):
+        build_scenario_effect_request(
+            execution_identity=_identity(),
+            scenario_type="actuator_failure",
+            scenario_config=config,
+            job_config={
+                "wind": {
+                    "north": 0.0,
+                    "east": 0.0,
+                    "south": 0.0,
+                    "west": 0.0,
+                },
+                "sensor_noise_level": "medium",
+            },
+            advanced_config={},
+        )
+
+
+def test_actuator_failure_default_motor_is_seed_deterministic() -> None:
+    def compile_for(seed: int) -> dict[str, object]:
+        request = build_scenario_effect_request(
+            execution_identity={**_identity(), "seed": seed},
+            scenario_type="actuator_failure",
+            scenario_config={},
+            job_config={
+                "wind": {
+                    "north": 0.0,
+                    "east": 0.0,
+                    "south": 0.0,
+                    "west": 0.0,
+                },
+                "sensor_noise_level": "medium",
+            },
+            advanced_config={},
+        )
+        profile = compile_bundled_sdf_profile(request)
+        assert profile is not None
+        return profile["actuator_failure"]
+
+    assert compile_for(42) == compile_for(42)
+    assert 0 <= int(compile_for(42)["target_motor_number"]) <= 3
 
 
 def test_request_hash_rejects_tampering() -> None:

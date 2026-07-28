@@ -218,6 +218,7 @@ def test_mock_scenario_changes_controller_response_not_only_constant_difficulty(
         "payload_changed",
         "battery_degraded",
         "actuator_delay",
+        "actuator_failure",
         "custom",
     ],
 )

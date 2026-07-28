@@ -621,16 +621,16 @@ def _minimal_px4_gazebo_tree(tmp_path: Path, *, world: str = "default") -> Path:
   <model name="x500">
     <include><uri>model://x500_base</uri></include>
     <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
-      <motorNumber>0</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+      <jointName>rotor_0_joint</jointName><motorNumber>0</motorNumber><maxRotVelocity>1000</maxRotVelocity><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
     </plugin>
     <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
-      <motorNumber>1</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+      <jointName>rotor_1_joint</jointName><motorNumber>1</motorNumber><maxRotVelocity>1000</maxRotVelocity><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
     </plugin>
     <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
-      <motorNumber>2</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+      <jointName>rotor_2_joint</jointName><motorNumber>2</motorNumber><maxRotVelocity>1000</maxRotVelocity><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
     </plugin>
     <plugin filename="motor" name="gz::sim::systems::MulticopterMotorModel">
-      <motorNumber>3</motorNumber><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
+      <jointName>rotor_3_joint</jointName><motorNumber>3</motorNumber><maxRotVelocity>1000</maxRotVelocity><timeConstantUp>0.0125</timeConstantUp><timeConstantDown>0.025</timeConstantDown>
     </plugin>
   </model>
 </sdf>
@@ -1101,6 +1101,196 @@ def test_advanced_sdf_overlay_binds_trial_local_top_level_model(tmp_path: Path) 
     trial_env = Path(overlay["px4_trial_gz_env_path"]).read_text(encoding="utf-8")
     expected_models = shlex.quote(str(vehicle_path.parents[1]))
     assert f"export PX4_GZ_MODELS={expected_models}" in trial_env
+
+
+def test_actuator_failure_sdf_and_joint_state_prove_one_hard_stopped_motor(
+    tmp_path: Path,
+) -> None:
+    request = build_scenario_effect_request(
+        execution_identity={"trial_id": "actuator-failure", "seed": 42},
+        scenario_type="actuator_failure",
+        scenario_config={
+            "motor_number": 2,
+            "failure_mode": "stuck_stopped_at_launch",
+        },
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+    profile = compile_bundled_sdf_profile(request)
+    assert profile is not None
+    px4_root = _minimal_px4_gazebo_tree(tmp_path)
+    overlay = wrapper._prepare_steady_wind_overlay(
+        request,
+        scenario_effects,
+        run_dir=tmp_path / "run",
+        autopilot_dir=str(px4_root),
+        simulator_model="x500",
+        world="default",
+        launch_env={},
+    )
+
+    assert overlay is not None
+    applied = overlay["applied_sdf_profile"]
+    failure = applied["actuator_failure"]
+    assert failure["target_motor_number"] == 2
+    assert failure["failure_mode"] == "stuck_stopped_at_launch"
+    vehicle_tree = ET.parse(Path(overlay["vehicle_model_sdf_path"]))
+    source_vehicle = vehicle_tree.find("./model[@name='x500']")
+    assert source_vehicle is not None
+    motor_maxima = {
+        int(plugin.findtext("motorNumber", default="-1")): float(
+            plugin.findtext("maxRotVelocity", default="nan")
+        )
+        for plugin in source_vehicle.findall(
+            "./plugin[@name='gz::sim::systems::MulticopterMotorModel']"
+        )
+    }
+    assert motor_maxima == {0: 1000.0, 1: 1000.0, 2: 0.0, 3: 1000.0}
+    publisher = source_vehicle.find(
+        "./plugin[@name='gz::sim::systems::JointStatePublisher']"
+    )
+    assert publisher is not None
+    assert publisher.findtext("topic") == profile["actuator_failure"]["joint_state_topic"]
+    assert [item.text for item in publisher.findall("joint_name")] == [
+        "rotor_0_joint",
+        "rotor_1_joint",
+        "rotor_2_joint",
+        "rotor_3_joint",
+    ]
+
+    base_tree = ET.parse(Path(overlay["model_sdf_path"]))
+    base_link = base_tree.find("./model[@name='x500_base']/link[@name='base_link']")
+    assert base_link is not None
+    runtime_root = ET.Element("sdf", {"version": "1.9"})
+    world = ET.SubElement(runtime_root, "world", {"name": "default"})
+    runtime_model = ET.SubElement(world, "model", {"name": "x500_0"})
+    runtime_model.append(copy.deepcopy(base_link))
+    for plugin in source_vehicle.findall("plugin"):
+        runtime_model.append(copy.deepcopy(plugin))
+    runtime_observation = wrapper._runtime_sdf_profile_observation(
+        ET.tostring(runtime_root, encoding="unicode"),
+        generated_path=tmp_path / "generated_actuator_failure.sdf",
+        expected_vehicle_model="x500_0",
+        applied_sdf_profile=applied,
+        require_wind_mode=False,
+    )
+    assert runtime_observation["verified_profile_sections"] == [
+        "actuator_failure"
+    ]
+
+    raw_path = tmp_path / "run" / "actuator_failure_joint_state.log"
+    raw_path.write_text(
+        """
+name: "x500_0"
+joint { name: "rotor_0_joint" axis1 { velocity: 62.5 } }
+joint { name: "rotor_1_joint" axis1 { velocity: -61.25 } }
+joint { name: "rotor_2_joint" axis1 { velocity: 0 } }
+joint { name: "rotor_3_joint" axis1 { velocity: -63.75 } }
+joint { name: "rotor_0_joint" axis1 { velocity: 70 } }
+joint { name: "rotor_1_joint" axis1 { velocity: -69 } }
+joint { name: "rotor_2_joint" axis1 { velocity: 0 } }
+joint { name: "rotor_3_joint" axis1 { velocity: -68 } }
+""".strip(),
+        encoding="utf-8",
+    )
+    joint_observation = wrapper._parse_actuator_failure_joint_state(
+        raw_path.read_text(encoding="utf-8"),
+        profile["actuator_failure"],
+        raw_path=raw_path,
+    )
+    assert joint_observation["target_max_abs_velocity_rad_s"] == 0.0
+    assert joint_observation["healthy_motion_verified"] is True
+
+    effect = request["effects"][0]
+    runtime_sdf_item = {
+        "source": "/world/default/generate_world_sdf",
+        "kind": "artifact",
+        "value": runtime_observation,
+        "sha256": scenario_effects.scenario_effect_value_sha256(
+            runtime_observation
+        ),
+    }
+    record = wrapper._scenario_effect_record(
+        effect,
+        status="applied",
+        capability_status="available",
+        reason="test",
+        evidence={
+            "requested_value_sha256": (
+                scenario_effects.scenario_effect_value_sha256(
+                    effect["requested_value"]
+                )
+            ),
+            "compiled_sdf_profile": profile,
+            "verification": {
+                "status": "verified",
+                "method": "trial_local_sdf_and_generated_world_sdf",
+                "observations": [runtime_sdf_item],
+            },
+        },
+    )
+    wrapper._augment_actuator_failure_record(
+        record,
+        joint_observation,
+        scenario_effects,
+        topic=profile["actuator_failure"]["joint_state_topic"],
+    )
+    evidence = scenario_effects.build_scenario_effect_evidence(
+        request,
+        launcher="test",
+        world="default",
+        effects=[record],
+    )
+    assert (
+        validate_scenario_effect_evidence(request, evidence)[
+            "verification_status"
+        ]
+        == "verified_applied"
+    )
+
+
+@pytest.mark.parametrize(
+    ("target_velocity", "healthy_velocity", "message"),
+    [
+        (0.1, 10.0, "failed rotor exceeded"),
+        (0.0, 0.5, "healthy rotors did not all exceed"),
+    ],
+)
+def test_actuator_failure_joint_state_fails_closed(
+    tmp_path: Path,
+    target_velocity: float,
+    healthy_velocity: float,
+    message: str,
+) -> None:
+    profile = {
+        "failure_mode": "stuck_stopped_at_launch",
+        "failure_start": "launch",
+        "target_motor_number": 0,
+        "target_joint_name": "rotor_0_joint",
+        "max_failed_motor_abs_velocity_rad_s": 0.05,
+        "min_healthy_motor_abs_velocity_rad_s": 1.0,
+    }
+    raw_path = tmp_path / "joint_state.log"
+    raw_path.write_text(
+        "\n".join(
+            [
+                f'joint {{ name: "rotor_0_joint" axis1 {{ velocity: {target_velocity} }} }}',
+                f'joint {{ name: "rotor_1_joint" axis1 {{ velocity: {healthy_velocity} }} }}',
+                f'joint {{ name: "rotor_2_joint" axis1 {{ velocity: {healthy_velocity} }} }}',
+                f'joint {{ name: "rotor_3_joint" axis1 {{ velocity: {healthy_velocity} }} }}',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match=message):
+        wrapper._parse_actuator_failure_joint_state(
+            raw_path.read_text(encoding="utf-8"),
+            profile,
+            raw_path=raw_path,
+        )
 
 
 def test_trial_wind_world_launches_from_clean_rootfs(

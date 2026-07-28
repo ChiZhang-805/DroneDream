@@ -78,6 +78,8 @@ MAX_TRUSTED_LOCAL_XML_BYTES = 16 * 1024 * 1024
 RETAINED_ULOG_NAME = "px4_source.ulg"
 WIND_EFFECTS_PLUGIN_FILENAME = "gz-sim-wind-effects-system"
 WIND_EFFECTS_PLUGIN_NAME = "gz::sim::systems::WindEffects"
+JOINT_STATE_PUBLISHER_PLUGIN_FILENAME = "gz-sim-joint-state-publisher-system"
+JOINT_STATE_PUBLISHER_PLUGIN_NAME = "gz::sim::systems::JointStatePublisher"
 _FORBIDDEN_XML_DECLARATION = re.compile(rb"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
 
 REQUIRED_SAMPLE_KEYS = (
@@ -721,6 +723,100 @@ def _apply_actuator_dynamics_sdf(
     }
 
 
+def _apply_actuator_failure_sdf(
+    model_root: ET.Element,
+    profile: dict[str, Any],
+) -> dict[str, Any]:
+    model = model_root.find("./model[@name='x500']")
+    if model is None:
+        raise RuntimeError("pinned x500 model SDF has no x500 model")
+    target_motor = int(profile["target_motor_number"])
+    observed: dict[int, dict[str, Any]] = {}
+    for plugin in model.findall("plugin"):
+        if plugin.get("name") != "gz::sim::systems::MulticopterMotorModel":
+            continue
+        try:
+            motor_number = int(plugin.findtext("motorNumber", default=""))
+            original_max = float(plugin.findtext("maxRotVelocity", default=""))
+        except ValueError as exc:
+            raise RuntimeError("pinned x500 motor plugin has invalid hard-stop fields") from exc
+        if (
+            motor_number not in {0, 1, 2, 3}
+            or motor_number in observed
+            or not math.isfinite(original_max)
+            or original_max <= 0
+        ):
+            raise RuntimeError("pinned x500 motor plugin set is invalid")
+        final_max = (
+            float(profile["max_rot_velocity_rad_s"])
+            if motor_number == target_motor
+            else original_max
+        )
+        _ensure_xml_path(plugin, "maxRotVelocity").text = f"{final_max:.17g}"
+        observed[motor_number] = {
+            "joint_name": plugin.findtext("jointName", default=""),
+            "original_max_rot_velocity_rad_s": original_max,
+            "final_max_rot_velocity_rad_s": final_max,
+            "failed": motor_number == target_motor,
+        }
+    if set(observed) != {0, 1, 2, 3}:
+        raise RuntimeError("pinned x500 model does not expose all four motor plugins")
+    if observed[target_motor]["joint_name"] != profile["target_joint_name"]:
+        raise RuntimeError("pinned x500 target motor joint does not match the failure profile")
+
+    publishers = [
+        plugin
+        for plugin in model.findall("plugin")
+        if plugin.get("name") == JOINT_STATE_PUBLISHER_PLUGIN_NAME
+        or plugin.get("filename") == JOINT_STATE_PUBLISHER_PLUGIN_FILENAME
+    ]
+    if publishers:
+        raise RuntimeError("pinned x500 model unexpectedly already has a joint-state publisher")
+    publisher = ET.SubElement(
+        model,
+        "plugin",
+        {
+            "filename": JOINT_STATE_PUBLISHER_PLUGIN_FILENAME,
+            "name": JOINT_STATE_PUBLISHER_PLUGIN_NAME,
+        },
+    )
+    _ensure_xml_path(publisher, "topic").text = str(profile["joint_state_topic"])
+    _ensure_xml_path(publisher, "update_rate").text = (
+        f"{float(profile['joint_state_update_rate_hz']):.17g}"
+    )
+    for motor_number in range(4):
+        joint_name = str(observed[motor_number]["joint_name"])
+        if not re.fullmatch(r"rotor_[0-3]_joint", joint_name):
+            raise RuntimeError("pinned x500 motor plugin has an unexpected joint name")
+        ET.SubElement(publisher, "joint_name").text = joint_name
+
+    return {
+        "failure_mode": profile["failure_mode"],
+        "failure_start": profile["failure_start"],
+        "target_motor_number": target_motor,
+        "target_joint_name": profile["target_joint_name"],
+        "max_failed_motor_abs_velocity_rad_s": float(
+            profile["max_failed_motor_abs_velocity_rad_s"]
+        ),
+        "min_healthy_motor_abs_velocity_rad_s": float(
+            profile["min_healthy_motor_abs_velocity_rad_s"]
+        ),
+        "joint_state_publisher": {
+            "filename": JOINT_STATE_PUBLISHER_PLUGIN_FILENAME,
+            "name": JOINT_STATE_PUBLISHER_PLUGIN_NAME,
+            "topic": profile["joint_state_topic"],
+            "update_rate_hz": float(profile["joint_state_update_rate_hz"]),
+            "joint_names": [
+                str(observed[number]["joint_name"]) for number in range(4)
+            ],
+        },
+        "motors": [
+            {"motor_number": number, **observed[number]}
+            for number in sorted(observed)
+        ],
+    }
+
+
 def _configure_wind_effects_plugin(
     plugin: ET.Element,
     gust_profile: dict[str, Any] | None,
@@ -927,7 +1023,12 @@ def _prepare_steady_wind_overlay(
     model_tree.write(overlay_model_sdf, encoding="utf-8", xml_declaration=True)
 
     overlay_vehicle_model_sdf = overlay_vehicle_model_dir / "model.sdf"
-    if compiled_sdf_profile is not None and "actuator_dynamics" in compiled_sdf_profile:
+    vehicle_profile_sections = (
+        {"actuator_dynamics", "actuator_failure"} & set(compiled_sdf_profile)
+        if isinstance(compiled_sdf_profile, dict)
+        else set()
+    )
+    if vehicle_profile_sections:
         vehicle_tree = _parse_trusted_local_xml(
             overlay_vehicle_model_sdf,
             trusted_root=runtime_root,
@@ -936,10 +1037,16 @@ def _prepare_steady_wind_overlay(
         vehicle_root_xml = vehicle_tree.getroot()
         if vehicle_root_xml is None:
             raise RuntimeError("pinned x500 vehicle model SDF has no root element")
-        applied_sdf_profile["actuator_dynamics"] = _apply_actuator_dynamics_sdf(
-            vehicle_root_xml,
-            compiled_sdf_profile["actuator_dynamics"],
-        )
+        if "actuator_dynamics" in vehicle_profile_sections:
+            applied_sdf_profile["actuator_dynamics"] = _apply_actuator_dynamics_sdf(
+                vehicle_root_xml,
+                compiled_sdf_profile["actuator_dynamics"],
+            )
+        if "actuator_failure" in vehicle_profile_sections:
+            applied_sdf_profile["actuator_failure"] = _apply_actuator_failure_sdf(
+                vehicle_root_xml,
+                compiled_sdf_profile["actuator_failure"],
+            )
         ET.indent(vehicle_tree, space="  ")
         vehicle_tree.write(
             overlay_vehicle_model_sdf,
@@ -1416,6 +1523,80 @@ def _runtime_sdf_profile_observation(
                 "generated runtime SDF motor plugin coverage does not match the profile"
             )
         verified_sections.append("actuator_dynamics")
+
+    expected_failure = applied_sdf_profile.get("actuator_failure")
+    if isinstance(expected_failure, dict):
+        expected_motors = {
+            int(item["motor_number"]): item for item in expected_failure["motors"]
+        }
+        observed_motors: set[int] = set()
+        for plugin in model.findall("plugin"):
+            if plugin.get("name") != "gz::sim::systems::MulticopterMotorModel":
+                continue
+            try:
+                motor_number = int(plugin.findtext("motorNumber", default=""))
+            except ValueError as exc:
+                raise RuntimeError(
+                    "generated runtime SDF has invalid motorNumber"
+                ) from exc
+            if motor_number in observed_motors or motor_number not in expected_motors:
+                raise RuntimeError(
+                    "generated runtime SDF has invalid hard-stop motor coverage"
+                )
+            observed_motors.add(motor_number)
+            expected_motor = expected_motors[motor_number]
+            actual_max = _required_float_text(
+                plugin,
+                "maxRotVelocity",
+                context=f"motor {motor_number} maxRotVelocity",
+            )
+            _assert_runtime_float(
+                actual_max,
+                float(expected_motor["final_max_rot_velocity_rad_s"]),
+                context=f"motor {motor_number} maxRotVelocity",
+            )
+            if plugin.findtext("jointName", default="") != expected_motor["joint_name"]:
+                raise RuntimeError(
+                    f"generated runtime SDF motor {motor_number} jointName mismatch"
+                )
+        if observed_motors != set(expected_motors):
+            raise RuntimeError(
+                "generated runtime SDF hard-stop motor coverage does not match the profile"
+            )
+
+        publishers = [
+            plugin
+            for plugin in model.findall("plugin")
+            if plugin.get("name") == JOINT_STATE_PUBLISHER_PLUGIN_NAME
+            or plugin.get("filename") == JOINT_STATE_PUBLISHER_PLUGIN_FILENAME
+        ]
+        if len(publishers) != 1:
+            raise RuntimeError(
+                "generated runtime SDF does not expose exactly one joint-state publisher"
+            )
+        publisher = publishers[0]
+        expected_publisher = expected_failure["joint_state_publisher"]
+        if (
+            publisher.get("filename") != expected_publisher["filename"]
+            or publisher.get("name") != expected_publisher["name"]
+            or publisher.findtext("topic", default="") != expected_publisher["topic"]
+            or publisher.findall("joint_name") == []
+            or [item.text or "" for item in publisher.findall("joint_name")]
+            != expected_publisher["joint_names"]
+        ):
+            raise RuntimeError(
+                "generated runtime SDF joint-state publisher does not match the profile"
+            )
+        _assert_runtime_float(
+            _required_float_text(
+                publisher,
+                "update_rate",
+                context="joint-state publisher update_rate",
+            ),
+            float(expected_publisher["update_rate_hz"]),
+            context="joint-state publisher update_rate",
+        )
+        verified_sections.append("actuator_failure")
 
     expected_gust = applied_sdf_profile.get("wind_gust")
     if isinstance(expected_gust, dict):
@@ -2799,6 +2980,255 @@ def _run_offboard_executor(args: argparse.Namespace, stderr_log: Path) -> int:
     return proc.returncode
 
 
+def _protobuf_field_blocks(text: str, field_name: str) -> list[str]:
+    blocks: list[str] = []
+    pattern = re.compile(rf"\b{re.escape(field_name)}\s*\{{")
+    for match in pattern.finditer(text):
+        opening = text.find("{", match.start())
+        depth = 0
+        in_string = False
+        escaped = False
+        for index in range(opening, len(text)):
+            character = text[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif character == "\\":
+                    escaped = True
+                elif character == '"':
+                    in_string = False
+                continue
+            if character == '"':
+                in_string = True
+            elif character == "{":
+                depth += 1
+            elif character == "}":
+                depth -= 1
+                if depth == 0:
+                    blocks.append(text[opening + 1 : index])
+                    break
+    return blocks
+
+
+def _parse_actuator_failure_joint_state(
+    raw: str,
+    profile: dict[str, Any],
+    *,
+    raw_path: Path,
+) -> dict[str, Any]:
+    velocities: dict[str, list[float]] = {
+        f"rotor_{number}_joint": [] for number in range(4)
+    }
+    for joint_block in _protobuf_field_blocks(raw, "joint"):
+        name_match = re.search(r'\bname\s*:\s*"([^"]+)"', joint_block)
+        if name_match is None or name_match.group(1) not in velocities:
+            continue
+        axis_blocks = _protobuf_field_blocks(joint_block, "axis1")
+        if len(axis_blocks) != 1:
+            continue
+        velocity_match = re.search(
+            rf"\bvelocity\s*:\s*({_PROTOBUF_NUMBER})",
+            axis_blocks[0],
+        )
+        if velocity_match is None:
+            continue
+        velocity = float(velocity_match.group(1))
+        if not math.isfinite(velocity):
+            raise RuntimeError("Gazebo joint-state readback contains non-finite velocity")
+        velocities[name_match.group(1)].append(velocity)
+
+    missing = sorted(name for name, values in velocities.items() if not values)
+    if missing:
+        raise RuntimeError(
+            "Gazebo joint-state readback omitted rotor velocity samples: "
+            + ", ".join(missing)
+        )
+    maxima = {
+        name: max(abs(value) for value in values)
+        for name, values in velocities.items()
+    }
+    target_joint = str(profile["target_joint_name"])
+    target_max = maxima[target_joint]
+    healthy_maxima = {
+        name: value for name, value in maxima.items() if name != target_joint
+    }
+    failed_limit = float(profile["max_failed_motor_abs_velocity_rad_s"])
+    healthy_minimum = float(profile["min_healthy_motor_abs_velocity_rad_s"])
+    hard_stop_verified = target_max <= failed_limit
+    healthy_motion_verified = all(
+        value >= healthy_minimum for value in healthy_maxima.values()
+    )
+    if not hard_stop_verified:
+        raise RuntimeError(
+            "failed rotor exceeded the hard-stop velocity boundary: "
+            f"joint={target_joint}, max={target_max:.17g}, limit={failed_limit:.17g}"
+        )
+    if not healthy_motion_verified:
+        raise RuntimeError(
+            "healthy rotors did not all exceed the motion boundary during the "
+            f"failure trial: maxima={healthy_maxima}, minimum={healthy_minimum:.17g}"
+        )
+    return {
+        "failure_mode": profile["failure_mode"],
+        "failure_start": profile["failure_start"],
+        "target_motor_number": int(profile["target_motor_number"]),
+        "target_joint_name": target_joint,
+        "target_sample_count": len(velocities[target_joint]),
+        "target_max_abs_velocity_rad_s": round(target_max, 12),
+        "healthy_sample_counts": {
+            name: len(velocities[name]) for name in sorted(healthy_maxima)
+        },
+        "healthy_joint_max_abs_velocity_rad_s": {
+            name: round(healthy_maxima[name], 12) for name in sorted(healthy_maxima)
+        },
+        "max_failed_motor_abs_velocity_rad_s": failed_limit,
+        "min_healthy_motor_abs_velocity_rad_s": healthy_minimum,
+        "hard_stop_verified": hard_stop_verified,
+        "healthy_motion_verified": healthy_motion_verified,
+        "raw_log_path": str(raw_path),
+        "raw_log_sha256": _sha256_hex(raw_path),
+    }
+
+
+def _start_actuator_failure_observer(
+    request: dict[str, Any],
+    engine: Any,
+    overlay: dict[str, Any] | None,
+    *,
+    run_dir: Path,
+) -> dict[str, Any] | None:
+    compiled = engine.compile_bundled_sdf_profile(request)
+    profile = (
+        compiled.get("actuator_failure")
+        if isinstance(compiled, dict)
+        else None
+    )
+    if not isinstance(profile, dict):
+        return None
+    if (
+        overlay is None
+        or overlay.get("compiled_sdf_profile") != compiled
+        or overlay.get("applied_sdf_profile", {}).get("actuator_failure")
+        is None
+    ):
+        raise RuntimeError("actuator-failure observer is missing its exact SDF overlay")
+    gz_cli = _gazebo_cli()
+    if not gz_cli:
+        raise ScenarioEffectUnsupportedError(
+            "Gazebo gz CLI is unavailable; hard actuator failure requires joint-state readback"
+        )
+    topic = str(profile["joint_state_topic"])
+    topic_seen = False
+    topic_error = ""
+    for _attempt in range(50):
+        try:
+            topics = set(
+                _run_gazebo_command(
+                    [gz_cli, "topic", "--list"],
+                    timeout=5.0,
+                    failure_context="could not inspect Gazebo topics",
+                ).split()
+            )
+            if topic in topics:
+                topic_seen = True
+                break
+            topic_error = f"topic {topic!r} not present"
+        except RuntimeError as exc:
+            topic_error = str(exc)
+        time.sleep(0.1)
+    if not topic_seen:
+        raise ScenarioEffectUnsupportedError(
+            "Gazebo actuator-failure joint-state topic is unavailable: " + topic_error
+        )
+
+    raw_path = run_dir / "actuator_failure_joint_state.log"
+    stderr_path = run_dir / "actuator_failure_joint_state.stderr.log"
+    stdout_handle = raw_path.open("w", encoding="utf-8")
+    stderr_handle = stderr_path.open("w", encoding="utf-8")
+    command = [gz_cli, "topic", "--echo", "--topic", topic]
+    stdbuf = shutil.which("stdbuf")
+    if stdbuf:
+        command = [stdbuf, "-oL", "-eL", *command]
+    try:
+        process = subprocess.Popen(  # noqa: S603 - resolved executable and fixed argv.
+            command,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            text=True,
+            start_new_session=(os.name != "nt"),
+        )
+    except Exception:
+        stdout_handle.close()
+        stderr_handle.close()
+        raise
+    return {
+        "process": process,
+        "stdout_handle": stdout_handle,
+        "stderr_handle": stderr_handle,
+        "raw_path": raw_path,
+        "stderr_path": stderr_path,
+        "profile": profile,
+        "topic": topic,
+    }
+
+
+def _finish_actuator_failure_observer(observer: dict[str, Any]) -> dict[str, Any]:
+    process = observer["process"]
+    try:
+        time.sleep(0.25)
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5.0)
+    finally:
+        observer["stdout_handle"].close()
+        observer["stderr_handle"].close()
+    raw_path = Path(observer["raw_path"])
+    if not raw_path.is_file() or raw_path.stat().st_size > MAX_JSON_BYTES:
+        raise RuntimeError("Gazebo actuator-failure joint-state log is missing or too large")
+    try:
+        raw = raw_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise RuntimeError("Gazebo actuator-failure joint-state log is unreadable") from exc
+    return _parse_actuator_failure_joint_state(
+        raw,
+        observer["profile"],
+        raw_path=raw_path,
+    )
+
+
+def _augment_actuator_failure_record(
+    record: dict[str, Any],
+    observation: dict[str, Any],
+    engine: Any,
+    *,
+    topic: str,
+) -> None:
+    evidence = record.get("evidence")
+    verification = evidence.get("verification") if isinstance(evidence, dict) else None
+    observations = (
+        verification.get("observations")
+        if isinstance(verification, dict)
+        else None
+    )
+    if not isinstance(observations, list):
+        raise RuntimeError("actuator-failure SDF evidence is missing verification observations")
+    observations.append(
+        {
+            "source": topic,
+            "kind": "readback",
+            "value": observation,
+            "sha256": engine.scenario_effect_value_sha256(observation),
+        }
+    )
+    verification["method"] = (
+        "trial_local_sdf_generated_world_plus_gazebo_joint_state"
+    )
+
+
 def _resolve_real_launch_command(args: argparse.Namespace) -> tuple[str, str | None]:
     setup_commands = os.environ.get("PX4_SETUP_COMMANDS", "").strip()
     simulator_model = args.simulator_model or args.vehicle
@@ -3191,7 +3621,9 @@ def main() -> int:
     px4_proc: subprocess.Popen[str] | None = None
     gui_proc: subprocess.Popen[str] | None = None
     steady_wind_overlay: dict[str, Any] | None = None
+    actuator_failure_observer: dict[str, Any] | None = None
     scenario_applied_by_id: dict[str, dict[str, Any]] = {}
+    actuator_failure_ids: set[str] = set()
     previous_signal_handlers: dict[int, Any] = {}
 
     def _raise_shutdown(signum: int, _frame: Any) -> None:
@@ -3313,6 +3745,11 @@ def main() -> int:
                 effect["effect_id"]
                 for effect in scenario_effect_request["effects"]
                 if effect["effect_id"] in scenario_engine.BUNDLED_RUNTIME_EFFECT_IDS
+            }
+            actuator_failure_ids = {
+                effect["effect_id"]
+                for effect in scenario_effect_request["effects"]
+                if effect["effect_id"] == "scenario_type.actuator_failure"
             }
             if runtime_effect_ids and not enable_offboard_executor:
                 reason = (
@@ -3438,7 +3875,7 @@ def main() -> int:
                 raise RuntimeError(
                     "scenario-effect dispatcher omitted available effects: " + ", ".join(missing)
                 )
-            if not runtime_effect_ids:
+            if not runtime_effect_ids and not actuator_failure_ids:
                 _write_scenario_effect_evidence(
                     scenario_engine,
                     scenario_effect_request,
@@ -3549,7 +3986,81 @@ def main() -> int:
             )
 
         if enable_offboard_executor:
+            if scenario_effect_request is not None and actuator_failure_ids:
+                try:
+                    actuator_failure_observer = _start_actuator_failure_observer(
+                        scenario_effect_request,
+                        scenario_engine,
+                        steady_wind_overlay,
+                        run_dir=args.run_dir,
+                    )
+                except Exception as exc:
+                    remaining = {
+                        effect_id: record
+                        for effect_id, record in scenario_applied_by_id.items()
+                        if effect_id not in actuator_failure_ids
+                    }
+                    _write_scenario_effect_evidence(
+                        scenario_engine,
+                        scenario_effect_request,
+                        scenario_effect_evidence_path,
+                        world=args.world,
+                        effects=_scenario_effect_failure_records(
+                            scenario_effect_request,
+                            applied_by_id=remaining,
+                            failing_ids=actuator_failure_ids,
+                            reason=str(exc),
+                            unsupported=isinstance(
+                                exc,
+                                ScenarioEffectUnsupportedError,
+                            ),
+                        ),
+                    )
+                    raise
             executor_exit = _run_offboard_executor(args, args.stderr_log)
+            if actuator_failure_observer is not None:
+                observer = actuator_failure_observer
+                actuator_failure_observer = None
+                try:
+                    joint_observation = _finish_actuator_failure_observer(observer)
+                    effect_id = "scenario_type.actuator_failure"
+                    _augment_actuator_failure_record(
+                        scenario_applied_by_id[effect_id],
+                        joint_observation,
+                        scenario_engine,
+                        topic=str(observer["topic"]),
+                    )
+                except Exception as exc:
+                    remaining = {
+                        effect_id: record
+                        for effect_id, record in scenario_applied_by_id.items()
+                        if effect_id not in actuator_failure_ids
+                    }
+                    _write_scenario_effect_evidence(
+                        scenario_engine,
+                        scenario_effect_request,
+                        scenario_effect_evidence_path,
+                        world=args.world,
+                        effects=_scenario_effect_failure_records(
+                            scenario_effect_request,
+                            applied_by_id=remaining,
+                            failing_ids=actuator_failure_ids,
+                            reason=str(exc),
+                            unsupported=False,
+                        ),
+                    )
+                    raise
+                if executor_exit != 0 or not runtime_effect_ids:
+                    _write_scenario_effect_evidence(
+                        scenario_engine,
+                        scenario_effect_request,
+                        scenario_effect_evidence_path,
+                        world=args.world,
+                        effects=[
+                            scenario_applied_by_id[effect["effect_id"]]
+                            for effect in scenario_effect_request["effects"]
+                        ],
+                    )
             _append_log(
                 args.stdout_log,
                 f"[local_px4_launch_wrapper] Offboard executor exit code: {executor_exit}",
@@ -3612,6 +4123,18 @@ def main() -> int:
         _append_log(args.stderr_log, f"[local_px4_launch_wrapper] Real mode failure: {exc}")
         return 1
     finally:
+        if actuator_failure_observer is not None:
+            process = actuator_failure_observer["process"]
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5.0)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    with contextlib.suppress(subprocess.TimeoutExpired):
+                        process.wait(timeout=5.0)
+            actuator_failure_observer["stdout_handle"].close()
+            actuator_failure_observer["stderr_handle"].close()
         for shutdown_signal_number, previous_handler in previous_signal_handlers.items():
             signal.signal(shutdown_signal_number, previous_handler)
 

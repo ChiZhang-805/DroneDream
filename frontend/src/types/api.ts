@@ -75,6 +75,7 @@ export type ScenarioType =
   | "payload_changed"
   | "battery_degraded"
   | "actuator_delay"
+  | "actuator_failure"
   | "custom";
 
 export interface StartPoint {

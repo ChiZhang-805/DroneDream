@@ -146,6 +146,7 @@ def _simulator_capabilities() -> dict[str, object]:
                     "payload_changed",
                     "battery_degraded",
                     "actuator_delay",
+                    "actuator_failure",
                     "custom",
                 ],
             },

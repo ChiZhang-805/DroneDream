@@ -70,6 +70,7 @@ _SCENARIO_TYPES = frozenset(
         "payload_changed",
         "battery_degraded",
         "actuator_delay",
+        "actuator_failure",
         "custom",
     }
 )
