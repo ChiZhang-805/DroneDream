@@ -1,9 +1,9 @@
 # LLM Tool-Orchestrated Optimization Harness
 
-Status: approved target design; Evidence 2.9 bounded multi-tool planning, execution, cost memory, and offline equal-budget evaluation implemented; current-version online provider rerun gated<br>
+Status: approved target design; Evidence 2.9 bounded multi-tool planning, execution, cost memory, offline equal-budget evaluation, and current-version online provider freeze implemented<br>
 Audience: backend, optimization, simulation, security, evaluation, and course-review stakeholders<br>
 Scope: DroneDream's automated PX4/Gazebo tuning loop<br>
-Last reviewed: 2026-07-28
+Last reviewed: 2026-07-29
 
 ## 1. Executive decision
 
@@ -8699,17 +8699,21 @@ The archived Evidence 2.4 / Prompt Template 1.1 freeze remains a historical
 under Prompt 1.6 rather than selecting only the best. The spread demonstrates
 provider stochasticity.
 
-The latest retained online Artifact is Evidence 2.8 / Prompt Template 1.7. It
+The current retained online Artifact is Evidence 2.9 / Prompt Template 1.7. It
 uses the same 24-case development corpus, passes 23/24 and all declared
 qualification thresholds, and preserves
 `tight_budget_expensive_matrix` as the single failure. Its file SHA-256 is
-`d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4`.
-Production planning has since moved to Evidence 2.9, so the Artifact is not
-current-contract Evidence 2.9 validation. A new real campaign requires the
-separate per-batch API approval gate. None of the unpaired online runs is a
-causal prompt-lift estimate or proof of lower simulator loss. Campaign and
-evaluator CLIs pin the selected worktree's `backend/` import root and fail
-closed against neighbouring checkout contamination.
+`11c5de7e208cb9b3e1263943ff8086bd919a57753948a9fd0db0ffd48e621ed1`;
+its manifest canonical-payload SHA-256 is
+`ea4c6242fe01c56f088d4042772dba763378d94d011f0c550c35ec862638ea7a`.
+The authorized batch made 24 provider calls with zero retries from exact source
+`d36ef166f985f761ab9e733753f61237950049da` and is frozen at
+`d49353925ce074e3cb71508ee21cd2abfcee79cf`. Evidence 2.8 remains an immutable
+historical freeze. The unpaired online runs are not a causal prompt-lift
+estimate, proof of multi-tool benefit, or proof of lower simulator loss.
+Campaign and evaluator CLIs pin the selected worktree's `backend/` import root
+and fail closed against neighbouring checkout contamination. Every future real
+campaign remains subject to the separate per-batch API approval gate.
 
 ### 30.15 Evidence 2.5 observed-outcome reflection
 
@@ -9005,11 +9009,11 @@ over two positive retrieval fixtures and eight isolation/lifecycle negatives,
 with zero provider, network, or simulator calls and zero provider-identifier
 leaks. It establishes the enumerated software-contract behavior only. The
 554-Trial Evidence 2.7 component freeze remains historical evidence; it is not
-evidence for the new memory channel. The later Evidence 2.8 / Prompt 1.7
-provider freeze is likewise not a cross-Job-memory evaluation. A real current
-Evidence 2.9 provider campaign is still required before a current-contract
-online-routing claim. The offline equal-budget dispatcher study is now complete,
-but it does not replace a causal optimization-benefit study.
+evidence for the new memory channel. Neither the Evidence 2.8 nor the current
+Evidence 2.9 / Prompt 1.7 provider freeze is a cross-Job-memory evaluation.
+Evidence 2.9 now closes current-contract online-routing qualification on the
+frozen 24-case development corpus, but the offline memory and equal-budget
+dispatcher studies do not replace a causal optimization-benefit study.
 
 ## 33. Evidence 2.9 multi-tool plan and accounting boundary
 
@@ -9047,8 +9051,10 @@ the live plan/revision/tool wall and CPU receipts, and blocks all socket
 connections. Scripted schema-valid decisions are not real model calls.
 Consequently this evaluation can support dispatcher, provenance, concurrency,
 and accounting claims only. It cannot support LLM-quality, optimizer-superiority,
-PX4/Gazebo, real-flight, or causal-benefit claims. Any real Evidence 2.9 model
-campaign remains subject to the separate per-run API approval gate.
+PX4/Gazebo, real-flight, or causal-benefit claims. The separately approved
+Evidence 2.9 online campaign qualifies routing on the frozen 24-case development
+corpus but does not change those multi-tool or offline-study claim boundaries.
+Every future real model batch remains subject to a new per-run API approval.
 
 The frozen offline result contains three seed blocks, six arm runs, configured
 budget parity in 3/3 blocks, six verified scripted generations, multi-tool

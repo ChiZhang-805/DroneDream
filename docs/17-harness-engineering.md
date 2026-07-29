@@ -867,16 +867,20 @@ as stale. The Evidence 2.7 campaign retained Prompt Template 1.5 outcomes of
 direct evidence that provider reruns are stochastic, so it must not be hidden
 or used as a causal prompt comparison.
 
-The latest retained online campaign is Evidence 2.8 / Prompt Template 1.7 on
+The current retained online campaign is Evidence 2.9 / Prompt Template 1.7 on
 `gpt-4.1-2025-04-14`: 23/24 cases pass, all declared qualification thresholds
 pass, and `tight_budget_expensive_matrix` remains the single frozen failure.
 The Artifact file SHA-256 is
-`d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4`.
-Current production planning is Evidence 2.9, so this online Artifact is a
-qualified historical development-corpus result, not current-contract Evidence
-2.9 validation. A new real provider campaign requires separate, batch-specific
-user approval before any API-key access. None of these routing campaigns proves
-simulator outcome improvement.
+`11c5de7e208cb9b3e1263943ff8086bd919a57753948a9fd0db0ffd48e621ed1`;
+the manifest canonical-payload SHA-256 is
+`ea4c6242fe01c56f088d4042772dba763378d94d011f0c550c35ec862638ea7a`.
+The one authorized batch made 24 provider calls with zero retries from exact
+source `d36ef166f985f761ab9e733753f61237950049da` and is frozen at
+`d49353925ce074e3cb71508ee21cd2abfcee79cf`. Evidence 2.8 remains historical.
+This result qualifies routing discrimination on the frozen development corpus;
+it does not prove multi-tool execution benefit or simulator outcome improvement.
+Every future real provider batch still requires separate, batch-specific user
+approval before any API-key access.
 
 `backend/scripts/run_harness_routing_campaign.py` runs the entire corpus through
 an online provider using the exact production prompt and per-case response
@@ -1252,6 +1256,7 @@ The 39-entry source inventory explicitly includes the 554-Trial component
 ablation and records separate subject/freeze commits for every historical
 layer. Its focused compatibility receipt records 70/70 plus 7/7 tests; it is
 not a current-source full-suite receipt. The bundle deliberately reports
-`release_ready=false`, because a newly approved Evidence 2.9 online campaign,
-current-source full regression, Windows Rust, and report/PDF gates remain
-separate.
+`release_ready=false`. The later Evidence 2.9 online campaign and current-source
+full regression remain separate software freezes and are not injected into v10
+while the technical-report line is frozen; exact Windows MSVC and report/PDF
+gates remain outside.
