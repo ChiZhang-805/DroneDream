@@ -754,18 +754,26 @@ export function CommunityPage({
           </label>
         </header>
 
-        <div className="community-tag-filter" role="group" aria-label={copy.tagsLabel}>
-          {presets.map((tagName) => (
-            <button
-              key={tagName}
-              type="button"
-              className={activeTag === tagName ? "is-active" : ""}
-              aria-pressed={activeTag === tagName}
-              onClick={() => setActiveTag(activeTag === tagName ? null : tagName)}
-            >
-              #{tagName}
-            </button>
-          ))}
+        <div className="community-filter-row">
+          <div className="community-tag-filter" role="group" aria-label={copy.tagsLabel}>
+            {presets.map((tagName) => (
+              <button
+                key={tagName}
+                type="button"
+                className={activeTag === tagName ? "is-active" : ""}
+                aria-pressed={activeTag === tagName}
+                onClick={() => setActiveTag(activeTag === tagName ? null : tagName)}
+              >
+                #{tagName}
+              </button>
+            ))}
+          </div>
+          {!loading && !feedError && !allTopicsView && visibleTopics.length > 0 ? (
+            <a className="community-more is-filter-action" href="/community/?view=all">
+              {copy.more}
+              <ChevronRight aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
 
         {loading ? <p role="status">{copy.loading}</p> : null}
@@ -869,19 +877,13 @@ export function CommunityPage({
             <ChevronRight aria-hidden="true" />
           </button>
         ) : null}
-        {!loading
-          && !feedError
-          && (allTopicsView || visibleTopics.length > 0)
-          && (!allTopicsView || !hasMoreTopics) ? (
+        {!loading && !feedError && allTopicsView && !hasMoreTopics ? (
           <a
             className="community-more"
-            href={allTopicsView ? "/community/" : "/community/?view=all"}
+            href="/community/"
           >
-            {allTopicsView ? (
-              <><ArrowLeft aria-hidden="true" />{copy.back}</>
-            ) : (
-              <>{copy.more}<ChevronRight aria-hidden="true" /></>
-            )}
+            <ArrowLeft aria-hidden="true" />
+            {copy.back}
           </a>
         ) : null}
       </section>

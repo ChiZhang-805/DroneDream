@@ -130,6 +130,8 @@ title: "DroneDream 1.0.0 User Manual"
 
 DroneDream turns a bounded PX4 tuning study into reviewable evidence.
 
+The manual explains where each control lives and which validation gate owns it.
+
 > **Scope.** The result remains simulation evidence.
 
 ## How to read the field references
@@ -149,6 +151,26 @@ Complete the readiness gate before entering the tuning platform.
 ## 2.2 Account, cloud data, and local drafts
 
 Account records and local drafts follow different storage boundaries.
+
+# 4. Step 1 — Flight Setup
+
+## 4.1 Vehicle
+
+# 5. Step 2 — Parameters
+
+## 5.1 Parameter families
+
+# 6. Step 3 — Scenarios
+
+## 6.1 Holdout cases
+
+# 7. Step 4 — Constraints & Budget
+
+## 7.1 Trial budget
+
+# 8. Step 5 — Review
+
+## 8.1 Final validation
 `;
     const chineseManual = `---
 title: "DroneDream 1.0.0 用户说明书"
@@ -194,7 +216,8 @@ title: "DroneDream 1.0.0 用户说明书"
       "/docs/downloads/manual-assets/en/tuning-chat.png",
     );
     expect(screen.getByRole("table")).toBeVisible();
-    expect(screen.getAllByRole("link", { name: "PDF" })[0]).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: "PDF" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "PDF" })).toHaveAttribute(
       "href",
       "/docs/downloads/DroneDream-Manual-en.pdf",
     );
@@ -204,15 +227,25 @@ title: "DroneDream 1.0.0 用户说明书"
     );
     expect(container.querySelector("iframe")).toBeNull();
     expect(container.querySelector(".site-footer")).toBeNull();
+    expect(screen.queryByText(/complete field-by-field guide/i)).toBeNull();
+    expect(container.querySelectorAll(".manual-markdown > h1:first-child + p")).toHaveLength(1);
+    expect(container.querySelector(".manual-markdown > h1:first-child + p")).toHaveTextContent(
+      /reviewable evidence\. The manual explains/u,
+    );
 
     const firstChapterToggle = within(manualContents).getByRole("button", {
       name: "Expand chapter: About this manual",
     });
     const secondChapterToggle = within(manualContents).getByRole("button", {
-      name: "Expand chapter: 1. Installation and first launch",
+      name: "Expand chapter: Installation and first launch",
+    });
+    const workflowToggle = within(manualContents).getByRole("button", {
+      name: "Expand chapter: Five-step workflow",
     });
     expect(firstChapterToggle).toHaveAttribute("aria-expanded", "false");
     expect(secondChapterToggle).toHaveAttribute("aria-expanded", "false");
+    expect(workflowToggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(manualContents).queryByText("1. Installation and first launch")).toBeNull();
     expect(within(manualContents).queryByRole("link", {
       name: "How to read the field references",
     })).toBeNull();
@@ -228,11 +261,18 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(firstChapterToggle).toHaveAttribute("aria-expanded", "true");
     expect(secondChapterToggle).toHaveAttribute("aria-expanded", "true");
     expect(within(manualContents).getByRole("link", {
-      name: "2.2 Accounts and data",
+      name: "Accounts and data",
     })).toBeVisible();
     expect(within(manualContents).queryByText(
       "2.2 Account, cloud data, and local drafts",
     )).toBeNull();
+
+    fireEvent.click(workflowToggle);
+    expect(workflowToggle).toHaveAttribute("aria-expanded", "true");
+    expect(within(manualContents).getByRole("link", {
+      name: "Step 1 — Flight Setup",
+    })).toBeVisible();
+    expect(within(manualContents).queryByText("4. Step 1 — Flight Setup")).toBeNull();
 
     fireEvent.click(firstChapterToggle);
     expect(firstChapterToggle).toHaveAttribute("aria-expanded", "false");

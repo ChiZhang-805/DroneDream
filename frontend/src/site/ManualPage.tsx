@@ -1,7 +1,6 @@
 import {
   BookOpen,
   ChevronRight,
-  Download,
   FileDown,
   FileText,
   Languages,
@@ -24,9 +23,19 @@ interface ManualPageProps {
 type LoadState = "loading" | "ready" | "error";
 
 interface ManualNavigationChapter {
+  kind: "chapter";
   heading: ManualHeading;
   subsections: ManualHeading[];
 }
+
+interface ManualNavigationGroup {
+  kind: "group";
+  id: string;
+  label: string;
+  chapters: ManualNavigationChapter[];
+}
+
+type ManualNavigationItem = ManualNavigationChapter | ManualNavigationGroup;
 
 const manualCopy = {
   en: {
@@ -39,8 +48,7 @@ const manualCopy = {
     pdf: "PDF",
     online: "ONLINE MANUAL",
     title: "DroneDream 1.0.0 User Manual",
-    description:
-      "The complete field-by-field guide, rendered as a native web document with the same verified text, tables, and product screenshots as the downloadable editions.",
+    wizard: "Five-step workflow",
     loading: "Preparing the complete manual…",
     error: "The manual document could not be loaded.",
     retry: "Try again",
@@ -58,8 +66,7 @@ const manualCopy = {
     pdf: "PDF",
     online: "在线说明书",
     title: "DroneDream 1.0.0 用户说明书",
-    description:
-      "把经过校验的完整文字、字段表格和软件截图重新排成网站原生文档；PDF 与 Markdown 仅作为离线下载版本。",
+    wizard: "五步实验流程",
     loading: "正在准备完整说明书……",
     error: "说明书正文加载失败。",
     retry: "重新加载",
@@ -74,8 +81,41 @@ function normalizeSearch(value: string, locale: SiteLocale): string {
 }
 
 function manualNavigationLabel(heading: ManualHeading, locale: SiteLocale): string {
-  if (!/^2\.2(?:\s|$)/u.test(heading.plainLabel)) return heading.plainLabel;
-  return locale === "zh-CN" ? "2.2 账户与数据" : "2.2 Accounts and data";
+  if (/^2\.2(?:\s|$)/u.test(heading.plainLabel)) {
+    return locale === "zh-CN" ? "账户与数据" : "Accounts and data";
+  }
+
+  const withoutNumber = heading.plainLabel
+    .replace(/^\d+(?:\.\d+)*\.?\s+/u, "")
+    .replace(/^Appendix\s+[A-Z]\s*[—-]\s*/u, "")
+    .replace(/^附录\s*[A-Z]\s*[—-]\s*/u, "");
+
+  const compactLabels: Record<SiteLocale, Record<string, string>> = {
+    en: {
+      "Workspace orientation": "Workspace",
+      "Two ways to create an experiment": "Create an experiment",
+      "Monitor, compare, and interpret results": "Results and evidence",
+      "Exit, recovery, and safe interruption": "Exit and recovery",
+      "Common study patterns": "Study patterns",
+      "Validation limits at a glance": "Validation limits",
+    },
+    "zh-CN": {
+      "两种创建实验的方式": "创建实验",
+      "监控、比较与解释结果": "结果与证据",
+      "退出、恢复与安全中断": "退出与恢复",
+      "第一次实验检查表": "首次实验检查表",
+      "常见研究模板": "研究模板",
+      "校验范围速查": "校验范围",
+    },
+  };
+
+  return compactLabels[locale][withoutNumber] ?? withoutNumber;
+}
+
+function isWizardStep(heading: ManualHeading, locale: SiteLocale): boolean {
+  return locale === "zh-CN"
+    ? /^\d+\.\s*第[一二三四五]步/u.test(heading.plainLabel)
+    : /^\d+\.\s*Step\s+[1-5]\b/u.test(heading.plainLabel);
 }
 
 export function ManualPage({ locale }: ManualPageProps) {
@@ -129,13 +169,41 @@ export function ManualPage({ locale }: ManualPageProps) {
       .filter((heading) => heading.level <= 2)
       .forEach((heading) => {
         if (heading.level === 1) {
-          chapters.push({ heading, subsections: [] });
+          chapters.push({ kind: "chapter", heading, subsections: [] });
           return;
         }
         chapters.at(-1)?.subsections.push(heading);
       });
-    if (!normalized) return chapters;
-    return chapters.flatMap((chapter) => {
+
+    const items: ManualNavigationItem[] = [];
+    const wizardChapters: ManualNavigationChapter[] = [];
+    chapters.forEach((chapter) => {
+      if (isWizardStep(chapter.heading, locale)) {
+        wizardChapters.push(chapter);
+        return;
+      }
+      if (wizardChapters.length && !items.some((item) => item.kind === "group")) {
+        items.push({
+          kind: "group",
+          id: "manual-five-step-workflow",
+          label: copy.wizard,
+          chapters: [...wizardChapters],
+        });
+      }
+      items.push(chapter);
+    });
+    if (wizardChapters.length && !items.some((item) => item.kind === "group")) {
+      items.push({
+        kind: "group",
+        id: "manual-five-step-workflow",
+        label: copy.wizard,
+        chapters: [...wizardChapters],
+      });
+    }
+
+    if (!normalized) return items;
+
+    const filterChapter = (chapter: ManualNavigationChapter) => {
       const chapterMatches = normalizeSearch(
         manualNavigationLabel(chapter.heading, locale),
         locale,
@@ -146,13 +214,33 @@ export function ManualPage({ locale }: ManualPageProps) {
           locale,
         ).includes(normalized),
       );
-      if (!chapterMatches && matchingSubsections.length === 0) return [];
-      return [{
+      if (!chapterMatches && matchingSubsections.length === 0) return null;
+      return {
         ...chapter,
         subsections: chapterMatches ? chapter.subsections : matchingSubsections,
-      }];
+      };
+    };
+
+    const filteredItems: ManualNavigationItem[] = [];
+    items.forEach((item) => {
+      if (item.kind === "chapter") {
+        const match = filterChapter(item);
+        if (match) filteredItems.push(match);
+        return;
+      }
+      const groupMatches = normalizeSearch(item.label, locale).includes(normalized);
+      const matchingChapters = groupMatches
+        ? item.chapters
+        : item.chapters.flatMap((chapter) => {
+          const match = filterChapter(chapter);
+          return match ? [match] : [];
+        });
+      if (matchingChapters.length) {
+        filteredItems.push({ ...item, chapters: matchingChapters });
+      }
     });
-  }, [headings, locale, query]);
+    return filteredItems;
+  }, [copy.wizard, headings, locale, query]);
 
   useEffect(() => {
     if (!headings.length) return;
@@ -244,7 +332,98 @@ export function ManualPage({ locale }: ManualPageProps) {
         </div>
 
         <nav aria-label={copy.contents}>
-          {navigationChapters.map((chapter) => {
+          {navigationChapters.map((item, itemIndex) => {
+            if (item.kind === "group") {
+              const expanded = Boolean(query) || expandedChapterIds.has(item.id);
+              const groupPanelId = `${item.id}-steps`;
+              const groupContainsActive = item.chapters.some((chapter) =>
+                activeId === chapter.heading.id
+                || chapter.subsections.some((heading) => heading.id === activeId)
+              );
+              return (
+                <div
+                  key={item.id}
+                  className={`manual-nav-chapter is-step-group${groupContainsActive ? " contains-active" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="manual-nav-group-row"
+                    aria-expanded={expanded}
+                    aria-controls={groupPanelId}
+                    aria-label={`${expanded ? copy.collapseChapter : copy.expandChapter}: ${item.label}`}
+                    onClick={() => toggleChapter(item.id)}
+                  >
+                    <span aria-hidden="true">{String(itemIndex + 1).padStart(2, "0")}</span>
+                    <strong>{item.label}</strong>
+                    <ChevronRight aria-hidden="true" />
+                  </button>
+                  <div
+                    id={groupPanelId}
+                    className="manual-nav-step-list"
+                    hidden={!expanded}
+                  >
+                    {item.chapters.map((chapter) => {
+                      const stepExpanded = Boolean(query)
+                        || expandedChapterIds.has(chapter.heading.id);
+                      const stepPanelId = `${chapter.heading.id}-subsections`;
+                      return (
+                        <div className="manual-nav-step" key={chapter.heading.id}>
+                          <div className="manual-nav-step-row">
+                            <a
+                              href={`#${chapter.heading.id}`}
+                              className={activeId === chapter.heading.id ? "is-active" : ""}
+                              aria-current={activeId === chapter.heading.id ? "location" : undefined}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                navigateToHeading(chapter.heading);
+                              }}
+                            >
+                              <strong>{manualNavigationLabel(chapter.heading, locale)}</strong>
+                            </a>
+                            {chapter.subsections.length ? (
+                              <button
+                                type="button"
+                                className="manual-nav-toggle"
+                                aria-expanded={stepExpanded}
+                                aria-controls={stepPanelId}
+                                aria-label={`${stepExpanded ? copy.collapseChapter : copy.expandChapter}: ${manualNavigationLabel(chapter.heading, locale)}`}
+                                onClick={() => toggleChapter(chapter.heading.id)}
+                              >
+                                <ChevronRight aria-hidden="true" />
+                              </button>
+                            ) : null}
+                          </div>
+                          {chapter.subsections.length ? (
+                            <div
+                              id={stepPanelId}
+                              className="manual-nav-subsections is-tertiary"
+                              hidden={!stepExpanded}
+                            >
+                              {chapter.subsections.map((heading) => (
+                                <a
+                                  key={heading.id}
+                                  href={`#${heading.id}`}
+                                  className={`is-subsection${activeId === heading.id ? " is-active" : ""}`}
+                                  aria-current={activeId === heading.id ? "location" : undefined}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    navigateToHeading(heading);
+                                  }}
+                                >
+                                  <strong>{manualNavigationLabel(heading, locale)}</strong>
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
+            const chapter = item;
             const expanded = Boolean(query)
               || expandedChapterIds.has(chapter.heading.id);
             const chapterPanelId = `${chapter.heading.id}-subsections`;
@@ -266,7 +445,7 @@ export function ManualPage({ locale }: ManualPageProps) {
                     }}
                   >
                     <span aria-hidden="true">
-                      {String(chapter.heading.majorIndex + 1).padStart(2, "0")}
+                      {String(itemIndex + 1).padStart(2, "0")}
                     </span>
                     <strong>{manualNavigationLabel(chapter.heading, locale)}</strong>
                   </a>
@@ -300,7 +479,6 @@ export function ManualPage({ locale }: ManualPageProps) {
                           navigateToHeading(heading);
                         }}
                       >
-                        <span aria-hidden="true">—</span>
                         <strong>{manualNavigationLabel(heading, locale)}</strong>
                       </a>
                     ))}
@@ -320,15 +498,10 @@ export function ManualPage({ locale }: ManualPageProps) {
           <div>
             <p>
               <Languages aria-hidden="true" />
-              {copy.online} · {copy.edition}
+              {copy.online}
             </p>
             <h1 id="manual-reader-title">{copy.title}</h1>
-            <span>{copy.description}</span>
           </div>
-          <a href={`${documentRoot}.pdf`} download>
-            <Download aria-hidden="true" />
-            PDF
-          </a>
         </header>
 
         <article ref={articleRef} className="manual-reader-document">

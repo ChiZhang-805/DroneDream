@@ -70,6 +70,40 @@ interface ManualDocumentProps {
   headings: ManualHeading[];
 }
 
+function prepareManualWebSource(source: string): string {
+  const lines = stripManualFrontmatter(source).split(/\r?\n/u);
+  const firstChapterIndex = lines.findIndex((line) => /^#\s+/u.test(line));
+  if (firstChapterIndex < 0) return lines.join("\n");
+
+  const paragraphAt = (startAt: number) => {
+    let start = startAt;
+    while (start < lines.length && !lines[start].trim()) start += 1;
+    if (
+      start >= lines.length
+      || /^(?:#{1,6}\s+|>|```|~~~|!\[|\||[-+*]\s+|\d+\.\s+)/u.test(lines[start])
+    ) {
+      return null;
+    }
+    let end = start;
+    while (end < lines.length && lines[end].trim()) end += 1;
+    return { start, end };
+  };
+
+  const firstParagraph = paragraphAt(firstChapterIndex + 1);
+  const secondParagraph = firstParagraph ? paragraphAt(firstParagraph.end) : null;
+  if (!firstParagraph || !secondParagraph) return lines.join("\n");
+
+  const firstText = lines.slice(firstParagraph.start, firstParagraph.end).join(" ").trim();
+  const secondText = lines.slice(secondParagraph.start, secondParagraph.end).join(" ").trim();
+  lines.splice(
+    firstParagraph.start,
+    secondParagraph.end - firstParagraph.start,
+    `${firstText} ${secondText}`,
+    "",
+  );
+  return lines.join("\n");
+}
+
 export default function ManualDocument({ source, headings }: ManualDocumentProps) {
   let headingCursor = 0;
 
@@ -212,7 +246,7 @@ export default function ManualDocument({ source, headings }: ManualDocumentProps
           },
         }}
       >
-        {stripManualFrontmatter(source)}
+        {prepareManualWebSource(source)}
       </ReactMarkdown>
       <footer className="manual-document-end">
         <PlayCircle aria-hidden="true" />

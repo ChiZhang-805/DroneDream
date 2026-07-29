@@ -128,7 +128,7 @@ const profiles = [
     name: "desktop",
     viewport: { width: 1440, height: 1000 },
     desktop: true,
-    expectedRecentCards: 4,
+    expectedRecentCards: 5,
     topicCount: 5,
   },
   {
@@ -149,7 +149,7 @@ const profiles = [
     name: "mobile",
     viewport: { width: 390, height: 844 },
     desktop: false,
-    expectedRecentCards: null,
+    expectedRecentCards: 5,
     topicCount: 5,
   },
 ];
@@ -199,6 +199,17 @@ const installApiRoutes = async (context, topicCount) => {
 const settle = async (page) => {
   await page.evaluate(async () => {
     await document.fonts.ready;
+    await Promise.all(
+      [...document.images]
+        .filter((image) => {
+          const rect = image.getBoundingClientRect();
+          return rect.bottom >= 0
+            && rect.top <= window.innerHeight
+            && rect.right >= 0
+            && rect.left <= window.innerWidth;
+        })
+        .map((image) => image.decode().catch(() => undefined)),
+    );
     await new Promise((resolveFrame) => requestAnimationFrame(() => requestAnimationFrame(resolveFrame)));
   });
   await page.waitForTimeout(250);
@@ -253,7 +264,11 @@ try {
         const articles = [...document.querySelectorAll(".community-topic-grid > article")];
         const feed = document.querySelector(".community-feed");
         const more = document.querySelector(".community-more");
+        const search = document.querySelector(".community-search");
+        const filterRow = document.querySelector(".community-filter-row");
         const moreRect = more?.getBoundingClientRect();
+        const searchRect = search?.getBoundingClientRect();
+        const filterRect = filterRow?.getBoundingClientRect();
         return {
           ...(feed instanceof HTMLElement ? {
             feedBottom: Math.round(feed.getBoundingClientRect().bottom),
@@ -268,7 +283,11 @@ try {
           ...(moreRect ? {
             moreTop: Math.round(moreRect.top),
             moreBottom: Math.round(moreRect.bottom),
+            moreRight: Math.round(moreRect.right),
           } : {}),
+          searchRight: Math.round(searchRect?.right ?? 0),
+          filterTop: Math.round(filterRect?.top ?? 0),
+          filterBottom: Math.round(filterRect?.bottom ?? 0),
           cardRects: articles.map((article) => {
             const rect = article.getBoundingClientRect();
             const cover = article.querySelector(".community-topic-cover");
@@ -280,11 +299,14 @@ try {
               display: getComputedStyle(article).display,
               width: Math.round(rect.width),
               height: Math.round(rect.height),
+              top: Math.round(rect.top),
               bottom: Math.round(rect.bottom),
               clientHeight: article.clientHeight,
               scrollHeight: article.scrollHeight,
               coverWidth: Math.round(coverRect?.width ?? 0),
               coverHeight: Math.round(coverRect?.height ?? 0),
+              coverTop: Math.round(coverRect?.top ?? 0),
+              coverBottom: Math.round(coverRect?.bottom ?? 0),
               coverPosition: cover ? getComputedStyle(cover).position : "",
               coverAspectRatio: cover ? getComputedStyle(cover).aspectRatio : "",
               bodyHeight: Math.round(bodyRect?.height ?? 0),
@@ -302,6 +324,12 @@ try {
       if (recentLayout.documentWidth > recentLayout.viewportWidth + 2) {
         failures.push("community recent has document horizontal overflow");
       }
+      if (recentLayout.documentHeight > recentLayout.viewportHeight + 2) {
+        failures.push(
+          `community recent owns document vertical scroll `
+          + `(${recentLayout.documentHeight}px > ${recentLayout.viewportHeight}px)`,
+        );
+      }
       if (
         profile.expectedRecentCards !== null
         && recent.visibleCards !== profile.expectedRecentCards
@@ -312,8 +340,7 @@ try {
         );
       }
       if (
-        profile.desktop
-        && recent.cardRects.some((card) =>
+        recent.cardRects.some((card) =>
           card.display !== "none"
           && card.bottom > recent.feedBottom + 1
         )
@@ -321,22 +348,17 @@ try {
         failures.push("desktop recent card extends below its feed");
       }
       if (
-        profile.desktop
-        && recent.feedScrollHeight > recent.feedClientHeight + 2
+        recent.feedScrollHeight > recent.feedClientHeight + 2
       ) {
-        failures.push("desktop recent feed clips content instead of growing with it");
+        failures.push("community recent feed clips content");
       }
       if (
-        profile.desktop
-        && (
-          !recent.moreBottom
-          || recent.moreBottom > recent.feedBottom + 1
-          || recent.cardRects.some((card) =>
-            card.display !== "none" && card.bottom > recent.moreTop - 4
-          )
-        )
+        !recent.moreRight
+        || Math.abs(recent.moreRight - recent.searchRight) > 3
+        || recent.moreTop < recent.filterTop - 1
+        || recent.moreBottom > recent.filterBottom + 1
       ) {
-        failures.push("desktop recent More topics link overlaps or leaves its feed");
+        failures.push("community recent More topics is not aligned with the search/filter edge");
       }
       if (profile.desktop) {
         const visibleCardBottoms = recent.cardRects
@@ -344,34 +366,28 @@ try {
           .map((card) => card.bottom);
         const maxCardBottom = Math.max(...visibleCardBottoms);
         const cardToFeedGap = recent.feedBottom - maxCardBottom;
-        const moreToFeedGap = recent.feedBottom - recent.moreBottom;
-        if (cardToFeedGap < 32 || cardToFeedGap > 72) {
+        if (cardToFeedGap < 6 || cardToFeedGap > 26) {
           failures.push(
-            `desktop recent card-to-feed gap ${cardToFeedGap}px outside 32-72px`,
-          );
-        }
-        if (moreToFeedGap < 8 || moreToFeedGap > 32) {
-          failures.push(
-            `desktop recent More topics-to-feed gap ${moreToFeedGap}px outside 8-32px`,
+            `desktop recent card-to-feed gap ${cardToFeedGap}px outside 6-26px`,
           );
         }
       }
       if (
-        profile.desktop
-        && recent.cardRects.some((card) =>
+        recent.cardRects.some((card) =>
           card.display !== "none"
           && (
-            card.bodyHeight < 80
+            card.bodyHeight < 64
             || card.scrollHeight > card.clientHeight + 2
             || card.bodyScrollHeight > card.bodyClientHeight + 2
-            || Math.abs((card.coverHeight / Math.max(1, card.coverWidth)) - 1.25) > 0.03
+            || card.coverTop < card.top - 1
+            || card.coverBottom > card.bottom - card.bodyHeight + 2
             || card.titleScrollWidth > card.titleClientWidth + 2
           )
         )
       ) {
-        failures.push("desktop recent card cover or body is not fully contained");
+        failures.push("community recent card cover or body is not fully contained");
       }
-      await screenshot(page, `${prefix}-community-recent`, true);
+      await screenshot(page, `${prefix}-community-recent`);
 
       await page.locator(".community-topic-cover").first().click();
       const dialog = page.locator(".community-topic-dialog");
@@ -489,8 +505,18 @@ try {
         const header = document.querySelector(".site-header");
         const sidebar = document.querySelector(".manual-sidebar");
         const toggles = [...document.querySelectorAll(".manual-nav-toggle")];
+        const groupToggles = [...document.querySelectorAll(".manual-nav-group-row")];
+        const readerHeader = document.querySelector(".manual-reader-header");
+        const introductionHeading = document.querySelector(".manual-markdown > h1:first-child");
+        const introductionParagraphs = [];
+        let introductionSibling = introductionHeading?.nextElementSibling;
+        while (introductionSibling && introductionSibling.tagName !== "H2") {
+          if (introductionSibling.tagName === "P") introductionParagraphs.push(introductionSibling);
+          introductionSibling = introductionSibling.nextElementSibling;
+        }
         const headerRect = header?.getBoundingClientRect();
         const sidebarRect = sidebar?.getBoundingClientRect();
+        const brandRect = document.querySelector(".site-brand")?.getBoundingClientRect();
         const isWithinViewport = (selector) => {
           const element = document.querySelector(selector);
           if (!(element instanceof HTMLElement)) return false;
@@ -503,11 +529,29 @@ try {
           headerHeight: headerRect?.height ?? null,
           headerBottom: headerRect?.bottom ?? null,
           sidebarTop: sidebarRect?.top ?? null,
+          sidebarScrollHeight: sidebar instanceof HTMLElement ? sidebar.scrollHeight : null,
+          sidebarClientHeight: sidebar instanceof HTMLElement ? sidebar.clientHeight : null,
+          brandLeft: brandRect?.left ?? null,
           headerContentWithinViewport:
             isWithinViewport(".site-brand")
             && isWithinViewport(".site-header-actions"),
           toggleCount: toggles.length,
           expandedCount: toggles.filter((toggle) => toggle.getAttribute("aria-expanded") === "true").length,
+          expandedGroupCount: groupToggles.filter(
+            (toggle) => toggle.getAttribute("aria-expanded") === "true",
+          ).length,
+          groupToggleCount: groupToggles.length,
+          numericChapterLabelCount: [...document.querySelectorAll(
+            ".manual-nav-chapter-row > a > strong",
+          )].filter((label) => /^\d+\./u.test(label.textContent?.trim() ?? "")).length,
+          readerHeaderPdfPresent: Boolean(document.querySelector(".manual-reader-header > a")),
+          readerHeaderDescriptionPresent: Boolean(
+            document.querySelector(".manual-reader-header div > span"),
+          ),
+          readerHeaderBorderBottom: readerHeader instanceof HTMLElement
+            ? getComputedStyle(readerHeader).borderBottomWidth
+            : null,
+          introductionParagraphCount: introductionParagraphs.length,
           editionSubtitlePresent: Boolean(
             document.querySelector(".manual-sidebar-title span"),
           ),
@@ -518,6 +562,32 @@ try {
       if (initialManual.editionSubtitlePresent) failures.push("manual sidebar edition subtitle remains");
       if (!initialManual.toggleCount) failures.push("manual has no chapter toggles");
       if (initialManual.expandedCount) failures.push("manual chapters are not collapsed by default");
+      if (initialManual.expandedGroupCount) failures.push("manual step group is not collapsed by default");
+      if (initialManual.groupToggleCount !== 1) failures.push("manual five-step group is missing");
+      if (initialManual.numericChapterLabelCount) {
+        failures.push("manual chapter labels retain duplicate numeric prefixes");
+      }
+      if (initialManual.readerHeaderPdfPresent) failures.push("manual reader retains duplicate PDF action");
+      if (initialManual.readerHeaderDescriptionPresent) {
+        failures.push("manual reader retains the removed supporting description");
+      }
+      if (initialManual.readerHeaderBorderBottom !== "0px") {
+        failures.push("manual reader retains the faint separator above the first chapter");
+      }
+      if (initialManual.introductionParagraphCount !== 1) {
+        failures.push(
+          `manual introduction has ${initialManual.introductionParagraphCount} paragraphs instead of one`,
+        );
+      }
+      if (profile.desktop && initialManual.brandLeft !== null && initialManual.brandLeft > 25) {
+        failures.push(`manual brand remains ${initialManual.brandLeft}px from the left edge`);
+      }
+      if (
+        profile.desktop
+        && initialManual.sidebarScrollHeight > initialManual.sidebarClientHeight + 2
+      ) {
+        failures.push("collapsed manual navigation does not fit its initial sidebar viewport");
+      }
       if (!initialManual.headerContentWithinViewport) {
         failures.push("manual header content is clipped before scrolling");
       }
@@ -532,7 +602,9 @@ try {
       const chapterToggleLabels = await page.locator(".manual-nav-toggle").evaluateAll(
         (toggles) => toggles.map((toggle) => toggle.getAttribute("aria-label") ?? ""),
       );
-      const workspaceToggleIndex = chapterToggleLabels.findIndex((label) => /:\s*2\./u.test(label));
+      const workspaceToggleIndex = chapterToggleLabels.findIndex(
+        (label) => /:\s*(?:Workspace|工作区)/u.test(label),
+      );
       if (workspaceToggleIndex < 0) {
         failures.push("manual workspace chapter toggle is missing");
       } else {
@@ -544,8 +616,8 @@ try {
         }
       }
       const accountLabel = locale === "en"
-        ? "2.2 Accounts and data"
-        : "2.2 账户与数据";
+        ? "Accounts and data"
+        : "账户与数据";
       const accountLink = page.locator(".manual-sidebar").getByRole("link", {
         name: accountLabel,
         exact: true,
