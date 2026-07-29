@@ -1235,6 +1235,56 @@ def cancel_job(
     return job
 
 
+DeletedArtifactPayload = tuple[str, str]
+
+
+def cleanup_deleted_job_artifacts(
+    artifact_payloads: list[DeletedArtifactPayload],
+) -> None:
+    """Best-effort physical cleanup after the owning database rows commit.
+
+    A failed payload deletion intentionally leaves an orphan for the retention
+    scanner (or the S3 lifecycle policy). It must never roll back an already
+    committed user deletion or, conversely, run before that deletion commits.
+    """
+
+    if not artifact_payloads:
+        return
+    try:
+        storage = get_artifact_storage()
+    except Exception:
+        logger.exception("could not initialize storage for deleted Job cleanup")
+        return
+    for artifact_id, storage_path in artifact_payloads:
+        try:
+            if storage_path.startswith("s3://"):
+                if storage.exists(storage_path):
+                    storage.delete(storage_path)
+                continue
+            raw_path = Path(storage_path)
+            if ".." in raw_path.parts:
+                logger.warning(
+                    "skipping out-of-root artifact during job deletion; artifact_id=%s",
+                    artifact_id,
+                )
+                continue
+            if storage.exists(storage_path):
+                storage.delete(storage_path)
+        except ValueError:
+            # A stale or corrupted DB row must never make us touch a path
+            # outside configured storage roots. The committed metadata
+            # deletion still stands while that path remains untouched.
+            logger.warning(
+                "skipping forbidden artifact path during job deletion; artifact_id=%s",
+                artifact_id,
+            )
+        except Exception:
+            logger.exception(
+                "post-commit artifact cleanup failed; artifact_id=%s",
+                artifact_id,
+            )
+
+
 def delete_job(
     db: Session,
     job_id: str,
@@ -1242,7 +1292,10 @@ def delete_job(
     user: models.User | None = None,
     commit: bool = True,
     expected_control_version: int | None = None,
+    deferred_artifact_cleanup: list[DeletedArtifactPayload] | None = None,
 ) -> dict[str, object]:
+    if not commit and deferred_artifact_cleanup is None:
+        raise ValueError("deferred_artifact_cleanup is required when commit=False")
     job = get_job(db, job_id, user=user)
     expected_version = _expected_control_version(
         resource_kind="Job",
@@ -1302,8 +1355,11 @@ def delete_job(
             )
         )
     )
-    real_artifacts = [a for a in artifact_rows if not a.storage_path.startswith("mock://")]
-    storage = get_artifact_storage() if real_artifacts else None
+    artifact_payloads = [
+        (artifact.id, artifact.storage_path)
+        for artifact in artifact_rows
+        if not artifact.storage_path.startswith("mock://")
+    ]
     try:
         for artifact in artifact_rows:
             authorize_artifact_integrity_deletion(
@@ -1341,43 +1397,6 @@ def delete_job(
                     "Winner freeze deletion has a conflicting authorization.",
                     http_status=500,
                 )
-        for artifact in real_artifacts:
-            if storage is None:
-                continue
-            storage_path = artifact.storage_path
-            try:
-                if storage_path.startswith("s3://"):
-                    if storage.exists(storage_path):
-                        storage.delete(storage_path)
-                    continue
-                raw_path = Path(storage_path)
-                if ".." in raw_path.parts:
-                    logger.warning(
-                        "skipping out-of-root artifact during job deletion; artifact_id=%s",
-                        artifact.id,
-                    )
-                    continue
-                if not storage.exists(storage_path):
-                    continue
-                storage.delete(storage_path)
-            except JobServiceError:
-                raise
-            except ValueError:
-                # A stale or corrupted DB row must never make us touch a path
-                # outside configured storage roots, nor hold the job hostage.
-                # Drop the metadata with the job while leaving that path alone.
-                logger.warning(
-                    "skipping forbidden artifact path during job deletion; artifact_id=%s",
-                    artifact.id,
-                )
-                continue
-            except Exception as exc:
-                raise JobServiceError(
-                    "ARTIFACT_DELETE_FAILED",
-                    f"Failed to delete artifact_id={artifact.id}",
-                    http_status=500,
-                ) from exc
-
         for child in db.scalars(select(models.Job).where(models.Job.source_job_id == job.id)):
             child.source_job_id = None
         for artifact in artifact_rows:
@@ -1385,8 +1404,11 @@ def delete_job(
         db.delete(job)
         if commit:
             db.commit()
+            cleanup_deleted_job_artifacts(artifact_payloads)
         else:
             db.flush()
+            assert deferred_artifact_cleanup is not None
+            deferred_artifact_cleanup.extend(artifact_payloads)
         return {"id": job_id, "deleted": True}
     except Exception as exc:
         db.rollback()

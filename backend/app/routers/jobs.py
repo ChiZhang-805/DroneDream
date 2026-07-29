@@ -319,6 +319,7 @@ def delete_job(
     )
     if gate.replay is not None:
         return gate.replay
+    deferred_artifact_cleanup: list[job_service.DeletedArtifactPayload] = []
     try:
         payload = job_service.delete_job(
             db,
@@ -326,12 +327,19 @@ def delete_job(
             user=user,
             commit=False,
             expected_control_version=control_version,
+            deferred_artifact_cleanup=deferred_artifact_cleanup,
         )
     except job_service.JobServiceError as err:
         db.rollback()
         _raise(err)
     response = ok(payload)
-    return gate.complete(response, resource_type="job", resource_id=job_id)
+    committed_response = gate.complete(
+        response,
+        resource_type="job",
+        resource_id=job_id,
+    )
+    job_service.cleanup_deleted_job_artifacts(deferred_artifact_cleanup)
+    return committed_response
 
 
 @router.delete("/jobs/{job_id}/harness-experiences")

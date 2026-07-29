@@ -1016,6 +1016,97 @@ def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) 
         )
 
 
+def test_delete_job_commit_failure_preserves_artifact_payload(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app import models
+    from app.db import SessionLocal
+    from app.services import jobs as job_service
+
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    artifact_file = tmp_path / "mock_artifacts" / "commit-fence.bin"
+    artifact_file.parent.mkdir(parents=True, exist_ok=True)
+    artifact_file.write_bytes(b"must survive a database rollback")
+    with SessionLocal() as db:
+        stored_job = db.get(models.Job, job["id"])
+        assert stored_job is not None
+        stored_job.status = "COMPLETED"
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=stored_job.id,
+                artifact_type="log",
+                storage_path=str(artifact_file),
+            )
+        )
+        db.commit()
+
+    with SessionLocal() as db:
+        monkeypatch.setattr(
+            db,
+            "commit",
+            lambda: (_ for _ in ()).throw(RuntimeError("forced commit failure")),
+        )
+        with pytest.raises(RuntimeError, match="forced commit failure"):
+            job_service.delete_job(db, job["id"])
+
+    assert artifact_file.read_bytes() == b"must survive a database rollback"
+    with SessionLocal() as db:
+        assert db.get(models.Job, job["id"]) is not None
+        artifact = db.query(models.Artifact).filter_by(owner_id=job["id"]).one()
+        assert artifact.storage_path == str(artifact_file)
+
+
+def test_delete_job_keeps_committed_deletion_when_payload_cleanup_fails(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app import models
+    from app.db import SessionLocal
+    from app.services import jobs as job_service
+
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    artifact_file = tmp_path / "mock_artifacts" / "orphan-after-delete.bin"
+    artifact_file.parent.mkdir(parents=True, exist_ok=True)
+    artifact_file.write_bytes(b"retention cleanup may reclaim this orphan")
+    with SessionLocal() as db:
+        stored_job = db.get(models.Job, job["id"])
+        assert stored_job is not None
+        stored_job.status = "COMPLETED"
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=stored_job.id,
+                artifact_type="log",
+                storage_path=str(artifact_file),
+            )
+        )
+        db.commit()
+
+    class FailingStorage:
+        def exists(self, _storage_path: str) -> bool:
+            return True
+
+        def delete(self, _storage_path: str) -> None:
+            raise RuntimeError("forced payload cleanup failure")
+
+    monkeypatch.setattr(
+        job_service,
+        "get_artifact_storage",
+        lambda: FailingStorage(),
+    )
+    response = client.delete(f"/api/v1/jobs/{job['id']}")
+    assert response.status_code == 200, response.text
+    assert response.json()["data"] == {"id": job["id"], "deleted": True}
+    assert artifact_file.exists()
+    with SessionLocal() as db:
+        assert db.get(models.Job, job["id"]) is None
+        assert db.query(models.Artifact).filter_by(owner_id=job["id"]).count() == 0
+
+
 def test_delete_active_job_conflict(client: TestClient) -> None:
     job = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
     resp = client.delete(f"/api/v1/jobs/{job['id']}")
