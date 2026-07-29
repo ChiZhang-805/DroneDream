@@ -125,6 +125,21 @@ describe("environment-aware routing", () => {
       expect(children.find((route) => route.path === path)?.loader, path)
         .toBeUndefined();
     }
+    for (const path of [
+      "assistant",
+      "dashboard",
+      "jobs/new",
+      "jobs/:jobId",
+      "trials/:trialId",
+      "history",
+      "compare",
+      "desktop/setup",
+      "ece498",
+    ]) {
+      const route = children.find((candidate) => candidate.path === path);
+      expect(route?.lazy, path).toEqual(expect.any(Function));
+      expect(route?.element, path).toBeUndefined();
+    }
 
     router.dispose();
   });

@@ -9,15 +9,6 @@ import type { RouteObject } from "react-router-dom";
 import { AppShell } from "./AppShell";
 import { isDesktopRuntime } from "./desktop/bridge";
 import { getDesktopStartupGateSession } from "./desktop/startupGate";
-import { Dashboard } from "./pages/Dashboard";
-import { NewJobRoute } from "./pages/NewJobRoute";
-import { JobDetail } from "./pages/JobDetail";
-import { TrialDetail } from "./pages/TrialDetail";
-import { History } from "./pages/History";
-import { JobCompare } from "./pages/JobCompare";
-import { ECE498 } from "./pages/ECE498";
-import { DesktopSetup } from "./pages/DesktopSetup";
-import { ExperimentAssistant } from "./pages/ExperimentAssistant";
 
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
   const requireDesktopReadiness = (feature: "experiment" | "job") =>
@@ -41,34 +32,73 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         },
         {
           path: "assistant",
-          element: <ExperimentAssistant />,
+          lazy: async () => {
+            const { ExperimentAssistant } = await import("./pages/ExperimentAssistant");
+            return { Component: ExperimentAssistant };
+          },
           loader: requireDesktopReadiness("experiment"),
         },
-        { path: "dashboard", element: <Dashboard /> },
+        {
+          path: "dashboard",
+          lazy: async () => {
+            const { Dashboard } = await import("./pages/Dashboard");
+            return { Component: Dashboard };
+          },
+        },
         {
           path: "jobs/new",
-          element: <NewJobRoute />,
+          lazy: async () => {
+            const { NewJobRoute } = await import("./pages/NewJobRoute");
+            return { Component: NewJobRoute };
+          },
           loader: requireDesktopReadiness("experiment"),
         },
         {
           path: "jobs/:jobId",
-          element: <JobDetail />,
+          lazy: async () => {
+            const { JobDetail } = await import("./pages/JobDetail");
+            return { Component: JobDetail };
+          },
           loader: requireDesktopReadiness("job"),
         },
         {
           path: "trials/:trialId",
-          element: <TrialDetail />,
+          lazy: async () => {
+            const { TrialDetail } = await import("./pages/TrialDetail");
+            return { Component: TrialDetail };
+          },
           loader: requireDesktopReadiness("job"),
         },
-        { path: "history", element: <History /> },
+        {
+          path: "history",
+          lazy: async () => {
+            const { History } = await import("./pages/History");
+            return { Component: History };
+          },
+        },
         { path: "batches/*", loader: () => redirect("/dashboard") },
         {
           path: "compare",
-          element: <JobCompare />,
+          lazy: async () => {
+            const { JobCompare } = await import("./pages/JobCompare");
+            return { Component: JobCompare };
+          },
           loader: requireDesktopReadiness("job"),
         },
-        { path: "desktop/setup", element: <DesktopSetup /> },
-        { path: "ece498", element: <ECE498 /> },
+        {
+          path: "desktop/setup",
+          lazy: async () => {
+            const { DesktopSetup } = await import("./pages/DesktopSetup");
+            return { Component: DesktopSetup };
+          },
+        },
+        {
+          path: "ece498",
+          lazy: async () => {
+            const { ECE498 } = await import("./pages/ECE498");
+            return { Component: ECE498 };
+          },
+        },
         { path: "*", loader: () => redirect(fallbackPath) },
       ],
     },
