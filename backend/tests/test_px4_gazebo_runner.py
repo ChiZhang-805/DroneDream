@@ -380,14 +380,14 @@ def test_hover_track_has_independent_stationary_dwell_contract(tmp_path: Path) -
     assert reference["track_type"] == "hover"
     assert reference["hover_duration_s"] == 10.0
     assert len(reference["points"]) == 101
-    assert {
-        (point["x"], point["y"], point["z"]) for point in reference["points"]
-    } == {(0.0, 0.0, 3.0)}
+    assert {(point["x"], point["y"], point["z"]) for point in reference["points"]} == {
+        (0.0, 0.0, 3.0)
+    }
     raw = result["metrics"]["raw_metric_json"]
     assert raw["track_mode"] == "stationary_hover"
     assert raw["track_length_3d_m"] == 0.0
     assert raw["track_projection"] == "stationary_point_3d_projection"
-    assert raw["coverage_basis"] == "stationary_hover_time_in_tolerance"
+    assert raw["coverage_basis"] == ("stationary_hover_time_weighted_trapezoidal_in_tolerance")
     assert raw["hover_minimum_evaluation_duration_s"] == 10.0
     assert raw["px4_core_metric_evidence"]["projection_revision"] == (
         "stationary-point-3d-projection-1.0"

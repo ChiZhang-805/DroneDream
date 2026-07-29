@@ -32,7 +32,7 @@ PX4_EVALUATION_WINDOW_EVIDENCE_V1 = "dronedream.px4-evaluation-window-evidence/v
 PX4_EVALUATION_WINDOW_VERIFIER_REVISION = "px4-evaluation-window-verifier-1.0"
 PX4_OUTCOME_POLICY_V1 = "dronedream.px4-outcome-policy/v1"
 PX4_OUTCOME_EVIDENCE_V1 = "dronedream.px4-outcome-evidence/v1"
-PX4_OUTCOME_VERIFIER_REVISION = "px4-outcome-verifier-1.0"
+PX4_OUTCOME_VERIFIER_REVISION = "px4-outcome-verifier-1.1"
 PX4_PROGRESS_REVISION = "directed-continuous-arc-coverage-1.0"
 PX4_SCORE_REVISION = "rmse-plus-half-max-plus-duration-and-fixed-penalties-1.0"
 
@@ -213,7 +213,10 @@ class Px4OutcomeEvidenceV1(BaseModel):
 
     schema_id: Literal["dronedream.px4-outcome-evidence/v1"] = "dronedream.px4-outcome-evidence/v1"
     evidence_id: Sha256Id
-    verifier_revision: Literal["px4-outcome-verifier-1.0"] = "px4-outcome-verifier-1.0"
+    verifier_revision: Literal[
+        "px4-outcome-verifier-1.0",
+        "px4-outcome-verifier-1.1",
+    ] = "px4-outcome-verifier-1.1"
     outcome_policy_id: Sha256Id
     evaluation_policy_id: Sha256Id
     evaluation_window_evidence_id: Sha256Id
@@ -1449,9 +1452,7 @@ def _evaluate_track_progress(
     policy: Px4OutcomePolicyV1,
 ) -> _TrackProgress:
     if geometry.stationary:
-        valid_projections = [
-            projection for projection in projections if projection.error <= max_track_error
-        ]
+        in_tolerance = [projection.error <= max_track_error for projection in projections]
         duration_seconds = (
             max(0.0, float(samples[-1]["t"]) - float(samples[0]["t"])) if len(samples) >= 2 else 0.0
         )
@@ -1459,9 +1460,25 @@ def _evaluate_track_progress(
             1.0,
             duration_seconds / _HOVER_MIN_EVALUATION_DURATION_SECONDS,
         )
-        in_tolerance_fraction = len(valid_projections) / len(projections) if projections else 0.0
+        in_tolerance_duration = 0.0
+        for index in range(1, len(samples)):
+            interval_seconds = float(samples[index]["t"]) - float(samples[index - 1]["t"])
+            if interval_seconds <= 0:
+                raise Px4CoreMetricEvidenceError(
+                    "stationary hover coverage requires increasing timestamps"
+                )
+            in_tolerance_duration += (
+                0.5
+                * (float(in_tolerance[index - 1]) + float(in_tolerance[index]))
+                * interval_seconds
+            )
+        in_tolerance_fraction = (
+            min(1.0, in_tolerance_duration / duration_seconds)
+            if duration_seconds > 0
+            else float(bool(in_tolerance and in_tolerance[0]))
+        )
         coverage = in_tolerance_fraction * duration_fraction
-        reached = 0.0 if valid_projections else None
+        reached = 0.0 if any(in_tolerance) else None
         return _TrackProgress(
             coverage=coverage,
             directed_progress_fraction=coverage,
@@ -1987,7 +2004,7 @@ def require_px4_outcome_binding(
         ),
         "track_projection_comparison_limit": (_MAX_PROJECTION_SEGMENT_COMPARISONS),
         "coverage_basis": (
-            "stationary_hover_time_in_tolerance"
+            "stationary_hover_time_weighted_trapezoidal_in_tolerance"
             if stationary_hover
             else "union_of_traversed_polyline_arc_length"
         ),

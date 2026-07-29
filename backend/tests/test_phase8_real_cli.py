@@ -1250,6 +1250,73 @@ def test_px4_core_metric_model_rejects_mismatched_evidence_id(
         )
 
 
+def test_stationary_hover_coverage_is_weighted_by_elapsed_time() -> None:
+    samples = [{"t": float(index), "x": 0.0, "y": 0.0, "z": 3.0} for index in range(9)]
+    samples.append({"t": 11.0, "x": 2.0, "y": 0.0, "z": 3.0})
+    contract = compile_telemetry_semantic_contract(
+        samples=samples,
+        source_bytes=b"irregular-hover-telemetry",
+        source_kind="launcher_json",
+        extraction_revision="test-hover-time-weighting-1.0",
+        synthetic=False,
+    )
+    telemetry_payload = {
+        "schema_version": TELEMETRY_SCHEMA_V2,
+        "samples": samples,
+        "semantic_contract": contract.model_dump(mode="json"),
+    }
+    reference_payload = {
+        "schema_version": "dronedream.reference_track.v1",
+        "track_type": "hover",
+        "reference_track": [
+            {"x": 0.0, "y": 0.0, "z": 3.0},
+            {"x": 0.0, "y": 0.0, "z": 3.0},
+        ],
+    }
+    evaluation_policy = px4_evaluation_policy_from_environment({})
+    window = compile_px4_evaluation_window_evidence(
+        telemetry_payload=telemetry_payload,
+        reference_track_payload=reference_payload,
+        offboard_timing_payload=None,
+        policy=evaluation_policy,
+    )
+    core = compile_px4_core_metric_evidence(
+        telemetry_payload=telemetry_payload,
+        reference_track_payload=reference_payload,
+        evaluation_start_index=window.start_index,
+        evaluation_end_index=window.end_index,
+    )
+    scenario_request = build_scenario_effect_request(
+        execution_identity={
+            "trial_id": "hover-time-weighting",
+            "job_id": "hover-time-weighting",
+            "candidate_id": "baseline",
+            "seed": 1,
+            "attempt_count": 1,
+        },
+        scenario_type="nominal",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+
+    _policy, outcome = compile_px4_outcome_evidence(
+        telemetry_payload=telemetry_payload,
+        reference_track_payload=reference_payload,
+        evaluation_policy=evaluation_policy,
+        evaluation_window_evidence=window,
+        core_metric_evidence=core,
+        scenario_effect_request_payload=scenario_request,
+        scenario_effect_evidence_payload=None,
+    )
+
+    assert outcome.evaluation_track_coverage == pytest.approx(9.5 / 11.0, abs=1e-6)
+    assert outcome.pass_flag is False
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
