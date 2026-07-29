@@ -203,4 +203,27 @@ describe("cloud model access client", () => {
       }),
     }));
   });
+
+  it("rejects cloud work before fetch on the public HTTP mirror", async () => {
+    vi.stubGlobal("window", {
+      location: { href: "http://47.93.180.216/pricing/" },
+    });
+    const { cloud, auth } = await loadCloudAccess();
+    auth.setAuthAccessToken("signed-user-token");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(cloud.createBillingCheckout("plus", "wechat"))
+      .rejects.toMatchObject({
+        name: "CloudModelAccessError",
+        code: "INSECURE_ORIGIN",
+        status: 403,
+      });
+    await expect(cloud.issueManagedModelGrant("assistant"))
+      .rejects.toMatchObject({
+        code: "INSECURE_ORIGIN",
+        status: 403,
+      });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

@@ -112,4 +112,22 @@ describe("PricingPage payment channels", () => {
       "true",
     ]);
   });
+
+  it("keeps the HTTP mirror read-only without probing or creating billing", () => {
+    render(
+      <PricingPage
+        locale="en"
+        authenticated
+        onRequireAccount={vi.fn()}
+        sensitiveCloudActionsEnabled={false}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "This HTTP mirror is read-only.",
+    );
+    expect(screen.getByRole("button", { name: "Choose Plus" })).toBeDisabled();
+    expect(billingMock.getBillingAvailability).not.toHaveBeenCalled();
+    expect(billingMock.createBillingCheckout).not.toHaveBeenCalled();
+  });
 });

@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2.110.8";
+import { BoundedResponseError, readBoundedResponseText } from "../_shared/bounded_response.ts";
+import { sensitiveAllowedOrigins, SensitiveCorsError, sensitiveCorsHeaders } from "../_shared/sensitive_cors.ts";
 
 type JsonRecord = Record<string, unknown>;
 type ModelPurpose = "assistant" | "job";
@@ -6,7 +8,6 @@ type ModelPurpose = "assistant" | "job";
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://getdronedream.com",
   "https://www.getdronedream.com",
-  "http://47.93.180.216",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://tauri.localhost",
@@ -15,6 +16,10 @@ const DEFAULT_ALLOWED_ORIGINS = [
 const MAX_REQUEST_BYTES = 300_000;
 const MAX_MESSAGES = 128;
 const MAX_MESSAGE_CONTENT_BYTES = 262_144;
+const MODEL_PROVIDER_RESPONSE_BASE_BYTES = 32 * 1_024;
+const MODEL_PROVIDER_RESPONSE_BYTES_PER_OUTPUT_TOKEN = 64;
+const MODEL_PROVIDER_RESPONSE_HARD_CAP_BYTES = 1_024 * 1_024;
+const MODEL_PROVIDER_MAX_OUTPUT_TOKENS = 16_384;
 
 class GatewayError extends Error {
   readonly code: string;
@@ -60,29 +65,39 @@ function positiveIntegerEnv(
 }
 
 function allowedOrigins(): Set<string> {
-  const configured = Deno.env.get("MODEL_GATEWAY_ALLOWED_ORIGINS")
-    ?.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  return new Set(configured?.length ? configured : DEFAULT_ALLOWED_ORIGINS);
+  return sensitiveAllowedOrigins(
+    Deno.env.get("MODEL_GATEWAY_ALLOWED_ORIGINS"),
+    DEFAULT_ALLOWED_ORIGINS,
+  );
 }
 
 function corsHeaders(request: Request): HeadersInit {
-  const origin = request.headers.get("Origin");
-  if (!origin) return {};
-  if (!allowedOrigins().has(origin)) {
-    throw new GatewayError("ORIGIN_NOT_ALLOWED", "The request origin is not allowed.", 403);
+  if (!request.headers.get("Origin")) return {};
+  let originHeaders: HeadersInit;
+  try {
+    originHeaders = sensitiveCorsHeaders(request, allowedOrigins());
+  } catch (error) {
+    if (error instanceof SensitiveCorsError) {
+      throw new GatewayError(error.code, error.message, error.status);
+    }
+    throw error;
   }
   return {
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Headers":
-      "authorization, apikey, content-type, idempotency-key, x-client-info",
+    ...originHeaders,
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, idempotency-key, x-client-info",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Expose-Headers":
-      "x-dronedream-usage-estimated, x-dronedream-consumed-credits",
-    Vary: "Origin",
+    "Access-Control-Expose-Headers": "x-dronedream-usage-estimated, x-dronedream-consumed-credits",
   };
+}
+
+function uncorsedJsonResponse(status: number, body: JsonRecord): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 function jsonResponse(
@@ -104,6 +119,14 @@ function jsonResponse(
 
 function errorResponse(request: Request, error: unknown): Response {
   if (error instanceof GatewayError) {
+    if (
+      error.code === "ORIGIN_NOT_ALLOWED" ||
+      error.code === "ORIGIN_CONFIGURATION_INVALID"
+    ) {
+      return uncorsedJsonResponse(error.status, {
+        error: { code: error.code, message: error.message },
+      });
+    }
     return jsonResponse(request, error.status, {
       error: { code: error.code, message: error.message },
     });
@@ -157,7 +180,11 @@ function bearerToken(request: Request): string {
   const authorization = request.headers.get("Authorization")?.trim() ?? "";
   const match = /^Bearer\s+(.+)$/i.exec(authorization);
   if (!match?.[1]) {
-    throw new GatewayError("AUTHENTICATION_REQUIRED", "A bearer token is required.", 401);
+    throw new GatewayError(
+      "AUTHENTICATION_REQUIRED",
+      "A bearer token is required.",
+      401,
+    );
   }
   return match[1].trim();
 }
@@ -165,11 +192,19 @@ function bearerToken(request: Request): string {
 async function authenticatedUser(request: Request): Promise<User> {
   const token = bearerToken(request);
   if (token.startsWith("ddg_")) {
-    throw new GatewayError("AUTHENTICATION_REQUIRED", "A signed-in account is required.", 401);
+    throw new GatewayError(
+      "AUTHENTICATION_REQUIRED",
+      "A signed-in account is required.",
+      401,
+    );
   }
   const { data, error } = await adminClient().auth.getUser(token);
   if (error || !data.user) {
-    throw new GatewayError("AUTHENTICATION_REQUIRED", "The account session is invalid.", 401);
+    throw new GatewayError(
+      "AUTHENTICATION_REQUIRED",
+      "The account session is invalid.",
+      401,
+    );
   }
   return data.user;
 }
@@ -188,20 +223,36 @@ function isRecord(value: unknown): value is JsonRecord {
 async function readJsonBody(request: Request): Promise<JsonRecord> {
   const announcedLength = Number(request.headers.get("Content-Length") ?? "0");
   if (Number.isFinite(announcedLength) && announcedLength > MAX_REQUEST_BYTES) {
-    throw new GatewayError("REQUEST_TOO_LARGE", "The request body is too large.", 413);
+    throw new GatewayError(
+      "REQUEST_TOO_LARGE",
+      "The request body is too large.",
+      413,
+    );
   }
   const raw = await request.text();
   if (new TextEncoder().encode(raw).byteLength > MAX_REQUEST_BYTES) {
-    throw new GatewayError("REQUEST_TOO_LARGE", "The request body is too large.", 413);
+    throw new GatewayError(
+      "REQUEST_TOO_LARGE",
+      "The request body is too large.",
+      413,
+    );
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new GatewayError("INVALID_REQUEST", "The request body must be valid JSON.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "The request body must be valid JSON.",
+      400,
+    );
   }
   if (!isRecord(parsed)) {
-    throw new GatewayError("INVALID_REQUEST", "The request body must be a JSON object.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "The request body must be a JSON object.",
+      400,
+    );
   }
   return parsed;
 }
@@ -229,11 +280,15 @@ function newGrantToken(): string {
 function validScopeReference(value: unknown): string | null {
   if (value == null || value === "") return null;
   if (
-    typeof value !== "string"
-    || value.length > 128
-    || !/^[A-Za-z0-9_.:-]+$/u.test(value)
+    typeof value !== "string" ||
+    value.length > 128 ||
+    !/^[A-Za-z0-9_.:-]+$/u.test(value)
   ) {
-    throw new GatewayError("INVALID_REQUEST", "scope_reference is invalid.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "scope_reference is invalid.",
+      400,
+    );
   }
   return value;
 }
@@ -258,7 +313,11 @@ async function handleGrant(request: Request): Promise<Response> {
   const body = await readJsonBody(request);
   const scope = body.scope;
   if (scope !== "assistant" && scope !== "job") {
-    throw new GatewayError("INVALID_REQUEST", "scope must be assistant or job.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "scope must be assistant or job.",
+      400,
+    );
   }
   const token = newGrantToken();
   const tokenHash = await sha256Hex(token);
@@ -281,48 +340,79 @@ async function handleGrant(request: Request): Promise<Response> {
       scope,
       expires_at: data.expires_at,
       max_calls: data.max_calls,
-      gateway_base_url: requestUrl.toString().replace(/\/chat\/completions$/u, ""),
-      managed_model: Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim() || "DroneDream Managed",
+      gateway_base_url: requestUrl.toString().replace(
+        /\/chat\/completions$/u,
+        "",
+      ),
+      managed_model: Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim() ||
+        "DroneDream Managed",
       usage: await usageSnapshot(user.id),
     },
   });
 }
 
 function validateMessages(value: unknown): JsonRecord[] {
-  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_MESSAGES) {
-    throw new GatewayError("INVALID_REQUEST", "messages must be a non-empty bounded array.", 400);
+  if (
+    !Array.isArray(value) || value.length < 1 || value.length > MAX_MESSAGES
+  ) {
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "messages must be a non-empty bounded array.",
+      400,
+    );
   }
   let contentBytes = 0;
   const messages = value.map((item) => {
     if (!isRecord(item)) {
-      throw new GatewayError("INVALID_REQUEST", "Each message must be an object.", 400);
+      throw new GatewayError(
+        "INVALID_REQUEST",
+        "Each message must be an object.",
+        400,
+      );
     }
     if (!["system", "user", "assistant"].includes(String(item.role))) {
-      throw new GatewayError("INVALID_REQUEST", "A message role is not allowed.", 400);
+      throw new GatewayError(
+        "INVALID_REQUEST",
+        "A message role is not allowed.",
+        400,
+      );
     }
     if (typeof item.content !== "string") {
-      throw new GatewayError("INVALID_REQUEST", "Message content must be text.", 400);
+      throw new GatewayError(
+        "INVALID_REQUEST",
+        "Message content must be text.",
+        400,
+      );
     }
     contentBytes += new TextEncoder().encode(item.content).byteLength;
     return { role: item.role, content: item.content };
   });
   if (contentBytes > MAX_MESSAGE_CONTENT_BYTES) {
-    throw new GatewayError("MODEL_PROMPT_TOO_LARGE", "The model prompt is too large.", 413);
+    throw new GatewayError(
+      "MODEL_PROMPT_TOO_LARGE",
+      "The model prompt is too large.",
+      413,
+    );
   }
   return messages;
 }
 
 function idempotencyKey(request: Request): string {
-  const raw = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
+  const raw = request.headers.get("Idempotency-Key")?.trim() ||
+    crypto.randomUUID();
   if (raw.length < 8 || raw.length > 128 || !/^[A-Za-z0-9_.:-]+$/u.test(raw)) {
-    throw new GatewayError("INVALID_IDEMPOTENCY_KEY", "Idempotency-Key is invalid.", 400);
+    throw new GatewayError(
+      "INVALID_IDEMPOTENCY_KEY",
+      "Idempotency-Key is invalid.",
+      400,
+    );
   }
   return raw;
 }
 
 function providerConfiguration() {
-  const baseUrl = (Deno.env.get("PLATFORM_LLM_BASE_URL")?.trim()
-    || "https://api.openai.com/v1").replace(/\/+$/u, "");
+  const baseUrl = (Deno.env.get("PLATFORM_LLM_BASE_URL")?.trim() ||
+    "https://api.openai.com/v1").replace(/\/+$/u, "");
   const parsed = new URL(baseUrl);
   if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
     throw new GatewayError(
@@ -357,6 +447,30 @@ function providerConfiguration() {
   };
 }
 
+export function modelProviderResponseLimitBytes(
+  maxOutputTokens: number,
+): number {
+  const boundedTokens = Number.isSafeInteger(maxOutputTokens) &&
+      maxOutputTokens > 0
+    ? Math.min(maxOutputTokens, MODEL_PROVIDER_MAX_OUTPUT_TOKENS)
+    : 64;
+  return Math.min(
+    MODEL_PROVIDER_RESPONSE_HARD_CAP_BYTES,
+    MODEL_PROVIDER_RESPONSE_BASE_BYTES +
+      boundedTokens * MODEL_PROVIDER_RESPONSE_BYTES_PER_OUTPUT_TOKEN,
+  );
+}
+
+export function readModelProviderResponseBody(
+  response: Response,
+  maxOutputTokens: number,
+): Promise<string> {
+  return readBoundedResponseText(
+    response,
+    modelProviderResponseLimitBytes(maxOutputTokens),
+  );
+}
+
 function integerUsage(value: unknown): number | null {
   return Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : null;
 }
@@ -366,19 +480,29 @@ async function failReservation(requestId: string, code: string): Promise<void> {
     p_request_id: requestId,
     p_error_code: code,
   });
-  if (error) console.error("failed to release model reservation", requestId, error);
+  if (error) {
+    console.error("failed to release model reservation", requestId, error);
+  }
 }
 
 async function handleChatCompletions(request: Request): Promise<Response> {
   const grant = bearerToken(request);
   if (!grant.startsWith("ddg_") || grant.length < 40 || grant.length > 128) {
-    throw new GatewayError("MODEL_GRANT_INVALID", "The managed-model grant is invalid.", 401);
+    throw new GatewayError(
+      "MODEL_GRANT_INVALID",
+      "The managed-model grant is invalid.",
+      401,
+    );
   }
   const body = await readJsonBody(request);
   const messages = validateMessages(body.messages);
   const responseFormat = body.response_format;
   if (responseFormat != null && !isRecord(responseFormat)) {
-    throw new GatewayError("INVALID_REQUEST", "response_format must be an object.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "response_format must be an object.",
+      400,
+    );
   }
   const config = providerConfiguration();
   const requestKey = idempotencyKey(request);
@@ -390,11 +514,15 @@ async function handleChatCompletions(request: Request): Promise<Response> {
     .eq("token_sha256", tokenHash)
     .maybeSingle();
   if (
-    grantLookupError
-    || !isRecord(grantRecord)
-    || (grantRecord.scope !== "assistant" && grantRecord.scope !== "job")
+    grantLookupError ||
+    !isRecord(grantRecord) ||
+    (grantRecord.scope !== "assistant" && grantRecord.scope !== "job")
   ) {
-    throw new GatewayError("MODEL_GRANT_INVALID", "The managed-model grant is invalid.", 401);
+    throw new GatewayError(
+      "MODEL_GRANT_INVALID",
+      "The managed-model grant is invalid.",
+      401,
+    );
   }
   const purpose = grantRecord.scope as ModelPurpose;
   const serializedPromptBytes = new TextEncoder().encode(JSON.stringify({
@@ -403,8 +531,8 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   })).byteLength;
   // UTF-8 bytes are a conservative upper bound for byte-level model tokens.
   // Output is reserved at its configured maximum and weighted by policy.
-  const reservedCredits = serializedPromptBytes
-    + config.maxOutputTokens * config.outputCreditWeight;
+  const reservedCredits = serializedPromptBytes +
+    config.maxOutputTokens * config.outputCreditWeight;
   const { data: reservation, error: reserveError } = await adminClient().rpc(
     "model_usage_reserve",
     {
@@ -461,9 +589,27 @@ async function handleChatCompletions(request: Request): Promise<Response> {
     );
   }
 
-  const providerText = await providerResponse.text();
+  let providerText: string;
+  try {
+    providerText = await readModelProviderResponseBody(
+      providerResponse,
+      config.maxOutputTokens,
+    );
+  } catch (error) {
+    const rejectionCode = error instanceof BoundedResponseError ? error.code : "UPSTREAM_RESPONSE_READ_FAILED";
+    await failReservation(requestId, rejectionCode);
+    console.error("managed model provider response rejected", rejectionCode);
+    throw new GatewayError(
+      "MODEL_PROVIDER_INVALID_RESPONSE",
+      "The managed model provider returned an invalid response.",
+      502,
+    );
+  }
   if (!providerResponse.ok) {
-    await failReservation(requestId, `PROVIDER_HTTP_${providerResponse.status}`);
+    await failReservation(
+      requestId,
+      `PROVIDER_HTTP_${providerResponse.status}`,
+    );
     console.error("managed model provider HTTP error", providerResponse.status);
     throw new GatewayError(
       "MODEL_PROVIDER_FAILED",
@@ -475,7 +621,9 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   let providerJson: JsonRecord;
   try {
     const parsed: unknown = JSON.parse(providerText);
-    if (!isRecord(parsed)) throw new Error("provider response is not an object");
+    if (!isRecord(parsed)) {
+      throw new Error("provider response is not an object");
+    }
     providerJson = parsed;
   } catch {
     await failReservation(requestId, "PROVIDER_RESPONSE_INVALID");
@@ -490,12 +638,10 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   const inputTokens = integerUsage(usage?.prompt_tokens);
   const outputTokens = integerUsage(usage?.completion_tokens);
   const totalTokens = integerUsage(usage?.total_tokens);
-  const hasActualUsage = inputTokens !== null
-    && outputTokens !== null
-    && totalTokens === inputTokens + outputTokens;
-  const consumedCredits = hasActualUsage
-    ? inputTokens + outputTokens * config.outputCreditWeight
-    : reservedCredits;
+  const hasActualUsage = inputTokens !== null &&
+    outputTokens !== null &&
+    totalTokens === inputTokens + outputTokens;
+  const consumedCredits = hasActualUsage ? inputTokens + outputTokens * config.outputCreditWeight : reservedCredits;
   const { error: settleError } = await adminClient().rpc("model_usage_settle", {
     p_request_id: requestId,
     p_consumed_ai_credits: consumedCredits,
@@ -503,11 +649,14 @@ async function handleChatCompletions(request: Request): Promise<Response> {
     p_output_tokens: hasActualUsage ? outputTokens : null,
     p_total_tokens: hasActualUsage ? totalTokens : null,
     p_usage_estimated: !hasActualUsage,
-    p_provider_request_id:
-      typeof providerJson.id === "string" ? providerJson.id : null,
+    p_provider_request_id: typeof providerJson.id === "string" ? providerJson.id : null,
   });
   if (settleError) {
-    console.error("managed model usage settlement failed", requestId, settleError);
+    console.error(
+      "managed model usage settlement failed",
+      requestId,
+      settleError,
+    );
     throw new GatewayError(
       "MODEL_USAGE_SETTLEMENT_FAILED",
       "The model response was produced but its allowance receipt could not be sealed.",
@@ -517,8 +666,8 @@ async function handleChatCompletions(request: Request): Promise<Response> {
 
   // The managed service deliberately exposes a stable DroneDream alias rather
   // than leaking or coupling clients to the upstream provider/model choice.
-  providerJson.model = Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim()
-    || "DroneDream Managed";
+  providerJson.model = Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim() ||
+    "DroneDream Managed";
   delete providerJson.system_fingerprint;
   return new Response(JSON.stringify(providerJson), {
     status: 200,
@@ -532,7 +681,9 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   });
 }
 
-Deno.serve(async (request: Request) => {
+export async function handleModelGatewayRequest(
+  request: Request,
+): Promise<Response> {
   try {
     const cors = corsHeaders(request);
     if (request.method === "OPTIONS") {
@@ -549,9 +700,16 @@ Deno.serve(async (request: Request) => {
       return await handleChatCompletions(request);
     }
     return jsonResponse(request, 404, {
-      error: { code: "NOT_FOUND", message: "The model-gateway route was not found." },
+      error: {
+        code: "NOT_FOUND",
+        message: "The model-gateway route was not found.",
+      },
     });
   } catch (error) {
     return errorResponse(request, error);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleModelGatewayRequest);
+}

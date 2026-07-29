@@ -57,6 +57,7 @@ import {
 import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import { sensitiveCloudActionsAllowed } from "./security/sensitiveOrigin";
 import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
 import {
   captchaProtectionConfigured,
@@ -234,6 +235,31 @@ async function stopDesktopRuntimeBeforeExit(): Promise<void> {
 }
 
 export function AppShell() {
+  const { locale } = useI18n();
+  if (!sensitiveCloudActionsAllowed()) {
+    const copy = locale === "zh-CN"
+      ? {
+          title: "安全控制台不可用",
+          body:
+            "当前 HTTP 镜像仅提供公开浏览与下载。账户、托管模型、社区写入和支付操作须等待可信 HTTPS 入口。",
+          back: "返回公共网站",
+        }
+      : {
+          title: "Secure console unavailable",
+          body:
+            "This HTTP mirror is limited to public viewing and downloads. Account, managed-model, community-write, and payment actions require a trusted HTTPS origin.",
+          back: "Return to the public site",
+        };
+    return (
+      <main className="startup-screen" aria-labelledby="insecure-console-title">
+        <section className="startup-card">
+          <h1 id="insecure-console-title">{copy.title}</h1>
+          <p>{copy.body}</p>
+          <a href="/">{copy.back}</a>
+        </section>
+      </main>
+    );
+  }
   return (
     <AuthProvider>
       <DesktopRuntimeAccessProvider>

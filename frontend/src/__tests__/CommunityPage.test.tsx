@@ -130,6 +130,42 @@ describe("CommunityPage public data loading", () => {
     expect(screen.getByRole("link", { name: "More topics" })).toBeVisible();
   });
 
+  it("keeps the HTTP mirror anonymous and prevents every community write entry", async () => {
+    render(
+      <CommunityPage
+        locale="en"
+        account={{
+          id: "00000000-0000-0000-0000-000000000002",
+          email: "pilot@example.com",
+          displayName: "Pilot",
+          avatarUrl: null,
+        }}
+        onRequireAccount={vi.fn()}
+        sensitiveCloudActionsEnabled={false}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", {
+      name: "Stable hover evidence",
+    })).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "This HTTP mirror is read-only.",
+    );
+    expect(screen.getByRole("button", { name: "Create a topic" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "7 likes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete topic" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", {
+      name: "Open discussion: Stable hover evidence",
+    }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Stable hover evidence",
+    });
+    expect(within(dialog).queryByRole("textbox", {
+      name: "Add a useful observation or a reproducible next step…",
+    })).toBeNull();
+    expect(supabaseMock.from).not.toHaveBeenCalled();
+  });
+
   it("loads only the selected topic's comments when opening a discussion", async () => {
     render(
       <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,

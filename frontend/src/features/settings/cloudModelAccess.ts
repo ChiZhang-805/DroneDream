@@ -1,4 +1,5 @@
 import { getAuthAccessToken } from "../auth/authTokenStore";
+import { sensitiveCloudActionsAllowed } from "../../security/sensitiveOrigin";
 
 export type ManagedModelPlanId = "free" | "plus" | "pro";
 export type ManagedModelGrantScope = "assistant" | "job";
@@ -135,6 +136,13 @@ async function cloudRequest<T>(
   init?: RequestInit,
   authenticated = true,
 ): Promise<T> {
+  if (!sensitiveCloudActionsAllowed()) {
+    throw new CloudModelAccessError(
+      "INSECURE_ORIGIN",
+      "Cloud account, model, and payment actions are disabled on this HTTP mirror.",
+      403,
+    );
+  }
   if (!baseUrl) {
     throw new CloudModelAccessError(
       "SERVICE_NOT_CONFIGURED",

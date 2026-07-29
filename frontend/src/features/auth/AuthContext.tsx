@@ -13,6 +13,7 @@ import type { Provider, User } from "@supabase/supabase-js";
 import { isDesktopRuntime } from "../../desktop/bridge";
 import { clearAllExperimentDrafts } from "../experiment/draftStorage";
 import { setAuthAccessToken } from "./authTokenStore";
+import { sensitiveCloudActionsAllowed } from "../../security/sensitiveOrigin";
 import {
   appleAuthEnabled,
   cloudAuthConfigured,
@@ -129,10 +130,18 @@ function providerRedirectUrl(): string {
   return redirect.toString();
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const docsPreview = import.meta.env.DEV &&
+export function AuthProvider({
+  children,
+  cloudActionsEnabled = sensitiveCloudActionsAllowed(),
+}: {
+  children: ReactNode;
+  cloudActionsEnabled?: boolean;
+}) {
+  const docsPreview = cloudActionsEnabled && import.meta.env.DEV &&
     new URLSearchParams(window.location.search).has("docsPreview");
-  const [loading, setLoading] = useState(cloudAuthConfigured && !docsPreview);
+  const [loading, setLoading] = useState(
+    cloudActionsEnabled && cloudAuthConfigured && !docsPreview,
+  );
   const [account, setAccount] = useState<DroneDreamAccount | null>(
     docsPreview
       ? {
@@ -158,6 +167,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (docsPreview) return undefined;
+    if (!cloudActionsEnabled) {
+      setAuthAccessToken(null);
+      setAccount(null);
+      setLoading(false);
+      return undefined;
+    }
     if (!supabaseClient) {
       setLoading(false);
       return undefined;
@@ -182,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [adoptUser, docsPreview]);
+  }, [adoptUser, cloudActionsEnabled, docsPreview]);
 
   const signInWithPassword = useCallback(async (
     email: string,
@@ -305,21 +320,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      configured: cloudAuthConfigured || docsPreview,
+      configured: cloudActionsEnabled && (cloudAuthConfigured || docsPreview),
       loading,
       account,
       googleEnabled: googleAuthEnabled && !isDesktopRuntime(),
       appleEnabled: appleAuthEnabled && !isDesktopRuntime(),
-      signInWithPassword,
-      sendRegistrationCode,
-      verifyRegistrationCode,
-      signInWithProvider,
-      updateDisplayName,
-      updateAvatar,
-      signOut,
+      signInWithPassword: cloudActionsEnabled
+        ? signInWithPassword
+        : unavailableAuthAction,
+      sendRegistrationCode: cloudActionsEnabled
+        ? sendRegistrationCode
+        : unavailableAuthAction,
+      verifyRegistrationCode: cloudActionsEnabled
+        ? verifyRegistrationCode
+        : unavailableAuthAction,
+      signInWithProvider: cloudActionsEnabled
+        ? signInWithProvider
+        : unavailableAuthAction,
+      updateDisplayName: cloudActionsEnabled
+        ? updateDisplayName
+        : unavailableAuthAction,
+      updateAvatar: cloudActionsEnabled ? updateAvatar : unavailableAuthAction,
+      signOut: cloudActionsEnabled ? signOut : unavailableAuthAction,
     }),
     [
       account,
+      cloudActionsEnabled,
       docsPreview,
       loading,
       sendRegistrationCode,

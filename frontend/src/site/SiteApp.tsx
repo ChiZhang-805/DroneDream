@@ -9,6 +9,7 @@ import {
 } from "../features/auth/supabaseClient";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
+import { sensitiveCloudActionsAllowed } from "../security/sensitiveOrigin";
 import { CommunityPage } from "./CommunityPage";
 import { ManualPage } from "./ManualPage";
 import { PricingPage } from "./PricingPage";
@@ -48,6 +49,8 @@ const content = {
     closeMenu: "Close navigation",
     downloadShort: "Preview EXE",
     console: "Console",
+    insecureMirror:
+      "This HTTP mirror is read-only; secure account and console actions are disabled.",
     signIn: "Sign in",
     register: "Register",
     account: "Account",
@@ -236,6 +239,7 @@ const content = {
     closeMenu: "关闭导航",
     downloadShort: "预览版 EXE",
     console: "控制台",
+    insecureMirror: "当前 HTTP 镜像仅供只读浏览与下载；账户和控制台操作已禁用。",
     signIn: "登录",
     register: "注册",
     account: "账号",
@@ -749,7 +753,11 @@ function StarflightIcon() {
   );
 }
 
-export function SiteApp() {
+export function SiteApp({
+  sensitiveCloudActionsEnabled = sensitiveCloudActionsAllowed(),
+}: {
+  sensitiveCloudActionsEnabled?: boolean;
+}) {
   const { locale, setLocale } = useI18n();
   const auth = useAuthOrLocal();
   const copy = content[locale];
@@ -1108,12 +1116,21 @@ export function SiteApp() {
           {copy.nav.map(([label, target]) => (
             <a key={target} href={target} onClick={closeMenu}>{label}</a>
           ))}
-          <button type="button" onClick={openConsole}>{copy.console}</button>
+          <button
+            type="button"
+            disabled={!sensitiveCloudActionsEnabled}
+            title={!sensitiveCloudActionsEnabled ? copy.insecureMirror : undefined}
+            onClick={openConsole}
+          >
+            {copy.console}
+          </button>
         </nav>
         <div className="site-header-actions">
           <button
             type="button"
             className="site-account-button"
+            disabled={!sensitiveCloudActionsEnabled}
+            title={!sensitiveCloudActionsEnabled ? copy.insecureMirror : undefined}
             onClick={() => openAccount("sign-in")}
           >
             <AccountIcon />
@@ -1155,12 +1172,14 @@ export function SiteApp() {
             locale={locale}
             authenticated={Boolean(auth.account)}
             onRequireAccount={() => openAccount("register")}
+            sensitiveCloudActionsEnabled={sensitiveCloudActionsEnabled}
           />
         ) : sitePage === "community" ? (
           <CommunityPage
             locale={locale}
             account={auth.account}
             onRequireAccount={() => openAccount("sign-in")}
+            sensitiveCloudActionsEnabled={sensitiveCloudActionsEnabled}
           />
         ) : (
           <>

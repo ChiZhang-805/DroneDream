@@ -167,6 +167,16 @@ body:has(#site-root) a {
 .site-nav button:hover::after,
 .site-nav button:focus-visible::after { right: 0; left: 0; }
 
+.site-nav button:disabled,
+.site-account-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.site-nav button:disabled::after {
+  display: none;
+}
+
 .site-header-actions {
   display: flex;
   align-items: center;
@@ -1561,6 +1571,13 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .community-hero button svg,
 .community-comment-form > button svg { width: 19px; }
+
+.community-hero > button:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+  filter: grayscale(0.55);
+  cursor: not-allowed;
+}
 
 .community-feed {
   display: flex;
@@ -4544,4 +4561,14 @@ html[lang="zh-CN"] .community-cover-art > strong {
     min-height: 0;
     height: auto;
   }
+}
+.site-security-notice {
+  margin: 0 auto 1rem;
+  max-width: min(100% - 2rem, 112rem);
+  border: 1px solid rgba(126, 87, 194, 0.28);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(126, 87, 194, 0.08);
+  color: #3d3158;
+  font-size: 0.9rem;
 }

@@ -106,6 +106,21 @@ describe("DroneDream public website", () => {
     ));
   });
 
+  it("keeps static downloads available while HTTP-mirror sensitive entries are disabled", () => {
+    render(
+      <I18nProvider>
+        <SiteApp sensitiveCloudActionsEnabled={false} />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Download Windows preview" }))
+      .toHaveAttribute("href", fallbackRelease.downloadUrl);
+    expect(screen.getByRole("link", { name: "Download preview" }))
+      .toHaveAttribute("href", fallbackRelease.downloadUrl);
+  });
+
   it("flips capability cards and browses their localized detail carousel", async () => {
     renderSite();
 

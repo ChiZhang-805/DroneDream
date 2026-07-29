@@ -49,6 +49,7 @@ interface PricingPageProps {
   locale: SiteLocale;
   authenticated: boolean;
   onRequireAccount: () => void;
+  sensitiveCloudActionsEnabled?: boolean;
 }
 
 interface Plan {
@@ -121,6 +122,8 @@ const pricingContent = {
     card: "Credit or debit card",
     continue: "Continue to payment",
     availabilityFailed: "Payment methods are temporarily unavailable.",
+    insecureMirror:
+      "This HTTP mirror is read-only. Account and payment actions require a trusted HTTPS site.",
     paymentFailed: "The payment order could not be created.",
     qrTitle: "Scan with WeChat to pay",
     qrAlt: "WeChat Pay QR code",
@@ -158,6 +161,8 @@ const pricingContent = {
     card: "信用卡或借记卡",
     continue: "继续付款",
     availabilityFailed: "支付方式暂时不可用。",
+    insecureMirror:
+      "当前 HTTP 镜像仅供只读浏览与下载；账户和支付操作须在可信 HTTPS 网站中使用。",
     paymentFailed: "暂时无法创建支付订单。",
     qrTitle: "请使用微信扫码支付",
     qrAlt: "微信支付二维码",
@@ -174,6 +179,7 @@ export function PricingPage({
   locale,
   authenticated,
   onRequireAccount,
+  sensitiveCloudActionsEnabled = true,
 }: PricingPageProps) {
   const copy = pricingContent[locale];
   const [audience, setAudience] = useState<Audience>("individual");
@@ -196,6 +202,13 @@ export function PricingPage({
   });
 
   useEffect(() => {
+    if (!sensitiveCloudActionsEnabled) {
+      setAvailability(null);
+      setPaymentState("error");
+      setPaymentMessage(copy.insecureMirror);
+      setWechatQr(null);
+      return undefined;
+    }
     let active = true;
     setPaymentState("checking");
     setPaymentMessage(null);
@@ -236,7 +249,11 @@ export function PricingPage({
     return () => {
       active = false;
     };
-  }, [copy.availabilityFailed]);
+  }, [
+    copy.availabilityFailed,
+    copy.insecureMirror,
+    sensitiveCloudActionsEnabled,
+  ]);
 
   const plans: readonly Plan[] = availability?.plans.length === 3
     ? availability.plans.map((plan) => ({
@@ -249,6 +266,10 @@ export function PricingPage({
     : PLANS;
 
   const choosePlan = (plan: Plan) => {
+    if (!sensitiveCloudActionsEnabled) {
+      setPaymentMessage(copy.insecureMirror);
+      return;
+    }
     if (!authenticated) {
       onRequireAccount();
       return;
@@ -259,6 +280,10 @@ export function PricingPage({
   };
 
   const startPayment = async () => {
+    if (!sensitiveCloudActionsEnabled) {
+      setPaymentMessage(copy.insecureMirror);
+      return;
+    }
     if (!selectedPlan || selectedPlan.id === "free") return;
     setPaymentState("creating");
     setPaymentMessage(null);
@@ -348,6 +373,11 @@ export function PricingPage({
           <span aria-hidden="true" className="portal-title-mobile">{copy.mobileTitle}</span>
         </h1>
       </header>
+      {!sensitiveCloudActionsEnabled ? (
+        <p className="site-security-notice" role="status">
+          {copy.insecureMirror}
+        </p>
+      ) : null}
 
       <div className="pricing-audience" role="tablist" aria-label={copy.audienceLabel}>
         <button
@@ -404,6 +434,8 @@ export function PricingPage({
             <button
               type="button"
               className={plan.featured ? "is-primary" : ""}
+              disabled={!sensitiveCloudActionsEnabled}
+              title={!sensitiveCloudActionsEnabled ? copy.insecureMirror : undefined}
               onClick={() => choosePlan(plan)}
             >
               {plan.id === "free" ? copy.start : `${copy.upgrade} ${plan.name}`}

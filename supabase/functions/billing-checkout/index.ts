@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2.110.8";
+import { BoundedResponseError, readBoundedResponseText } from "../_shared/bounded_response.ts";
+import { sensitiveAllowedOrigins, SensitiveCorsError, sensitiveCorsHeaders } from "../_shared/sensitive_cors.ts";
 
 type JsonRecord = Record<string, unknown>;
 type PaymentMethod = "alipay" | "wechat" | "card";
@@ -6,13 +8,13 @@ type PaymentMethod = "alipay" | "wechat" | "card";
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://getdronedream.com",
   "https://www.getdronedream.com",
-  "http://47.93.180.216",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://tauri.localhost",
   "tauri://localhost",
 ];
 const MAX_BODY_BYTES = 128_000;
+const PAYMENT_PROVIDER_RESPONSE_MAX_BYTES = 64 * 1_024;
 
 class BillingError extends Error {
   readonly code: string;
@@ -43,26 +45,58 @@ function requiredEnv(name: string): string {
 }
 
 function allowedOrigins(): Set<string> {
-  const configured = env("BILLING_ALLOWED_ORIGINS")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  return new Set(configured.length ? configured : DEFAULT_ALLOWED_ORIGINS);
+  return sensitiveAllowedOrigins(
+    Deno.env.get("BILLING_ALLOWED_ORIGINS"),
+    DEFAULT_ALLOWED_ORIGINS,
+  );
 }
 
 function corsHeaders(request: Request): HeadersInit {
-  const origin = request.headers.get("Origin");
-  if (!origin) return {};
-  if (!allowedOrigins().has(origin)) {
-    throw new BillingError("ORIGIN_NOT_ALLOWED", "The request origin is not allowed.", 403);
+  if (!request.headers.get("Origin")) return {};
+  let originHeaders: HeadersInit;
+  try {
+    originHeaders = sensitiveCorsHeaders(request, allowedOrigins());
+  } catch (error) {
+    if (error instanceof SensitiveCorsError) {
+      throw new BillingError(error.code, error.message, error.status);
+    }
+    throw error;
   }
   return {
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Credentials": "true",
+    ...originHeaders,
     "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    Vary: "Origin",
   };
+}
+
+function uncorsedJsonResponse(status: number, body: JsonRecord): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+export async function readPaymentProviderResponseBody(
+  response: Response,
+  provider: "wechat" | "stripe",
+): Promise<string> {
+  try {
+    return await readBoundedResponseText(
+      response,
+      PAYMENT_PROVIDER_RESPONSE_MAX_BYTES,
+    );
+  } catch (error) {
+    const rejectionCode = error instanceof BoundedResponseError ? error.code : "UPSTREAM_RESPONSE_READ_FAILED";
+    console.error(`${provider} provider response rejected`, rejectionCode);
+    throw new BillingError(
+      "PAYMENT_PROVIDER_FAILED",
+      "The payment provider returned an invalid response.",
+      502,
+    );
+  }
 }
 
 function jsonResponse(
@@ -116,15 +150,25 @@ function bearerToken(request: Request): string {
     request.headers.get("Authorization")?.trim() ?? "",
   );
   if (!match?.[1]) {
-    throw new BillingError("AUTHENTICATION_REQUIRED", "Sign in before checkout.", 401);
+    throw new BillingError(
+      "AUTHENTICATION_REQUIRED",
+      "Sign in before checkout.",
+      401,
+    );
   }
   return match[1].trim();
 }
 
 async function authenticatedUser(request: Request): Promise<User> {
-  const { data, error } = await adminClient().auth.getUser(bearerToken(request));
+  const { data, error } = await adminClient().auth.getUser(
+    bearerToken(request),
+  );
   if (error || !data.user) {
-    throw new BillingError("AUTHENTICATION_REQUIRED", "The account session is invalid.", 401);
+    throw new BillingError(
+      "AUTHENTICATION_REQUIRED",
+      "The account session is invalid.",
+      401,
+    );
   }
   return data.user;
 }
@@ -132,11 +176,19 @@ async function authenticatedUser(request: Request): Promise<User> {
 async function readBodyText(request: Request): Promise<string> {
   const announced = Number(request.headers.get("Content-Length") ?? "0");
   if (Number.isFinite(announced) && announced > MAX_BODY_BYTES) {
-    throw new BillingError("REQUEST_TOO_LARGE", "The request body is too large.", 413);
+    throw new BillingError(
+      "REQUEST_TOO_LARGE",
+      "The request body is too large.",
+      413,
+    );
   }
   const raw = await request.text();
   if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) {
-    throw new BillingError("REQUEST_TOO_LARGE", "The request body is too large.", 413);
+    throw new BillingError(
+      "REQUEST_TOO_LARGE",
+      "The request body is too large.",
+      413,
+    );
   }
   return raw;
 }
@@ -148,7 +200,11 @@ async function readJsonBody(request: Request): Promise<JsonRecord> {
     if (!isRecord(parsed)) throw new Error("body is not an object");
     return parsed;
   } catch {
-    throw new BillingError("INVALID_REQUEST", "The request body must be valid JSON.", 400);
+    throw new BillingError(
+      "INVALID_REQUEST",
+      "The request body must be valid JSON.",
+      400,
+    );
   }
 }
 
@@ -223,20 +279,31 @@ async function availability(): Promise<JsonRecord> {
   };
 }
 
-function pemBytes(value: string, label: "PRIVATE KEY" | "PUBLIC KEY"): Uint8Array {
+function pemBytes(
+  value: string,
+  label: "PRIVATE KEY" | "PUBLIC KEY",
+): Uint8Array {
   const normalized = value.replaceAll("\\n", "\n");
   const body = normalized
     .replace(`-----BEGIN ${label}-----`, "")
     .replace(`-----END ${label}-----`, "")
     .replace(/\s+/gu, "");
   if (!body) {
-    throw new BillingError("PAYMENT_NOT_CONFIGURED", "A payment signing key is invalid.", 503);
+    throw new BillingError(
+      "PAYMENT_NOT_CONFIGURED",
+      "A payment signing key is invalid.",
+      503,
+    );
   }
   let binary: string;
   try {
     binary = atob(body);
   } catch {
-    throw new BillingError("PAYMENT_NOT_CONFIGURED", "A payment signing key is invalid.", 503);
+    throw new BillingError(
+      "PAYMENT_NOT_CONFIGURED",
+      "A payment signing key is invalid.",
+      503,
+    );
   }
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
@@ -253,7 +320,10 @@ function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 
-export async function rsaSign(message: string, privateKeyPem: string): Promise<string> {
+export async function rsaSign(
+  message: string,
+  privateKeyPem: string,
+): Promise<string> {
   const key = await crypto.subtle.importKey(
     "pkcs8",
     arrayBuffer(pemBytes(privateKeyPem, "PRIVATE KEY")),
@@ -276,8 +346,9 @@ export async function rsaVerify(
 ): Promise<boolean> {
   let signature: Uint8Array;
   try {
-    signature = Uint8Array.from(atob(signatureBase64), (character) =>
-      character.charCodeAt(0)
+    signature = Uint8Array.from(
+      atob(signatureBase64),
+      (character) => character.charCodeAt(0),
     );
   } catch {
     return false;
@@ -316,17 +387,19 @@ async function hmacSha256Hex(secret: string, value: string): Promise<string> {
     false,
     ["sign"],
   );
-  return bytesToHex(new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)),
-  ));
+  return bytesToHex(
+    new Uint8Array(
+      await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value)),
+    ),
+  );
 }
 
 function constantTimeHexEqual(left: string, right: string): boolean {
   if (
-    left.length !== right.length
-    || left.length === 0
-    || !/^[0-9a-f]+$/iu.test(left)
-    || !/^[0-9a-f]+$/iu.test(right)
+    left.length !== right.length ||
+    left.length === 0 ||
+    !/^[0-9a-f]+$/iu.test(left) ||
+    !/^[0-9a-f]+$/iu.test(right)
   ) {
     return false;
   }
@@ -352,11 +425,11 @@ export async function verifyStripeSignature(
     .filter((component) => component.startsWith("v1="))
     .map((component) => component.slice(3));
   if (
-    !webhookSecret
-    || !Number.isSafeInteger(timestamp)
-    || timestamp <= 0
-    || Math.abs(nowMilliseconds / 1_000 - timestamp) > 300
-    || signatures.length === 0
+    !webhookSecret ||
+    !Number.isSafeInteger(timestamp) ||
+    timestamp <= 0 ||
+    Math.abs(nowMilliseconds / 1_000 - timestamp) > 300 ||
+    signatures.length === 0
   ) {
     return false;
   }
@@ -383,10 +456,10 @@ export function alipayNotificationProtocolMatches(
   expectedAppId: string,
   expectedSellerId: string,
 ): boolean {
-  return parameters.get("sign_type") === "RSA2"
-    && parameters.get("app_id") === expectedAppId
-    && parameters.get("seller_id") === expectedSellerId
-    && ["TRADE_SUCCESS", "TRADE_FINISHED"].includes(
+  return parameters.get("sign_type") === "RSA2" &&
+    parameters.get("app_id") === expectedAppId &&
+    parameters.get("seller_id") === expectedSellerId &&
+    ["TRADE_SUCCESS", "TRADE_FINISHED"].includes(
       parameters.get("trade_status") ?? "",
     );
 }
@@ -403,8 +476,8 @@ function alipayTimestamp(): string {
     hourCycle: "h23",
   }).formatToParts(new Date());
   const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  return `${value("year")}-${value("month")}-${value("day")} `
-    + `${value("hour")}:${value("minute")}:${value("second")}`;
+  return `${value("year")}-${value("month")}-${value("day")} ` +
+    `${value("hour")}:${value("minute")}:${value("second")}`;
 }
 
 function fenToYuan(amount: number): string {
@@ -422,15 +495,19 @@ interface PaymentOrder {
 
 function asOrder(value: unknown): PaymentOrder {
   if (
-    !isRecord(value)
-    || typeof value.order_id !== "string"
-    || (value.plan_id !== "plus" && value.plan_id !== "pro")
-    || !isPaymentMethod(value.payment_method)
-    || !Number.isSafeInteger(value.amount_cny_fen)
-    || typeof value.status !== "string"
-    || typeof value.checkout_expires_at !== "string"
+    !isRecord(value) ||
+    typeof value.order_id !== "string" ||
+    (value.plan_id !== "plus" && value.plan_id !== "pro") ||
+    !isPaymentMethod(value.payment_method) ||
+    !Number.isSafeInteger(value.amount_cny_fen) ||
+    typeof value.status !== "string" ||
+    typeof value.checkout_expires_at !== "string"
   ) {
-    throw new BillingError("PAYMENT_ORDER_INVALID", "The payment order is invalid.", 500);
+    throw new BillingError(
+      "PAYMENT_ORDER_INVALID",
+      "The payment order is invalid.",
+      500,
+    );
   }
   return value as unknown as PaymentOrder;
 }
@@ -482,13 +559,13 @@ async function wechatAuthorization(
     `${method}\n${path}\n${timestamp}\n${nonce}\n${body}\n`,
     requiredEnv("WECHAT_MERCHANT_PRIVATE_KEY_PKCS8"),
   );
-  const quote = (value: string) => value.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"");
-  return "WECHATPAY2-SHA256-RSA2048 "
-    + `mchid="${quote(requiredEnv("WECHAT_MCH_ID"))}",`
-    + `nonce_str="${quote(nonce)}",`
-    + `timestamp="${timestamp}",`
-    + `serial_no="${quote(requiredEnv("WECHAT_MERCHANT_CERT_SERIAL"))}",`
-    + `signature="${quote(signature)}"`;
+  const quote = (value: string) => value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+  return "WECHATPAY2-SHA256-RSA2048 " +
+    `mchid="${quote(requiredEnv("WECHAT_MCH_ID"))}",` +
+    `nonce_str="${quote(nonce)}",` +
+    `timestamp="${timestamp}",` +
+    `serial_no="${quote(requiredEnv("WECHAT_MERCHANT_CERT_SERIAL"))}",` +
+    `signature="${quote(signature)}"`;
 }
 
 async function createWechatCheckout(order: PaymentOrder): Promise<JsonRecord> {
@@ -512,17 +589,20 @@ async function createWechatCheckout(order: PaymentOrder): Promise<JsonRecord> {
     body,
     signal: AbortSignal.timeout(30_000),
   });
-  const responseText = await response.text();
+  const responseText = await readPaymentProviderResponseBody(
+    response,
+    "wechat",
+  );
   const responseTimestamp = response.headers.get("Wechatpay-Timestamp") ?? "";
   const responseNonce = response.headers.get("Wechatpay-Nonce") ?? "";
   const responseSignature = response.headers.get("Wechatpay-Signature") ?? "";
   const responseSerial = response.headers.get("Wechatpay-Serial") ?? "";
   const responseTimestampNumber = Number(responseTimestamp);
-  const responseSignatureValid = responseSerial
-    === requiredEnv("WECHAT_PLATFORM_CERTIFICATE_SERIAL")
-    && Number.isSafeInteger(responseTimestampNumber)
-    && Math.abs(Date.now() / 1_000 - responseTimestampNumber) <= 300
-    && await rsaVerify(
+  const responseSignatureValid = responseSerial ===
+      requiredEnv("WECHAT_PLATFORM_CERTIFICATE_SERIAL") &&
+    Number.isSafeInteger(responseTimestampNumber) &&
+    Math.abs(Date.now() / 1_000 - responseTimestampNumber) <= 300 &&
+    await rsaVerify(
       `${responseTimestamp}\n${responseNonce}\n${responseText}\n`,
       responseSignature,
       requiredEnv("WECHAT_PLATFORM_PUBLIC_KEY_SPKI"),
@@ -534,10 +614,10 @@ async function createWechatCheckout(order: PaymentOrder): Promise<JsonRecord> {
     responseJson = null;
   }
   if (
-    !response.ok
-    || !responseSignatureValid
-    || !isRecord(responseJson)
-    || typeof responseJson.code_url !== "string"
+    !response.ok ||
+    !responseSignatureValid ||
+    !isRecord(responseJson) ||
+    typeof responseJson.code_url !== "string"
   ) {
     console.error("WeChat checkout creation failed", response.status);
     throw new BillingError(
@@ -559,8 +639,7 @@ async function createCardCheckout(order: PaymentOrder): Promise<JsonRecord> {
     "line_items[0][quantity]": "1",
     "line_items[0][price_data][currency]": "cny",
     "line_items[0][price_data][unit_amount]": String(order.amount_cny_fen),
-    "line_items[0][price_data][product_data][name]":
-      `DroneDream ${order.plan_id === "plus" ? "Plus" : "Pro"} · 1 month`,
+    "line_items[0][price_data][product_data][name]": `DroneDream ${order.plan_id === "plus" ? "Plus" : "Pro"} · 1 month`,
     "metadata[order_id]": order.order_id,
     "metadata[plan_id]": order.plan_id,
     "payment_intent_data[metadata][order_id]": order.order_id,
@@ -580,34 +659,35 @@ async function createCardCheckout(order: PaymentOrder): Promise<JsonRecord> {
     body: parameters.toString(),
     signal: AbortSignal.timeout(30_000),
   });
-  const responseText = await response.text();
+  const responseText = await readPaymentProviderResponseBody(
+    response,
+    "stripe",
+  );
   let responseJson: unknown;
   try {
     responseJson = JSON.parse(responseText);
   } catch {
     responseJson = null;
   }
-  const checkoutUrl = isRecord(responseJson) && typeof responseJson.url === "string"
-    ? responseJson.url
-    : "";
+  const checkoutUrl = isRecord(responseJson) && typeof responseJson.url === "string" ? responseJson.url : "";
   let trustedCheckoutUrl = false;
   try {
     const parsed = new URL(checkoutUrl);
-    trustedCheckoutUrl = parsed.protocol === "https:"
-      && (
-        parsed.hostname === "checkout.stripe.com"
-        || parsed.hostname.endsWith(".checkout.stripe.com")
+    trustedCheckoutUrl = parsed.protocol === "https:" &&
+      (
+        parsed.hostname === "checkout.stripe.com" ||
+        parsed.hostname.endsWith(".checkout.stripe.com")
       );
   } catch {
     trustedCheckoutUrl = false;
   }
   if (
-    !response.ok
-    || !isRecord(responseJson)
-    || responseJson.object !== "checkout.session"
-    || typeof responseJson.id !== "string"
-    || !responseJson.id.startsWith("cs_")
-    || !trustedCheckoutUrl
+    !response.ok ||
+    !isRecord(responseJson) ||
+    responseJson.object !== "checkout.session" ||
+    typeof responseJson.id !== "string" ||
+    !responseJson.id.startsWith("cs_") ||
+    !trustedCheckoutUrl
   ) {
     console.error("Card checkout creation failed", response.status);
     throw new BillingError(
@@ -625,10 +705,14 @@ async function handleCreate(request: Request): Promise<Response> {
   const planId = body.plan_id;
   const paymentMethod = body.payment_method;
   if (
-    (planId !== "plus" && planId !== "pro")
-    || !isPaymentMethod(paymentMethod)
+    (planId !== "plus" && planId !== "pro") ||
+    !isPaymentMethod(paymentMethod)
   ) {
-    throw new BillingError("INVALID_REQUEST", "Choose Plus or Pro and a payment method.", 400);
+    throw new BillingError(
+      "INVALID_REQUEST",
+      "Choose Plus or Pro and a payment method.",
+      400,
+    );
   }
   if (!channelConfigured(paymentMethod)) {
     throw new BillingError(
@@ -637,15 +721,17 @@ async function handleCreate(request: Request): Promise<Response> {
       503,
     );
   }
-  const idempotencyKey = typeof body.idempotency_key === "string"
-    ? body.idempotency_key
-    : crypto.randomUUID();
+  const idempotencyKey = typeof body.idempotency_key === "string" ? body.idempotency_key : crypto.randomUUID();
   if (
-    idempotencyKey.length < 8
-    || idempotencyKey.length > 128
-    || !/^[A-Za-z0-9_.:-]+$/u.test(idempotencyKey)
+    idempotencyKey.length < 8 ||
+    idempotencyKey.length > 128 ||
+    !/^[A-Za-z0-9_.:-]+$/u.test(idempotencyKey)
   ) {
-    throw new BillingError("INVALID_REQUEST", "The checkout idempotency key is invalid.", 400);
+    throw new BillingError(
+      "INVALID_REQUEST",
+      "The checkout idempotency key is invalid.",
+      400,
+    );
   }
   const { data, error } = await adminClient().rpc("billing_create_order", {
     p_user_id: user.id,
@@ -657,13 +743,17 @@ async function handleCreate(request: Request): Promise<Response> {
   if (error) throw error;
   const order = asOrder(data);
   if (order.status !== "pending") {
-    throw new BillingError("PAYMENT_ORDER_NOT_PAYABLE", "This order is no longer payable.", 409);
+    throw new BillingError(
+      "PAYMENT_ORDER_NOT_PAYABLE",
+      "This order is no longer payable.",
+      409,
+    );
   }
   const checkout = paymentMethod === "alipay"
     ? await createAlipayCheckout(order)
     : paymentMethod === "wechat"
-      ? await createWechatCheckout(order)
-      : await createCardCheckout(order);
+    ? await createWechatCheckout(order)
+    : await createCardCheckout(order);
   return jsonResponse(request, 201, {
     data: {
       order_id: order.order_id,
@@ -677,15 +767,24 @@ async function handleCreate(request: Request): Promise<Response> {
   });
 }
 
-async function paymentOrder(orderId: string, method: PaymentMethod): Promise<PaymentOrder> {
+async function paymentOrder(
+  orderId: string,
+  method: PaymentMethod,
+): Promise<PaymentOrder> {
   const { data, error } = await adminClient()
     .from("payment_orders")
-    .select("order_id,plan_id,payment_method,amount_cny_fen,status,checkout_expires_at")
+    .select(
+      "order_id,plan_id,payment_method,amount_cny_fen,status,checkout_expires_at",
+    )
     .eq("order_id", orderId)
     .eq("payment_method", method)
     .maybeSingle();
   if (error || !data) {
-    throw new BillingError("PAYMENT_ORDER_NOT_FOUND", "The payment order was not found.", 404);
+    throw new BillingError(
+      "PAYMENT_ORDER_NOT_FOUND",
+      "The payment order was not found.",
+      404,
+    );
   }
   return asOrder(data);
 }
@@ -723,15 +822,15 @@ async function handleAlipayNotify(request: Request): Promise<Response> {
   const transactionId = parameters.get("trade_no") ?? "";
   const eventReference = parameters.get("notify_id") ?? transactionId;
   if (
-    !verified
-    || !alipayNotificationProtocolMatches(
+    !verified ||
+    !alipayNotificationProtocolMatches(
       parameters,
       requiredEnv("ALIPAY_APP_ID"),
       requiredEnv("ALIPAY_SELLER_ID"),
-    )
-    || !/^[0-9a-f-]{36}$/iu.test(orderId)
-    || !transactionId
-    || !eventReference
+    ) ||
+    !/^[0-9a-f-]{36}$/iu.test(orderId) ||
+    !transactionId ||
+    !eventReference
   ) {
     return new Response("failure", { status: 400 });
   }
@@ -761,15 +860,19 @@ function base64Bytes(value: string): Uint8Array {
   return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
 }
 
-async function decryptWechatResource(resource: JsonRecord): Promise<JsonRecord> {
+async function decryptWechatResource(
+  resource: JsonRecord,
+): Promise<JsonRecord> {
   const ciphertext = typeof resource.ciphertext === "string" ? resource.ciphertext : "";
   const nonce = typeof resource.nonce === "string" ? resource.nonce : "";
-  const associatedData = typeof resource.associated_data === "string"
-    ? resource.associated_data
-    : "";
+  const associatedData = typeof resource.associated_data === "string" ? resource.associated_data : "";
   const keyBytes = new TextEncoder().encode(requiredEnv("WECHAT_API_V3_KEY"));
   if (keyBytes.byteLength !== 32 || !ciphertext || !nonce) {
-    throw new BillingError("PAYMENT_NOTIFICATION_INVALID", "Invalid WeChat resource.", 400);
+    throw new BillingError(
+      "PAYMENT_NOTIFICATION_INVALID",
+      "Invalid WeChat resource.",
+      400,
+    );
   }
   const key = await crypto.subtle.importKey(
     "raw",
@@ -790,7 +893,11 @@ async function decryptWechatResource(resource: JsonRecord): Promise<JsonRecord> 
   );
   const parsed: unknown = JSON.parse(new TextDecoder().decode(plaintext));
   if (!isRecord(parsed)) {
-    throw new BillingError("PAYMENT_NOTIFICATION_INVALID", "Invalid WeChat resource.", 400);
+    throw new BillingError(
+      "PAYMENT_NOTIFICATION_INVALID",
+      "Invalid WeChat resource.",
+      400,
+    );
   }
   return parsed;
 }
@@ -802,16 +909,19 @@ export function isWechatTransactionSuccessEnvelope(
     return false;
   }
   const resource = value.resource;
-  return isRecord(resource)
-    && resource.algorithm === "AEAD_AES_256_GCM"
-    && resource.original_type === "transaction"
-    && typeof resource.ciphertext === "string"
-    && typeof resource.nonce === "string";
+  return isRecord(resource) &&
+    resource.algorithm === "AEAD_AES_256_GCM" &&
+    resource.original_type === "transaction" &&
+    typeof resource.ciphertext === "string" &&
+    typeof resource.nonce === "string";
 }
 
 async function handleWechatNotify(request: Request): Promise<Response> {
   if (!wechatConfigured()) {
-    return jsonResponse(request, 503, { code: "FAIL", message: "not configured" });
+    return jsonResponse(request, 503, {
+      code: "FAIL",
+      message: "not configured",
+    });
   }
   const raw = await readBodyText(request);
   const timestamp = request.headers.get("Wechatpay-Timestamp") ?? "";
@@ -820,16 +930,19 @@ async function handleWechatNotify(request: Request): Promise<Response> {
   const serial = request.headers.get("Wechatpay-Serial") ?? "";
   const timestampNumber = Number(timestamp);
   if (
-    serial !== requiredEnv("WECHAT_PLATFORM_CERTIFICATE_SERIAL")
-    || !Number.isSafeInteger(timestampNumber)
-    || Math.abs(Date.now() / 1_000 - timestampNumber) > 300
-    || !await rsaVerify(
+    serial !== requiredEnv("WECHAT_PLATFORM_CERTIFICATE_SERIAL") ||
+    !Number.isSafeInteger(timestampNumber) ||
+    Math.abs(Date.now() / 1_000 - timestampNumber) > 300 ||
+    !await rsaVerify(
       `${timestamp}\n${nonce}\n${raw}\n`,
       signature,
       requiredEnv("WECHAT_PLATFORM_PUBLIC_KEY_SPKI"),
     )
   ) {
-    return jsonResponse(request, 401, { code: "FAIL", message: "invalid signature" });
+    return jsonResponse(request, 401, {
+      code: "FAIL",
+      message: "invalid signature",
+    });
   }
   try {
     const notification: unknown = JSON.parse(raw);
@@ -838,20 +951,18 @@ async function handleWechatNotify(request: Request): Promise<Response> {
     }
     const resource = await decryptWechatResource(notification.resource);
     const orderId = typeof resource.out_trade_no === "string" ? resource.out_trade_no : "";
-    const transactionId = typeof resource.transaction_id === "string"
-      ? resource.transaction_id
-      : "";
+    const transactionId = typeof resource.transaction_id === "string" ? resource.transaction_id : "";
     const eventReference = typeof notification.id === "string" ? notification.id : "";
     const amount = isRecord(resource.amount) ? resource.amount : null;
     const order = await paymentOrder(orderId, "wechat");
     if (
-      resource.trade_state !== "SUCCESS"
-      || resource.appid !== requiredEnv("WECHAT_APP_ID")
-      || resource.mchid !== requiredEnv("WECHAT_MCH_ID")
-      || integerValue(amount?.total) !== order.amount_cny_fen
-      || amount?.currency !== "CNY"
-      || !transactionId
-      || !eventReference
+      resource.trade_state !== "SUCCESS" ||
+      resource.appid !== requiredEnv("WECHAT_APP_ID") ||
+      resource.mchid !== requiredEnv("WECHAT_MCH_ID") ||
+      integerValue(amount?.total) !== order.amount_cny_fen ||
+      amount?.currency !== "CNY" ||
+      !transactionId ||
+      !eventReference
     ) {
       throw new Error("notification fields do not match the order");
     }
@@ -865,7 +976,10 @@ async function handleWechatNotify(request: Request): Promise<Response> {
     return jsonResponse(request, 200, { code: "SUCCESS", message: "成功" });
   } catch (error) {
     console.error("WeChat notification processing failed", error);
-    return jsonResponse(request, 500, { code: "FAIL", message: "processing failed" });
+    return jsonResponse(request, 500, {
+      code: "FAIL",
+      message: "processing failed",
+    });
   }
 }
 
@@ -891,12 +1005,12 @@ async function handleCardNotify(request: Request): Promise<Response> {
     return new Response("invalid payload", { status: 400 });
   }
   if (
-    !isRecord(event)
-    || typeof event.id !== "string"
-    || !event.id.startsWith("evt_")
-    || typeof event.type !== "string"
-    || !isRecord(event.data)
-    || !isRecord(event.data.object)
+    !isRecord(event) ||
+    typeof event.id !== "string" ||
+    !event.id.startsWith("evt_") ||
+    typeof event.type !== "string" ||
+    !isRecord(event.data) ||
+    !isRecord(event.data.object)
   ) {
     return new Response("invalid payload", { status: 400 });
   }
@@ -905,31 +1019,27 @@ async function handleCardNotify(request: Request): Promise<Response> {
   }
   const session = event.data.object;
   const metadata = isRecord(session.metadata) ? session.metadata : null;
-  const orderId = typeof session.client_reference_id === "string"
-    ? session.client_reference_id
-    : "";
+  const orderId = typeof session.client_reference_id === "string" ? session.client_reference_id : "";
   const sessionId = typeof session.id === "string" ? session.id : "";
-  const paymentIntent = typeof session.payment_intent === "string"
-    ? session.payment_intent
-    : "";
+  const paymentIntent = typeof session.payment_intent === "string" ? session.payment_intent : "";
   if (
-    session.object !== "checkout.session"
-    || session.mode !== "payment"
-    || session.payment_status !== "paid"
-    || session.status !== "complete"
-    || session.currency !== "cny"
-    || metadata?.order_id !== orderId
-    || !/^[0-9a-f-]{36}$/iu.test(orderId)
-    || !sessionId.startsWith("cs_")
-    || !paymentIntent.startsWith("pi_")
+    session.object !== "checkout.session" ||
+    session.mode !== "payment" ||
+    session.payment_status !== "paid" ||
+    session.status !== "complete" ||
+    session.currency !== "cny" ||
+    metadata?.order_id !== orderId ||
+    !/^[0-9a-f-]{36}$/iu.test(orderId) ||
+    !sessionId.startsWith("cs_") ||
+    !paymentIntent.startsWith("pi_")
   ) {
     return new Response("payment fields do not match", { status: 400 });
   }
   try {
     const order = await paymentOrder(orderId, "card");
     if (
-      metadata?.plan_id !== order.plan_id
-      || integerValue(session.amount_total) !== order.amount_cny_fen
+      metadata?.plan_id !== order.plan_id ||
+      integerValue(session.amount_total) !== order.amount_cny_fen
     ) {
       return new Response("payment amount does not match", { status: 400 });
     }
@@ -953,6 +1063,14 @@ function integerValue(value: unknown): number | null {
 
 function errorResponse(request: Request, error: unknown): Response {
   if (error instanceof BillingError) {
+    if (
+      error.code === "ORIGIN_NOT_ALLOWED" ||
+      error.code === "ORIGIN_CONFIGURATION_INVALID"
+    ) {
+      return uncorsedJsonResponse(error.status, {
+        error: { code: error.code, message: error.message },
+      });
+    }
     return jsonResponse(request, error.status, {
       error: { code: error.code, message: error.message },
     });
@@ -965,7 +1083,10 @@ function errorResponse(request: Request, error: unknown): Response {
   ].find((code) => rawMessage.includes(code));
   if (knownCode) {
     return jsonResponse(request, 409, {
-      error: { code: knownCode, message: "The checkout order could not be created." },
+      error: {
+        code: knownCode,
+        message: "The checkout order could not be created.",
+      },
     });
   }
   console.error("billing-checkout unexpected error", error);
@@ -974,7 +1095,9 @@ function errorResponse(request: Request, error: unknown): Response {
   });
 }
 
-export async function handleBillingRequest(request: Request): Promise<Response> {
+export async function handleBillingRequest(
+  request: Request,
+): Promise<Response> {
   const path = endpointPath(request);
   // Provider callbacks do not use browser CORS and must receive their exact
   // protocol acknowledgements instead of the generic JSON envelope.

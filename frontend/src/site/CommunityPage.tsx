@@ -45,6 +45,7 @@ interface CommunityPageProps {
   locale: SiteLocale;
   account: DroneDreamAccount | null;
   onRequireAccount: () => void;
+  sensitiveCloudActionsEnabled?: boolean;
 }
 
 interface CommunityTopic {
@@ -106,6 +107,8 @@ const communityContent = {
     empty: "No topic matches this view. Start the first evidence-backed discussion.",
     loading: "Loading community topics…",
     unavailable: "The community connection is temporarily unavailable.",
+    insecureMirror:
+      "This HTTP mirror is read-only. Sign-in and community contributions require a trusted HTTPS site.",
     titleLabel: "Topic title",
     titlePlaceholder: "What should the community help you understand?",
     bodyLabel: "Evidence and context",
@@ -158,6 +161,8 @@ const communityContent = {
     empty: "当前视图没有匹配的话题；你可以发起第一场有证据的讨论。",
     loading: "正在加载社区话题……",
     unavailable: "社区连接暂时不可用。",
+    insecureMirror:
+      "当前 HTTP 镜像仅供只读浏览与下载；登录和社区写入须在可信 HTTPS 网站中使用。",
     titleLabel: "话题标题",
     titlePlaceholder: "你希望社区帮助理解什么问题？",
     bodyLabel: "证据与背景",
@@ -305,6 +310,7 @@ export function CommunityPage({
   locale,
   account,
   onRequireAccount,
+  sensitiveCloudActionsEnabled = true,
 }: CommunityPageProps) {
   const copy = communityContent[locale];
   const presets = tagOptions[locale];
@@ -446,6 +452,10 @@ export function CommunityPage({
   };
 
   const startTopic = () => {
+    if (!sensitiveCloudActionsEnabled) {
+      setFeedError(copy.insecureMirror);
+      return;
+    }
     if (!account) {
       onRequireAccount();
       return;
@@ -496,7 +506,11 @@ export function CommunityPage({
   };
 
   const removeUploadedImages = async (paths: string[]) => {
-    if (!supabaseClient || paths.length === 0) return;
+    if (
+      !sensitiveCloudActionsEnabled
+      || !supabaseClient
+      || paths.length === 0
+    ) return;
     const { error: removeError } = await supabaseClient.storage
       .from("community-media")
       .remove(paths);
@@ -506,7 +520,12 @@ export function CommunityPage({
   };
 
   const uploadImages = async () => {
-    if (!account || !supabaseClient || files.length === 0) {
+    if (
+      !sensitiveCloudActionsEnabled
+      || !account
+      || !supabaseClient
+      || files.length === 0
+    ) {
       return { urls: [] as string[], paths: [] as string[] };
     }
     const urls: string[] = [];
@@ -535,7 +554,12 @@ export function CommunityPage({
 
   const publish = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!account || !supabaseClient || publishing) return;
+    if (
+      !sensitiveCloudActionsEnabled
+      || !account
+      || !supabaseClient
+      || publishing
+    ) return;
     setPublishing(true);
     setComposerError(null);
     let uploadedPaths: string[] = [];
@@ -570,6 +594,7 @@ export function CommunityPage({
   const deleteTopic = async (topic: CommunityTopic) => {
     if (
       !account ||
+      !sensitiveCloudActionsEnabled ||
       account.id !== topic.author_id ||
       !supabaseClient ||
       deletingTopicId
@@ -616,6 +641,10 @@ export function CommunityPage({
   };
 
   const toggleTopicLike = async (topicId: string) => {
+    if (!sensitiveCloudActionsEnabled) {
+      setFeedError(copy.insecureMirror);
+      return;
+    }
     if (!account || !supabaseClient) {
       onRequireAccount();
       return;
@@ -653,6 +682,10 @@ export function CommunityPage({
   };
 
   const toggleCommentLike = async (commentId: string) => {
+    if (!sensitiveCloudActionsEnabled) {
+      setDialogError(copy.insecureMirror);
+      return;
+    }
     if (!account || !supabaseClient) {
       onRequireAccount();
       return;
@@ -689,7 +722,13 @@ export function CommunityPage({
 
   const publishComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!account || !selectedTopic || !supabaseClient || !commentBody.trim()) return;
+    if (
+      !sensitiveCloudActionsEnabled
+      || !account
+      || !selectedTopic
+      || !supabaseClient
+      || !commentBody.trim()
+    ) return;
     setDialogError(null);
     const { error: requestError } = await supabaseClient.from("community_comments").insert({
       topic_id: selectedTopic.id,
@@ -728,11 +767,21 @@ export function CommunityPage({
           </h1>
           <p>{copy.intro}</p>
         </div>
-        <button type="button" onClick={startTopic}>
+        <button
+          type="button"
+          disabled={!sensitiveCloudActionsEnabled}
+          title={!sensitiveCloudActionsEnabled ? copy.insecureMirror : undefined}
+          onClick={startTopic}
+        >
           <PenLine aria-hidden="true" />
           {account ? copy.newTopic : copy.signIn}
         </button>
       </header>
+      {!sensitiveCloudActionsEnabled ? (
+        <p className="site-security-notice" role="status">
+          {copy.insecureMirror}
+        </p>
+      ) : null}
 
       <section className="community-feed" aria-labelledby="community-feed-heading">
         <header className="community-feed-heading">
@@ -830,6 +879,7 @@ export function CommunityPage({
                       className={liked ? "is-liked" : ""}
                       aria-label={`${topic.like_count} ${copy.likes}`}
                       aria-pressed={liked}
+                      disabled={!sensitiveCloudActionsEnabled}
                       onClick={() => void toggleTopicLike(topic.id)}
                     >
                       <Heart aria-hidden="true" />
@@ -847,7 +897,10 @@ export function CommunityPage({
                       <button
                         type="button"
                         className="community-topic-delete"
-                        disabled={deletingTopicId === topic.id}
+                        disabled={
+                          !sensitiveCloudActionsEnabled
+                          || deletingTopicId === topic.id
+                        }
                         onClick={() => void deleteTopic(topic)}
                         aria-label={copy.deleteTopic}
                         title={copy.deleteTopic}
@@ -1113,6 +1166,7 @@ export function CommunityPage({
                       account && selectedTopic.liked_by_viewer ? "is-liked" : ""
                     }
                     aria-pressed={Boolean(account && selectedTopic.liked_by_viewer)}
+                    disabled={!sensitiveCloudActionsEnabled}
                     onClick={() => void toggleTopicLike(selectedTopic.id)}
                   >
                     <Heart aria-hidden="true" />
@@ -1164,6 +1218,7 @@ export function CommunityPage({
                           className={liked ? "is-liked" : ""}
                           aria-label={`${comment.like_count} ${copy.likes}`}
                           aria-pressed={liked}
+                          disabled={!sensitiveCloudActionsEnabled}
                           onClick={() => void toggleCommentLike(comment.id)}
                         >
                           <Heart aria-hidden="true" />{comment.like_count}
@@ -1171,9 +1226,12 @@ export function CommunityPage({
                         <button
                           type="button"
                           onClick={() => {
-                            if (!account) onRequireAccount();
+                            if (!sensitiveCloudActionsEnabled) {
+                              setDialogError(copy.insecureMirror);
+                            } else if (!account) onRequireAccount();
                             else setReplyTo(comment);
                           }}
+                          disabled={!sensitiveCloudActionsEnabled}
                         >
                           <Reply aria-hidden="true" />{copy.reply}
                         </button>
@@ -1195,7 +1253,7 @@ export function CommunityPage({
                   </button>
                 ) : null}
               </div>
-              {account ? (
+              {account && sensitiveCloudActionsEnabled ? (
                 <form
                   className="community-comment-form"
                   onSubmit={(event) => void publishComment(event)}
@@ -1221,7 +1279,7 @@ export function CommunityPage({
                     <span className="site-sr-only">{copy.sendComment}</span>
                   </button>
                 </form>
-              ) : (
+              ) : sensitiveCloudActionsEnabled ? (
                 <button
                   type="button"
                   className="community-sign-in-action"
@@ -1229,6 +1287,10 @@ export function CommunityPage({
                 >
                   {copy.signInAction}
                 </button>
+              ) : (
+                <p className="site-security-notice" role="status">
+                  {copy.insecureMirror}
+                </p>
               )}
             </div>
           </section>
