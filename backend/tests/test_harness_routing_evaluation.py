@@ -100,6 +100,28 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
         ) == selectable_harness_tools(snapshot)
 
 
+def test_cold_start_snapshot_does_not_invent_optimizer_history() -> None:
+    case = load_routing_eval_cases(CORPUS)[0]
+    assert case.stimulus.scored_candidate_count == 1
+
+    snapshot = compile_routing_eval_snapshot(case)
+
+    assert snapshot.candidate_history_total == 1
+    assert snapshot.candidate_history_included == 1
+    assert len(snapshot.candidates) == 1
+    assert snapshot.candidates[0].is_baseline is True
+
+
+def test_routing_eval_rejects_nonfinite_stimulus_values(tmp_path: Path) -> None:
+    case = load_routing_eval_cases(CORPUS)[0].model_dump(mode="json")
+    case["stimulus"]["baseline_score"] = float("nan")
+    corpus = tmp_path / "nonfinite.jsonl"
+    corpus.write_text(json.dumps(case, allow_nan=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid Harness routing case"):
+        load_routing_eval_cases(corpus)
+
+
 def test_routing_eval_grades_complete_predictions_by_category() -> None:
     cases = load_routing_eval_cases(CORPUS)
     predictions = {case.case_id: case.acceptable_tools[0] for case in cases}

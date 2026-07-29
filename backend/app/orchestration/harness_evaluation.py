@@ -68,7 +68,7 @@ HarnessEvalCategory = Literal[
 
 
 class _ClosedModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
 class HarnessEvalToolHistory(_ClosedModel):
@@ -453,7 +453,7 @@ def compile_routing_eval_snapshot(
                 best_score=stimulus.best_score,
             )
         )
-    candidates = (
+    candidate_rows = [
         HarnessCandidateEvidence(
             generation=0,
             source_type="baseline",
@@ -463,23 +463,27 @@ def compile_routing_eval_snapshot(
             trial_count=stimulus.trials_per_candidate,
             completed_trial_count=stimulus.trials_per_candidate,
             failed_trial_count=0,
-        ),
-        HarnessCandidateEvidence(
-            generation=stimulus.current_generation,
-            source_type="optimizer",
-            is_baseline=False,
-            aggregated_score=stimulus.best_score,
-            metrics={
-                "aggregated_score": stimulus.best_score,
-                "feasible": stimulus.feasible_candidate_count > 0,
-            },
-            trial_count=stimulus.trials_per_candidate,
-            completed_trial_count=stimulus.trials_per_candidate,
-            failed_trial_count=round(
-                stimulus.observed_failure_rate * stimulus.trials_per_candidate
-            ),
-        ),
-    )
+        )
+    ]
+    if stimulus.scored_candidate_count > 1:
+        candidate_rows.append(
+            HarnessCandidateEvidence(
+                generation=stimulus.current_generation,
+                source_type="optimizer",
+                is_baseline=False,
+                aggregated_score=stimulus.best_score,
+                metrics={
+                    "aggregated_score": stimulus.best_score,
+                    "feasible": stimulus.feasible_candidate_count > 0,
+                },
+                trial_count=stimulus.trials_per_candidate,
+                completed_trial_count=stimulus.trials_per_candidate,
+                failed_trial_count=round(
+                    stimulus.observed_failure_rate * stimulus.trials_per_candidate
+                ),
+            )
+        )
+    candidates = tuple(candidate_rows)
     tool_history = tuple(
         HarnessToolHistory(
             tool_id=item.tool_id,
