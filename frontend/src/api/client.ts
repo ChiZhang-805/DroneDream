@@ -1,7 +1,11 @@
 // HTTP client for the DroneDream /api/v1 backend. It owns envelope parsing,
 // desktop-runtime liveness checks, and the typed call surface used by pages.
 
-import { desktopApiRequest, isDesktopRuntime } from "../desktop/bridge";
+import {
+  desktopApiRequest,
+  desktopDownloadArtifact,
+  isDesktopRuntime,
+} from "../desktop/bridge";
 import {
   FetchDeadlineError,
   fetchWithDeadline,
@@ -548,6 +552,25 @@ export const apiClient = {
   },
 
   async downloadArtifact(artifactId: string, filename?: string): Promise<void> {
+    if (isDesktopRuntime()) {
+      try {
+        await desktopDownloadArtifact({
+          artifactId,
+          filename: filename ?? `artifact-${artifactId}`,
+          accessToken: currentAccessToken(),
+        });
+        return;
+      } catch (networkError) {
+        throw new ApiClientError(
+          "ARTIFACT_DOWNLOAD_FAILED",
+          networkError instanceof Error
+            ? networkError.message
+            : "Failed to save the artifact.",
+          null,
+          0,
+        );
+      }
+    }
     let response: Response;
     try {
       response = await transportRequest(

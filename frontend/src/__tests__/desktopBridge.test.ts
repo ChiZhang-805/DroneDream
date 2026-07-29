@@ -4,6 +4,7 @@ import {
   autoStartInstallerRuntime,
   cancelRuntimeInstall,
   desktopApiRequest,
+  desktopDownloadArtifact,
   DesktopCommandContractError,
   DesktopRuntimeUnavailableError,
   discardInstallerRuntimeIntent,
@@ -188,6 +189,39 @@ describe("desktop bridge", () => {
     })).rejects.toMatchObject({
       name: "DesktopCommandContractError",
       command: "desktop_api_request",
+    });
+  });
+
+  it("validates the native streaming-download response contract", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      savedPath: "C:\\Users\\pilot\\Downloads\\telemetry.ulg",
+      bytes: 70 * 1024 * 1024,
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(desktopDownloadArtifact({
+      artifactId: "art_large_1",
+      filename: "telemetry.ulg",
+      accessToken: "account-token",
+    })).resolves.toEqual({
+      savedPath: "C:\\Users\\pilot\\Downloads\\telemetry.ulg",
+      bytes: 70 * 1024 * 1024,
+    });
+    expect(invoke).toHaveBeenCalledWith("desktop_download_artifact", {
+      request: {
+        artifactId: "art_large_1",
+        filename: "telemetry.ulg",
+        accessToken: "account-token",
+      },
+    });
+
+    invoke.mockResolvedValueOnce({ savedPath: "", bytes: -1 });
+    await expect(desktopDownloadArtifact({
+      artifactId: "art_large_1",
+      filename: "telemetry.ulg",
+    })).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "desktop_download_artifact",
     });
   });
 

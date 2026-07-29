@@ -10,8 +10,12 @@ use reqwest::blocking::Client;
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::fs::{self, OpenOptions};
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
+use tauri::Manager;
 use uuid::Uuid;
 
 #[cfg(target_os = "windows")]
@@ -21,8 +25,10 @@ const BRIDGE_VERSION: &str = "DD-BRIDGE-V2";
 const API_ORIGIN: &str = "http://127.0.0.1:8000";
 const MAX_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
 const MAX_RESPONSE_BODY_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_ARTIFACT_DOWNLOAD_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+const ARTIFACT_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 const CREDENTIAL_SCRIPT: &str = r##"
 import hashlib
 import hmac
@@ -73,6 +79,22 @@ pub struct DesktopApiResponse {
     status: u16,
     content_type: Option<String>,
     body_base64: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DesktopArtifactDownloadRequest {
+    artifact_id: String,
+    filename: String,
+    #[serde(default)]
+    access_token: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopArtifactDownloadResponse {
+    saved_path: String,
+    bytes: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -161,6 +183,28 @@ pub async fn desktop_api_request(
     Ok(response)
 }
 
+#[tauri::command]
+pub async fn desktop_download_artifact(
+    app: tauri::AppHandle,
+    bridge: tauri::State<'_, DesktopApiBridge>,
+    request: DesktopArtifactDownloadRequest,
+) -> Result<DesktopArtifactDownloadResponse, String> {
+    let download_directory = app
+        .path()
+        .download_dir()
+        .map_err(|_| "The Windows Downloads directory is unavailable.".to_string())?;
+    let session_id = bridge.session_id.clone();
+    // Download requests deliberately derive a fresh credential. A Runtime
+    // repair may rotate identity while a large transfer is pending, and a
+    // failed download is safe for the user to retry explicitly.
+    let credential = load_runtime_bridge_credential().await?;
+    tauri::async_runtime::spawn_blocking(move || {
+        stream_artifact_download(&session_id, &credential, request, &download_directory)
+    })
+    .await
+    .map_err(|error| format!("Desktop artifact download task failed: {error}"))?
+}
+
 impl DesktopApiResponse {
     fn rejects_cached_credential(&self) -> bool {
         if !matches!(self.status, 401 | 500) {
@@ -241,6 +285,16 @@ fn forward_request(
     credential: &CachedCredential,
     request: DesktopApiRequest,
 ) -> Result<DesktopApiResponse, String> {
+    let response = send_signed_request(session_id, credential, request, REQUEST_TIMEOUT)?;
+    buffer_response(response)
+}
+
+fn send_signed_request(
+    session_id: &str,
+    credential: &CachedCredential,
+    request: DesktopApiRequest,
+    timeout: Duration,
+) -> Result<reqwest::blocking::Response, String> {
     let method = normalize_method(&request.method)?;
     validate_path(&request.path)?;
     let body = request.body.unwrap_or_default();
@@ -280,7 +334,7 @@ fn forward_request(
 
     let client = Client::builder()
         .connect_timeout(Duration::from_secs(3))
-        .timeout(REQUEST_TIMEOUT)
+        .timeout(timeout)
         .no_proxy()
         .build()
         .map_err(|_| "The desktop API bridge HTTP client could not start.".to_string())?;
@@ -309,9 +363,12 @@ fn forward_request(
     if !body.is_empty() {
         builder = builder.header(CONTENT_TYPE, "application/json").body(body);
     }
-    let response = builder
+    builder
         .send()
-        .map_err(|_| "The signed Runtime API did not respond.".to_string())?;
+        .map_err(|_| "The signed Runtime API did not respond.".to_string())
+}
+
+fn buffer_response(response: reqwest::blocking::Response) -> Result<DesktopApiResponse, String> {
     if response
         .headers()
         .get(CONTENT_LENGTH)
@@ -338,6 +395,183 @@ fn forward_request(
         content_type,
         body_base64: base64::engine::general_purpose::STANDARD.encode(bytes),
     })
+}
+
+fn stream_artifact_download(
+    session_id: &str,
+    credential: &CachedCredential,
+    request: DesktopArtifactDownloadRequest,
+    download_directory: &Path,
+) -> Result<DesktopArtifactDownloadResponse, String> {
+    let artifact_id = normalize_artifact_id(&request.artifact_id)?;
+    let filename = sanitize_download_filename(&request.filename, artifact_id);
+    let api_request = DesktopApiRequest {
+        method: "GET".to_string(),
+        path: format!("/api/v1/artifacts/{artifact_id}/download"),
+        body: None,
+        access_token: request.access_token,
+        accept: Some("application/octet-stream".to_string()),
+        idempotency_key: None,
+    };
+    let response = send_signed_request(
+        session_id,
+        credential,
+        api_request,
+        ARTIFACT_DOWNLOAD_TIMEOUT,
+    )?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!(
+            "The Runtime rejected the artifact download with HTTP {}.",
+            status.as_u16()
+        ));
+    }
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_ARTIFACT_DOWNLOAD_BYTES)
+    {
+        return Err("The artifact exceeds the 2 GiB desktop download limit.".to_string());
+    }
+    let (saved_path, bytes) = persist_download(
+        response,
+        download_directory,
+        &filename,
+        MAX_ARTIFACT_DOWNLOAD_BYTES,
+    )?;
+    Ok(DesktopArtifactDownloadResponse {
+        saved_path: saved_path.to_string_lossy().into_owned(),
+        bytes,
+    })
+}
+
+fn normalize_artifact_id(value: &str) -> Result<&str, String> {
+    if value.is_empty()
+        || value.len() > 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        return Err("The artifact identifier is malformed.".to_string());
+    }
+    Ok(value)
+}
+
+fn sanitize_download_filename(value: &str, artifact_id: &str) -> String {
+    let cleaned = value
+        .chars()
+        .take(512)
+        .map(|character| {
+            if character.is_control()
+                || matches!(
+                    character,
+                    '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'
+                )
+            {
+                '_'
+            } else {
+                character
+            }
+        })
+        .collect::<String>();
+    let trimmed = cleaned.trim_matches([' ', '.']);
+    let fallback = format!("artifact-{artifact_id}");
+    let selected = if trimmed.is_empty() {
+        fallback
+    } else {
+        trimmed.to_string()
+    };
+    let bounded = selected.chars().take(120).collect::<String>();
+    let stem = Path::new(&bounded)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_uppercase();
+    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || stem.strip_prefix("COM").is_some_and(|suffix| {
+            matches!(suffix, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
+        })
+        || stem.strip_prefix("LPT").is_some_and(|suffix| {
+            matches!(suffix, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
+        });
+    if reserved {
+        format!("_{bounded}")
+    } else {
+        bounded
+    }
+}
+
+fn available_download_path(directory: &Path, filename: &str) -> Result<PathBuf, String> {
+    let requested = directory.join(filename);
+    if !requested.exists() {
+        return Ok(requested);
+    }
+    let path = Path::new(filename);
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("artifact");
+    let extension = path.extension().and_then(|value| value.to_str());
+    for suffix in 1..=9_999_u32 {
+        let candidate_name = match extension {
+            Some(value) if !value.is_empty() => format!("{stem} ({suffix}).{value}"),
+            _ => format!("{stem} ({suffix})"),
+        };
+        let candidate = directory.join(candidate_name);
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+    Err("The Downloads directory has too many files with this name.".to_string())
+}
+
+fn persist_download(
+    reader: impl Read,
+    directory: &Path,
+    filename: &str,
+    max_bytes: u64,
+) -> Result<(PathBuf, u64), String> {
+    fs::create_dir_all(directory)
+        .map_err(|_| "The Windows Downloads directory could not be created.".to_string())?;
+    let destination = available_download_path(directory, filename)?;
+    let temporary = directory.join(format!(".dronedream-{}.part", Uuid::new_v4()));
+    let mut output = Some(
+        OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temporary)
+            .map_err(|_| "The temporary artifact download could not be created.".to_string())?,
+    );
+    let result = (|| {
+        let mut bounded = reader.take(max_bytes.saturating_add(1));
+        let bytes = io::copy(
+            &mut bounded,
+            output
+                .as_mut()
+                .ok_or_else(|| "The temporary artifact download was closed.".to_string())?,
+        )
+        .map_err(|_| "The artifact download could not be written.".to_string())?;
+        if bytes > max_bytes {
+            return Err(format!(
+                "The artifact exceeds the {} byte desktop download limit.",
+                max_bytes
+            ));
+        }
+        output
+            .as_ref()
+            .ok_or_else(|| "The temporary artifact download was closed.".to_string())?
+            .sync_all()
+            .map_err(|_| "The artifact download could not be synchronized.".to_string())?;
+        drop(output.take());
+        fs::rename(&temporary, &destination)
+            .map_err(|_| "The completed artifact download could not be finalized.".to_string())?;
+        Ok((destination, bytes))
+    })();
+    if result.is_err() {
+        drop(output.take());
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 
 fn normalize_method(value: &str) -> Result<String, String> {
@@ -473,5 +707,65 @@ mod tests {
         assert!(response(500, "DESKTOP_BRIDGE_CONFIGURATION_ERROR").rejects_cached_credential());
         assert!(!response(401, "AUTH_INVALID_TOKEN").rejects_cached_credential());
         assert!(!response(409, "DESKTOP_BRIDGE_REPLAY").rejects_cached_credential());
+    }
+
+    #[test]
+    fn artifact_download_names_and_identifiers_fail_closed() {
+        assert_eq!(
+            normalize_artifact_id("art_123-safe").unwrap(),
+            "art_123-safe"
+        );
+        assert!(normalize_artifact_id("../art_123").is_err());
+        assert!(normalize_artifact_id("art/123").is_err());
+        assert!(normalize_artifact_id("").is_err());
+        assert_eq!(
+            sanitize_download_filename(r#"..\unsafe:log?.ulg"#, "art_123"),
+            "_unsafe_log_.ulg"
+        );
+        assert_eq!(
+            sanitize_download_filename("... ", "art_123"),
+            "artifact-art_123"
+        );
+        assert_eq!(sanitize_download_filename("CON.ulg", "art_123"), "_CON.ulg");
+        assert_eq!(
+            sanitize_download_filename("lpt9.txt", "art_123"),
+            "_lpt9.txt"
+        );
+    }
+
+    #[test]
+    fn artifact_download_is_atomic_bounded_and_collision_safe() {
+        let sandbox =
+            std::env::temp_dir().join(format!("dronedream-download-test-{}", Uuid::new_v4()));
+        fs::create_dir(&sandbox).unwrap();
+
+        let (first, first_bytes) =
+            persist_download(&b"first"[..], &sandbox, "telemetry.ulg", 16).unwrap();
+        assert_eq!(
+            first.file_name().and_then(|value| value.to_str()),
+            Some("telemetry.ulg")
+        );
+        assert_eq!(first_bytes, 5);
+        assert_eq!(fs::read(&first).unwrap(), b"first");
+
+        let (second, second_bytes) =
+            persist_download(&b"second"[..], &sandbox, "telemetry.ulg", 16).unwrap();
+        assert_eq!(
+            second.file_name().and_then(|value| value.to_str()),
+            Some("telemetry (1).ulg")
+        );
+        assert_eq!(second_bytes, 6);
+        assert_eq!(fs::read(&second).unwrap(), b"second");
+
+        let error = persist_download(&b"oversized"[..], &sandbox, "too-large.ulg", 4).unwrap_err();
+        assert!(error.contains("exceeds the 4 byte"));
+        assert!(!sandbox.join("too-large.ulg").exists());
+        assert!(fs::read_dir(&sandbox).unwrap().all(|entry| !entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".part")));
+
+        fs::remove_dir_all(&sandbox).unwrap();
     }
 }

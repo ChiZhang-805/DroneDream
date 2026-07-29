@@ -87,6 +87,17 @@ export interface DesktopApiResponse {
   bodyBase64: string;
 }
 
+export interface DesktopArtifactDownloadRequest {
+  artifactId: string;
+  filename: string;
+  accessToken?: string | null;
+}
+
+export interface DesktopArtifactDownloadResponse {
+  savedPath: string;
+  bytes: number;
+}
+
 export interface RuntimeInstallStep {
   id: string;
   title: string;
@@ -443,6 +454,26 @@ export function desktopApiRequest(
     parseDesktopApiResponse,
     { request },
   );
+}
+
+export function desktopDownloadArtifact(
+  request: DesktopArtifactDownloadRequest,
+): Promise<DesktopArtifactDownloadResponse> {
+  return invokeDesktop(
+    "desktop_download_artifact",
+    parseDesktopArtifactDownloadResponse,
+    { request },
+  );
+}
+
+function parseDesktopArtifactDownloadResponse(
+  value: unknown,
+): DesktopArtifactDownloadResponse {
+  const record = expectRecord(value, "response");
+  return {
+    savedPath: expectSafeNonEmptyString(record.savedPath, "response.savedPath"),
+    bytes: expectNonNegativeInteger(record.bytes, "response.bytes"),
+  };
 }
 
 function parseDesktopApiResponse(value: unknown): DesktopApiResponse {

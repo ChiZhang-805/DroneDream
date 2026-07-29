@@ -359,6 +359,28 @@ describe("apiClient envelope handling", () => {
     );
   });
 
+  it("streams desktop artifact downloads through the native bridge", async () => {
+    setAuthAccessToken("cloud-session-token");
+    const invoke = vi.fn().mockResolvedValue({
+      savedPath: "C:\\Users\\pilot\\Downloads\\telemetry.ulg",
+      bytes: 70 * 1024 * 1024,
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await apiClient.downloadArtifact("art_large_1", "telemetry.ulg");
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith("desktop_download_artifact", {
+      request: {
+        artifactId: "art_large_1",
+        filename: "telemetry.ulg",
+        accessToken: "cloud-session-token",
+      },
+    });
+  });
+
   it("compareJobs posts job_ids payload", async () => {
     mockFetchOnce({
       success: true,

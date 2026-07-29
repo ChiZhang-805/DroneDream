@@ -66,6 +66,7 @@ pub fn run() {
             runtime_installer::start_runtime,
             runtime_installer::repair_runtime,
             desktop_api_bridge::desktop_api_request,
+            desktop_api_bridge::desktop_download_artifact,
             runtime_keepalive::stop_runtime_for_exit
         ])
         .run(tauri::generate_context!())
