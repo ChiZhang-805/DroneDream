@@ -508,7 +508,9 @@ def _fallback_candidates(
     existing = {
         tuple(search_space.to_unit_vector(item.parameters))
         for item in request.observations
-        if item.parameters and item.requested_fidelity >= 1.0 - 1e-9
+        if item.parameters
+        and item.requested_fidelity >= 1.0 - 1e-9
+        and item.fidelity >= 1.0 - 1e-9
     }
     existing.update(excluded or set())
     design_count = max(64, count * 16, count + len(existing) * 2)

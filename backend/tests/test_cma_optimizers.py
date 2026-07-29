@@ -966,6 +966,48 @@ def test_portfolio_rejects_nominal_full_fidelity_with_partial_effective_coverage
     assert statistic.normalized_improvement == 0.0
 
 
+def test_portfolio_fallback_can_upgrade_nominal_full_partial_coverage() -> None:
+    space = SearchSpace.from_schema(
+        [
+            ParameterSelection(
+                name="TEST_MODE",
+                baseline=0,
+                minimum=0,
+                maximum=1,
+                value_type="enum",
+                choices=[0, 1],
+            )
+        ]
+    )
+    parameters = space.from_unit_vector((0.0,))
+    partial = OptimizerObservation(
+        candidate_id="nominal-full-partial",
+        generation_index=1,
+        parameters=parameters,
+        unit_vector=space.to_unit_vector(parameters),
+        loss=0.1,
+        optimizer_strategy="multi_fidelity_mobo",
+        fidelity=0.25,
+        requested_fidelity=1.0,
+    )
+    request = OptimizerRequest(
+        strategy="optimizer_portfolio",
+        generation_index=2,
+        batch_size=2,
+        random_seed=17,
+        observations=(partial,),
+    )
+
+    proposals = portfolio_optimizer._fallback_candidates(
+        space,
+        request,
+        "surrogate_cma_es",
+        2,
+    )
+
+    assert {proposal.parameters["TEST_MODE"] for proposal in proposals} == {0.0, 1.0}
+
+
 def test_portfolio_uses_a_common_baseline_instead_of_each_childs_bad_start() -> None:
     space = _space()
     baseline = _observation(
