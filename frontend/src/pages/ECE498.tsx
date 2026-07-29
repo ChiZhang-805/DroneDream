@@ -3,6 +3,7 @@ import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } fr
 
 import { useI18n } from "../i18n/I18nProvider";
 import type { Locale } from "../i18n/I18nProvider";
+import { lastLineOccupancy } from "./ece498Layout";
 
 import "./ECE498.css";
 
@@ -518,29 +519,6 @@ function EngineeringBackdrop() {
       </g>
     </svg>
   );
-}
-
-function lastLineOccupancy(paragraph: HTMLParagraphElement): number {
-  const range = document.createRange();
-  const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
-  const characterRects: DOMRect[] = [];
-  while (walker.nextNode()) {
-    const node = walker.currentNode;
-    const text = node.textContent ?? "";
-    for (let offset = 0; offset < text.length; offset += 1) {
-      if (text[offset]?.trim() === "") continue;
-      range.setStart(node, offset);
-      range.setEnd(node, offset + 1);
-      const rect = range.getBoundingClientRect();
-      if (rect.width > 0) characterRects.push(rect);
-    }
-  }
-  if (characterRects.length === 0 || paragraph.clientWidth <= 0) return 1;
-  const lastTop = Math.max(...characterRects.map((rect) => rect.top));
-  const lastLine = characterRects.filter((rect) => Math.abs(rect.top - lastTop) < 1);
-  const left = Math.min(...lastLine.map((rect) => rect.left));
-  const right = Math.max(...lastLine.map((rect) => rect.right));
-  return (right - left) / paragraph.clientWidth;
 }
 
 function FittedParagraph({
