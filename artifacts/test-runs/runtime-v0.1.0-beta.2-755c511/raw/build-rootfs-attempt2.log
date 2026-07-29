@@ -1,0 +1,1012 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 9.57kB done
+#1 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#2 DONE 2.7s
+
+#3 docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#3 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e 0.0s done
+#3 CACHED
+
+#4 [internal] load metadata for docker.io/library/ubuntu:24.04@sha256:52df9b1ee71626e0088f7d400d5c6b5f7bb916f8f0c82b474289a4ece6cf3faf
+#4 DONE 1.8s
+
+#5 [ 1/19] FROM docker.io/library/ubuntu:24.04@sha256:52df9b1ee71626e0088f7d400d5c6b5f7bb916f8f0c82b474289a4ece6cf3faf
+#5 resolve docker.io/library/ubuntu:24.04@sha256:52df9b1ee71626e0088f7d400d5c6b5f7bb916f8f0c82b474289a4ece6cf3faf 0.0s done
+#5 DONE 0.0s
+
+#6 [ 2/19] RUN apt-get update && apt-get install -y --no-install-recommends       ca-certificates curl wget git gnupg lsb-release sudo systemd systemd-sysv       python3 python3-pip python3-venv build-essential cmake ninja-build       pkg-config procps iproute2 rsync unzip zip jq sqlite3 libssl-dev libsystemd-dev       libffi-dev libxml2-dev libxslt1-dev libyaml-dev libsqlite3-dev &&     rm -rf /var/lib/apt/lists/* &&     groupadd --gid "2000" dronedream &&     useradd --create-home --uid "2000" --gid dronedream --shell /bin/bash dronedream &&     groupadd --system valkey &&     useradd --system --gid valkey --home /var/lib/valkey --shell /usr/sbin/nologin valkey
+#6 CACHED
+
+#7 [ 3/19] RUN curl --fail --location --silent --show-error "https://packages.osrfoundation.org/gazebo.gpg"       --output /tmp/gazebo.gpg &&     echo "15d0300460e0c9c0efb21fa9770c0bf228988a07d71c4fac985c2161954a25a4  /tmp/gazebo.gpg" | sha256sum --check --strict &&     install -m 0644 /tmp/gazebo.gpg /usr/share/keyrings/gazebo-archive-keyring.gpg &&     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/gazebo-archive-keyring.gpg] https://packages.osrfoundation.org/gazebo/ubuntu-stable noble main"       >/etc/apt/sources.list.d/gazebo-stable.list &&     apt-get update &&     apt-get install -y --no-install-recommends       "gz-harmonic=1.0.0-1~noble" &&     rm -rf /var/lib/apt/lists/* /tmp/gazebo.gpg
+#7 CACHED
+
+#8 [ 4/19] RUN git clone --branch "v1.16.0" --depth 1 --recursive       "https://github.com/PX4/PX4-Autopilot.git" /opt/PX4-Autopilot &&     test "$(git -C /opt/PX4-Autopilot rev-parse HEAD)" = "6ea3539157ca358c70a515878b77077af7d4611d" &&     cd /opt/PX4-Autopilot &&     bash Tools/setup/ubuntu.sh --no-nuttx &&     chown -R dronedream:dronedream /opt/PX4-Autopilot
+#8 CACHED
+
+#9 [ 5/19] RUN cd /opt/PX4-Autopilot &&     make px4_sitl_default -j"2"
+#9 CACHED
+
+#10 [internal] load build context
+#10 transferring context: 24.55kB 0.0s done
+#10 DONE 0.0s
+
+#11 [ 6/19] RUN git clone --filter=blob:none "https://github.com/valkey-io/valkey.git" /tmp/valkey &&     git -C /tmp/valkey checkout --detach "5f4bae3ea10174a7c872cc099c953b0e91afa93a" &&     test "$(git -C /tmp/valkey rev-parse HEAD)" = "5f4bae3ea10174a7c872cc099c953b0e91afa93a" &&     make -C /tmp/valkey -j2 BUILD_TLS=yes USE_SYSTEMD=yes &&     /tmp/valkey/src/valkey-server --version | grep -F "v=8.1.4 " &&     install -m 0755 /tmp/valkey/src/valkey-server /usr/local/bin/valkey-server &&     install -m 0755 /tmp/valkey/src/valkey-cli /usr/local/bin/valkey-cli &&     install -D -m 0644 /tmp/valkey/COPYING /usr/share/doc/valkey/COPYING &&     rm -rf /tmp/valkey
+#11 0.350 Cloning into '/tmp/valkey'...
+#11 47.65 Updating files:   0% (2/1940)Updating files:   1% (20/1940)Updating files:   2% (39/1940)Updating files:   3% (59/1940)Updating files:   4% (78/1940)Updating files:   5% (97/1940)Updating files:   6% (117/1940)Updating files:   7% (136/1940)Updating files:   8% (156/1940)Updating files:   9% (175/1940)Updating files:  10% (194/1940)Updating files:  11% (214/1940)Updating files:  12% (233/1940)Updating files:  13% (253/1940)Updating files:  14% (272/1940)Updating files:  15% (291/1940)Updating files:  16% (311/1940)Updating files:  17% (330/1940)Updating files:  18% (350/1940)Updating files:  19% (369/1940)Updating files:  20% (388/1940)Updating files:  21% (408/1940)Updating files:  22% (427/1940)Updating files:  23% (447/1940)Updating files:  24% (466/1940)Updating files:  25% (485/1940)Updating files:  26% (505/1940)Updating files:  27% (524/1940)Updating files:  28% (544/1940)Updating files:  29% (563/1940)Updating files:  30% (582/1940)Updating files:  31% (602/1940)Updating files:  32% (621/1940)Updating files:  33% (641/1940)Updating files:  34% (660/1940)Updating files:  35% (679/1940)Updating files:  36% (699/1940)Updating files:  37% (718/1940)Updating files:  38% (738/1940)Updating files:  39% (757/1940)Updating files:  40% (776/1940)Updating files:  41% (796/1940)Updating files:  42% (815/1940)Updating files:  43% (835/1940)Updating files:  44% (854/1940)Updating files:  45% (873/1940)Updating files:  46% (893/1940)Updating files:  47% (912/1940)Updating files:  48% (932/1940)Updating files:  49% (951/1940)Updating files:  50% (970/1940)Updating files:  51% (990/1940)Updating files:  52% (1009/1940)Updating files:  53% (1029/1940)Updating files:  54% (1048/1940)Updating files:  55% (1067/1940)Updating files:  56% (1087/1940)Updating files:  57% (1106/1940)Updating files:  58% (1126/1940)Updating files:  59% (1145/1940)Updating files:  60% (1164/1940)Updating files:  61% (1184/1940)Updating files:  62% (1203/1940)Updating files:  63% (1223/1940)Updating files:  64% (1242/1940)Updating files:  65% (1261/1940)Updating files:  66% (1281/1940)Updating files:  67% (1300/1940)Updating files:  68% (1320/1940)Updating files:  69% (1339/1940)Updating files:  70% (1358/1940)Updating files:  71% (1378/1940)Updating files:  72% (1397/1940)Updating files:  73% (1417/1940)Updating files:  74% (1436/1940)Updating files:  75% (1455/1940)Updating files:  76% (1475/1940)Updating files:  77% (1494/1940)Updating files:  78% (1514/1940)Updating files:  79% (1533/1940)Updating files:  80% (1552/1940)Updating files:  81% (1572/1940)Updating files:  82% (1591/1940)Updating files:  83% (1611/1940)Updating files:  84% (1630/1940)Updating files:  85% (1649/1940)Updating files:  86% (1669/1940)Updating files:  87% (1688/1940)Updating files:  88% (1708/1940)Updating files:  89% (1727/1940)Updating files:  90% (1746/1940)Updating files:  91% (1766/1940)Updating files:  92% (1785/1940)Updating files:  93% (1805/1940)Updating files:  94% (1824/1940)Updating files:  95% (1843/1940)Updating files:  96% (1863/1940)Updating files:  97% (1882/1940)Updating files:  98% (1902/1940)Updating files:  99% (1921/1940)Updating files: 100% (1940/1940)Updating files: 100% (1940/1940), done.
+#11 57.18 HEAD is now at 5f4bae3ea Release notes for 8.1.4
+#11 57.19 make: Entering directory '/tmp/valkey'
+#11 57.19 cd src && make all
+#11 57.19 make[1]: Entering directory '/tmp/valkey/src'
+#11 57.35     [34mCC[0m [33mMakefile.dep[0m
+#11 59.13 rm -rf valkey-server valkey-sentinel valkey-cli valkey-benchmark valkey-check-rdb valkey-check-aof valkey-unit-tests libvalkey.a unit/*.o unit/*.d lua/*.o lua/*.d *.o *.gcda *.gcno *.gcov valkey.info lcov-html Makefile.dep *.so
+#11 59.18 rm -f threads_mngr.d adlist.d quicklist.d ae.d anet.d dict.d hashtable.d kvstore.d server.d sds.d zmalloc.d lzf_c.d lzf_d.d pqsort.d zipmap.d sha1.d ziplist.d release.d memory_prefetch.d io_threads.d networking.d util.d object.d db.d replication.d rdb.d t_string.d t_list.d t_set.d t_zset.d t_hash.d config.d aof.d pubsub.d multi.d debug.d sort.d intset.d syncio.d cluster.d cluster_legacy.d cluster_slot_stats.d crc16.d endianconv.d commandlog.d eval.d bio.d rio.d rand.d memtest.d syscheck.d crcspeed.d crccombine.d crc64.d bitops.d sentinel.d notify.d setproctitle.d blocked.d hyperloglog.d latency.d sparkline.d valkey-check-rdb.d valkey-check-aof.d geo.d lazyfree.d module.d evict.d expire.d geohash.d geohash_helper.d childinfo.d allocator_defrag.d defrag.d siphash.d rax.d t_stream.d listpack.d localtime.d lolwut.d lolwut5.d lolwut6.d acl.d tracking.d socket.d tls.d sha256.d timeout.d setcpuaffinity.d monotonic.d mt19937-64.d resp_parser.d call_reply.d script.d functions.d commands.d strl.d connection.d unix.d logreqres.d rdma.d scripting_engine.d lua/script_lua.d lua/function_lua.d lua/engine_lua.d lua/debug_lua.d anet.d adlist.d dict.d valkey-cli.d zmalloc.d release.d ae.d serverassert.d crcspeed.d crccombine.d crc64.d siphash.d crc16.d monotonic.d cli_common.d mt19937-64.d strl.d cli_commands.d ae.d anet.d valkey-benchmark.d adlist.d dict.d zmalloc.d serverassert.d release.d crcspeed.d crccombine.d crc64.d siphash.d crc16.d monotonic.d cli_common.d mt19937-64.d strl.d
+#11 59.18     [34mGEN[0m [33mcommands.def[0m
+#11 59.18 (cd ../deps && make distclean)
+#11 59.18 make[2]: Entering directory '/tmp/valkey/deps'
+#11 59.18 (cd hiredis && make clean) > /dev/null || true
+#11 59.19 (cd linenoise && make clean) > /dev/null || true
+#11 59.19 (cd lua && make clean) > /dev/null || true
+#11 59.19 (cd jemalloc && [ -f Makefile ] && make distclean) > /dev/null || true
+#11 59.19 (cd hdr_histogram && make clean) > /dev/null || true
+#11 59.20 (cd fpconv && make clean) > /dev/null || true
+#11 59.20 (cd fast_float_c_interface && make clean) > /dev/null || true
+#11 59.20 (rm -f .make-*)
+#11 59.21 make[2]: Leaving directory '/tmp/valkey/deps'
+#11 59.21 (cd modules && make clean)
+#11 59.21 make[2]: Entering directory '/tmp/valkey/src/modules'
+#11 59.21 rm -rf *.xo *.so
+#11 59.21 make[2]: Leaving directory '/tmp/valkey/src/modules'
+#11 59.21 (cd ../tests/modules && make clean)
+#11 59.21 make[2]: Entering directory '/tmp/valkey/tests/modules'
+#11 59.21 rm -f commandfilter.so basics.so testrdb.so fork.so infotest.so propagate.so misc.so hooks.so blockonkeys.so blockonbackground.so scan.so datatype.so datatype2.so auth.so keyspace_events.so block_keyspace_notification.so blockedclient.so getkeys.so getchannels.so test_lazyfree.so timer.so defragtest.so keyspecs.so hash.so zset.so stream.so mallocsize.so aclcheck.so list.so subcommands.so reply.so cmdintrospection.so eventloop.so moduleconfigs.so moduleconfigstwo.so moduleparameter.so publish.so usercall.so postnotifications.so moduleauthtwo.so rdbloadsave.so crash.so cluster.so helloscripting.so commandfilter.xo basics.xo testrdb.xo fork.xo infotest.xo propagate.xo misc.xo hooks.xo blockonkeys.xo blockonbackground.xo scan.xo datatype.xo datatype2.xo auth.xo keyspace_events.xo block_keyspace_notification.xo blockedclient.xo getkeys.xo getchannels.xo test_lazyfree.xo timer.xo defragtest.xo keyspecs.xo hash.xo zset.xo stream.xo mallocsize.xo aclcheck.xo list.xo subcommands.xo reply.xo cmdintrospection.xo eventloop.xo moduleconfigs.xo moduleconfigstwo.xo moduleparameter.xo publish.xo usercall.xo postnotifications.xo moduleauthtwo.xo rdbloadsave.xo crash.xo cluster.xo helloscripting.xo
+#11 59.21 make[2]: Leaving directory '/tmp/valkey/tests/modules'
+#11 59.21 (rm -f .make-*)
+#11 59.21 echo STD=-pedantic -std=gnu11 >> .make-settings
+#11 59.21 echo WARN=-Wall -W -Wno-missing-field-initializers -Werror=deprecated-declarations -Wstrict-prototypes >> .make-settings
+#11 59.21 echo OPT=-O3 -flto=auto -ffat-lto-objects -fno-omit-frame-pointer >> .make-settings
+#11 59.21 echo MALLOC=jemalloc >> .make-settings
+#11 59.21 echo BUILD_TLS=yes >> .make-settings
+#11 59.22 echo BUILD_RDMA= >> .make-settings
+#11 59.22 echo USE_SYSTEMD=yes >> .make-settings
+#11 59.22 echo CFLAGS= >> .make-settings
+#11 59.22 echo LDFLAGS= >> .make-settings
+#11 59.22 echo SERVER_CFLAGS= >> .make-settings
+#11 59.22 echo SERVER_LDFLAGS= >> .make-settings
+#11 59.22 echo PREV_FINAL_CFLAGS=-pedantic -std=gnu11 -Wall -W -Wno-missing-field-initializers -Werror=deprecated-declarations -Wstrict-prototypes -O3 -flto=auto -ffat-lto-objects -fno-omit-frame-pointer -g -ggdb   -I../deps/hiredis -I../deps/linenoise -I../deps/lua/src -I../deps/hdr_histogram -I../deps/fpconv -DHAVE_LIBSYSTEMD -DUSE_JEMALLOC -I../deps/jemalloc/include -DUSE_OPENSSL=1  -DBUILD_TLS_MODULE=0 >> .make-settings
+#11 59.22 echo PREV_FINAL_LDFLAGS= -O3 -flto=auto -ffat-lto-objects -fno-omit-frame-pointer  -g -ggdb -rdynamic  >> .make-settings
+#11 59.22 (cd ../deps && make hiredis linenoise lua hdr_histogram fpconv jemalloc)
+#11 59.22 make[2]: Entering directory '/tmp/valkey/deps'
+#11 59.22 (cd hiredis && make clean) > /dev/null || true
+#11 59.23 (cd linenoise && make clean) > /dev/null || true
+#11 59.23 (cd lua && make clean) > /dev/null || true
+#11 59.23 (cd jemalloc && [ -f Makefile ] && make distclean) > /dev/null || true
+#11 59.23 (cd hdr_histogram && make clean) > /dev/null || true
+#11 59.23 (cd fpconv && make clean) > /dev/null || true
+#11 59.24 (cd fast_float_c_interface && make clean) > /dev/null || true
+#11 59.24 (rm -f .make-*)
+#11 59.24 (echo "" > .make-cflags)
+#11 59.24 (echo "" > .make-ldflags)
+#11 59.24 [32;1mMAKE[0m [37;1mhiredis[0m
+#11 59.24 cd hiredis && make static USE_SSL=1
+#11 59.25 make[3]: Entering directory '/tmp/valkey/deps/hiredis'
+#11 59.25 cc -std=c99 -c -O3 -fPIC  -DHIREDIS_TEST_SSL -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers -g -ggdb  -pedantic alloc.c
+#11 59.25 Processing json files...
+#11 59.25 Linking container command to subcommands...
+#11 59.25 Checking all commands...
+#11 59.25 Generating commands.def...
+#11 59.25 All done, exiting.
+#11 59.26 cc -std=c99 -c -O3 -fPIC  -DHIREDIS_TEST_SSL -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers -g -ggdb  -pedantic net.c
+#11 59.29 cc -std=c99 -c -O3 -fPIC  -DHIREDIS_TEST_SSL -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers -g -ggdb  -pedantic hiredis.c
+#11 59.41 cc -std=c99 -c -O3 -fPIC  -DHIREDIS_TEST_SSL -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers -g -ggdb  -pedantic sds.c
+#11 59.56 cc -std=c99 -c -O3 -fPIC  -DHIREDIS_TEST_SSL -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers -g -ggdb  -pedantic async.c
+#11 59.69 cc -std=c99 -c -O3 -fPIC  -DHIREDIS_TEST_SSL -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers -g -ggdb  -pedantic read.c
+#11 59.81 cc -std=c99 -c -O3 -fPIC  -DHIREDIS_TEST_SSL -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers -g -ggdb  -pedantic sockcompat.c
+#11 59.82 cc -std=c99 -c -O3 -fPIC  -DHIREDIS_TEST_SSL -Wall -Wextra -Werror -Wstrict-prototypes -Wwrite-strings -Wno-missing-field-initializers -g -ggdb  -pedantic ssl.c
+#11 59.86 [32;1mMAKE[0m [37;1mlinenoise[0m
+#11 59.86 cd linenoise && make
+#11 59.86 make[3]: Entering directory '/tmp/valkey/deps/linenoise'
+#11 59.86 cc  -Wall -Os -g  -c linenoise.c
+#11 59.93 ar rcs libhiredis.a alloc.o net.o hiredis.o sds.o async.o read.o sockcompat.o
+#11 59.93 ar rcs libhiredis_ssl.a ssl.o
+#11 59.93 make[3]: Leaving directory '/tmp/valkey/deps/hiredis'
+#11 59.93 [32;1mMAKE[0m [37;1mlua[0m
+#11 59.93 cd lua/src && make all CFLAGS="-Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2 " MYLDFLAGS="" AR="ar rc"
+#11 59.94 make[3]: Entering directory '/tmp/valkey/deps/lua/src'
+#11 59.94 cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lapi.o lapi.c
+#11 60.04 make[3]: Leaving directory '/tmp/valkey/deps/linenoise'
+#11 60.04 [32;1mMAKE[0m [37;1mhdr_histogram[0m
+#11 60.04 cd hdr_histogram && make
+#11 60.04 make[3]: Entering directory '/tmp/valkey/deps/hdr_histogram'
+#11 60.04 cc -std=c99 -Wall -Os -g  -DHDR_MALLOC_INCLUDE=\"hdr_redis_malloc.h\" -c  hdr_histogram.c 
+#11 60.19 ar rcs libhdrhistogram.a hdr_histogram.o
+#11 60.19 make[3]: Leaving directory '/tmp/valkey/deps/hdr_histogram'
+#11 60.20 [32;1mMAKE[0m [37;1mfpconv[0m
+#11 60.20 cd fpconv && make
+#11 60.20 make[3]: Entering directory '/tmp/valkey/deps/fpconv'
+#11 60.20 cc  -Wall -Os -g  -c  fpconv_dtoa.c 
+#11 60.21 cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lcode.o lcode.c
+#11 60.27 ar rcs libfpconv.a fpconv_dtoa.o
+#11 60.27 make[3]: Leaving directory '/tmp/valkey/deps/fpconv'
+#11 60.27 [32;1mMAKE[0m [37;1mjemalloc[0m
+#11 60.27 cd jemalloc && ./configure --disable-cxx --with-version=5.3.0-0-g0 --with-lg-quantum=3 --disable-cache-oblivious --with-jemalloc-prefix=je_ CFLAGS="" LDFLAGS="" 
+#11 60.38 checking for xsltproc... false
+#11 60.38 checking for gcc... gcc
+#11 60.39 cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o ldebug.o ldebug.c
+#11 60.40 checking whether the C compiler works... yes
+#11 60.43 checking for C compiler default output file name... a.out
+#11 60.44 checking for suffix of executables... 
+#11 60.46 checking whether we are cross compiling... no
+#11 60.49 checking for suffix of object files... o
+#11 60.50 checking whether the compiler supports GNU C... yes
+#11 60.52 checking whether gcc accepts -g... yes
+#11 60.53 checking for gcc option to enable C11 features... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o ldo.o ldo.c
+#11 60.56 none needed
+#11 60.56 checking whether compiler is cray... no
+#11 60.58 checking whether compiler supports -std=gnu11... yes
+#11 60.60 checking whether compiler supports -Werror=unknown-warning-option... no
+#11 60.62 checking whether compiler supports -Wall... yes
+#11 60.64 checking whether compiler supports -Wextra... yes
+#11 60.65 checking whether compiler supports -Wshorten-64-to-32... no
+#11 60.67 checking whether compiler supports -Wsign-compare... yes
+#11 60.68 checking whether compiler supports -Wundef... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o ldump.o ldump.c
+#11 60.70 yes
+#11 60.70 checking whether compiler supports -Wno-format-zero-length... yes
+#11 60.71 checking whether compiler supports -Wpointer-arith... yes
+#11 60.73 checking whether compiler supports -Wno-missing-braces... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lfunc.o lfunc.c
+#11 60.74 yes
+#11 60.74 checking whether compiler supports -Wno-missing-field-initializers... yes
+#11 60.76 checking whether compiler supports -Wno-missing-attributes... yes
+#11 60.77 checking whether compiler supports -pipe... yes
+#11 60.78 checking whether compiler supports -g3... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lgc.o lgc.c
+#11 60.79 yes
+#11 60.79 checking how to run the C preprocessor... gcc -E
+#11 60.83 checking for stdio.h... yes
+#11 60.84 checking for stdlib.h... yes
+#11 60.86 checking for string.h... yes
+#11 60.87 checking for inttypes.h... yes
+#11 60.89 checking for stdint.h... yes
+#11 60.91 checking for strings.h... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o llex.o llex.c
+#11 60.93 yes
+#11 60.93 checking for sys/stat.h... yes
+#11 60.94 checking for sys/types.h... yes
+#11 60.96 checking for unistd.h... yes
+#11 60.98 checking whether byte ordering is bigendian... no
+#11 61.03 checking size of void *... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lmem.o lmem.c
+#11 61.06 8
+#11 61.06 checking size of int... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lobject.o lobject.c
+#11 61.10 4
+#11 61.10 checking size of long... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lopcodes.o lopcodes.c
+#11 61.13 8
+#11 61.13 checking size of long long... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lparser.o lparser.c
+#11 61.17 8
+#11 61.17 checking size of intmax_t... 8
+#11 61.21 checking build system type... x86_64-pc-linux-gnu
+#11 61.24 checking host system type... x86_64-pc-linux-gnu
+#11 61.24 checking whether pause instruction is compilable... yes
+#11 61.26 checking number of significant virtual address bits... 48
+#11 61.29 checking for ar... ar
+#11 61.29 checking for nm... nm
+#11 61.29 checking for gawk... no
+#11 61.29 checking for mawk... mawk
+#11 61.30 checking for malloc.h... yes
+#11 61.32 checking whether malloc_usable_size definition can use const argument... no
+#11 61.34 checking for library containing log... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lstate.o lstate.c
+#11 61.39 -lm
+#11 61.39 checking whether __attribute__ syntax is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lstring.o lstring.c
+#11 61.42 yes
+#11 61.42 checking whether compiler supports -fvisibility=hidden... yes
+#11 61.43 checking whether compiler supports -fvisibility=hidden... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o ltable.o ltable.c
+#11 61.44 no
+#11 61.44 checking whether compiler supports -Werror... yes
+#11 61.45 checking whether compiler supports -herror_on_warning... no
+#11 61.46 checking whether tls_model attribute is compilable... yes
+#11 61.48 checking whether compiler supports -Werror... yes
+#11 61.49 checking whether compiler supports -herror_on_warning... no
+#11 61.50 checking whether alloc_size attribute is compilable... yes
+#11 61.54 checking whether compiler supports -Werror... yes
+#11 61.55 checking whether compiler supports -herror_on_warning... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o ltm.o ltm.c
+#11 61.56 no
+#11 61.56 checking whether format(gnu_printf, ...) attribute is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lundump.o lundump.c
+#11 61.59 yes
+#11 61.59 checking whether compiler supports -Werror... yes
+#11 61.61 checking whether compiler supports -herror_on_warning... no
+#11 61.62 checking whether format(printf, ...) attribute is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lvm.o lvm.c
+#11 61.65 yes
+#11 61.65 checking whether compiler supports -Werror... yes
+#11 61.66 checking whether compiler supports -herror_on_warning... no
+#11 61.67 checking whether format(printf, ...) attribute is compilable... yes
+#11 61.71 checking whether compiler supports -Wimplicit-fallthrough... yes
+#11 61.72 checking whether fallthrough attribute is compilable... yes
+#11 61.75 checking whether compiler supports -Wimplicit-fallthrough... yes
+#11 61.76 checking whether compiler supports -Wimplicit-fallthrough... no
+#11 61.77 checking whether compiler supports -Werror... yes
+#11 61.78 checking whether compiler supports -herror_on_warning... no
+#11 61.79 checking whether cold attribute is compilable... yes
+#11 61.82 checking whether vm_make_tag is compilable... no
+#11 61.83 checking for a BSD-compatible install... /usr/bin/install -c
+#11 61.84 checking for ranlib... ranlib
+#11 61.84 checking for ld... /usr/bin/ld
+#11 61.84 checking for autoconf... /usr/bin/autoconf
+#11 61.84 checking for memalign... yes
+#11 61.87 checking for valloc... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lzio.o lzio.c
+#11 61.89 yes
+#11 61.89 checking for malloc_size... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o strbuf.o strbuf.c
+#11 61.92 no
+#11 61.92 checking whether compiler supports -O3... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o fpconv.o fpconv.c
+#11 61.93 yes
+#11 61.93 checking whether compiler supports -O3... no
+#11 61.94 checking whether compiler supports -funroll-loops... yes
+#11 61.95 checking configured backtracing method... N/A
+#11 61.95 checking for sbrk... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lauxlib.o lauxlib.c
+#11 61.98 yes
+#11 61.98 checking whether utrace(2) is compilable... no
+#11 62.00 checking whether utrace(2) with label is compilable... no
+#11 62.02 checking whether a program using __builtin_unreachable is compilable... yes
+#11 62.05 checking whether a program using __builtin_ffsl is compilable... yes
+#11 62.08 checking whether a program using __builtin_popcountl is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lbaselib.o lbaselib.c
+#11 62.11 yes
+#11 62.11 checking LG_PAGE... 12
+#11 62.16 checking for pthread.h... yes
+#11 62.19 checking for pthread_create in -lpthread... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o ldblib.o ldblib.c
+#11 62.22 yes
+#11 62.22 checking for dlfcn.h... yes
+#11 62.25 checking for dlsym... yes
+#11 62.28 checking whether pthread_atfork(3) is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o liolib.o liolib.c
+#11 62.32 yes
+#11 62.32 checking whether pthread_setname_np(3) is compilable... yes
+#11 62.35 checking whether pthread_getname_np(3) is compilable... yes
+#11 62.39 checking whether pthread_get_name_np(3) is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lmathlib.o lmathlib.c
+#11 62.41 no
+#11 62.41 checking for library containing clock_gettime... none required
+#11 62.44 checking whether clock_gettime(CLOCK_MONOTONIC_COARSE, ...) is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o loslib.o loslib.c
+#11 62.47 yes
+#11 62.47 checking whether clock_gettime(CLOCK_MONOTONIC, ...) is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o ltablib.o ltablib.c
+#11 62.51 yes
+#11 62.51 checking whether mach_absolute_time() is compilable... no
+#11 62.53 checking whether clock_gettime(CLOCK_REALTIME, ...) is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lstrlib.o lstrlib.c
+#11 62.57 yes
+#11 62.57 checking whether compiler supports -Werror... yes
+#11 62.58 checking whether syscall(2) is compilable... yes
+#11 62.62 checking for secure_getenv... yes
+#11 62.65 checking for sched_getcpu... yes
+#11 62.68 checking for sched_setaffinity... yes
+#11 62.71 checking for issetugid... no
+#11 62.74 checking for _malloc_thread_cleanup... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o loadlib.o loadlib.c
+#11 62.78 no
+#11 62.78 checking for _pthread_mutex_init_calloc_cb... no
+#11 62.81 checking for memcntl... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o linit.o linit.c
+#11 62.83 cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lua_cjson.o lua_cjson.c
+#11 62.84 no
+#11 62.84 checking for TLS... yes
+#11 62.86 checking whether C11 atomics is compilable... yes
+#11 62.89 checking whether GCC __atomic atomics is compilable... yes
+#11 62.91 checking whether GCC 8-bit __atomic atomics is compilable... yes
+#11 62.94 checking whether GCC __sync atomics is compilable... yes
+#11 62.97 checking whether GCC 8-bit __sync atomics is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lua_struct.o lua_struct.c
+#11 63.00 yes
+#11 63.00 checking whether Darwin OSAtomic*() is compilable... no
+#11 63.01 checking whether madvise(2) is compilable... yes
+#11 63.04 checking whether madvise(..., MADV_FREE) is compilable... yes
+#11 63.07 checking whether madvise(..., MADV_DONTNEED) is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lua_cmsgpack.o lua_cmsgpack.c
+#11 63.09 yes
+#11 63.09 checking whether madvise(..., MADV_DO[NT]DUMP) is compilable... yes
+#11 63.12 checking whether madvise(..., MADV_[NO]HUGEPAGE) is compilable... yes
+#11 63.15 checking whether madvise(..., MADV_[NO]CORE) is compilable... no
+#11 63.16 checking whether mprotect(2) is compilable... yes
+#11 63.19 checking for __builtin_clz... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lua_bit.o lua_bit.c
+#11 63.22 yes
+#11 63.22 checking whether Darwin os_unfair_lock_*() is compilable... no
+#11 63.23 checking whether glibc malloc hook is compilable... no
+#11 63.27 checking whether glibc memalign hook is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o lua.o lua.c
+#11 63.30 no
+#11 63.30 checking whether pthreads adaptive mutexes is compilable... yes
+#11 63.33 checking whether compiler supports -D_GNU_SOURCE... yes
+#11 63.34 checking whether compiler supports -Werror... yes
+#11 63.35 checking whether compiler supports -herror_on_warning... no
+#11 63.36 checking whether strerror_r returns char with gnu source is compilable... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o luac.o luac.c
+#11 63.40 yes
+#11 63.40 checking for _Bool... cc -Wall -DLUA_ANSI -DENABLE_CJSON_GLOBAL -DLUA_USE_MKSTEMP  -O2    -c -o print.o print.c
+#11 63.45 yes
+#11 63.45 checking for stdbool.h that conforms to C99... yes
+#11 63.48 configure: creating ./config.status
+#11 63.48 ar rc liblua.a lapi.o lcode.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o ltm.o lundump.o lvm.o lzio.o strbuf.o fpconv.o lauxlib.o lbaselib.o ldblib.o liolib.o lmathlib.o loslib.o ltablib.o lstrlib.o loadlib.o linit.o lua_cjson.o lua_struct.o lua_cmsgpack.o lua_bit.o	# DLL needs all object files
+#11 63.48 ranlib liblua.a
+#11 63.49 cc -o lua  lua.o liblua.a -lm 
+#11 63.50 cc -o luac  luac.o print.o liblua.a -lm 
+#11 63.52 make[3]: Leaving directory '/tmp/valkey/deps/lua/src'
+#11 63.53 config.status: creating Makefile
+#11 63.54 config.status: creating jemalloc.pc
+#11 63.55 config.status: creating doc/html.xsl
+#11 63.56 config.status: creating doc/manpages.xsl
+#11 63.56 config.status: creating doc/jemalloc.xml
+#11 63.58 config.status: creating include/jemalloc/jemalloc_macros.h
+#11 63.59 config.status: creating include/jemalloc/jemalloc_protos.h
+#11 63.60 config.status: creating include/jemalloc/jemalloc_typedefs.h
+#11 63.61 config.status: creating include/jemalloc/internal/jemalloc_preamble.h
+#11 63.62 config.status: creating test/test.sh
+#11 63.63 config.status: creating test/include/test/jemalloc_test.h
+#11 63.64 config.status: creating config.stamp
+#11 63.64 config.status: creating bin/jemalloc-config
+#11 63.65 config.status: creating bin/jemalloc.sh
+#11 63.66 config.status: creating bin/jeprof
+#11 63.68 config.status: creating include/jemalloc/jemalloc_defs.h
+#11 63.69 config.status: creating include/jemalloc/internal/jemalloc_internal_defs.h
+#11 63.69 config.status: creating test/include/test/jemalloc_test_defs.h
+#11 63.70 config.status: executing include/jemalloc/internal/public_symbols.txt commands
+#11 63.71 config.status: executing include/jemalloc/internal/private_symbols.awk commands
+#11 63.73 config.status: executing include/jemalloc/internal/private_symbols_jet.awk commands
+#11 63.74 config.status: executing include/jemalloc/internal/public_namespace.h commands
+#11 63.77 config.status: executing include/jemalloc/internal/public_unnamespace.h commands
+#11 63.80 config.status: executing include/jemalloc/jemalloc_protos_jet.h commands
+#11 63.81 config.status: executing include/jemalloc/jemalloc_rename.h commands
+#11 63.85 config.status: executing include/jemalloc/jemalloc_mangle.h commands
+#11 63.90 config.status: executing include/jemalloc/jemalloc_mangle_jet.h commands
+#11 63.95 config.status: executing include/jemalloc/jemalloc.h commands
+#11 63.96 ===============================================================================
+#11 63.96 jemalloc version   : 5.3.0-0-g0
+#11 63.96 library revision   : 2
+#11 63.96 
+#11 63.96 CONFIG             : --disable-cxx --with-version=5.3.0-0-g0 --with-lg-quantum=3 --disable-cache-oblivious --with-jemalloc-prefix=je_ CFLAGS= LDFLAGS=
+#11 63.96 CC                 : gcc
+#11 63.96 CONFIGURE_CFLAGS   : -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops
+#11 63.96 SPECIFIED_CFLAGS   : 
+#11 63.96 EXTRA_CFLAGS       : 
+#11 63.96 CPPFLAGS           : -D_GNU_SOURCE -D_REENTRANT
+#11 63.96 CXX                : 
+#11 63.96 CONFIGURE_CXXFLAGS : 
+#11 63.96 SPECIFIED_CXXFLAGS : 
+#11 63.96 EXTRA_CXXFLAGS     : 
+#11 63.96 LDFLAGS            : 
+#11 63.96 EXTRA_LDFLAGS      : 
+#11 63.96 DSO_LDFLAGS        : -shared -Wl,-soname,$(@F)
+#11 63.96 LIBS               : -lm  -pthread
+#11 63.96 RPATH_EXTRA        : 
+#11 63.96 
+#11 63.96 XSLTPROC           : false
+#11 63.96 XSLROOT            : 
+#11 63.96 
+#11 63.96 PREFIX             : /usr/local
+#11 63.96 BINDIR             : /usr/local/bin
+#11 63.96 DATADIR            : /usr/local/share
+#11 63.96 INCLUDEDIR         : /usr/local/include
+#11 63.96 LIBDIR             : /usr/local/lib
+#11 63.96 MANDIR             : /usr/local/share/man
+#11 63.96 
+#11 63.96 srcroot            : 
+#11 63.96 abs_srcroot        : /tmp/valkey/deps/jemalloc/
+#11 63.96 objroot            : 
+#11 63.96 abs_objroot        : /tmp/valkey/deps/jemalloc/
+#11 63.96 
+#11 63.96 JEMALLOC_PREFIX    : je_
+#11 63.96 JEMALLOC_PRIVATE_NAMESPACE
+#11 63.96                    : je_
+#11 63.96 install_suffix     : 
+#11 63.96 malloc_conf        : 
+#11 63.96 documentation      : 1
+#11 63.96 shared libs        : 1
+#11 63.96 static libs        : 1
+#11 63.96 autogen            : 0
+#11 63.96 debug              : 0
+#11 63.96 stats              : 1
+#11 63.96 experimental_smallocx : 0
+#11 63.96 prof               : 0
+#11 63.96 prof-libunwind     : 0
+#11 63.96 prof-libgcc        : 0
+#11 63.96 prof-gcc           : 0
+#11 63.96 fill               : 1
+#11 63.96 utrace             : 0
+#11 63.96 xmalloc            : 0
+#11 63.96 log                : 0
+#11 63.96 lazy_lock          : 0
+#11 63.96 cache-oblivious    : 0
+#11 63.96 cxx                : 0
+#11 63.96 ===============================================================================
+#11 63.97 cd jemalloc && make lib/libjemalloc.a
+#11 63.98 make[3]: Entering directory '/tmp/valkey/deps/jemalloc'
+#11 63.98 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/jemalloc.sym.o src/jemalloc.c
+#11 63.98 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/arena.sym.o src/arena.c
+#11 64.90 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/background_thread.sym.o src/background_thread.c
+#11 65.22 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/base.sym.o src/base.c
+#11 65.47 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/bin.sym.o src/bin.c
+#11 65.61 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/bin_info.sym.o src/bin_info.c
+#11 65.74 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/bitmap.sym.o src/bitmap.c
+#11 65.86 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/buf_writer.sym.o src/buf_writer.c
+#11 65.90 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/cache_bin.sym.o src/cache_bin.c
+#11 66.03 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/ckh.sym.o src/ckh.c
+#11 66.08 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/counter.sym.o src/counter.c
+#11 66.19 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/ctl.sym.o src/ctl.c
+#11 66.51 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/decay.sym.o src/decay.c
+#11 66.69 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/div.sym.o src/div.c
+#11 66.75 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/ecache.sym.o src/ecache.c
+#11 66.88 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/edata.sym.o src/edata.c
+#11 67.41 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/edata_cache.sym.o src/edata_cache.c
+#11 67.55 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/ehooks.sym.o src/ehooks.c
+#11 67.72 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/emap.sym.o src/emap.c
+#11 68.09 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/eset.sym.o src/eset.c
+#11 68.33 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/exp_grow.sym.o src/exp_grow.c
+#11 68.46 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/extent.sym.o src/extent.c
+#11 68.90 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/extent_dss.sym.o src/extent_dss.c
+#11 69.05 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/extent_mmap.sym.o src/extent_mmap.c
+#11 69.17 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/fxp.sym.o src/fxp.c
+#11 69.32 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/san.sym.o src/san.c
+#11 69.46 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/san_bump.sym.o src/san_bump.c
+#11 69.59 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/hook.sym.o src/hook.c
+#11 69.72 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/hpa.sym.o src/hpa.c
+#11 70.01 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/hpa_hooks.sym.o src/hpa_hooks.c
+#11 70.14 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/hpdata.sym.o src/hpdata.c
+#11 70.17 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/inspect.sym.o src/inspect.c
+#11 70.33 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/large.sym.o src/large.c
+#11 70.60 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/log.sym.o src/log.c
+#11 70.61 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/malloc_io.sym.o src/malloc_io.c
+#11 70.73 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/mutex.sym.o src/mutex.c
+#11 70.89 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/nstime.sym.o src/nstime.c
+#11 70.89 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/pa.sym.o src/pa.c
+#11 71.03 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/pa_extra.sym.o src/pa_extra.c
+#11 71.06 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/pai.sym.o src/pai.c
+#11 71.19 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/pac.sym.o src/pac.c
+#11 71.19 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/pages.sym.o src/pages.c
+#11 71.37 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/peak_event.sym.o src/peak_event.c
+#11 71.40 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/prof.sym.o src/prof.c
+#11 71.49 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/prof_data.sym.o src/prof_data.c
+#11 71.55 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/prof_log.sym.o src/prof_log.c
+#11 71.67 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/prof_recent.sym.o src/prof_recent.c
+#11 71.79 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/prof_stats.sym.o src/prof_stats.c
+#11 71.91 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/prof_sys.sym.o src/prof_sys.c
+#11 71.94 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/psset.sym.o src/psset.c
+#11 72.05 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/rtree.sym.o src/rtree.c
+#11 72.17 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/safety_check.sym.o src/safety_check.c
+#11 72.18 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/sc.sym.o src/sc.c
+#11 72.28 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/sec.sym.o src/sec.c
+#11 72.28 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/stats.sym.o src/stats.c
+#11 72.51 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/sz.sym.o src/sz.c
+#11 72.66 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/tcache.sym.o src/tcache.c
+#11 73.10 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/test_hooks.sym.o src/test_hooks.c
+#11 73.15 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/thread_event.sym.o src/thread_event.c
+#11 73.25 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/ticker.sym.o src/ticker.c
+#11 73.31 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/tsd.sym.o src/tsd.c
+#11 73.37 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -DJEMALLOC_NO_PRIVATE_NAMESPACE -o src/witness.sym.o src/witness.c
+#11 73.48 nm -a src/jemalloc.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/jemalloc.sym
+#11 73.49 nm -a src/arena.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/arena.sym
+#11 73.49 nm -a src/background_thread.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/background_thread.sym
+#11 73.49 nm -a src/base.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/base.sym
+#11 73.49 nm -a src/bin.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/bin.sym
+#11 73.49 nm -a src/bin_info.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/bin_info.sym
+#11 73.50 nm -a src/bitmap.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/bitmap.sym
+#11 73.50 nm -a src/buf_writer.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/buf_writer.sym
+#11 73.50 nm -a src/cache_bin.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/cache_bin.sym
+#11 73.50 nm -a src/ckh.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/ckh.sym
+#11 73.50 nm -a src/counter.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/counter.sym
+#11 73.50 nm -a src/ctl.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/ctl.sym
+#11 73.50 nm -a src/decay.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/decay.sym
+#11 73.51 nm -a src/div.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/div.sym
+#11 73.51 nm -a src/ecache.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/ecache.sym
+#11 73.51 nm -a src/edata.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/edata.sym
+#11 73.51 nm -a src/edata_cache.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/edata_cache.sym
+#11 73.51 nm -a src/ehooks.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/ehooks.sym
+#11 73.51 nm -a src/emap.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/emap.sym
+#11 73.51 nm -a src/eset.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/eset.sym
+#11 73.51 nm -a src/exp_grow.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/exp_grow.sym
+#11 73.52 nm -a src/extent.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/extent.sym
+#11 73.52 nm -a src/extent_dss.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/extent_dss.sym
+#11 73.52 nm -a src/extent_mmap.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/extent_mmap.sym
+#11 73.52 nm -a src/fxp.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/fxp.sym
+#11 73.52 nm -a src/san.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/san.sym
+#11 73.52 nm -a src/san_bump.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/san_bump.sym
+#11 73.52 nm -a src/hook.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/hook.sym
+#11 73.53 nm -a src/hpa.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/hpa.sym
+#11 73.53 nm -a src/hpa_hooks.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/hpa_hooks.sym
+#11 73.53 nm -a src/hpdata.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/hpdata.sym
+#11 73.53 nm -a src/inspect.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/inspect.sym
+#11 73.53 nm -a src/large.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/large.sym
+#11 73.53 nm -a src/log.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/log.sym
+#11 73.53 nm -a src/malloc_io.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/malloc_io.sym
+#11 73.53 nm -a src/mutex.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/mutex.sym
+#11 73.54 nm -a src/nstime.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/nstime.sym
+#11 73.54 nm -a src/pa.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/pa.sym
+#11 73.54 nm -a src/pa_extra.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/pa_extra.sym
+#11 73.54 nm -a src/pai.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/pai.sym
+#11 73.54 nm -a src/pac.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/pac.sym
+#11 73.54 nm -a src/pages.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/pages.sym
+#11 73.54 nm -a src/peak_event.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/peak_event.sym
+#11 73.54 nm -a src/prof.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/prof.sym
+#11 73.55 nm -a src/prof_data.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/prof_data.sym
+#11 73.55 nm -a src/prof_log.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/prof_log.sym
+#11 73.55 nm -a src/prof_recent.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/prof_recent.sym
+#11 73.55 nm -a src/prof_stats.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/prof_stats.sym
+#11 73.55 nm -a src/prof_sys.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/prof_sys.sym
+#11 73.55 nm -a src/psset.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/psset.sym
+#11 73.55 nm -a src/rtree.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/rtree.sym
+#11 73.56 nm -a src/safety_check.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/safety_check.sym
+#11 73.56 nm -a src/sc.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/sc.sym
+#11 73.56 nm -a src/sec.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/sec.sym
+#11 73.56 nm -a src/stats.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/stats.sym
+#11 73.56 nm -a src/sz.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/sz.sym
+#11 73.56 nm -a src/tcache.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/tcache.sym
+#11 73.56 nm -a src/test_hooks.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/test_hooks.sym
+#11 73.56 nm -a src/thread_event.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/thread_event.sym
+#11 73.57 nm -a src/ticker.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/ticker.sym
+#11 73.57 nm -a src/tsd.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/tsd.sym
+#11 73.57 nm -a src/witness.sym.o | mawk -f include/jemalloc/internal/private_symbols.awk > src/witness.sym
+#11 73.57 /bin/sh include/jemalloc/internal/private_namespace.sh src/jemalloc.sym src/arena.sym src/background_thread.sym src/base.sym src/bin.sym src/bin_info.sym src/bitmap.sym src/buf_writer.sym src/cache_bin.sym src/ckh.sym src/counter.sym src/ctl.sym src/decay.sym src/div.sym src/ecache.sym src/edata.sym src/edata_cache.sym src/ehooks.sym src/emap.sym src/eset.sym src/exp_grow.sym src/extent.sym src/extent_dss.sym src/extent_mmap.sym src/fxp.sym src/san.sym src/san_bump.sym src/hook.sym src/hpa.sym src/hpa_hooks.sym src/hpdata.sym src/inspect.sym src/large.sym src/log.sym src/malloc_io.sym src/mutex.sym src/nstime.sym src/pa.sym src/pa_extra.sym src/pai.sym src/pac.sym src/pages.sym src/peak_event.sym src/prof.sym src/prof_data.sym src/prof_log.sym src/prof_recent.sym src/prof_stats.sym src/prof_sys.sym src/psset.sym src/rtree.sym src/safety_check.sym src/sc.sym src/sec.sym src/stats.sym src/sz.sym src/tcache.sym src/test_hooks.sym src/thread_event.sym src/ticker.sym src/tsd.sym src/witness.sym > include/jemalloc/internal/private_namespace.gen.h
+#11 73.58 cp include/jemalloc/internal/private_namespace.gen.h include/jemalloc/internal/private_namespace.h
+#11 73.58 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/jemalloc.o src/jemalloc.c
+#11 73.58 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/arena.o src/arena.c
+#11 74.42 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/background_thread.o src/background_thread.c
+#11 74.75 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/base.o src/base.c
+#11 75.00 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/bin.o src/bin.c
+#11 75.14 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/bin_info.o src/bin_info.c
+#11 75.27 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/bitmap.o src/bitmap.c
+#11 75.39 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/buf_writer.o src/buf_writer.c
+#11 75.41 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/cache_bin.o src/cache_bin.c
+#11 75.53 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/ckh.o src/ckh.c
+#11 75.60 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/counter.o src/counter.c
+#11 75.72 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/ctl.o src/ctl.c
+#11 76.03 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/decay.o src/decay.c
+#11 76.22 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/div.o src/div.c
+#11 76.28 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/ecache.o src/ecache.c
+#11 76.40 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/edata.o src/edata.c
+#11 76.91 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/edata_cache.o src/edata_cache.c
+#11 77.07 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/ehooks.o src/ehooks.c
+#11 77.23 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/emap.o src/emap.c
+#11 77.59 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/eset.o src/eset.c
+#11 77.79 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/exp_grow.o src/exp_grow.c
+#11 77.91 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/extent.o src/extent.c
+#11 78.36 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/extent_dss.o src/extent_dss.c
+#11 77.77 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/extent_mmap.o src/extent_mmap.c
+#11 77.89 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/fxp.o src/fxp.c
+#11 78.06 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/san.o src/san.c
+#11 78.21 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/san_bump.o src/san_bump.c
+#11 78.34 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/hook.o src/hook.c
+#11 78.49 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/hpa.o src/hpa.c
+#11 78.80 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/hpa_hooks.o src/hpa_hooks.c
+#11 78.93 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/hpdata.o src/hpdata.c
+#11 78.98 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/inspect.o src/inspect.c
+#11 79.15 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/large.o src/large.c
+#11 79.42 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/log.o src/log.c
+#11 79.46 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/malloc_io.o src/malloc_io.c
+#11 79.56 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/mutex.o src/mutex.c
+#11 79.71 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/nstime.o src/nstime.c
+#11 79.72 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/pa.o src/pa.c
+#11 79.85 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/pa_extra.o src/pa_extra.c
+#11 79.89 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/pai.o src/pai.c
+#11 80.01 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/pac.o src/pac.c
+#11 80.01 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/pages.o src/pages.c
+#11 80.19 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/peak_event.o src/peak_event.c
+#11 80.21 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/prof.o src/prof.c
+#11 80.32 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/prof_data.o src/prof_data.c
+#11 80.37 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/prof_log.o src/prof_log.c
+#11 80.50 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/prof_recent.o src/prof_recent.c
+#11 80.63 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/prof_stats.o src/prof_stats.c
+#11 80.76 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/prof_sys.o src/prof_sys.c
+#11 80.80 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/psset.o src/psset.c
+#11 80.91 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/rtree.o src/rtree.c
+#11 81.05 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/safety_check.o src/safety_check.c
+#11 81.06 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/sc.o src/sc.c
+#11 81.16 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/sec.o src/sec.c
+#11 81.18 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/stats.o src/stats.c
+#11 81.42 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/sz.o src/sz.c
+#11 81.57 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/tcache.o src/tcache.c
+#11 82.03 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/test_hooks.o src/test_hooks.c
+#11 82.09 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/thread_event.o src/thread_event.c
+#11 82.17 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/ticker.o src/ticker.c
+#11 82.24 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/tsd.o src/tsd.c
+#11 82.28 gcc -std=gnu11 -Wall -Wextra -Wsign-compare -Wundef -Wno-format-zero-length -Wpointer-arith -Wno-missing-braces -Wno-missing-field-initializers -Wno-missing-attributes -pipe -g3 -fvisibility=hidden -Wimplicit-fallthrough -O3 -funroll-loops -c -D_GNU_SOURCE -D_REENTRANT -Iinclude -Iinclude -o src/witness.o src/witness.c
+#11 82.41 ar crs lib/libjemalloc.a src/jemalloc.o src/arena.o src/background_thread.o src/base.o src/bin.o src/bin_info.o src/bitmap.o src/buf_writer.o src/cache_bin.o src/ckh.o src/counter.o src/ctl.o src/decay.o src/div.o src/ecache.o src/edata.o src/edata_cache.o src/ehooks.o src/emap.o src/eset.o src/exp_grow.o src/extent.o src/extent_dss.o src/extent_mmap.o src/fxp.o src/san.o src/san_bump.o src/hook.o src/hpa.o src/hpa_hooks.o src/hpdata.o src/inspect.o src/large.o src/log.o src/malloc_io.o src/mutex.o src/nstime.o src/pa.o src/pa_extra.o src/pai.o src/pac.o src/pages.o src/peak_event.o src/prof.o src/prof_data.o src/prof_log.o src/prof_recent.o src/prof_stats.o src/prof_sys.o src/psset.o src/rtree.o src/safety_check.o src/sc.o src/sec.o src/stats.o src/sz.o src/tcache.o src/test_hooks.o src/thread_event.o src/ticker.o src/tsd.o src/witness.o
+#11 82.48 make[3]: Leaving directory '/tmp/valkey/deps/jemalloc'
+#11 82.48 make[2]: Leaving directory '/tmp/valkey/deps'
+#11 82.48     [34mCC[0m [33mthreads_mngr.o[0m
+#11 82.48     [34mCC[0m [33madlist.o[0m
+#11 82.54     [34mCC[0m [33mquicklist.o[0m
+#11 82.57     [34mCC[0m [33mae.o[0m
+#11 82.74     [34mCC[0m [33manet.o[0m
+#11 82.91     [34mCC[0m [33mdict.o[0m
+#11 82.98     [34mCC[0m [33mhashtable.o[0m
+#11 83.50     [34mCC[0m [33mkvstore.o[0m
+#11 83.57     [34mCC[0m [33mserver.o[0m
+#11 83.72     [34mCC[0m [33msds.o[0m
+#11 84.24     [34mCC[0m [33mzmalloc.o[0m
+#11 84.40     [34mCC[0m [33mlzf_c.o[0m
+#11 84.44     [34mCC[0m [33mlzf_d.o[0m
+#11 84.50     [34mCC[0m [33mpqsort.o[0m
+#11 84.66     [34mCC[0m [33mzipmap.o[0m
+#11 84.70     [34mCC[0m [33msha1.o[0m
+#11 84.82     [34mCC[0m [33mziplist.o[0m
+#11 85.15     [34mCC[0m [33mrelease.o[0m
+#11 85.17     [34mCC[0m [33mmemory_prefetch.o[0m
+#11 85.27     [34mCC[0m [33mio_threads.o[0m
+#11 85.43     [34mCC[0m [33mnetworking.o[0m
+#11 85.58     [34mCC[0m [33mutil.o[0m
+#11 86.02     [34mCC[0m [33mobject.o[0m
+#11 86.58     [34mCC[0m [33mdb.o[0m
+#11 86.81     [34mCC[0m [33mreplication.o[0m
+#11 87.39     [34mCC[0m [33mrdb.o[0m
+#11 87.75     [34mCC[0m [33mt_string.o[0m
+#11 88.07     [34mCC[0m [33mt_list.o[0m
+#11 88.47     [34mCC[0m [33mt_set.o[0m
+#11 88.52     [34mCC[0m [33mt_zset.o[0m
+#11 89.06     [34mCC[0m [33mt_hash.o[0m
+#11 89.55     [34mCC[0m [33mconfig.o[0m
+#11 90.07     [34mCC[0m [33maof.o[0m
+#11 90.24     [34mCC[0m [33mpubsub.o[0m
+#11 90.53     [34mCC[0m [33mmulti.o[0m
+#11 90.62     [34mCC[0m [33mdebug.o[0m
+#11 90.69     [34mCC[0m [33msort.o[0m
+#11 90.90     [34mCC[0m [33mintset.o[0m
+#11 91.01     [34mCC[0m [33msyncio.o[0m
+#11 91.07     [34mCC[0m [33mcluster.o[0m
+#11 91.16     [34mCC[0m [33mcluster_legacy.o[0m
+#11 91.45     [34mCC[0m [33mcluster_slot_stats.o[0m
+#11 91.56     [34mCC[0m [33mcrc16.o[0m
+#11 91.61     [34mCC[0m [33mendianconv.o[0m
+#11 91.63     [34mCC[0m [33mcommandlog.o[0m
+#11 91.74     [34mCC[0m [33meval.o[0m
+#11 91.98     [34mCC[0m [33mbio.o[0m
+#11 92.08     [34mCC[0m [33mrio.o[0m
+#11 92.25     [34mCC[0m [33mrand.o[0m
+#11 92.27     [34mCC[0m [33mmemtest.o[0m
+#11 92.47     [34mCC[0m [33msyscheck.o[0m
+#11 92.53     [34mCC[0m [33mcrcspeed.o[0m
+#11 92.64     [34mCC[0m [33mcrccombine.o[0m
+#11 92.68     [34mCC[0m [33mcrc64.o[0m
+#11 92.71     [34mCC[0m [33mbitops.o[0m
+#11 92.74     [34mCC[0m [33msentinel.o[0m
+#11 93.38     [34mCC[0m [33mnotify.o[0m
+#11 93.46     [34mCC[0m [33msetproctitle.o[0m
+#11 93.50     [34mCC[0m [33mblocked.o[0m
+#11 93.69     [34mCC[0m [33mhyperloglog.o[0m
+#11 93.87     [34mCC[0m [33mlatency.o[0m
+#11 94.07     [34mCC[0m [33msparkline.o[0m
+#11 94.18     [34mCC[0m [33mvalkey-check-rdb.o[0m
+#11 94.32     [34mCC[0m [33mvalkey-check-aof.o[0m
+#11 94.35     [34mCC[0m [33mgeo.o[0m
+#11 94.48     [34mCC[0m [33mlazyfree.o[0m
+#11 94.57     [34mCC[0m [33mmodule.o[0m
+#11 94.66     [34mCC[0m [33mevict.o[0m
+#11 94.86     [34mCC[0m [33mexpire.o[0m
+#11 95.06     [34mCC[0m [33mgeohash.o[0m
+#11 95.15     [34mCC[0m [33mgeohash_helper.o[0m
+#11 95.23     [34mCC[0m [33mchildinfo.o[0m
+#11 95.31     [34mCC[0m [33mallocator_defrag.o[0m
+#11 95.41     [34mCC[0m [33mdefrag.o[0m
+#11 95.70     [34mCC[0m [33msiphash.o[0m
+#11 95.75     [34mCC[0m [33mrax.o[0m
+#11 96.29     [34mCC[0m [33mt_stream.o[0m
+#11 97.20     [34mCC[0m [33mlistpack.o[0m
+#11 97.32     [34mCC[0m [33mlocaltime.o[0m
+#11 97.35     [34mCC[0m [33mlolwut.o[0m
+#11 97.44     [34mCC[0m [33mlolwut5.o[0m
+#11 97.54     [34mCC[0m [33mlolwut6.o[0m
+#11 97.63     [34mCC[0m [33macl.o[0m
+#11 97.91     [34mCC[0m [33mtracking.o[0m
+#11 98.11     [34mCC[0m [33msocket.o[0m
+#11 98.23     [34mCC[0m [33mtls.o[0m
+#11 98.42     [34mCC[0m [33msha256.o[0m
+#11 98.47     [34mCC[0m [33mtimeout.o[0m
+#11 98.53     [34mCC[0m [33msetcpuaffinity.o[0m
+#11 98.56     [34mCC[0m [33mmonotonic.o[0m
+#11 98.57     [34mCC[0m [33mmt19937-64.o[0m
+#11 98.59     [34mCC[0m [33mresp_parser.o[0m
+#11 98.64     [34mCC[0m [33mcall_reply.o[0m
+#11 98.66     [34mCC[0m [33mscript.o[0m
+#11 98.79     [34mCC[0m [33mfunctions.o[0m
+#11 98.80     [34mCC[0m [33mcommands.o[0m
+#11 98.94     [34mCC[0m [33mstrl.o[0m
+#11 98.96     [34mCC[0m [33mconnection.o[0m
+#11 99.06     [34mCC[0m [33munix.o[0m
+#11 99.07     [34mCC[0m [33mlogreqres.o[0m
+#11 99.12     [34mCC[0m [33mrdma.o[0m
+#11 99.14     [34mCC[0m [33mscripting_engine.o[0m
+#11 99.19     [34mCC[0m [33mlua/script_lua.o[0m
+#11 99.24     [34mCC[0m [33mlua/function_lua.o[0m
+#11 99.34     [34mCC[0m [33mlua/engine_lua.o[0m
+#11 99.44     [34mCC[0m [33mlua/debug_lua.o[0m
+#11 99.52     [34mCC[0m [33mvalkey-cli.o[0m
+#11 99.85     [34mCC[0m [33mserverassert.o[0m
+#11 99.87     [34mCC[0m [33mcli_common.o[0m
+#11 100.0     [34mCC[0m [33mcli_commands.o[0m
+#11 100.1     [34mCC[0m [33mvalkey-benchmark.o[0m
+#11 100.6     [34;1mLINK[0m [37;1mvalkey-server[0m
+#11 103.6     [34;1mLINK[0m [37;1mvalkey-benchmark[0m
+#11 104.5     [34;1mINSTALL[0m [37;1mvalkey-sentinel[0m
+#11 104.5     [34;1mLINK[0m [37;1mvalkey-cli[0m
+#11 104.9     [34;1mINSTALL[0m [37;1mvalkey-check-rdb[0m
+#11 104.9     [34;1mINSTALL[0m [37;1mvalkey-check-aof[0m
+#11 105.8 
+#11 105.8 Hint: It's a good idea to run 'make test' ;)
+#11 105.8 
+#11 105.8 make[1]: Leaving directory '/tmp/valkey/src'
+#11 105.8 make: Leaving directory '/tmp/valkey'
+#11 105.8 Valkey server v=8.1.4 sha=5f4bae3e:0 malloc=jemalloc-5.3.0 bits=64 build=88f8a9fad43ed4a6
+#11 DONE 105.9s
+
+#12 [ 7/19] COPY . /opt/dronedream/source
+#12 DONE 0.2s
+
+#13 [ 8/19] RUN test -n "755c511539fe561207ca38ff5079f471a4110896" &&     python3 -m venv /opt/dronedream/venv &&     /opt/dronedream/venv/bin/pip install --disable-pip-version-check --no-cache-dir       -r /opt/dronedream/source/runtime/locks/python-requirements.lock &&     /opt/dronedream/venv/bin/pip install --disable-pip-version-check --no-cache-dir       --no-deps /opt/dronedream/source/backend /opt/dronedream/source/worker &&     /opt/dronedream/venv/bin/pip check &&     test "$(/opt/dronedream/venv/bin/python -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')" = "3.12" &&     test "$(/opt/dronedream/venv/bin/python -c 'import importlib.metadata as m; print(m.version("drone-dream-backend"))')" = "0.1.0" &&     test "$(/opt/dronedream/venv/bin/python -c 'import importlib.metadata as m; print(m.version("drone-dream-worker"))')" = "0.1.0" &&     test "$(/opt/dronedream/venv/bin/python -c 'import importlib.metadata as m; print(m.version("mavsdk"))')" = "3.15.3" &&     test "$(/opt/dronedream/venv/bin/python -c 'import importlib.metadata as m; print(m.version("pyulog"))')" = "1.2.3" &&     test "$(dpkg-query -W -f='${Version}' "gz-harmonic")" = "1.0.0-1~noble" &&     install -d -m 0755 /usr/share/doc/dronedream-runtime &&     install -m 0644 /opt/dronedream/source/LICENSE       /usr/share/doc/dronedream-runtime/LICENSE &&     install -m 0644 /opt/dronedream/source/runtime/THIRD_PARTY_NOTICES.md       /usr/share/doc/dronedream-runtime/THIRD_PARTY_NOTICES.md &&     cmp /opt/dronedream/source/runtime/licenses/valkey-COPYING       /usr/share/doc/valkey/COPYING &&     install -d -m 0755 /opt/dronedream/runtime &&     /opt/dronedream/venv/bin/python /opt/dronedream/source/runtime/tools/runtime_manifest.py       generate --pins /opt/dronedream/source/runtime/pins.env       --python-lock /opt/dronedream/source/runtime/locks/python-requirements.lock       --source-commit "755c511539fe561207ca38ff5079f471a4110896"       --output /opt/dronedream/runtime-manifest.json &&     dpkg-query -W -f='${Package}=${Version}\n' | LC_ALL=C sort       >/opt/dronedream/runtime/apt-packages.lock &&     /opt/dronedream/venv/bin/pip freeze --all | LC_ALL=C sort       >/opt/dronedream/runtime/python-installed.lock
+#13 3.574 Collecting alembic==1.18.5 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 3))
+#13 4.026   Downloading alembic-1.18.5-py3-none-any.whl.metadata (7.2 kB)
+#13 4.294 Collecting annotated-doc==0.0.4 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 4))
+#13 4.565   Downloading annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+#13 4.860 Collecting annotated-types==0.7.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 5))
+#13 5.171   Downloading annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+#13 5.504 Collecting anyio==4.14.1 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 6))
+#13 5.771   Downloading anyio-4.14.1-py3-none-any.whl.metadata (4.6 kB)
+#13 8.354 Collecting boto3==1.43.45 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 7))
+#13 8.652   Downloading boto3-1.43.45-py3-none-any.whl.metadata (6.6 kB)
+#13 11.49 Collecting botocore==1.43.45 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 8))
+#13 11.80   Downloading botocore-1.43.45-py3-none-any.whl.metadata (5.6 kB)
+#13 12.15 Collecting certifi==2026.6.17 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 9))
+#13 12.41   Downloading certifi-2026.6.17-py3-none-any.whl.metadata (2.5 kB)
+#13 13.54 Collecting cffi==2.1.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 10))
+#13 13.81   Downloading cffi-2.1.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.5 kB)
+#13 14.14 Collecting click==8.4.2 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 11))
+#13 14.40   Downloading click-8.4.2-py3-none-any.whl.metadata (2.6 kB)
+#13 16.36 Collecting cryptography==49.0.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 12))
+#13 16.77   Downloading cryptography-49.0.0-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (4.3 kB)
+#13 17.05 Collecting distro==1.9.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 13))
+#13 17.31   Downloading distro-1.9.0-py3-none-any.whl.metadata (6.8 kB)
+#13 17.96 Collecting fastapi==0.139.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 14))
+#13 18.22   Downloading fastapi-0.139.0-py3-none-any.whl.metadata (26 kB)
+#13 19.89 Collecting greenlet==3.5.3 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 15))
+#13 20.27   Downloading greenlet-3.5.3-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (3.8 kB)
+#13 24.11 Collecting grpcio==1.82.1 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 16))
+#13 24.39   Downloading grpcio-1.82.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (3.7 kB)
+#13 24.66 Collecting h11==0.16.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 17))
+#13 24.92   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+#13 25.24 Collecting httpcore==1.0.9 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 18))
+#13 25.50   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+#13 25.91 Collecting httptools==0.8.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 19))
+#13 26.18   Downloading httptools-0.8.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (3.5 kB)
+#13 26.48 Collecting httpx==0.28.1 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 20))
+#13 26.74   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+#13 27.07 Collecting idna==3.18 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 21))
+#13 27.33   Downloading idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+#13 28.01 Collecting jiter==0.16.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 22))
+#13 28.27   Downloading jiter-0.16.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.2 kB)
+#13 28.56 Collecting jmespath==1.1.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 23))
+#13 28.82   Downloading jmespath-1.1.0-py3-none-any.whl.metadata (7.6 kB)
+#13 29.22 Collecting Mako==1.3.12 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 24))
+#13 29.49   Downloading mako-1.3.12-py3-none-any.whl.metadata (2.9 kB)
+#13 29.95 Collecting MarkupSafe==3.0.3 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 25))
+#13 30.22   Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+#13 30.68 Collecting mavsdk==3.15.3 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 26))
+#13 30.96   Downloading mavsdk-3.15.3-py3-none-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl.metadata (7.7 kB)
+#13 32.20 Collecting numpy==2.3.5 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 27))
+#13 32.46   Downloading numpy-2.3.5-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (62 kB)
+#13 32.88      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.1/62.1 kB 199.7 kB/s eta 0:00:00
+#13 33.41 Collecting openai==2.45.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 28))
+#13 33.69   Downloading openai-2.45.0-py3-none-any.whl.metadata (34 kB)
+#13 34.08 Collecting packaging==26.2 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 29))
+#13 34.35   Downloading packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+#13 35.36 Collecting protobuf==7.35.1 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 30))
+#13 35.71   Downloading protobuf-7.35.1-cp310-abi3-manylinux2014_x86_64.whl.metadata (595 bytes)
+#13 35.25 Collecting psycopg==3.3.4 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 31))
+#13 35.51   Downloading psycopg-3.3.4-py3-none-any.whl.metadata (4.3 kB)
+#13 37.05 Collecting psycopg-binary==3.3.4 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 32))
+#13 37.32   Downloading psycopg_binary-3.3.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.7 kB)
+#13 37.60 Collecting pycparser==3.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 33))
+#13 37.86   Downloading pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+#13 39.38 Collecting pydantic==2.13.4 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 34))
+#13 39.69   Downloading pydantic-2.13.4-py3-none-any.whl.metadata (109 kB)
+#13 39.76      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 109.4/109.4 kB 1.5 MB/s eta 0:00:00
+#13 40.08 Collecting pydantic-settings==2.14.2 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 35))
+#13 40.34   Downloading pydantic_settings-2.14.2-py3-none-any.whl.metadata (3.4 kB)
+#13 47.14 Collecting pydantic_core==2.46.4 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 36))
+#13 47.41   Downloading pydantic_core-2.46.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+#13 47.73 Collecting PyJWT==2.13.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 37))
+#13 47.99   Downloading pyjwt-2.13.0-py3-none-any.whl.metadata (3.4 kB)
+#13 48.42 Collecting python-dateutil==2.9.0.post0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 38))
+#13 48.68   Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+#13 49.00 Collecting python-dotenv==1.2.2 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 39))
+#13 49.26   Downloading python_dotenv-1.2.2-py3-none-any.whl.metadata (27 kB)
+#13 49.59 Collecting pyulog==1.2.3 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 40))
+#13 49.86   Downloading pyulog-1.2.3-py3-none-any.whl.metadata (1.6 kB)
+#13 50.39 Collecting PyYAML==6.0.3 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 41))
+#13 50.65   Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+#13 51.04 Collecting redis==6.4.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 42))
+#13 51.31   Downloading redis-6.4.0-py3-none-any.whl.metadata (10 kB)
+#13 51.63 Collecting s3transfer==0.19.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 43))
+#13 52.02   Downloading s3transfer-0.19.0-py3-none-any.whl.metadata (1.7 kB)
+#13 52.30 Collecting six==1.17.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 44))
+#13 52.56   Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+#13 52.84 Collecting sniffio==1.3.1 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 45))
+#13 53.10   Downloading sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)
+#13 55.24 Collecting SQLAlchemy==2.0.51 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 46))
+#13 55.50   Downloading sqlalchemy-2.0.51-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (9.5 kB)
+#13 55.88 Collecting starlette==1.3.1 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 47))
+#13 56.14   Downloading starlette-1.3.1-py3-none-any.whl.metadata (6.4 kB)
+#13 56.53 Collecting tqdm==4.68.4 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 48))
+#13 56.79   Downloading tqdm-4.68.4-py3-none-any.whl.metadata (57 kB)
+#13 56.88      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 57.4/57.4 kB 747.7 kB/s eta 0:00:00
+#13 57.18 Collecting typing_extensions==4.16.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 49))
+#13 57.58   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+#13 57.85 Collecting typing-inspection==0.4.2 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 50))
+#13 58.11   Downloading typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+#13 58.45 Collecting urllib3==2.7.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 51))
+#13 58.71   Downloading urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+#13 59.15 Collecting uvicorn==0.51.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 52))
+#13 59.41   Downloading uvicorn-0.51.0-py3-none-any.whl.metadata (6.6 kB)
+#13 59.89 Collecting uvloop==0.22.1 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 53))
+#13 60.16   Downloading uvloop-0.22.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (4.9 kB)
+#13 60.85 Collecting watchfiles==1.2.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 54))
+#13 61.19   Downloading watchfiles-1.2.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.9 kB)
+#13 61.92 Collecting websockets==16.0 (from -r /opt/dronedream/source/runtime/locks/python-requirements.lock (line 55))
+#13 62.19   Downloading websockets-16.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (6.8 kB)
+#13 63.05 Downloading alembic-1.18.5-py3-none-any.whl (264 kB)
+#13 63.49    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 264.7/264.7 kB 613.3 kB/s eta 0:00:00
+#13 63.75 Downloading annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+#13 64.02 Downloading annotated_types-0.7.0-py3-none-any.whl (13 kB)
+#13 64.44 Downloading anyio-4.14.1-py3-none-any.whl (124 kB)
+#13 64.62    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 124.9/124.9 kB 715.7 kB/s eta 0:00:00
+#13 64.89 Downloading boto3-1.43.45-py3-none-any.whl (140 kB)
+#13 65.08    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 140.0/140.0 kB 738.2 kB/s eta 0:00:00
+#13 65.35 Downloading botocore-1.43.45-py3-none-any.whl (15.4 MB)
+#13 122.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 15.4/15.4 MB 140.8 kB/s eta 0:00:00
+#13 122.7 Downloading certifi-2026.6.17-py3-none-any.whl (133 kB)
+#13 123.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 133.3/133.3 kB 157.4 kB/s eta 0:00:00
+#13 123.8 Downloading cffi-2.1.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (221 kB)
+#13 125.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 221.8/221.8 kB 187.9 kB/s eta 0:00:00
+#13 125.2 Downloading click-8.4.2-py3-none-any.whl (119 kB)
+#13 126.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 119.2/119.2 kB 161.0 kB/s eta 0:00:00
+#13 126.3 Downloading cryptography-49.0.0-cp311-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
+#13 137.2    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 408.9 kB/s eta 0:00:00
+#13 137.4 Downloading distro-1.9.0-py3-none-any.whl (20 kB)
+#13 137.7 Downloading fastapi-0.139.0-py3-none-any.whl (130 kB)
+#13 137.9    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 130.3/130.3 kB 717.9 kB/s eta 0:00:00
+#13 138.2 Downloading greenlet-3.5.3-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (614 kB)
+#13 139.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 614.2/614.2 kB 624.9 kB/s eta 0:00:00
+#13 139.4 Downloading grpcio-1.82.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (6.9 MB)
+#13 162.7    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.9/6.9 MB 285.9 kB/s eta 0:00:00
+#13 163.0 Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+#13 163.4 Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+#13 163.8    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.8/78.8 kB 217.1 kB/s eta 0:00:00
+#13 164.1 Downloading httptools-0.8.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (523 kB)
+#13 166.7    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 523.9/523.9 kB 197.2 kB/s eta 0:00:00
+#13 167.0 Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+#13 167.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.5/73.5 kB 230.0 kB/s eta 0:00:00
+#13 167.6 Downloading idna-3.18-py3-none-any.whl (65 kB)
+#13 168.6    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 65.5/65.5 kB 57.8 kB/s eta 0:00:00
+#13 168.9 Downloading jiter-0.16.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (343 kB)
+#13 170.6    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 343.8/343.8 kB 203.6 kB/s eta 0:00:00
+#13 170.8 Downloading jmespath-1.1.0-py3-none-any.whl (20 kB)
+#13 171.2 Downloading mako-1.3.12-py3-none-any.whl (78 kB)
+#13 171.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.5/78.5 kB 250.3 kB/s eta 0:00:00
+#13 171.8 Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+#13 172.1 Downloading mavsdk-3.15.3-py3-none-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl (15.2 MB)
+#13 223.7    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 15.2/15.2 MB 326.4 kB/s eta 0:00:00
+#13 223.9 Downloading numpy-2.3.5-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.6 MB)
+#13 277.2    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.6/16.6 MB 239.2 kB/s eta 0:00:00
+#13 277.5 Downloading openai-2.45.0-py3-none-any.whl (1.6 MB)
+#13 284.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.6/1.6 MB 250.2 kB/s eta 0:00:00
+#13 284.3 Downloading packaging-26.2-py3-none-any.whl (100 kB)
+#13 284.7    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.2/100.2 kB 246.9 kB/s eta 0:00:00
+#13 285.0 Downloading protobuf-7.35.1-cp310-abi3-manylinux2014_x86_64.whl (327 kB)
+#13 286.8    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 327.1/327.1 kB 185.3 kB/s eta 0:00:00
+#13 287.1 Downloading psycopg-3.3.4-py3-none-any.whl (213 kB)
+#13 288.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 213.0/213.0 kB 221.2 kB/s eta 0:00:00
+#13 288.3 Downloading psycopg_binary-3.3.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (5.2 MB)
+#13 306.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.2/5.2 MB 275.1 kB/s eta 0:00:00
+#13 306.7 Downloading pycparser-3.0-py3-none-any.whl (48 kB)
+#13 306.9    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 48.2/48.2 kB 379.2 kB/s eta 0:00:00
+#13 307.1 Downloading pydantic-2.13.4-py3-none-any.whl (472 kB)
+#13 308.6    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 472.3/472.3 kB 316.4 kB/s eta 0:00:00
+#13 308.9 Downloading pydantic_settings-2.14.2-py3-none-any.whl (61 kB)
+#13 309.1    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 61.7/61.7 kB 288.2 kB/s eta 0:00:00
+#13 309.4 Downloading pydantic_core-2.46.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+#13 313.4    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 519.8 kB/s eta 0:00:00
+#13 313.7 Downloading pyjwt-2.13.0-py3-none-any.whl (31 kB)
+#13 314.0 Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+#13 314.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 229.9/229.9 kB 714.2 kB/s eta 0:00:00
+#13 314.6 Downloading python_dotenv-1.2.2-py3-none-any.whl (22 kB)
+#13 314.9 Downloading pyulog-1.2.3-py3-none-any.whl (52 kB)
+#13 314.9    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 52.3/52.3 kB 982.1 kB/s eta 0:00:00
+#13 315.2 Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (807 kB)
+#13 316.2    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 807.9/807.9 kB 815.2 kB/s eta 0:00:00
+#13 316.4 Downloading redis-6.4.0-py3-none-any.whl (279 kB)
+#13 316.9    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 279.8/279.8 kB 641.7 kB/s eta 0:00:00
+#13 317.1 Downloading s3transfer-0.19.0-py3-none-any.whl (90 kB)
+#13 317.3    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 90.1/90.1 kB 801.2 kB/s eta 0:00:00
+#13 317.5 Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+#13 317.8 Downloading sniffio-1.3.1-py3-none-any.whl (10 kB)
+#13 318.1 Downloading sqlalchemy-2.0.51-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.4 MB)
+#13 327.8    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.4/3.4 MB 320.6 kB/s eta 0:00:00
+#13 328.0 Downloading starlette-1.3.1-py3-none-any.whl (73 kB)
+#13 328.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.6/73.6 kB 175.7 kB/s eta 0:00:00
+#13 328.9 Downloading tqdm-4.68.4-py3-none-any.whl (676 kB)
+#13 332.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 676.6/676.6 kB 180.9 kB/s eta 0:00:00
+#13 332.8 Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+#13 333.0    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 245.9 kB/s eta 0:00:00
+#13 333.3 Downloading typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+#13 333.7 Downloading urllib3-2.7.0-py3-none-any.whl (131 kB)
+#13 334.4    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 131.1/131.1 kB 193.3 kB/s eta 0:00:00
+#13 334.8 Downloading uvicorn-0.51.0-py3-none-any.whl (73 kB)
+#13 335.2    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.2/73.2 kB 165.5 kB/s eta 0:00:00
+#13 335.5 Downloading uvloop-0.22.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (4.4 MB)
+#13 351.5    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.4/4.4 MB 277.5 kB/s eta 0:00:00
+#13 351.7 Downloading watchfiles-1.2.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (456 kB)
+#13 352.9    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 456.4/456.4 kB 403.1 kB/s eta 0:00:00
+#13 352.3 Downloading websockets-16.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (184 kB)
+#13 352.7    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 184.9/184.9 kB 466.2 kB/s eta 0:00:00
+#13 352.9 Installing collected packages: websockets, uvloop, urllib3, typing_extensions, tqdm, sniffio, six, redis, PyYAML, python-dotenv, PyJWT, pycparser, psycopg-binary, protobuf, packaging, numpy, MarkupSafe, jmespath, jiter, idna, httptools, h11, greenlet, distro, click, certifi, annotated-types, annotated-doc, uvicorn, typing-inspection, SQLAlchemy, pyulog, python-dateutil, pydantic_core, psycopg, Mako, httpcore, grpcio, cffi, anyio, watchfiles, starlette, pydantic, mavsdk, httpx, cryptography, botocore, alembic, s3transfer, pydantic-settings, openai, fastapi, boto3
+#13 358.7 Successfully installed Mako-1.3.12 MarkupSafe-3.0.3 PyJWT-2.13.0 PyYAML-6.0.3 SQLAlchemy-2.0.51 alembic-1.18.5 annotated-doc-0.0.4 annotated-types-0.7.0 anyio-4.14.1 boto3-1.43.45 botocore-1.43.45 certifi-2026.6.17 cffi-2.1.0 click-8.4.2 cryptography-49.0.0 distro-1.9.0 fastapi-0.139.0 greenlet-3.5.3 grpcio-1.82.1 h11-0.16.0 httpcore-1.0.9 httptools-0.8.0 httpx-0.28.1 idna-3.18 jiter-0.16.0 jmespath-1.1.0 mavsdk-3.15.3 numpy-2.3.5 openai-2.45.0 packaging-26.2 protobuf-7.35.1 psycopg-3.3.4 psycopg-binary-3.3.4 pycparser-3.0 pydantic-2.13.4 pydantic-settings-2.14.2 pydantic_core-2.46.4 python-dateutil-2.9.0.post0 python-dotenv-1.2.2 pyulog-1.2.3 redis-6.4.0 s3transfer-0.19.0 six-1.17.0 sniffio-1.3.1 starlette-1.3.1 tqdm-4.68.4 typing-inspection-0.4.2 typing_extensions-4.16.0 urllib3-2.7.0 uvicorn-0.51.0 uvloop-0.22.1 watchfiles-1.2.0 websockets-16.0
+#13 359.5 Processing /opt/dronedream/source/backend
+#13 359.5   Installing build dependencies: started
+#13 366.9   Installing build dependencies: finished with status 'done'
+#13 366.9   Getting requirements to build wheel: started
+#13 367.0   Getting requirements to build wheel: finished with status 'done'
+#13 367.0   Preparing metadata (pyproject.toml): started
+#13 367.1   Preparing metadata (pyproject.toml): finished with status 'done'
+#13 367.1 Processing /opt/dronedream/source/worker
+#13 367.1   Installing build dependencies: started
+#13 369.8   Installing build dependencies: finished with status 'done'
+#13 369.8   Getting requirements to build wheel: started
+#13 369.9   Getting requirements to build wheel: finished with status 'done'
+#13 369.9   Preparing metadata (pyproject.toml): started
+#13 370.0   Preparing metadata (pyproject.toml): finished with status 'done'
+#13 370.0 Building wheels for collected packages: drone-dream-backend, drone-dream-worker
+#13 370.0   Building wheel for drone-dream-backend (pyproject.toml): started
+#13 370.2   Building wheel for drone-dream-backend (pyproject.toml): finished with status 'done'
+#13 370.2   Created wheel for drone-dream-backend: filename=drone_dream_backend-0.1.0-py3-none-any.whl size=566898 sha256=2f9d96d630dce2279c70481494e1c256501ca57ecd6a1ab6249c24bd669766c1
+#13 370.2   Stored in directory: /tmp/pip-ephem-wheel-cache-ui6ggtl5/wheels/83/fa/7a/b56c61f0ca12b4ea64c450efe6387c8e878ca1218baa589665
+#13 370.2   Building wheel for drone-dream-worker (pyproject.toml): started
+#13 370.3   Building wheel for drone-dream-worker (pyproject.toml): finished with status 'done'
+#13 370.3   Created wheel for drone-dream-worker: filename=drone_dream_worker-0.1.0-py3-none-any.whl size=4021 sha256=94d1d1d96cf085671381ec3bd939b6e580da42684f5944f5202eaad8f9ccac4e
+#13 370.3   Stored in directory: /tmp/pip-ephem-wheel-cache-ui6ggtl5/wheels/1a/8a/00/b1de284f0d59ccd5b7358da28c1e6518774085ed5deb401e84
+#13 370.3 Successfully built drone-dream-backend drone-dream-worker
+#13 370.3 Installing collected packages: drone-dream-worker, drone-dream-backend
+#13 370.6 Successfully installed drone-dream-backend-0.1.0 drone-dream-worker-0.1.0
+#13 370.9 No broken requirements found.
+#13 DONE 371.5s
+
+#14 [ 9/19] COPY runtime/config/wsl.conf /etc/wsl.conf
+#14 DONE 0.1s
+
+#15 [10/19] COPY runtime/config/runtime.env.default /usr/lib/dronedream/runtime.env.default
+#15 DONE 0.1s
+
+#16 [11/19] COPY runtime/config/valkey.conf /etc/valkey/valkey.conf
+#16 DONE 0.1s
+
+#17 [12/19] COPY runtime/config/journald-dronedream.conf /etc/systemd/journald.conf.d/60-dronedream-runtime.conf
+#17 DONE 0.1s
+
+#18 [13/19] COPY runtime/scripts/runtime-init.sh /usr/lib/dronedream/runtime-init.sh
+#18 DONE 0.1s
+
+#19 [14/19] COPY runtime/scripts/runtime-check.sh /usr/lib/dronedream/runtime-check.sh
+#19 DONE 0.1s
+
+#20 [15/19] COPY runtime/scripts/px4-gazebo-smoke.py /usr/lib/dronedream/px4-gazebo-smoke.py
+#20 DONE 0.1s
+
+#21 [16/19] COPY runtime/scripts/px4-log-cleanup.py /usr/lib/dronedream/px4-log-cleanup.py
+#21 DONE 0.1s
+
+#22 [17/19] COPY runtime/systemd/*.service /etc/systemd/system/
+#22 DONE 0.1s
+
+#23 [18/19] COPY runtime/systemd/*.timer /etc/systemd/system/
+#23 DONE 0.1s
+
+#24 [19/19] RUN chmod 0755 /usr/lib/dronedream/runtime-init.sh       /usr/lib/dronedream/runtime-check.sh /usr/lib/dronedream/px4-gazebo-smoke.py       /usr/lib/dronedream/px4-log-cleanup.py &&     install -d -m 0750 -o root -g dronedream /etc/dronedream &&     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/artifacts &&     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/runtime-smoke &&     install -d -m 0750 -o valkey -g valkey /var/lib/valkey &&     install -d -m 0750 -o dronedream -g dronedream       /opt/PX4-Autopilot/build/px4_sitl_default/rootfs/log &&     install -d -m 2755 -o root -g systemd-journal /var/log/journal &&     chown -R root:root /opt/dronedream &&     test -x /usr/lib/dronedream/runtime-init.sh &&     test -x /usr/local/bin/valkey-server &&     test -x /opt/dronedream/venv/bin/alembic &&     test -x /opt/dronedream/venv/bin/uvicorn &&     test -x /opt/dronedream/venv/bin/drone-dream-worker &&     test -x /usr/lib/dronedream/px4-log-cleanup.py &&     test -x /usr/bin/curl &&     test -x /usr/bin/timeout &&     test -x /usr/bin/head &&     test -x /usr/bin/systemctl &&     test -x /usr/bin/journalctl &&     test -x /usr/bin/ss &&     test -x /usr/bin/ip &&     test -s /usr/share/doc/valkey/COPYING &&     test -s /usr/share/doc/dronedream-runtime/LICENSE &&     test -s /usr/share/doc/dronedream-runtime/THIRD_PARTY_NOTICES.md &&     systemd-analyze cat-config systemd/journald.conf >/dev/null &&     systemd-analyze verify /etc/systemd/system/dronedream-runtime-init.service       /etc/systemd/system/valkey.service /etc/systemd/system/dronedream-api.service       /etc/systemd/system/dronedream-worker.service       /etc/systemd/system/dronedream-px4-log-cleanup.service       /etc/systemd/system/dronedream-px4-log-cleanup.timer &&     systemctl enable dronedream-runtime-init.service valkey.service       dronedream-api.service dronedream-worker.service       dronedream-px4-log-cleanup.timer &&     printf '[network]\ngenerateResolvConf=true\n' >/etc/wsl.conf.tmp &&     cat /etc/wsl.conf >>/etc/wsl.conf.tmp && mv /etc/wsl.conf.tmp /etc/wsl.conf &&     rm -f /var/lib/dbus/machine-id &&     : >/etc/machine-id &&     ln -s /etc/machine-id /var/lib/dbus/machine-id &&     ln -sfn /dev/null /etc/systemd/system/systemd-firstboot.service &&     rm -rf /root/.cache /home/dronedream/.cache /tmp/* /var/lib/apt/lists/*
+#24 53.09 Created symlink /etc/systemd/system/multi-user.target.wants/dronedream-runtime-init.service → /etc/systemd/system/dronedream-runtime-init.service.
+#24 53.09 Created symlink /etc/systemd/system/multi-user.target.wants/valkey.service → /etc/systemd/system/valkey.service.
+#24 53.09 Created symlink /etc/systemd/system/multi-user.target.wants/dronedream-api.service → /etc/systemd/system/dronedream-api.service.
+#24 53.09 Created symlink /etc/systemd/system/multi-user.target.wants/dronedream-worker.service → /etc/systemd/system/dronedream-worker.service.
+#24 53.09 Created symlink /etc/systemd/system/timers.target.wants/dronedream-px4-log-cleanup.timer → /etc/systemd/system/dronedream-px4-log-cleanup.timer.
+#24 DONE 53.5s
+
+#25 exporting to image
+#25 exporting layers
+#25 exporting layers 91.8s done
+#25 exporting manifest sha256:046ab326c5ef363bbf97c9835dde82a4e71490ea1c6a60f0be76e0c312005d18 0.0s done
+#25 exporting config sha256:57fe732dd1b306ad6df9502327d3e19ebaae5ebcfe1a2b31bac1f57672785e47 0.0s done
+#25 naming to docker.io/dronedream/runtime:0.1.0-beta.2-755c511 0.0s done
+#25 unpacking to docker.io/dronedream/runtime:0.1.0-beta.2-755c511
+#25 unpacking to docker.io/dronedream/runtime:0.1.0-beta.2-755c511 36.1s done
+#25 DONE 128.1s
+built dronedream/runtime:0.1.0-beta.2-755c511 from 755c511539fe561207ca38ff5079f471a4110896

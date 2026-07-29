@@ -1,0 +1,44 @@
+{
+  "checks": [
+    {
+      "durationSeconds": 1,
+      "name": "component_versions",
+      "passed": true
+    },
+    {
+      "durationSeconds": 1,
+      "name": "python_imports",
+      "passed": true
+    },
+    {
+      "durationSeconds": 0,
+      "name": "valkey_ping",
+      "passed": true
+    },
+    {
+      "durationSeconds": 0,
+      "name": "api_worker_heartbeat",
+      "passed": true
+    },
+    {
+      "durationSeconds": 1,
+      "name": "real_cli_dry_run",
+      "passed": true
+    },
+    {
+      "durationSeconds": 15,
+      "name": "px4_gazebo_headless",
+      "passed": true
+    },
+    {
+      "durationSeconds": 0,
+      "name": "parameter_readback",
+      "passed": true
+    }
+  ],
+  "completedAt": "2026-07-29T02:35:51.125487+00:00",
+  "imageId": "sha256:046ab326c5ef363bbf97c9835dde82a4e71490ea1c6a60f0be76e0c312005d18",
+  "mode": "runtime-image",
+  "passed": true,
+  "runtimeId": "c75ae324-c247-50b5-bd74-fa8325e9e616"
+}

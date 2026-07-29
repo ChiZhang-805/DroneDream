@@ -1,0 +1,127 @@
+{
+  "schema_version": "dronedream.runtime-fresh-import-receipt.v1",
+  "generated_at": "2026-07-29T05:03:02Z",
+  "subject_commit": "755c511539fe561207ca38ff5079f471a4110896",
+  "runtime_tag": "runtime-v0.1.0-beta.2",
+  "runtime_id": "c75ae324-c247-50b5-bd74-fa8325e9e616",
+  "temporary_distribution": {
+    "name": "DroneDreamRuntimeBeta2Verify755c511",
+    "existing_distribution_name": "DroneDreamRuntime",
+    "name_absent_before_import": true,
+    "existing_distribution_untouched": true,
+    "wsl_version": 2,
+    "install_path": "C:\\Users\\zju20\\AppData\\Local\\Temp\\DroneDreamRuntimeBeta2Verify755c511",
+    "install_path_absent_before_import": true,
+    "host_free_bytes_before_import": 302900514816,
+    "manifest_minimum_free_bytes": 55834574848,
+    "imported_vhdx_bytes": 6757023744
+  },
+  "import": {
+    "command": "wsl.exe --import DroneDreamRuntimeBeta2Verify755c511 <temporary-install-path> <verified-reassembled-tar> --version 2",
+    "source_tar_bytes": 6141118464,
+    "source_tar_sha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+    "duration_seconds": 369.7,
+    "exit_code": 0,
+    "manifest_subject_commit_matches": true,
+    "manifest_runtime_id_matches": true,
+    "promoted_smoke_present": true
+  },
+  "core_services_after_import": {
+    "dronedream-runtime-init.service": "active/exited, Result=success, ExecMainStatus=0",
+    "valkey.service": "active/running, Result=success, ExecMainStatus=0",
+    "dronedream-api.service": "active/running, Result=success, ExecMainStatus=0",
+    "dronedream-worker.service": "active/running, Result=success, ExecMainStatus=0",
+    "dronedream-px4-log-cleanup.timer": "active",
+    "all_required_services_active": true
+  },
+  "health_ready": {
+    "http_status": 200,
+    "status": "ready",
+    "service": "drone-dream-backend",
+    "version": "0.1.0",
+    "runtime_id_matches": true,
+    "database": "available",
+    "storage": "available",
+    "worker": "available",
+    "px4": "available",
+    "gazebo": "available",
+    "path": "fresh-import/health-ready.json",
+    "bytes": 432,
+    "sha256": "b923dc0a076472b3fb71fdbb45daf85f2252e0ad39848af662edd43f25a44813"
+  },
+  "fresh_runtime_checks": {
+    "root_diagnostic_attempt": {
+      "result": "failed",
+      "failed_check": "component_versions",
+      "message": "fatal: detected dubious ownership in repository at '/opt/PX4-Autopilot'",
+      "cause": "The diagnostic was incorrectly invoked as root while the immutable PX4 tree is intentionally owned by dronedream.",
+      "security_policy_changed": false,
+      "safe_directory_bypass_added": false
+    },
+    "installer_default_user": {
+      "user": "dronedream",
+      "uid": 2000,
+      "gid": 2000,
+      "configured_by": "/etc/wsl.conf"
+    },
+    "default_user_full_suite": {
+      "command": "runtime-check.sh component_versions python_imports valkey_ping api_worker_heartbeat real_cli_dry_run px4_gazebo_headless parameter_readback (sequential)",
+      "duration_seconds": 16.4,
+      "exit_code": 0,
+      "component_versions": true,
+      "python_imports": true,
+      "valkey_ping": true,
+      "api_worker_heartbeat": true,
+      "real_cli_dry_run": true,
+      "px4_gazebo_headless": true,
+      "parameter_readback": true,
+      "warning": "MAVSDK reported that udp:// is deprecated; the check passed."
+    }
+  },
+  "systemd_residual": {
+    "system_state": "degraded",
+    "only_failed_unit": "kmod-static-nodes.service",
+    "failed_unit_description": "Create List of Static Device Nodes",
+    "dronedream_unit_failed": false,
+    "core_runtime_health_affected": false
+  },
+  "post_check_state": {
+    "all_required_services_still_active": true,
+    "health_ready_still_passed": true,
+    "lingering_px4_or_gazebo_processes": 0
+  },
+  "raw_evidence": [
+    {
+      "path": "fresh-import/dry-run-input.json",
+      "bytes": 779,
+      "sha256": "9b5037d64d10c66d90126a91f15cef560f2132d84e812c98881ad45e293ec924"
+    },
+    {
+      "path": "fresh-import/dry-run-output.json",
+      "bytes": 14308,
+      "sha256": "1482fce92c82850f763be5258d89342740e9fe5dd49bfd4e906c75ed79697088"
+    },
+    {
+      "path": "fresh-import/health-ready.json",
+      "bytes": 432,
+      "sha256": "b923dc0a076472b3fb71fdbb45daf85f2252e0ad39848af662edd43f25a44813"
+    },
+    {
+      "path": "fresh-import/parameter-readback.json",
+      "bytes": 105,
+      "sha256": "744e9bb60c8d802753327ac60dd1c40152536d1c3ad3a23ec88e12f4605f998e"
+    }
+  ],
+  "cleanup": {
+    "temporary_distribution_terminated": true,
+    "temporary_distribution_unregistered": true,
+    "temporary_install_path_removed_by_wsl": true,
+    "existing_DroneDreamRuntime_preserved": true,
+    "remaining_distributions": [
+      "Ubuntu-22.04",
+      "DroneDreamRuntime"
+    ]
+  },
+  "online_provider_calls": 0,
+  "openai_api_key_read_or_used": false
+}

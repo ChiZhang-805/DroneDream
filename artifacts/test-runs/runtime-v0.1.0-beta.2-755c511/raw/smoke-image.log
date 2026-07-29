@@ -1,0 +1,5 @@
+[component_versions] 8.14.0
+[component_versions] Valkey server v=8.1.4 sha=5f4bae3e:0 malloc=jemalloc-5.3.0 bits=64 build=88f8a9fad43ed4a6
+[component_versions] No broken requirements found.
+[px4_gazebo_headless] Connection using udp:// is deprecated, please use udpin:// or udpout:// (cli_arg.cpp:28)
+smoke report: /home/chi/dronedream-release-output/runtime-v0.1.0-beta.2-755c511/smoke-report.json
