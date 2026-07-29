@@ -119,6 +119,30 @@ def test_current_fallback_campaign_matches_current_production_contracts() -> Non
     assert not contains_evidence_id(current["block_rows"])
 
 
+def test_current_fallback_verifier_rejects_missing_tool_execution_trace() -> None:
+    artifact = json.loads(CURRENT_JSON_ARTIFACT.read_text(encoding="utf-8"))
+    execution = artifact["block_rows"][0]["arms"][0]["fallback_trace"][
+        "generation_rows"
+    ][0]["execution"]
+    assert execution["tool_calls"]
+    execution["tool_calls"] = []
+    unsigned = {
+        key: value for key, value in artifact.items() if key != "artifact_sha256"
+    }
+    artifact["artifact_sha256"] = hashlib.sha256(
+        json.dumps(
+            unsigned,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+
+    with pytest.raises(ValueError, match="declared current fallback contract"):
+        verify_harness_fallback_contract_campaign(artifact)
+
+
 def test_legacy_fallback_campaign_remains_strictly_verifiable() -> None:
     legacy = verify_harness_fallback_contract_campaign(
         json.loads(LEGACY_JSON_ARTIFACT.read_text(encoding="utf-8"))

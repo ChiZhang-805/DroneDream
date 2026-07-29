@@ -265,11 +265,14 @@ def _verify_arm_trace(arm: dict[str, Any]) -> None:
             != execution.get("dispatched_candidates")
             or execution.get("dispatched_candidates", 0) < 1
             or not isinstance(execution.get("tool_calls"), list)
+            or len(execution["tool_calls"]) != 1
             or any(
-                tool.get("tool_id") != "optimizer_portfolio"
+                not isinstance(tool, dict)
+                or tool.get("tool_id") != "optimizer_portfolio"
                 or tool.get("status") != "completed"
+                or tool.get("allocation") != execution.get("planned_candidates")
+                or tool.get("proposal_count") != execution.get("dispatched_candidates")
                 for tool in execution["tool_calls"]
-                if isinstance(tool, dict)
             )
         ):
             raise ValueError(
