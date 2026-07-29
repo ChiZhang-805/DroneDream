@@ -1,0 +1,220 @@
+{
+  "schema_version": "dronedream.software-quality-gate-receipt.v1",
+  "generated_at": "2026-07-29T11:47:41.850Z",
+  "subject_commit": "bb1677a12175a51ce5c7d3bb8824d25365a50545",
+  "branch": "codex/software",
+  "workflow": {
+    "name": "Quality gate",
+    "workflow_file": ".github/workflows/quality-gate.yml",
+    "run_id": 30448014655,
+    "run_number": 38,
+    "run_attempt": 1,
+    "event": "workflow_dispatch",
+    "created_at": "2026-07-29T11:33:20Z",
+    "started_at": "2026-07-29T11:33:20Z",
+    "completed_at": "2026-07-29T11:44:44Z",
+    "status": "completed",
+    "conclusion": "failure",
+    "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30448014655"
+  },
+  "online_policy": {
+    "openai_api_key_read": false,
+    "harness_routing_api_key_read": false,
+    "openai_api_calls": 0,
+    "uploads_or_deployments_by_software_line": 0
+  },
+  "repair_commits": [
+    {
+      "commit": "78452c0a8db39d4118c8761c4bb9e714b1c6b7f8",
+      "scope": "Harness fallback campaign cross-version determinism",
+      "claim": "The immutable v2 freeze remains verifiable. The new v3 campaign removes nested evidence_id fields from normalized aggregate projections because those identifiers hash higher-precision pre-normalization floats."
+    },
+    {
+      "commit": "2e0cd7892e7b7a2cf06924537cdfbf57b17acf3c",
+      "scope": "Frontend Docker build-context self-containment",
+      "claim": "BrandLockup imports a repository-local frontend asset and has a focused two-test contract."
+    },
+    {
+      "commit": "bb1677a12175a51ce5c7d3bb8824d25365a50545",
+      "scope": "Backend historical evidence checkout",
+      "claim": "Only the backend actions/checkout contract changed, adding fetch-depth: 0 so evidence exporters can git show frozen historical commits."
+    }
+  ],
+  "jobs": [
+    {
+      "id": 90563054032,
+      "name": "Backend / Python 3.11",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30448014655/job/90563054032",
+      "started_at": "2026-07-29T11:33:24Z",
+      "completed_at": "2026-07-29T11:44:43Z",
+      "conclusion": "success",
+      "checkout_contract": {
+        "persist_credentials": false,
+        "fetch_depth": 0
+      },
+      "results": {
+        "repository_hygiene": "passed",
+        "ruff_primary": "passed",
+        "ruff_security": "passed",
+        "ruff_format": "passed",
+        "mypy_backend_source_files": 114,
+        "mypy_worker_source_files": 3,
+        "compileall": "passed",
+        "pytest_passed": 1292,
+        "pytest_failed": 0,
+        "pytest_duration_seconds": 607.82
+      },
+      "regressions_closed": [
+        "The six v10 evidence-export failures caused by shallow history did not recur.",
+        "The fallback campaign passes in the hosted Python 3.11 dependency environment.",
+        "The full preceding test order does not produce the former fallback reproducibility failure."
+      ]
+    },
+    {
+      "id": 90563054008,
+      "name": "Frontend / Node.js 22",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30448014655/job/90563054008",
+      "started_at": "2026-07-29T11:33:30Z",
+      "completed_at": "2026-07-29T11:36:25Z",
+      "conclusion": "failure",
+      "software_core_step": {
+        "name": "Lint, type-check, test, and build frontend",
+        "conclusion": "success",
+        "dependency_policy_audit": "passed",
+        "desktop_npm_high_severity_audit": "passed_with_0_vulnerabilities",
+        "lint": "passed",
+        "typecheck": "passed",
+        "test_files_passed": 51,
+        "tests_passed": 322,
+        "tests_failed": 0,
+        "test_duration_seconds": 66.28,
+        "brand_lockup_tests_passed": 2,
+        "application_build": {
+          "modules_transformed": 1967,
+          "duration_seconds": 4.37,
+          "status": "passed"
+        },
+        "public_site_build": {
+          "modules_transformed": 1907,
+          "duration_seconds": 3.7,
+          "status": "passed"
+        }
+      },
+      "website_owned_visual_step": {
+        "name": "Enforce bilingual copy rhythm and responsive layout",
+        "conclusion": "failure",
+        "failed_audit": "1440x1000 bilingual typography and layout",
+        "failure_count": 19,
+        "failures": [
+          "capability-detail-0-1: zh-CN final line 77% of available width",
+          "capability-detail-0-2: zh-CN final line 77% of available width",
+          "capability-detail-0-3: zh-CN final line 77% of available width",
+          "capability-detail-0-4: zh-CN final line 77% of available width",
+          "capability-detail-1-0: zh-CN final line 77% of available width",
+          "capability-detail-1-2: zh-CN final line 77% of available width",
+          "capability-detail-1-5: zh-CN final line 77% of available width",
+          "capability-detail-1-6: zh-CN final line 77% of available width",
+          "capability-detail-2-0: zh-CN final line 78% of available width",
+          "capability-detail-2-1: zh-CN final line 77% of available width",
+          "capability-detail-2-3: zh-CN final line 77% of available width",
+          "capability-detail-3-1: zh-CN final line 77% of available width",
+          "capability-detail-3-2: zh-CN final line 77% of available width",
+          "footer-line: en final line 50% of available width",
+          "footer-line: line mismatch en=2, zh-CN=1",
+          "product-body: en final line 50% of available width",
+          "product-body: line mismatch en=2, zh-CN=1",
+          "en phase-1: text overflows its own box by 26px",
+          "en phase-2: text overflows its own box by 6px in 23 states"
+        ],
+        "not_run_after_fail_fast": [
+          "2048x1280 typography and layout audit",
+          "390x844 layout-only audit"
+        ],
+        "ownership": "website line; preserved as a failing cross-line gate and not modified by the software line"
+      }
+    },
+    {
+      "id": 90563054024,
+      "name": "Deployment / Hardened images",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30448014655/job/90563054024",
+      "started_at": "2026-07-29T11:33:23Z",
+      "completed_at": "2026-07-29T11:34:52Z",
+      "conclusion": "success",
+      "results": {
+        "deployment_script_validation": "passed",
+        "production_configuration_fail_closed": "passed",
+        "api_image_sha256": "4e03aba525eeee70ae7600b721a424f15ebbac9b1b404835b2f71e3e5a451195",
+        "worker_image_sha256": "c5d24e11a1be81ff7c010f84ce81bc76bad1d6739d390a4cda7ccfc5d444e90a",
+        "frontend_image_sha256": "8f2158f16c0116d348ac18c33c2a2e41a16e64cd3bd152d003be4989e7aa5b4b",
+        "frontend_modules_transformed": 1967,
+        "frontend_build_duration_seconds": 3.66,
+        "nginx_configuration_checks_passed": 3
+      },
+      "regression_closed": "The production frontend image builds from the repository Docker context without importing docs/assets."
+    },
+    {
+      "id": 90563053970,
+      "name": "Desktop / Rust 1.97.0",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30448014655/job/90563053970",
+      "started_at": "2026-07-29T11:33:24Z",
+      "completed_at": "2026-07-29T11:34:57Z",
+      "conclusion": "success",
+      "results": {
+        "rustc": "1.97.0",
+        "cargo_audit": "passed_with_documented_allowed_warnings",
+        "format": "passed",
+        "clippy_all_targets_warnings_denied": "passed",
+        "tests_passed": 101,
+        "tests_failed": 0,
+        "tests_ignored": 1,
+        "ignored_reason": "requires an installed, owned DroneDreamRuntime",
+        "installer_contract": "Pinned Tauri 2.11.4 NSIS template and DroneDream anchors verified."
+      }
+    },
+    {
+      "id": 90563054016,
+      "name": "Runtime / Static contract",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30448014655/job/90563054016",
+      "started_at": "2026-07-29T11:33:24Z",
+      "completed_at": "2026-07-29T11:33:45Z",
+      "conclusion": "success",
+      "results": {
+        "backend_lock_pip_audit": "no_known_vulnerabilities",
+        "worker_lock_pip_audit": "no_known_vulnerabilities",
+        "ruff": "passed",
+        "manifest_and_python_contracts": "passed",
+        "tests_total": 48,
+        "tests_passed": 47,
+        "tests_failed": 0,
+        "tests_skipped": 1,
+        "skip_reason": "secure POSIX dirfd support is available only on the supported POSIX path",
+        "shell_scripts": "passed_bash_syntax_validation"
+      }
+    }
+  ],
+  "fallback_campaign_freeze": {
+    "current_schema": "harness-fallback-contract-campaign-v3",
+    "canonical_artifact_sha256": "12d200777278455cfc4f47de127f027d43834901e76b793d5addbb18c5435605",
+    "json_file_sha256": "1c7b7a15662ae519c4f1b1c17db018a3cc7536f5ec5c87bf4f7b2f50e36bd458",
+    "csv_file_sha256": "d4a002789924297973c19d4b0213b381ce30c437e441346732a52b64f9bde4c2",
+    "sha_file_sha256": "6dda7d0e790341f65c301ba5c37dd1c0d20804d19f62d8de1b8749505e8fd8fe",
+    "legacy_v2_canonical_artifact_sha256": "6a6cd147a79ce2583192304802f263b9902850120701934ba58329832b103ff9",
+    "legacy_v2_mutated": false
+  },
+  "warnings": [
+    "npm ci reported two high-severity transitive advisories, while the repository policy audit passed because neither advisory is applicable to the deployed browser SPA contract.",
+    "Docker emitted two SecretsUsedInArgOrEnv warnings for the CI placeholder VITE_DEMO_AUTH_TOKEN build argument and environment variable.",
+    "The frontend test log retains existing React act(...) warnings even though all 322 tests passed.",
+    "The workflow conclusion remains failure because the website-owned 1440x1000 visual contract has 19 failures."
+  ],
+  "overall": {
+    "software_owned_quality_gates": "passed",
+    "workflow_status": "completed",
+    "workflow_conclusion": "failure",
+    "remaining_failure_owner": "website line",
+    "remaining_failure_count": 19,
+    "release_artifacts_rebuilt": false,
+    "runtime_artifacts_rebuilt": false,
+    "claim_boundary": "This receipt proves the software-owned quality repairs at the exact subject commit. It does not convert the failed website visual step or the aggregate workflow into a pass."
+  }
+}
