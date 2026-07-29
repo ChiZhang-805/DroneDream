@@ -139,14 +139,51 @@ pub async fn desktop_api_request(
     .await
     .map_err(|error| format!("Desktop API bridge task failed: {error}"))??;
 
+    let rejects_cached_credential = response.rejects_cached_credential();
     let mut cache = bridge
         .credential
         .lock()
         .map_err(|_| "The desktop API bridge credential cache is unavailable.".to_string())?;
-    if cache.is_none() {
+    if rejects_cached_credential
+        && cache.as_ref().is_some_and(|cached| {
+            cached.runtime_id == credential.runtime_id && cached.key == credential.key
+        })
+    {
+        // A Runtime repair or reinstall can rotate both its identity and
+        // bridge secret while the desktop process remains open. Never replay
+        // the completed request automatically: a mutating route might have
+        // crossed a failure boundary. Evict only the exact stale credential so
+        // the user's next explicit request derives the current Runtime value.
+        *cache = None;
+    } else if cache.is_none() && !rejects_cached_credential {
         *cache = Some(credential);
     }
     Ok(response)
+}
+
+impl DesktopApiResponse {
+    fn rejects_cached_credential(&self) -> bool {
+        if !matches!(self.status, 401 | 500) {
+            return false;
+        }
+        let Ok(body) = base64::engine::general_purpose::STANDARD.decode(&self.body_base64) else {
+            return false;
+        };
+        let Ok(payload) = serde_json::from_slice::<serde_json::Value>(&body) else {
+            return false;
+        };
+        matches!(
+            payload
+                .get("error")
+                .and_then(|error| error.get("code"))
+                .and_then(serde_json::Value::as_str),
+            Some(
+                "DESKTOP_BRIDGE_RUNTIME_MISMATCH"
+                    | "DESKTOP_BRIDGE_INVALID_PROOF"
+                    | "DESKTOP_BRIDGE_CONFIGURATION_ERROR"
+            )
+        )
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -417,5 +454,24 @@ mod tests {
             hex::encode(hmac_sha256(b"key", b"The quick brown fox")),
             "203d1e5cedd2d18f8c5a3beff0bd9c1ebcb97097dfcb288c46b00c9227fde2c0"
         );
+    }
+
+    #[test]
+    fn only_bridge_credential_rejections_evict_the_cached_value() {
+        fn response(status: u16, code: &str) -> DesktopApiResponse {
+            let body = serde_json::json!({"error": {"code": code}});
+            DesktopApiResponse {
+                status,
+                content_type: Some("application/json".to_string()),
+                body_base64: base64::engine::general_purpose::STANDARD
+                    .encode(serde_json::to_vec(&body).unwrap()),
+            }
+        }
+
+        assert!(response(401, "DESKTOP_BRIDGE_RUNTIME_MISMATCH").rejects_cached_credential());
+        assert!(response(401, "DESKTOP_BRIDGE_INVALID_PROOF").rejects_cached_credential());
+        assert!(response(500, "DESKTOP_BRIDGE_CONFIGURATION_ERROR").rejects_cached_credential());
+        assert!(!response(401, "AUTH_INVALID_TOKEN").rejects_cached_credential());
+        assert!(!response(409, "DESKTOP_BRIDGE_REPLAY").rejects_cached_credential());
     }
 }
