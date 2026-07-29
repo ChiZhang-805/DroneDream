@@ -11,7 +11,11 @@ from app.optimization.generalization_evidence import (
 from app.optimization.simulation_coverage_campaign import (
     SimulationCoverageArtifact,
     _canonical_sha256,
+    _exhaustive_oracle,
+    _optimizer_search,
     _optimizer_transcript_sha256,
+    _scenario_suite,
+    _search_space,
     run_simulation_coverage_campaign,
     write_frozen_simulation_coverage_artifact,
 )
@@ -97,6 +101,33 @@ def test_campaign_transcript_hash_binds_causal_execution_not_blas_diagnostics() 
     assert _optimizer_transcript_sha256(equivalent_diagnostics) == baseline_hash
     assert _optimizer_transcript_sha256(changed_candidate) != baseline_hash
     assert _optimizer_transcript_sha256(changed_route) != baseline_hash
+
+
+def test_campaign_selection_and_oracle_prioritize_feasible_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.optimization.simulation_coverage_campaign as module
+
+    def feasibility_landscape(
+        parameters: dict[str, float],
+        *,
+        suite: object,
+        holdout: bool,
+    ) -> tuple[float, dict[str, float], bool]:
+        del suite, holdout
+        infeasible = parameters["kp_xy"] == 0.8
+        return (0.0 if infeasible else 1.0), {}, not infeasible
+
+    monkeypatch.setattr(module, "_evaluate_parameters", feasibility_landscape)
+    suite = _scenario_suite()
+    selected, transcript = _optimizer_search(space=_search_space(), suite=suite)
+    oracle, _candidate_count, _tie_count = _exhaustive_oracle(suite=suite)
+
+    assert any(row["parameters"]["kp_xy"] == 0.8 for row in transcript)
+    assert selected.training_all_pass is True
+    assert selected.parameters["kp_xy"] != 0.8
+    assert oracle.training_all_pass is True
+    assert oracle.parameters["kp_xy"] != 0.8
 
 
 def test_simulation_coverage_freeze_refuses_overwrite(

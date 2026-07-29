@@ -453,6 +453,7 @@ def _optimizer_search(
     selected = min(
         observations,
         key=lambda item: (
+            0 if item.feasible else 1,
             math.inf if item.loss is None else item.loss,
             _parameter_key(dict(item.parameters)),
         ),
@@ -466,22 +467,37 @@ def _exhaustive_oracle(
 ) -> tuple[SimulationCoveragePoint, int, int]:
     best_loss = math.inf
     best_parameters: dict[str, float] | None = None
+    best_feasibility_rank = 1
     tie_count = 0
     candidate_count = 0
     names = tuple(_PARAMETER_CHOICES)
     for values in itertools.product(*(_PARAMETER_CHOICES[name] for name in names)):
         parameters = dict(zip(names, values, strict=True))
         candidate_count += 1
-        loss, _by_scenario, _all_pass = _evaluate_parameters(
+        loss, _by_scenario, all_pass = _evaluate_parameters(
             parameters,
             suite=suite,
             holdout=False,
         )
-        if loss < best_loss - _LOSS_TOLERANCE:
+        feasibility_rank = 0 if all_pass else 1
+        if (
+            best_parameters is None
+            or feasibility_rank < best_feasibility_rank
+            or (
+                feasibility_rank == best_feasibility_rank
+                and loss < best_loss - _LOSS_TOLERANCE
+            )
+        ):
             best_loss = loss
             best_parameters = parameters
+            best_feasibility_rank = feasibility_rank
             tie_count = 1
-        elif math.isclose(loss, best_loss, rel_tol=0.0, abs_tol=_LOSS_TOLERANCE):
+        elif feasibility_rank == best_feasibility_rank and math.isclose(
+            loss,
+            best_loss,
+            rel_tol=0.0,
+            abs_tol=_LOSS_TOLERANCE,
+        ):
             tie_count += 1
     if best_parameters is None:
         raise RuntimeError("exhaustive scenario oracle did not evaluate a candidate")
