@@ -118,4 +118,40 @@ describe("experiment workspace registry", () => {
 
     expect(listExperimentWorkspaces(OWNER_A)).toEqual([]);
   });
+
+  it("rejects corrupted navigation and wizard-step state from local storage", () => {
+    const base = {
+      id: FIRST_ID,
+      ownerId: OWNER_A,
+      name: "Corrupted experiment",
+      source: "manual",
+      status: "created",
+      activeStep: 4,
+      pinned: false,
+      archived: false,
+      createdAt: "2026-07-29T12:00:00.000Z",
+      updatedAt: "2026-07-29T12:00:00.000Z",
+    };
+    window.localStorage.setItem(
+      `drone-dream:experiment-workspaces:v1:${encodeURIComponent(OWNER_A)}`,
+      JSON.stringify({
+        schemaVersion: 1,
+        items: [
+          {
+            ...base,
+            completedSteps: [0, 1, "2"],
+            jobId: "job_safe",
+          },
+          {
+            ...base,
+            id: SECOND_ID,
+            completedSteps: [0, 1, 2, 3, 4],
+            jobId: "../account",
+          },
+        ],
+      }),
+    );
+
+    expect(listExperimentWorkspaces(OWNER_A)).toEqual([]);
+  });
 });

@@ -67,6 +67,11 @@ function registryKey(ownerId: string): string {
   return `${WORKSPACE_REGISTRY_PREFIX}${encodeURIComponent(normalizeOwnerId(ownerId))}`;
 }
 
+function isWorkspaceJobId(value: unknown): value is string {
+  return typeof value === "string" &&
+    /^[a-zA-Z0-9_-]{1,64}$/u.test(value);
+}
+
 function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorkspace {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const candidate = value as Record<string, unknown>;
@@ -76,6 +81,7 @@ function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorksp
     candidate.ownerId === ownerId &&
     typeof candidate.name === "string" &&
     candidate.name.trim().length > 0 &&
+    candidate.name.length <= 255 &&
     (candidate.source === "manual" || candidate.source === "assistant") &&
     (candidate.status === "draft" || candidate.status === "created") &&
     typeof candidate.activeStep === "number" &&
@@ -83,7 +89,14 @@ function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorksp
     candidate.activeStep >= 0 &&
     candidate.activeStep <= 4 &&
     Array.isArray(candidate.completedSteps) &&
-    (candidate.jobId === null || typeof candidate.jobId === "string") &&
+    candidate.completedSteps.every(
+      (step) =>
+        typeof step === "number" &&
+        Number.isInteger(step) &&
+        step >= 0 &&
+        step <= 4,
+    ) &&
+    (candidate.jobId === null || isWorkspaceJobId(candidate.jobId)) &&
     typeof candidate.pinned === "boolean" &&
     typeof candidate.archived === "boolean" &&
     typeof candidate.createdAt === "string" &&
@@ -252,6 +265,6 @@ export function removeExperimentWorkspace(
 }
 
 export function experimentWorkspacePath(workspace: ExperimentWorkspace): string {
-  if (workspace.jobId) return `/jobs/${workspace.jobId}`;
+  if (workspace.jobId) return `/jobs/${encodeURIComponent(workspace.jobId)}`;
   return `/jobs/new?experiment=${encodeURIComponent(workspace.id)}`;
 }
