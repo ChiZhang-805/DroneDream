@@ -26,6 +26,15 @@ cd frontend
 npm ci
 ```
 
+### Runtime contract tooling
+
+```bash
+python -m venv runtime/.venv
+runtime/.venv/bin/pip install \
+  -r runtime/locks/release-tools-requirements.lock \
+  ruff==0.15.21
+```
+
 ## Run services
 
 ```bash
@@ -49,17 +58,37 @@ Use existing scripts (recommended):
 
 - `./scripts/check-backend.sh`
 - `./scripts/check-worker.sh`
+- `./scripts/check-runtime.sh`
 - `./scripts/check-frontend.sh`
 - `./scripts/check-all.sh`
 
-Equivalent manual commands:
+`check-all.sh` is the portable service-layer aggregate. The Windows Desktop
+application is an explicit platform gate because Tauri, WebView2, and NSIS
+require a Windows toolchain; a portable aggregate must not silently present a
+skipped Desktop build as a full-product pass.
+
+Equivalent service-layer manual commands:
 
 ```bash
 backend/.venv/bin/python -m ruff check backend
 backend/.venv/bin/python -m mypy backend/app
 backend/.venv/bin/python -m pytest backend
 worker/.venv/bin/python -m ruff check worker
+worker/.venv/bin/python -m mypy --config-file worker/pyproject.toml worker/drone_dream_worker
+worker/.venv/bin/python -m pytest worker
+RUNTIME_PYTHON=runtime/.venv/bin/python ./scripts/check-runtime.sh
 cd frontend && npm run typecheck && npm run lint && npm run build && npm test
+```
+
+Run the Windows Desktop gate separately from PowerShell:
+
+```powershell
+npm --prefix desktop audit --audit-level=high
+npm --prefix desktop run verify:release-source
+cargo fmt --all --manifest-path desktop/src-tauri/Cargo.toml -- --check
+cargo clippy --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets
+./desktop/scripts/verify-nsis-template.ps1
 ```
 
 ## Current capabilities
