@@ -110,6 +110,7 @@ def main() -> None:
             "dronedream.technical-report-validation-receipt.v6",
             "dronedream.technical-report-validation-receipt.v7",
             "dronedream.technical-report-validation-receipt.v8",
+            "dronedream.technical-report-validation-receipt.v9",
         },
         "unsupported receipt schema",
     )
@@ -156,6 +157,7 @@ def main() -> None:
         "dronedream.technical-report-validation-receipt.v6",
         "dronedream.technical-report-validation-receipt.v7",
         "dronedream.technical-report-validation-receipt.v8",
+        "dronedream.technical-report-validation-receipt.v9",
     }:
         claim_record = receipt["claim_evidence"]
         ledger_record = claim_record["ledger"]
@@ -211,7 +213,9 @@ def main() -> None:
         len(pdf_bytes) == pdf_record["bytes"],
         "committed PDF byte count mismatch",
     )
-    if schema_version == "dronedream.technical-report-validation-receipt.v8":
+    if schema_version == "dronedream.technical-report-validation-receipt.v9":
+        expected_pages = 25
+    elif schema_version == "dronedream.technical-report-validation-receipt.v8":
         expected_pages = 21
     elif schema_version == "dronedream.technical-report-validation-receipt.v7":
         expected_pages = 20
@@ -239,7 +243,9 @@ def main() -> None:
         "committed audit hash mismatch",
     )
     policy = audit["paragraph_policy"]["explanatory_body"]
-    if schema_version == "dronedream.technical-report-validation-receipt.v8":
+    if schema_version == "dronedream.technical-report-validation-receipt.v9":
+        expected_body = 79
+    elif schema_version == "dronedream.technical-report-validation-receipt.v8":
         expected_body = 65
     elif schema_version == "dronedream.technical-report-validation-receipt.v7":
         expected_body = 61
@@ -261,9 +267,18 @@ def main() -> None:
         "dronedream.technical-report-validation-receipt.v6",
         "dronedream.technical-report-validation-receipt.v7",
         "dronedream.technical-report-validation-receipt.v8",
+        "dronedream.technical-report-validation-receipt.v9",
     }:
         short_list_policy = audit["paragraph_policy"]["short_list_items"]
-        if schema_version == "dronedream.technical-report-validation-receipt.v8":
+        if schema_version == "dronedream.technical-report-validation-receipt.v9":
+            require(
+                short_list_policy["total"] == 12
+                and short_list_policy["passed"] == 12
+                and short_list_policy["failed"] == 0
+                and len(short_list_policy["above_3_lines"]) == 21,
+                "committed audit does not pass the 12/12 short-list gate",
+            )
+        elif schema_version == "dronedream.technical-report-validation-receipt.v8":
             require(
                 short_list_policy["total"] == 14
                 and short_list_policy["passed"] == 14
@@ -322,6 +337,7 @@ def main() -> None:
         "dronedream.technical-report-validation-receipt.v6",
         "dronedream.technical-report-validation-receipt.v7",
         "dronedream.technical-report-validation-receipt.v8",
+        "dronedream.technical-report-validation-receipt.v9",
     }:
         result["short_list_items_passed_90"] = short_list_policy["passed"]
     if claim_summary is not None:

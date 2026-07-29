@@ -25,7 +25,7 @@
     },
     {
       "literal": "evidence bundle v6",
-      "reason": "Publication-facing references must resolve to the frozen v9 bundle."
+      "reason": "Publication-facing references must resolve through the frozen v10 provenance ledger; v9 remains its exact-byte base."
     },
     {
       "literal": "Prompt 1.6 current freeze",
@@ -33,7 +33,7 @@
     },
     {
       "literal": "Evidence 2.4 / Prompt 1.1 only",
-      "reason": "Figures preserve the archived Evidence 2.7 / Prompt 1.6 freeze, while the current software contract is Evidence 2.8 / Prompt 1.7."
+      "reason": "Figures preserve archived and retained routing freezes, while the current software evidence contract is Evidence 2.9 / Prompt 1.7 and has no current online campaign."
     },
     {
       "literal": "Prompt 1.5 require a fresh online provider freeze",
@@ -53,7 +53,7 @@
     },
     {
       "literal": "evidence bundle v7",
-      "reason": "The current publication ledger is Evidence v9; Evidence 2.7 remains only an archived provider/data contract label."
+      "reason": "The current publication navigation ledger is Evidence v10; Evidence 2.7 remains only an archived provider/data contract label."
     },
     {
       "literal": "battery initial state and voltage sag, and hard actuator failure beyond bounded first-order delay remain unimplemented",
@@ -62,15 +62,216 @@
     {
       "literal": "GPS/battery capability is qualified",
       "reason": "The negative-control Trial completed its three effect checks but failed the 25 m/s stability gate."
+    },
+    {
+      "literal": "Hard actuator failure beyond bounded first-order delay remains unimplemented.",
+      "reason": "The later exact-commit probe verifies motor-2 hard-stop SDF materialization and joint-state read-back; trusted flight evaluation and recovery remain unproved."
+    },
+    {
+      "literal": "hard actuator failure beyond the bounded first-order delay profile remain unproved",
+      "reason": "The hard-stop mechanism is now verified at the SDF and joint-state layers, although it has no trusted flight-evaluation outcome."
+    },
+    {
+      "literal": "hard actuator failure campaign passed",
+      "reason": "The actuator probe has trial_success=false and establishes no trusted evaluation window, flight score, pass flag, stable-control result, or recovery result."
+    },
+    {
+      "literal": "9/9 performance PASS",
+      "reason": "Closure v2 records 9/9 mechanism categories with injection/read-back evidence but only five categories with all retained Trials performance-successful."
+    },
+    {
+      "literal": "9/9 categories passed performance",
+      "reason": "Mechanism coverage and performance qualification are separate fields; the closure explicitly sets all_effects_performance_successful=false."
+    },
+    {
+      "literal": "Evidence 2.9 online routing campaign qualifies 23/24",
+      "reason": "The retained 23/24 online campaign is Evidence 2.8 / Prompt 1.7 and v10 marks it not current for Evidence 2.9."
+    },
+    {
+      "literal": "release_ready=true",
+      "reason": "Evidence v10 explicitly sets release_ready=false; the later backend regression receipt closes only that external gate, while Windows Rust, report/PDF, online-refresh, frontend, desktop, deployment, and physical qualification remain separate."
+    },
+    {
+      "literal": "Evidence v9 is the current publication ledger",
+      "reason": "Evidence v10 is the latest provenance navigation ledger; v9 remains its exact-byte base evidence."
     }
   ],
   "claims": [
     {
-      "id": "backend-validation-boundary",
+      "id": "current-backend-regression-receipt",
       "report_locations": [
         "Abstract",
         "Section 8",
-        "Table 6"
+        "Table 6",
+        "Conclusion",
+        "Appendix A.12"
+      ],
+      "source_id": "current_backend_regression_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.test-run-receipt.v2"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/source_commit",
+          "expected": "755c511539fe561207ca38ff5079f471a4110896"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/receipt_sha256",
+          "expected": "15e2c97e62f9d75b60a315fd62ec93a7a2f38db401e8c8817146e4e7f1fdaafe"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/full_suite/result/passed",
+          "expected": 1284
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/full_suite/result/failed",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/full_suite/tested_state/base_commit",
+          "expected": "755c511539fe561207ca38ff5079f471a4110896"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/full_suite/tested_state/exact_final_commit_run",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/focused_checks/0/result/passed",
+          "expected": 73
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/focused_checks/0/result/failed",
+          "expected": 0
+        }
+      ],
+      "body_contains": [
+        "1,284/1,284 tests in 831.79 seconds",
+        "73/73 in 29.73 seconds",
+        "Current backend validation receipt & 1,284 & 1,284",
+        "73-check focused supplement",
+        "receipt head \\texttt{1e542b7}"
+      ]
+    },
+    {
+      "id": "current-backend-regression-attestation",
+      "report_locations": [
+        "Abstract",
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "current_backend_regression_manifest",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.software-regression-attestation.v1"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/source_commit",
+          "expected": "755c511539fe561207ca38ff5079f471a4110896"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/environment/openai_api_key_removed_before_run",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/environment/real_credentials_used",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/environment/real_provider_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/full_suite/pytest_reported_duration_seconds",
+          "expected": 831.79
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/full_suite/junit/tests",
+          "expected": 1284
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/focused_suite/pytest_reported_duration_seconds",
+          "expected": 29.73
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/focused_suite/junit/tests",
+          "expected": 73
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/receipt/file_sha256",
+          "expected": "113307a8ee6c722d0cd4e16e245373a5637dd0ec00ba8dbee274f6a57a897f10"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/receipt/internal_sha256",
+          "expected": "15e2c97e62f9d75b60a315fd62ec93a7a2f38db401e8c8817146e4e7f1fdaafe"
+        }
+      ],
+      "body_contains": [
+        "\\texttt{OPENAI\\_API\\_KEY} was removed before both",
+        "real provider calls remain zero",
+        "113307a8ee6c",
+        "15e2c97e62f9",
+        "0e0e0df70087",
+        "52f73accc5f5"
+      ]
+    },
+    {
+      "id": "current-backend-full-pytest-result",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "current_backend_regression_full_log",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "1284 passed in 831.79s"
+        }
+      ],
+      "body_contains": [
+        "1,284/1,284 tests in 831.79 seconds"
+      ]
+    },
+    {
+      "id": "current-backend-focused-pytest-result",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "current_backend_regression_focused_log",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "73 passed in 29.73s"
+        }
+      ],
+      "body_contains": [
+        "73/73 in 29.73 seconds"
+      ]
+    },
+    {
+      "id": "historical-v9-backend-validation-boundary",
+      "report_locations": [
+        "Section 8"
       ],
       "source_id": "backend_1204_test_receipt",
       "assertions": [
@@ -123,8 +324,7 @@
       "body_contains": [
         "1,204/1,204 tests in",
         "receipt wall intervals are 864.488 and 8.451 seconds",
-        "Subject-focused supplement & 28 & 28",
-        "Backend validation receipt & 1,204 & 1,204",
+        "historical upstream v9 base",
         "Windows Rust was not run"
       ]
     },
@@ -147,9 +347,7 @@
     {
       "id": "backend-focused-pytest-result",
       "report_locations": [
-        "Abstract",
-        "Section 8",
-        "Table 6"
+        "Section 8"
       ],
       "source_id": "backend_28_focused_log",
       "assertions": [
@@ -511,10 +709,10 @@
         }
       ],
       "body_contains": [
-        "Current Prompt 1.7 online freeze & 23/24 & Qualified",
+      "Retained Prompt 1.7 online freeze & 23/24 & Qualified Evidence 2.8",
         "tight\\_budget\\_expensive\\_matrix",
         "gpt-4.1-2025-04-14",
-        "23/24 current-contract qualification"
+      "The retained 23/24 qualification"
       ]
     },
     {
@@ -2263,7 +2461,7 @@
       ],
       "body_contains": [
         "all three requested effects are applied and verified",
-        "battery initial-state and voltage-sag injection"
+        "battery-profile injection"
       ]
     },
     {
@@ -2452,6 +2650,762 @@
         "provider, network, or simulator",
         "source-bound CLI fix",
         "611783c9388b"
+      ]
+    },
+    {
+      "id": "advanced-physics-actuator-failure-probe",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_actuator_failure_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.advanced-physics-actuator-failure-receipt/v1"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/subject_commit",
+          "expected": "793f02089413f2baa8ea78387cd1e9e078f02b83"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/duration_seconds",
+          "expected": 82
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/runner_exit_code",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/acceptance_exit_code",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/trial_success",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/physical_effect_verified",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/residual_process_count",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/openai_api_key_used",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/environment/runtime",
+          "expected": "DroneDreamRuntime"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/environment/gazebo_sim_version",
+          "expected": "8.14.0"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/physical_run/environment/px4_version",
+          "expected": "v1.16"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/requested_effect/failure_mode",
+          "expected": "stuck_stopped_at_launch"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/requested_effect/target_motor_number",
+          "expected": 2
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/verification_status",
+          "expected": "verified_applied"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/generated_world_sdf/motor_max_rot_velocity_rad_s/2",
+          "expected": 0.0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/gazebo_joint_state/target_sample_count",
+          "expected": 641
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/gazebo_joint_state/target_max_abs_velocity_rad_s",
+          "expected": 8.93786e-07
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/gazebo_joint_state/max_failed_motor_abs_velocity_rad_s",
+          "expected": 0.05
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/gazebo_joint_state/healthy_sample_counts/rotor_0_joint",
+          "expected": 653
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/gazebo_joint_state/healthy_sample_counts/rotor_1_joint",
+          "expected": 653
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/gazebo_joint_state/healthy_sample_counts/rotor_3_joint",
+          "expected": 653
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/effect_result/gazebo_joint_state/min_healthy_motor_abs_velocity_rad_s",
+          "expected": 1.0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/trial_outcome/success",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/trial_outcome/reason",
+          "expected": "trusted evaluation window could not be established from offboard timing or telemetry"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/focused_test_receipt/passed",
+          "expected": 138
+        }
+      ],
+      "body_contains": [
+        "hard-actuator probe physically stops motor 2",
+        "no trusted evaluation window",
+        "641 target samples",
+        "each healthy rotor contributes 653 samples",
+        "trial\\_success=false",
+        "Hard-actuator probe & 1 injection verified; no trusted window"
+      ]
+    },
+    {
+      "id": "advanced-physics-actuator-failure-focused-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_actuator_failure_focused_junit",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "tests=\"138\""
+        },
+        {
+          "kind": "text_contains",
+          "expected": "failures=\"0\""
+        },
+        {
+          "kind": "text_contains",
+          "expected": "errors=\"0\""
+        }
+      ],
+      "body_contains": [
+        "138-test JUnit prefix"
+      ]
+    },
+    {
+      "id": "advanced-physics-actuator-failure-preflight-lineage",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_actuator_failure_preflight_attempt_0",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/exit_code",
+          "expected": 66
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/phase",
+          "expected": "preflight_before_px4_launch"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/px4_or_gazebo_started",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/residual_process_count",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/openai_api_key_used",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "attempt-0 preflight lineage",
+        "WSL could not",
+        "resolve the Windows worktree pointer"
+      ]
+    },
+    {
+      "id": "advanced-physics-closure-manifest",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_closure_manifest",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.advanced-physics-closure-manifest.v2"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/subject_commit",
+          "expected": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/manifest_sha256",
+          "expected": "7193e21ff826560e9e9f4d30453dc122d55fbee054397ff4a52f89deca15cb9f"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/evidence_class",
+          "expected": "REAL_PX4_GAZEBO_BUNDLED_EFFECT_CLOSURE"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/capability_category_count",
+          "expected": 9
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/verified_category_count",
+          "expected": 9
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/categories_with_all_retained_performance_success",
+          "expected": 5
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/all_effects_performance_successful",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/summary/real_aircraft_claim_permitted",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/capability_contract/requires_runtime_extension",
+          "expected": []
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/remaining_runtime_extensions",
+          "expected": []
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/coverage/0/category",
+          "expected": "steady_wind"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/coverage/0/performance_success_for_all_retained_trials",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/coverage/3/category",
+          "expected": "sensor_noise"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/coverage/3/performance_success_for_all_retained_trials",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/coverage/6/category",
+          "expected": "deterministic_seeded_gps_dropout"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/coverage/6/performance_success_for_all_retained_trials",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/coverage/8/category",
+          "expected": "actuator_hard_failure"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/coverage/8/performance_success_for_all_retained_trials",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "All 9/9 bundled physical-effect",
+        "five categories have every retained Trial pass its performance gate",
+        "coverage count denotes exercised mechanisms rather than nine performance",
+        "Unified advanced-physics closure matrix (v2)",
+        "Advanced-physics closure & 9/9 covered; 5 performance-qualified",
+        "not a nine-category performance qualification"
+      ]
+    },
+    {
+      "id": "advanced-physics-closure-receipt",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_closure_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.advanced-physics-closure-receipt.v2"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/subject_commit",
+          "expected": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/receipt_sha256",
+          "expected": "6f195b2908aa8673eab3bfee56c5e6cd1254b3535c3029e652f237d8a08edc10"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/status",
+          "expected": "complete_for_bundled_runtime_effect_contract"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/verified_categories",
+          "expected": 9
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/remaining_runtime_extensions",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/all_effects_performance_successful",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/real_aircraft_claim_permitted",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "Closure v2 binds aggregator source",
+        "reports 9/9 mechanism categories covered",
+        "reports only five categories"
+      ]
+    },
+    {
+      "id": "advanced-physics-closure-test-receipt",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_closure_test_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.advanced-physics-closure-test-receipt/v1"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/subject_commit",
+          "expected": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/exit_code",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/tests",
+          "expected": 52
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/passed",
+          "expected": 52
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/result/failures",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/environment/network_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/environment/px4_or_gazebo_runs",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/artifacts/focused-tests.xml/sha256",
+          "expected": "2b95be8b9ce7ad3369ae7f8d0c2b8148acb691286a95269db9ae4fde28cda01a"
+        }
+      ],
+      "body_contains": [
+        "52/52",
+        "exact-subject test receipt prefix"
+      ]
+    },
+    {
+      "id": "technical-report-evidence-v10-provenance-closure",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Section 8",
+        "Section 9",
+        "Reference 1",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "technical_report_evidence_v10_bundle",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.technical-report-evidence.v10"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/source_commit",
+          "expected": "97492448c36bef240e468a0cd53c3ba198cb6aae"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/bundle_sha256",
+          "expected": "df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b"
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/sources",
+          "expected": 39
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/base_evidence/schema_version",
+          "expected": "dronedream.technical-report-evidence.v9"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/base_evidence/bundle_sha256",
+          "expected": "d33c308ce3b47138572c86bf7f45aa8e4a37901a0248a5d5e0d3cd71ce2bfa8a"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/artifact_contract/evidence_schema_version",
+          "expected": "2.8"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/current_contract/evidence_schema_version",
+          "expected": "2.9"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/contract_current",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/qualification_scope",
+          "expected": "archived_evidence_2_8_prompt_1_7"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/case_count",
+          "expected": 24
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/passed_count",
+          "expected": 23
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/qualified",
+          "expected": true
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/routing/failed_cases/0/case_id",
+          "expected": "tight_budget_expensive_matrix"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_multi_tool_budget/contracts/evidence_schema_version",
+          "expected": "2.9"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_multi_tool_budget/summary/block_count",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_multi_tool_budget/summary/configured_budget_parity_count",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_multi_tool_budget/runtime/network_calls",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/harness_multi_tool_budget/runtime/real_credentials_used",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/advanced_physics/summary/verified_category_count",
+          "expected": 9
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/advanced_physics/summary/categories_with_all_retained_performance_success",
+          "expected": 5
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/advanced_physics/summary/all_effects_performance_successful",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/release_readiness/online_routing_current_for_evidence_2_9",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/release_readiness/release_ready",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/release_readiness/current_source_full_regression_receipt_included",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/release_readiness/current_source_windows_rust_gate_included",
+          "expected": false
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/release_readiness/report_pdf_gate_included",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "Evidence v10 is the latest software provenance navigation ledger",
+        "exact-byte revalidates 39 sources",
+        "three CSV projections",
+        "not current for Evidence 2.9",
+        "release\\_ready=false",
+        "Evidence v10 ledger & 39 sources; 3 CSV"
+      ]
+    },
+    {
+      "id": "technical-report-evidence-v10-manifest",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "technical_report_evidence_v10_manifest",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.technical-report-evidence-manifest.v2"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/source_commit",
+          "expected": "97492448c36bef240e468a0cd53c3ba198cb6aae"
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/sources",
+          "expected": 39
+        },
+        {
+          "kind": "json_len",
+          "pointer": "/csv_exports",
+          "expected": 3
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/bundle/file_sha256",
+          "expected": "27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/bundle/bundle_sha256",
+          "expected": "df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/release_readiness/release_ready",
+          "expected": false
+        }
+      ],
+      "body_contains": [
+        "manifest file prefix is",
+        "134d1ae0f0a9",
+        "39-source manifest rehashes"
+      ]
+    },
+    {
+      "id": "technical-report-evidence-v10-test-receipt",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "technical_report_evidence_v10_test_receipt",
+      "assertions": [
+        {
+          "kind": "json_equals",
+          "pointer": "/schema_version",
+          "expected": "dronedream.test-run-receipt.v2"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/source_commit",
+          "expected": "97492448c36bef240e468a0cd53c3ba198cb6aae"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/receipt_sha256",
+          "expected": "b9407556588e5c0a65d3e93f22e29d0fdd8fd4bb57f1b5cb1c890f94c7b9d98d"
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/full_suite/result/passed",
+          "expected": 70
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/full_suite/result/failed",
+          "expected": 0
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/focused_checks/0/result/passed",
+          "expected": 7
+        },
+        {
+          "kind": "json_equals",
+          "pointer": "/focused_checks/0/result/failed",
+          "expected": 0
+        }
+      ],
+      "body_contains": [
+        "70/70",
+        "7/7 focused tamper",
+        "5284eca94d2d",
+        "b9407556588e"
+      ]
+    },
+    {
+      "id": "technical-report-evidence-v10-compatibility-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "technical_report_evidence_v10_compatibility_junit",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "tests=\"70\""
+        },
+        {
+          "kind": "text_contains",
+          "expected": "failures=\"0\""
+        },
+        {
+          "kind": "text_contains",
+          "expected": "errors=\"0\""
+        }
+      ],
+      "body_contains": [
+        "70/70"
+      ]
+    },
+    {
+      "id": "technical-report-evidence-v10-focused-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "technical_report_evidence_v10_focused_junit",
+      "assertions": [
+        {
+          "kind": "text_contains",
+          "expected": "tests=\"7\""
+        },
+        {
+          "kind": "text_contains",
+          "expected": "failures=\"0\""
+        },
+        {
+          "kind": "text_contains",
+          "expected": "errors=\"0\""
+        }
+      ],
+      "body_contains": [
+        "7/7 focused tamper"
       ]
     }
   ]

@@ -180,6 +180,11 @@ def main() -> int:
     physical = software["physical_campaign"]
     advanced = software["advanced_physics"]
     negative_control = software["advanced_physics_runtime_negative_control"]
+    actuator_probe = software["advanced_physics_actuator_failure_probe"]
+    advanced_closure = software["advanced_physics_closure"]
+    evidence_v10 = software["evidence_v10"]
+    documentation_alignment = software["documentation_alignment"]
+    current_backend_regression = software["current_backend_regression"]
     cross_job = software["cross_job_memory"]
     online_routing = software["online_routing"]
     multi_tool_budget = software["multi_tool_budget"]
@@ -187,6 +192,11 @@ def main() -> int:
         software["subject_commit"],
         software["provenance_commit"],
         software["branch_head"],
+        evidence_v10["source_commit"],
+        evidence_v10["freeze_commit"],
+        documentation_alignment["commit"],
+        current_backend_regression["subject_commit"],
+        current_backend_regression["receipt_head"],
         cross_job["implementation_commit"],
         cross_job["subject_commit"],
         cross_job["receipt_head"],
@@ -203,6 +213,10 @@ def main() -> int:
         advanced["evidence_head"],
         negative_control["implementation_commit"],
         negative_control["evidence_head"],
+        actuator_probe["implementation_commit"],
+        actuator_probe["evidence_head"],
+        advanced_closure["subject_commit"],
+        advanced_closure["evidence_head"],
         website["subject_commit"],
         website["attestation_commit"],
     ]
@@ -311,9 +325,97 @@ def main() -> int:
         negative_control["evidence_head"],
         failures,
     )
+    verify_ancestor(
+        repo,
+        negative_control["evidence_head"],
+        actuator_probe["implementation_commit"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        actuator_probe["implementation_commit"],
+        actuator_probe["evidence_head"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        actuator_probe["evidence_head"],
+        advanced_closure["subject_commit"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        advanced_closure["subject_commit"],
+        advanced_closure["evidence_head"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        advanced_closure["evidence_head"],
+        evidence_v10["source_commit"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        evidence_v10["source_commit"],
+        evidence_v10["freeze_commit"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        evidence_v10["freeze_commit"],
+        documentation_alignment["commit"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        documentation_alignment["commit"],
+        current_backend_regression["subject_commit"],
+        failures,
+    )
+    verify_ancestor(
+        repo,
+        current_backend_regression["subject_commit"],
+        current_backend_regression["receipt_head"],
+        failures,
+    )
     require(
-        negative_control["evidence_head"] == software["branch_head"],
-        "advanced-physics negative-control evidence must bind the latest software head",
+        documentation_alignment
+        == {
+            "commit": "755c511539fe561207ca38ff5079f471a4110896",
+            "authority": "secondary_narrative_reference",
+            "experimental_evidence": False,
+            "authoritative_evidence_source": (
+                "evidence_v10_bundle_manifest_and_receipt"
+            ),
+        },
+        "software documentation-alignment head or authority drifted",
+        failures,
+    )
+    require(
+        current_backend_regression
+        == {
+            "subject_commit": "755c511539fe561207ca38ff5079f471a4110896",
+            "receipt_head": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+            "generated_at": "2026-07-29T00:28:51Z",
+            "exact_final_commit_run": True,
+            "full_passed": 1284,
+            "full_failed": 0,
+            "full_pytest_seconds": 831.79,
+            "focused_passed": 73,
+            "focused_failed": 0,
+            "focused_pytest_seconds": 29.73,
+            "openai_api_key_removed_before_run": True,
+            "provider_calls": 0,
+            "claim_class": (
+                "exact_source_offline_backend_regression_without_frontend_"
+                "desktop_rust_release_or_physical_claim"
+            ),
+        }
+        and current_backend_regression["subject_commit"]
+        == documentation_alignment["commit"]
+        and current_backend_regression["receipt_head"] == software["branch_head"],
+        "current backend regression metadata or subject/receipt boundary drifted",
         failures,
     )
     require(
@@ -404,6 +506,134 @@ def main() -> int:
                 "sha256": actual,
             }
         )
+
+    current_receipt_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "current_backend_regression_receipt"
+    )
+    current_manifest_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "current_backend_regression_manifest"
+    )
+    current_checksums_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "current_backend_regression_checksums"
+    )
+    current_full_junit_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "current_backend_regression_full_junit"
+    )
+    current_focused_junit_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "current_backend_regression_focused_junit"
+    )
+    current_receipt = software_json.get("current_backend_regression_receipt", {})
+    current_manifest = software_json.get("current_backend_regression_manifest", {})
+    current_focused_checks = current_receipt.get("focused_checks", [])
+    current_focused = current_focused_checks[0] if current_focused_checks else {}
+    require(
+        current_receipt.get("schema_version") == "dronedream.test-run-receipt.v2"
+        and current_receipt.get("source_commit")
+        == current_backend_regression["subject_commit"]
+        and current_receipt.get("generated_at")
+        == current_backend_regression["generated_at"]
+        and current_receipt.get("receipt_sha256")
+        == current_receipt_entry["internal_receipt_sha256"]
+        and canonical_json_sha256(current_receipt, "receipt_sha256")
+        == current_receipt_entry["internal_receipt_sha256"]
+        and current_receipt.get("full_suite", {}).get("result")
+        == {"failed": 0, "passed": 1284, "status": "passed"}
+        and current_receipt.get("full_suite", {})
+        .get("tested_state", {})
+        .get("exact_final_commit_run")
+        is True
+        and current_receipt.get("full_suite", {})
+        .get("tested_state", {})
+        .get("base_commit")
+        == current_backend_regression["subject_commit"]
+        and current_focused.get("result")
+        == {"failed": 0, "passed": 73, "status": "passed"},
+        "current backend exact-source receipt identity or counts drifted",
+        failures,
+    )
+    current_manifest_full = current_manifest.get("full_suite", {})
+    current_manifest_focused = current_manifest.get("focused_suite", {})
+    current_environment = current_manifest.get("environment", {})
+    require(
+        current_manifest.get("schema_version")
+        == "dronedream.software-regression-attestation.v1"
+        and current_manifest.get("source_commit")
+        == current_backend_regression["subject_commit"]
+        and current_manifest.get("generated_at")
+        == current_backend_regression["generated_at"]
+        and current_manifest.get("tested_state", {}).get("exact_final_commit_run")
+        is True
+        and current_manifest_full.get("result") == "passed"
+        and current_manifest_full.get("pytest_reported_duration_seconds") == 831.79
+        and current_manifest_full.get("junit", {}).get("tests") == 1284
+        and current_manifest_full.get("junit", {}).get("failures") == 0
+        and current_manifest_full.get("junit", {}).get("errors") == 0
+        and current_manifest_focused.get("result") == "passed"
+        and current_manifest_focused.get("pytest_reported_duration_seconds") == 29.73
+        and current_manifest_focused.get("junit", {}).get("tests") == 73
+        and current_manifest_focused.get("junit", {}).get("failures") == 0
+        and current_manifest_focused.get("junit", {}).get("errors") == 0
+        and current_environment.get("openai_api_key_removed_before_run") is True
+        and current_environment.get("real_credentials_used") is False
+        and current_environment.get("real_provider_calls") == 0
+        and current_manifest.get("receipt", {}).get("file_sha256")
+        == current_receipt_entry["file_sha256"]
+        and current_manifest.get("receipt", {}).get("internal_sha256")
+        == current_receipt_entry["internal_receipt_sha256"],
+        "current backend attestation manifest or claim boundary drifted",
+        failures,
+    )
+    current_checksums = run_git(
+        repo,
+        "show",
+        f"{current_checksums_entry['ref_commit']}:{current_checksums_entry['path']}",
+    ).decode("utf-8")
+    for digest, filename in (
+        (current_manifest_entry["file_sha256"], "attestation-manifest.json"),
+        ("6cf663090b5d649976072aeecb31508e252b9a02affe5a0155329521025efad0", "focused-suite.log"),
+        (current_focused_junit_entry["file_sha256"], "focused-suite.xml"),
+        ("a6b7d84a14fdb8f1dfb98591acdaca45230a15b3a60e52bf7104489d6e067958", "full-suite.log"),
+        (current_full_junit_entry["file_sha256"], "full-suite.xml"),
+        (current_receipt_entry["file_sha256"], "test-receipt.json"),
+    ):
+        require(
+            f"{digest}  {filename}" in current_checksums,
+            f"current backend checksum sidecar lacks {filename}",
+            failures,
+        )
+    for entry, expected_tests in (
+        (current_full_junit_entry, 1284),
+        (current_focused_junit_entry, 73),
+    ):
+        junit_payload = run_git(
+            repo,
+            "show",
+            f"{entry['ref_commit']}:{entry['path']}",
+        )
+        try:
+            junit_root = ET.fromstring(junit_payload)
+            junit_suite = next(junit_root.iter("testsuite"))
+        except (ET.ParseError, StopIteration):
+            failures.append(f"current backend JUnit is unreadable: {entry['id']}")
+        else:
+            require(
+                junit_suite.attrib.get("tests") == str(expected_tests)
+                and junit_suite.attrib.get("failures") == "0"
+                and junit_suite.attrib.get("errors") == "0"
+                and junit_suite.attrib.get("skipped") == "0",
+                f"current backend JUnit result drifted: {entry['id']}",
+                failures,
+            )
 
     physical_manifest_entry = next(
         item
@@ -1342,6 +1572,652 @@ def main() -> int:
             failures,
         )
 
+    actuator_receipt = software_json.get(
+        "advanced_physics_actuator_failure_receipt", {}
+    )
+    actuator_scenario = software_json.get(
+        "advanced_physics_actuator_failure_scenario_applied", {}
+    )
+    actuator_preflight = software_json.get(
+        "advanced_physics_actuator_failure_preflight_attempt_0", {}
+    )
+    require(
+        actuator_probe
+        == {
+            "implementation_commit": "793f02089413f2baa8ea78387cd1e9e078f02b83",
+            "evidence_head": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+            "evidence_class": "REAL_PX4_GAZEBO_ACTUATOR_FAILURE_INJECTION_READBACK",
+            "claim_class": (
+                "verified_sdf_and_joint_state_injection_without_trusted_"
+                "flight_evaluation"
+            ),
+            "trial_success": False,
+            "physical_effect_verified": True,
+            "focused_test_count": 138,
+        },
+        "advanced-physics actuator-probe manifest metadata drifted",
+        failures,
+    )
+    actuator_physical = actuator_receipt.get("physical_run", {})
+    require(
+        actuator_receipt.get("schema_version")
+        == "dronedream.advanced-physics-actuator-failure-receipt/v1"
+        and actuator_receipt.get("subject_commit")
+        == actuator_probe["implementation_commit"]
+        and actuator_physical.get("duration_seconds") == 82
+        and actuator_physical.get("runner_exit_code") == 0
+        and actuator_physical.get("acceptance_exit_code") == 0
+        and actuator_physical.get("trial_success") is False
+        and actuator_physical.get("physical_effect_verified") is True
+        and actuator_physical.get("preexisting_process_count") == 0
+        and actuator_physical.get("residual_process_count") == 0
+        and actuator_physical.get("openai_api_key_used") is False
+        and actuator_physical.get("environment", {}).get("runtime")
+        == "DroneDreamRuntime"
+        and actuator_physical.get("environment", {}).get("gazebo_sim_version")
+        == "8.14.0"
+        and actuator_physical.get("environment", {}).get("px4_version") == "v1.16"
+        and actuator_physical.get("environment", {}).get("px4_firmware_commit")
+        == "6ea3539157ca358c70a515878b77077af7d4611d"
+        and actuator_physical.get("environment", {}).get("vehicle") == "x500",
+        "advanced-physics actuator-probe execution boundary drifted",
+        failures,
+    )
+    requested_actuator = actuator_receipt.get("requested_effect", {})
+    actuator_effect = actuator_receipt.get("effect_result", {})
+    actuator_sdf = actuator_effect.get("generated_world_sdf", {})
+    actuator_joint = actuator_effect.get("gazebo_joint_state", {})
+    require(
+        requested_actuator
+        == {
+            "effect_id": "scenario_type.actuator_failure",
+            "failure_mode": "stuck_stopped_at_launch",
+            "target_joint_name": "rotor_2_joint",
+            "target_motor_number": 2,
+        }
+        and actuator_effect.get("verification_status") == "verified_applied"
+        and actuator_effect.get("verification_method")
+        == "trial_local_sdf_generated_world_plus_gazebo_joint_state"
+        and actuator_sdf.get("motor_max_rot_velocity_rad_s")
+        == {"0": 1000.0, "1": 1000.0, "2": 0.0, "3": 1000.0}
+        and actuator_joint.get("target_sample_count") == 641
+        and actuator_joint.get("target_max_abs_velocity_rad_s") == 8.93786e-07
+        and actuator_joint.get("max_failed_motor_abs_velocity_rad_s") == 0.05
+        and actuator_joint.get("hard_stop_verified") is True
+        and actuator_joint.get("healthy_sample_counts")
+        == {"rotor_0_joint": 653, "rotor_1_joint": 653, "rotor_3_joint": 653}
+        and actuator_joint.get("min_healthy_motor_abs_velocity_rad_s") == 1.0
+        and actuator_joint.get("healthy_motion_verified") is True
+        and all(
+            99.99 < float(value) < 100.01
+            for value in actuator_joint.get(
+                "healthy_joint_max_abs_velocity_rad_s", {}
+            ).values()
+        ),
+        "advanced-physics actuator-probe physical read-back drifted",
+        failures,
+    )
+    actuator_outcome = actuator_receipt.get("trial_outcome", {})
+    require(
+        actuator_outcome.get("success") is False
+        and actuator_outcome.get("failure_code") == "SIMULATION_FAILED"
+        and actuator_outcome.get("reason")
+        == "trusted evaluation window could not be established from offboard timing or telemetry"
+        and actuator_outcome.get("offboard_executor_exit")
+        == "completed successfully"
+        and "no score or pass result is claimed"
+        in str(actuator_outcome.get("interpretation", "")),
+        "advanced-physics actuator-probe outcome boundary drifted",
+        failures,
+    )
+    actuator_focused = actuator_receipt.get("focused_test_receipt", {})
+    require(
+        actuator_focused.get("source_commit")
+        == actuator_probe["implementation_commit"]
+        and actuator_focused.get("tests") == 138
+        and actuator_focused.get("passed") == 138
+        and actuator_focused.get("failures") == 0
+        and actuator_focused.get("errors") == 0
+        and actuator_focused.get("skipped") == 0
+        and actuator_focused.get("openai_api_key_used") is False
+        and actuator_focused.get("junit_xml", {}).get("sha256")
+        == "65e027756f66e7fe7df4ccdc2e172bf821be9fbd104b71ac5199eee939a924d5",
+        "advanced-physics actuator-probe focused-test receipt drifted",
+        failures,
+    )
+    actuator_artifacts = actuator_receipt.get("artifacts", {})
+    require(
+        actuator_artifacts.get("px4_source.ulg", {}).get("sha256")
+        == "fd01f02f7a97ee8ad3650e9687a6aa07a1197f46b76b19c1146fbe913f513f76"
+        and actuator_artifacts.get("actuator_failure_joint_state.log", {}).get(
+            "sha256"
+        )
+        == "f927dbb6561e912a80ae69e368cc65e14a5427640e5e83f8b933838e38e08e10"
+        and actuator_artifacts.get("scenario_effects.applied.json", {}).get(
+            "sha256"
+        )
+        == "8995d7b926c2745018a68159ef370e309c4b19370cbf1abca0b0e49c693d6458"
+        and actuator_artifacts.get("preflight-failure-attempt-0.json", {}).get(
+            "sha256"
+        )
+        == "72471490aa92fb132ea01fb941557c2c8dbd3f4cb77d480fa9fc14c00a97df2d",
+        "advanced-physics actuator-probe artifact binding drifted",
+        failures,
+    )
+    actuator_effect_rows = actuator_scenario.get("effects", [])
+    require(
+        len(actuator_effect_rows) == 1
+        and actuator_effect_rows[0].get("effect_id")
+        == "scenario_type.actuator_failure"
+        and actuator_effect_rows[0].get("status") == "applied"
+        and actuator_effect_rows[0].get("capability", {}).get("status")
+        == "available"
+        and actuator_effect_rows[0]
+        .get("evidence", {})
+        .get("verification", {})
+        .get("status")
+        == "verified",
+        "advanced-physics actuator-probe scenario effect record drifted",
+        failures,
+    )
+    require(
+        actuator_preflight.get("subject_head_verified_by_windows_git")
+        == actuator_probe["implementation_commit"]
+        and actuator_preflight.get("exit_code") == 66
+        and actuator_preflight.get("phase") == "preflight_before_px4_launch"
+        and "WSL git could not resolve the Windows worktree .git pointer"
+        == actuator_preflight.get("reason")
+        and actuator_preflight.get("px4_or_gazebo_started") is False
+        and actuator_preflight.get("residual_process_count") == 0
+        and actuator_preflight.get("openai_api_key_used") is False,
+        "advanced-physics actuator-probe preflight lineage drifted",
+        failures,
+    )
+    actuator_junit_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "advanced_physics_actuator_failure_focused_junit"
+    )
+    actuator_junit_payload = run_git(
+        repo,
+        "show",
+        f"{actuator_junit_entry['ref_commit']}:{actuator_junit_entry['path']}",
+    )
+    try:
+        actuator_junit_root = ET.fromstring(actuator_junit_payload)
+        actuator_junit_suite = next(actuator_junit_root.iter("testsuite"))
+    except (ET.ParseError, StopIteration):
+        failures.append("advanced-physics actuator-probe JUnit is unreadable")
+    else:
+        require(
+            actuator_junit_suite.attrib.get("tests") == "138"
+            and actuator_junit_suite.attrib.get("failures") == "0"
+            and actuator_junit_suite.attrib.get("errors") == "0"
+            and actuator_junit_suite.attrib.get("skipped") == "0",
+            "advanced-physics actuator-probe JUnit result drifted",
+            failures,
+        )
+
+    closure_manifest = software_json.get("advanced_physics_closure_manifest", {})
+    closure_receipt = software_json.get("advanced_physics_closure_receipt", {})
+    closure_test_receipt = software_json.get(
+        "advanced_physics_closure_test_receipt", {}
+    )
+    require(
+        advanced_closure
+        == {
+            "subject_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+            "evidence_head": "83982f37899f8054e24a749af8e6469fedf48e8d",
+            "evidence_class": "REAL_PX4_GAZEBO_BUNDLED_EFFECT_CLOSURE",
+            "claim_class": (
+                "nine_of_nine_injection_readback_coverage_with_five_"
+                "performance_successful_categories"
+            ),
+            "verified_category_count": 9,
+            "performance_successful_category_count": 5,
+            "remaining_runtime_extension_count": 0,
+            "all_effects_performance_successful": False,
+            "real_aircraft_claim_permitted": False,
+            "focused_test_count": 52,
+        },
+        "advanced-physics closure manifest metadata drifted",
+        failures,
+    )
+    require(
+        closure_manifest.get("schema_version")
+        == "dronedream.advanced-physics-closure-manifest.v2"
+        and closure_manifest.get("subject_commit")
+        == advanced_closure["subject_commit"]
+        and closure_manifest.get("evidence_class")
+        == advanced_closure["evidence_class"]
+        and closure_manifest.get("manifest_sha256")
+        == "7193e21ff826560e9e9f4d30453dc122d55fbee054397ff4a52f89deca15cb9f"
+        and canonical_json_sha256(closure_manifest, "manifest_sha256")
+        == closure_manifest.get("manifest_sha256")
+        and closure_manifest.get("remaining_runtime_extensions") == [],
+        "advanced-physics closure manifest identity drifted",
+        failures,
+    )
+    closure_categories = closure_manifest.get("coverage", [])
+    expected_closure_categories = [
+        ("steady_wind", True),
+        ("obstacles", True),
+        ("gust_and_turbulence", True),
+        ("sensor_noise", False),
+        ("payload_mass_and_inertia", True),
+        ("actuator_first_order_delay", True),
+        ("deterministic_seeded_gps_dropout", False),
+        ("battery_initial_state_and_voltage_sag", False),
+        ("actuator_hard_failure", False),
+    ]
+    require(
+        [
+            (
+                item.get("category"),
+                item.get("performance_success_for_all_retained_trials"),
+            )
+            for item in closure_categories
+        ]
+        == expected_closure_categories
+        and all(bool(item.get("evidence_strength")) for item in closure_categories),
+        "advanced-physics closure category matrix drifted",
+        failures,
+    )
+    closure_summary = closure_manifest.get("summary", {})
+    require(
+        closure_summary
+        == {
+            "all_effects_performance_successful": False,
+            "all_runtime_effect_categories_verified": True,
+            "capability_category_count": 9,
+            "categories_with_all_retained_performance_success": 5,
+            "real_aircraft_claim_permitted": False,
+            "source_manifest_count": 2,
+            "source_receipt_count": 4,
+            "verified_category_count": 9,
+        },
+        "advanced-physics closure summary drifted",
+        failures,
+    )
+    closure_contract = closure_manifest.get("capability_contract", {})
+    require(
+        closure_contract.get("requires_runtime_extension") == []
+        and closure_contract.get("physically_applied")
+        == [
+            "actuator_first_order_delay",
+            "actuator_hard_failure",
+            "battery_initial_state_and_voltage_sag",
+            "deterministic_seeded_gps_dropout",
+            "gust_and_turbulence",
+            "obstacles",
+            "payload_mass_and_inertia",
+            "sensor_noise",
+            "steady_wind",
+        ],
+        "advanced-physics closure capability contract drifted",
+        failures,
+    )
+    source_evidence = closure_manifest.get("source_evidence", [])
+    require(
+        [item.get("role") for item in source_evidence]
+        == [
+            "constant_wind_and_obstacles",
+            "gust_noise_payload_and_actuator_delay",
+            "gps_dropout_and_battery",
+            "hard_actuator_failure",
+        ]
+        and [
+            item.get("receipt", {}).get("sha256") for item in source_evidence
+        ]
+        == [
+            "8f7e1c953338ae87154b25822bf7c781921473cbcd76fd5874d79c178ef73dee",
+            "99e257fb56d46d9293ba9365ccae604ddd697802370b877360541628ebd1354f",
+            "2d6470fb085e638c52754f580d22a5d3d50d2f26000e584148557f3c505fdd8a",
+            "5cc93ee5bfb75c53f95bdd925bb3121658d9ae93d6742d2b677d489112252cc6",
+        ],
+        "advanced-physics closure source bindings drifted",
+        failures,
+    )
+    require(
+        closure_receipt.get("schema_version")
+        == "dronedream.advanced-physics-closure-receipt.v2"
+        and closure_receipt.get("subject_commit")
+        == advanced_closure["subject_commit"]
+        and closure_receipt.get("receipt_sha256")
+        == "6f195b2908aa8673eab3bfee56c5e6cd1254b3535c3029e652f237d8a08edc10"
+        and canonical_json_sha256(closure_receipt, "receipt_sha256")
+        == closure_receipt.get("receipt_sha256")
+        and closure_receipt.get("network_calls") == 0
+        and closure_receipt.get("openai_api_key_used") is False
+        and closure_receipt.get("real_credentials_used") is False
+        and closure_receipt.get("result")
+        == {
+            "all_effects_performance_successful": False,
+            "real_aircraft_claim_permitted": False,
+            "remaining_runtime_extensions": 0,
+            "status": "complete_for_bundled_runtime_effect_contract",
+            "verified_categories": 9,
+        },
+        "advanced-physics closure receipt drifted",
+        failures,
+    )
+    closure_manifest_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "advanced_physics_closure_manifest"
+    )
+    closure_receipt_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "advanced_physics_closure_receipt"
+    )
+    closure_digest_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "advanced_physics_closure_digest"
+    )
+    closure_manifest_payload = run_git(
+        repo,
+        "show",
+        f"{closure_manifest_entry['ref_commit']}:{closure_manifest_entry['path']}",
+    )
+    closure_receipt_payload = run_git(
+        repo,
+        "show",
+        f"{closure_receipt_entry['ref_commit']}:{closure_receipt_entry['path']}",
+    )
+    closure_digest_payload = run_git(
+        repo,
+        "show",
+        f"{closure_digest_entry['ref_commit']}:{closure_digest_entry['path']}",
+    )
+    require(
+        closure_digest_payload
+        == (
+            f"{sha256(closure_manifest_payload)}  "
+            "advanced-physics-closure-v2.manifest.json\n"
+            f"{sha256(closure_receipt_payload)}  "
+            "advanced-physics-closure-v2.receipt.json\n"
+        ).encode("ascii"),
+        "advanced-physics closure sidecar binding drifted",
+        failures,
+    )
+    closure_test_result = closure_test_receipt.get("result", {})
+    require(
+        closure_test_receipt.get("schema_version")
+        == "dronedream.advanced-physics-closure-test-receipt/v1"
+        and closure_test_receipt.get("subject_commit")
+        == advanced_closure["subject_commit"]
+        and closure_test_receipt.get("exit_code") == 0
+        and closure_test_result
+        == {
+            "tests": 52,
+            "passed": 52,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit_time_seconds": 6.498,
+        }
+        and closure_test_receipt.get("environment", {}).get("network_calls") == 0
+        and closure_test_receipt.get("environment", {}).get("px4_or_gazebo_runs")
+        == 0
+        and closure_test_receipt.get("artifacts", {})
+        .get("focused-tests.xml", {})
+        .get("sha256")
+        == "2b95be8b9ce7ad3369ae7f8d0c2b8148acb691286a95269db9ae4fde28cda01a",
+        "advanced-physics closure focused-test receipt drifted",
+        failures,
+    )
+    closure_junit_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "advanced_physics_closure_focused_junit"
+    )
+    closure_junit_payload = run_git(
+        repo,
+        "show",
+        f"{closure_junit_entry['ref_commit']}:{closure_junit_entry['path']}",
+    )
+    try:
+        closure_junit_root = ET.fromstring(closure_junit_payload)
+        closure_junit_suite = next(closure_junit_root.iter("testsuite"))
+    except (ET.ParseError, StopIteration):
+        failures.append("advanced-physics closure JUnit is unreadable")
+    else:
+        require(
+            closure_junit_suite.attrib.get("tests") == "52"
+            and closure_junit_suite.attrib.get("failures") == "0"
+            and closure_junit_suite.attrib.get("errors") == "0"
+            and closure_junit_suite.attrib.get("skipped") == "0",
+            "advanced-physics closure JUnit result drifted",
+            failures,
+        )
+
+    v10_bundle_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "technical_report_evidence_v10_bundle"
+    )
+    v10_manifest_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "technical_report_evidence_v10_manifest"
+    )
+    v10_digest_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "technical_report_evidence_v10_digest"
+    )
+    v10_receipt_entry = next(
+        item
+        for item in software["artifacts"]
+        if item["id"] == "technical_report_evidence_v10_test_receipt"
+    )
+    v10_bundle = software_json.get("technical_report_evidence_v10_bundle", {})
+    v10_manifest = software_json.get("technical_report_evidence_v10_manifest", {})
+    v10_receipt = software_json.get("technical_report_evidence_v10_test_receipt", {})
+    require(
+        evidence_v10
+        == {
+            "source_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+            "freeze_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+            "generated_at": "2026-07-28T23:54:28Z",
+            "schema_version": "dronedream.technical-report-evidence.v10",
+            "source_count": 39,
+            "csv_export_count": 3,
+            "compatibility_test_count": 70,
+            "tamper_test_count": 7,
+            "online_routing_current_for_evidence_2_9": False,
+            "release_ready": False,
+            "claim_class": (
+                "latest_exact_byte_provenance_navigation_ledger_without_"
+                "release_readiness"
+            ),
+        },
+        "Evidence v10 metadata drifted",
+        failures,
+    )
+    require(
+        v10_bundle.get("schema_version")
+        == "dronedream.technical-report-evidence.v10"
+        and v10_bundle.get("source_commit") == evidence_v10["source_commit"]
+        and v10_bundle.get("generated_at") == evidence_v10["generated_at"]
+        and v10_bundle.get("bundle_sha256") == v10_bundle_entry["canonical_sha256"]
+        and canonical_json_sha256(v10_bundle, "bundle_sha256")
+        == v10_bundle_entry["canonical_sha256"],
+        "Evidence v10 bundle identity or canonical digest mismatch",
+        failures,
+    )
+    require(
+        len(v10_bundle.get("sources", {})) == 39
+        and v10_bundle.get("base_evidence", {}).get("schema_version")
+        == "dronedream.technical-report-evidence.v9"
+        and v10_bundle.get("base_evidence", {}).get("bundle_sha256")
+        == "d33c308ce3b47138572c86bf7f45aa8e4a37901a0248a5d5e0d3cd71ce2bfa8a",
+        "Evidence v10 source inventory or v9 base binding mismatch",
+        failures,
+    )
+    v10_routing = v10_bundle.get("routing", {})
+    require(
+        v10_routing.get("artifact_contract", {}).get("evidence_schema_version")
+        == "2.8"
+        and v10_routing.get("artifact_contract", {}).get("prompt_template_version")
+        == "1.7"
+        and v10_routing.get("current_contract", {}).get("evidence_schema_version")
+        == "2.9"
+        and v10_routing.get("contract_current") is False
+        and v10_routing.get("qualification_scope")
+        == "archived_evidence_2_8_prompt_1_7"
+        and v10_routing.get("case_count") == 24
+        and v10_routing.get("passed_count") == 23
+        and v10_routing.get("qualified") is True
+        and v10_routing.get("provider_calls") == 24
+        and len(v10_routing.get("failed_cases", [])) == 1
+        and v10_routing.get("failed_cases", [{}])[0].get("case_id")
+        == "tight_budget_expensive_matrix",
+        "Evidence v10 retained online-routing boundary drifted",
+        failures,
+    )
+    v10_budget = v10_bundle.get("harness_multi_tool_budget", {})
+    require(
+        v10_budget.get("contracts", {}).get("evidence_schema_version") == "2.9"
+        and v10_budget.get("summary", {}).get("block_count") == 3
+        and v10_budget.get("summary", {}).get("arm_run_count") == 6
+        and v10_budget.get("summary", {}).get("configured_budget_parity_count") == 3
+        and v10_budget.get("summary", {}).get(
+            "scripted_accounted_provider_call_count"
+        )
+        == 12
+        and v10_budget.get("runtime", {}).get("network_calls") == 0
+        and v10_budget.get("runtime", {}).get("real_provider_calls") == 0
+        and v10_budget.get("runtime", {}).get("real_credentials_used") is False
+        and v10_budget.get("runtime", {}).get("simulator_backend") == "mock",
+        "Evidence v10 offline Evidence 2.9 budget boundary drifted",
+        failures,
+    )
+    v10_physics = v10_bundle.get("advanced_physics", {})
+    v10_physics_summary = v10_physics.get("summary", {})
+    require(
+        v10_physics.get("subject_commit") == advanced_closure["subject_commit"]
+        and v10_physics_summary.get("capability_category_count") == 9
+        and v10_physics_summary.get("verified_category_count") == 9
+        and v10_physics_summary.get(
+            "categories_with_all_retained_performance_success"
+        )
+        == 5
+        and v10_physics_summary.get("all_effects_performance_successful") is False
+        and v10_physics_summary.get("real_aircraft_claim_permitted") is False
+        and len(v10_physics.get("coverage", [])) == 9
+        and sum(
+            bool(row.get("all_retained_trials_passed"))
+            for row in v10_physics.get("coverage", [])
+        )
+        == 5,
+        "Evidence v10 advanced-physics coverage/qualification split drifted",
+        failures,
+    )
+    v10_release = v10_bundle.get("release_readiness", {})
+    require(
+        v10_release.get("release_ready") is False
+        and v10_release.get("online_routing_current_for_evidence_2_9") is False
+        and v10_release.get("online_provider_refresh_requires_separate_user_approval")
+        is True
+        and v10_release.get("current_source_full_regression_receipt_included")
+        is False
+        and v10_release.get("current_source_windows_rust_gate_included") is False
+        and v10_release.get("report_pdf_gate_included") is False,
+        "Evidence v10 release-readiness boundary drifted",
+        failures,
+    )
+    require(
+        v10_manifest.get("schema_version")
+        == "dronedream.technical-report-evidence-manifest.v2"
+        and v10_manifest.get("source_commit") == evidence_v10["source_commit"]
+        and v10_manifest.get("generated_at") == evidence_v10["generated_at"]
+        and len(v10_manifest.get("sources", {})) == 39
+        and len(v10_manifest.get("csv_exports", {})) == 3
+        and v10_manifest.get("bundle", {}).get("file_sha256")
+        == v10_bundle_entry["file_sha256"]
+        and v10_manifest.get("bundle", {}).get("bundle_sha256")
+        == v10_bundle_entry["canonical_sha256"]
+        and v10_manifest.get("release_readiness") == v10_release,
+        "Evidence v10 manifest binding mismatch",
+        failures,
+    )
+    v10_lineage = v10_bundle.get("source_lineage", {})
+    require(
+        v10_lineage.get("evidence_v9_source_commit") == software["subject_commit"]
+        and v10_lineage.get("evidence_v9_freeze_commit")
+        == software["provenance_commit"]
+        and v10_lineage.get("online_routing_source_commit")
+        == online_routing["implementation_commit"]
+        and v10_lineage.get("online_routing_freeze_commit")
+        == online_routing["evidence_head"]
+        and v10_lineage.get("multi_tool_budget_source_commit")
+        == multi_tool_budget["source_commit"]
+        and v10_lineage.get("multi_tool_budget_freeze_commit")
+        == multi_tool_budget["evidence_head"]
+        and v10_lineage.get("advanced_physics_subject_commit")
+        == advanced_closure["subject_commit"]
+        and v10_lineage.get("advanced_physics_freeze_commit")
+        == advanced_closure["evidence_head"],
+        "Evidence v10 source-lineage binding mismatch",
+        failures,
+    )
+    require(
+        v10_receipt.get("schema_version") == "dronedream.test-run-receipt.v2"
+        and v10_receipt.get("source_commit") == evidence_v10["source_commit"]
+        and v10_receipt.get("receipt_sha256")
+        == v10_receipt_entry["internal_receipt_sha256"]
+        and canonical_json_sha256(v10_receipt, "receipt_sha256")
+        == v10_receipt_entry["internal_receipt_sha256"]
+        and v10_receipt.get("full_suite", {}).get("result", {}).get("passed") == 70
+        and v10_receipt.get("full_suite", {}).get("result", {}).get("failed") == 0
+        and v10_receipt.get("focused_checks", [{}])[0]
+        .get("result", {})
+        .get("passed")
+        == 7
+        and v10_receipt.get("focused_checks", [{}])[0]
+        .get("result", {})
+        .get("failed")
+        == 0,
+        "Evidence v10 test receipt identity or counts drifted",
+        failures,
+    )
+    v10_digest_payload = run_git(
+        repo, "show", f"{v10_digest_entry['ref_commit']}:{v10_digest_entry['path']}"
+    ).decode("ascii")
+    require(
+        v10_bundle_entry["file_sha256"] in v10_digest_payload
+        and v10_manifest_entry["file_sha256"] in v10_digest_payload
+        and len([line for line in v10_digest_payload.splitlines() if line.strip()]) == 5,
+        "Evidence v10 digest sidecar inventory drifted",
+        failures,
+    )
+    for artifact_id, expected_tests in (
+        ("technical_report_evidence_v10_compatibility_junit", "70"),
+        ("technical_report_evidence_v10_focused_junit", "7"),
+    ):
+        junit_entry = next(
+            item for item in software["artifacts"] if item["id"] == artifact_id
+        )
+        junit_payload = run_git(
+            repo, "show", f"{junit_entry['ref_commit']}:{junit_entry['path']}"
+        )
+        try:
+            junit_root = ET.fromstring(junit_payload)
+            junit_suite = next(junit_root.iter("testsuite"))
+        except (ET.ParseError, StopIteration):
+            failures.append(f"Evidence v10 JUnit is unreadable: {artifact_id}")
+        else:
+            require(
+                junit_suite.attrib.get("tests") == expected_tests
+                and junit_suite.attrib.get("failures") == "0"
+                and junit_suite.attrib.get("errors") == "0",
+                f"Evidence v10 JUnit result drifted: {artifact_id}",
+                failures,
+            )
+
     bundle_entry = next(
         item for item in software["artifacts"] if item["id"] == "technical_report_evidence_bundle"
     )
@@ -1810,7 +2686,13 @@ def main() -> int:
     )
     require(
         online_routing["claim_class"]
-        == "current_contract_development_routing_qualification"
+        == (
+            "retained_online_development_routing_qualification_not_current_"
+            "for_evidence_2_9"
+        )
+        and online_routing.get("contract_current") is False
+        and online_routing.get("qualification_scope")
+        == "archived_evidence_2_8_prompt_1_7"
         and "does not establish causal optimizer-outcome benefit"
         in online_manifest.get("claim_boundary", ""),
         "online routing claim boundary drifted",

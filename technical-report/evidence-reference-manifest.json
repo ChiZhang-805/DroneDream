@@ -17,7 +17,41 @@
     "branch": "codex/software",
     "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
     "provenance_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
-    "branch_head": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+    "branch_head": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+    "evidence_v10": {
+      "source_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+      "freeze_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "generated_at": "2026-07-28T23:54:28Z",
+      "schema_version": "dronedream.technical-report-evidence.v10",
+      "source_count": 39,
+      "csv_export_count": 3,
+      "compatibility_test_count": 70,
+      "tamper_test_count": 7,
+      "online_routing_current_for_evidence_2_9": false,
+      "release_ready": false,
+      "claim_class": "latest_exact_byte_provenance_navigation_ledger_without_release_readiness"
+    },
+    "documentation_alignment": {
+      "commit": "755c511539fe561207ca38ff5079f471a4110896",
+      "authority": "secondary_narrative_reference",
+      "experimental_evidence": false,
+      "authoritative_evidence_source": "evidence_v10_bundle_manifest_and_receipt"
+    },
+    "current_backend_regression": {
+      "subject_commit": "755c511539fe561207ca38ff5079f471a4110896",
+      "receipt_head": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "generated_at": "2026-07-29T00:28:51Z",
+      "exact_final_commit_run": true,
+      "full_passed": 1284,
+      "full_failed": 0,
+      "full_pytest_seconds": 831.79,
+      "focused_passed": 73,
+      "focused_failed": 0,
+      "focused_pytest_seconds": 29.73,
+      "openai_api_key_removed_before_run": true,
+      "provider_calls": 0,
+      "claim_class": "exact_source_offline_backend_regression_without_frontend_desktop_rust_release_or_physical_claim"
+    },
     "cross_job_memory": {
       "implementation_commit": "abb9002746e061af44a164fe749243d68d098e10",
       "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
@@ -36,7 +70,9 @@
       "tool_registry_version": "2.1",
       "model_snapshot": "gpt-4.1-2025-04-14",
       "provider_calls": 24,
-      "claim_class": "current_contract_development_routing_qualification"
+      "contract_current": false,
+      "qualification_scope": "archived_evidence_2_8_prompt_1_7",
+      "claim_class": "retained_online_development_routing_qualification_not_current_for_evidence_2_9"
     },
     "multi_tool_budget": {
       "source_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
@@ -89,7 +125,66 @@
       "applied_effect_count": 3,
       "focused_test_count": 159
     },
+    "advanced_physics_actuator_failure_probe": {
+      "implementation_commit": "793f02089413f2baa8ea78387cd1e9e078f02b83",
+      "evidence_head": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+      "evidence_class": "REAL_PX4_GAZEBO_ACTUATOR_FAILURE_INJECTION_READBACK",
+      "claim_class": "verified_sdf_and_joint_state_injection_without_trusted_flight_evaluation",
+      "trial_success": false,
+      "physical_effect_verified": true,
+      "focused_test_count": 138
+    },
+    "advanced_physics_closure": {
+      "subject_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+      "evidence_head": "83982f37899f8054e24a749af8e6469fedf48e8d",
+      "evidence_class": "REAL_PX4_GAZEBO_BUNDLED_EFFECT_CLOSURE",
+      "claim_class": "nine_of_nine_injection_readback_coverage_with_five_performance_successful_categories",
+      "verified_category_count": 9,
+      "performance_successful_category_count": 5,
+      "remaining_runtime_extension_count": 0,
+      "all_effects_performance_successful": false,
+      "real_aircraft_claim_permitted": false,
+      "focused_test_count": 52
+    },
     "artifacts": [
+      {
+        "id": "technical_report_evidence_v10_bundle",
+        "path": "artifacts/technical-report/evidence-v10.json",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89",
+        "canonical_sha256": "df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b"
+      },
+      {
+        "id": "technical_report_evidence_v10_manifest",
+        "path": "artifacts/technical-report/evidence-v10.manifest.json",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "134d1ae0f0a96b7999755b0b2e4352c0ce1388bddc4f5f0adc9eb744cc302d4a"
+      },
+      {
+        "id": "technical_report_evidence_v10_digest",
+        "path": "artifacts/technical-report/evidence-v10.sha256",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "898c472934cc30fc2b26aa99b63095c273e49b348430b0aedaff983c8b26666c"
+      },
+      {
+        "id": "technical_report_evidence_v10_test_receipt",
+        "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/test-receipt.json",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "5284eca94d2d9bac657f696b4b6899720c4623caf75cbaf39eda09fb4738ae72",
+        "internal_receipt_sha256": "b9407556588e5c0a65d3e93f22e29d0fdd8fd4bb57f1b5cb1c890f94c7b9d98d"
+      },
+      {
+        "id": "technical_report_evidence_v10_compatibility_junit",
+        "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/compatibility-tests.xml",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "ec375b944d0203441cdc7d4af1b3f01b6c648bba19165b98c128bdb58ba795e6"
+      },
+      {
+        "id": "technical_report_evidence_v10_focused_junit",
+        "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/focused-tests.xml",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "fc0a5b0a7fb9e0560643c9a18eefb22f852c225808f4d99b4d52ec3983e20a04"
+      },
       {
         "id": "technical_report_evidence_bundle",
         "path": "artifacts/technical-report/evidence-v9.json",
@@ -111,6 +206,49 @@
         "internal_receipt_sha256": "9d3b0cfd9c99a32ee9055741448797d3e5c72f894e0207650e37bd31da9eff9d",
         "full_log_sha256": "e12a1503ebde1400c882a90f1b49d4fb5fb274300f4f193db9e3a051c70d6e5f",
         "focused_log_sha256": "571ded85369e1747d9ae02f8dadb4b499e887168b8a5ca686edddc2248f10bbf"
+      },
+      {
+        "id": "current_backend_regression_receipt",
+        "path": "artifacts/test-runs/aurora-software-755c511/test-receipt.json",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "113307a8ee6c722d0cd4e16e245373a5637dd0ec00ba8dbee274f6a57a897f10",
+        "internal_receipt_sha256": "15e2c97e62f9d75b60a315fd62ec93a7a2f38db401e8c8817146e4e7f1fdaafe"
+      },
+      {
+        "id": "current_backend_regression_manifest",
+        "path": "artifacts/test-runs/aurora-software-755c511/attestation-manifest.json",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "0e0e0df70087e2240aba7f76cfa72a8d17acc55a674033ec4475258e2ec13267"
+      },
+      {
+        "id": "current_backend_regression_checksums",
+        "path": "artifacts/test-runs/aurora-software-755c511/checksums.sha256",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "52f73accc5f582ba0ceffb3d75f29fd948a8d1e06d801e885a19d72ec300d1ad"
+      },
+      {
+        "id": "current_backend_regression_full_log",
+        "path": "artifacts/test-runs/aurora-software-755c511/full-suite.log",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "a6b7d84a14fdb8f1dfb98591acdaca45230a15b3a60e52bf7104489d6e067958"
+      },
+      {
+        "id": "current_backend_regression_focused_log",
+        "path": "artifacts/test-runs/aurora-software-755c511/focused-suite.log",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "6cf663090b5d649976072aeecb31508e252b9a02affe5a0155329521025efad0"
+      },
+      {
+        "id": "current_backend_regression_full_junit",
+        "path": "artifacts/test-runs/aurora-software-755c511/full-suite.xml",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "4b356f314e23db202c791e5b50b946e7cfae2aa30561aa8bc1db83ef358adef9"
+      },
+      {
+        "id": "current_backend_regression_focused_junit",
+        "path": "artifacts/test-runs/aurora-software-755c511/focused-suite.xml",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "25f94a80a7b6efac04ea004a89f92e1e510af9540a063a8ced34bded917927a1"
       },
       {
         "id": "cross_job_memory_contract_artifact",
@@ -240,9 +378,98 @@
         "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/focused-tests.xml",
         "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
         "file_sha256": "67d614764b213408833f50be63c0490e27c99dbcca41f349ab6281b605fc6b8c"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_receipt",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/receipt.json",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "5cc93ee5bfb75c53f95bdd925bb3121658d9ae93d6742d2b677d489112252cc6"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_ulog",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/px4_source.ulg",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "fd01f02f7a97ee8ad3650e9687a6aa07a1197f46b76b19c1146fbe913f513f76"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_joint_log",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/actuator_failure_joint_state.log",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "f927dbb6561e912a80ae69e368cc65e14a5427640e5e83f8b933838e38e08e10"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_scenario_applied",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_effects.applied.json",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "8995d7b926c2745018a68159ef370e309c4b19370cbf1abca0b0e49c693d6458"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_focused_junit",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/focused-tests.xml",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "65e027756f66e7fe7df4ccdc2e172bf821be9fbd104b71ac5199eee939a924d5"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_preflight_attempt_0",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/preflight-failure-attempt-0.json",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "72471490aa92fb132ea01fb941557c2c8dbd3f4cb77d480fa9fc14c00a97df2d"
+      },
+      {
+        "id": "advanced_physics_closure_manifest",
+        "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.manifest.json",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3",
+        "canonical_sha256": "7193e21ff826560e9e9f4d30453dc122d55fbee054397ff4a52f89deca15cb9f"
+      },
+      {
+        "id": "advanced_physics_closure_receipt",
+        "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.receipt.json",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "1ee74f3b207d7c69e1d2cb6601bffa7d8a92f34181313c51ad22474c73995eda",
+        "internal_receipt_sha256": "6f195b2908aa8673eab3bfee56c5e6cd1254b3535c3029e652f237d8a08edc10"
+      },
+      {
+        "id": "advanced_physics_closure_digest",
+        "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.sha256",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "096aed94fe18253cc9c9ac45acb10b478cf3b38bc58930dddafc8e5909715a3f"
+      },
+      {
+        "id": "advanced_physics_closure_test_receipt",
+        "path": "artifacts/test-runs/advanced-physics-closure-f1e8fa8/test-receipt.json",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "50994da3b3385fb81411499349ee02123a26cebfa0af39a8a464588ad29eeb79"
+      },
+      {
+        "id": "advanced_physics_closure_focused_junit",
+        "path": "artifacts/test-runs/advanced-physics-closure-f1e8fa8/focused-tests.xml",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "2b95be8b9ce7ad3369ae7f8d0c2b8148acb691286a95269db9ae4fde28cda01a"
       }
     ],
     "source_references": [
+      {
+        "id": "technical_report_evidence_v10_core",
+        "path": "backend/app/orchestration/technical_report_evidence_v10.py",
+        "ref_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+        "file_sha256": "159eab14235b7e366045cec63acea1fb63a91e9cefe5da610a00085a5b292860",
+        "evidence_role": "Exact-byte provenance closure that preserves the v9, retained online-routing, offline Evidence 2.9, and advanced-physics evidence classes without pooling their claims."
+      },
+      {
+        "id": "technical_report_evidence_v10_exporter",
+        "path": "backend/scripts/export_technical_report_evidence_v10.py",
+        "ref_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+        "file_sha256": "beac18265dfb902bad2fe5abc0011d8da6e5e7ab741614cf0983e7bafcb1a041",
+        "evidence_role": "Source-bound v10 exporter and check path for the 39-source, three-CSV navigation ledger."
+      },
+      {
+        "id": "technical_report_evidence_v10_tests",
+        "path": "backend/tests/test_technical_report_evidence_v10.py",
+        "ref_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+        "file_sha256": "40f7096e9e6d263ce60de0198d0e10a80a4910af39159b8d3d6c99738115c0f4",
+        "evidence_role": "Focused tamper and compatibility assertions for v10 source lineage, release gates, and evidence-class separation."
+      },
       {
         "id": "multi_tool_budget_evaluator",
         "path": "backend/scripts/evaluate_harness_multi_tool_budget.py",
@@ -265,11 +492,18 @@
         "evidence_role": "Pinned PX4/Gazebo implementation, smoke evidence, and customer-Runtime qualification boundary."
       },
       {
+        "id": "harness_engineering_v10_alignment",
+        "path": "docs/17-harness-engineering.md",
+        "ref_commit": "755c511539fe561207ca38ff5079f471a4110896",
+        "file_sha256": "dc1b464a8df86e40c37dc0a5dbf0ad65ce2848c55ec1d625d05ff2afd8ea026b",
+        "evidence_role": "Secondary narrative alignment with v10 boundaries; this document is not a new experiment or authoritative evidence source."
+      },
+      {
         "id": "harness_contract_design",
         "path": "docs/19-llm-tool-orchestration-harness.md",
-        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
-        "file_sha256": "129676c4e6d58bb8f61fdd335da31d4c55c04cf89e4c27dcc21bce8adbe5c267",
-        "evidence_role": "Frozen contract versions, authority boundaries, and phase-qualified execution design."
+        "ref_commit": "755c511539fe561207ca38ff5079f471a4110896",
+        "file_sha256": "8b433a7662fa73f6ecf8f458a66d2e5df56c25616c43dbe949bac3fa33fc87ea",
+        "evidence_role": "Secondary contract and v10 narrative alignment; authoritative experimental fields remain bound to v10 and their original receipts."
       },
       {
         "id": "harness_phase_registry",
@@ -288,9 +522,9 @@
       {
         "id": "technical_report_evaluation_protocol",
         "path": "docs/20-technical-report-evaluation.md",
-        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
-        "file_sha256": "e3d805c2155a54b64e0a6ab6e48a542d2ef993c615933416276e1b8f094795e3",
-        "evidence_role": "Current evaluation-unit separation, Evidence v9 export boundaries, and publication protocol."
+        "ref_commit": "755c511539fe561207ca38ff5079f471a4110896",
+        "file_sha256": "a33739d11af0bbe043c816b695b72c2b7e1440d4ebf0ae309dc3c1549f996888",
+        "evidence_role": "Secondary v10-aligned evaluation-unit and publication protocol; it is not a new experiment or release receipt."
       },
       {
         "id": "technical_report_evidence_v9_digest",
@@ -529,6 +763,27 @@
         "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
         "file_sha256": "63e463e8965212091b5b1ec8ca6364ad4cf77f9b8fe251e9672325f2486aacc9",
         "evidence_role": "Authoritative file-backed GPS readiness-boundary stderr retaining the exact 30.0-second PX4 readiness timeout."
+      },
+      {
+        "id": "advanced_physics_closure_core",
+        "path": "backend/app/simulator/advanced_physics_closure_evidence.py",
+        "ref_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+        "file_sha256": "a2cde779d00a213dfe367e6e06155f59e8a276c907dfd7fadbd8f024eb608e00",
+        "evidence_role": "Exact-byte aggregator that binds the four frozen real-PX4/Gazebo source classes into the nine-category closure ledger without changing their performance denominators."
+      },
+      {
+        "id": "advanced_physics_closure_export_cli",
+        "path": "backend/scripts/export_advanced_physics_closure.py",
+        "ref_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+        "file_sha256": "2faf0cae629e9df1a55760082156b4b3502931ab80013173fb142122733aa013",
+        "evidence_role": "Exact-source export and check CLI for the advanced-physics closure v2 manifest, receipt, and digest."
+      },
+      {
+        "id": "advanced_physics_closure_tests",
+        "path": "backend/tests/test_advanced_physics_closure_evidence.py",
+        "ref_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+        "file_sha256": "087a07eb824d63fd95144efd33d107adaa601137f01cb1451bed398a9e3aa7f4",
+        "evidence_role": "Exact-source regression coverage for source-byte binding, category coverage, performance boundaries, and closure sidecars."
       }
     ]
   },
@@ -577,7 +832,7 @@
         "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
           "modified_after_migration": true,
           "current_hash_serialization": "utf8_lf",
-          "current_sha256": "cbde3018507f1c6e9a1026a6dedf218b87165f293e744d2b07278982890af991"
+          "current_sha256": "16bab9d4f8c6865f11e5487cd7d348fe1e5a4769035ad934daef72a8dd36635b"
       },
       {
         "path": "media/github-mark.png",

@@ -18,7 +18,7 @@ evidence.
 and Assurance}---is the evidence-gated Harness inside DroneDream 1.0.
 Foundation models interpret intent and rank eligible methods, while
 deterministic contracts authorize execution, evidence admission, holdout
-isolation, and final selection. The frozen
+isolation, and final selection. A retained
 Evidence 2.8 / Prompt 1.7 online routing campaign qualifies 23/24
 responses from 24 calls to the \texttt{gpt-4.1-2025-04-14} snapshot; its
 single failing case is retained, and archived prompt histories are not
@@ -36,12 +36,23 @@ effect injections but end at a 30.0-second PX4 readiness timeout; they
 are failures, not successful GPS-noise flights. A later negative-control
 Trial completes deterministic GPS denial/recovery and battery-profile
 injection with all three effects verified, but fails the 25 m/s stability
-gate at 31.211302 m/s; it is excluded from both pass numerators. Neither
-campaign proves
-optimizer superiority, broad simulator quality, obstacle avoidance,
-real-aircraft safety, simulation-to-reality transfer, or statistical
-generalization. Claims bind to frozen commits and hashes; Windows Rust
-was not run; its toolchain gate therefore remains explicitly open for publication.
+gate at 31.211302 m/s; it is excluded from both pass numerators. A separate
+hard-actuator probe physically stops motor 2 and verifies the joint-state
+read-back, yet produces no trusted evaluation window and no successful
+flight result. Closure v2 exact-byte aggregates all four source classes:
+9/9 bundled categories have real injection/read-back evidence, while only
+five categories have all retained Trials pass a performance gate. None of
+these evidence classes proves optimizer superiority, broad simulator
+fidelity, autonomous obstacle avoidance, real-aircraft safety, transfer
+from simulation to reality, or statistical generalization. Evidence v10 is
+the latest exact-byte provenance ledger,
+but it sets \texttt{release\_ready=false}: the online route is not current
+for Evidence 2.9. A later exact-source backend receipt records 1,284/1,284
+full tests and 73/73 focused tests with zero provider calls; it closes only
+the backend regression gate. Windows Rust and the report/PDF gate remain
+separate. The unresolved Windows toolchain check cannot inherit status from
+Python, rendered-report gates, or product-readiness assertions, or substitute
+for the separately frozen simulator, deployment, and release gates.
 
 \vspace{0.35em}
 \href{https://github.com/ChiZhang-805/DroneDream}{
@@ -75,13 +86,16 @@ and static-obstacle conditions; the later advanced-effects campaign
 instead repeats one seed under a fixed five-effect profile and records
 separate GPS readiness failures. A still later GPS/battery negative
 control completes its trajectory and effect checks but fails stability
-acceptance. All three numerators, failures, environments, and permissible
+acceptance. A separate hard-actuator probe verifies SDF injection and
+joint-state read-back but never establishes a trusted flight-evaluation
+window. All four evidence units, failures, environments, and permissible
 claims remain distinct. That separation allows additional Runtime evidence
 to strengthen implementation coverage without converting heterogeneous
 Trials into a pooled reliability estimate or optimizer comparison.
 Reviewers can reproduce each denominator without inferring that a new
 disturbance profile enlarges the earlier matrix or supplies missing
-independent seeds for broader inference at release.
+independent seeds for broader inference at release or erases retained
+failures from any later customer-facing denominator during review.
 
 Foundation models provide a useful interface layer, but not experimental
 authority. Tool-using agent systems show that model reasoning becomes
@@ -276,6 +290,18 @@ with every filtered alternative and its rejection basis during later
 replay without changing the frozen source identity or claim scope in
 audit review.
 
+\textbf{Authority narrows monotonically across the chain.} A later stage
+may restrict an earlier proposal, but it may not broaden the scenario,
+budget, tool, or evidence eligibility without issuing a new bound claim.
+During retry, a worker may reacquire a lease and replay the same immutable
+input; a changed Runtime, scenario digest, or acceptance predicate instead
+creates a new evidence identity and preserves the prior attempt. Publication
+obeys the same rule: a summary may project admitted fields from retained
+receipts, but it cannot repair a failed gate, infer an absent metric, or pool
+denominators whose scenario and seed structures differ. Figure 1 is therefore
+a claim-authority map, not merely a generic model-to-tool agent workflow for
+later review, replay, and independent audit.
+
 \noindent\makebox[\linewidth][c]{%
 \includegraphics[width=6.50000in,height=2.54583in]{media/media/image3.png}}
 
@@ -458,6 +484,9 @@ a simulator crash, stale callback, or evaluation-only result from being
 learned as if it described the quality of a parameter set. The retained
 experiment ledger makes every quarantine decision independently
 inspectable without allowing the rejected observation to affect later search.
+Replay also rejects a status-preserving row whose receipt schema or source
+identity has drifted. Replay authority therefore follows immutable bytes,
+not a reused terminal label.
 \looseness=-1
 
 \section{\texorpdfstring{\textbf{4. Experiments and
@@ -476,10 +505,10 @@ silently promoted beyond their declared evidence class in any
 publication-facing claim during external review, customer acceptance, or
 independent replay of the frozen release.
 
-\subsection{\texorpdfstring{\textbf{4.1 Current and archived
-development-routing evidence}}{4.1 Current and archived development-routing evidence}}\label{development-routing-evidence}
+\subsection{\texorpdfstring{\textbf{4.1 Retained and archived
+development-routing evidence}}{4.1 Retained and archived development-routing evidence}}\label{development-routing-evidence}
 
-The current online artifact binds Evidence 2.8, Prompt 1.7, Tool 2.1,
+The retained online artifact binds Evidence 2.8, Prompt 1.7, Tool 2.1,
 the \texttt{gpt-4.1-2025-04-14} model snapshot, JSON-schema responses,
 temperature 0, top-\emph{p} 1, seed 20260728, and the same 24-case
 development corpus. Its 24 provider calls completed in 77.8 seconds.
@@ -490,7 +519,10 @@ the best constant, and 2/3 in every category; tight budget is the lowest
 category at exactly 2/3. The seed does not make provider output
 deterministic, and qualification applies only to this exact frozen call
 set, snapshot, controls, corpus, and scoring rule used for that
-qualification decision and no broader release.
+qualification decision and no broader release. Evidence v10 marks this
+route \texttt{contract\_current=false} because the current software
+contract is Evidence 2.9; no Evidence 2.9 online campaign is claimed until
+a separate exact-contract online freeze is retained for review.
 
 The sole failure, \texttt{tight\_budget\_expensive\_matrix}, selected
 TuRBO where the accepted set was multi-fidelity MOBO or the optimizer
@@ -506,7 +538,7 @@ deployment.
 
 \begin{center}
 \begingroup
-\refstepcounter{table}\textnormal{Table \thetable: Current and archived routing accuracy}\par
+\refstepcounter{table}\textnormal{Table \thetable: Retained and archived routing accuracy}\par
 \vspace{0.22em}
 \small
 \renewcommand{\arraystretch}{0.92}
@@ -516,8 +548,8 @@ deployment.
 \textbf{Comparator} & \textbf{Acceptable selections} & \textbf{Evidence
 treatment}\tabularnewline
 \midrule
-Current Prompt 1.7 online freeze & 23/24 & Qualified exact-contract
-campaign\tabularnewline
+Retained Prompt 1.7 online freeze & 23/24 & Qualified Evidence 2.8
+campaign; not current for 2.9\tabularnewline
 Prompt 1.6 archived freeze & 24/24 & Historical development
 qualification\tabularnewline
 Prompt 1.5 first freeze & 19/24 & Unqualified\tabularnewline
@@ -534,7 +566,7 @@ expectation\tabularnewline
 \endgroup
 \end{center}
 
-The current 23/24 current-contract qualification retains its one
+The retained 23/24 qualification preserves its one
 tight-budget miss instead of normalizing it away. The first Prompt 1.5
 freeze missed five cases; the 21/24 repeat retained three of those errors,
 and the archived Prompt 1.6 freeze selected acceptable tools for all 24
@@ -546,7 +578,7 @@ necessary before any revision receives causal credit or publication.
 \noindent\makebox[\linewidth][c]{%
 \includegraphics[width=5.40in]{media/media/image4.png}}
 
-\emph{Figure 2. Acceptable selection rates for the current Evidence 2.8 /
+\emph{Figure 2. Acceptable selection rates for the retained Evidence 2.8 /
 Prompt 1.7 online freeze, the archived Evidence 2.7 / Prompt 1.6 freeze,
 and corpus baselines. The unpaired results are not a causal prompt
 comparison, optimizer outcome, or simulator result.}
@@ -625,6 +657,17 @@ enforcement; it estimates neither customer frequency nor optimizer benefit
 in physical controller campaigns or release decisions across independently
 retained seed blocks and later acceptance reviews.
 
+\textbf{Ablation scoring is row-level before it is aggregate.} Every probe
+names one expected admission decision and one source guard, and the verifier
+compares the exact Boolean result before computing group totals. Partial credit
+cannot hide a leaked holdout row, an untrusted provider observation, an
+incompatible tool, or a missing scenario profile. The weakened arm changes
+only its named guard, so a discrepancy localizes contract enforcement while
+unchanged rows remain controls. This design supports a source-boundary
+diagnosis, not a frequency estimate for production failures or an estimate of
+physical controller benefit across broader operational distributions or
+deployment settings.
+
 \Needspace{11\baselineskip}
 \begin{center}
 \begingroup
@@ -686,7 +729,9 @@ replace the failed observation or silently create a second eligible
 outcome. Any discrepancy remains a failed equivalence check rather than
 being normalized into a shared terminal status or aggregate. The receipt
 records the mismatched field and preserves the affected seed block for
-replay.
+replay. The audit also compares attempt ordinals, Candidate ancestry, budget,
+and receipt paths, preventing equal loss from masking a replacement execution
+or a rewritten provider failure.
 \looseness=-1
 
 \Needspace{6\baselineskip}
@@ -725,7 +770,8 @@ coverage from recovery performance. The matching fields are deliberately
 stricter than terminal status alone: Candidate inventory, Trial
 denominator, winner identity, loss, failures, and receipt completeness
 must agree within each seed block. A shared \texttt{COMPLETED} label
-without that identity-level equality would fail the frozen comparison.}
+without that identity-level equality would fail the frozen comparison. A
+later claim must reproduce this identity-level match before aggregation.}
 
 \subsection{\texorpdfstring{\textbf{4.5 Tool-use
 behavior}}{4.5 Tool-use behavior}}\label{tool-use-behavior}
@@ -795,7 +841,12 @@ export, and evidence recomputation across ten scenario schemas. The local
 adapter uses frozen seeds and coefficients; no PX4, Gazebo, vehicle
 dynamics, network provider, or customer credential is involved. The
 result tests orchestration and evidence flow only; it does not establish
-controller quality, simulator fidelity, physical performance, deployment safety, or simulation-to-reality transfer.}
+controller quality, simulator fidelity, physical performance, deployment
+safety, or simulation-to-reality transfer. Its admissible use is to verify
+that case-separated inputs, failures, and terminal evidence traverse the
+same frozen ledger and can be independently recomputed without a live
+provider or vehicle. Any later physical claim requires a separately pinned
+Runtime, physical receipts, and an independently recomputed denominator.}
 
 Simulation-queue behavior is also an experimental-validity concern.
 Execution Claim Gate 1.1 binds each authorized Trial to a
@@ -988,33 +1039,66 @@ passing one: observed position speed reaches 31.211302 m/s against the
 25 m/s policy limit, so \texttt{pass\_flag=false} despite RMSE
 0.345207 m, maximum error 1.498568 m, and coverage 0.983807.
 
+A still later exact-commit probe binds implementation \texttt{793f020} to
+software head \texttt{2da6a4f}. In an 82-second WSL
+DroneDreamRuntime/PX4 v1.16/Gazebo 8.14 x500 run, the generated SDF sets
+motor 2 maximum rotational velocity to zero while the other three motors
+remain at 1,000 rad/s. Joint-state read-back records 641 target samples
+with maximum absolute velocity $8.93786\times10^{-7}$ rad/s, below the
+0.05 rad/s hard-stop limit; each healthy rotor contributes 653 samples
+and reaches approximately 100 rad/s, above the 1.0 rad/s motion threshold.
+Runner and acceptance commands exit zero and leave no residual process,
+but \texttt{trial\_success=false}: no trusted evaluation window is
+established. The evidence therefore verifies actuator-failure injection
+and read-back only, not flight performance, stable control, fault recovery,
+or another passing campaign record under this dedicated probe.
+
+The closure-v2 ledger exact-byte aggregates four source classes while preserving
+their individual receipts, outcomes, and denominators. All 9/9 bundled
+physical-effect categories now have real PX4/Gazebo injection and read-back
+evidence, and none requires a further Runtime implementation extension. Only
+five categories have every retained Trial pass its performance gate, so the
+coverage count denotes exercised mechanisms rather than nine performance
+passes. The ledger retains each readiness, policy-failure, and no-window
+boundary from its source receipt.
+
+\Needspace{25\baselineskip}
+\begin{center}
+\begingroup
+\footnotesize
+\renewcommand{\arraystretch}{1.02}
+\setlength{\tabcolsep}{4pt}
+\textnormal{Unified advanced-physics closure matrix (v2)}\par
+\vspace{0.16em}
+\begin{tabular}{@{}L{0.14\linewidth}L{0.20\linewidth}L{0.16\linewidth}L{0.17\linewidth}L{0.25\linewidth}@{}}
+\toprule
+\textbf{Category} & \textbf{Injection/read-back} & \textbf{Trial completion} &
+\textbf{Performance gate} & \textbf{Residual boundary}\tabularnewline
+\midrule
+Steady wind & ENU wind read-back & 2 seed Trials & All retained pass &
+x500/default-world matrix only\tabularnewline
+Obstacles & Create reply and SDF hash & 2 seed Trials & All retained pass &
+No avoidance or collision-response claim\tabularnewline
+Gust/turbulence & Generated-SDF read-back & 3 same-seed Trials &
+All retained pass & No distribution across seeds\tabularnewline
+Sensor noise & Barometer/IMU flight; GPS readiness & Mixed &
+Not all retained pass & GPS-noise flights stop at readiness\tabularnewline
+Payload mass/inertia & Generated-SDF read-back & 3 same-seed Trials &
+All retained pass & One configured payload profile\tabularnewline
+First-order delay & Generated-SDF read-back & 3 same-seed Trials &
+All retained pass & No hard-fault recovery claim\tabularnewline
+Deterministic GPS denial & Parameter, MAVSDK, and ULog & 1 completed Trial &
+Policy failed & Fixed schedule, not probability law\tabularnewline
+Battery initial/sag & Parameter and telemetry & Same completed Trial &
+Policy failed & No depleted-battery qualification\tabularnewline
+Hard actuator stop & SDF and joint-state log & No trusted scoring window &
+No score & No stable-control or recovery claim\tabularnewline
+\bottomrule
+\end{tabular}
+\endgroup
+\end{center}
+
 \begin{itemize}
-\item
-  Execution boundary --- the dedicated Runtime records 6/6 successful,
-  passing Trials for exactly two seeds and three x500 scenarios; this
-  verifies the retained matrix, not a wider reliability distribution,
-  optimizer advantage, released customer-performance claim, or
-  cross-scenario reliability estimate across independently repeated
-  installations and audits.
-\item
-  Advanced-effects boundary --- the three passing same-seed trajectories
-  authorize only the five exercised effect applications and their
-  retained metrics; they do not enlarge the two-seed scenario matrix,
-  establish an optimizer comparison, or support a broad stability,
-  safety, customer-Runtime, real-aircraft, or sim-to-real claim.
-\item
-  GPS boundary --- the two failed readiness attempts preserve their
-  timeout denominator and prove only six-effect injection/read-back. They
-  are excluded from the three successful trajectories and from every
-  performance statistic because neither produced a successful
-  GPS-noise flight, admissible trajectory outcome, or frozen pass flag.
-\item
-  GPS/battery negative-control boundary --- the later Trial proves
-  deterministic denial/recovery, battery initial-state and voltage-sag
-  injection/read-back, and completed trajectory execution. Its failed stability
-  gate remains the outcome: it cannot enter the earlier 3/3 or 6/6 pass
-  numerator, qualify the capability as a whole, or support endurance,
-  safety, or broad-stability claims.
 \item
   Injection boundary --- both wind runs retain ENU $(0,2,0)$ m/s
   read-back, and both obstacle runs retain successful create replies plus
@@ -1132,6 +1216,19 @@ claim because it cannot distinguish an intended omission from missing
 evidence, a timeout, or a post-outcome deletion. The same rule applies to
 appendix tables and customer-facing exports.
 
+The analysis receipt must also freeze the statistic implementation, units,
+pairing key, interval method, multiplicity treatment, and minimum evidence
+required for each claim. A reviewer should be able to rebuild the primary
+table from Trial-level rows without consulting a dashboard cache or manually
+transcribed spreadsheet. If a planned metric cannot be computed, its cell
+remains unavailable with a declared reason; a correlated diagnostic cannot
+silently replace it after outcomes are visible. Any exploratory post-hoc
+analysis is labeled separately, retains the same failure denominator, and
+cannot satisfy the preregistered publication gate. This keeps analysis-code
+changes, missing measurements, and selective metric substitution visible as
+protocol events rather than allowing them to become unrecorded researcher
+degrees of freedom in the final comparison after outcomes are known.
+
 \section{\texorpdfstring{\textbf{6. Product reliability and
 operations}}{6. Product reliability and operations}}\label{product-reliability-and-operations}
 
@@ -1213,10 +1310,11 @@ deployment receipt.
   software-contract scope and do not inherit assurance from the mock,
   WSL, or policy-only artifacts reported here.
 \item
-  The current Evidence 2.8 / Prompt 1.7 online freeze qualifies at 23/24
-  for one model snapshot and 24 calls; it establishes neither broad model
+  The retained Evidence 2.8 / Prompt 1.7 online freeze qualifies at 23/24
+  for one model snapshot and 24 calls, but Evidence v10 marks it not
+  current for Evidence 2.9. It establishes neither broad model
   generalization nor optimizer, simulator, flight-performance, or safety
-  gain.
+  gain for the current or any broader operational population.
 \item
   Evidence 2.9 exercises equal-budget scripted multi-tool planning and
   accounting over three seed blocks, six arm runs, and 12/12 accounted
@@ -1282,13 +1380,15 @@ deployment receipt.
   records cannot be pooled with the six-Trial scenario matrix or recast
   as a larger success rate, and the bundle claims no Gazebo version.
 \item
-  Deterministic GPS denial/recovery and battery initial-state plus
+  Closure v2 records no remaining Runtime extension for any of the nine
+  bundled effect categories, yet only five categories have all retained
+  Trials pass their performance gate. Deterministic GPS denial/recovery and battery initial-state plus
   voltage-sag injection are now verified in one completed Trial, but its
   31.211302 m/s speed violates the 25 m/s stability gate. Probability-law
   behavior across seeds, probabilistic GPS dropout endurance,
   depleted-battery stability,
-  combined-fault qualification, and hard actuator failure beyond the
-  bounded first-order delay profile remain unproved.
+  combined-fault qualification, trusted flight evaluation under the
+  verified motor-2 hard stop, and fault-tolerant recovery remain unproved.
 \item
   Optimizer comparison, physical component ablation, confidence
   intervals, cost/latency measurement, and UX telemetry remain pending.
@@ -1303,6 +1403,15 @@ deployment receipt.
   reported as a protocol difference rather than hidden inside a pooled
   ranking.
 \end{itemize}
+
+Experiment priority follows the claim gap, not implementation novelty. First,
+repeat the retained physical matrices with wider preregistered seed blocks and
+an independently rebuilt signed Runtime; second, establish trusted scoring
+windows for the GPS/battery and hard-actuator mechanisms; only then compare
+matched optimizer arms. This order prevents a larger software feature surface
+from being mistaken for stronger physical qualification and gives every new
+result a denominator that can be audited before any superiority claim or
+release decision.
 
 \subsection{\texorpdfstring{\textbf{7.1 Threats to
 validity}}{7.1 Threats to validity}}\label{threats-to-validity}
@@ -1358,8 +1467,8 @@ audit.
 External validity is bounded by controller, vehicle, world, and
 disturbance combinations actually executed. Many Trials in one x500
 setup do not cover fixed-wing vehicles, broader payload geometries,
-actuator saturation or hard failure, estimator dropout, battery voltage
-sag, or other controller structures. A broader
+actuator saturation or evaluated recovery from hard failure, estimator
+dropout, battery voltage sag, or other controller structures. A broader
 benchmark therefore needs a declared scenario matrix with held-out
 combinations, not a convenient collection of worlds. Every cell must
 explain its distinct operating condition, mutable parameters, and
@@ -1369,7 +1478,9 @@ mean cannot conceal a systematic failure in one operationally important
 subgroup or declared scenario family under final evaluation before a
 broader cross-platform claim is admitted or published across all
 preregistered vehicle, disturbance, energy, and fault families in
-external review.
+external review, together with their frozen acceptance predicates,
+denominators, and failure rules. These limits remain explicit in every
+vehicle-family table and customer-facing release claim.
 
 Measurement validity requires more than scalar holdout loss: retain
 trajectory error, settling time, overshoot, control effort, saturation,
@@ -1412,20 +1523,55 @@ For external recomputation, the registry must enumerate the planned and
 realized seed block for every arm and preserve unavailable cells. A
 verifier should reproduce each table from that registry without querying
 application state or choosing a favorable subset after observing outcomes
-during publication preparation, customer review, or independent audit.
+during publication preparation, customer review, or independent audit. The
+registry must also bind the scoring implementation, exclusion taxonomy, and
+interval procedure to a versioned digest. Independent reviewers can then
+distinguish an unavailable measurement from a removed failure and can test
+the registered estimator without selecting a more favorable analysis after
+the matched outcomes become visible.
+The same digest also binds every table label and summary heading to the
+published claim inventory.
 
 \section{\texorpdfstring{\textbf{8. Reproducibility and source
 ledger}}{8. Reproducibility and source ledger}}\label{reproducibility-and-source-ledger}
 
-Figures 3, 5, and 6 trace to evidence bundle v9, canonical SHA-256 prefix
+Evidence v10 is the latest software provenance navigation ledger. Exporter
+source \texttt{9749244} is frozen at \texttt{a1f091f}; its bundle file and
+canonical SHA-256 prefixes are \texttt{27b6b1c96524}/
+\texttt{df6ef5e89851}, and its manifest file prefix is
+\texttt{134d1ae0f0a9}. The export exact-byte revalidates 39 sources,
+including the 1,651,339-byte, 554-Trial component ablation, and publishes
+three CSV projections without replacing any upstream receipt. Its 70/70
+compatibility and 7/7 focused tamper checks bind receipt file/internal
+prefixes \texttt{5284eca94d2d}/\texttt{b9407556588e}.
+
+The v10 ledger preserves four distinct lineages: the v9 cross-Job base at
+\texttt{c1222c9}/\texttt{8102ffe}; the retained 24-call online route at
+\texttt{aeffaae}/\texttt{ef00362}; offline Evidence 2.9 multi-tool evidence
+at \texttt{136a1e3}/\texttt{15603c6}; and advanced physics at
+\texttt{f1e8fa8}/\texttt{83982f3}. The online 23/24 result remains qualified
+for Evidence 2.8 / Prompt 1.7 but is not current for Evidence 2.9. Evidence
+2.9 remains scripted/mock with 3/3 budget-parity blocks and zero network,
+provider, or credential use; physics remains 9/9 mechanism coverage with
+only five performance-successful categories. The ledger explicitly sets
+\texttt{release\_ready=false}; it is not a current-source regression,
+Windows Rust, report/PDF, deployment, or final release receipt.
+Later documentation-alignment head \texttt{755c511} changes only engineering
+documents 17, 19, and 20. Their hashes are secondary narrative references;
+they neither add an experiment nor override the v10 bundle, manifest, and
+receipt as the authoritative evidence sources.
+
+Figures 3, 5, and 6 trace to the v9 base bundle retained inside v10,
+canonical SHA-256 prefix
 \texttt{d33c308ce3b47138}; Figure 1 is a schematic. Figures 2 and 4 also
-consume the current online-routing artifact at software head
+consume the retained online-routing artifact at software head
 \texttt{ef00362}, file SHA-256 prefix \texttt{d2359e0540aa}. Its
 manifest file and canonical prefixes are \texttt{6b625b8c0a6a} and
 \texttt{3ab3830ecf79}; implementation source is
 \texttt{aeffaae01a81}. The exact 24 provider calls completed in
 77.8 seconds and were independently regraded without rerunning the
-campaign, contacting the provider again, or mutating evidence.
+campaign, contacting the provider again, or mutating evidence. The retained
+bytes remain the sole authority for every plotted selection and score alike.
 
 Evidence 2.9 is separately bound to source \texttt{136a1e3} and evidence
 head \texttt{15603c6}. Its artifact file and internal SHA-256 prefixes
@@ -1438,7 +1584,18 @@ equal-budget, scripted/mock plan-history and accounting contract under
 the frozen mock Runtime; they authorize no online planning-quality or
 optimizer-outcome claim.
 
-The v9 bundle separately binds \texttt{c1222c9} to receipt head
+The current backend regression receipt binds subject \texttt{755c511} to
+receipt head \texttt{1e542b7}. Its exact-final full suite records
+1,284/1,284 tests in 831.79 seconds, and its focused supplement records
+73/73 in 29.73 seconds. \texttt{OPENAI\_API\_KEY} was removed before both
+runs and real provider calls remain zero. Receipt file/internal prefixes
+are \texttt{113307a8ee6c}/\texttt{15e2c97e62f9}; attestation-manifest and
+checksum-sidecar prefixes are \texttt{0e0e0df70087} and
+\texttt{52f73accc5f5}. This receipt proves the enumerated backend software
+regression only; it does not qualify frontend, desktop, Rust, release,
+physical performance, customer environments, or deployment targets.
+
+The historical upstream v9 base separately binds \texttt{c1222c9} to receipt head
 \texttt{8102ffe}. Its exact-source logs record 1,204/1,204 tests in
 854.71 seconds plus 28/28 focused checks in 6.98 seconds; receipt wall
 intervals are 864.488 and 8.451 seconds. Ruff and mypy remain
@@ -1446,7 +1603,8 @@ unreceipted, and Windows Rust was not run. Cross-Job artifact and manifest
 canonical prefixes are \texttt{e1abf46c2aa44e9b} and
 \texttt{b8d55e358d5642cb}; the ten-case evaluation is deterministic
 in-memory SQLite evidence rather than an online provider or simulator
-study, physical-performance result, or deployment qualification.
+study, physical-performance result, or deployment qualification. Its result
+remains bounded to those ten named contract fixtures and lifecycle checks.
 
 The physical campaign independently binds \texttt{86273db} to
 \texttt{3b09951}. Manifest file and canonical prefixes are
@@ -1474,7 +1632,9 @@ the full inventory with prefix \texttt{125463206a7965b3}. Its three
 successful trajectories, two GPS readiness boundaries, one file-backed
 preflight failure, and three non-machine-verified terminal preflights
 remain separate evidence classes and denominators. This separation
-prevents a failed readiness probe from becoming flight evidence.
+prevents a failed readiness probe from becoming flight evidence and preserves
+the sampled environment and same-seed boundary for later comparison and
+independent replay.
 
 The later GPS/battery negative control binds evidence head
 \texttt{2f1caae}; its implementation commit is \texttt{fdf1250}. The
@@ -1487,12 +1647,39 @@ failed stability acceptance. Its attempt-16 lineage also retains two
 MAVLink command-420 arrivals with zero acknowledgments before the supported
 \texttt{SIM\_GPS\_USED} mechanism replaced the unavailable
 SimulatorMavlink failure-handler path in the exact frozen Runtime lineage.
+That sequence remains failure lineage rather than a successful alternative
+transport path in retained evidence.
+
+The hard-actuator probe separately binds implementation \texttt{793f020}
+to evidence head \texttt{2da6a4f}. Receipt, ULog, and joint-state prefixes
+are \texttt{5cc93ee5bfb7}, \texttt{fd01f02f7a97}, and
+\texttt{f927dbb6561e}; the 138-test JUnit prefix is
+\texttt{65e027756f66}, and attempt-0 preflight lineage is
+\texttt{72471490aa92}. The receipt preserves runner and acceptance
+exit zero, 82 seconds, zero residual processes, physical-effect
+verification, and \texttt{trial\_success=false} because the trusted
+evaluation window is absent. It authorizes an injection/read-back claim,
+not a flight, stability, recovery, or campaign-pass claim under any
+customer, publication, or cross-installation performance denominator.
+
+Closure v2 binds aggregator source \texttt{f1e8fa8} to frozen head
+\texttt{83982f3}. Its manifest file/canonical prefixes are
+\texttt{5345cd6b7fa7}/\texttt{7193e21ff826}; receipt
+file/canonical prefixes are
+\texttt{1ee74f3b207d}/\texttt{6f195b2908aa}; and the 52/52
+exact-subject test receipt prefix is \texttt{50994da3b338}. The
+aggregator verifies the exact bytes of all four source classes, reports
+9/9 mechanism categories covered, and reports only five categories with
+all retained Trials performance-successful. Its empty Runtime-extension
+list closes implementation coverage, not the failed or absent performance
+gates preserved by those source receipts and their non-exchangeable
+denominators in every later release.
 
 Execution Claim Gate 1.1 and Outcome Contract 2.20 bind each
 Trial/Candidate/Job snapshot and scenario matrix before evidence
 admission. Evidence 2.8 / Prompt 1.7 / Decision Trace 1.4 binds the
 cross-Job memory contract and its \textbf{observational\_not\_causal}
-projection. The current online freeze qualifies at 23/24 for its exact
+projection. The retained online freeze qualifies at 23/24 for its exact
 model snapshot and controls, while the archived Prompt 1.6 freeze records
 24/24 and Prompt 1.5 histories remain visible at 19/24 and 21/24. These
 unpaired observations are not causal prompt evidence. Policy holdout passes 16/16,
@@ -1538,12 +1725,12 @@ DroneDream 1.0 positions AURORA as an evidence-gated Harness for UAV
 controller optimization in simulation: model reasoning interprets intent
 and coordinates eligible methods, while deterministic contracts retain
 authority over inputs, execution, evidence admission, and completion.
-The frozen release demonstrates exercised software boundaries through
+The frozen evidence set demonstrates exercised software boundaries through
 routing, holdout-policy, guard-ablation, fallback-equivalence,
 claim-receipt, case-separated feedback, and a 10/10 cross-Job memory
 contract evaluation. That memory result is observational and
 non-causal; it establishes only the enumerated software fixtures. The
-current 23/24 online routing qualification is likewise bounded to 24
+retained 23/24 online routing qualification is likewise bounded to 24
 calls, one frozen model snapshot, and the exact development corpus
 retained for review.
 
@@ -1575,7 +1762,31 @@ capability-wide qualification, or a larger campaign success rate under
 any release or customer-qualification denominator or evidence class in a
 signed Runtime.
 
-Neither evidence
+A subsequent hard-actuator probe separately verifies a motor-2 SDF hard
+stop and joint-state response while retaining
+\texttt{trial\_success=false} because no trusted evaluation window is
+established. It is mechanism evidence, not evidence of stable flight,
+fault-tolerant recovery, or an additional passing Trial under this probe.
+
+Closure v2 unifies these exact-byte sources as a navigation ledger: 9/9
+bundled categories have real injection/read-back evidence, while only five
+categories have all retained Trials pass their performance gate. The
+readiness, policy-failure, and no-window records remain distinct rather
+than being converted into a nine-category performance result.
+
+Evidence v10 binds these lineages into the latest 39-source provenance
+ledger, not a new pooled experiment. It preserves the online route as a
+qualified Evidence 2.8 / Prompt 1.7 record while marking it not current for
+Evidence 2.9; it also keeps the Evidence 2.9 budget closure offline and
+scripted. At the v10 freeze, current-source full regression, Windows Rust,
+and the report/PDF gates remained outside that software export, so its
+authoritative \texttt{release\_ready=false} field prevents provenance closure
+from being misreported as final product or publication readiness. The later
+1,284-test backend receipt closes one external gate without mutating v10 or
+supplying Windows Rust, report/PDF, frontend, desktop, customer-facing
+deployment, or physical qualification independently.
+
+None of these evidence
 class establishes optimizer superiority, broad stability, collision
 avoidance, signed customer-Runtime acceptance, real-aircraft safety, or
 simulation-to-reality transfer. The next decisive step is therefore a
@@ -1583,7 +1794,7 @@ larger matched-arm campaign plus signed-Runtime repetition and independent
 recomputation, without weakening AURORA's provenance and leakage
 boundaries during later evidence campaigns or releases.
 
-The current release therefore changes what future experiments can safely
+The current evidence closure therefore changes what future experiments can safely
 assert before it changes the empirical flight result itself. Claim v3,
 Outcome Contract 2.20, input/outcome/scenario drift rejection, and
 cross-Job fair scheduling make concurrent attempt counts, parameter
@@ -1607,9 +1818,10 @@ the final registry.
 \setlength{\parskip}{0.18em}
 
 \protect\hypertarget{ref_1}{}{}{[}1{]} DroneDream, ``Release evidence
-ledger,'' ver. 1.2, evidence bundle v9, current online-routing freeze,
+ledger,'' ver. 1.3, evidence v10 provenance closure, retained online-routing freeze,
 offline multi-tool budget closure, and real-PX4 physical campaign
-receipts, software evidence head \texttt{2f1caae}, Jul. 2026.
+receipts including advanced-physics closure v2, software evidence head
+\texttt{a1f091f}, Jul. 2026.
 
 {\RaggedRight
 \protect\hypertarget{ref_2}{}{}{[}2{]} PX4 Development Team,
@@ -1808,14 +2020,14 @@ qualification claim.
 \textbf{Verification surface} & \textbf{Cases} & \textbf{Passed} &
 \textbf{Claim boundary}\tabularnewline
 \midrule
-Subject-focused supplement & 28 & 28 & Memory/routing/report/evidence
-paths\tabularnewline
+Historical v9 focused supplement & 28 & 28 & Memory/routing/report/evidence
+paths at \texttt{c1222c9}\tabularnewline
 Frontend validation receipt & 325 & 325 & Tests plus
 typecheck/lint/build\tabularnewline
 Report layout contract & Recomputed & Required & Rendered body/list
 policy\tabularnewline
-Backend validation receipt & 1,204 & 1,204 & Exact-final full run;
-28-check focused supplement\tabularnewline
+Current backend validation receipt & 1,284 & 1,284 & Exact-final full run;
+73-check focused supplement\tabularnewline
 \bottomrule
 \end{tabular}
 \endgroup
@@ -1844,7 +2056,12 @@ Missing receipts stay unavailable, failures stay in the denominator, and
 prose cannot invent causes. Free pages receive a native vector seal after
 pagination; authenticated Plus and Pro pages omit it. Redirects cannot
 change tier, trace, or stable bytes, and the contract does not qualify
-controller, simulator, or real-aircraft performance.
+controller, simulator, or real-aircraft performance. Every projected claim
+keeps its exact source-ledger pointer, while unavailable rows remain explicit
+across localized exports.
+
+Localized presentation changes formatting only; evidence disposition and
+source identity remain invariant across every generated language variant.
 \looseness=-1
 
 \subsection{\texorpdfstring{\textbf{A.3 Qualification
@@ -1863,6 +2080,11 @@ readiness timeouts prove injection only and are not successful flights.
 The later GPS/battery negative control verifies deterministic effect
 application and Trial completion but fails its stability gate, so it
 qualifies neither a passing trajectory nor the capability as a whole.
+The hard-actuator probe verifies injection and physical read-back but not
+a trusted flight-evaluation window, stable control, or fault recovery.
+Closure v2 therefore closes the nine-category Runtime mechanism inventory
+while preserving only five categories as performance-successful across
+all retained Trials; it is not a nine-category performance qualification.
 Customer qualification still needs matched arms, wider
 seed blocks, signed-Runtime repetition, retained failures, and independent
 recomputation; flight safety and sim-to-real transfer remain unclaimed.
@@ -1951,11 +2173,34 @@ Budget policy\tabularnewline
 \subsection{\texorpdfstring{\textbf{A.6 Evidence-source
 ledger}}{A.6 Evidence-source ledger}}\label{a.6-evidence-source-ledger}
 
+This ledger is a routing index rather than an aggregate score. Each row fixes
+four independent coordinates: the evidence surface, its exercised denominator,
+the source identity that owns the bytes, and the narrowest claim those bytes
+authorize. Rows therefore remain separate even when they concern the same
+Harness feature or Runtime. A newer navigation ledger may verify that earlier
+objects are present and unchanged, but it cannot merge their denominators,
+upgrade an injection read-back into a performance pass, make an offline mock
+campaign online, or replace a failed readiness boundary with a successful
+flight. Reviewers should follow the source ID to the report manifest and then
+recompute the listed hash from the upstream Git object before relying on any
+scale or result stated below. The scale column is descriptive, not
+interchangeable: calls, Jobs, Trials, probes, categories, and browser tests
+remain protocol-specific units. A denominator can change only through a newly
+frozen source that preserves earlier failures, identifies the row it supersedes,
+and passes the same ancestry and digest checks. Otherwise, both versions remain
+separately historical, and no row contributes to a combined pass rate or
+release-readiness decision. This keeps the table auditable without implying a
+shared population, denominator, qualification threshold, or release surface.
+No count may move between rows without first naming, freezing, and validating
+the new protocol-specific evidence object, denominator, and acceptance rule.
+
 \begingroup
 \footnotesize
 \renewcommand{\arraystretch}{0.92}
 \Needspace{13\baselineskip}
 \begin{center}
+\begin{minipage}{\linewidth}
+\centering
 \refstepcounter{table}\textnormal{Table \thetable: Evidence-source and claim-boundary ledger}\par
 \vspace{0.12em}
 \begin{tabular}{@{}L{0.25\linewidth}C{0.15\linewidth}L{0.21\linewidth}L{0.31\linewidth}@{}}
@@ -1963,8 +2208,10 @@ ledger}}{A.6 Evidence-source ledger}}\label{a.6-evidence-source-ledger}
 \textbf{Evidence surface} & \textbf{Scale} &
 \textbf{Source ID} & \textbf{Authorized claim}\tabularnewline
 \midrule
-Current online routing & 23/24; 24 calls & Evidence 2.8 / Prompt 1.7 &
-Exact-contract development qualification\tabularnewline
+Evidence v10 ledger & 39 sources; 3 CSV & Provenance closure v10 &
+Latest navigation ledger; release-ready false\tabularnewline
+Retained online routing & 23/24; 24 calls & Evidence 2.8 / Prompt 1.7 &
+Qualified retained campaign; not current for Evidence 2.9\tabularnewline
 Provider routing freezes & 19/24, 21/24, 24/24 & Prompt 1.5 / 1.6 &
 Archived development routing only\tabularnewline
 Cross-Job memory contract & 10/10 & Evidence 2.8 / Prompt 1.7 &
@@ -1988,10 +2235,15 @@ Advanced-physics PX4/Gazebo & 3 passing; 2 readiness timeouts; 1 file failure &
 Advanced physics v1 & Five-effect trajectories; GPS injection boundary\tabularnewline
 GPS/battery negative control & 1 completed; stability gate failed &
 Runtime receipt v1 & Injection/read-back only; excluded from pass rates\tabularnewline
+Hard-actuator probe & 1 injection verified; no trusted window &
+Actuator receipt v1 & SDF/joint read-back only; no flight claim\tabularnewline
+Advanced-physics closure & 9/9 covered; 5 performance-qualified &
+Closure v2 & Navigation ledger; no pooled pass rate\tabularnewline
 Website validation chain & 325 tests; 5 routes & Typography receipt v1 &
 Local validation only; no deployment\tabularnewline
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{center}
 \endgroup
 
@@ -2195,8 +2447,9 @@ reliability, real-aircraft safety, or simulation-to-reality transfer.
 The later negative control verifies deterministic GPS denial/recovery and
 battery-profile injection, but not a passing stability outcome, probability
 law across seeds, dropout endurance, depleted-battery qualification, or
-capability-wide acceptance. Hard actuator failure beyond bounded
-first-order delay remains unimplemented.
+capability-wide acceptance. The later hard-actuator probe verifies a
+motor-2 stop at the SDF and joint-state layers, but not a trusted flight
+evaluation, stable control, or fault-tolerant recovery.
 
 The two state vectors are preserved independently. The execution vector is
 \texttt{runner=0}, \texttt{acceptance=0},
@@ -2224,6 +2477,43 @@ the retained RMSE, maximum error, and coverage remain diagnostic values for
 the failed Trial rather than performance evidence for a qualified battery
 capability or combined-fault envelope.
 
+The hard-actuator verifier begins from implementation \texttt{793f020}
+and evidence head \texttt{2da6a4f}. It reads the receipt, ULog,
+joint-state log, applied-scenario record, focused JUnit, and attempt-0
+preflight record from committed Git objects. The receipt fixes the Runtime
+to WSL DroneDreamRuntime, PX4 v1.16, Gazebo 8.14, x500, and 82 seconds;
+runner and acceptance exit zero, the residual count is zero, and no API
+key is used. Attempt 0 remains a pre-PX4 failure because WSL could not
+resolve the Windows worktree pointer; it is preserved rather than
+overwritten by attempt 1.
+
+Physical read-back is exact but outcome admission is narrower. The
+generated SDF sets motor 2 \texttt{maxRotVelocity=0} while motors 0, 1,
+and 3 remain at 1,000 rad/s. The selected joint contributes 641 samples
+and never exceeds $8.93786\times10^{-7}$ rad/s in absolute value, well
+inside the 0.05 rad/s hard-stop limit. Each healthy joint contributes 653
+samples and reaches about 100 rad/s, above the 1.0 rad/s motion threshold.
+Those observations establish \texttt{verified\_applied}; they do not
+establish a trusted evaluation window. The retained outcome is
+\texttt{trial\_success=false}, so no score, pass flag, stable-control
+result, or fault-recovery result is admitted.
+
+The closure-v2 verifier then treats the four source classes as immutable
+inputs. It rehashes the constant-wind/obstacle manifest and receipt, the
+five-effect advanced manifest and receipt, the GPS/battery receipt, and
+the hard-actuator receipt before constructing any category row. The nine
+rows must match the bundled capability contract exactly; a missing,
+duplicated, renamed, or extra category fails closure rather than becoming
+an unavailable cell or an inferred success.
+
+Coverage and qualification remain separate machine fields. The closure fixes
+the verified-category count at 9, the count with all retained performance
+success at 5, and the all-effects performance-success flag to false. Its empty
+remaining-Runtime-extension list states only that every bundled category has an
+exercised Runtime mechanism; it does not erase readiness failure, policy
+failure, an absent scoring window, first-party provenance, or the need for
+wider seeds and independently recomputed customer evidence.
+
 Finally, attempt 16 explains why the supported control path matters. Two
 command-420 messages entered PX4's \texttt{vehicle\_command} stream, but
 no matching acknowledgment appeared because the gz\_x500 stack used
@@ -2247,12 +2537,17 @@ Attempt 18 alone supplies the exact-commit authority used here. This rule
 prevents a promising diagnostic, transport observation, or unfrozen success
 from displacing the narrower machine-verifiable negative-control result.
 
-Publication therefore preserves four non-interchangeable counters: 6/6
+Publication therefore preserves five non-interchangeable counters: 6/6
 passing scenario-matrix Trials, 3/3 passing five-effect trajectories, 0/2
 successful GPS-noise readiness attempts, and 0/1 stability passes for the
-later negative control despite 1/1 completed Trial. They are never summed
+later negative control despite 1/1 completed Trial, plus 0/1 trusted
+flight-evaluation windows for the hard-actuator probe despite 1/1 verified
+injection/read-back record. They are never summed
 because their scenario designs, seed structures, failure stages, effect
 profiles, and acceptance predicates define non-exchangeable experimental units.
+The closure's 9/9 mechanism-coverage and five-category performance fields
+are category-level projections over these records, not a fifth Trial
+campaign, a 5/9 flight rate, or permission to sum their denominators.
 
 This separation is enforced mechanically. The verifier asserts the exact
 authority names, common Candidate and seed, all three successful metric
@@ -2262,7 +2557,7 @@ history and rejects any invented timestamp or hash for entries lacking raw
 files. A later exporter therefore cannot increase the numerator by
 relabeling readiness, removing a retained failure, or inferring machine
 evidence from an operator note. Any future campaign that exercises the
-remaining extensions needs a new subject, manifest, receipt, inventory,
+remaining qualification gaps needs a new subject, manifest, receipt, inventory,
 and independently audited denominator before entering this report or
 customer qualification. The new receipt must also state its vehicle,
 world, controller, fault semantics, Runtime identity, and whether each
@@ -2279,6 +2574,202 @@ exchangeable experimental units. This rule is evaluated before any rate,
 interval, table, abstract statement, conclusion, or customer-facing
 evidence summary is accepted from either campaign for publication or
 release.
+
+Evidence v10 adds a final provenance projection without changing those
+admission rules. Its 39-source manifest rehashes the v9 base, retained online
+route, offline Evidence 2.9 budget closure, and four advanced-physics source
+classes before emitting three CSV views. The advanced-physics CSV contains
+exactly nine category rows and exactly five true retained-performance fields;
+the other four rows preserve readiness failure, policy failure, or the absent
+trusted scoring window. A CSV total that disagrees with the JSON category
+projection, or a source byte that differs from its frozen commit object, fails
+the v10 check instead of becoming a report-side correction.
+
+The v10 release fields are also machine assertions. The retained 23/24 route
+is qualified for Evidence 2.8 / Prompt 1.7 but explicitly not current for
+Evidence 2.9; the Evidence 2.9 multi-tool record remains scripted/mock with
+zero provider, network, and credential use. Current-source full regression,
+Windows Rust, the report/PDF gate, and a newly approved Evidence 2.9 online
+campaign were absent from that frozen export. The later 1,284-test receipt
+supplies the backend regression externally but does not rewrite v10's
+historical field or supply the remaining gates. The resulting
+\texttt{release\_ready=false} therefore survives into the abstract, source
+ledger, conclusion, and claim audit rather than being inferred from successful
+compatibility or tamper checks.
+
+The v10 verifier resolves provenance in layers before accepting a projected
+field. It first loads each of the 39 manifest rows from the row's frozen commit
+and path, compares the committed file bytes with the recorded SHA-256, and only
+then evaluates the row's semantic assertions. The three CSV views are rebuilt
+from the accepted JSON structures and compared byte for byte with their
+committed counterparts. Consequently, a correct category count cannot excuse
+a changed source byte, and a correct file digest cannot excuse a semantic
+projection that changes a contract version, current-status flag, denominator,
+or release boundary.
+
+Compatibility and tamper tests serve different purposes in that closure. The
+70 compatibility checks preserve the exact source vocabulary, inherited v9
+records, CSV projections, and consumer expectations across the exporter
+upgrade. The seven tamper checks deliberately alter provenance, counts, and
+boundary fields and require fail-closed rejection. These 77 focused checks
+validate the evidence-export contract; they are not a substitute for the
+later current-source backend regression receipt, a Windows Rust run, an online
+Evidence 2.9 campaign, or any physical-flight acceptance result. Conversely,
+the later backend receipt cannot substitute for these v10 compatibility and
+tamper checks.
+
+Version alignment is therefore a typed relationship rather than a numerical
+roll-up. The retained 23/24 provider artifact remains an Evidence 2.8 /
+Prompt 1.7 qualification, the 3-block parity record remains an offline
+Evidence 2.9 accounting check, and the 9/9 advanced-physics field remains
+mechanism coverage with only five performance-qualified categories. The v10
+ledger can navigate among those sources because it preserves their individual
+subjects, freeze heads, paths, hashes, and admissible claims; it cannot merge
+their scores, promote an archived online route to the current contract, or
+convert mechanism coverage into a pooled flight pass rate.
+
+The later software documentation alignment at head \texttt{755c511} is used
+only as a secondary narrative consistency check. Its three engineering
+chapters repeat the v10 vocabulary and \texttt{release\_ready=false} boundary,
+but they do not create experimental observations or supersede the v10 bundle,
+manifest, and receipts. The report records those document hashes separately,
+keeps every software artifact read-only, and stores only commit/path/hash
+references in its own manifest. This ownership boundary lets a reviewer audit
+the prose without copying, editing, or silently re-exporting upstream evidence
+inside the report branch.
+
+Exact-source reproduction adds one more guard. The source commit fixes the
+LaTeX, report-owned figures, evidence-reference manifest, claim ledger, and
+validation programs before the PDF is built twice in clean state. The two
+PDF byte streams must match, and the receipt is created only afterward in a
+separate attestation commit. This ordering prevents the published artifact
+from attesting to mutable source or from embedding a self-referential commit
+claim that cannot be independently reconstructed.
+
+The report-side claim audit then evaluates every declared sentence boundary
+against its frozen upstream object and the exact report source. Numerical
+assertions, current-versus-archived labels, failure denominators, and prohibited
+overclaims are checked together, so a prose revision cannot quietly upgrade a
+read-back into a performance pass or turn compatibility tests into release
+readiness. The final visual review remains separate because hashes and text
+geometry cannot establish that labels, tables, figures, and page bottoms are
+legible in the rendered pages.
+
+Finally, the receipt verifier reconstructs the source-tree digest from the
+subject commit, proves that subject is an ancestor of the artifact commit, and
+rehashes the committed PDF, structural audit, claim audit, manifest, and
+ledger. It checks page count, every declared claim count, immutable-source
+inventory, paragraph and list policies, link targets, warning counts, and the
+recorded visual-review attestation. Dirty report source, a missing artifact,
+changed serialization, or a mismatched tree fails verification. This is a
+publication-integrity control for the bounded report; it does not alter the
+upstream software release state or supply any absent experimental gate.
+
+Determinism is checked at two layers. Report-owned data figures are
+regenerated from frozen source objects and must be pixel-identical to the
+committed media before LaTeX runs. The clean build fixes its source-date
+epoch and must reproduce the same PDF bytes. These checks establish artifact
+stability only; scientific replication still requires the separately frozen
+upstream campaigns and their declared Runtime, failures, and denominators.
+
+This distinction keeps artifact reproducibility, evidentiary reproducibility,
+and experimental replication independently reviewable, so passing one layer
+cannot silently satisfy or supersede the controls of another layer.
+
+\subsection{\texorpdfstring{\textbf{A.13 Current backend regression
+attestation}}{A.13 Current backend regression attestation}}\label{a.13-current-backend-regression-attestation}
+
+The current backend attestation begins with a subject/receipt split. Commit
+\texttt{755c511} is the tested source tree; \texttt{1e542b7} is a later
+receipt-only head that contains the generated logs, JUnit files, checksum
+sidecar, attestation manifest, and test receipt. The verifier proves that the
+subject is an ancestor of the receipt head and that the receipt's tested-state
+base equals the subject with \texttt{exact\_final\_commit\_run=true}. This
+prevents an artifact-only commit from being mislabeled as the source under
+test and prevents later documentation or evidence files from silently entering
+the software denominator.
+
+The full-suite result is read from two independent projections. The receipt
+records 1,284 passed, zero failed, and a 842.690-second wall interval for the
+exact \texttt{backend/tests} command. The retained pytest log records
+1,284 passed in 831.79 seconds, while the JUnit contains 1,284 tests, zero
+failures, zero errors, and zero skips with 831.497 seconds of accumulated test
+time. The report uses 831.79 seconds when quoting pytest duration and preserves
+842.690 seconds as receipt wall time; neither value is substituted for the
+other or presented as an application-performance measurement.
+
+The focused supplement is similarly explicit. It executes the 11 named
+Harness, routing, evidence-export, advanced-physics, and receipt test modules,
+then records 73 passed and zero failed. Pytest reports 29.73 seconds, JUnit
+reports 29.712 seconds, and the receipt wall interval is 31.011 seconds. The
+focused run supplements the complete backend suite by making the evidence
+surfaces easy to locate; it neither bridges from a failed full run nor expands
+the tested scope beyond the named Python modules and exact source commit.
+
+Environment fields form part of the claim boundary. The attestation records
+Windows 11, Python 3.13.0, and pytest 9.1.0. It also records that
+\texttt{OPENAI\_API\_KEY} was removed before execution, real credentials were
+not used, and real provider calls were zero. These fields permit an offline
+backend-regression claim; they do not create an online Evidence 2.9 routing
+campaign, validate a provider response, or inherit qualification from the
+retained Evidence 2.8 / Prompt 1.7 artifact.
+
+Exact-byte checks bind every publication-facing file. The receipt file and its
+canonical internal digest are verified separately; the attestation manifest
+then binds both logs and both JUnit files by size and SHA-256. The checksum
+sidecar must enumerate the same six payloads, and each XML root must reproduce
+the reported test, failure, error, and skip counts. A changed log, reformatted
+receipt, missing checksum line, or count disagreement fails the report-side
+verifier even when the human-readable summary still says ``passed.'' This
+keeps transport integrity distinct from the semantic count checks.
+
+The two suites are related but not additive. The 73 focused tests are selected
+from the same backend test surface to expose the evidence-sensitive modules;
+they are not 73 new observations that can be added to the 1,284-test full-suite
+denominator. Their independent command, log, JUnit, and duration fields instead
+provide a second locator for the contracts most likely to affect this report.
+The full-suite result remains the regression total, while the focused result
+remains a diagnostic supplement. This rule prevents duplicated tests from
+inflating coverage and prevents a focused pass from replacing a future failed
+or unavailable full-suite receipt.
+
+A reviewer can reproduce the report-side decision without rerunning Python or
+contacting a provider. Starting from receipt head \texttt{1e542b7}, the
+reviewer reads the receipt, attestation manifest, checksum sidecar, two logs,
+and two JUnit files directly from Git, verifies all seven file hashes, and
+recomputes the receipt's canonical internal digest. The reviewer then checks
+the exact command, subject ancestry, key-removal flags, provider-call count,
+pytest summaries, and XML totals. This procedure verifies what the retained
+run says and whether its bytes drifted; it does not independently reproduce
+the execution environment or convert the software run into experimental
+replication.
+
+The wall intervals also retain their own clocks. Receipt wall time includes
+the wrapper and artifact-writing interval around each command; pytest duration
+comes from the terminal summary; JUnit time is the test-runner's accumulated
+suite value. They agree closely enough to identify the same two executions,
+but none is silently normalized, averaged, or added to another. Keeping all
+three measurements preserves a useful diagnostic for later receipts: a large
+disagreement would trigger review of collection overhead or incomplete output
+rather than being concealed by a single rounded duration.
+
+Promotion of a later backend receipt is therefore fail-closed. It must name a
+tested subject reachable from its receipt head, declare exact-source execution,
+retain zero-failure full-suite and focused projections, and bind every listed
+payload by both manifest and checksum sidecar. If any relation or count is
+missing, the report keeps the last qualified receipt as historical and marks
+the current backend gate unavailable. This policy governs receipt admission
+only; it cannot waive Rust, frontend, desktop, deployment, signing, online
+provider, or physical-performance gates owned by other evidence surfaces.
+
+Finally, this receipt updates the current backend total without erasing
+history. The v9 subject remains attached to its 1,204-test and 28-test records,
+and v10 correctly records that no current-source full regression receipt was
+included at its own freeze. The later 1,284-test receipt closes that backend
+gap externally, but it does not mutate v10, qualify frontend or desktop code,
+run the Windows Rust gate, validate deployment, refresh the online routing
+contract, or add physical-performance evidence. Product and publication
+readiness therefore remain false until their independently defined gates pass.
 
 \endgroup
 

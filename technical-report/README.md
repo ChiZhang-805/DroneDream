@@ -22,7 +22,11 @@ The software chain is:
 - v9 receipt-only evidence head: `8102ffecb37b1f1b0e25c80d6b02db05325ca986`
 - online-routing implementation: `aeffaae01a8106f74ff811b39ec26d9d2203d1f6`
 - multi-tool budget source: `136a1e3293efa6e53f3648e21fa8f7c6b5158d6f`
-- current software/evidence head: `2f1caae6fbb5b037e55a4b339dff6c590833f019`
+- Evidence v10 source closure: `97492448c36bef240e468a0cd53c3ba198cb6aae`
+- Evidence v10 freeze: `a1f091f2edf1ae43233cd01e483bc3990c9aa279`
+- current software documentation-alignment head: `755c511539fe561207ca38ff5079f471a4110896`
+- current backend-regression subject: `755c511539fe561207ca38ff5079f471a4110896`
+- current backend-regression receipt head: `1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e`
 - physical-campaign subject: `86273db6d827a790cb0a8b1472256b23e0a629d2`
 - physical-campaign evidence head: `3b09951bbea2e5f1c64197b0347a0ed529172192`
 - advanced-physics subject: `26b957efd985d0ac37702a8d2518e87ab65347c3`
@@ -30,6 +34,10 @@ The software chain is:
 - advanced-physics evidence head: `d14bf9c0d453599b2bc9733be8c4159fef67c220`
 - GPS/battery negative-control implementation: `fdf1250398567c6658ad5148efc1c302dede4a17`
 - GPS/battery negative-control evidence head: `2f1caae6fbb5b037e55a4b339dff6c590833f019`
+- hard-actuator implementation: `793f02089413f2baa8ea78387cd1e9e078f02b83`
+- hard-actuator evidence head: `2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53`
+- advanced-physics closure source: `f1e8fa855ebe95bf5ce208d62da7a3a46bba6228`
+- advanced-physics closure evidence head: `83982f37899f8054e24a749af8e6469fedf48e8d`
 
 The website chain is:
 
@@ -43,16 +51,49 @@ chains only through immutable commit/path/SHA references.
 
 ## Evidence boundary
 
-The frozen backend receipt records 1,204 tests on the exact software subject
-commit and explicitly sets `exact_final_commit_run=true`. The pytest log records
-854.71 seconds while the receipt wall interval is 864.488 seconds. A 28-check
-focused supplement records 6.98 seconds in its pytest log and 8.451 seconds in
-the receipt; it supplements, rather than bridges from, the exact full run. The
-receipt does not cover Ruff, mypy, or the Windows Rust desktop gate.
-The Rust gate was not run because Visual Studio C++ Build Tools and `link.exe`
-were unavailable.
+The current backend receipt binds subject
+`755c511539fe561207ca38ff5079f471a4110896` to receipt head
+`1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e` and sets
+`exact_final_commit_run=true`. The full suite records 1,284/1,284 passed in
+831.79 seconds; the focused suite records 73/73 passed in 29.73 seconds.
+`OPENAI_API_KEY` was removed before execution and provider calls remained
+zero. Receipt file/internal SHA-256 values are
+`113307a8ee6c722d0cd4e16e245373a5637dd0ec00ba8dbee274f6a57a897f10` /
+`15e2c97e62f9d75b60a315fd62ec93a7a2f38db401e8c8817146e4e7f1fdaafe`;
+attestation-manifest and checksum-sidecar SHA-256 values are
+`0e0e0df70087e2240aba7f76cfa72a8d17acc55a674033ec4475258e2ec13267` /
+`52f73accc5f582ba0ceffb3d75f29fd948a8d1e06d801e885a19d72ec300d1ad`.
+This is exact-source offline backend regression evidence only. It does not
+qualify frontend, desktop, Rust, release, or physical performance.
 
-Evidence v9 publishes the current Evidence 2.8 / Prompt 1.7 / Decision Trace
+The older v9 receipt is retained as historical evidence for subject
+`c1222c9`: 1,204/1,204 tests in 854.71 seconds plus a 28/28 focused
+supplement in 6.98 seconds. Its receipt wall intervals are 864.488 and 8.451
+seconds. It no longer represents the current backend total. Windows Rust
+remains unrun because Visual Studio C++ Build Tools and `link.exe` were
+unavailable.
+
+Evidence v10 is the latest exact-byte provenance navigation ledger. Its
+39-source manifest revalidates the complete v9 source inventory, the retained
+24-call online-routing freeze, the offline Evidence 2.9 multi-tool budget
+closure, and advanced-physics closure v2, and exports three CSV views. Bundle
+file/canonical SHA-256 values are
+`27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89` /
+`df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b`;
+the manifest file SHA-256 is
+`134d1ae0f0a96b7999755b0b2e4352c0ce1388bddc4f5f0adc9eb744cc302d4a`.
+Its 70/70 compatibility and 7/7 focused tamper checks pass, but the ledger
+sets `online_routing_current_for_evidence_2_9=false` and
+`release_ready=false`. At its freeze it did not include a current-source full
+regression, Windows Rust, report/PDF, deployment, or final release receipt.
+The later 1,284-test receipt supplies the backend regression separately without
+rewriting v10's frozen release fields or satisfying the remaining gates.
+The later `755c511539fe561207ca38ff5079f471a4110896` commit changes only
+engineering documents 17, 19, and 20. Their exact bytes are retained as
+secondary narrative-alignment references; they are not new experimental
+evidence and never override the v10 bundle, manifest, or test receipt.
+
+Evidence v9 publishes the Evidence 2.8 / Prompt 1.7 / Decision Trace
 1.4 cross-Job memory contract. Its deterministic in-memory SQLite evaluation
 passes 10/10 fixtures: two positive retrievals and eight isolation/lifecycle
 negatives, with zero provider, network, or simulator calls and zero
@@ -65,14 +106,16 @@ observations reach the provider projection. This is
 `observational_not_causal`, not evidence of provider effect, optimizer gain,
 physical fidelity, real-aircraft performance, or safety improvement.
 
-The current online-routing freeze binds Evidence 2.8 / Prompt 1.7 / Tool 2.1,
+The retained online-routing freeze binds Evidence 2.8 / Prompt 1.7 / Tool 2.1,
 `gpt-4.1-2025-04-14`, temperature 0, top-p 1, seed 20260728, and 24 provider
 calls. Independent regrading finds 23/24 acceptable selections (95.83%) and
 one retained failure, `tight_budget_expensive_matrix`, which selected TuRBO
 instead of multi-fidelity MOBO or the optimizer portfolio. The result qualifies
-the exact current development contract: it exceeds the 75% overall threshold,
+the exact frozen Evidence 2.8 development contract: it exceeds the 75% overall threshold,
 the 15-percentage-point lift threshold by recording 37.5 percentage points
-over the best constant, and the two-thirds category threshold. It does not
+over the best constant, and the two-thirds category threshold. Evidence v10
+marks it `contract_current=false` because the current schema is Evidence 2.9;
+there is no current Evidence 2.9 online campaign. It does not
 show causal prompt lift, provider determinism from the seed, optimizer gain,
 simulator or flight improvement, or broad model generalization.
 
@@ -132,8 +175,8 @@ does not claim a Gazebo version or WSL Runtime identifier. Its three same-seed
 successes do not establish broad reliability, safety, real-aircraft behavior,
 sim-to-real transfer, customer acceptance, or optimizer superiority. Remaining
 evidence gaps are probability-law behavior across seeds, dropout endurance,
-depleted-battery stability, combined-fault qualification, and hard actuator
-failure beyond the bounded first-order delay profile.
+depleted-battery stability, combined-fault qualification, trusted flight
+evaluation under a hard actuator stop, and fault-tolerant recovery.
 
 A later exact-commit negative-control Trial separately verifies deterministic
 GPS denial/recovery plus battery initial-state and voltage-sag injection. Its
@@ -145,6 +188,23 @@ advanced-effects pass numerator and the 6/6 scenario-matrix pass numerator.
 The report manifest binds its receipt, failure lineage, ULog, applied-scenario
 record, and 159-test JUnit by path, commit, and SHA-256 without copying the
 upstream attempt directory.
+
+A later hard-actuator probe separately verifies a motor-2 SDF hard stop and
+joint-state read-back: 641 target samples remain below the 0.05 rad/s threshold,
+while three healthy rotors each contribute 653 samples and reach approximately
+100 rad/s. Runner and acceptance exit zero, but `trial_success=false` because no
+trusted evaluation window is established. The report therefore treats the run
+as verified injection/read-back only, excludes it from all flight-pass
+numerators, and binds its receipt, ULog, joint log, applied scenario, 138-test
+JUnit, and retained attempt-0 preflight failure without copying upstream bytes.
+
+Advanced-physics closure v2 exact-byte aggregates the four source classes as a
+navigation ledger. All 9/9 bundled effect categories have real PX4/Gazebo
+injection/read-back evidence and `requires_runtime_extension=[]`; only five
+categories have all retained Trials pass their performance gate. The other
+categories retain GPS readiness, deterministic GPS/battery policy-failure, and
+hard-actuator no-window boundaries. The closure is not a 9/9 performance pass,
+does not add a new flight, and does not authorize real-aircraft or safety claims.
 
 The latest typography receipt records 13/13 focused PublicSite checks, 325/325
 frontend tests across 50 files, typecheck, lint, application and shared builds,
@@ -191,7 +251,7 @@ The A4 layout uses a 10-point body with 12-point leading, 24 mm side margins,
 and a 25 mm top / 20 mm bottom geometry. The first-page hierarchy, upper-left
 brand lockup, rounded abstract frame, and body rhythm were quantitatively
 checked against the JoyAI-RA 0.1 report while preserving DroneDream's purple
-identity and a roomier 21-page evidence narrative.
+identity and a roomier 23-page evidence narrative.
 
 From the repository root:
 
@@ -203,7 +263,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 The script regenerates Figures 2--6 from the frozen evidence bundle in an
 ignored build directory and requires their rendered pixels to match the
 tracked PNGs. It then performs two XeLaTeX passes, rejects warning gates,
-renders all 21 pages, runs the structural/paragraph/link audit, and publishes
+renders all 25 pages, runs the structural/paragraph/link audit, and publishes
 the validated PDF, layout audit, and claim-evidence audit to
 `technical-report/output/`.
 The claim gate fails the build when a declared report projection drifts from
@@ -226,7 +286,7 @@ with body prose. Intermediate files remain under the ignored
 
 The audit and receipt writers emit UTF-8 JSON with LF newlines as exact bytes,
 independent of the host operating system. After visually reviewing the final
-21-page render, create the artifact-layer receipt:
+23-page render, create the artifact-layer receipt:
 
 ```powershell
 python technical-report/scripts/create_report_validation_receipt.py `
@@ -278,14 +338,18 @@ The release uses two layers to avoid self-reference:
 2. Build from that source commit, then commit the final PDF, audit artifacts,
    and validation receipt that names and hashes the source commit.
 
-Any integration of this report must retain v9 software subject
-`c1222c9215e01a56351f6588af0d2b8694bca831`, v9 receipt head
-`8102ffecb37b1f1b0e25c80d6b02db05325ca986`, online-routing implementation
-`aeffaae01a8106f74ff811b39ec26d9d2203d1f6`, multi-tool source
-`136a1e3293efa6e53f3648e21fa8f7c6b5158d6f`, current evidence head
-`15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8`, physical-campaign subject
-`86273db6d827a790cb0a8b1472256b23e0a629d2`, and physical evidence head
-`3b09951bbea2e5f1c64197b0347a0ed529172192` as immutable dependencies.
+Any integration of this report must retain Evidence v10 source/freeze
+`97492448c36bef240e468a0cd53c3ba198cb6aae` /
+`a1f091f2edf1ae43233cd01e483bc3990c9aa279`, current backend subject/receipt
+`755c511539fe561207ca38ff5079f471a4110896` /
+`1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e`, online-routing implementation
+`aeffaae01a8106f74ff811b39ec26d9d2203d1f6`, multi-tool source/head
+`136a1e3293efa6e53f3648e21fa8f7c6b5158d6f` /
+`15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8`, physical-campaign
+subject/head `86273db6d827a790cb0a8b1472256b23e0a629d2` /
+`3b09951bbea2e5f1c64197b0347a0ed529172192`, and advanced-physics closure
+subject/head `f1e8fa855ebe95bf5ce208d62da7a3a46bba6228` /
+`83982f37899f8054e24a749af8e6469fedf48e8d` as immutable dependencies.
 
 ## Website handoff
 
