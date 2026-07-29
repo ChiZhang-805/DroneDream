@@ -29,6 +29,8 @@ const CURRENT_STATE: AppUpdateState = {
 export function useAppUpdater() {
   const desktopRuntime = isDesktopRuntime();
   const updateRef = useRef<Update | null>(null);
+  const checkGenerationRef = useRef(0);
+  const installInFlightRef = useRef(false);
   const [state, setState] = useState<AppUpdateState>(() => (
     desktopRuntime && import.meta.env.MODE !== "test"
       ? { ...CURRENT_STATE, status: "checking" }
@@ -40,13 +42,22 @@ export function useAppUpdater() {
       setState(CURRENT_STATE);
       return;
     }
+    if (installInFlightRef.current) return;
+    const generation = ++checkGenerationRef.current;
     setState((current) => ({ ...current, status: "checking", error: null, progress: null }));
     try {
-      await updateRef.current?.close();
+      const previousUpdate = updateRef.current;
+      updateRef.current = null;
+      await previousUpdate?.close();
+      if (generation !== checkGenerationRef.current) return;
       const update = await check({
         timeout: 15_000,
         allowDowngrades: false,
       });
+      if (generation !== checkGenerationRef.current) {
+        await update?.close();
+        return;
+      }
       updateRef.current = update;
       if (!update) {
         setState(CURRENT_STATE);
@@ -59,6 +70,7 @@ export function useAppUpdater() {
         error: null,
       });
     } catch (error) {
+      if (generation !== checkGenerationRef.current) return;
       setState({
         status: "error",
         availableVersion: null,
@@ -70,7 +82,12 @@ export function useAppUpdater() {
 
   const installAvailableUpdate = useCallback(async () => {
     const update = updateRef.current;
-    if (!update || state.status !== "available") return;
+    if (
+      !update
+      || state.status !== "available"
+      || installInFlightRef.current
+    ) return;
+    installInFlightRef.current = true;
     let downloaded = 0;
     let contentLength = 0;
     setState((current) => ({ ...current, status: "downloading", progress: 0, error: null }));
@@ -99,12 +116,15 @@ export function useAppUpdater() {
         progress: null,
         error: error instanceof Error ? error.message : String(error),
       }));
+    } finally {
+      installInFlightRef.current = false;
     }
   }, [state.status]);
 
   useEffect(() => {
     void checkForUpdates();
     return () => {
+      checkGenerationRef.current += 1;
       void updateRef.current?.close();
       updateRef.current = null;
     };
