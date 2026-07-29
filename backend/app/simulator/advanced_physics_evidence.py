@@ -23,9 +23,7 @@ from app.simulator.scenario_effects import scenario_effect_request_sha256
 
 MANIFEST_SCHEMA_VERSION = "dronedream.advanced-physics-real-px4-manifest.v1"
 RECEIPT_SCHEMA_VERSION = "dronedream.advanced-physics-real-px4-receipt.v1"
-EXECUTION_WINDOW_SCHEMA_VERSION = (
-    "dronedream.advanced-physics-execution-window/v1"
-)
+EXECUTION_WINDOW_SCHEMA_VERSION = "dronedream.advanced-physics-execution-window/v1"
 CLAIM_LABEL = "PHYSICAL_SIMULATION"
 EVIDENCE_CLASS = "REAL_PX4_GAZEBO_ADVANCED_PHYSICS"
 CLAIM_BOUNDARY = (
@@ -34,9 +32,7 @@ CLAIM_BOUNDARY = (
     "boundary proves injection/readback before a PX4 readiness timeout; it does "
     "not claim a successful GPS-noise flight."
 )
-RETENTION_POLICY_ID = (
-    "dronedream.minimum-sufficient-advanced-physics-retention/v1"
-)
+RETENTION_POLICY_ID = "dronedream.minimum-sufficient-advanced-physics-retention/v1"
 
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -382,12 +378,10 @@ def _validate_effect_contract(
     if not isinstance(request_rows, list) or not isinstance(evidence_rows, list):
         raise ValueError(f"{spec.directory} effect rows are invalid")
     request_effects = [
-        str(_mapping(row, field="request effect").get("effect_id"))
-        for row in request_rows
+        str(_mapping(row, field="request effect").get("effect_id")) for row in request_rows
     ]
     applied_effects = [
-        str(_mapping(row, field="applied effect").get("effect_id"))
-        for row in evidence_rows
+        str(_mapping(row, field="applied effect").get("effect_id")) for row in evidence_rows
     ]
     if sorted(request_effects) != list(spec.expected_effects):
         raise ValueError(f"{spec.directory} requested effects drifted")
@@ -405,9 +399,7 @@ def _validate_effect_contract(
     for row in evidence_rows:
         item = _mapping(row, field="applied effect")
         capability = _mapping(item.get("capability"), field="evidence capability")
-        verification = _mapping(item.get("evidence"), field="effect evidence").get(
-            "verification"
-        )
+        verification = _mapping(item.get("evidence"), field="effect evidence").get("verification")
         if (
             item.get("status") != "applied"
             or capability.get("status") != "available"
@@ -577,9 +569,7 @@ def _validate_attempt(
         if spec.authoritative and require_large_raw:
             for required in ("px4_source.ulg", "telemetry.json"):
                 if not (trial_dir / required).is_file():
-                    raise ValueError(
-                        f"{spec.directory} lacks authoritative {required}"
-                    )
+                    raise ValueError(f"{spec.directory} lacks authoritative {required}")
     else:
         failure = _mapping(result.get("failure"), field=f"{spec.directory}.failure")
         stderr = (trial_dir / "stderr.log").read_text(encoding="utf-8")
@@ -649,10 +639,19 @@ def _inventory_and_retain(
     records: list[dict[str, Any]] = []
     source_bytes = 0
     retained_bytes = 0
+    source_entries = list(trial_dir.rglob("*"))
+    linked_entries = sorted(
+        path.relative_to(trial_dir).as_posix() for path in source_entries if path.is_symlink()
+    )
+    if linked_entries:
+        raise ValueError(
+            "advanced-physics evidence source must not contain symbolic links: "
+            + ", ".join(linked_entries)
+        )
     source_files = sorted(
         (
             (path.relative_to(trial_dir).as_posix(), path)
-            for path in trial_dir.rglob("*")
+            for path in source_entries
             if path.is_file()
         ),
         key=lambda item: item[0],
@@ -668,9 +667,7 @@ def _inventory_and_retain(
             "retained": False,
         }
         if _should_retain(relative, spec):
-            retained_base = (
-                PurePosixPath("attempts") / spec.directory / PurePosixPath(relative)
-            )
+            retained_base = PurePosixPath("attempts") / spec.directory / PurePosixPath(relative)
             if relative == "px4_source.ulg":
                 retained_path = f"{retained_base}.gz"
                 raw = path.read_bytes()
@@ -770,11 +767,7 @@ def export_advanced_physics_evidence(
             aggregate[key] += counts[key]
 
     successful = [item for item in attempts if item["success"] is True]
-    boundaries = [
-        item
-        for item in attempts
-        if "gps_readiness_boundary" in str(item["role"])
-    ]
+    boundaries = [item for item in attempts if "gps_readiness_boundary" in str(item["role"])]
     unsigned_manifest: dict[str, Any] = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "evidence_class": EVIDENCE_CLASS,
@@ -811,18 +804,14 @@ def export_advanced_physics_evidence(
         "summary": {
             "attempt_count": len(attempts),
             "successful_flight_count": len(successful),
-            "passing_flight_count": sum(
-                item.get("pass_flag") is True for item in attempts
-            ),
+            "passing_flight_count": sum(item.get("pass_flag") is True for item in attempts),
             "gps_readiness_boundary_count": len(boundaries),
             "file_backed_preflight_failure_count": sum(
                 item["role"] == "file_backed_preflight_failure" for item in attempts
             ),
             "terminal_only_preflight_count": len(_TERMINAL_ONLY_PREFLIGHTS),
             "authoritative_success_directory": "success-five-effects-attempt-4",
-            "authoritative_boundary_directory": (
-                "gps-readiness-boundary-attempt-2"
-            ),
+            "authoritative_boundary_directory": ("gps-readiness-boundary-attempt-2"),
             **aggregate,
             "full_source_inventory_sha256": _inventory_sha256(full_inventory),
         },
@@ -923,11 +912,7 @@ def _verify_retained_inventory(
             raise ValueError(f"{directory} source inventory repeats {source_path}")
         seen_source.add(source_path)
         source_bytes = row.get("source_bytes")
-        if (
-            isinstance(source_bytes, bool)
-            or not isinstance(source_bytes, int)
-            or source_bytes < 0
-        ):
+        if isinstance(source_bytes, bool) or not isinstance(source_bytes, int) or source_bytes < 0:
             raise ValueError(f"{directory} source byte count is invalid")
         source_sha = _require_sha256(
             row.get("source_sha256"),
@@ -954,24 +939,16 @@ def _verify_retained_inventory(
                     raise ValueError(f"retained source drifted: {retained_path}")
             elif compression == "gzip-level-9-mtime-0":
                 compressed = retained_file.read_bytes()
-                if len(compressed) < 10 or int.from_bytes(
-                    compressed[4:8], "little"
-                ) != 0:
+                if len(compressed) < 10 or int.from_bytes(compressed[4:8], "little") != 0:
                     raise ValueError(f"retained gzip framing drifted: {retained_path}")
                 try:
                     raw = gzip.decompress(compressed)
                 except OSError as exc:
-                    raise ValueError(
-                        f"retained gzip is invalid: {retained_path}"
-                    ) from exc
+                    raise ValueError(f"retained gzip is invalid: {retained_path}") from exc
                 if len(raw) != source_bytes or _sha256_bytes(raw) != source_sha:
-                    raise ValueError(
-                        f"retained gzip source drifted: {retained_path}"
-                    )
+                    raise ValueError(f"retained gzip source drifted: {retained_path}")
                 if gzip.compress(raw, compresslevel=9, mtime=0) != compressed:
-                    raise ValueError(
-                        f"retained gzip is not deterministic: {retained_path}"
-                    )
+                    raise ValueError(f"retained gzip is not deterministic: {retained_path}")
             else:
                 raise ValueError(f"unknown compression for {retained_path}")
         elif (
@@ -1016,12 +993,8 @@ def verify_advanced_physics_evidence(
         raise ValueError("advanced-physics manifest schema is invalid")
     if receipt.get("schema_version") != RECEIPT_SCHEMA_VERSION:
         raise ValueError("advanced-physics receipt schema is invalid")
-    unsigned_manifest = {
-        key: value for key, value in manifest.items() if key != "manifest_sha256"
-    }
-    unsigned_receipt = {
-        key: value for key, value in receipt.items() if key != "receipt_sha256"
-    }
+    unsigned_manifest = {key: value for key, value in manifest.items() if key != "manifest_sha256"}
+    unsigned_receipt = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
     if manifest.get("manifest_sha256") != _sha256_value(unsigned_manifest):
         raise ValueError("advanced-physics manifest hash does not recompute")
     if receipt.get("receipt_sha256") != _sha256_value(unsigned_receipt):
@@ -1081,14 +1054,11 @@ def verify_advanced_physics_evidence(
         or protocol.get("candidate_id") != _EXPECTED_CANDIDATE_ID
         or protocol.get("job_id") != _EXPECTED_JOB_ID
         or protocol.get("successful_flight_effects") != list(_SUCCESS_EFFECTS)
-        or protocol.get("gps_readiness_boundary_effects")
-        != list(_GPS_BOUNDARY_EFFECTS)
+        or protocol.get("gps_readiness_boundary_effects") != list(_GPS_BOUNDARY_EFFECTS)
         or protocol.get("unsupported_effects_included") is not False
     ):
         raise ValueError("advanced-physics protocol drifted")
-    if manifest.get("remaining_runtime_extensions") != list(
-        _REQUIRES_RUNTIME_EXTENSION
-    ):
+    if manifest.get("remaining_runtime_extensions") != list(_REQUIRES_RUNTIME_EXTENSION):
         raise ValueError("advanced-physics remaining extensions drifted")
     retention = _mapping(manifest.get("retention_policy"), field="retention_policy")
     if (
@@ -1150,9 +1120,7 @@ def verify_advanced_physics_evidence(
             "boundary",
         ):
             if key in semantic and item.get(key) != semantic[key]:
-                raise ValueError(
-                    f"{spec.directory} retained semantic summary drifted: {key}"
-                )
+                raise ValueError(f"{spec.directory} retained semantic summary drifted: {key}")
         counts = _mapping(
             item.get("retention_summary"),
             field=f"{spec.directory}.retention_summary",

@@ -21,9 +21,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 PHYSICAL_CAMPAIGN_SCHEMA_VERSION = "dronedream.px4-physical-campaign-evidence.v1"
-PHYSICAL_CAMPAIGN_RECEIPT_SCHEMA_VERSION = (
-    "dronedream.px4-physical-campaign-receipt.v1"
-)
+PHYSICAL_CAMPAIGN_RECEIPT_SCHEMA_VERSION = "dronedream.px4-physical-campaign-receipt.v1"
 PHYSICAL_CAMPAIGN_EVIDENCE_CLASS = "real_px4_gazebo_sitl_physical_campaign"
 PHYSICAL_CAMPAIGN_CLAIM_LABEL = "REAL_PX4_GAZEBO_SITL"
 PHYSICAL_CAMPAIGN_CLAIM_BOUNDARY = (
@@ -266,11 +264,7 @@ def _validate_runtime_release_manifest(
     artifact = _nested_mapping(payload.get("artifact"), field="artifact")
     _require_sha256(artifact.get("sha256"), field="artifact.sha256")
     artifact_size = artifact.get("sizeBytes")
-    if (
-        isinstance(artifact_size, bool)
-        or not isinstance(artifact_size, int)
-        or artifact_size <= 0
-    ):
+    if isinstance(artifact_size, bool) or not isinstance(artifact_size, int) or artifact_size <= 0:
         raise ValueError("Runtime release artifact size is invalid")
     parts = artifact.get("parts")
     if not isinstance(parts, list) or not parts:
@@ -346,9 +340,7 @@ def _validate_runtime_observation(
     if (
         not isinstance(commands, list)
         or len(commands) != len(_EXPECTED_RUNTIME_OBSERVATION_COMMANDS)
-        or [
-            item.get("name") if isinstance(item, dict) else None for item in commands
-        ]
+        or [item.get("name") if isinstance(item, dict) else None for item in commands]
         != list(_EXPECTED_RUNTIME_OBSERVATION_COMMANDS)
     ):
         raise ValueError("Runtime observation command matrix is incomplete")
@@ -367,10 +359,8 @@ def _validate_runtime_observation(
             or any(not isinstance(item, str) or not item for item in argv)
             or not isinstance(stdout, str)
             or not isinstance(stderr, str)
-            or command.get("stdout_sha256")
-            != _sha256_bytes(stdout.encode("utf-8"))
-            or command.get("stderr_sha256")
-            != _sha256_bytes(stderr.encode("utf-8"))
+            or command.get("stdout_sha256") != _sha256_bytes(stdout.encode("utf-8"))
+            or command.get("stderr_sha256") != _sha256_bytes(stderr.encode("utf-8"))
         ):
             raise ValueError("Runtime observation command evidence is invalid")
     return {
@@ -471,9 +461,7 @@ def _validate_telemetry(
         field="semantic_contract.contract_id",
         prefix_allowed=True,
     )
-    unsigned_contract = {
-        key: value for key, value in contract.items() if key != "contract_id"
-    }
+    unsigned_contract = {key: value for key, value in contract.items() if key != "contract_id"}
     if contract_id != _sha256_value(unsigned_contract):
         raise ValueError("telemetry semantic contract_id does not recompute")
     samples = payload.get("samples")
@@ -591,9 +579,7 @@ def _validate_scenario(
     request_effects = request.get("effects")
     if not isinstance(request_effects, list):
         raise ValueError("scenario request effects must be an array")
-    effect_ids = [
-        effect.get("effect_id") for effect in request_effects if isinstance(effect, dict)
-    ]
+    effect_ids = [effect.get("effect_id") for effect in request_effects if isinstance(effect, dict)]
     if len(effect_ids) != len(request_effects) or any(
         not isinstance(effect_id, str) for effect_id in effect_ids
     ):
@@ -648,9 +634,7 @@ def _validate_scenario(
         }
         if normalized_vector != _EXPECTED_WIND_VECTOR:
             raise ValueError("steady-wind Trial vector is not the fixed (0, 2, 0) m/s vector")
-        verification = _nested_mapping(
-            evidence.get("verification"), field="wind verification"
-        )
+        verification = _nested_mapping(evidence.get("verification"), field="wind verification")
         observations = verification.get("observations")
         if not isinstance(observations, list):
             raise ValueError("wind verification observations must be an array")
@@ -663,17 +647,19 @@ def _validate_scenario(
         ]
         if len(readbacks) != 1:
             raise ValueError("wind Trial must retain one /world/default/wind_info read-back")
-        readback_value = _nested_mapping(
-            readbacks[0].get("value"), field="wind read-back value"
-        )
+        readback_value = _nested_mapping(readbacks[0].get("value"), field="wind read-back value")
         readback_vector = _nested_mapping(
             readback_value.get("linear_velocity_mps"),
             field="wind read-back vector",
         )
-        if readback_value.get("enable_wind") is not True or {
-            axis: _require_finite(readback_vector.get(axis), field=f"wind read-back {axis}")
-            for axis in ("x", "y", "z")
-        } != _EXPECTED_WIND_VECTOR:
+        if (
+            readback_value.get("enable_wind") is not True
+            or {
+                axis: _require_finite(readback_vector.get(axis), field=f"wind read-back {axis}")
+                for axis in ("x", "y", "z")
+            }
+            != _EXPECTED_WIND_VECTOR
+        ):
             raise ValueError("wind read-back does not match the fixed request")
     elif scenario == "static_obstacle":
         if effect_id != "obstacles":
@@ -812,9 +798,7 @@ def _validate_success_trial(
         "pass_flag": True,
         "metrics": {
             "rmse_m": _require_finite(metrics.get("rmse"), field="metrics.rmse"),
-            "max_error_m": _require_finite(
-                metrics.get("max_error"), field="metrics.max_error"
-            ),
+            "max_error_m": _require_finite(metrics.get("max_error"), field="metrics.max_error"),
             "completion_time_s": _require_finite(
                 metrics.get("completion_time"), field="metrics.completion_time"
             ),
@@ -837,9 +821,7 @@ def _retained(relative: str, *, failure: bool) -> bool:
         return True
     if failure:
         return relative in _FAILURE_RETAINED
-    return relative in _COMMON_RETAINED or relative.startswith(
-        _SCENARIO_RETAINED_PREFIXES
-    )
+    return relative in _COMMON_RETAINED or relative.startswith(_SCENARIO_RETAINED_PREFIXES)
 
 
 def _omission_reason(relative: str) -> str:
@@ -869,10 +851,19 @@ def _inventory_and_retain(
     records: list[dict[str, Any]] = []
     retained_bytes = 0
     source_bytes = 0
+    source_entries = list(source_dir.rglob("*"))
+    linked_entries = sorted(
+        path.relative_to(source_dir).as_posix() for path in source_entries if path.is_symlink()
+    )
+    if linked_entries:
+        raise ValueError(
+            "physical campaign evidence source must not contain symbolic links: "
+            + ", ".join(linked_entries)
+        )
     source_files = sorted(
         (
             (path.relative_to(source_dir).as_posix(), path)
-            for path in source_dir.rglob("*")
+            for path in source_entries
             if path.is_file()
         ),
         key=lambda item: item[0],
@@ -1005,9 +996,7 @@ def export_physical_campaign_evidence(
 
     subject_commit = _require_commit(subject_commit, field="subject_commit")
     exporter_commit = _require_commit(exporter_commit, field="exporter_commit")
-    failure_source_commit = _require_commit(
-        failure_source_commit, field="failure_source_commit"
-    )
+    failure_source_commit = _require_commit(failure_source_commit, field="failure_source_commit")
     generated_at = _require_utc_timestamp(generated_at, field="generated_at")
     if output_root.exists() and any(output_root.iterdir()):
         raise ValueError(f"output directory must be absent or empty: {output_root}")
@@ -1015,9 +1004,7 @@ def export_physical_campaign_evidence(
 
     runtime_payload = _load_json(runtime_manifest_path)
     firmware_commit = _require_commit(
-        _nested_mapping(runtime_payload.get("source"), field="source").get(
-            "px4Commit"
-        ),
+        _nested_mapping(runtime_payload.get("source"), field="source").get("px4Commit"),
         field="runtime PX4 commit",
     )
     runtime_summary = _validate_runtime_release_manifest(
@@ -1040,9 +1027,7 @@ def export_physical_campaign_evidence(
     if len(trial_specs) != 6:
         raise ValueError("fixed physical campaign must contain exactly six Trials")
     matrix = {(spec.seed, spec.scenario) for spec in trial_specs}
-    expected_matrix = {
-        (seed, scenario) for seed in _EXPECTED_SEEDS for scenario in _SCENARIOS
-    }
+    expected_matrix = {(seed, scenario) for seed in _EXPECTED_SEEDS for scenario in _SCENARIOS}
     if matrix != expected_matrix:
         raise ValueError("physical campaign Trial specs do not form the fixed 2x3 matrix")
 
@@ -1100,9 +1085,7 @@ def export_physical_campaign_evidence(
         summary["source_inventory_sha256"] = _inventory_sha256(inventory)
         summary["retention_summary"] = counts
         if trial_dir.name == "probe-nominal-attempt-4":
-            ulog_rows = [
-                item for item in inventory if item["source_path"] == "px4_source.ulg"
-            ]
+            ulog_rows = [item for item in inventory if item["source_path"] == "px4_source.ulg"]
             if len(ulog_rows) != 1:
                 raise ValueError("attempt 4 must contain exactly one PX4 ULog")
             reprocessed_path = trial_dir / "telemetry.reprocessed.json"
@@ -1113,10 +1096,7 @@ def export_physical_campaign_evidence(
             )
             summary["post_fix_reprocessing"] = {
                 "processor_commit": subject_commit,
-                "path": (
-                    "failure-history/probe-nominal-attempt-4/"
-                    "telemetry.reprocessed.json"
-                ),
+                "path": ("failure-history/probe-nominal-attempt-4/telemetry.reprocessed.json"),
                 "sha256": _sha256_file(reprocessed_path),
                 "bytes": reprocessed_path.stat().st_size,
                 **reprocessed_summary,
@@ -1140,8 +1120,7 @@ def export_physical_campaign_evidence(
 
     rmse_values = [float(entry["metrics"]["rmse_m"]) for entry in trial_entries]
     coverage_values = [
-        float(entry["metrics"]["evaluation_track_coverage"])
-        for entry in trial_entries
+        float(entry["metrics"]["evaluation_track_coverage"]) for entry in trial_entries
     ]
     unsigned_manifest: dict[str, Any] = {
         "schema_version": PHYSICAL_CAMPAIGN_SCHEMA_VERSION,
@@ -1199,8 +1178,7 @@ def export_physical_campaign_evidence(
             "success_count": sum(entry["success"] is True for entry in trial_entries),
             "pass_count": sum(entry["pass_flag"] is True for entry in trial_entries),
             "scenario_verified_applied_count": sum(
-                entry["scenario_evidence"]["verification_status"]
-                == "verified_applied"
+                entry["scenario_evidence"]["verification_status"] == "verified_applied"
                 for entry in trial_entries
             ),
             "retained_failure_probe_count": len(failure_entries),
@@ -1364,14 +1342,10 @@ def verify_physical_campaign_evidence(
         raise ValueError("physical campaign manifest schema is invalid")
     if receipt.get("schema_version") != PHYSICAL_CAMPAIGN_RECEIPT_SCHEMA_VERSION:
         raise ValueError("physical campaign receipt schema is invalid")
-    unsigned_manifest = {
-        key: value for key, value in manifest.items() if key != "manifest_sha256"
-    }
+    unsigned_manifest = {key: value for key, value in manifest.items() if key != "manifest_sha256"}
     if manifest.get("manifest_sha256") != _sha256_value(unsigned_manifest):
         raise ValueError("physical campaign manifest hash does not recompute")
-    unsigned_receipt = {
-        key: value for key, value in receipt.items() if key != "receipt_sha256"
-    }
+    unsigned_receipt = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
     if receipt.get("receipt_sha256") != _sha256_value(unsigned_receipt):
         raise ValueError("physical campaign receipt hash does not recompute")
     manifest_bytes = manifest_path.read_bytes()
@@ -1428,8 +1402,7 @@ def verify_physical_campaign_evidence(
         raise ValueError("physical campaign fixed protocol drifted")
     retention = _nested_mapping(manifest.get("retention_policy"), field="retention_policy")
     if (
-        retention.get("policy_id")
-        != "dronedream.minimum-sufficient-px4-campaign-retention/v1"
+        retention.get("policy_id") != "dronedream.minimum-sufficient-px4-campaign-retention/v1"
         or any(
             retention.get(field) is not True
             for field in (
@@ -1480,18 +1453,14 @@ def verify_physical_campaign_evidence(
         if not isinstance(trial.get("job_id"), str):
             raise ValueError("campaign Trial job_id is invalid")
         job_ids.add(str(trial["job_id"]))
-        directory = _safe_relative_path(
-            trial.get("directory"), field="campaign Trial directory"
-        )
+        directory = _safe_relative_path(trial.get("directory"), field="campaign Trial directory")
         trial_source = source_root / directory if source_root is not None else None
         _verify_retained_inventory(
             trial.get("source_inventory"),
             evidence_root=evidence_root,
             source_root=trial_source,
         )
-        if trial.get("source_inventory_sha256") != _inventory_sha256(
-            trial["source_inventory"]
-        ):
+        if trial.get("source_inventory_sha256") != _inventory_sha256(trial["source_inventory"]):
             raise ValueError("campaign Trial source inventory hash drifted")
         inventory = trial["source_inventory"]
         aggregate_inventory.extend(
@@ -1502,16 +1471,12 @@ def verify_physical_campaign_evidence(
             for item in inventory
         )
         aggregate_counts["source_file_count"] += len(inventory)
-        aggregate_counts["source_bytes"] += sum(
-            int(item["source_bytes"]) for item in inventory
-        )
+        aggregate_counts["source_bytes"] += sum(int(item["source_bytes"]) for item in inventory)
         aggregate_counts["retained_file_count"] += sum(
             item.get("retained") is True for item in inventory
         )
         aggregate_counts["retained_bytes"] += sum(
-            int(item["retained_bytes"])
-            for item in inventory
-            if item.get("retained") is True
+            int(item["retained_bytes"]) for item in inventory if item.get("retained") is True
         )
         metrics = _nested_mapping(trial.get("metrics"), field=f"{directory}.metrics")
         rmse_values.append(_require_finite(metrics.get("rmse_m"), field="metrics.rmse_m"))
@@ -1549,12 +1514,8 @@ def verify_physical_campaign_evidence(
             )
             for key, expected in source_projection.items():
                 if trial.get(key) != expected:
-                    raise ValueError(
-                        f"campaign Trial source projection drifted: {directory}.{key}"
-                    )
-    expected_matrix = {
-        (seed, scenario) for seed in _EXPECTED_SEEDS for scenario in _SCENARIOS
-    }
+                    raise ValueError(f"campaign Trial source projection drifted: {directory}.{key}")
+    expected_matrix = {(seed, scenario) for seed in _EXPECTED_SEEDS for scenario in _SCENARIOS}
     if observed_matrix != expected_matrix or len(job_ids) != 1:
         raise ValueError("physical campaign is not the fixed paired matrix")
 
@@ -1567,26 +1528,21 @@ def verify_physical_campaign_evidence(
     if not isinstance(attempts, list) or len(attempts) != 4:
         raise ValueError("physical campaign failure history is incomplete")
     if [
-        attempt.get("directory") if isinstance(attempt, dict) else None
-        for attempt in attempts
+        attempt.get("directory") if isinstance(attempt, dict) else None for attempt in attempts
     ] != list(_EXPECTED_FAILURE_DIRECTORIES):
         raise ValueError("physical campaign failure history order drifted")
     for raw_attempt in attempts:
         attempt = _nested_mapping(raw_attempt, field="failure attempt")
         if attempt.get("success") is not False:
             raise ValueError("failure history contains a successful attempt")
-        directory = _safe_relative_path(
-            attempt.get("directory"), field="failure attempt directory"
-        )
+        directory = _safe_relative_path(attempt.get("directory"), field="failure attempt directory")
         attempt_source = failure_root / directory if failure_root is not None else None
         _verify_retained_inventory(
             attempt.get("source_inventory"),
             evidence_root=evidence_root,
             source_root=attempt_source,
         )
-        if attempt.get("source_inventory_sha256") != _inventory_sha256(
-            attempt["source_inventory"]
-        ):
+        if attempt.get("source_inventory_sha256") != _inventory_sha256(attempt["source_inventory"]):
             raise ValueError("failure attempt source inventory hash drifted")
         inventory = attempt["source_inventory"]
         aggregate_inventory.extend(
@@ -1597,16 +1553,12 @@ def verify_physical_campaign_evidence(
             for item in inventory
         )
         aggregate_counts["source_file_count"] += len(inventory)
-        aggregate_counts["source_bytes"] += sum(
-            int(item["source_bytes"]) for item in inventory
-        )
+        aggregate_counts["source_bytes"] += sum(int(item["source_bytes"]) for item in inventory)
         aggregate_counts["retained_file_count"] += sum(
             item.get("retained") is True for item in inventory
         )
         aggregate_counts["retained_bytes"] += sum(
-            int(item["retained_bytes"])
-            for item in inventory
-            if item.get("retained") is True
+            int(item["retained_bytes"]) for item in inventory if item.get("retained") is True
         )
         retained_attempt = evidence_root / "failure-history" / PurePosixPath(directory)
         retained_projection = _validate_failure_trial(
@@ -1615,9 +1567,7 @@ def verify_physical_campaign_evidence(
         )
         for key, expected in retained_projection.items():
             if attempt.get(key) != expected:
-                raise ValueError(
-                    f"failure attempt retained projection drifted: {directory}.{key}"
-                )
+                raise ValueError(f"failure attempt retained projection drifted: {directory}.{key}")
         if attempt_source is not None:
             source_projection = _validate_failure_trial(
                 attempt_source,
@@ -1643,10 +1593,7 @@ def verify_physical_campaign_evidence(
             if len(ulog_rows) != 1:
                 raise ValueError("post-fix failure does not bind one PX4 ULog")
             reprocessed_path = (
-                evidence_root
-                / "failure-history"
-                / directory
-                / "telemetry.reprocessed.json"
+                evidence_root / "failure-history" / directory / "telemetry.reprocessed.json"
             )
             telemetry_summary = _validate_reprocessed_failure_telemetry(
                 _load_json(reprocessed_path),
@@ -1658,10 +1605,7 @@ def verify_physical_campaign_evidence(
             )
             expected_post_fix = {
                 "processor_commit": manifest.get("subject_commit"),
-                "path": (
-                    "failure-history/probe-nominal-attempt-4/"
-                    "telemetry.reprocessed.json"
-                ),
+                "path": ("failure-history/probe-nominal-attempt-4/telemetry.reprocessed.json"),
                 "sha256": _sha256_file(reprocessed_path),
                 "bytes": reprocessed_path.stat().st_size,
                 **telemetry_summary,
@@ -1706,9 +1650,7 @@ def verify_physical_campaign_evidence(
 
     for label in ("runtime_manifest", "runtime_observation"):
         artifact = _nested_mapping(runtime.get(label), field=f"runtime_identity.{label}")
-        relative = _safe_relative_path(
-            artifact.get("path"), field=f"runtime_identity.{label}.path"
-        )
+        relative = _safe_relative_path(artifact.get("path"), field=f"runtime_identity.{label}.path")
         path = evidence_root / relative
         if (
             not path.is_file()

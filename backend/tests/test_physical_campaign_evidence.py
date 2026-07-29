@@ -226,6 +226,26 @@ def test_inventory_uses_posix_sort_order_and_deterministic_ulog_gzip(
     assert gzip.decompress(first_gzip.read_bytes()) == ulog
 
 
+def test_inventory_rejects_symlink_to_file_outside_source(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    outside = tmp_path / "outside-secret.txt"
+    outside.write_text("must not be retained", encoding="utf-8")
+    linked = source / "trial_result.json"
+    try:
+        linked.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symbolic links are unavailable in this environment: {exc}")
+
+    with pytest.raises(ValueError, match="must not contain symbolic links"):
+        physical_campaign_evidence._inventory_and_retain(
+            source,
+            output_root=tmp_path / "bundle",
+            retained_prefix=PurePosixPath("trial"),
+            failure=False,
+        )
+
+
 def test_attempt_four_reprocessing_remains_a_diagnostic_contract() -> None:
     ulog = b"diagnostic ULog"
     ulog_sha = hashlib.sha256(ulog).hexdigest()

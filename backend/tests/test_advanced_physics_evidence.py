@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from app.simulator import advanced_physics_evidence
 from app.simulator.advanced_physics_evidence import (
     ATTEMPT_SPECS,
     CLAIM_BOUNDARY,
@@ -230,9 +231,7 @@ def _build_source(root: Path) -> Path:
         (directory / "runner.log").write_text("fixture\n", encoding="utf-8")
         (directory / "stdout.log").write_text("fixture stdout\n", encoding="utf-8")
         stderr = (
-            "fixture stderr\n"
-            if spec.expected_success
-            else "PX4 readiness timeout after 30.0s\n"
+            "fixture stderr\n" if spec.expected_success else "PX4 readiness timeout after 30.0s\n"
         )
         (directory / "stderr.log").write_text(stderr, encoding="utf-8")
         sdf = directory / "scenario_runtime" / "generated_world.sdf"
@@ -297,12 +296,7 @@ def test_export_is_deterministic_and_verifies_every_raw_byte(tmp_path: Path) -> 
     assert manifest["summary"]["file_backed_preflight_failure_count"] == 1
     assert receipt["result"]["status"] == "passed"
 
-    ulog = (
-        first
-        / "attempts"
-        / "success-five-effects-attempt-4"
-        / "px4_source.ulg.gz"
-    )
+    ulog = first / "attempts" / "success-five-effects-attempt-4" / "px4_source.ulg.gz"
     raw = ulog.read_bytes()
     assert int.from_bytes(raw[4:8], "little") == 0
 
@@ -311,12 +305,7 @@ def test_verifier_rejects_retained_tampering(tmp_path: Path) -> None:
     source = _build_source(tmp_path / "source")
     output = tmp_path / "bundle"
     _export(source, output)
-    retained = (
-        output
-        / "attempts"
-        / "success-five-effects-attempt-4"
-        / "trial-result.json"
-    )
+    retained = output / "attempts" / "success-five-effects-attempt-4" / "trial-result.json"
     retained.write_bytes(retained.read_bytes() + b" ")
 
     with pytest.raises(ValueError, match="retained evidence drifted"):
@@ -343,13 +332,28 @@ def test_raw_verifier_rejects_omitted_source_tampering(tmp_path: Path) -> None:
         )
 
 
+def test_inventory_rejects_symlink_to_file_outside_source(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    outside = tmp_path / "outside-secret.txt"
+    outside.write_text("must not be retained", encoding="utf-8")
+    linked = source / "trial-result.json"
+    try:
+        linked.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symbolic links are unavailable in this environment: {exc}")
+
+    with pytest.raises(ValueError, match="must not contain symbolic links"):
+        advanced_physics_evidence._inventory_and_retain(
+            source,
+            spec=ATTEMPT_SPECS[0],
+            output_root=tmp_path / "bundle",
+        )
+
+
 def test_export_rejects_boundary_without_readiness_timeout(tmp_path: Path) -> None:
     source = _build_source(tmp_path / "source")
-    stderr = (
-        source
-        / "gps-readiness-boundary-attempt-2"
-        / "stderr.log"
-    )
+    stderr = source / "gps-readiness-boundary-attempt-2" / "stderr.log"
     stderr.write_text("generic failure\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="readiness boundary drifted"):
@@ -358,11 +362,7 @@ def test_export_rejects_boundary_without_readiness_timeout(tmp_path: Path) -> No
 
 def test_export_rejects_unverified_effect(tmp_path: Path) -> None:
     source = _build_source(tmp_path / "source")
-    path = (
-        source
-        / "success-five-effects-attempt-4"
-        / "scenario_effects.applied.json"
-    )
+    path = source / "success-five-effects-attempt-4" / "scenario_effects.applied.json"
     evidence = json.loads(path.read_text(encoding="utf-8"))
     evidence["effects"][0]["evidence"]["verification"]["status"] = "unverified"
     _write_json(path, evidence)
