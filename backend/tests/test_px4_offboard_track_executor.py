@@ -243,6 +243,8 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
     battery_value = artifact["records"][0]["evidence"]["verification"]["observations"][0][
         "value"
     ]
+    assert battery_value["takeoff_gate_parameters"]["SIM_BAT_MIN_PCT"]["applied"] == 100.0
+    assert battery_value["takeoff_gate_parameters"]["SIM_BAT_DRAIN"]["applied"] == 86400.0
     assert battery_value["track_start_sample"]["remaining_percent"] == 60.0
     assert battery_value["track_end_sample"]["remaining_percent"] == 58.0
     final_payload = scenario_effects.build_scenario_effect_evidence(
@@ -345,6 +347,104 @@ def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
     assert timing["track_start_t"] <= timing["track_end_t"]
 
 
+def test_executor_waits_for_continuously_stable_hover_before_track_entry(
+    tmp_path: Path,
+) -> None:
+    client = executor.FakeOffboardClient()
+    client.position_velocity_samples = [
+        executor.PositionVelocityNed(0.0, 0.0, -1.0, 0.0, 0.0, -1.5),
+        executor.PositionVelocityNed(0.0, 0.0, -3.0, 0.0, 0.0, 0.0),
+        executor.PositionVelocityNed(0.0, 0.0, -3.0, 0.0, 0.0, 0.0),
+        executor.PositionVelocityNed(0.0, 0.0, -3.0, 0.0, 0.0, 0.0),
+    ]
+    schedule = [
+        executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+        executor.Setpoint(2.0, 0.0, -3.0, 0.0),
+    ]
+    timing_path = tmp_path / "offboard_timing.json"
+
+    asyncio.run(
+        executor.run_executor(
+            client,
+            schedule,
+            connection="udp://:14540",
+            takeoff_timeout_seconds=1.0,
+            track_timeout_seconds=5.0,
+            rate_hz=100.0,
+            land_after=True,
+            log_path=tmp_path / "offboard.log",
+            track_start_index=1,
+            track_end_index=1,
+            timing_path=timing_path,
+            takeoff_stable_window_seconds=0.015,
+        )
+    )
+
+    first_track_setpoint = next(
+        index for index, setpoint in enumerate(client.setpoints) if setpoint.north_m == 2.0
+    )
+    assert first_track_setpoint >= 5
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    gate = timing["takeoff_gate"]
+    assert gate["status"] == "achieved"
+    assert gate["readiness_observed"] is True
+    assert gate["sample_count"] >= 3
+    assert gate["observations"][0]["within_all_limits"] is False
+    assert gate["latest_observation"]["within_all_limits"] is True
+    assert timing["takeoff_stable_t"] <= timing["track_start_t"]
+    assert timing["cleanup"] == {
+        "stop_offboard": "completed",
+        "land": "command_sent",
+        "close": "completed",
+    }
+
+
+def test_executor_fails_closed_when_hover_velocity_never_stabilizes(
+    tmp_path: Path,
+) -> None:
+    client = executor.FakeOffboardClient()
+    client.position_velocity_samples = [
+        executor.PositionVelocityNed(0.0, 0.0, -3.0, 1.0, 0.0, 0.0)
+    ]
+    timing_path = tmp_path / "offboard_timing.json"
+
+    with pytest.raises(TimeoutError, match="continuously stable hover"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [
+                    executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+                    executor.Setpoint(2.0, 0.0, -3.0, 0.0),
+                ],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=0.04,
+                track_timeout_seconds=5.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                track_start_index=1,
+                track_end_index=1,
+                timing_path=timing_path,
+                takeoff_stable_window_seconds=0.01,
+            )
+        )
+
+    assert all(setpoint.north_m == 0.0 for setpoint in client.setpoints)
+    assert client.offboard_started is False
+    assert client.landed is True
+    assert client.closed is True
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert timing["status"] == "failed"
+    assert timing["takeoff_gate"]["status"] == "failed"
+    assert timing["takeoff_gate"]["failure_reason"] == "takeoff_stability_timeout"
+    assert timing["takeoff_gate"]["latest_observation"]["horizontal_speed_m_s"] == 1.0
+    assert timing["cleanup"] == {
+        "stop_offboard": "completed_during_failure_cleanup",
+        "land": "command_sent_during_failure_cleanup",
+        "close": "completed",
+    }
+
+
 def test_executor_stops_offboard_and_lands_after_streaming_failure(tmp_path: Path):
     class FailingClient(executor.FakeOffboardClient):
         async def set_position_ned(self, setpoint: executor.Setpoint) -> None:
@@ -419,6 +519,78 @@ def test_mavsdk_readiness_timeout_applies_when_stream_emits_nothing():
     client._system = SilentSystem()
     with pytest.raises(TimeoutError, match="PX4 readiness timeout"):
         asyncio.run(client.wait_until_ready(0.01))
+
+
+def test_mavsdk_readiness_returns_observed_health_state():
+    class CoreStub:
+        async def connection_state(self):
+            yield type("ConnectionState", (), {"is_connected": True})()
+
+    class TelemetryStub:
+        async def health(self):
+            yield type(
+                "Health",
+                (),
+                {
+                    "is_global_position_ok": True,
+                    "is_home_position_ok": True,
+                    "is_local_position_ok": True,
+                    "is_armable": True,
+                },
+            )()
+
+    class SystemStub:
+        core = CoreStub()
+        telemetry = TelemetryStub()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = SystemStub()
+
+    assert asyncio.run(client.wait_until_ready(1.0)) == executor.TelemetryHealth(
+        connected=True,
+        global_position_ok=True,
+        home_position_ok=True,
+        local_position_ok=True,
+        armable=True,
+    )
+
+
+def test_mavsdk_position_velocity_sample_preserves_ned_units():
+    class TelemetryStub:
+        async def position_velocity_ned(self):
+            yield type(
+                "PositionVelocity",
+                (),
+                {
+                    "position": type(
+                        "Position",
+                        (),
+                        {"north_m": 1.0, "east_m": -2.0, "down_m": -3.0},
+                    )(),
+                    "velocity": type(
+                        "Velocity",
+                        (),
+                        {"north_m_s": 0.1, "east_m_s": -0.2, "down_m_s": 0.3},
+                    )(),
+                },
+            )()
+
+    class SystemStub:
+        telemetry = TelemetryStub()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = SystemStub()
+
+    assert asyncio.run(client.sample_position_velocity_ned(1.0)) == (
+        executor.PositionVelocityNed(
+            north_m=1.0,
+            east_m=-2.0,
+            down_m=-3.0,
+            north_m_s=0.1,
+            east_m_s=-0.2,
+            down_m_s=0.3,
+        )
+    )
 
 
 def test_mavsdk_battery_remaining_percent_keeps_documented_zero_to_100_units():

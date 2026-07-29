@@ -76,10 +76,29 @@ class SetpointSchedulePlan:
     track_end_index: int
 
 
+@dataclass(frozen=True)
+class TelemetryHealth:
+    connected: bool
+    global_position_ok: bool
+    home_position_ok: bool
+    local_position_ok: bool
+    armable: bool
+
+
+@dataclass(frozen=True)
+class PositionVelocityNed:
+    north_m: float
+    east_m: float
+    down_m: float
+    north_m_s: float
+    east_m_s: float
+    down_m_s: float
+
+
 class OffboardClientProtocol(Protocol):
     async def connect(self, connection_url: str) -> None: ...
 
-    async def wait_until_ready(self, timeout_seconds: float) -> None: ...
+    async def wait_until_ready(self, timeout_seconds: float) -> TelemetryHealth: ...
 
     async def arm(self) -> None: ...
 
@@ -102,6 +121,11 @@ class OffboardClientProtocol(Protocol):
     async def sample_battery(self, timeout_seconds: float) -> dict[str, float]: ...
 
     async def sample_gps_info(self, timeout_seconds: float) -> dict[str, int | str]: ...
+
+    async def sample_position_velocity_ned(
+        self,
+        timeout_seconds: float,
+    ) -> PositionVelocityNed: ...
 
     async def close(self) -> None: ...
 
@@ -131,7 +155,7 @@ class MavsdkOffboardClient:
             raise RuntimeError("PX4 offboard client is not connected")
         return self._system
 
-    async def wait_until_ready(self, timeout_seconds: float) -> None:
+    async def wait_until_ready(self, timeout_seconds: float) -> TelemetryHealth:
         system = self._require_system()
         try:
             async with asyncio.timeout(timeout_seconds):
@@ -144,10 +168,26 @@ class MavsdkOffboardClient:
                     raise RuntimeError("PX4 connection state stream ended before connecting")
 
                 async for health in system.telemetry.health():
-                    if bool(getattr(health, "is_global_position_ok", True)) and bool(
-                        getattr(health, "is_home_position_ok", True)
+                    sample = TelemetryHealth(
+                        connected=True,
+                        global_position_ok=bool(
+                            getattr(health, "is_global_position_ok", False)
+                        ),
+                        home_position_ok=bool(
+                            getattr(health, "is_home_position_ok", False)
+                        ),
+                        local_position_ok=bool(
+                            getattr(health, "is_local_position_ok", False)
+                        ),
+                        armable=bool(getattr(health, "is_armable", False)),
+                    )
+                    if (
+                        sample.global_position_ok
+                        and sample.home_position_ok
+                        and sample.local_position_ok
+                        and sample.armable
                     ):
-                        return
+                        return sample
                 raise RuntimeError("PX4 health stream ended before the vehicle became ready")
         except TimeoutError:
             raise TimeoutError(f"PX4 readiness timeout after {timeout_seconds}s") from None
@@ -226,6 +266,35 @@ class MavsdkOffboardClient:
                 f"PX4 GPS info telemetry timeout after {timeout_seconds:g}s"
             ) from None
 
+    async def sample_position_velocity_ned(
+        self,
+        timeout_seconds: float,
+    ) -> PositionVelocityNed:
+        async def _sample() -> PositionVelocityNed:
+            async for telemetry in self._require_system().telemetry.position_velocity_ned():
+                position = telemetry.position
+                velocity = telemetry.velocity
+                sample = PositionVelocityNed(
+                    north_m=float(position.north_m),
+                    east_m=float(position.east_m),
+                    down_m=float(position.down_m),
+                    north_m_s=float(velocity.north_m_s),
+                    east_m_s=float(velocity.east_m_s),
+                    down_m_s=float(velocity.down_m_s),
+                )
+                if not all(math.isfinite(value) for value in sample.__dict__.values()):
+                    raise RuntimeError("PX4 position/velocity telemetry contains non-finite values")
+                return sample
+            raise RuntimeError("PX4 position/velocity telemetry stream ended without a sample")
+
+        try:
+            return await asyncio.wait_for(_sample(), timeout=timeout_seconds)
+        except TimeoutError:
+            raise TimeoutError(
+                "PX4 position/velocity telemetry timeout after "
+                f"{timeout_seconds:g}s"
+            ) from None
+
     async def close(self) -> None:
         system = self._system
         self._system = None
@@ -257,13 +326,21 @@ class FakeOffboardClient:
         self.gps_info_samples: list[dict[str, int | str]] = [
             {"num_satellites": 10, "fix_type": 3, "fix_type_name": "FIX_3D"}
         ]
+        self.position_velocity_samples: list[PositionVelocityNed] = []
 
     async def connect(self, connection_url: str) -> None:
         _ = connection_url
         self.connected = True
 
-    async def wait_until_ready(self, timeout_seconds: float) -> None:
+    async def wait_until_ready(self, timeout_seconds: float) -> TelemetryHealth:
         _ = timeout_seconds
+        return TelemetryHealth(
+            connected=True,
+            global_position_ok=True,
+            home_position_ok=True,
+            local_position_ok=True,
+            armable=True,
+        )
 
     async def arm(self) -> None:
         self.armed = True
@@ -306,6 +383,25 @@ class FakeOffboardClient:
             "fix_type": 3 if target_used >= 4 else 0,
             "fix_type_name": "FIX_3D" if target_used >= 4 else "NO_GPS",
         }
+
+    async def sample_position_velocity_ned(
+        self,
+        timeout_seconds: float,
+    ) -> PositionVelocityNed:
+        _ = timeout_seconds
+        if self.position_velocity_samples:
+            if len(self.position_velocity_samples) > 1:
+                return self.position_velocity_samples.pop(0)
+            return self.position_velocity_samples[0]
+        target = self.setpoints[-1] if self.setpoints else Setpoint(0.0, 0.0, 0.0, 0.0)
+        return PositionVelocityNed(
+            north_m=target.north_m,
+            east_m=target.east_m,
+            down_m=target.down_m,
+            north_m_s=0.0,
+            east_m_s=0.0,
+            down_m_s=0.0,
+        )
 
     async def close(self) -> None:
         self.closed = True
@@ -353,6 +449,46 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--track-timeout-seconds",
         type=float,
         default=_parse_float(os.environ.get("PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS"), default=120.0),
+    )
+    parser.add_argument(
+        "--takeoff-horizontal-tolerance-m",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_HORIZONTAL_TOLERANCE_M"),
+            default=0.35,
+        ),
+    )
+    parser.add_argument(
+        "--takeoff-vertical-tolerance-m",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_VERTICAL_TOLERANCE_M"),
+            default=0.25,
+        ),
+    )
+    parser.add_argument(
+        "--takeoff-horizontal-speed-tolerance-m-s",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_HORIZONTAL_SPEED_TOLERANCE_M_S"),
+            default=0.35,
+        ),
+    )
+    parser.add_argument(
+        "--takeoff-vertical-speed-tolerance-m-s",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_VERTICAL_SPEED_TOLERANCE_M_S"),
+            default=0.25,
+        ),
+    )
+    parser.add_argument(
+        "--takeoff-stable-window-seconds",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_STABLE_WINDOW_SECONDS"),
+            default=1.5,
+        ),
     )
     parser.add_argument("--log", required=True, type=Path)
     return parser.parse_args(argv)
@@ -690,6 +826,168 @@ def build_setpoint_schedule_plan(
     )
 
 
+def _validate_takeoff_gate_limit(value: float, label: str, *, allow_zero: bool = False) -> None:
+    if not math.isfinite(value) or value < 0 or (value == 0 and not allow_zero):
+        comparator = "non-negative" if allow_zero else "greater than zero"
+        raise ValueError(f"{label} must be finite and {comparator}")
+
+
+def _health_payload(health: TelemetryHealth | None) -> dict[str, bool]:
+    if health is None:
+        return {
+            "connected": False,
+            "global_position_ok": False,
+            "home_position_ok": False,
+            "local_position_ok": False,
+            "armable": False,
+        }
+    return {
+        "connected": health.connected,
+        "global_position_ok": health.global_position_ok,
+        "home_position_ok": health.home_position_ok,
+        "local_position_ok": health.local_position_ok,
+        "armable": health.armable,
+    }
+
+
+def _position_velocity_payload(
+    sample: PositionVelocityNed,
+    target: Setpoint,
+) -> dict[str, float | bool]:
+    horizontal_error_m = math.hypot(
+        sample.north_m - target.north_m,
+        sample.east_m - target.east_m,
+    )
+    vertical_error_m = abs(sample.down_m - target.down_m)
+    horizontal_speed_m_s = math.hypot(sample.north_m_s, sample.east_m_s)
+    vertical_speed_m_s = abs(sample.down_m_s)
+    return {
+        "north_m": sample.north_m,
+        "east_m": sample.east_m,
+        "down_m": sample.down_m,
+        "north_m_s": sample.north_m_s,
+        "east_m_s": sample.east_m_s,
+        "down_m_s": sample.down_m_s,
+        "horizontal_error_m": horizontal_error_m,
+        "vertical_error_m": vertical_error_m,
+        "horizontal_speed_m_s": horizontal_speed_m_s,
+        "vertical_speed_m_s": vertical_speed_m_s,
+    }
+
+
+async def _wait_for_takeoff_stability(
+    client: OffboardClientProtocol,
+    target: Setpoint,
+    *,
+    timeout_seconds: float,
+    sample_rate_hz: float,
+    stable_window_seconds: float,
+    horizontal_tolerance_m: float,
+    vertical_tolerance_m: float,
+    horizontal_speed_tolerance_m_s: float,
+    vertical_speed_tolerance_m_s: float,
+    evidence: dict[str, Any],
+) -> None:
+    for label, value, allow_zero in (
+        ("timeout_seconds", timeout_seconds, False),
+        ("sample_rate_hz", sample_rate_hz, False),
+        ("stable_window_seconds", stable_window_seconds, True),
+        ("horizontal_tolerance_m", horizontal_tolerance_m, False),
+        ("vertical_tolerance_m", vertical_tolerance_m, False),
+        (
+            "horizontal_speed_tolerance_m_s",
+            horizontal_speed_tolerance_m_s,
+            False,
+        ),
+        ("vertical_speed_tolerance_m_s", vertical_speed_tolerance_m_s, False),
+    ):
+        _validate_takeoff_gate_limit(value, label, allow_zero=allow_zero)
+
+    sample_interval_seconds = max(0.01, 1.0 / sample_rate_hz)
+    telemetry_timeout_seconds = min(1.0, timeout_seconds)
+    deadline = time.monotonic() + timeout_seconds
+    stable_since: float | None = None
+    evidence.update(
+        {
+            "schema_version": "dronedream.takeoff_gate.v1",
+            "status": "waiting",
+            "target_ned": {
+                "north_m": target.north_m,
+                "east_m": target.east_m,
+                "down_m": target.down_m,
+            },
+            "tolerances": {
+                "horizontal_position_m": horizontal_tolerance_m,
+                "vertical_position_m": vertical_tolerance_m,
+                "horizontal_speed_m_s": horizontal_speed_tolerance_m_s,
+                "vertical_speed_m_s": vertical_speed_tolerance_m_s,
+            },
+            "required_stable_window_s": stable_window_seconds,
+            "sample_count": 0,
+            "stable_sample_count": 0,
+            "reset_count": 0,
+            "observations": [],
+        }
+    )
+
+    while True:
+        now = time.monotonic()
+        remaining = deadline - now
+        if remaining <= 0:
+            latest = evidence.get("latest_observation")
+            evidence["status"] = "failed"
+            evidence["failure_reason"] = "takeoff_stability_timeout"
+            raise TimeoutError(
+                "takeoff did not reach a continuously stable hover within "
+                f"{timeout_seconds:g}s; latest={latest}"
+            )
+
+        await client.set_position_ned(target)
+        try:
+            sample = await client.sample_position_velocity_ned(
+                min(telemetry_timeout_seconds, remaining)
+            )
+        except BaseException as exc:
+            evidence["status"] = "failed"
+            evidence["failure_reason"] = "position_velocity_telemetry_unavailable"
+            evidence["telemetry_error"] = f"{type(exc).__name__}: {exc}"
+            raise
+
+        observed_at = time.monotonic()
+        payload = _position_velocity_payload(sample, target)
+        within_limits = bool(
+            float(payload["horizontal_error_m"]) <= horizontal_tolerance_m
+            and float(payload["vertical_error_m"]) <= vertical_tolerance_m
+            and float(payload["horizontal_speed_m_s"])
+            <= horizontal_speed_tolerance_m_s
+            and float(payload["vertical_speed_m_s"]) <= vertical_speed_tolerance_m_s
+        )
+        payload["within_all_limits"] = within_limits
+        evidence["sample_count"] = int(evidence["sample_count"]) + 1
+        if within_limits:
+            evidence["stable_sample_count"] = int(evidence["stable_sample_count"]) + 1
+            if stable_since is None:
+                stable_since = observed_at
+        else:
+            if stable_since is not None:
+                evidence["reset_count"] = int(evidence["reset_count"]) + 1
+            stable_since = None
+
+        stable_duration = 0.0 if stable_since is None else observed_at - stable_since
+        payload["stable_duration_s"] = stable_duration
+        evidence["latest_observation"] = payload
+        observations = evidence["observations"]
+        if isinstance(observations, list):
+            observations.append(payload)
+
+        if within_limits and stable_duration >= stable_window_seconds:
+            evidence["status"] = "achieved"
+            evidence["achieved_stable_window_s"] = stable_duration
+            return
+
+        await asyncio.sleep(min(sample_interval_seconds, max(0.0, deadline - time.monotonic())))
+
+
 async def _set_float_parameter_verified(
     client: OffboardClientProtocol,
     name: str,
@@ -793,6 +1091,23 @@ async def _prepare_battery_profile(
     }
 
 
+async def _hold_battery_during_takeoff_gate(
+    client: OffboardClientProtocol,
+) -> dict[str, dict[str, float]]:
+    return {
+        "SIM_BAT_MIN_PCT": await _set_float_parameter_verified(
+            client,
+            "SIM_BAT_MIN_PCT",
+            100.0,
+        ),
+        "SIM_BAT_DRAIN": await _set_float_parameter_verified(
+            client,
+            "SIM_BAT_DRAIN",
+            86400.0,
+        ),
+    }
+
+
 async def _transition_battery_at_track_start(
     client: OffboardClientProtocol,
     profile: dict[str, Any],
@@ -848,6 +1163,11 @@ async def run_executor(
     scenario_request: dict[str, Any] | None = None,
     runtime_profile: dict[str, Any] | None = None,
     runtime_evidence_path: Path | None = None,
+    takeoff_stable_window_seconds: float = 0.0,
+    takeoff_horizontal_tolerance_m: float = 0.35,
+    takeoff_vertical_tolerance_m: float = 0.25,
+    takeoff_horizontal_speed_tolerance_m_s: float = 0.35,
+    takeoff_vertical_speed_tolerance_m_s: float = 0.25,
 ) -> None:
     if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
         raise ValueError(f"rate_hz must be finite and in (0, {MAX_SETPOINT_RATE_HZ:g}]")
@@ -864,7 +1184,17 @@ async def run_executor(
         "time_base": "executor_relative_seconds",
         "setpoint_count": len(schedule),
         "rate_hz": rate_hz,
+        "takeoff_gate": {
+            "status": "not_started",
+        },
+        "cleanup": {
+            "stop_offboard": "not_needed",
+            "land": "not_requested" if not land_after else "not_needed",
+            "close": "pending",
+        },
     }
+    takeoff_gate = timing["takeoff_gate"]
+    cleanup = timing["cleanup"]
     track_end = (
         len(schedule) - 1
         if track_end_index is None
@@ -887,6 +1217,7 @@ async def run_executor(
     gps_schedule: list[bool] = []
     gps_last_tick = -1
     gps_off = False
+    battery_takeoff_gate_parameters: dict[str, dict[str, float]] | None = None
     if isinstance(gps_profile, dict):
         runtime_profile_details = _require_runtime_details(
             runtime_profile,
@@ -906,7 +1237,9 @@ async def run_executor(
     try:
         await client.connect(connection)
         _log(log_path, f"connected via {connection}")
-        await client.wait_until_ready(takeoff_timeout_seconds)
+        health = await client.wait_until_ready(takeoff_timeout_seconds)
+        takeoff_gate["readiness"] = _health_payload(health)
+        takeoff_gate["readiness_observed"] = all(takeoff_gate["readiness"].values())
         if isinstance(gps_profile, dict):
             baseline_satellites = await client.get_param_int("SIM_GPS_USED")
             if baseline_satellites < 4:
@@ -925,10 +1258,8 @@ async def run_executor(
                 f"SIM_GPS_USED baseline recorded as {baseline_satellites}",
             )
         if isinstance(battery_profile, dict):
-            battery_details = await _prepare_battery_profile(
-                client,
-                battery_profile,
-                takeoff_hold_seconds=max(1.0 / rate_hz, track_start / rate_hz),
+            battery_takeoff_gate_parameters = await _hold_battery_during_takeoff_gate(
+                client
             )
         await client.arm()
         armed = True
@@ -940,6 +1271,32 @@ async def run_executor(
         offboard_started = True
         timing["offboard_start_t"] = time.monotonic() - exec_start
         _log(log_path, "offboard started")
+
+        await _wait_for_takeoff_stability(
+            client,
+            schedule[0],
+            timeout_seconds=takeoff_timeout_seconds,
+            sample_rate_hz=rate_hz,
+            stable_window_seconds=takeoff_stable_window_seconds,
+            horizontal_tolerance_m=takeoff_horizontal_tolerance_m,
+            vertical_tolerance_m=takeoff_vertical_tolerance_m,
+            horizontal_speed_tolerance_m_s=takeoff_horizontal_speed_tolerance_m_s,
+            vertical_speed_tolerance_m_s=takeoff_vertical_speed_tolerance_m_s,
+            evidence=takeoff_gate,
+        )
+        timing["takeoff_stable_t"] = time.monotonic() - exec_start
+        _log(log_path, "takeoff telemetry gate achieved stable hover")
+
+        if isinstance(battery_profile, dict):
+            battery_details = await _prepare_battery_profile(
+                client,
+                battery_profile,
+                takeoff_hold_seconds=max(1.0 / rate_hz, track_start / rate_hz),
+            )
+            battery_details["takeoff_gate_parameters"] = _require_runtime_details(
+                battery_takeoff_gate_parameters,
+                label="battery takeoff-gate control details",
+            )
 
         dt = 1.0 / rate_hz
         start = time.monotonic()
@@ -1065,14 +1422,22 @@ async def run_executor(
             }
         await client.stop_offboard()
         offboard_stopped = True
+        cleanup["stop_offboard"] = "completed"
         _log(log_path, "offboard stopped")
         if land_after:
             timing["land_start_t"] = time.monotonic() - exec_start
             await client.land()
             land_command_sent = True
+            cleanup["land"] = "command_sent"
             _log(log_path, "land command sent")
     except BaseException as exc:
         runtime_failure = f"{type(exc).__name__}: {exc}"
+        if takeoff_gate.get("status") not in {"achieved", "failed"}:
+            takeoff_gate["status"] = "failed"
+            takeoff_gate["failure_reason"] = "readiness_or_preflight_failure"
+            takeoff_gate["preflight_error"] = runtime_failure
+        timing["status"] = "failed"
+        timing["failure"] = runtime_failure
         raise
     finally:
         reset_error: Exception | None = None
@@ -1113,15 +1478,21 @@ async def run_executor(
         if offboard_started and not offboard_stopped:
             try:
                 await client.stop_offboard()
+                offboard_stopped = True
+                cleanup["stop_offboard"] = "completed_during_failure_cleanup"
                 _log(log_path, "offboard stopped during failure cleanup")
             except Exception as exc:
+                cleanup["stop_offboard"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard failure cleanup could not stop offboard: {exc}")
         if armed and land_after and not land_command_sent:
             try:
                 timing.setdefault("land_start_t", time.monotonic() - exec_start)
                 await client.land()
+                land_command_sent = True
+                cleanup["land"] = "command_sent_during_failure_cleanup"
                 _log(log_path, "land command sent during failure cleanup")
             except Exception as exc:
+                cleanup["land"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard failure cleanup could not land: {exc}")
         try:
             if (
@@ -1139,14 +1510,18 @@ async def run_executor(
                     status="complete" if runtime_failure is None else "failed",
                     error=runtime_failure,
                 )
-            if timing_path is not None:
-                _write_offboard_timing(timing_path, timing)
+            if runtime_failure is None:
+                timing["status"] = "complete"
         finally:
             try:
                 await client.close()
+                cleanup["close"] = "completed"
                 _log(log_path, "offboard client closed")
             except Exception as exc:
+                cleanup["close"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard client cleanup failed: {exc}")
+            if timing_path is not None:
+                _write_offboard_timing(timing_path, timing)
         reset_failure_text = (
             f"{type(reset_error).__name__}: {reset_error}" if reset_error is not None else None
         )
@@ -1194,6 +1569,10 @@ def main(argv: list[str] | None = None) -> int:
                 "offboard_start_t": 0.0,
                 "track_start_t": plan.track_start_index / max(1e-6, args.setpoint_rate_hz),
                 "track_end_t": plan.track_end_index / max(1e-6, args.setpoint_rate_hz),
+                "takeoff_gate": {
+                    "status": "dry_run_not_observed",
+                    "reason": "dry-run does not emit PX4 position/velocity telemetry",
+                },
             }
             _write_offboard_timing(args.run_dir / "offboard_timing.json", dry_timing)
             return 0
@@ -1216,6 +1595,15 @@ def main(argv: list[str] | None = None) -> int:
                 scenario_request=scenario_request,
                 runtime_profile=runtime_profile,
                 runtime_evidence_path=runtime_evidence_path,
+                takeoff_stable_window_seconds=args.takeoff_stable_window_seconds,
+                takeoff_horizontal_tolerance_m=args.takeoff_horizontal_tolerance_m,
+                takeoff_vertical_tolerance_m=args.takeoff_vertical_tolerance_m,
+                takeoff_horizontal_speed_tolerance_m_s=(
+                    args.takeoff_horizontal_speed_tolerance_m_s
+                ),
+                takeoff_vertical_speed_tolerance_m_s=(
+                    args.takeoff_vertical_speed_tolerance_m_s
+                ),
             )
         )
         _log(args.log, "executor completed successfully")
