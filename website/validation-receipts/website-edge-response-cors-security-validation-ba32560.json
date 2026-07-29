@@ -1,0 +1,239 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-edge-response-cors-security-validation",
+  "generatedAtUtc": "2026-07-29T21:25:41Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "ba325606737e6309e6186c5a4815a35c56809a83",
+    "sourceTree": "a50d4e02d4835527bfe0bcdb267dc6401afbbd39",
+    "sourceStateDuringValidation": "clean",
+    "attestationRule": "This receipt attests only the immutable source commit. The receipt-only commit that contains this file is not self-attested."
+  },
+  "scope": {
+    "implemented": [
+      "A shared bounded upstream-response reader rejects an oversized valid Content-Length before reading and treats measured stream bytes as authoritative when Content-Length is absent, invalid, or false.",
+      "The reader cancels rejected streams, releases reader locks, uses fatal UTF-8 decoding, and returns structured sanitized failures for size, stream, abort, and encoding errors without exposing upstream bytes.",
+      "The managed-model provider response budget is 32768 base bytes plus 64 bytes per configured max output token, with the token input bounded to 16384 and an absolute 1048576-byte response cap.",
+      "WeChat Pay and Stripe response bodies both use a fixed 65536-byte cap before signature verification or JSON parsing.",
+      "The public HTTP mirror origin http://47.93.180.216 was removed from both sensitive Function default CORS allowlists. Wildcards, opaque null origins, unknown origins, public HTTP aliases, and unsafe configured allowlists fail closed.",
+      "The HTTP mirror remains available for anonymous public viewing and versioned downloads, while account, console, managed-model, community-write, and checkout entries are disabled before a sensitive request can be issued.",
+      "Existing bearer-token, grant, callback-signature, idempotency, and provider-verification controls remain in place; CORS is explicitly not treated as authentication."
+    ],
+    "sourceFiles": [
+      "frontend/src/AppShell.tsx",
+      "frontend/src/__tests__/CloudModelAccess.test.ts",
+      "frontend/src/__tests__/CommunityPage.test.tsx",
+      "frontend/src/__tests__/PricingPage.test.tsx",
+      "frontend/src/__tests__/PublicSite.test.tsx",
+      "frontend/src/__tests__/SensitiveOrigin.test.ts",
+      "frontend/src/features/auth/AuthContext.tsx",
+      "frontend/src/features/settings/cloudModelAccess.ts",
+      "frontend/src/security/sensitiveOrigin.ts",
+      "frontend/src/site/CommunityPage.tsx",
+      "frontend/src/site/PricingPage.tsx",
+      "frontend/src/site/SiteApp.tsx",
+      "frontend/src/site/main.tsx",
+      "frontend/src/site/site.css",
+      "supabase/functions/_shared/bounded_response.test.ts",
+      "supabase/functions/_shared/bounded_response.ts",
+      "supabase/functions/_shared/sensitive_cors.test.ts",
+      "supabase/functions/_shared/sensitive_cors.ts",
+      "supabase/functions/billing-checkout/index.test.ts",
+      "supabase/functions/billing-checkout/index.ts",
+      "supabase/functions/model-gateway/index.test.ts",
+      "supabase/functions/model-gateway/index.ts"
+    ],
+    "excluded": "No Supabase Function, production secret, CORS environment variable, payment or model-provider configuration, DNS, TLS, server, GitHub Release, GitHub Pages, Alibaba Cloud site, installer, runtime, backend, or technical-report state was deployed or changed.",
+    "deploymentPerformed": false
+  },
+  "securityDesign": {
+    "contentLength": "A valid announced size over the route limit is rejected before body consumption. Any missing, invalid, or smaller announced size never weakens the measured stream-byte limit.",
+    "streaming": "ReadableStream chunks are counted before decoding; a measured overrun cancels the reader. All completion and rejection paths release the reader lock.",
+    "modelResponseLimit": {
+      "baseBytes": 32768,
+      "bytesPerMaxOutputToken": 64,
+      "maxOutputTokensUsedForSizing": 16384,
+      "hardCapBytes": 1048576
+    },
+    "paymentResponseLimitBytes": 65536,
+    "errorPrivacy": "Call points log only a structured rejection code or provider status. They never log or return an upstream response body, credential, payment payload, or model text.",
+    "cors": {
+      "allowedProductionSchemes": [
+        "https"
+      ],
+      "explicitLocalDevelopmentExceptions": [
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://*.localhost",
+        "http://tauri.localhost",
+        "tauri://localhost"
+      ],
+      "httpMirrorSensitiveAccess": "denied",
+      "wildcardOrReflectedOrigin": false,
+      "opaqueNullOrigin": "denied"
+    },
+    "threatBoundary": "CORS reduces browser-origin exposure but does not authenticate a caller. JWT, one-time model grants, payment signatures, RLS, provider signature checks, and server-side authorization remain required. A request without an Origin header is governed by those authentication and protocol controls, not by CORS."
+  },
+  "validationEnvironment": {
+    "operatingSystem": "Windows",
+    "worktree": "Z:\\DroneDream-worktrees\\website-20260728",
+    "node": "v24.14.1",
+    "deno": "2.8.1",
+    "typescript": "6.0.3 for Deno checks",
+    "browser": "Microsoft Edge via Playwright",
+    "browserViewport": "1440x1000 at 100%",
+    "browserOriginSimulation": "The exact clean shared artifact was served locally while browser requests retained http://47.93.180.216 as the page origin. Non-artifact external requests were observed and blocked; no production endpoint or credential was used.",
+    "buildCloudConfiguration": "Local visual-audit Supabase URL and publishable-key placeholders only. No production secret or account was read or used."
+  },
+  "validation": {
+    "focusedFrontend": {
+      "command": "npx vitest run src/__tests__/SensitiveOrigin.test.ts src/__tests__/CloudModelAccess.test.ts src/__tests__/AuthContext.test.tsx src/__tests__/PricingPage.test.tsx src/__tests__/CommunityPage.test.tsx src/__tests__/PublicSite.test.tsx",
+      "testFiles": 6,
+      "tests": 39,
+      "passed": 39,
+      "failed": 0,
+      "result": "pass"
+    },
+    "frontendFull": {
+      "command": "npm test -- --run",
+      "testFiles": 51,
+      "tests": 335,
+      "passed": 335,
+      "failed": 0,
+      "result": "pass"
+    },
+    "frontendTypecheck": {
+      "command": "npm run typecheck",
+      "result": "pass"
+    },
+    "frontendLint": {
+      "command": "npm run lint",
+      "result": "pass"
+    },
+    "denoFormat": {
+      "command": "npx -y deno@2.8.1 fmt --check --line-width 160 <8 modified Edge Function files>",
+      "files": 8,
+      "result": "pass"
+    },
+    "denoLint": {
+      "command": "npx -y deno@2.8.1 lint <8 modified Edge Function files>",
+      "files": 8,
+      "result": "pass"
+    },
+    "denoCheck": {
+      "command": "npx -y deno@2.8.1 check supabase/functions/model-gateway/index.ts supabase/functions/billing-checkout/index.ts",
+      "result": "pass"
+    },
+    "denoTests": {
+      "command": "npx -y deno@2.8.1 test --allow-env supabase/functions",
+      "tests": 24,
+      "passed": 24,
+      "failed": 0,
+      "result": "pass",
+      "coverage": [
+        "oversized valid Content-Length",
+        "missing Content-Length chunk overrun",
+        "falsely small Content-Length with actual overrun",
+        "exact byte boundary",
+        "normal JSON and empty body",
+        "mid-stream failure",
+        "AbortError",
+        "invalid UTF-8",
+        "reader cancellation and lock release",
+        "model response budget mapping and hard cap",
+        "model, WeChat, and Stripe call points",
+        "HTTP mirror preflight and actual-request denial",
+        "unknown and null origin denial",
+        "exact HTTPS origin success",
+        "wildcard and public HTTP configured-origin rejection"
+      ]
+    },
+    "applicationBuild": {
+      "command": "npm run build",
+      "result": "pass",
+      "note": "Vite emitted its existing non-failing application chunk-size advisory."
+    },
+    "sharedSiteAndConsoleBuild": {
+      "command": "website/scripts/build-pages-site.ps1 with GITHUB_SHA=ba325606737e6309e6186c5a4815a35c56809a83 and non-production visual-audit cloud placeholders",
+      "result": "pass",
+      "sourceCommit": "ba325606737e6309e6186c5a4815a35c56809a83",
+      "artifactKind": "dronedream-shared-static-site",
+      "fileCount": 123,
+      "sha256SumsEntries": 122,
+      "verifiedEntries": 122,
+      "missingEntries": 0,
+      "mismatchedEntries": 0,
+      "totalBytesIncludingSha256Sums": 31866853,
+      "sha256SumsSha256": "41a9074cb697327469ca4af985b32d91ad996f50fee31fdf3e74409517d5d9cd",
+      "buildManifestSha256": "0379f1756681d5081dea562589a6889973462ae45be96d89625a6f2411a80ec0",
+      "latestJsonSha256": "7d0844cafd94147adee993914f41b913213f11ba5696af92da61680b0b6bfd59",
+      "installerSha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b"
+    },
+    "deploymentContract": {
+      "command": "python -m unittest -v runtime.tests.test_website_deployment",
+      "tests": 11,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass"
+    },
+    "sourceSecretScan": {
+      "scope": "All 22 files in the exact source commit, using the repository PEM, Alibaba Cloud, AWS, GitHub, and OpenAI credential patterns.",
+      "files": 22,
+      "findings": 0,
+      "result": "pass"
+    },
+    "fullRepositoryHygiene": {
+      "command": "python scripts/check-repository.py",
+      "result": "fail-inherited-out-of-scope",
+      "finding": "backend/tests/test_phase8_llm_proposer.py contains a probable OpenAI API key pattern in test fixture text.",
+      "ownership": "backend is outside this website/server security task and was not modified.",
+      "unchangedProof": {
+        "sourceParentBlob": "7c85f59f9967d271409f2f8430665fed4b8fd036",
+        "sourceCommitBlob": "7c85f59f9967d271409f2f8430665fed4b8fd036",
+        "identical": true
+      }
+    },
+    "httpMirrorBrowserAudit": {
+      "result": "pass",
+      "pages": 3,
+      "origin": "http://47.93.180.216",
+      "accountDisabled": true,
+      "consoleDisabled": true,
+      "pricingActionsDisabled": true,
+      "communityCreateDisabled": true,
+      "externalSensitiveWrites": 0,
+      "documentHorizontalOverflowPixels": {
+        "home": 0,
+        "pricing": 0,
+        "community": 0
+      },
+      "staticDownloadUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "screenshots": [
+        {
+          "page": "home",
+          "sha256": "fa88bcabe6f7107a2e9117e6576f90b20c1cd348098bcbd97f466afa44c61e6d"
+        },
+        {
+          "page": "pricing",
+          "sha256": "ea518d9ee5d66f33650b771820fb57f12d6fcab2ccfc211acf9492a9375cb12a"
+        },
+        {
+          "page": "community",
+          "sha256": "f4e41ff005793295159f11116b534292945e343026020fa5da3e263383306521"
+        }
+      ],
+      "visualInspection": "Codex inspected all three screenshots after the final disabled-state styling change. Disabled header and community actions are visibly de-emphasized; pricing actions are disabled; the static download remains visually available."
+    },
+    "gitDiffCheck": "pass",
+    "worktreeStateAtSourceValidation": "clean"
+  },
+  "residualRisksAndGates": [
+    "The source is not active in production until Supabase Functions and the shared website artifact are separately deployed under explicit production authorization.",
+    "Production MODEL_GATEWAY_ALLOWED_ORIGINS or BILLING_ALLOWED_ORIGINS values were not changed. If either contains a public HTTP origin or wildcard, the new helper rejects browser-origin evaluation as an unsafe configuration once deployed.",
+    "The bare-IP mirror must remain anonymous/read-only. Re-enabling account, model, community-write, or checkout actions requires a normally trusted HTTPS origin with a valid certificate.",
+    "The existing full-repository hygiene finding is in an unchanged backend test fixture outside this task. The exact source commit itself has zero secret-pattern findings.",
+    "CORS is not an authentication control; JWT, grants, RLS, signatures, idempotency, and provider verification must remain enabled."
+  ],
+  "canonicalValidationSummary": "source=ba325606737e6309e6186c5a4815a35c56809a83|tree=a50d4e02d4835527bfe0bcdb267dc6401afbbd39|deno=24/24|frontend=51/335|focused=6/39|typecheck=pass|lint=pass|appBuild=pass|sharedBuild=pass|deploymentContract=11/11|artifactEntries=122|artifactMismatch=0|browserPages=3/3|sensitiveWrites=0|sourceSecretFindings=0|fullHygieneInheritedFindings=1|deploymentPerformed=false",
+  "canonicalValidationSummarySha256": "bd27d0d853a1837f82413f58c00fd43ca2faa31369772c8d73aca8e80075a88f"
+}
