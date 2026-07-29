@@ -1,0 +1,112 @@
+{
+  "schema_version": "dronedream.harness-routing-online-campaign-receipt.v1",
+  "generated_at": "2026-07-29T09:59:18.324Z",
+  "subject_commit": "d36ef166f985f761ab9e733753f61237950049da",
+  "branch": "codex/software",
+  "authorization": {
+    "authorized_by_user": true,
+    "permission_relay": "total-control exact-scope approval",
+    "scope": {
+      "corpus_cases": 24,
+      "estimated_cost_usd": 0.13,
+      "estimated_cost_upper_bound_usd": 0.25,
+      "max_retries": 0,
+      "model_snapshot": "gpt-4.1-2025-04-14",
+      "seed": 20260729,
+      "temperature": 0.0,
+      "top_p": 1.0
+    }
+  },
+  "execution": {
+    "started_at": "2026-07-29T09:56:18.937Z",
+    "completed_at": "2026-07-29T09:57:28.472Z",
+    "duration_seconds": 69.533,
+    "exit_code": 0,
+    "logical_calls": 24,
+    "network_calls": 24,
+    "automatic_retries": 0,
+    "simulator_calls": 0,
+    "deployments": 0
+  },
+  "artifact": {
+    "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.9-prompt-1.7-20260729.json",
+    "bytes": 12812,
+    "sha256": "11c5de7e208cb9b3e1263943ff8086bd919a57753948a9fd0db0ffd48e621ed1",
+    "corpus_sha256": "98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89",
+    "prompt_suite_sha256": "5e57d7a02e855f68eb4eb481e92e24b520775af1479534063ae352321e200d3f",
+    "evidence_schema_version": "2.9",
+    "prompt_template_version": "1.7",
+    "tool_registry_version": "2.1",
+    "generation_config": {
+      "response_format": "json_schema",
+      "seed": 20260729,
+      "temperature": 0.0,
+      "top_p": 1.0
+    }
+  },
+  "manifest": {
+    "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.9-prompt-1.7-20260729.manifest.json",
+    "bytes": 3802,
+    "file_sha256": "a771b5a0b9bb825bb92eb5cbf44b2abf19b0ebb9bbcf95a1424eed5f3094a7f2",
+    "canonical_payload_sha256": "ea4c6242fe01c56f088d4042772dba763378d94d011f0c550c35ec862638ea7a"
+  },
+  "result": {
+    "qualified": true,
+    "case_count": 24,
+    "passed_count": 23,
+    "pass_rate": 0.9583333333333334,
+    "minimum_category_pass_rate": 0.6666666666666666,
+    "best_constant_pass_rate": 0.5833333333333334,
+    "uniform_random_expected_pass_rate": 0.234375,
+    "absolute_lift_over_best_constant": 0.375,
+    "failed_requirements": [],
+    "failed_cases": [
+      {
+        "case_id": "tight_budget_expensive_matrix",
+        "category": "tight_budget",
+        "selected_tool": "turbo",
+        "acceptable_tools": [
+          "multi_fidelity_mobo",
+          "optimizer_portfolio"
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "offline_grader": {
+      "command": "python backend/scripts/evaluate_harness_router.py --predictions backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.9-prompt-1.7-20260729.json",
+      "status": "passed"
+    },
+    "focused_tests": {
+      "command": "python -m pytest -q backend/tests/test_harness_routing_campaign.py backend/tests/test_harness_routing_evaluation.py backend/tests/test_harness_routing_freezes.py",
+      "passed": 23,
+      "failed": 0,
+      "duration_seconds": 3.86
+    },
+    "repository_hygiene": "passed",
+    "artifact_json_valid": true,
+    "prediction_count": 24
+  },
+  "sensitive_information_scan": {
+    "forbidden_key_paths": [],
+    "openai_key_pattern_hits": 0,
+    "bearer_pattern_hits": 0,
+    "authorization_pattern_hits": 0,
+    "repository_hygiene_secret_findings": 0,
+    "provider_request_ids_persisted": false
+  },
+  "credential_cleanup": {
+    "HARNESS_ROUTING_API_KEY_present_after": false,
+    "OPENAI_API_KEY_present_after": false,
+    "api_key_printed": false,
+    "api_key_persisted": false
+  },
+  "usage_and_cost": {
+    "actual_token_usage_available": false,
+    "actual_billed_cost_available": false,
+    "estimated_cost_usd": 0.13,
+    "estimated_cost_upper_bound_usd": 0.25,
+    "explanation": "The campaign client does not persist provider usage or billing fields, so no actual token or invoice amount is claimed."
+  },
+  "claim_boundary": "This receipt establishes current-contract Evidence 2.9 routing discrimination on the 24-case frozen development corpus. It does not establish optimizer outcome benefit, causal multi-tool benefit, PX4/Gazebo performance, real-aircraft transfer, flight safety, or production reliability."
+}
