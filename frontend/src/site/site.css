@@ -4227,6 +4227,30 @@ html[lang="zh-CN"] .community-cover-art > strong {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
+  .dd-site[data-page="community"] {
+    height: auto;
+    min-height: 100svh;
+    overflow: visible;
+  }
+
+  .dd-site[data-page="community"] > main {
+    overflow: visible;
+  }
+
+  .dd-site[data-page="community"] .site-portal {
+    height: auto;
+    min-height: 100svh;
+  }
+
+  .dd-site[data-page="community"] .community-page,
+  .dd-site[data-page="community"] .community-feed {
+    overflow: visible;
+  }
+
+  .dd-site[data-page="community"] .community-topic-grid {
+    flex: 0 0 auto;
+  }
+
   .community-page:not(.is-all-topics) .community-topic-card-body {
     padding: 0.68rem 0.75rem;
   }
@@ -4274,7 +4298,7 @@ html[lang="zh-CN"] .community-cover-art > strong {
 
   .dd-site[data-page="community"][data-community-view="all"] .site-portal {
     height: auto;
-    min-height: calc(100svh - 78px);
+    min-height: 100svh;
   }
 
   .dd-site[data-page="community"][data-community-view="all"] .community-page,

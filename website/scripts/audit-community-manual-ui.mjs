@@ -124,8 +124,34 @@ const auditSession = {
 };
 
 const profiles = [
-  { name: "desktop", viewport: { width: 1440, height: 1000 } },
-  { name: "mobile", viewport: { width: 390, height: 844 } },
+  {
+    name: "desktop",
+    viewport: { width: 1440, height: 1000 },
+    desktop: true,
+    expectedRecentCards: 4,
+    topicCount: 5,
+  },
+  {
+    name: "wide-desktop",
+    viewport: { width: 2000, height: 1080 },
+    desktop: true,
+    expectedRecentCards: 5,
+    topicCount: 5,
+  },
+  {
+    name: "wide-three-topics",
+    viewport: { width: 2000, height: 1080 },
+    desktop: true,
+    expectedRecentCards: 3,
+    topicCount: 3,
+  },
+  {
+    name: "mobile",
+    viewport: { width: 390, height: 844 },
+    desktop: false,
+    expectedRecentCards: null,
+    topicCount: 5,
+  },
 ];
 const locales = ["en", "zh-CN"];
 const results = [];
@@ -136,7 +162,7 @@ const browser = await chromium.launch({
   args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--disable-gpu"],
 });
 
-const installApiRoutes = async (context) => {
+const installApiRoutes = async (context, topicCount) => {
   const fulfillApiRoute = async (route) => {
     const url = new URL(route.request().url());
     const headers = {
@@ -149,7 +175,11 @@ const installApiRoutes = async (context) => {
       return;
     }
     if (url.pathname.endsWith("/rpc/community_list_topics")) {
-      await route.fulfill({ status: 200, headers, body: JSON.stringify(topics) });
+      await route.fulfill({
+        status: 200,
+        headers,
+        body: JSON.stringify(topics.slice(0, topicCount)),
+      });
       return;
     }
     if (url.pathname.endsWith("/rpc/community_list_comments")) {
@@ -208,7 +238,7 @@ try {
         session: auditSession,
         storageKeys: authStorageKeys,
       });
-      await installApiRoutes(context);
+      await installApiRoutes(context, profile.topicCount);
       const page = await context.newPage();
       const failures = [];
       const prefix = `${locale}-${profile.name}`;
@@ -251,11 +281,15 @@ try {
               width: Math.round(rect.width),
               height: Math.round(rect.height),
               bottom: Math.round(rect.bottom),
+              clientHeight: article.clientHeight,
+              scrollHeight: article.scrollHeight,
               coverWidth: Math.round(coverRect?.width ?? 0),
               coverHeight: Math.round(coverRect?.height ?? 0),
               coverPosition: cover ? getComputedStyle(cover).position : "",
               coverAspectRatio: cover ? getComputedStyle(cover).aspectRatio : "",
               bodyHeight: Math.round(bodyRect?.height ?? 0),
+              bodyClientHeight: body?.clientHeight ?? 0,
+              bodyScrollHeight: body?.scrollHeight ?? 0,
               titleScrollWidth: title?.scrollWidth ?? 0,
               titleClientWidth: title?.clientWidth ?? 0,
             };
@@ -268,23 +302,32 @@ try {
       if (recentLayout.documentWidth > recentLayout.viewportWidth + 2) {
         failures.push("community recent has document horizontal overflow");
       }
-      if (profile.name === "desktop" && recent.visibleCards !== 4) {
-        failures.push(`desktop recent visible card count ${recent.visibleCards}, expected 4`);
+      if (
+        profile.expectedRecentCards !== null
+        && recent.visibleCards !== profile.expectedRecentCards
+      ) {
+        failures.push(
+          `${profile.name} recent visible card count ${recent.visibleCards}, `
+          + `expected ${profile.expectedRecentCards}`,
+        );
       }
       if (
-        profile.name === "desktop"
+        profile.desktop
         && recent.cardRects.some((card) =>
           card.display !== "none"
-          && (
-            card.bottom > profile.viewport.height + 2
-            || card.bottom > recent.feedBottom + 1
-          )
+          && card.bottom > recent.feedBottom + 1
         )
       ) {
-        failures.push("desktop recent card extends below its feed or viewport");
+        failures.push("desktop recent card extends below its feed");
       }
       if (
-        profile.name === "desktop"
+        profile.desktop
+        && recent.feedScrollHeight > recent.feedClientHeight + 2
+      ) {
+        failures.push("desktop recent feed clips content instead of growing with it");
+      }
+      if (
+        profile.desktop
         && (
           !recent.moreBottom
           || recent.moreBottom > recent.feedBottom + 1
@@ -296,11 +339,13 @@ try {
         failures.push("desktop recent More topics link overlaps or leaves its feed");
       }
       if (
-        profile.name === "desktop"
+        profile.desktop
         && recent.cardRects.some((card) =>
           card.display !== "none"
           && (
             card.bodyHeight < 80
+            || card.scrollHeight > card.clientHeight + 2
+            || card.bodyScrollHeight > card.bodyClientHeight + 2
             || Math.abs((card.coverHeight / Math.max(1, card.coverWidth)) - 1.25) > 0.03
             || card.titleScrollWidth > card.titleClientWidth + 2
           )
@@ -308,7 +353,7 @@ try {
       ) {
         failures.push("desktop recent card cover or body is not fully contained");
       }
-      await screenshot(page, `${prefix}-community-recent`);
+      await screenshot(page, `${prefix}-community-recent`, true);
 
       await page.locator(".community-topic-cover").first().click();
       const dialog = page.locator(".community-topic-dialog");
@@ -359,7 +404,7 @@ try {
             failures.push(`topic cover does not fill visual ${dimension}`);
           }
         }
-        const minimumTextarea = profile.name === "desktop" ? 190 : 132;
+        const minimumTextarea = profile.desktop ? 190 : 132;
         if (detail.textareaHeight + tolerance < minimumTextarea) {
           failures.push(`comment textarea ${detail.textareaHeight}px below ${minimumTextarea}px`);
         }
@@ -539,7 +584,7 @@ try {
         failures.push("manual header height changes after scrolling");
       }
       if (
-        profile.name === "desktop"
+        profile.desktop
         && Math.abs((scrolledManual.headerBottom ?? 0) - (scrolledManual.sidebarTop ?? 0)) > 1
       ) {
         failures.push("manual sticky header and sidebar no longer meet");
