@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 import uuid
@@ -55,6 +56,22 @@ EXACT_REQUIREMENT = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([A-Za-z0-9][A-Z
 
 class ManifestError(ValueError):
     pass
+
+
+def _atomic_write_json(path: Path, value: dict[str, Any]) -> None:
+    """Publish canonical manifest JSON without exposing a truncated destination."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.parent / f".{path.name}.partial-{uuid.uuid4().hex}"
+    payload = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    try:
+        with temporary.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _require_exact_keys(value: dict[str, Any], expected: set[str], label: str) -> None:
@@ -250,8 +267,7 @@ def generate(
         "smokeReport": None,
         "artifact": None,
     }
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _atomic_write_json(output, manifest)
     return manifest
 
 
@@ -499,7 +515,7 @@ def promote_smoke(manifest_path: Path, report_path: Path, output: Path) -> None:
         "checks": checks,
     }
     validate_manifest(manifest, require_smoke_passed=True)
-    output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _atomic_write_json(output, manifest)
 
 
 def main() -> int:

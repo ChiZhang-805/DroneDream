@@ -10,6 +10,7 @@ import tempfile
 import tomllib
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "runtime"
@@ -57,6 +58,30 @@ class RuntimeManifestContractTests(unittest.TestCase):
         runtime_manifest.validate_manifest(manifest)
         with self.assertRaises(runtime_manifest.ManifestError):
             runtime_manifest.validate_manifest(manifest, require_smoke_passed=True)
+
+    def test_manifest_publication_preserves_existing_bytes_when_replace_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "runtime-manifest.json"
+            original = b'{"preserve":"this exact manifest"}\n'
+            output.write_bytes(original)
+
+            with (
+                mock.patch.object(
+                    runtime_manifest.os,
+                    "replace",
+                    side_effect=OSError("injected replacement failure"),
+                ),
+                self.assertRaisesRegex(OSError, "injected replacement failure"),
+            ):
+                runtime_manifest.generate(
+                    RUNTIME / "pins.env",
+                    RUNTIME / "locks" / "python-requirements.lock",
+                    "a" * 40,
+                    output,
+                )
+
+            self.assertEqual(output.read_bytes(), original)
+            self.assertEqual(list(output.parent.glob(f".{output.name}.partial-*")), [])
 
     def test_python_component_pins_match_the_exact_lock(self) -> None:
         pins = runtime_manifest.load_pins(RUNTIME / "pins.env")
