@@ -27,6 +27,7 @@ describe("cloud model access client", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
@@ -126,6 +127,22 @@ describe("cloud model access client", () => {
       status: 402,
       message: "Switch to BYOK or upgrade.",
     });
+  });
+
+  it("fails a cloud request at its deadline even if fetch ignores abort", async () => {
+    vi.useFakeTimers();
+    const { cloud, auth } = await loadCloudAccess();
+    auth.setAuthAccessToken("signed-user-token");
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+
+    const assertion = expect(cloud.getManagedModelUsage()).rejects.toMatchObject({
+      name: "CloudModelAccessError",
+      code: "NETWORK_ERROR",
+      status: 0,
+      message: "Request timed out after 30 seconds.",
+    });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await assertion;
   });
 
   it("loads public plan availability and creates an authenticated checkout", async () => {

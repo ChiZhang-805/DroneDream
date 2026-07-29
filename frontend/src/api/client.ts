@@ -2,6 +2,7 @@
 // desktop-runtime liveness checks, and the typed call surface used by pages.
 
 import { desktopApiRequest, isDesktopRuntime } from "../desktop/bridge";
+import { fetchWithDeadline } from "./fetchWithDeadline";
 import {
   ensureDesktopRuntimeLiveness,
   getDesktopReadinessSession,
@@ -64,6 +65,7 @@ const API_BASE_URL: string =
   "http://127.0.0.1:8000";
 const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
+const BROWSER_REQUEST_TIMEOUT_MS = 120_000;
 
 function authHeaders(): Record<string, string> {
   const accessToken = currentAccessToken();
@@ -333,18 +335,22 @@ async function transportRequest(
   idempotencyKey: string | null = null,
 ): Promise<Response> {
   if (!isDesktopRuntime()) {
-    return fetch(`${API_BASE_URL}/api/v1${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: accept,
-        ...authHeaders(),
-        ...(init?.headers ?? {}),
-        ...(idempotencyKey
-          ? { "Idempotency-Key": idempotencyKey }
-          : {}),
+    return fetchWithDeadline(
+      `${API_BASE_URL}/api/v1${path}`,
+      {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: accept,
+          ...authHeaders(),
+          ...(init?.headers ?? {}),
+          ...(idempotencyKey
+            ? { "Idempotency-Key": idempotencyKey }
+            : {}),
+        },
       },
-    });
+      BROWSER_REQUEST_TIMEOUT_MS,
+    );
   }
 
   const method = (init?.method ?? "GET").toUpperCase();

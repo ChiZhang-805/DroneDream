@@ -1,4 +1,5 @@
 import { getAuthAccessToken } from "../auth/authTokenStore";
+import { fetchWithDeadline } from "../../api/fetchWithDeadline";
 
 export type ManagedModelPlanId = "free" | "plus" | "pro";
 export type ManagedModelGrantScope = "assistant" | "job";
@@ -95,6 +96,8 @@ export class CloudModelAccessError extends Error {
   }
 }
 
+const CLOUD_REQUEST_TIMEOUT_MS = 30_000;
+
 function deriveFunctionUrl(functionName: string, explicitUrl: string | undefined): string {
   const explicit = explicitUrl?.trim().replace(/\/+$/u, "");
   if (explicit) return explicit;
@@ -150,13 +153,17 @@ async function cloudRequest<T>(
       };
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers: {
-        ...requestHeaders,
-        ...(init?.headers ?? {}),
+    response = await fetchWithDeadline(
+      `${baseUrl}${path}`,
+      {
+        ...init,
+        headers: {
+          ...requestHeaders,
+          ...(init?.headers ?? {}),
+        },
       },
-    });
+      CLOUD_REQUEST_TIMEOUT_MS,
+    );
   } catch (error) {
     throw new CloudModelAccessError(
       "NETWORK_ERROR",

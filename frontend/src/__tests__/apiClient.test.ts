@@ -52,6 +52,7 @@ const runtimeComponents = [
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   setAuthAccessToken(null);
   resetDesktopReadinessSession();
   resetDesktopStartupGateSession();
@@ -220,6 +221,20 @@ describe("apiClient envelope handling", () => {
     await expect(apiClient.getJob("job_x")).rejects.toBeInstanceOf(
       ApiClientError,
     );
+  });
+
+  it("fails a browser API request at its hard deadline", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+
+    const assertion = expect(apiClient.getJob("job_x")).rejects.toMatchObject({
+      name: "ApiClientError",
+      code: "NETWORK_ERROR",
+      httpStatus: 0,
+      message: "Request timed out after 120 seconds.",
+    });
+    await vi.advanceTimersByTimeAsync(120_000);
+    await assertion;
   });
 
   it("fetchArtifactJson uses artifact download URL and parses JSON", async () => {
