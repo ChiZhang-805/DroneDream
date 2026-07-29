@@ -21,10 +21,16 @@ assert SPEC and SPEC.loader
 runtime_release = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runtime_release)
 
+MANIFEST_SPEC = importlib.util.spec_from_file_location(
+    "runtime_manifest_test", RUNTIME / "tools" / "runtime_manifest.py"
+)
+assert MANIFEST_SPEC and MANIFEST_SPEC.loader
+runtime_manifest = importlib.util.module_from_spec(MANIFEST_SPEC)
+MANIFEST_SPEC.loader.exec_module(runtime_manifest)
+
 
 class RuntimeReleaseTests(unittest.TestCase):
     def _inputs(self, directory: Path) -> tuple[Path, Path, Path]:
-        runtime_id = "8a3a9a36-1198-5c56-a453-2d9637acbb01"
         checks = [
             {"name": name, "passed": True, "durationSeconds": 1}
             for name in (
@@ -37,39 +43,39 @@ class RuntimeReleaseTests(unittest.TestCase):
                 "parameter_readback",
             )
         ]
+        unpromoted_path = directory / "unpromoted.manifest.json"
+        unpromoted = runtime_manifest.generate(
+            RUNTIME / "pins.env",
+            RUNTIME / "locks" / "python-requirements.lock",
+            "a" * 40,
+            unpromoted_path,
+        )
         report = {
             "mode": "runtime-image",
-            "runtimeId": runtime_id,
+            "runtimeId": unpromoted["runtimeId"],
             "imageId": "sha256:" + "b" * 64,
             "passed": True,
             "completedAt": "2026-07-12T01:02:03+00:00",
             "checks": checks,
         }
-        promoted = {
-            "schemaVersion": 1,
-            "runtimeId": runtime_id,
-            "version": "0.1.0",
-            "source": {"droneDreamCommit": "a" * 40},
-            "componentDetails": {
-                "px4": {"version": "v1.16.0", "commit": "c" * 40},
-                "gazebo": {
-                    "release": "harmonic",
-                    "packageVersion": "1.0.0-1~noble",
-                },
-            },
-            "smokeTests": {
-                "px4Sitl": True,
-                "gazebo": True,
-                "parameterReadback": True,
-            },
-            "smokeReport": report,
-        }
-        rootfs = directory / "DroneDreamRuntime-0.1.0-amd64.tar"
-        rootfs.write_bytes(b"a release rootfs split across many tiny test parts")
-        manifest = directory / "promoted.manifest.json"
-        manifest.write_text(json.dumps(promoted), encoding="utf-8")
         report_path = directory / "smoke-report.json"
         report_path.write_text(json.dumps(report), encoding="utf-8")
+        manifest = directory / "promoted.manifest.json"
+        runtime_manifest.promote_smoke(
+            unpromoted_path,
+            report_path,
+            manifest,
+        )
+        rootfs = directory / "DroneDreamRuntime-0.1.0-amd64.tar"
+        manifest_bytes = manifest.read_bytes()
+        with tarfile.open(rootfs, mode="w") as archive:
+            member = tarfile.TarInfo(runtime_release.EMBEDDED_MANIFEST_MEMBER)
+            member.size = len(manifest_bytes)
+            archive.addfile(member, io.BytesIO(manifest_bytes))
+            payload = b"a release rootfs split across many tiny test parts"
+            payload_member = tarfile.TarInfo("opt/dronedream/payload.txt")
+            payload_member.size = len(payload)
+            archive.addfile(payload_member, io.BytesIO(payload))
         return rootfs, manifest, report_path
 
     def _package(self, directory: Path, **changes: object) -> tuple[Path, Path]:
@@ -83,7 +89,7 @@ class RuntimeReleaseTests(unittest.TestCase):
                 "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.1"
             ),
             "build_timestamp": "2026-07-12T00:00:00Z",
-            "part_bytes": 7,
+            "part_bytes": 1024,
             "minimum_free_bytes": runtime_release.DEFAULT_MINIMUM_FREE_BYTES,
         }
         arguments.update(changes)
@@ -204,6 +210,33 @@ class RuntimeReleaseTests(unittest.TestCase):
                     )
                 self.assertFalse((directory / "release").exists())
 
+    def test_package_rejects_rootfs_manifest_sidecar_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            rootfs, promoted, report = self._inputs(directory)
+            mismatched = json.loads(promoted.read_text(encoding="utf-8"))
+            mismatched["smokeReport"]["imageId"] = "sha256:" + "d" * 64
+            mismatched_bytes = json.dumps(mismatched).encode("utf-8")
+            with tarfile.open(rootfs, mode="w") as archive:
+                member = tarfile.TarInfo(runtime_release.EMBEDDED_MANIFEST_MEMBER)
+                member.size = len(mismatched_bytes)
+                archive.addfile(member, io.BytesIO(mismatched_bytes))
+
+            with self.assertRaisesRegex(
+                runtime_release.ReleaseError,
+                "does not match its promoted sidecar",
+            ):
+                runtime_release.package_release(
+                    rootfs=rootfs,
+                    runtime_manifest_path=promoted,
+                    smoke_report_path=report,
+                    output_directory=directory / "release",
+                    base_url="https://example.test/runtime",
+                    build_timestamp="2026-07-12T00:00:00Z",
+                    part_bytes=1024,
+                )
+            self.assertFalse((directory / "release").exists())
+
     def test_validated_embedded_manifest_can_be_recovered_without_extracting_tar(
         self,
     ) -> None:
@@ -240,7 +273,7 @@ class RuntimeReleaseTests(unittest.TestCase):
                 runtime_release.package_release(
                     **common,
                     base_url="http://example.test/runtime",
-                    part_bytes=7,
+                    part_bytes=1024,
                 )
             with self.assertRaises(runtime_release.ReleaseError):
                 runtime_release.package_release(
