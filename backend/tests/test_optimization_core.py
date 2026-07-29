@@ -1152,8 +1152,32 @@ def test_scenario_execution_contract_rejects_payload_and_fidelity_drift() -> Non
         },
         advanced_scenario_config={},
     )
+    nominal_full_partial_payload = scenario_execution_payload(
+        run,
+        source="optimizer",
+        generation_index=2,
+        advanced_scenario_config={},
+        optimizer_fidelity_value=0.25,
+        optimizer_requested_fidelity_value=1.0,
+    )
+    nominal_full_partial = validate_scenario_execution_contract(
+        suite,
+        scenario_type=run.scenario_type,
+        scenario_config=nominal_full_partial_payload,
+        seed=run.seed,
+        candidate_source="optimizer",
+        candidate_generation=2,
+        candidate_is_baseline=False,
+        optimizer_metadata={
+            "effective_fidelity": 0.25,
+            "requested_fidelity": 1.0,
+        },
+        advanced_scenario_config={},
+    )
 
     assert not contract.valid
     assert contract.error == "scenario_payload_mismatch"
     assert not fidelity_drift.valid
     assert fidelity_drift.error == "optimizer_fidelity_mismatch"
+    assert not nominal_full_partial.valid
+    assert nominal_full_partial.error == "optimizer_fidelity_mismatch"

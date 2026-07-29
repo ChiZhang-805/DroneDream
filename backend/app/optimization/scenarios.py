@@ -334,7 +334,18 @@ def validate_scenario_execution_contract(
                 expected_config=None,
                 error="invalid_optimizer_fidelity",
             )
-        if requested_fidelity < 1.0:
+        if requested_fidelity >= 1.0 - 1e-12:
+            if not math.isclose(
+                fidelity,
+                1.0,
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            ):
+                return ScenarioExecutionContract(
+                    expected_config=None,
+                    error="optimizer_fidelity_mismatch",
+                )
+        else:
             full_training_count = sum(
                 1 for run in configured_runs if not run.holdout
             )
