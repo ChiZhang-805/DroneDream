@@ -30,6 +30,7 @@ from app.simulator.base import (
     TrialMetricsPayload,
 )
 from app.simulator.px4_metric_evidence import (
+    Px4CoreMetricEvidenceV1,
     compile_px4_core_metric_evidence,
     compile_px4_evaluation_window_evidence,
     compile_px4_outcome_evidence,
@@ -1230,6 +1231,22 @@ def test_px4_metric_evidence_rejects_compiled_evidence_mutation(
             raw,
             metrics=metrics,
             artifacts=artifacts,
+        )
+
+
+def test_px4_core_metric_model_rejects_mismatched_evidence_id(
+    tmp_path: Path,
+) -> None:
+    _raw, metrics, _artifacts, _ = _px4_metric_evidence(tmp_path)
+    evidence = metrics.raw_metric_json["px4_core_metric_evidence"]
+    assert isinstance(evidence, dict)
+
+    with pytest.raises(ValueError, match="core metric evidence ID"):
+        Px4CoreMetricEvidenceV1.model_validate(
+            {
+                **evidence,
+                "evidence_id": "sha256:" + "0" * 64,
+            }
         )
 
 

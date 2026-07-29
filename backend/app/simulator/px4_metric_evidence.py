@@ -365,7 +365,7 @@ class Px4CoreMetricEvidenceV1(BaseModel):
 
     @model_validator(mode="after")
     def _validate_window(self) -> Px4CoreMetricEvidenceV1:
-        if (
+        is_single_sample_synthetic = (
             self.synthetic
             and self.total_sample_count == 1
             and self.evaluation_start_index == 0
@@ -373,18 +373,22 @@ class Px4CoreMetricEvidenceV1(BaseModel):
             and self.evaluation_sample_count == 1
             and self.evaluation_start_time_s == self.evaluation_end_time_s
             and self.evaluation_duration_s == 0.0
-        ):
-            return self
-        if self.evaluation_end_index <= self.evaluation_start_index:
-            raise ValueError("evaluation end index must follow its start index")
-        if (
-            self.evaluation_end_index >= self.total_sample_count
-            or self.evaluation_sample_count
-            != self.evaluation_end_index - self.evaluation_start_index + 1
-        ):
-            raise ValueError("evaluation indices do not match sample counts")
-        if self.evaluation_end_time_s <= self.evaluation_start_time_s:
-            raise ValueError("evaluation end time must follow its start time")
+        )
+        if not is_single_sample_synthetic:
+            if self.evaluation_end_index <= self.evaluation_start_index:
+                raise ValueError("evaluation end index must follow its start index")
+            if (
+                self.evaluation_end_index >= self.total_sample_count
+                or self.evaluation_sample_count
+                != self.evaluation_end_index - self.evaluation_start_index + 1
+            ):
+                raise ValueError("evaluation indices do not match sample counts")
+            if self.evaluation_end_time_s <= self.evaluation_start_time_s:
+                raise ValueError("evaluation end time must follow its start time")
+        payload = self.model_dump(mode="json")
+        evidence_id = payload.pop("evidence_id")
+        if evidence_id != _sha256_id(payload):
+            raise ValueError("core metric evidence ID does not match its content")
         return self
 
 
@@ -738,8 +742,7 @@ def _project_sample_to_segment(
             1.0,
             max(
                 0.0,
-                sum(offset[index] * segment.delta[index] for index in range(3))
-                / length_squared,
+                sum(offset[index] * segment.delta[index] for index in range(3)) / length_squared,
             ),
         )
     )
@@ -1450,17 +1453,13 @@ def _evaluate_track_progress(
             projection for projection in projections if projection.error <= max_track_error
         ]
         duration_seconds = (
-            max(0.0, float(samples[-1]["t"]) - float(samples[0]["t"]))
-            if len(samples) >= 2
-            else 0.0
+            max(0.0, float(samples[-1]["t"]) - float(samples[0]["t"])) if len(samples) >= 2 else 0.0
         )
         duration_fraction = min(
             1.0,
             duration_seconds / _HOVER_MIN_EVALUATION_DURATION_SECONDS,
         )
-        in_tolerance_fraction = (
-            len(valid_projections) / len(projections) if projections else 0.0
-        )
+        in_tolerance_fraction = len(valid_projections) / len(projections) if projections else 0.0
         coverage = in_tolerance_fraction * duration_fraction
         reached = 0.0 if valid_projections else None
         return _TrackProgress(
@@ -2006,9 +2005,7 @@ def require_px4_outcome_binding(
         expected_raw.update(
             {
                 "track_mode": "stationary_hover",
-                "hover_minimum_evaluation_duration_s": (
-                    _HOVER_MIN_EVALUATION_DURATION_SECONDS
-                ),
+                "hover_minimum_evaluation_duration_s": (_HOVER_MIN_EVALUATION_DURATION_SECONDS),
             }
         )
     if any(raw_metrics.get(field) != value for field, value in expected_raw.items()):
