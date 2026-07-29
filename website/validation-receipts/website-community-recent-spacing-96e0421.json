@@ -1,0 +1,193 @@
+{
+  "schemaVersion": "dronedream.website.validation-receipt.v1",
+  "generatedAt": "2026-07-29T02:02:07.0708515Z",
+  "subject": {
+    "commit": "96e042178eb042786aafe053e57f135bc0766334",
+    "tree": "98d2f24dc5c9e43df148dbf1957662feff46df95",
+    "branch": "codex/website",
+    "files": [
+      {
+        "path": "frontend/src/site/site.css",
+        "blob": "2377532656b16252abfa88d1e4b434123ecba35d"
+      },
+      {
+        "path": "website/scripts/audit-community-manual-ui.mjs",
+        "blob": "5db5edf02b55aeb9e7168a3575dd6de651b46f84"
+      }
+    ]
+  },
+  "claim": {
+    "summary": "The Recent Topics module now follows its card content instead of stretching to fill the desktop viewport.",
+    "desktop": "Three complete portrait cards sit close to the module bottom while retaining a small, intentional gap around the More topics action.",
+    "mobile": "The existing document-scroll layout remains unchanged and has no horizontal overflow.",
+    "regressionGate": "The targeted audit now rejects card-to-feed gaps outside 32-72 px and More-topics-to-feed gaps outside 8-32 px."
+  },
+  "measurements": {
+    "viewport": "2000x1080",
+    "before": {
+      "cardToFeedGapPixels": 230,
+      "moreTopicsToFeedGapPixels": 194
+    },
+    "after": {
+      "en": {
+        "visibleCards": 3,
+        "cardHeightsPixels": [
+          430,
+          430,
+          430
+        ],
+        "feedClientHeightPixels": 610,
+        "feedScrollHeightPixels": 610,
+        "cardToFeedGapPixels": 53,
+        "moreTopicsToFeedGapPixels": 17,
+        "footerPresent": false
+      },
+      "zh-CN": {
+        "visibleCards": 3,
+        "cardHeightsPixels": [
+          430,
+          430,
+          430
+        ],
+        "feedClientHeightPixels": 610,
+        "feedScrollHeightPixels": 610,
+        "cardToFeedGapPixels": 53,
+        "moreTopicsToFeedGapPixels": 17,
+        "footerPresent": false
+      }
+    }
+  },
+  "validation": {
+    "exactSourceCleanBeforeValidation": true,
+    "focused": {
+      "command": "npm.cmd --prefix frontend test -- src/__tests__/CommunityPage.test.tsx",
+      "result": "passed",
+      "files": 1,
+      "tests": 9
+    },
+    "frontend": {
+      "command": "npm.cmd --prefix frontend test",
+      "result": "passed",
+      "files": 50,
+      "tests": 329
+    },
+    "typecheck": {
+      "command": "npm.cmd --prefix frontend run typecheck",
+      "result": "passed"
+    },
+    "lint": {
+      "command": "npm.cmd --prefix frontend run lint",
+      "result": "passed"
+    },
+    "builds": [
+      {
+        "command": "npm.cmd --prefix frontend run site:build",
+        "result": "passed",
+        "configuration": "documented local-preview Supabase placeholders"
+      },
+      {
+        "command": "npm.cmd --prefix frontend run console:build",
+        "result": "passed",
+        "configuration": "documented local-preview Supabase placeholders"
+      },
+      {
+        "command": "npm.cmd --prefix frontend run build",
+        "result": "passed",
+        "advisory": "Existing non-failing Vite chunk-size advisory only."
+      },
+      {
+        "command": "powershell -File website/scripts/build-pages-site.ps1",
+        "result": "passed",
+        "configuration": "Local-only shared artifact bound to subject commit; no deployment performed."
+      }
+    ],
+    "deploymentContract": {
+      "command": "python -m pytest runtime/tests/test_website_deployment.py -q",
+      "result": "passed",
+      "tests": 11,
+      "subtests": 22
+    },
+    "browserMatrix": {
+      "command": "node website/scripts/audit-browser-matrix.mjs http://127.0.0.1:4198/ <output> edge,chrome,lenovo,firefox",
+      "result": "passed",
+      "checks": 100,
+      "passed": 100,
+      "failed": 0,
+      "unavailableBrowsers": 0,
+      "externalWarnings": 32,
+      "documentWidthMismatches": 0,
+      "reportSha256": "41ebe6de582fb32b21f4630d8d1bc500bdd47094f003192ea5b53d5a1e86c83e"
+    },
+    "communityManualAudit": {
+      "command": "node website/scripts/audit-community-manual-ui.mjs http://127.0.0.1:4198/ <output>",
+      "result": "passed",
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "reportSha256": "76f978bc5aee10aa715a733b0a66d1ff7796886a6aba41c8240aa4b28c357201"
+    },
+    "typographyAndLayout": [
+      {
+        "viewport": "1440x1000",
+        "mode": "full",
+        "result": "passed",
+        "reportSha256": "9f088bb6c1a6573ced70a1bdbc3729980421e90ec227632daec05c445415bd83"
+      },
+      {
+        "viewport": "2000x1080",
+        "mode": "full",
+        "result": "passed",
+        "reportSha256": "d2bae2a55c93e7f6a3db3e7464b8817af2c3aed202065f714098dd193a2b722d"
+      },
+      {
+        "viewport": "390x844",
+        "mode": "layout-only",
+        "result": "passed",
+        "reportSha256": "1939879307b8723d583d92b7e90f15a0ea0622fd24e64cccd14844dce2b827c9"
+      }
+    ],
+    "performance": {
+      "command": "node website/scripts/audit-site-performance.mjs http://127.0.0.1:4198/ <output>",
+      "result": "passed",
+      "routes": 5,
+      "passed": 5,
+      "failed": 0,
+      "reportSha256": "3ac7d232e5ec01e3dc98be557be1680ebb9d189d44ad3f8c417fb51caf0c2098"
+    },
+    "syntaxAndDiff": {
+      "nodeCheck": "passed",
+      "gitDiffCheck": "passed"
+    }
+  },
+  "visualInspection": {
+    "performed": true,
+    "notes": [
+      "Visually inspected the exact-source English and Simplified Chinese wide-three-topic screenshots.",
+      "Confirmed every card cover and metadata row remains complete and the module no longer has a large empty lower region.",
+      "Confirmed the More topics action remains readable and has a 17 px bottom gap."
+    ],
+    "screenshots": [
+      {
+        "name": "en-wide-three-topics-community-recent.png",
+        "bytes": 418500,
+        "sha256": "54cd80ba2c85a87481c1ada10680f63a2a1e2e0a1cbdb0f6e502587a97d010d9"
+      },
+      {
+        "name": "zh-CN-wide-three-topics-community-recent.png",
+        "bytes": 398559,
+        "sha256": "db4dd37fe8a6f62d10b42d6bf30cfda4d39729da0fc1ff2fd841ad7d4154d27e"
+      }
+    ]
+  },
+  "releaseBoundary": {
+    "releaseMetadataModified": false,
+    "installerModified": false,
+    "deploymentPerformed": false,
+    "productionOriginsModified": false,
+    "reason": "Production remains frozen until the authoritative 1.0.0 desktop EXE and runtime-v0.1.0-beta.2 release are jointly ready for fresh-install validation."
+  },
+  "attestation": {
+    "receiptOnlyCommitMayFollow": true,
+    "thisReceiptDoesNotClaimValidationOfItsOwnCommit": true
+  }
+}
