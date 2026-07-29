@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # --- Enums / literals -------------------------------------------------------
 
-TrackType = Literal["circle", "u_turn", "lemniscate", "custom"]
+TrackType = Literal["hover", "circle", "u_turn", "lemniscate", "custom"]
 SensorNoiseLevel = Literal["low", "medium", "high"]
 ObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom"]
 JobStatus = Literal[
@@ -678,6 +678,20 @@ class JobCreateRequest(_Strict):
             raise ValueError(
                 "reference_track with at least 2 points is required when track_type=custom"
             )
+        if self.track_type == "hover":
+            if abs(self.start_point.x) > 1e-9 or abs(self.start_point.y) > 1e-9:
+                raise ValueError("hover track requires start_point x=0 and y=0")
+            for idx, point in enumerate(points):
+                point_z = self.altitude_m if point.z is None else point.z
+                if (
+                    abs(point.x) > 1e-9
+                    or abs(point.y) > 1e-9
+                    or abs(point_z - self.altitude_m) > 1e-9
+                ):
+                    raise ValueError(
+                        "hover reference_track must remain at x=0, y=0 "
+                        f"and altitude_m; point {idx} differs"
+                    )
         for idx, point in enumerate(points):
             if not math.isfinite(point.x) or not math.isfinite(point.y):
                 raise ValueError(f"reference_track[{idx}] x/y must be finite numbers")

@@ -132,6 +132,59 @@ def test_build_setpoint_schedule_respects_vel_limit_and_takeoff_phase():
         assert d <= max_step + 1e-6 or d <= 0.11
 
 
+def test_hover_schedule_has_rate_independent_ten_second_stationary_window(
+    tmp_path: Path,
+) -> None:
+    track = _write_json(
+        tmp_path / "reference_track.json",
+        {
+            "track_type": "hover",
+            "hover_duration_s": 10.0,
+            "points": [{"x": 0.0, "y": 0.0, "z": 3.0}] * 101,
+        },
+    )
+    reference_plan = executor.load_reference_track_plan(track)
+    params = executor.ControllerParams(1.0, 0.2, 0.05, 5.0, 4.0, 0.5)
+
+    plan = executor.build_setpoint_schedule_plan(
+        reference_plan.points,
+        params,
+        20.0,
+        hover_duration_seconds=reference_plan.hover_duration_seconds,
+    )
+
+    assert plan.track_start_index == 40
+    assert (plan.track_end_index - plan.track_start_index) / 20.0 == pytest.approx(10.0)
+    hover_window = plan.schedule[plan.track_start_index : plan.track_end_index + 1]
+    assert len(hover_window) == 201
+    assert {
+        (setpoint.north_m, setpoint.east_m, setpoint.down_m)
+        for setpoint in hover_window
+    } == {(0.0, 0.0, -3.0)}
+
+
+def test_hover_schedule_rejects_a_moving_or_non_origin_reference() -> None:
+    params = executor.ControllerParams(1.0, 0.2, 0.05, 5.0, 4.0, 0.5)
+
+    with pytest.raises(ValueError, match="stationary anchor"):
+        executor.build_setpoint_schedule_plan(
+            [
+                executor.TrackPoint(0.0, 0.0, 3.0),
+                executor.TrackPoint(1.0, 0.0, 3.0),
+            ],
+            params,
+            10.0,
+            hover_duration_seconds=10.0,
+        )
+    with pytest.raises(ValueError, match="local origin"):
+        executor.build_setpoint_schedule_plan(
+            [executor.TrackPoint(1.0, 0.0, 3.0)],
+            params,
+            10.0,
+            hover_duration_seconds=10.0,
+        )
+
+
 def test_coordinate_conversion_maps_positive_up_to_ned_down():
     sp = executor.enu_point_to_ned_setpoint(executor.TrackPoint(1.0, -2.0, 3.5), yaw_deg=45.0)
     assert sp.north_m == 1.0

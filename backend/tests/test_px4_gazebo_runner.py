@@ -355,6 +355,93 @@ def test_px4_runner_dry_run_is_deterministic(tmp_path: Path):
     assert raw["scenario_effects_ready"] is True
 
 
+def test_hover_track_has_independent_stationary_dwell_contract(tmp_path: Path) -> None:
+    input_path = _trial_input(tmp_path)
+    input_payload = json.loads(input_path.read_text(encoding="utf-8"))
+    input_payload["job_config"]["track_type"] = "hover"
+    input_path.write_text(json.dumps(input_payload), encoding="utf-8")
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env["PX4_GAZEBO_DRY_RUN"] = "true"
+
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is True, result
+    assert result["metrics"]["pass_flag"] is True
+    reference = json.loads((tmp_path / "reference_track.json").read_text(encoding="utf-8"))
+    assert reference["track_type"] == "hover"
+    assert reference["hover_duration_s"] == 10.0
+    assert len(reference["points"]) == 101
+    assert {
+        (point["x"], point["y"], point["z"]) for point in reference["points"]
+    } == {(0.0, 0.0, 3.0)}
+    raw = result["metrics"]["raw_metric_json"]
+    assert raw["track_mode"] == "stationary_hover"
+    assert raw["track_length_3d_m"] == 0.0
+    assert raw["track_projection"] == "stationary_point_3d_projection"
+    assert raw["coverage_basis"] == "stationary_hover_time_in_tolerance"
+    assert raw["hover_minimum_evaluation_duration_s"] == 10.0
+    assert raw["px4_core_metric_evidence"]["projection_revision"] == (
+        "stationary-point-3d-projection-1.0"
+    )
+
+
+def test_hover_track_fails_when_stationary_dwell_is_too_short(tmp_path: Path) -> None:
+    input_path = _trial_input(tmp_path)
+    input_payload = json.loads(input_path.read_text(encoding="utf-8"))
+    input_payload["job_config"]["track_type"] = "hover"
+    input_path.write_text(json.dumps(input_payload), encoding="utf-8")
+    launcher = _write_launcher_with_payloads(
+        tmp_path / "short_hover_launcher.py",
+        {
+            "samples": [
+                {
+                    "t": round(index * 0.1, 3),
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 3.0,
+                    "crashed": False,
+                }
+                for index in range(51)
+            ]
+        },
+    )
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f'"{sys.executable}" "{launcher}" --telemetry {{telemetry_json}}'
+            ),
+        }
+    )
+
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is True, result
+    assert result["metrics"]["pass_flag"] is False
+    raw = result["metrics"]["raw_metric_json"]
+    assert raw["evaluation_track_coverage"] == pytest.approx(0.5)
+    assert raw["evaluation_progress_contract_ok"] is False
+
+
 def test_px4_runner_timeout_maps_to_timeout(tmp_path: Path):
     sleeper = tmp_path / "sleeper.py"
     sleeper.write_text(

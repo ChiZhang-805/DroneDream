@@ -286,6 +286,7 @@ const AGGREGATION_HINT_KEYS: Record<RobustAggregation, TranslationKey> = {
 };
 
 const TRACK_HINT_KEYS: Record<TrackType, TranslationKey> = {
+  hover: "wizard.hint.track.hover",
   circle: "wizard.hint.track.circle",
   u_turn: "wizard.hint.track.uTurn",
   lemniscate: "wizard.hint.track.lemniscate",
@@ -692,8 +693,19 @@ function validate(
     const value = parseNumber(form.lemniscate_scale_m);
     if (value === null || value <= 0 || value > 100) errors.lemniscate_scale_m = t("wizard.validation.positiveAtMost", { max: 100 });
   }
-  if (parseNumber(form.start_x) === null) errors.start_x = t("wizard.validation.requiredNumber");
-  if (parseNumber(form.start_y) === null) errors.start_y = t("wizard.validation.requiredNumber");
+  const startX = parseNumber(form.start_x);
+  const startY = parseNumber(form.start_y);
+  if (startX === null) errors.start_x = t("wizard.validation.requiredNumber");
+  if (startY === null) errors.start_y = t("wizard.validation.requiredNumber");
+  if (
+    form.track_type === "hover"
+    && startX !== null
+    && startY !== null
+    && (Math.abs(startX) > 1e-9 || Math.abs(startY) > 1e-9)
+  ) {
+    errors.start_x = t("wizard.validation.hoverOrigin");
+    errors.start_y = t("wizard.validation.hoverOrigin");
+  }
   const altitude = parseNumber(form.altitude_m);
   if (altitude === null) errors.altitude_m = t("wizard.validation.requiredNumber");
   else if (altitude < 1 || altitude > 20) errors.altitude_m = t("wizard.validation.between", { min: 1, max: 20 });
@@ -2071,6 +2083,9 @@ export function NewJob() {
                     })}
                   </select>
                 </Field>
+                {form.track_type === "hover" ? (
+                  <p className="form-hint wizard-full-row">{t(TRACK_HINT_KEYS.hover)}</p>
+                ) : null}
                 {form.track_type === "circle" ? <Field label={t("wizard.field.circleRadius")} htmlFor="circle_radius_m" error={errors.circle_radius_m} hint={t("wizard.hint.circleRadius")}><input id="circle_radius_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.circle_radius_m} onChange={handleTextChange("circle_radius_m")} /></Field> : null}
                 {form.track_type === "u_turn" ? <><Field label={t("wizard.field.uTurnStraight")} htmlFor="u_turn_straight_length_m" error={errors.u_turn_straight_length_m} hint={t("wizard.hint.uTurnStraight")}><input id="u_turn_straight_length_m" type="number" min="0" max="200" step="0.1" placeholder="0–200" value={form.u_turn_straight_length_m} onChange={handleTextChange("u_turn_straight_length_m")} /></Field><Field label={t("wizard.field.uTurnRadius")} htmlFor="u_turn_turn_radius_m" error={errors.u_turn_turn_radius_m} hint={t("wizard.hint.uTurnRadius")}><input id="u_turn_turn_radius_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.u_turn_turn_radius_m} onChange={handleTextChange("u_turn_turn_radius_m")} /></Field></> : null}
                 {form.track_type === "lemniscate" ? <Field label={t("wizard.field.lemniscateScale")} htmlFor="lemniscate_scale_m" error={errors.lemniscate_scale_m} hint={t("wizard.hint.lemniscateScale")}><input id="lemniscate_scale_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.lemniscate_scale_m} onChange={handleTextChange("lemniscate_scale_m")} /></Field> : null}

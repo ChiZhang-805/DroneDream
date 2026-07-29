@@ -867,6 +867,38 @@ describe("NewJob experiment wizard", () => {
     expect(payload.advanced_scenario_config?.sensor_degradation?.dropout_rate).toBe(0.2);
   });
 
+  it("submits hover as a stationary 10-second reference without lateral points", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "job_hover" } as Job);
+    renderPage();
+    openStep(/Flight Setup/i);
+    fireEvent.change(screen.getByLabelText(/Track Type/i), { target: { value: "hover" } });
+    createExperiment();
+
+    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
+    const payload = createSpy.mock.calls[0][0];
+    expect(payload.track_type).toBe("hover");
+    expect(payload.reference_track).toHaveLength(101);
+    expect(
+      new Set(payload.reference_track?.map((point) => `${point.x},${point.y},${point.z}`)),
+    ).toEqual(new Set(["0,0,3"]));
+  });
+
+  it("blocks a hover draft whose origin has a lateral offset", () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "unused" } as Job);
+    renderPage();
+    openStep(/Flight Setup/i);
+    fireEvent.change(screen.getByLabelText(/Track Type/i), { target: { value: "hover" } });
+    fireEvent.change(screen.getByLabelText(/Start X/i), { target: { value: "1" } });
+
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(screen.getByText(/At local origin X=0, Y=0/i)).toBeVisible();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
   it("falls back to the legacy contract only when an old backend rejects advanced fields", async () => {
     const createSpy = vi
       .spyOn(apiClient, "createJob")

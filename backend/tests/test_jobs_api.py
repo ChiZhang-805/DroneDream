@@ -357,7 +357,7 @@ def test_create_job_rejects_invalid_battery_percent(client: TestClient) -> None:
     assert resp.status_code == 422
 
 
-@pytest.mark.parametrize("track_type", ["circle", "u_turn", "lemniscate"])
+@pytest.mark.parametrize("track_type", ["hover", "circle", "u_turn", "lemniscate"])
 def test_non_custom_track_creation_unchanged(client: TestClient, track_type: str) -> None:
     payload = {**HEURISTIC_JOB_PAYLOAD, "track_type": track_type}
     resp = client.post("/api/v1/jobs", json=payload)
@@ -365,6 +365,29 @@ def test_non_custom_track_creation_unchanged(client: TestClient, track_type: str
     body = resp.json()["data"]
     assert body["track_type"] == track_type
     assert body["reference_track"] is None
+
+
+def test_hover_track_rejects_non_origin_or_moving_reference(client: TestClient) -> None:
+    non_origin = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "track_type": "hover",
+        "start_point": {"x": 1, "y": 0},
+    }
+    response = client.post("/api/v1/jobs", json=non_origin)
+    assert response.status_code == 422
+    assert "start_point x=0 and y=0" in response.text
+
+    moving_reference = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "track_type": "hover",
+        "reference_track": [
+            {"x": 0, "y": 0, "z": 5},
+            {"x": 0.5, "y": 0, "z": 5},
+        ],
+    }
+    response = client.post("/api/v1/jobs", json=moving_reference)
+    assert response.status_code == 422
+    assert "hover reference_track must remain" in response.text
 
 
 def test_create_job_rejects_invalid_sensor_noise(client: TestClient) -> None:

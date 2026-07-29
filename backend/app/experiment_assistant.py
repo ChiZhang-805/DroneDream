@@ -138,7 +138,7 @@ _FIELD_SPECS: tuple[FieldSpec, ...] = (
         "track_type",
         "enum",
         "Reference trajectory type",
-        enum_values=("circle", "u_turn", "lemniscate", "custom"),
+        enum_values=("hover", "circle", "u_turn", "lemniscate", "custom"),
     ),
     _spec("circle_radius_m", "number", "Circle radius in metres", minimum=0.1, maximum=100),
     _spec(

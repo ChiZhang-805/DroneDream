@@ -36,8 +36,9 @@ export type TrialStatus =
   | "FAILED"
   | "CANCELLED";
 
-export type TrackType = "circle" | "u_turn" | "lemniscate" | "custom";
+export type TrackType = "hover" | "circle" | "u_turn" | "lemniscate" | "custom";
 export const TRACK_TYPES: readonly TrackType[] = [
+  "hover",
   "circle",
   "u_turn",
   "lemniscate",

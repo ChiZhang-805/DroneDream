@@ -46,7 +46,7 @@ HarnessToolId = Literal[
 ]
 HarnessSourceType = Literal["baseline", "optimizer", "llm_optimizer", "unknown"]
 HarnessObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom", "unknown"]
-HarnessTrackType = Literal["circle", "u_turn", "lemniscate", "custom", "unknown"]
+HarnessTrackType = Literal["hover", "circle", "u_turn", "lemniscate", "custom", "unknown"]
 HarnessScenarioType = Literal[
     "nominal",
     "noise_perturbed",
@@ -94,7 +94,7 @@ MAX_GENERATION_TREND_ITEMS = 32
 
 _ALLOWED_SOURCE_TYPES = frozenset({"baseline", "optimizer", "llm_optimizer"})
 _ALLOWED_OBJECTIVE_PROFILES = frozenset({"stable", "fast", "smooth", "robust", "custom"})
-_ALLOWED_TRACK_TYPES = frozenset({"circle", "u_turn", "lemniscate", "custom"})
+_ALLOWED_TRACK_TYPES = frozenset({"hover", "circle", "u_turn", "lemniscate", "custom"})
 _ALLOWED_SCENARIO_TYPES = frozenset(
     {
         "nominal",

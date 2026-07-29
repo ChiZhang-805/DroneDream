@@ -31,6 +31,9 @@ from typing import Any, Protocol
 MAX_REFERENCE_TRACK_POINTS = 10_000
 MAX_SETPOINT_RATE_HZ = 100.0
 MAX_SETPOINTS = 1_000_000
+DEFAULT_HOVER_DURATION_SECONDS = 10.0
+MIN_HOVER_DURATION_SECONDS = 1.0
+MAX_HOVER_DURATION_SECONDS = 300.0
 RUNTIME_EFFECT_SCHEMA_VERSION = "dronedream.scenario_runtime_effects.v1"
 
 
@@ -49,6 +52,13 @@ class TrackPoint:
     x: float
     y: float
     z: float
+
+
+@dataclass(frozen=True)
+class ReferenceTrackPlan:
+    points: list[TrackPoint]
+    track_type: str | None
+    hover_duration_seconds: float | None
 
 
 @dataclass(frozen=True)
@@ -687,7 +697,7 @@ def _finite_float(value: Any, label: str) -> float:
     return parsed
 
 
-def load_reference_track(path: Path) -> list[TrackPoint]:
+def load_reference_track_plan(path: Path) -> ReferenceTrackPlan:
     payload = json.loads(
         path.read_text(encoding="utf-8"),
         parse_constant=_reject_nonfinite_json,
@@ -711,7 +721,30 @@ def load_reference_track(path: Path) -> list[TrackPoint]:
         )
     if not points:
         raise ValueError("reference_track.json points[] cannot be empty")
-    return points
+    track_type_raw = payload.get("track_type")
+    track_type = None if track_type_raw is None else str(track_type_raw).strip()
+    if track_type not in {None, "hover", "circle", "u_turn", "lemniscate", "custom"}:
+        raise ValueError("reference_track.json track_type is unsupported")
+    hover_duration_seconds: float | None = None
+    if track_type == "hover":
+        hover_duration_seconds = _finite_float(
+            payload.get("hover_duration_s", DEFAULT_HOVER_DURATION_SECONDS),
+            "hover_duration_s",
+        )
+        if not MIN_HOVER_DURATION_SECONDS <= hover_duration_seconds <= MAX_HOVER_DURATION_SECONDS:
+            raise ValueError(
+                "hover_duration_s must be between "
+                f"{MIN_HOVER_DURATION_SECONDS:g} and {MAX_HOVER_DURATION_SECONDS:g} seconds"
+            )
+    return ReferenceTrackPlan(
+        points=points,
+        track_type=track_type,
+        hover_duration_seconds=hover_duration_seconds,
+    )
+
+
+def load_reference_track(path: Path) -> list[TrackPoint]:
+    return load_reference_track_plan(path).points
 
 
 def load_controller_params(path: Path) -> ControllerParams:
@@ -774,7 +807,11 @@ def build_setpoint_schedule(
 
 
 def build_setpoint_schedule_plan(
-    points: list[TrackPoint], params: ControllerParams, rate_hz: float
+    points: list[TrackPoint],
+    params: ControllerParams,
+    rate_hz: float,
+    *,
+    hover_duration_seconds: float | None = None,
 ) -> SetpointSchedulePlan:
     if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
         raise ValueError(f"rate_hz must be finite and in (0, {MAX_SETPOINT_RATE_HZ:g}]")
@@ -791,6 +828,41 @@ def build_setpoint_schedule_plan(
         raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
     for _ in range(takeoff_hold_samples):
         schedule.append(enu_point_to_ned_setpoint(takeoff, yaw_deg=0.0))
+
+    if hover_duration_seconds is not None:
+        if (
+            not math.isfinite(hover_duration_seconds)
+            or not MIN_HOVER_DURATION_SECONDS
+            <= hover_duration_seconds
+            <= MAX_HOVER_DURATION_SECONDS
+        ):
+            raise ValueError(
+                "hover_duration_seconds must be between "
+                f"{MIN_HOVER_DURATION_SECONDS:g} and {MAX_HOVER_DURATION_SECONDS:g}"
+            )
+        anchor = points[0]
+        if any(
+            math.dist(
+                (point.x, point.y, point.z),
+                (anchor.x, anchor.y, anchor.z),
+            )
+            > 1e-9
+            for point in points
+        ):
+            raise ValueError("hover reference track must contain one stationary anchor")
+        if abs(anchor.x) > 1e-9 or abs(anchor.y) > 1e-9:
+            raise ValueError("hover anchor must remain at local origin x=0, y=0")
+        hover_samples = max(2, int(math.ceil(rate_hz * hover_duration_seconds)) + 1)
+        if hover_samples > MAX_SETPOINTS - len(schedule):
+            raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
+        hover_setpoint = enu_point_to_ned_setpoint(anchor, yaw_deg=0.0)
+        track_start_index = len(schedule)
+        schedule.extend(hover_setpoint for _ in range(hover_samples))
+        return SetpointSchedulePlan(
+            schedule=schedule,
+            track_start_index=track_start_index,
+            track_end_index=len(schedule) - 1,
+        )
 
     prev = takeoff
     smoothed_speed = 0.0
@@ -1543,9 +1615,15 @@ def main(argv: list[str] | None = None) -> int:
             if runtime_profile is not None
             else None
         )
-        points = load_reference_track(args.track)
+        reference_plan = load_reference_track_plan(args.track)
+        points = reference_plan.points
         params = load_controller_params(args.params)
-        plan = build_setpoint_schedule_plan(points, params, args.setpoint_rate_hz)
+        plan = build_setpoint_schedule_plan(
+            points,
+            params,
+            args.setpoint_rate_hz,
+            hover_duration_seconds=reference_plan.hover_duration_seconds,
+        )
         _log(
             args.log,
             f"vehicle={args.vehicle} world={args.world} points={len(points)} "

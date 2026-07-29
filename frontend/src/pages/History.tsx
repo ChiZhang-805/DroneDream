@@ -34,6 +34,7 @@ import { fetchAllHistoryJobs } from "../features/history/fetchAllHistoryJobs";
 type Translator = ReturnType<typeof useI18n>["t"];
 
 const TRACK_LABELS: Record<TrackType, TranslationKey> = {
+  hover: "wizard.track.hover",
   circle: "wizard.track.circle",
   u_turn: "wizard.track.uTurn",
   lemniscate: "wizard.track.lemniscate",

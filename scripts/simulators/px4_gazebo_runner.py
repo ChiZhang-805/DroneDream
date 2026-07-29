@@ -98,6 +98,9 @@ _MAX_TELEMETRY_SAMPLES = 50_000
 _MAX_TRIAL_INPUT_BYTES = 8 * 1024 * 1024
 _MAX_OFFBOARD_TIMING_BYTES = 1024 * 1024
 _MAX_REFERENCE_TRACK_POINTS = 10_000
+_HOVER_DURATION_SECONDS = 10.0
+_HOVER_REFERENCE_SAMPLE_COUNT = 101
+_HOVER_MIN_EVALUATION_DURATION_SECONDS = 10.0
 _MAX_ID_LENGTH = 256
 _PROJECTION_BACKTRACK_SEGMENTS = 16
 _PROJECTION_FORWARD_SEGMENTS = 64
@@ -200,6 +203,7 @@ class TrackGeometry:
     segments: tuple[TrackSegment, ...]
     total_length: float
     closed: bool
+    stationary: bool = False
 
 
 @dataclass(frozen=True)
@@ -808,8 +812,10 @@ def _validate_trial_input(
     objective_profile = _cfg_value("objective_profile")
     reference_track_raw = _cfg_value("reference_track")
 
-    if track_type not in {"circle", "u_turn", "lemniscate", "custom"}:
-        raise RunnerError("track_type must be one of: circle, u_turn, lemniscate, custom")
+    if track_type not in {"hover", "circle", "u_turn", "lemniscate", "custom"}:
+        raise RunnerError(
+            "track_type must be one of: hover, circle, u_turn, lemniscate, custom"
+        )
     if not isinstance(start_point, dict):
         raise RunnerError("start_point must be an object with x/y")
 
@@ -823,6 +829,8 @@ def _validate_trial_input(
         raise RunnerError("start_point.x/y and altitude_m must be finite")
     if not 1.0 <= altitude <= 20.0:
         raise RunnerError("altitude_m must be between 1 and 20 meters")
+    if track_type == "hover" and (abs(start_x) > 1e-9 or abs(start_y) > 1e-9):
+        raise RunnerError("hover track requires start_point x=0 and y=0")
 
     if wind is not None and not isinstance(wind, dict):
         raise RunnerError("wind must be an object when provided")
@@ -884,6 +892,19 @@ def _validate_trial_input(
         normalized_job_cfg["reference_track"] = normalized_points
     if track_type == "custom" and len(normalized_job_cfg["reference_track"]) < 2:
         raise RunnerError("custom track_type requires reference_track with at least 2 points")
+    if (
+        track_type == "hover"
+        and normalized_job_cfg["reference_track"]
+        and any(
+            abs(point["x"]) > 1e-9
+            or abs(point["y"]) > 1e-9
+            or abs(point["z"] - altitude) > 1e-9
+            for point in normalized_job_cfg["reference_track"]
+        )
+    ):
+        raise RunnerError(
+            "hover reference_track must remain at x=0, y=0 and altitude_m"
+        )
 
     params_value = payload.get("parameters")
     if params_value is not None and not isinstance(params_value, dict):
@@ -1080,7 +1101,10 @@ def _make_reference_track(
     if track_type == "custom":
         return list(reference_track or [])
     points: list[dict[str, float]] = []
-    if track_type == "circle":
+    if track_type == "hover":
+        for _ in range(_HOVER_REFERENCE_SAMPLE_COUNT):
+            points.append({"x": 0.0, "y": 0.0, "z": altitude})
+    elif track_type == "circle":
         radius = 5.0
         n = 180
         for i in range(n + 1):
@@ -1405,7 +1429,11 @@ def _load_telemetry(path: Path, *, allow_csv: bool) -> dict[str, Any]:
     raise RunnerError("telemetry output is missing")
 
 
-def _build_track_geometry(ref_points: list[dict[str, float]]) -> TrackGeometry:
+def _build_track_geometry(
+    ref_points: list[dict[str, float]],
+    *,
+    allow_stationary: bool = False,
+) -> TrackGeometry:
     if len(ref_points) < 2:
         raise RunnerError("reference track must contain at least two points")
     segments: list[TrackSegment] = []
@@ -1430,6 +1458,26 @@ def _build_track_geometry(ref_points: list[dict[str, float]]) -> TrackGeometry:
         )
         progress += length
     if not segments or progress <= 1e-12:
+        if allow_stationary and ref_points:
+            anchor = ref_points[0]
+            anchor_start = (
+                float(anchor["x"]),
+                float(anchor["y"]),
+                float(anchor["z"]),
+            )
+            return TrackGeometry(
+                segments=(
+                    TrackSegment(
+                        start=anchor_start,
+                        delta=(0.0, 0.0, 0.0),
+                        length=0.0,
+                        start_progress=0.0,
+                    ),
+                ),
+                total_length=0.0,
+                closed=True,
+                stationary=True,
+            )
         raise RunnerError("reference track must have non-zero three-dimensional length")
     first = ref_points[0]
     last = ref_points[-1]
@@ -1442,6 +1490,7 @@ def _build_track_geometry(ref_points: list[dict[str, float]]) -> TrackGeometry:
         segments=tuple(segments),
         total_length=progress,
         closed=endpoint_distance <= max(1e-6, progress * 1e-6),
+        stationary=False,
     )
 
 
@@ -1456,12 +1505,16 @@ def _project_sample_to_segment(
         float(sample["z"]) - segment.start[2],
     )
     length_squared = segment.length * segment.length
-    fraction = min(
-        1.0,
-        max(
-            0.0,
-            sum(offset[i] * segment.delta[i] for i in range(3)) / length_squared,
-        ),
+    fraction = (
+        0.0
+        if length_squared <= 1e-24
+        else min(
+            1.0,
+            max(
+                0.0,
+                sum(offset[i] * segment.delta[i] for i in range(3)) / length_squared,
+            ),
+        )
     )
     reference = tuple(segment.start[i] + fraction * segment.delta[i] for i in range(3))
     error = math.sqrt(
@@ -1631,6 +1684,33 @@ def _evaluate_track_progress(
     max_track_error: float,
 ) -> TrackProgressEvaluation:
     """Evaluate directed, continuous progress independent of waypoint density."""
+
+    if geometry.stationary:
+        valid_projections = [
+            projection for projection in projections if projection.error <= max_track_error
+        ]
+        duration_seconds = (
+            max(0.0, float(samples[-1]["t"]) - float(samples[0]["t"]))
+            if len(samples) >= 2
+            else 0.0
+        )
+        duration_fraction = min(
+            1.0,
+            duration_seconds / _HOVER_MIN_EVALUATION_DURATION_SECONDS,
+        )
+        in_tolerance_fraction = (
+            len(valid_projections) / len(projections) if projections else 0.0
+        )
+        coverage = in_tolerance_fraction * duration_fraction
+        reached = 0.0 if valid_projections else None
+        return TrackProgressEvaluation(
+            coverage=coverage,
+            directed_progress_fraction=coverage,
+            backward_distance=0.0,
+            discontinuity_count=0,
+            start_progress=reached,
+            end_progress=reached,
+        )
 
     intervals: list[tuple[float, float]] = []
     previous: tuple[dict[str, Any], TrackProjection] | None = None
@@ -1975,7 +2055,11 @@ def _compute_metrics(
     if telemetry_contract is None:
         raise RunnerError("telemetry semantic contract is missing or does not match samples")
     synthetic_telemetry = dry_run or telemetry_contract.synthetic
-    track_geometry = _build_track_geometry(reference_track)
+    stationary_hover = job_cfg.get("track_type") == "hover"
+    track_geometry = _build_track_geometry(
+        reference_track,
+        allow_stationary=stationary_hover,
+    )
     projections = _project_samples_to_track(samples, track_geometry)
     altitude_fraction = env.eval_altitude_fraction
     near_track_threshold = env.eval_near_track_threshold_m
@@ -2263,9 +2347,23 @@ def _compute_metrics(
             "evaluation_progress_contract_ok": progress_contract_ok,
             "track_length_3d_m": round(track_geometry.total_length, 6),
             "track_is_closed": track_geometry.closed,
-            "track_projection": "ordered_local_3d_segment_projection",
+            "track_projection": (
+                "stationary_point_3d_projection"
+                if track_geometry.stationary
+                else "ordered_local_3d_segment_projection"
+            ),
             "track_projection_comparison_limit": _MAX_PROJECTION_SEGMENT_COMPARISONS,
-            "coverage_basis": "union_of_traversed_polyline_arc_length",
+            "coverage_basis": (
+                "stationary_hover_time_in_tolerance"
+                if track_geometry.stationary
+                else "union_of_traversed_polyline_arc_length"
+            ),
+            "track_mode": "stationary_hover" if track_geometry.stationary else "trajectory",
+            "hover_minimum_evaluation_duration_s": (
+                _HOVER_MIN_EVALUATION_DURATION_SECONDS
+                if track_geometry.stationary
+                else None
+            ),
             "full_log_rmse": round(
                 _time_weighted_rms(errors, samples),
                 6,
@@ -2882,6 +2980,9 @@ def run_once(input_path: Path, output_path: Path) -> int:
             {
                 "schema_version": "dronedream.reference_track.v1",
                 "track_type": job_cfg["track_type"],
+                "hover_duration_s": (
+                    _HOVER_DURATION_SECONDS if job_cfg["track_type"] == "hover" else None
+                ),
                 "points": reference_track,
                 "reference_track": reference_track,
             },
@@ -3182,6 +3283,10 @@ def run_once(input_path: Path, output_path: Path) -> int:
         try:
             reference_track_payload = {
                 "schema_version": "dronedream.reference_track.v1",
+                "track_type": job_cfg["track_type"],
+                "hover_duration_s": (
+                    _HOVER_DURATION_SECONDS if job_cfg["track_type"] == "hover" else None
+                ),
                 "reference_track": reference_track,
             }
             evaluation_policy = compile_px4_evaluation_policy(
