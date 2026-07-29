@@ -122,6 +122,28 @@ class RuntimeManifestContractTests(unittest.TestCase):
             with self.assertRaisesRegex(runtime_manifest.ManifestError, "unsupported"):
                 runtime_manifest.validate_manifest(manifest)
 
+    def test_manifest_validation_recomputes_runtime_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["runtimeId"] = "123e4567-e89b-12d3-a456-426614174000"
+
+            with self.assertRaisesRegex(
+                runtime_manifest.ManifestError,
+                "runtimeId does not match its identity inputs",
+            ):
+                runtime_manifest.validate_manifest(manifest)
+
+    def test_manifest_validation_rejects_component_summary_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["components"]["backend"] = "9.9.9"
+
+            with self.assertRaisesRegex(
+                runtime_manifest.ManifestError,
+                "component summaries do not match",
+            ):
+                runtime_manifest.validate_manifest(manifest)
+
     def test_promotion_rejects_incomplete_or_duplicated_smoke_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
