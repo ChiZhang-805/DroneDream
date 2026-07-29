@@ -159,6 +159,12 @@ describe("conversational experiment drafting", () => {
       "user",
       "assistant",
     ]);
+    const persistentRaw = window.localStorage.getItem(EXPERIMENT_DRAFT_KEY);
+    expect(persistentRaw).toContain("five metre circular track");
+    expect(persistentRaw).not.toContain(
+      "Tune an x500 on a circular track at 3 metres and include MPC_XY_P.",
+    );
+    expect(JSON.parse(persistentRaw ?? "null").conversation.messages).toEqual([]);
   });
 
   it("does not request microphone permission until the user clicks the voice button", async () => {
@@ -257,6 +263,8 @@ describe("conversational experiment drafting", () => {
   });
 
   it("imports a supported reference file from the add menu", async () => {
+    const compile = vi.spyOn(apiClient, "compileExperimentAssistantTurn")
+      .mockResolvedValue(assistantResponse());
     const { container } = renderAssistant();
     const fileInput = container.querySelector<HTMLInputElement>(
       ".assistant-reference-input",
@@ -276,7 +284,34 @@ describe("conversational experiment drafting", () => {
     expect(
       screen.getByRole("button", { name: "Remove file: experiment.json" }),
     ).toBeEnabled();
+    expect(screen.getByText(
+      "DroneDream uses reference content only in this request and does not save it in drafts or memory. Your selected model provider still receives the request.",
+    )).toBeVisible();
     expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(compile).toHaveBeenCalledTimes(1));
+    const request = compile.mock.calls[0][0];
+    expect(request.message).toBe(
+      "Use the imported reference files to prepare this experiment.",
+    );
+    expect(request.message).not.toContain("track_type");
+    expect(request.document_context).toMatchObject({
+      schema_version: "1.0",
+      purpose: "experiment_draft_reference",
+      chunks: [
+        {
+          chunk_id: "chunk-1",
+          display_name: "experiment.json",
+          content: '{"track_type":"circle","altitude_m":3}',
+          retention: "request_only",
+        },
+      ],
+    });
+    expect(request.document_context?.chunks[0].content_sha256)
+      .toMatch(/^[0-9a-f]{64}$/u);
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .not.toContain('{"track_type":"circle","altitude_m":3}');
   });
 
   it("clears the conversation and shared experiment draft only after confirmation", async () => {

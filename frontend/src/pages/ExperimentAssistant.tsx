@@ -50,7 +50,10 @@ import {
   issueManagedModelGrant,
 } from "../features/settings/cloudModelAccess";
 import { useI18n } from "../i18n/I18nProvider";
-import type { ExperimentAssistantTurnResponse } from "../types/api";
+import type {
+  ExperimentAssistantDocumentContext,
+  ExperimentAssistantTurnResponse,
+} from "../types/api";
 
 const COPY = {
   en: {
@@ -62,11 +65,16 @@ const COPY = {
     importFiles: "Import files",
     removeFile: "Remove file",
     unsupportedFile: "Use JSON, text, Markdown, CSV, YAML, TOML, XML, or log files.",
-    fileTooLarge: "Each imported file must be 1 MB or smaller.",
-    tooManyFiles: "You can attach up to 5 reference files.",
-    messageTooLong: "The request and imported file content must stay within 12,000 characters.",
+    fileTooLarge: "Each imported file must contain 4,000 bytes or fewer.",
+    tooManyFiles: "You can attach up to 4 reference files.",
+    referenceContextTooLarge:
+      "Imported reference content must contain 8,000 bytes or fewer in total.",
+    emptyFile: "Empty reference files cannot be attached.",
+    messageTooLong: "The request must stay within 12,000 characters.",
     attachmentOnlyPrompt: "Use the imported reference files to prepare this experiment.",
     attachmentLabel: "Imported reference files",
+    referencePrivacy:
+      "DroneDream uses reference content only in this request and does not save it in drafts or memory. Your selected model provider still receives the request.",
     placeholder: "Describe your experiment…",
     send: "Send",
     sending: "Reading your intent…",
@@ -124,11 +132,15 @@ const COPY = {
     importFiles: "导入参考文件",
     removeFile: "移除文件",
     unsupportedFile: "请选择 JSON、文本、Markdown、CSV、YAML、TOML、XML 或日志文件。",
-    fileTooLarge: "每个导入文件不能超过 1 MB。",
-    tooManyFiles: "最多可以添加 5 个参考文件。",
-    messageTooLong: "输入内容和参考文件合计不能超过 12,000 个字符。",
+    fileTooLarge: "每个导入文件的内容不能超过 4,000 字节。",
+    tooManyFiles: "最多可以添加 4 个参考文件。",
+    referenceContextTooLarge: "导入的参考内容合计不能超过 8,000 字节。",
+    emptyFile: "不能添加空白参考文件。",
+    messageTooLong: "输入内容不能超过 12,000 个字符。",
     attachmentOnlyPrompt: "请根据导入的参考文件准备这次实验。",
     attachmentLabel: "导入的参考文件",
+    referencePrivacy:
+      "DroneDream 只在本次请求中使用参考内容，不会写入草稿或长期记忆；你选择的模型服务商仍会收到本次请求。",
     placeholder: "描述你的实验…",
     send: "发送",
     sending: "正在理解你的意图…",
@@ -189,14 +201,17 @@ const ACCEPTED_REFERENCE_EXTENSIONS = new Set([
   "yaml",
   "yml",
 ]);
-const MAX_REFERENCE_FILES = 5;
-const MAX_REFERENCE_FILE_BYTES = 1_000_000;
+const MAX_REFERENCE_FILES = 4;
+const MAX_REFERENCE_FILE_BYTES = 4_000;
+const MAX_REFERENCE_CONTEXT_BYTES = 8_000;
 const MAX_ASSISTANT_MESSAGE_LENGTH = 12_000;
 
 interface AssistantReferenceFile {
   id: string;
   name: string;
   content: string;
+  contentBytes: number;
+  contentSha256: string;
 }
 
 function referenceFileExtension(fileName: string): string {
@@ -204,19 +219,33 @@ function referenceFileExtension(fileName: string): string {
   return separator >= 0 ? fileName.slice(separator + 1).toLowerCase() : "";
 }
 
-function assistantMessageWithReferences(
-  message: string,
+async function sha256Hex(content: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(content),
+  );
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function requestOnlyDocumentContext(
   files: AssistantReferenceFile[],
-  attachmentLabel: string,
-): string {
-  if (!files.length) return message;
-  const references = files
-    .map(
-      (file) =>
-        `--- ${file.name} ---\n${file.content.trim()}\n--- end ${file.name} ---`,
-    )
-    .join("\n\n");
-  return `${message}\n\n${attachmentLabel}:\n${references}`;
+): ExperimentAssistantDocumentContext | null {
+  if (!files.length) return null;
+  return {
+    schema_version: "1.0",
+    purpose: "experiment_draft_reference",
+    chunks: files.map((file) => ({
+      schema_version: "1.0",
+      document_id: `document-${file.id}`,
+      chunk_id: "chunk-1",
+      display_name: file.name,
+      content: file.content,
+      content_sha256: file.contentSha256,
+      retention: "request_only",
+    })),
+  };
 }
 
 const FIELD_LABELS: Record<string, { en: string; "zh-CN": string }> = {
@@ -368,6 +397,10 @@ export function ExperimentAssistant() {
       return;
     }
     const imported: AssistantReferenceFile[] = [];
+    let totalContentBytes = referenceFiles.reduce(
+      (total, file) => total + file.contentBytes,
+      0,
+    );
     for (const file of selected) {
       if (!ACCEPTED_REFERENCE_EXTENSIONS.has(referenceFileExtension(file.name))) {
         setError(copy.unsupportedFile);
@@ -377,10 +410,27 @@ export function ExperimentAssistant() {
         setError(copy.fileTooLarge);
         return;
       }
+      const content = await file.text();
+      const contentBytes = new TextEncoder().encode(content).byteLength;
+      if (!content.trim()) {
+        setError(copy.emptyFile);
+        return;
+      }
+      if (contentBytes > MAX_REFERENCE_FILE_BYTES) {
+        setError(copy.fileTooLarge);
+        return;
+      }
+      totalContentBytes += contentBytes;
+      if (totalContentBytes > MAX_REFERENCE_CONTEXT_BYTES) {
+        setError(copy.referenceContextTooLarge);
+        return;
+      }
       imported.push({
         id: messageId(),
         name: file.name,
-        content: await file.text(),
+        content,
+        contentBytes,
+        contentSha256: await sha256Hex(content),
       });
     }
     setReferenceFiles((current) => [...current, ...imported]);
@@ -390,13 +440,8 @@ export function ExperimentAssistant() {
   async function submitMessage(event: FormEvent): Promise<void> {
     event.preventDefault();
     const visibleMessage = composer.trim() || copy.attachmentOnlyPrompt;
-    const message = assistantMessageWithReferences(
-      visibleMessage,
-      referenceFiles,
-      copy.attachmentLabel,
-    );
     if ((!composer.trim() && !referenceFiles.length) || pending) return;
-    if (message.length > MAX_ASSISTANT_MESSAGE_LENGTH) {
+    if (visibleMessage.length > MAX_ASSISTANT_MESSAGE_LENGTH) {
       setError(copy.messageTooLong);
       return;
     }
@@ -417,12 +462,13 @@ export function ExperimentAssistant() {
         : null;
       const result = await apiClient.compileExperimentAssistantTurn({
         message_id: id,
-        message,
+        message: visibleMessage,
         locale,
         conversation_summary: draft.conversation.summary,
         current_values: assistantCurrentValues(draft.form),
         explicit_field_ids: explicitAssistantFields(draft.conversation),
         current_parameters: assistantCurrentParameters(draft.selections),
+        document_context: requestOnlyDocumentContext(referenceFiles),
         llm: modelAccess.accessMode === "platform"
           ? {
               access_mode: "platform",
@@ -623,26 +669,29 @@ export function ExperimentAssistant() {
           }}
         />
         {referenceFiles.length ? (
-          <div className="assistant-reference-files" aria-label={copy.attachmentLabel}>
-            {referenceFiles.map((file) => (
-              <span key={file.id}>
-                <FileText aria-hidden="true" strokeWidth={1.8} />
-                <b title={file.name}>{file.name}</b>
-                <button
-                  type="button"
-                  aria-label={`${copy.removeFile}: ${file.name}`}
-                  title={`${copy.removeFile}: ${file.name}`}
-                  onClick={() =>
-                    setReferenceFiles((current) =>
-                      current.filter((item) => item.id !== file.id),
-                    )
-                  }
-                >
-                  <X aria-hidden="true" strokeWidth={1.9} />
-                </button>
-              </span>
-            ))}
-          </div>
+          <>
+            <div className="assistant-reference-files" aria-label={copy.attachmentLabel}>
+              {referenceFiles.map((file) => (
+                <span key={file.id}>
+                  <FileText aria-hidden="true" strokeWidth={1.8} />
+                  <b title={file.name}>{file.name}</b>
+                  <button
+                    type="button"
+                    aria-label={`${copy.removeFile}: ${file.name}`}
+                    title={`${copy.removeFile}: ${file.name}`}
+                    onClick={() =>
+                      setReferenceFiles((current) =>
+                        current.filter((item) => item.id !== file.id),
+                      )
+                    }
+                  >
+                    <X aria-hidden="true" strokeWidth={1.9} />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <p className="assistant-reference-privacy">{copy.referencePrivacy}</p>
+          </>
         ) : null}
         <div className="assistant-composer-bar">
           <div

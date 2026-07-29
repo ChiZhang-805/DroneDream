@@ -7,6 +7,7 @@ validation; unknown fields are rejected (``extra="forbid"``) per the API spec.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from datetime import datetime
@@ -333,6 +334,57 @@ class ExperimentAssistantCurrentParameter(_Strict):
         return self
 
 
+class ExperimentAssistantDocumentChunk(_Strict):
+    schema_version: Literal["1.0"] = "1.0"
+    document_id: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-z0-9][a-z0-9._-]*$",
+    )
+    chunk_id: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-z0-9][a-z0-9._-]*$",
+    )
+    display_name: str = Field(min_length=1, max_length=255)
+    content: str = Field(min_length=1, max_length=4_000)
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    retention: Literal["request_only"] = "request_only"
+
+    @model_validator(mode="after")
+    def _validate_chunk(self) -> ExperimentAssistantDocumentChunk:
+        if "\x00" in self.display_name or "\x00" in self.content:
+            raise ValueError("document context cannot contain NUL bytes")
+        actual_sha256 = hashlib.sha256(self.content.encode("utf-8")).hexdigest()
+        if actual_sha256 != self.content_sha256:
+            raise ValueError("document context content_sha256 does not match content")
+        return self
+
+
+class ExperimentAssistantDocumentContext(_Strict):
+    schema_version: Literal["1.0"] = "1.0"
+    purpose: Literal["experiment_draft_reference"] = "experiment_draft_reference"
+    chunks: list[ExperimentAssistantDocumentChunk] = Field(min_length=1, max_length=4)
+
+    @model_validator(mode="after")
+    def _validate_context(self) -> ExperimentAssistantDocumentContext:
+        identities = [(chunk.document_id, chunk.chunk_id) for chunk in self.chunks]
+        if len(set(identities)) != len(identities):
+            raise ValueError("document context chunk identities must be unique")
+        if sum(len(chunk.content.encode("utf-8")) for chunk in self.chunks) > 8_000:
+            raise ValueError("document context exceeds the 8000-byte request-only limit")
+        return self
+
+
+class ExperimentAssistantDocumentContextReceipt(_Strict):
+    schema_version: Literal["1.0"] = "1.0"
+    retention: Literal["request_only"] = "request_only"
+    persisted: Literal[False] = False
+    chunk_count: Annotated[int, Field(ge=1, le=4)]
+    content_bytes: Annotated[int, Field(ge=1, le=8_000)]
+    context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class ExperimentAssistantTurnRequest(_Strict):
     message_id: str = Field(min_length=1, max_length=128)
     message: str = Field(min_length=1, max_length=12_000)
@@ -347,6 +399,7 @@ class ExperimentAssistantTurnRequest(_Strict):
         default_factory=list,
         max_length=64,
     )
+    document_context: ExperimentAssistantDocumentContext | None = None
     llm: LLMProviderConfig
 
     @model_validator(mode="after")
@@ -378,6 +431,7 @@ class ExperimentAssistantTurnResponse(_Strict):
     missing_field_ids: list[str] = Field(max_length=32)
     review_field_ids: list[str] = Field(max_length=32)
     questions: list[ExperimentAssistantQuestion] = Field(max_length=4)
+    document_context_receipt: ExperimentAssistantDocumentContextReceipt | None = None
     usage: ExperimentAssistantUsage = Field(default_factory=ExperimentAssistantUsage)
     provider: str
     model: str
@@ -1174,6 +1228,9 @@ __all__ = [
     "ObjectiveSpec",
     "ConstraintSpec",
     "ExperimentAssistantCurrentParameter",
+    "ExperimentAssistantDocumentChunk",
+    "ExperimentAssistantDocumentContext",
+    "ExperimentAssistantDocumentContextReceipt",
     "ExperimentAssistantPatch",
     "ExperimentAssistantParameterPatch",
     "ExperimentAssistantQuestion",

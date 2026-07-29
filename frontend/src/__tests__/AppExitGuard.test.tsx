@@ -112,7 +112,17 @@ describe("desktop close protection", () => {
       completed_steps: [0, 1],
       form: { display_name: "Keep me", llm_api_key: "must-not-persist" },
       selections: {},
-      conversation: null,
+      conversation: {
+        summary: "Keep only this compact summary.",
+        field_provenance: {},
+        messages: [
+          {
+            id: "turn-private",
+            role: "user",
+            content: "must-not-persist-raw-chat",
+          },
+        ],
+      },
     }));
     renderShell("/dashboard");
 
@@ -125,6 +135,12 @@ describe("desktop close protection", () => {
     expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("Keep me");
     expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toContain(
       "must-not-persist",
+    );
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toContain(
+      "must-not-persist-raw-chat",
+    );
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain(
+      "Keep only this compact summary.",
     );
     expect(invokeDesktop).toHaveBeenCalledWith("stop_runtime_for_exit", undefined);
   });

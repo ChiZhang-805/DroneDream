@@ -458,6 +458,31 @@ export interface ExperimentAssistantCurrentParameter {
   scale: ParameterScale;
 }
 
+export interface ExperimentAssistantDocumentChunk {
+  schema_version: "1.0";
+  document_id: string;
+  chunk_id: string;
+  display_name: string;
+  content: string;
+  content_sha256: string;
+  retention: "request_only";
+}
+
+export interface ExperimentAssistantDocumentContext {
+  schema_version: "1.0";
+  purpose: "experiment_draft_reference";
+  chunks: ExperimentAssistantDocumentChunk[];
+}
+
+export interface ExperimentAssistantDocumentContextReceipt {
+  schema_version: "1.0";
+  retention: "request_only";
+  persisted: false;
+  chunk_count: number;
+  content_bytes: number;
+  context_sha256: string;
+}
+
 export interface ExperimentAssistantTurnRequest {
   message_id: string;
   message: string;
@@ -466,6 +491,7 @@ export interface ExperimentAssistantTurnRequest {
   current_values: Record<string, ExperimentAssistantFieldValue>;
   explicit_field_ids: string[];
   current_parameters: ExperimentAssistantCurrentParameter[];
+  document_context?: ExperimentAssistantDocumentContext | null;
   llm: LLMProviderConfig;
 }
 
@@ -479,6 +505,7 @@ export interface ExperimentAssistantTurnResponse {
   missing_field_ids: string[];
   review_field_ids: string[];
   questions: ExperimentAssistantQuestion[];
+  document_context_receipt?: ExperimentAssistantDocumentContextReceipt | null;
   usage: ExperimentAssistantUsage;
   provider: string;
   model: string;
