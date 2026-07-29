@@ -1,0 +1,111 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-typography-cross-branch-resolution",
+  "generatedAtUtc": "2026-07-29T12:35:06Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "3e2e8dfc9ebb13f1d194453bab507a3356acd9d8",
+    "sourceTree": "41ee1df7292a9d848da8c3a0cf08523f7d7f4418",
+    "productionReceiptCommit": "7e2e08d2bac2deb670d76a6f93a198f88fa01065",
+    "productionReceipt": "website/validation-receipts/website-production-deployment-3e2e8df.json",
+    "productionReceiptSha256": "2a43c2cc3cb4713faaecb96c81a7b2cad563b6c5c056bd820d1ca424fdd13629",
+    "attestationRule": "This receipt attests the immutable website source and its exact deployed artifact. This receipt-only commit is not self-attested."
+  },
+  "incomingObservation": {
+    "qualityGateRunId": 30448014655,
+    "qualityGateUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30448014655",
+    "testedBranch": "codex/software",
+    "testedHead": "bb1677a12175a51ce5c7d3bb8824d25365a50545",
+    "frontendJobId": 90563054008,
+    "step": "Enforce bilingual copy rhythm and responsive layout",
+    "stepResult": "failure",
+    "failureCount": 19,
+    "completeFrontendLogSha256": "074b6773d715b096b88cb0709625cb526ce8f5f133b3305af343da64e11154b1",
+    "relationship": "The failing run tested the software branch, not the current website source or deployment artifact."
+  },
+  "incomingFailures": [
+    "capability-detail-0-1: zh-CN final line 77% of available width",
+    "capability-detail-0-2: zh-CN final line 77% of available width",
+    "capability-detail-0-3: zh-CN final line 77% of available width",
+    "capability-detail-0-4: zh-CN final line 77% of available width",
+    "capability-detail-1-0: zh-CN final line 77% of available width",
+    "capability-detail-1-2: zh-CN final line 77% of available width",
+    "capability-detail-1-5: zh-CN final line 77% of available width",
+    "capability-detail-1-6: zh-CN final line 77% of available width",
+    "capability-detail-2-0: zh-CN final line 78% of available width",
+    "capability-detail-2-1: zh-CN final line 77% of available width",
+    "capability-detail-2-3: zh-CN final line 77% of available width",
+    "capability-detail-3-1: zh-CN final line 77% of available width",
+    "capability-detail-3-2: zh-CN final line 77% of available width",
+    "footer-line: en final line 50% of available width",
+    "footer-line: line mismatch en=2, zh-CN=1",
+    "product-body: en final line 50% of available width",
+    "product-body: line mismatch en=2, zh-CN=1",
+    "phase-1: en text overflows its own box by 26px",
+    "phase-2: en text overflows its own box by 6px"
+  ],
+  "exactWebsiteValidation": {
+    "onlineOrigin": "http://47.93.180.216/site.html",
+    "onlineBuildManifestSha256": "a9816f9131c4e02c2d409390c5cb387be41689ba55860fd6f52c06f94ae69068",
+    "onlineBuildManifestSourceCommit": "3e2e8dfc9ebb13f1d194453bab507a3356acd9d8",
+    "desktop1440": {
+      "command": "node website/scripts/audit-site-typography.mjs http://47.93.180.216/site.html 1440 1000 0.80 <report>",
+      "mode": "full",
+      "result": "pass",
+      "violations": 0,
+      "reportBytes": 267834,
+      "reportSha256": "ff46b0348662548628f77b94b4f324528b888c9fd3c656277ee5659936794aa8",
+      "relevantMeasurements": {
+        "zhCapabilityDetails": "all final-line occupancy values are 80% to 89%",
+        "phase1English": "six lines, 99% final-line occupancy, no overflow",
+        "phase2English": "six lines, 94% final-line occupancy, no overflow",
+        "downloadBody": "EN/ZH both two lines, 90%/84% final-line occupancy"
+      }
+    },
+    "wide2048": {
+      "command": "node website/scripts/audit-site-typography.mjs http://47.93.180.216/site.html 2048 1280 0.80 <report>",
+      "mode": "full",
+      "result": "pass",
+      "violations": 0,
+      "reportBytes": 267618,
+      "reportSha256": "df601ca325fcd3254eac1e262c0a55c5c9dd9e9052aa10eef347ae1cfb682135"
+    },
+    "mobile390": {
+      "command": "node website/scripts/audit-site-typography.mjs http://47.93.180.216/site.html 390 844 0.80 <report> layout-only",
+      "mode": "layout-only",
+      "result": "pass",
+      "layoutViolations": 0,
+      "reportBytes": 276958,
+      "reportSha256": "45b49e77e43b1dbd836cb4cca082dc3998d982fae8b2a2f4c45faf355e741216"
+    },
+    "fourBrowserMatrix": {
+      "checks": 100,
+      "passed": 100,
+      "failed": 0,
+      "unavailableBrowsers": [],
+      "externalWarnings": 0,
+      "reportSha256": "b317ac15d6289c3e5468711e8b7017713c64aa483ceb38c7dd01acc098d823d7"
+    },
+    "communityManualOnlineAudit": {
+      "githubPages": "8/8 pass",
+      "alibabaCloud": "8/8 pass",
+      "screenshots": 96
+    }
+  },
+  "sourceComparison": {
+    "softwareQualityHeadAvailableLocally": true,
+    "websiteSourceHistoryIncludes": [
+      "fd7e770 fix(site): label unsigned installer as preview",
+      "8710553 fix(site): balance preview download copy",
+      "02c1447 Polish community and manual layouts for release"
+    ],
+    "disposition": "No new website source patch is required. The current website source already contains the typography fixes that are absent from the tested software-branch snapshot."
+  },
+  "conclusion": {
+    "currentWebsiteTypographyGate": "pass",
+    "incomingNineteenFailuresReproducedOnCurrentWebsite": false,
+    "newSourceCommitRequired": false,
+    "newDeploymentRequired": false,
+    "recommendedControllerAction": "Rerun or realign the aggregate quality gate only after its tested branch consumes the current website-owned source. Do not copy website source into the software branch from this workstream."
+  }
+}
