@@ -20,6 +20,7 @@ from app.release.installer_integrity import (
     verify_new_immutable_installer_release,
     verify_public_installer_origin_audit,
 )
+from scripts.audit_public_installers import _write_audit
 
 _FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
 _WEBSITE_RECEIPT = _FIXTURE_ROOT / "installer_public_recheck_20260728.json"
@@ -52,9 +53,9 @@ def _write_pe(path: Path, *, certificate_size: int = 0, marker: int = 0) -> None
     )
     raw[0x40] = marker
     if certificate_size:
-        raw[certificate_offset : certificate_offset + certificate_size] = bytes(
-            [marker or 1]
-        ) * certificate_size
+        raw[certificate_offset : certificate_offset + certificate_size] = (
+            bytes([marker or 1]) * certificate_size
+        )
     path.write_bytes(raw)
 
 
@@ -186,9 +187,7 @@ def test_corrected_website_receipt_fixture_is_exact_authority() -> None:
         AUTHORITATIVE_WEBSITE_RECEIPT_SHA256
     )
     payload = json.loads(_WEBSITE_RECEIPT.read_text(encoding="utf-8"))
-    assert payload["baotaMirror"]["checksumAssetSha256"] == (
-        AUTHORITATIVE_MIRROR_CHECKSUM_SHA256
-    )
+    assert payload["baotaMirror"]["checksumAssetSha256"] == (AUTHORITATIVE_MIRROR_CHECKSUM_SHA256)
 
 
 def test_pe_certificate_table_inspection_distinguishes_unsigned_and_present(
@@ -255,6 +254,30 @@ def test_frozen_public_audit_preserves_failures_and_recomputes(
     }
 
 
+def test_public_audit_writer_refuses_colliding_or_frozen_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audit = _build_frozen_audit(monkeypatch)
+    output = tmp_path / "audit.json"
+    sidecar = tmp_path / "audit.json.sha256"
+
+    with pytest.raises(ValueError, match="different paths"):
+        _write_audit(audit, output_path=output, sha256_output_path=output)
+
+    _write_audit(audit, output_path=output, sha256_output_path=sidecar)
+    original_audit = output.read_bytes()
+    original_sidecar = sidecar.read_bytes()
+    with pytest.raises(ValueError, match="refusing to overwrite"):
+        _write_audit(audit, output_path=output, sha256_output_path=sidecar)
+
+    assert output.read_bytes() == original_audit
+    assert sidecar.read_bytes() == original_sidecar
+    assert sidecar.read_text(encoding="ascii") == (
+        f"{hashlib.sha256(original_audit).hexdigest()}  {output.name}\n"
+    )
+
+
 def test_frozen_public_audit_rejects_tampered_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -308,9 +331,7 @@ def test_future_immutable_release_contract_accepts_only_new_exact_signed_bytes(
         (lambda value: value.update(source_inventory_commit="e" * 40), "inventory"),
         (lambda value: value.update(single_installer_for_both_origins=False), "same exact"),
         (
-            lambda value: value["origin_metadata"]["alibaba_baota_mirror"].update(
-                sha256="f" * 64
-            ),
+            lambda value: value["origin_metadata"]["alibaba_baota_mirror"].update(sha256="f" * 64),
             "metadata does not bind",
         ),
     ],
@@ -333,9 +354,9 @@ def test_future_immutable_release_contract_rejects_gate_failures(
 
 def test_windows_audit_wrapper_observes_authenticode_without_status_override() -> None:
     repository_root = Path(__file__).resolve().parents[2]
-    wrapper = (
-        repository_root / "desktop" / "scripts" / "audit-public-installers.ps1"
-    ).read_text(encoding="utf-8")
+    wrapper = (repository_root / "desktop" / "scripts" / "audit-public-installers.ps1").read_text(
+        encoding="utf-8"
+    )
 
     assert wrapper.count("Get-AuthenticodeSignature -LiteralPath") == 2
     assert "GlobalAuthenticodeStatus" not in wrapper
@@ -346,9 +367,9 @@ def test_windows_audit_wrapper_observes_authenticode_without_status_override() -
 
 def test_formal_release_workflow_fails_closed_on_signing_and_source_binding() -> None:
     repository_root = Path(__file__).resolve().parents[2]
-    workflow = (
-        repository_root / ".github" / "workflows" / "desktop-installer.yml"
-    ).read_text(encoding="utf-8")
+    workflow = (repository_root / ".github" / "workflows" / "desktop-installer.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert workflow.count("signpath/github-action-submit-signing-request@") == 2
     assert workflow.count('if ($signature.Status -ne "Valid")') == 2

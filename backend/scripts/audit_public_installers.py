@@ -45,14 +45,29 @@ def _write_audit(
     output_path: Path,
     sha256_output_path: Path,
 ) -> None:
+    output_path = output_path.resolve()
+    sha256_output_path = sha256_output_path.resolve()
+    if output_path == sha256_output_path:
+        raise ValueError("audit and checksum outputs must use different paths")
+    existing = [path for path in (output_path, sha256_output_path) if path.exists()]
+    if existing:
+        raise ValueError(
+            "refusing to overwrite frozen installer audit output: "
+            + ", ".join(str(path) for path in existing)
+        )
+    audit_bytes = canonical_pretty_bytes(payload)
+    audit_sha256 = hashlib.sha256(audit_bytes).hexdigest()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(canonical_pretty_bytes(payload))
     sha256_output_path.parent.mkdir(parents=True, exist_ok=True)
-    sha256_output_path.write_text(
-        f"{_sha256_file(output_path)}  {output_path.name}\n",
-        encoding="ascii",
-        newline="\n",
-    )
+    try:
+        with output_path.open("xb") as handle:
+            handle.write(audit_bytes)
+        with sha256_output_path.open("x", encoding="ascii", newline="\n") as handle:
+            handle.write(f"{audit_sha256}  {output_path.name}\n")
+    except FileExistsError as exc:
+        raise ValueError(
+            f"refusing to overwrite frozen installer audit output: {exc.filename}"
+        ) from exc
 
 
 def _verify_sidecar(audit_path: Path, sidecar_path: Path) -> None:
@@ -146,9 +161,7 @@ def main() -> int:
                     "audit": str(args.output.resolve()),
                     "audit_file_sha256": _sha256_file(args.output.resolve()),
                     "audit_sha256": payload["audit_sha256"],
-                    "publication_gate_status": payload["conclusion"][
-                        "publication_gate_status"
-                    ],
+                    "publication_gate_status": payload["conclusion"]["publication_gate_status"],
                 },
                 sort_keys=True,
             )
@@ -189,9 +202,7 @@ def main() -> int:
             version=payload["release"]["version"],
             release_tag=payload["release"]["tag"],
             release_target_commit=payload["release"]["release_target_commit"],
-            release_inventory_source_commit=payload["release"][
-                "release_inventory_source_commit"
-            ],
+            release_inventory_source_commit=payload["release"]["release_inventory_source_commit"],
             auditor_commit=payload["auditor_commit"],
             generated_at=payload["generated_at"],
             website_receipt_path=args.website_receipt.resolve(),
