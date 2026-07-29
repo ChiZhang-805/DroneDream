@@ -1,0 +1,213 @@
+{
+  "schemaVersion": "dronedream.website.validation-receipt.v1",
+  "generatedAt": "2026-07-29T01:32:06.7341538Z",
+  "subject": {
+    "commit": "069fa0bf45cdb56c5064ce2b82e965ad3199b0d4",
+    "tree": "55eae5a8357d77c77eba4659b7c896454e788d4f",
+    "branch": "codex/website",
+    "files": [
+      {
+        "path": "frontend/src/site/site.css",
+        "blob": "e5f99e405d14a8ebee69e7610c796cd9659ed3c7"
+      },
+      {
+        "path": "website/scripts/audit-community-manual-ui.mjs",
+        "blob": "ca206a71d0f1df0ef4a438105d4dd721a8faca49"
+      }
+    ]
+  },
+  "claim": {
+    "summary": "Recent Topics cards grow with their content instead of being clipped by a desktop one-screen container.",
+    "desktop": "The community document and feed may grow naturally; every visible card, its body controls, and the More topics link remain inside the feed.",
+    "wideThreeTopicCase": "English and Simplified Chinese at 2000x1080 render exactly three complete cards with no article or body overflow.",
+    "mobile": "The existing single-column layout remains document-scrollable with no horizontal overflow.",
+    "footer": "Community pages render no footer, and the portal background fills the viewport without exposing a footer-like black strip."
+  },
+  "validation": {
+    "exactSourceCleanBeforeValidation": true,
+    "focused": {
+      "command": "npm.cmd --prefix frontend test -- src/__tests__/CommunityPage.test.tsx",
+      "result": "passed",
+      "files": 1,
+      "tests": 9
+    },
+    "frontend": {
+      "command": "npm.cmd --prefix frontend test",
+      "result": "passed",
+      "files": 50,
+      "tests": 329
+    },
+    "typecheck": {
+      "command": "npm.cmd --prefix frontend run typecheck",
+      "result": "passed"
+    },
+    "lint": {
+      "command": "npm.cmd --prefix frontend run lint",
+      "result": "passed"
+    },
+    "builds": [
+      {
+        "command": "npm.cmd --prefix frontend run site:build",
+        "result": "passed",
+        "configuration": "documented local-preview Supabase placeholders"
+      },
+      {
+        "command": "npm.cmd --prefix frontend run console:build",
+        "result": "passed",
+        "configuration": "documented local-preview Supabase placeholders"
+      },
+      {
+        "command": "npm.cmd --prefix frontend run build",
+        "result": "passed",
+        "advisory": "Existing non-failing Vite chunk-size advisory only."
+      }
+    ],
+    "deploymentContract": {
+      "command": "python -m pytest runtime/tests/test_website_deployment.py -q",
+      "result": "passed",
+      "tests": 11,
+      "subtests": 22
+    },
+    "browserMatrix": {
+      "command": "node website/scripts/audit-browser-matrix.mjs http://127.0.0.1:4196/ <output> edge,chrome,lenovo,firefox",
+      "result": "passed",
+      "checks": 100,
+      "passed": 100,
+      "failed": 0,
+      "unavailableBrowsers": 0,
+      "externalWarnings": 38,
+      "reportSha256": "fff9d337d37f6c3138aa96a97bee68de68f532bcfd377c3cbcc81fe328f3c213"
+    },
+    "communityManualAudit": {
+      "command": "node website/scripts/audit-community-manual-ui.mjs http://127.0.0.1:4196/ <output>",
+      "result": "passed",
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "reportSha256": "2549a8873014af6bb73add97cd5b46d9efc94a666527179685b9107248dc87fa",
+      "profiles": [
+        "EN/ZH x 1440x1000 with four visible cards",
+        "EN/ZH x 2000x1080 with five visible cards",
+        "EN/ZH x 2000x1080 with exactly three visible cards",
+        "EN/ZH x 390x844 single-column mobile"
+      ],
+      "wideThreeTopicMeasurements": {
+        "en": {
+          "visibleCards": 3,
+          "feedClientHeight": 788,
+          "feedScrollHeight": 788,
+          "cardHeights": [
+            430,
+            430,
+            430
+          ],
+          "articleOverflowPixels": [
+            0,
+            0,
+            0
+          ],
+          "bodyOverflowPixels": [
+            0,
+            0,
+            0
+          ],
+          "footerPresent": false
+        },
+        "zh-CN": {
+          "visibleCards": 3,
+          "feedClientHeight": 788,
+          "feedScrollHeight": 788,
+          "cardHeights": [
+            430,
+            430,
+            430
+          ],
+          "articleOverflowPixels": [
+            0,
+            0,
+            0
+          ],
+          "bodyOverflowPixels": [
+            0,
+            0,
+            0
+          ],
+          "footerPresent": false
+        }
+      }
+    },
+    "typographyAndLayout": [
+      {
+        "viewport": "1440x1000",
+        "mode": "full",
+        "result": "passed",
+        "reportSha256": "5a3128fab6bb70ed0703625f435b2b02f4a2cccd9667bf8097158767fbf7627a"
+      },
+      {
+        "viewport": "2000x1080",
+        "mode": "full",
+        "result": "passed",
+        "reportSha256": "2f6255131eb52baea89125f78022f5023da3bf843acbaea1397a7afcd59946da"
+      },
+      {
+        "viewport": "390x844",
+        "mode": "layout-only",
+        "result": "passed",
+        "reportSha256": "9c7a9da656b365edae628e5ea87ffcaba38353638ca90755733137911149f05a"
+      }
+    ],
+    "performance": {
+      "command": "node website/scripts/audit-site-performance.mjs http://127.0.0.1:4196/ <output>",
+      "result": "passed",
+      "routes": 5,
+      "passed": 5,
+      "failed": 0,
+      "reportSha256": "2bd4713abe6193d48f5bbf45a9c9a7da350aa2201f151cd29ecc65d2a75753b1"
+    },
+    "syntaxAndDiff": {
+      "nodeCheck": "passed",
+      "gitDiffCheck": "passed"
+    }
+  },
+  "visualInspection": {
+    "performed": true,
+    "notes": [
+      "Rejected one transient screenshot batch captured while the preview server held stale build hashes.",
+      "Restarted the preview server and visually inspected the complete replacement screenshots.",
+      "Confirmed card cover, author, timestamp, reactions, discussion action, More topics link, and page background are fully rendered."
+    ],
+    "screenshots": [
+      {
+        "name": "en-wide-three-topics-community-recent.png",
+        "bytes": 417954,
+        "sha256": "d241eff0d734476ec3eaf605cd37d42e091194104c283d0117b32fa72e077b80"
+      },
+      {
+        "name": "zh-CN-wide-three-topics-community-recent.png",
+        "bytes": 397978,
+        "sha256": "9a184b984cde88e9f806b5d78c87963a542a7cfec234ebb686d1b2ab060a4622"
+      },
+      {
+        "name": "en-desktop-community-recent.png",
+        "bytes": 447496,
+        "sha256": "6029784bbb4a24ebe7aef18f25d4b41a404dd631cfc9a66aa72b0b342ffc8a01"
+      },
+      {
+        "name": "zh-CN-mobile-community-recent.png",
+        "bytes": 478850,
+        "sha256": "74c1f7df4a3d996a3853abce7f103cdb9f8e8231c81bb41b63514a66738a9aa9"
+      }
+    ]
+  },
+  "releaseBoundary": {
+    "releaseMetadataModified": false,
+    "installerModified": false,
+    "deploymentPerformed": false,
+    "productionOriginsModified": false,
+    "reason": "Production remains frozen until the authoritative 1.0.0 desktop EXE and runtime-v0.1.0-beta.2 release are jointly ready for fresh-install validation."
+  },
+  "attestation": {
+    "receiptOnlyCommitMayFollow": true,
+    "thisReceiptDoesNotClaimValidationOfItsOwnCommit": true
+  }
+}
