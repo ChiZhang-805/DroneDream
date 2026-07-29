@@ -4,17 +4,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from app.orchestration.harness_routing_holdout import (
+BACKEND = Path(__file__).resolve().parents[1]
+while str(BACKEND) in sys.path:
+    sys.path.remove(str(BACKEND))
+sys.path.insert(0, str(BACKEND))
+
+import app  # noqa: E402
+from app.orchestration.harness_routing_holdout import (  # noqa: E402
     evaluate_locked_routing_policy_holdout,
     load_locked_routing_policy_holdout,
     load_locked_routing_policy_result,
     write_locked_routing_policy_result,
 )
 
-BACKEND = Path(__file__).resolve().parents[1]
 FIXTURES = BACKEND / "tests" / "fixtures"
+
+
+def _assert_local_backend_import() -> None:
+    app_path = Path(app.__file__).resolve()
+    if not app_path.is_relative_to(BACKEND):
+        raise RuntimeError(f"imported app from {app_path}, expected it under {BACKEND}")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -46,6 +58,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    _assert_local_backend_import()
     args = _parser().parse_args()
     bundle = load_locked_routing_policy_holdout(
         args.corpus,
