@@ -1156,24 +1156,41 @@ def _search_summary(
         else None
     )
 
-    generation_scores: dict[int, list[float]] = defaultdict(list)
+    generation_scores: dict[int, list[tuple[float, bool | None]]] = defaultdict(list)
     for candidate, score in scored:
-        generation_scores[max(0, int(candidate.generation_index or 0))].append(score)
-    full_best_by_generation = tuple(
-        HarnessGenerationBest(
-            generation=generation,
-            best_score=min(values),
+        generation_scores[max(0, int(candidate.generation_index or 0))].append(
+            (score, _candidate_feasibility(feedback_by_id[candidate.id]))
         )
-        for generation, values in sorted(generation_scores.items())
-    )
     incumbent: float | None = None
+    incumbent_is_non_infeasible = False
     trailing_stagnation = 0
-    for item in full_best_by_generation:
-        if incumbent is None or item.best_score < incumbent - 1e-12:
-            incumbent = item.best_score
+    full_best_items: list[HarnessGenerationBest] = []
+    for generation, values in sorted(generation_scores.items()):
+        non_infeasible = [score for score, feasible in values if feasible is not False]
+        generation_is_non_infeasible = bool(non_infeasible)
+        generation_best = min(non_infeasible or [score for score, _ in values])
+        if incumbent is None:
+            incumbent = generation_best
+            incumbent_is_non_infeasible = generation_is_non_infeasible
+            trailing_stagnation = 0
+        elif generation_is_non_infeasible and not incumbent_is_non_infeasible:
+            incumbent = generation_best
+            incumbent_is_non_infeasible = True
+            trailing_stagnation = 0
+        elif generation_is_non_infeasible and generation_best < incumbent - 1e-12:
+            incumbent = generation_best
             trailing_stagnation = 0
         else:
             trailing_stagnation += 1
+            if incumbent_is_non_infeasible and not generation_is_non_infeasible:
+                generation_best = incumbent
+        full_best_items.append(
+            HarnessGenerationBest(
+                generation=generation,
+                best_score=generation_best,
+            )
+        )
+    full_best_by_generation = tuple(full_best_items)
     best_by_generation = full_best_by_generation
     if len(best_by_generation) > MAX_GENERATION_TREND_ITEMS:
         best_by_generation = (

@@ -7,18 +7,21 @@ from typing import Literal
 import pytest
 from pydantic import ValidationError
 
+from app import models
 from app.orchestration.harness_context import (
     HarnessBudgetEvidence,
     HarnessExecutionMemory,
     HarnessObservedDecisionOutcome,
     HarnessPlanningEvidence,
     HarnessSearchSummary,
+    _search_summary,
     compile_harness_plan,
 )
 from app.orchestration.job_manager import (
     _batch_size_for_policy,
     _required_fidelity_for_plan,
 )
+from app.orchestration.provider_feedback import CandidateFeedbackView
 
 
 def _budget(
@@ -100,6 +103,46 @@ def _verified_memory(
             ),
         ),
     )
+
+
+def test_infeasible_score_improvements_do_not_reset_safe_stagnation() -> None:
+    candidates: list[models.CandidateParameterSet] = []
+    feedback_by_id: dict[str, CandidateFeedbackView] = {}
+    for generation, score, feasible in (
+        (0, 1.0, True),
+        (1, 0.8, True),
+        (2, 0.1, False),
+        (3, 0.05, False),
+    ):
+        candidate_id = f"candidate-{generation}"
+        candidates.append(
+            models.CandidateParameterSet(
+                id=candidate_id,
+                job_id="job-stagnation",
+                generation_index=generation,
+                parameter_json={"kp_xy": 1.0 + generation / 10},
+            )
+        )
+        feedback_by_id[candidate_id] = CandidateFeedbackView(
+            aggregate={"feasible": feasible},
+            score=score,
+            feedback_status="legacy_unsealed",
+            learning_trial_count=1,
+            completed_trial_count=1,
+            failed_trial_count=0,
+            feasible=feasible,
+        )
+
+    summary = _search_summary(candidates, feedback_by_id)
+
+    assert summary.best_score == pytest.approx(0.8)
+    assert summary.trailing_stagnant_generations == 2
+    assert [item.best_score for item in summary.best_score_by_generation] == [
+        1.0,
+        0.8,
+        0.8,
+        0.8,
+    ]
 
 
 @pytest.mark.parametrize(
