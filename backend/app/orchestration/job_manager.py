@@ -2037,7 +2037,8 @@ def _fail_job_initialization(
     now = _now()
     job.status = "FAILED"
     job.current_phase = "failed"
-    job.completed_at = now
+    job.failed_at = now
+    job.completed_at = None
     job.latest_error_code = code
     job.latest_error_message = (
         "The saved optimization outcome contract changed after Job creation."

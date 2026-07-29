@@ -248,6 +248,8 @@ def test_outcome_contract_drift_is_rejected_before_candidate_dispatch(
         assert job is not None
         assert job.status == "FAILED"
         assert job.latest_error_code == "OUTCOME_CONTRACT_DRIFT"
+        assert job.failed_at is not None
+        assert job.completed_at is None
         assert list(job.candidates) == []
         assert list(job.trials) == []
         failure = next(event for event in job.events if event.event_type == "job_failed")
@@ -276,6 +278,8 @@ def test_invalid_queued_job_is_quarantined_without_blocking_following_job(
         assert invalid_job is not None and valid_job is not None
         assert invalid_job.status == "FAILED"
         assert invalid_job.latest_error_code == "JOB_INITIALIZATION_FAILED"
+        assert invalid_job.failed_at is not None
+        assert invalid_job.completed_at is None
         assert valid_job.status == "RUNNING"
 
 

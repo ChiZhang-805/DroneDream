@@ -1432,7 +1432,9 @@ def finalize_job_if_ready(
     nor budget-exhausted, dispatches the next LLM-proposed generation instead
     of finalizing. The job is only marked terminal when either a candidate
     passes acceptance, the acceptance criteria are not configured, or the
-    iteration/trial budget is exhausted.
+    iteration/trial budget is exhausted. When the user explicitly disables
+    every stopping threshold, iterative strategies use their configured budget
+    as the stopping policy.
     """
 
     if job.status != "FINALIZING":
@@ -1743,8 +1745,8 @@ def _try_continue_iterative_optimizer(
 
     * If any scored candidate (including baseline) passes acceptance, we stop
       and let the caller finalize as COMPLETED.
-    * If acceptance criteria are not configured, we don't proceed past the
-      baseline generation — the baseline is implicitly accepted.
+    * If every acceptance threshold is disabled, the optimizer keeps searching
+      until its configured iteration/trial budget or search space is exhausted.
     * Respects ``max_iterations`` and ``max_total_trials``.
     """
 
