@@ -73,6 +73,14 @@ import {
   type ExperimentFormState,
   type ScenarioPreset,
 } from "../features/experiment/formState";
+import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPreview";
+import {
+  applyStarterExperienceTemplate,
+  STARTER_EXPERIENCE_CATALOG_VERSION,
+  STARTER_EXPERIENCE_TEMPLATES,
+  type StarterExperienceId,
+  type StarterExperienceTemplate,
+} from "../features/experiment/experienceTemplates";
 import {
   createExperimentWorkspaceId,
   listExperimentWorkspaces,
@@ -111,6 +119,24 @@ const WIZARD_STEPS: Array<{ key: TranslationKey }> = [
   { key: "wizard.step.constraints" },
   { key: "wizard.step.review" },
 ];
+
+const STARTER_EXPERIENCE_I18N: Record<
+  StarterExperienceId,
+  { title: TranslationKey; description: TranslationKey }
+> = {
+  "hover-basics": {
+    title: "wizard.starter.hover.title",
+    description: "wizard.starter.hover.description",
+  },
+  "first-circle": {
+    title: "wizard.starter.circle.title",
+    description: "wizard.starter.circle.description",
+  },
+  "light-wind-circle": {
+    title: "wizard.starter.wind.title",
+    description: "wizard.starter.wind.description",
+  },
+};
 
 const OBJECTIVE_WEIGHT_PRESETS: Record<
   Exclude<ObjectiveProfile, "custom">,
@@ -1258,6 +1284,7 @@ export function NewJob() {
   const [showTrackEditor, setShowTrackEditor] = useState(false);
   const [showTrackJson, setShowTrackJson] = useState(false);
   const [showParameterReview, setShowParameterReview] = useState(false);
+  const [lastAppliedTemplateKey, setLastAppliedTemplateKey] = useState<string | null>(null);
   const [capabilities, setCapabilities] = useState<BackendCapabilitiesResponse | null>(null);
   const [capabilitiesUnavailable, setCapabilitiesUnavailable] = useState(false);
   const submittingRef = useRef(false);
@@ -1271,6 +1298,7 @@ export function NewJob() {
   ).length;
   const trialPlan = calculateTrialPlan(form, selectedCount);
   const estimatedTrials = trialPlan.scheduledTrials;
+  const localPreviewPoints = referenceTrack(form) ?? [];
 
   useEffect(() => {
     if (
@@ -1494,6 +1522,19 @@ export function NewJob() {
       if (!previous[key]) return previous;
       const next = { ...previous };
       delete next[key];
+      return next;
+    });
+  }
+
+  function applyStarterTemplate(template: StarterExperienceTemplate): void {
+    setForm((previous) => applyStarterExperienceTemplate(previous, template));
+    applyModePreset(template.patch.tuning_mode);
+    setLastAppliedTemplateKey(template.key);
+    setErrors((previous) => {
+      const next = { ...previous };
+      for (const key of Object.keys(template.patch)) {
+        delete next[key];
+      }
       return next;
     });
   }
@@ -1948,6 +1989,64 @@ export function NewJob() {
                 ))}
               </select>
             </div>
+            <section
+              className="stack-sm wizard-subsection starter-experience-section"
+              aria-labelledby="starter-experience-title"
+            >
+              <div className="starter-experience-heading">
+                <div>
+                  <h3 id="starter-experience-title">{t("wizard.starter.title")}</h3>
+                  <p>{t("wizard.starter.description")}</p>
+                </div>
+                <span className="starter-experience-version">
+                  {t("wizard.starter.catalogVersion", {
+                    version: STARTER_EXPERIENCE_CATALOG_VERSION,
+                  })}
+                </span>
+              </div>
+              <div className="starter-experience-layout">
+                <div className="starter-experience-grid">
+                  {STARTER_EXPERIENCE_TEMPLATES.map((template) => {
+                    const copy = STARTER_EXPERIENCE_I18N[template.id];
+                    const title = t(copy.title);
+                    return (
+                      <article className="starter-experience-card" key={template.key}>
+                        <div>
+                          <strong>{title}</strong>
+                          <span>v{template.version}</span>
+                        </div>
+                        <p>{t(copy.description)}</p>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-small"
+                          aria-label={`${t("wizard.starter.apply")}: ${title}`}
+                          onClick={() => applyStarterTemplate(template)}
+                        >
+                          {t("wizard.starter.apply")}
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+                <ExperienceTrackPreview
+                  trackType={form.track_type}
+                  points={localPreviewPoints}
+                  altitudeM={Number(form.altitude_m)}
+                  title={t("wizard.preview.title")}
+                  hoverLabel={t("wizard.preview.hover")}
+                  routeLabel={t("wizard.preview.route")}
+                  pointCountLabel={t("wizard.preview.pointCount", {
+                    count: localPreviewPoints.length,
+                  })}
+                  localOnlyLabel={t("wizard.preview.localOnly")}
+                />
+              </div>
+              {lastAppliedTemplateKey ? (
+                <p className="starter-experience-status" role="status">
+                  {t("wizard.starter.applied", { key: lastAppliedTemplateKey })}
+                </p>
+              ) : null}
+            </section>
             <section className="stack-sm wizard-subsection" aria-labelledby="flight-setup-vehicle-title">
               <h3 id="flight-setup-vehicle-title">{t("wizard.section.vehicle")}</h3>
               <div className="form-grid">

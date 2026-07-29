@@ -885,6 +885,28 @@ describe("NewJob experiment wizard", () => {
     ).toEqual(new Set(["0,0,3"]));
   });
 
+  it("applies a versioned starter experience to the draft without creating a Job", () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "unused" } as Job);
+    renderPage();
+
+    expect(screen.getByText("Template catalog v1")).toBeVisible();
+    expect(screen.getByTestId("route-preview")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply to draft: Hover basics" }),
+    );
+
+    expect(screen.getByLabelText(/Track type/i)).toHaveValue("hover");
+    expect(screen.getByLabelText(/Start X/i)).toHaveValue(0);
+    expect(screen.getByLabelText(/Start Y/i)).toHaveValue(0);
+    expect(screen.getByLabelText(/Altitude/i)).toHaveValue(3);
+    expect(screen.getByText(/Applied hover-basics@1/i)).toBeVisible();
+    expect(screen.getByTestId("hover-preview")).toBeInTheDocument();
+    expect(screen.getByText(/Preview only.*no Job created/i)).toBeVisible();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
   it("blocks a hover draft whose origin has a lateral offset", () => {
     const createSpy = vi
       .spyOn(apiClient, "createJob")
