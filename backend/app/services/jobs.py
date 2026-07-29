@@ -967,6 +967,42 @@ def _claim_job_cancellation(
     return isinstance(rowcount, int) and rowcount == 1
 
 
+def _seal_cancelled_trial_attempt(
+    db: Session,
+    *,
+    trial: models.Trial,
+) -> None:
+    """Seal an open physical attempt after its logical Trial is cancelled."""
+
+    attempt = db.scalar(
+        select(models.TrialExecutionAttempt).where(
+            models.TrialExecutionAttempt.trial_id == trial.id,
+            models.TrialExecutionAttempt.attempt_count == trial.attempt_count,
+        )
+    )
+    if attempt is None or attempt.outcome is not None:
+        return
+    db.flush()
+    artifact_mapping = candidate_trial_artifact_evidence(
+        trial.candidate,
+        [trial],
+        verify_bytes=True,
+    )
+    if artifact_mapping is None or trial.id not in artifact_mapping:
+        raise JobServiceError(
+            "TRIAL_ATTEMPT_EVIDENCE_INVALID",
+            "Cannot seal the cancelled physical Trial attempt.",
+            http_status=500,
+        )
+    record_accepted_trial_attempt_outcome(
+        db,
+        trial=trial,
+        attempt=attempt,
+        outcome_class="cancelled",
+        artifact_evidence=artifact_mapping[trial.id],
+    )
+
+
 def cancel_batch(
     db: Session,
     batch_id: str,
@@ -1049,6 +1085,7 @@ def cancel_batch(
             trial.finished_at = now
             trial.lease_owner = None
             trial.lease_expires_at = None
+            _seal_cancelled_trial_attempt(db, trial=trial)
         db.add(
             models.JobEvent(
                 job_id=child.id,
@@ -1187,32 +1224,7 @@ def cancel_job(
         trial.finished_at = now
         trial.lease_owner = None
         trial.lease_expires_at = None
-        attempt = db.scalar(
-            select(models.TrialExecutionAttempt).where(
-                models.TrialExecutionAttempt.trial_id == trial.id,
-                models.TrialExecutionAttempt.attempt_count == trial.attempt_count,
-            )
-        )
-        if attempt is not None and attempt.outcome is None:
-            db.flush()
-            artifact_mapping = candidate_trial_artifact_evidence(
-                trial.candidate,
-                [trial],
-                verify_bytes=True,
-            )
-            if artifact_mapping is None or trial.id not in artifact_mapping:
-                raise JobServiceError(
-                    "TRIAL_ATTEMPT_EVIDENCE_INVALID",
-                    "Cannot seal the cancelled physical Trial attempt.",
-                    http_status=500,
-                )
-            record_accepted_trial_attempt_outcome(
-                db,
-                trial=trial,
-                attempt=attempt,
-                outcome_class="cancelled",
-                artifact_evidence=artifact_mapping[trial.id],
-            )
+        _seal_cancelled_trial_attempt(db, trial=trial)
     purge_job_secrets(db, job, reason="job_cancelled")
     db.add(models.JobEvent(job_id=job.id, event_type="job_cancelled", payload_json=None))
     if commit:

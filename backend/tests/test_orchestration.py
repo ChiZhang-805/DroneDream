@@ -2035,6 +2035,62 @@ def test_cancel_job_seals_an_open_physical_attempt(orchestration_ctx) -> None:
         assert attempt.outcome.outcome_class == "cancelled"
 
 
+def test_cancel_batch_seals_an_open_physical_attempt(orchestration_ctx) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        batch = models.BatchJob(
+            user_id=trial.job.user_id,
+            name="cancel-open-attempt",
+            status="QUEUED",
+        )
+        db.add(batch)
+        db.flush()
+        trial.job.batch_id = batch.id
+        batch_id = batch.id
+        db.commit()
+
+    class InterruptingCleanupAdapter(MockSimulatorAdapter):
+        def cleanup(self, _trial_ctx: TrialContext) -> None:
+            raise SystemExit(53)
+
+    with (
+        ctx["db_module"].SessionLocal() as db,
+        pytest.raises(
+            SystemExit,
+            match="53",
+        ),
+    ):
+        ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-batch-cancel",
+            adapter=InterruptingCleanupAdapter(),
+        )
+
+    with ctx["db_module"].SessionLocal() as db:
+        batch = db.get(models.BatchJob, batch_id)
+        assert batch is not None
+        user = db.get(models.User, batch.user_id)
+        assert user is not None
+        ctx["jobs_service"].cancel_batch(db, batch.id, user=user)
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "CANCELLED"
+        assert trial.accepted_attempt_id is not None
+        attempt = trial.accepted_attempt
+        assert attempt is not None
+        assert attempt.outcome is not None
+        assert attempt.outcome.accepted is True
+        assert attempt.outcome.terminal_status == "CANCELLED"
+        assert attempt.outcome.outcome_class == "cancelled"
+
+
 def test_real_cli_artifacts_are_persisted_before_transient_run_cleanup(
     orchestration_ctx, monkeypatch, tmp_path
 ):
