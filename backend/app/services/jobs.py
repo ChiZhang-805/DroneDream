@@ -13,6 +13,7 @@ import math
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal, cast
 
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
@@ -374,6 +375,7 @@ def _create_job_from_config(
     settings = get_settings()
     platform_access = req.llm is not None and req.llm.access_mode == "platform"
     if req.llm is not None:
+        llm_access_mode = req.llm.access_mode
         llm_provider = req.llm.provider
         llm_model = settings.model_gateway_managed_model_alias if platform_access else req.llm.model
         llm_base_url = (
@@ -383,11 +385,13 @@ def _create_job_from_config(
         )
         llm_credential = req.llm.platform_grant if platform_access else req.llm.api_key
     elif req.openai is not None:
+        llm_access_mode = "byok"
         llm_provider = "openai"
         llm_model = req.openai.model
         llm_base_url = None
         llm_credential = req.openai.api_key
     else:
+        llm_access_mode = None
         llm_provider = None
         llm_model = None
         llm_base_url = None
@@ -445,6 +449,7 @@ def _create_job_from_config(
         current_generation=0,
         optimization_outcome=None,
         openai_model=llm_model,
+        llm_access_mode=llm_access_mode,
         llm_provider=llm_provider,
         llm_base_url=llm_base_url,
     )
@@ -1454,6 +1459,19 @@ def to_job_schema(job: models.Job) -> schemas.Job:
             message=job.latest_error_message or "",
         )
     baseline_parameters = schemas.BaselineParameters(**(job.baseline_parameter_json or {}))
+    llm_access_mode: Literal["platform", "byok"] | None
+    if job.llm_access_mode in {"platform", "byok"}:
+        llm_access_mode = cast(Literal["platform", "byok"], job.llm_access_mode)
+    elif job.llm_provider == "dronedream":
+        # Compatibility for jobs created before the explicit access-mode
+        # column existed. Managed access has always used this reserved
+        # provider identifier.
+        llm_access_mode = "platform"
+    elif job.llm_provider is not None:
+        llm_access_mode = "byok"
+    else:
+        llm_access_mode = None
+
     return schemas.Job(
         id=job.id,
         control_version=job.control_version,
@@ -1519,6 +1537,7 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         current_generation=job.current_generation,
         optimization_outcome=job.optimization_outcome,  # type: ignore[arg-type]
         openai_model=job.openai_model,
+        llm_access_mode=llm_access_mode,
         llm_provider=job.llm_provider,
         llm_base_url=job.llm_base_url,
     )

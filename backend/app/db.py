@@ -116,12 +116,22 @@ def _apply_sqlite_lightweight_migrations() -> None:
             "parameter_space_json": "JSON",
             "objective_config_json": "JSON",
             "scenario_suite_json": "JSON",
+            "llm_access_mode": "VARCHAR(16)",
             "llm_provider": "VARCHAR(64)",
             "llm_base_url": "VARCHAR(2048)",
         }
         for column_name, column_type in experiment_columns.items():
             if column_name not in job_columns:
                 conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
+        conn.execute(
+            text(
+                "UPDATE jobs SET llm_access_mode = CASE "
+                "WHEN llm_provider = 'dronedream' THEN 'platform' "
+                "WHEN llm_provider IS NOT NULL THEN 'byok' "
+                "ELSE NULL END "
+                "WHERE llm_access_mode IS NULL"
+            )
+        )
         finalization_claim_columns = {
             "finalization_claim_token": "VARCHAR(64)",
             "finalization_claim_generation": "INTEGER",

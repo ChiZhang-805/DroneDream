@@ -650,6 +650,8 @@ def test_rerun_gpt_stays_gpt_with_new_openai_key(
     assert resp.status_code == 200
     rerun = resp.json()["data"]
     assert rerun["optimizer_strategy"] == "gpt"
+    assert rerun["llm_access_mode"] == "byok"
+    assert rerun["llm_provider"] == "openai"
 
 
 def test_rerun_gpt_accepts_provider_neutral_llm_configuration(
@@ -686,6 +688,7 @@ def test_rerun_gpt_accepts_provider_neutral_llm_configuration(
     assert resp.status_code == 200, resp.text
     rerun = resp.json()["data"]
     assert rerun["optimizer_strategy"] == "gpt"
+    assert rerun["llm_access_mode"] == "byok"
     assert rerun["llm_provider"] == "deepseek"
     assert rerun["llm_base_url"] == "https://api.deepseek.com/v1"
     assert rerun["openai_model"] == "deepseek-reasoner"

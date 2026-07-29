@@ -7,6 +7,7 @@ import type {
   Job,
   JobEventInfo,
   JobReport,
+  JobRerunRequest,
   TrialSummary,
 } from "../types/api";
 import { isActiveJobStatus, formatDateTime, formatNumber } from "../utils/format";
@@ -26,6 +27,7 @@ import {
 } from "../features/experiment/optimizerStrategies";
 import { optimizerUsesModelAccess } from "../types/api";
 import { useI18n } from "../i18n/I18nProvider";
+import { issueManagedModelGrant } from "../features/settings/cloudModelAccess";
 
 // Polling interval for active jobs. The frontend only polls; all state
 // transitions are driven by the backend worker process (Phase 3+). See
@@ -164,21 +166,26 @@ export function JobDetail() {
   const rerunMutation = useMutation({
     mutationFn: ({
       id,
-      openaiApiKey,
-      openaiModel,
+      request,
+      managedAccess,
     }: {
       id: string;
-      openaiApiKey?: string;
-      openaiModel?: string | null;
-    }) =>
-      apiClient.rerunJob(id, {
-        openai: openaiApiKey
-          ? {
-              api_key: openaiApiKey,
-              model: openaiModel ?? null,
-            }
-          : undefined,
-      }),
+      request?: JobRerunRequest;
+      managedAccess?: boolean;
+    }) => managedAccess
+      ? issueManagedModelGrant("job", id).then((grant) =>
+          apiClient.rerunJob(id, {
+            llm: {
+              access_mode: "platform",
+              provider: "dronedream",
+              api_key: null,
+              platform_grant: grant.grant,
+              model: null,
+              base_url: null,
+            },
+          })
+        )
+      : apiClient.rerunJob(id, request),
     onSuccess: (newJob) => {
       queryClient.invalidateQueries({ queryKey: ["jobs", "dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["jobs", "history"] });
@@ -289,14 +296,29 @@ export function JobDetail() {
 
   const handleRerun = () => {
     if (optimizerUsesModelAccess(job.optimizer_strategy)) {
+      const accessMode = job.llm_access_mode
+        ?? (job.llm_provider === "dronedream" ? "platform" : "byok");
+      if (accessMode === "platform") {
+        rerunMutation.mutate({ id: job.id, managedAccess: true });
+        return;
+      }
+      const provider = job.llm_provider?.trim() || "openai";
       const freshKey = window.prompt(
-        t("jobDetail.apiKeyPrompt"),
+        t("jobDetail.apiKeyPrompt", { provider }),
       );
       if (!freshKey || freshKey.trim() === "") return;
       rerunMutation.mutate({
         id: job.id,
-        openaiApiKey: freshKey.trim(),
-        openaiModel: job.openai_model,
+        request: {
+          llm: {
+            access_mode: "byok",
+            provider,
+            api_key: freshKey.trim(),
+            platform_grant: null,
+            model: job.openai_model,
+            base_url: job.llm_base_url,
+          },
+        },
       });
       return;
     }

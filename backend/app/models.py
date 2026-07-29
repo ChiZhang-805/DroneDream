@@ -253,6 +253,7 @@ class Job(Base):
         index=True,
     )
     openai_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    llm_access_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
     llm_provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
     llm_base_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 

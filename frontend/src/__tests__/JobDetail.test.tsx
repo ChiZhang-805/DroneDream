@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { JobDetail } from "../pages/JobDetail";
 import { apiClient } from "../api/client";
+import * as cloudModelAccess from "../features/settings/cloudModelAccess";
 import type { Artifact, Job, JobReport, TrialSummary } from "../types/api";
 
 const PHASE8_DEFAULTS = {
@@ -407,8 +408,15 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("rerun for gpt asks for a fresh OpenAI key and stays gpt-based", async () => {
-    const job = makeJob({ status: "COMPLETED", optimizer_strategy: "gpt" });
+  it("rerun for a BYOK job preserves its provider, model, and endpoint", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "gpt",
+      llm_access_mode: "byok",
+      llm_provider: "deepseek",
+      llm_base_url: "https://api.deepseek.com/v1",
+      openai_model: "deepseek-chat",
+    });
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
     vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
     vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
@@ -416,16 +424,96 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     const rerunSpy = vi
       .spyOn(apiClient, "rerunJob")
       .mockResolvedValue({ ...job, id: "job_rerun_1" });
-    vi.spyOn(window, "prompt").mockReturnValue("sk-rerun");
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("fresh-key");
 
     renderWithJob(job.id);
 
     fireEvent.click(await screen.findByRole("button", { name: /Rerun/i }));
     await waitFor(() =>
       expect(rerunSpy).toHaveBeenCalledWith(job.id, {
-        openai: { api_key: "sk-rerun", model: null },
+        llm: {
+          access_mode: "byok",
+          provider: "deepseek",
+          api_key: "fresh-key",
+          platform_grant: null,
+          model: "deepseek-chat",
+          base_url: "https://api.deepseek.com/v1",
+        },
       }),
     );
+    expect(promptSpy).toHaveBeenCalledWith(
+      expect.stringContaining("deepseek"),
+    );
+  });
+
+  it("rerun for managed access requests a fresh scoped grant without prompting", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "llm_harness",
+      llm_access_mode: "platform",
+      llm_provider: "dronedream",
+      llm_base_url: "https://gateway.example.test",
+      openai_model: "DroneDream Managed",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+    const rerunSpy = vi
+      .spyOn(apiClient, "rerunJob")
+      .mockResolvedValue({ ...job, id: "job_rerun_managed" });
+    const promptSpy = vi.spyOn(window, "prompt");
+    vi.spyOn(cloudModelAccess, "issueManagedModelGrant").mockResolvedValue({
+      access_mode: "platform",
+      grant: `ddg_${"A".repeat(48)}`,
+      scope: "job",
+      expires_at: "2026-07-29T12:00:00Z",
+      max_calls: 1,
+      gateway_base_url: "https://gateway.example.test",
+      managed_model: "DroneDream Managed",
+      usage: {
+        plan: {
+          id: "free",
+          name: "Free",
+          monthly_price_cny_fen: 0,
+          included_ai_credits: 10,
+          capability_set: "core-v1",
+        },
+        period: {
+          starts_at: "2026-07-01T00:00:00Z",
+          ends_at: "2026-08-01T00:00:00Z",
+        },
+        usage: {
+          reserved_ai_credits: 0,
+          consumed_ai_credits: 0,
+          remaining_ai_credits: 10,
+          request_count: 0,
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+          estimated_request_count: 0,
+          credit_policy_version: 1,
+        },
+        recent_requests: [],
+      },
+    });
+
+    renderWithJob(job.id);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Rerun/i }));
+    await waitFor(() =>
+      expect(rerunSpy).toHaveBeenCalledWith(job.id, {
+        llm: {
+          access_mode: "platform",
+          provider: "dronedream",
+          api_key: null,
+          platform_grant: `ddg_${"A".repeat(48)}`,
+          model: null,
+          base_url: null,
+        },
+      }),
+    );
+    expect(promptSpy).not.toHaveBeenCalled();
   });
 
   it("renders artifact cards for long paths with grouped sections", async () => {

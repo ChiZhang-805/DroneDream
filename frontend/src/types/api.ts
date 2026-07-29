@@ -305,6 +305,7 @@ export interface Job {
   current_generation: number;
   optimization_outcome: OptimizationOutcome | null;
   openai_model: string | null;
+  llm_access_mode?: "platform" | "byok" | null;
   llm_provider?: string | null;
   llm_base_url?: string | null;
   vehicle_profile?: VehicleProfileConfig;

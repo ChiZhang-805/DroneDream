@@ -246,6 +246,7 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         "finalization_lease_expires_at",
     }.issubset(job_columns)
     assert "control_version" in job_columns
+    assert "llm_access_mode" in job_columns
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
@@ -608,7 +609,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260729_0017 (head)"]
+    assert heads == ["20260729_0018 (head)"]
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

@@ -886,6 +886,7 @@ class Job(BaseModel):
     current_generation: int = 0
     optimization_outcome: OptimizationOutcome | None = None
     openai_model: str | None = None
+    llm_access_mode: Literal["platform", "byok"] | None = None
     llm_provider: str | None = None
     llm_base_url: str | None = None
 

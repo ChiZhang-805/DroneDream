@@ -1051,11 +1051,14 @@ def test_managed_platform_grant_is_scoped_encrypted_and_never_returned(llm_ctx):
         job = jobs_service.create_job(db, request)
         db.flush()
         assert job.llm_provider == "dronedream"
+        assert job.llm_access_mode == "platform"
         assert job.openai_model == "DroneDream Managed"
         assert job.llm_base_url == ("https://example.supabase.co/functions/v1/model-gateway")
         assert len(job.secrets) == 1
         assert job.secrets[0].provider == "dronedream_gateway"
-        assert grant not in repr(jobs_service.to_job_schema(job).model_dump())
+        response = jobs_service.to_job_schema(job).model_dump()
+        assert response["llm_access_mode"] == "platform"
+        assert grant not in repr(response)
         assert ctx["proposer"].load_job_api_key(db, job) == grant
 
 
