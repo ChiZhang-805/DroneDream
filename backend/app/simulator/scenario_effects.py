@@ -118,6 +118,15 @@ def scenario_effect_value_sha256(value: object) -> str:
     return _value_hash(value)
 
 
+def scenario_effect_request_sha256(payload: object) -> str:
+    """Return the canonical digest used by a scenario-effect request."""
+
+    if not isinstance(payload, dict):
+        raise ScenarioEffectContractError("scenario effect request must be an object")
+    _validate_json_tree(payload, path="scenario effect request")
+    return _request_hash(payload)
+
+
 def _validate_json_tree(
     value: object,
     *,
@@ -1194,7 +1203,7 @@ def validate_scenario_effect_request(payload: object) -> dict[str, Any]:
     digest = payload.get("request_sha256")
     if not isinstance(digest, str) or not _SHA256.fullmatch(digest):
         raise ScenarioEffectContractError("scenario effect request hash is invalid")
-    if digest != _request_hash(payload):
+    if digest != scenario_effect_request_sha256(payload):
         raise ScenarioEffectContractError("scenario effect request hash does not match")
     identity = payload.get("execution_identity")
     if not isinstance(identity, dict):
@@ -2068,6 +2077,7 @@ __all__ = [
     "compile_bundled_runtime_profile",
     "load_scenario_effect_evidence",
     "load_scenario_effect_request",
+    "scenario_effect_request_sha256",
     "scenario_effect_value_sha256",
     "RUNTIME_EVIDENCE_ARTIFACT_NAME",
     "validate_scenario_effect_evidence",

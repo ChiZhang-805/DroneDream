@@ -12,6 +12,7 @@ from app.simulator.advanced_physics_evidence import (
     export_advanced_physics_evidence,
     verify_advanced_physics_evidence,
 )
+from app.simulator.scenario_effects import scenario_effect_request_sha256
 
 SUBJECT_COMMIT = "1" * 40
 EXPORTER_COMMIT = "2" * 40
@@ -41,12 +42,10 @@ def _effect_request(
     *,
     identity: dict[str, Any],
     effects: tuple[str, ...],
-    request_sha256: str,
 ) -> dict[str, Any]:
-    return {
+    request = {
         "schema_version": "dronedream.scenario_effect_request.v1",
         "execution_identity": identity,
-        "request_sha256": request_sha256,
         "effects": [
             {
                 "effect_id": effect,
@@ -56,6 +55,8 @@ def _effect_request(
             for effect in effects
         ],
     }
+    request["request_sha256"] = scenario_effect_request_sha256(request)
+    return request
 
 
 def _effect_evidence(
@@ -195,14 +196,14 @@ def _build_source(root: Path) -> Path:
             )
             continue
 
-        request_sha = f"{index:064x}"
+        request = _effect_request(
+            identity=identity,
+            effects=spec.expected_effects,
+        )
+        request_sha = str(request["request_sha256"])
         _write_json(
             directory / "scenario_effects.request.json",
-            _effect_request(
-                identity=identity,
-                effects=spec.expected_effects,
-                request_sha256=request_sha,
-            ),
+            request,
         )
         _write_json(
             directory / "scenario_effects.applied.json",
@@ -367,4 +368,30 @@ def test_export_rejects_unverified_effect(tmp_path: Path) -> None:
     _write_json(path, evidence)
 
     with pytest.raises(ValueError, match="effect is not verified applied"):
+        _export(source, tmp_path / "bundle")
+
+
+def test_export_rejects_request_hash_that_only_matches_cross_file_references(
+    tmp_path: Path,
+) -> None:
+    source = _build_source(tmp_path / "source")
+    directory = source / "success-five-effects-attempt-4"
+    forged_hash = "f" * 64
+    request_path = directory / "scenario_effects.request.json"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request["request_sha256"] = forged_hash
+    _write_json(request_path, request)
+
+    evidence_path = directory / "scenario_effects.applied.json"
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    evidence["request_sha256"] = forged_hash
+    _write_json(evidence_path, evidence)
+
+    runtime_path = directory / "simulator_runtime_manifest.json"
+    runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+    runtime["scenario_effect_contract"]["request_sha256"] = forged_hash
+    runtime["scenario_effect_request"]["request_sha256"] = forged_hash
+    _write_json(runtime_path, runtime)
+
+    with pytest.raises(ValueError, match="request hash does not recompute"):
         _export(source, tmp_path / "bundle")

@@ -19,6 +19,8 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from app.simulator.scenario_effects import scenario_effect_request_sha256
+
 MANIFEST_SCHEMA_VERSION = "dronedream.advanced-physics-real-px4-manifest.v1"
 RECEIPT_SCHEMA_VERSION = "dronedream.advanced-physics-real-px4-receipt.v1"
 EXECUTION_WINDOW_SCHEMA_VERSION = (
@@ -418,6 +420,8 @@ def _validate_effect_contract(
         request.get("request_sha256"),
         field=f"{spec.directory}.request_sha256",
     )
+    if request_sha != scenario_effect_request_sha256(dict(request)):
+        raise ValueError(f"{spec.directory} request hash does not recompute")
     if evidence.get("request_sha256") != request_sha:
         raise ValueError(f"{spec.directory} evidence request hash drifted")
     contract = _mapping(
