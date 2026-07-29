@@ -16,7 +16,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+import subprocess
 from collections.abc import Iterable
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -77,6 +81,32 @@ def _canonical_json(value: object) -> str:
 
 def _sha256(value: object) -> str:
     return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _verify_provenance(source_commit: str, generated_at: str) -> None:
+    if len(source_commit) != 40 or any(
+        char not in "0123456789abcdef" for char in source_commit
+    ):
+        raise ValueError("source_commit must be a lowercase 40-character Git SHA")
+    if not isinstance(generated_at, str) or not generated_at.endswith("Z"):
+        raise ValueError("generated_at must be an RFC3339 UTC timestamp")
+    try:
+        datetime.fromisoformat(generated_at[:-1] + "+00:00")
+    except ValueError as exc:
+        raise ValueError("generated_at must be an RFC3339 UTC timestamp") from exc
+    git = shutil.which("git")
+    if git is None:
+        raise ValueError("git is required to verify evaluation provenance")
+    repository_root = Path(__file__).resolve().parents[3]
+    resolved = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
+        [git, "rev-parse", "--verify", f"{source_commit}^{{commit}}"],
+        cwd=repository_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if resolved.returncode != 0 or resolved.stdout.strip() != source_commit:
+        raise ValueError("source_commit does not resolve to the exact requested commit")
 
 
 class _ScriptedMultiToolClient:
@@ -318,10 +348,7 @@ def build_harness_multi_tool_budget_evaluation(
 ) -> dict[str, object]:
     """Run matched arms and return a self-hashed measurement artifact."""
 
-    if len(source_commit) != 40 or any(
-        char not in "0123456789abcdef" for char in source_commit
-    ):
-        raise ValueError("source_commit must be a lowercase 40-character Git SHA")
+    _verify_provenance(source_commit, generated_at)
     blocks = tuple(seed_blocks)
     if not blocks or len(set(blocks)) != len(blocks):
         raise ValueError("evaluation seed blocks must be non-empty and unique")
@@ -444,6 +471,40 @@ def build_harness_multi_tool_budget_manifest(
 ) -> dict[str, object]:
     """Bind the measured artifact to exact code, policy, and claim scope."""
 
+    if (
+        artifact.get("source_commit") != source_commit
+        or artifact.get("generated_at") != generated_at
+    ):
+        raise ValueError("multi-tool artifact provenance drifted")
+    _verify_provenance(source_commit, generated_at)
+    artifact_unsigned = {
+        key: value for key, value in artifact.items() if key != "artifact_sha256"
+    }
+    seed_blocks = artifact.get("seed_blocks")
+    expected_budget = {
+        "max_iterations": HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS,
+        "max_total_trials": HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS,
+    }
+    expected_contracts = {
+        "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+        "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+    }
+    if (
+        artifact.get("schema_version") != HARNESS_MULTI_TOOL_BUDGET_EVAL_SCHEMA_VERSION
+        or artifact.get("artifact_sha256") != _sha256(artifact_unsigned)
+        or artifact.get("claim_boundary") != HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY
+        or not isinstance(seed_blocks, list)
+        or not seed_blocks
+        or any(isinstance(seed, bool) or not isinstance(seed, int) for seed in seed_blocks)
+        or len(set(seed_blocks)) != len(seed_blocks)
+        or artifact.get("configured_budget") != expected_budget
+        or artifact.get("contracts") != expected_contracts
+        or artifact.get("physical_fidelity") is not False
+        or artifact.get("real_provider_calls") != 0
+        or artifact.get("network_calls") != 0
+        or artifact.get("real_credentials_used") is not False
+    ):
+        raise ValueError("multi-tool artifact provenance or integrity drifted")
     unsigned: dict[str, object] = {
         "schema_version": HARNESS_MULTI_TOOL_BUDGET_EVAL_MANIFEST_SCHEMA_VERSION,
         "generated_at": generated_at,
@@ -451,16 +512,10 @@ def build_harness_multi_tool_budget_manifest(
         "artifact_schema_version": HARNESS_MULTI_TOOL_BUDGET_EVAL_SCHEMA_VERSION,
         "artifact_sha256": artifact["artifact_sha256"],
         "claim_boundary": HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY,
-        "seed_blocks": list(HARNESS_MULTI_TOOL_BUDGET_EVAL_SEED_BLOCKS),
+        "seed_blocks": list(seed_blocks),
         "arms": list(HARNESS_MULTI_TOOL_BUDGET_EVAL_ARMS),
-        "configured_budget": {
-            "max_iterations": HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS,
-            "max_total_trials": HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS,
-        },
-        "contracts": {
-            "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
-            "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
-        },
+        "configured_budget": expected_budget,
+        "contracts": expected_contracts,
         "runtime": {
             "simulator_backend": "mock",
             "real_provider_calls": 0,

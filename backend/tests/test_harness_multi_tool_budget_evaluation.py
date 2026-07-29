@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from app.orchestration.harness_multi_tool_budget_evaluation import (
     HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY,
     build_harness_multi_tool_budget_evaluation,
@@ -16,6 +18,16 @@ from scripts.evaluate_harness_multi_tool_budget import _payloads
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = BACKEND_ROOT.parent
 EVALUATOR = BACKEND_ROOT / "scripts" / "evaluate_harness_multi_tool_budget.py"
+
+
+def _head() -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
 
 
 def _sha256(payload: dict[str, object], field: str) -> str:
@@ -32,7 +44,7 @@ def _sha256(payload: dict[str, object], field: str) -> str:
 
 
 def test_equal_budget_multi_tool_evaluation_exercises_verified_live_dispatch() -> None:
-    source_commit = "a" * 40
+    source_commit = _head()
     generated_at = "2026-07-28T18:00:00Z"
     artifact = build_harness_multi_tool_budget_evaluation(
         source_commit=source_commit,
@@ -81,12 +93,29 @@ def test_equal_budget_multi_tool_evaluation_exercises_verified_live_dispatch() -
 
 
 def test_multi_tool_evaluation_manifest_and_rendered_files_bind_artifact() -> None:
-    source_commit = "b" * 40
+    source_commit = _head()
     generated_at = "2026-07-28T18:01:00Z"
     artifact = {
-        "artifact_sha256": "c" * 64,
+        "schema_version": "dronedream.harness-multi-tool-budget-evaluation/v1",
+        "source_commit": source_commit,
+        "generated_at": generated_at,
+        "claim_boundary": HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY,
+        "seed_blocks": [7100],
+        "configured_budget": {
+            "max_iterations": 2,
+            "max_total_trials": 40,
+        },
+        "contracts": {
+            "evidence_schema_version": "2.9",
+            "tool_registry_version": "2.1",
+        },
+        "physical_fidelity": False,
+        "real_provider_calls": 0,
+        "network_calls": 0,
+        "real_credentials_used": False,
         "block_rows": [],
     }
+    artifact["artifact_sha256"] = _sha256(artifact, "artifact_sha256")
     manifest = build_harness_multi_tool_budget_manifest(
         source_commit=source_commit,
         generated_at=generated_at,
@@ -95,7 +124,8 @@ def test_multi_tool_evaluation_manifest_and_rendered_files_bind_artifact() -> No
 
     assert manifest["source_commit"] == source_commit
     assert manifest["generated_at"] == generated_at
-    assert manifest["artifact_sha256"] == "c" * 64
+    assert manifest["artifact_sha256"] == artifact["artifact_sha256"]
+    assert manifest["seed_blocks"] == [7100]
     assert manifest["runtime"] == {
         "simulator_backend": "mock",
         "real_provider_calls": 0,
@@ -112,6 +142,13 @@ def test_multi_tool_evaluation_manifest_and_rendered_files_bind_artifact() -> No
         "harness-multi-tool-budget-evaluation-v1.manifest.json",
         "harness-multi-tool-budget-evaluation-v1.sha256",
     }
+
+    with pytest.raises(ValueError, match="artifact provenance"):
+        build_harness_multi_tool_budget_manifest(
+            source_commit="0" * 40,
+            generated_at=generated_at,
+            artifact=artifact,
+        )
 
 
 def test_multi_tool_evaluator_binds_backend_when_launched_from_repo_root() -> None:
