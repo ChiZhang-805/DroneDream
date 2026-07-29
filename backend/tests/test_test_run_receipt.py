@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from scripts.export_test_run_receipt import build_test_run_receipt
+from scripts.export_test_run_receipt import (
+    build_test_run_receipt,
+    write_new_test_run_receipt,
+)
 
 _SOURCE_COMMIT = "a" * 40
 _BASE_COMMIT = "b" * 40
@@ -133,3 +136,15 @@ def test_test_run_receipt_rejects_reversed_time_window() -> None:
 def test_test_run_receipt_rejects_duration_that_disagrees_with_timestamps() -> None:
     with pytest.raises(ValueError, match="disagrees with its timestamps"):
         _build_receipt(focused_duration_seconds=20.0)
+
+
+def test_test_run_receipt_writer_never_replaces_a_freeze(tmp_path: Path) -> None:
+    output = tmp_path / "receipt.json"
+    receipt = _build_receipt()
+
+    write_new_test_run_receipt(output, receipt)
+    original = output.read_bytes()
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        write_new_test_run_receipt(output, receipt)
+
+    assert output.read_bytes() == original

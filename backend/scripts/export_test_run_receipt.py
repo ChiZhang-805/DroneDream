@@ -225,6 +225,19 @@ def build_test_run_receipt(
     }
 
 
+def write_new_test_run_receipt(path: Path, receipt: dict[str, Any]) -> None:
+    """Write one frozen receipt without replacing any existing evidence."""
+
+    path = path.resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    try:
+        with path.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(payload)
+    except FileExistsError as exc:
+        raise FileExistsError(f"refusing to overwrite frozen test receipt: {path}") from exc
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-commit", required=True)
@@ -283,11 +296,7 @@ def main() -> int:
         bridge_reason=args.bridge_reason,
         exact_final_commit_run=args.exact_final_commit_run,
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
-        json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    write_new_test_run_receipt(args.output, receipt)
     print(
         json.dumps(
             {

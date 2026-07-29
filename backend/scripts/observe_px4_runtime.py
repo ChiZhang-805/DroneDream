@@ -88,8 +88,7 @@ def _run_wsl(*, distribution: str, name: str, argv: tuple[str, ...]) -> dict[str
     }
     if completed.returncode != 0:
         raise ValueError(
-            f"Runtime observation command {name} failed with "
-            f"{completed.returncode}: {stderr}"
+            f"Runtime observation command {name} failed with {completed.returncode}: {stderr}"
         )
     return record
 
@@ -136,6 +135,28 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def write_new_runtime_observation(path: Path, payload: dict[str, Any]) -> None:
+    """Write one observation without replacing any previously frozen evidence."""
+
+    path = path.resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rendered = (
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    try:
+        with path.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(rendered)
+    except FileExistsError as exc:
+        raise ValueError(f"Runtime observation output already exists: {path}") from exc
+
+
 def main() -> int:
     args = _parse_args()
     output = args.output.resolve()
@@ -152,8 +173,7 @@ def main() -> int:
         raise ValueError("Runtime release manifest lacks buildId/PX4 commit")
 
     records = [
-        _run_wsl(distribution=args.distribution, name=name, argv=argv)
-        for name, argv in _COMMANDS
+        _run_wsl(distribution=args.distribution, name=name, argv=argv) for name, argv in _COMMANDS
     ]
     observed_px4 = _command_stdout(records, "px4_git_head")
     if observed_px4 != px4_commit:
@@ -187,19 +207,7 @@ def main() -> int:
         kernel=_command_stdout(records, "kernel"),
         commands=records,
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        json.dumps(
-            payload,
-            ensure_ascii=False,
-            allow_nan=False,
-            indent=2,
-            sort_keys=True,
-        )
-        + "\n",
-        encoding="utf-8",
-        newline="\n",
-    )
+    write_new_runtime_observation(output, payload)
     print(
         json.dumps(
             {

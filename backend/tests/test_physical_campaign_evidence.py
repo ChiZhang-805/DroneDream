@@ -10,6 +10,7 @@ import pytest
 
 from app.simulator import physical_campaign_evidence
 from app.simulator.physical_campaign_evidence import build_runtime_observation
+from scripts.observe_px4_runtime import write_new_runtime_observation
 
 _PX4_COMMIT = "6ea3539157ca358c70a515878b77077af7d4611d"
 _OBSERVER_COMMIT = "a" * 40
@@ -68,6 +69,18 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def test_runtime_observation_writer_never_replaces_a_freeze(tmp_path: Path) -> None:
+    output = tmp_path / "runtime-observation.json"
+    payload = _observation()
+
+    write_new_runtime_observation(output, payload)
+    original = output.read_bytes()
+    with pytest.raises(ValueError, match="already exists"):
+        write_new_runtime_observation(output, payload)
+
+    assert output.read_bytes() == original
+
+
 def _identity(*, attempt: int) -> dict[str, Any]:
     return {
         "trial_id": f"failure-{attempt}",
@@ -85,15 +98,18 @@ def test_runtime_observation_is_deterministic_and_content_addressed() -> None:
     assert first == second
     unsigned = dict(first)
     declared = unsigned.pop("observation_sha256")
-    assert declared == hashlib.sha256(
-        json.dumps(
-            unsigned,
-            ensure_ascii=False,
-            allow_nan=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-    ).hexdigest()
+    assert (
+        declared
+        == hashlib.sha256(
+            json.dumps(
+                unsigned,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+    )
     assert first["network_calls"] == 0
     assert first["real_credentials_used"] is False
 
@@ -109,13 +125,9 @@ def test_runtime_observation_rejects_failed_command() -> None:
 def test_runtime_release_fixture_binds_campaign_firmware() -> None:
     repository_root = Path(__file__).resolve().parents[2]
     payload = json.loads(
-        (
-            repository_root
-            / "runtime"
-            / "tests"
-            / "fixtures"
-            / "runtime-release.json"
-        ).read_text(encoding="utf-8")
+        (repository_root / "runtime" / "tests" / "fixtures" / "runtime-release.json").read_text(
+            encoding="utf-8"
+        )
     )
 
     summary = physical_campaign_evidence._validate_runtime_release_manifest(
@@ -180,24 +192,15 @@ def test_inventory_uses_posix_sort_order_and_deterministic_ulog_gzip(
     source = tmp_path / "source"
     first_output = tmp_path / "first"
     second_output = tmp_path / "second"
-    (source / "scenario_runtime" / "px4_rootfs" / "etc" / "init.d").mkdir(
-        parents=True
-    )
-    (source / "scenario_runtime" / "px4_rootfs" / "etc" / "init.d-posix").mkdir(
-        parents=True
-    )
+    (source / "scenario_runtime" / "px4_rootfs" / "etc" / "init.d").mkdir(parents=True)
+    (source / "scenario_runtime" / "px4_rootfs" / "etc" / "init.d-posix").mkdir(parents=True)
     (source / "scenario_runtime" / "px4_rootfs" / "etc" / "init.d" / "rcS").write_text(
         "rcS",
         encoding="utf-8",
     )
-    (
-        source
-        / "scenario_runtime"
-        / "px4_rootfs"
-        / "etc"
-        / "init.d-posix"
-        / "airframe"
-    ).write_text("airframe", encoding="utf-8")
+    (source / "scenario_runtime" / "px4_rootfs" / "etc" / "init.d-posix" / "airframe").write_text(
+        "airframe", encoding="utf-8"
+    )
     ulog = b"ULog" * 100
     (source / "px4_source.ulg").write_bytes(ulog)
 
