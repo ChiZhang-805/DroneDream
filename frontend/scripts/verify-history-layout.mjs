@@ -255,7 +255,18 @@ function containmentViolations(metrics) {
   return violations;
 }
 
-await mkdir(outputRoot, { recursive: true });
+await mkdir(path.dirname(outputRoot), { recursive: true });
+try {
+  await mkdir(outputRoot);
+} catch (error) {
+  if (error && typeof error === "object" && error.code === "EEXIST") {
+    throw new Error(
+      `History layout evidence output already exists; use a new --label: ${outputRoot}`,
+      { cause: error },
+    );
+  }
+  throw error;
+}
 const server = await createServer({
   configFile: path.join(frontendRoot, "vite.config.ts"),
   root: frontendRoot,
