@@ -15,7 +15,7 @@ from app.orchestration.technical_report_evidence_v10 import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_COMMIT = "a" * 40
+SOURCE_COMMIT = "97492448c36bef240e468a0cd53c3ba198cb6aae"
 GENERATED_AT = "2026-07-29T00:00:00Z"
 
 
@@ -178,4 +178,16 @@ def test_v10_requires_full_commit_and_utc_timestamp() -> None:
             repository_root=REPOSITORY_ROOT,
             source_commit=SOURCE_COMMIT,
             generated_at="2026-07-29",
+        )
+    with pytest.raises(ValueError, match="does not resolve"):
+        build_technical_report_evidence_v10(
+            repository_root=REPOSITORY_ROOT,
+            source_commit="0" * 40,
+            generated_at=GENERATED_AT,
+        )
+    with pytest.raises(ValueError, match="does not contain freeze commit"):
+        build_technical_report_evidence_v10(
+            repository_root=REPOSITORY_ROOT,
+            source_commit="8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+            generated_at=GENERATED_AT,
         )

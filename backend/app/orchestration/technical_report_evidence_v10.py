@@ -172,6 +172,37 @@ def _require_timestamp(value: object, *, field: str) -> str:
     return value
 
 
+def _verify_source_commit(repository_root: Path, source_commit: str) -> None:
+    git = shutil.which("git")
+    if git is None:
+        raise ValueError("git is required to verify evidence provenance")
+    resolved = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
+        [git, "rev-parse", "--verify", f"{source_commit}^{{commit}}"],
+        cwd=repository_root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if resolved.returncode != 0 or resolved.stdout.strip() != source_commit:
+        raise ValueError("source_commit does not resolve to the exact requested commit")
+    for freeze_commit in (
+        _BASE_V9_FREEZE_COMMIT,
+        _ONLINE_ROUTING_FREEZE_COMMIT,
+        _MULTI_TOOL_FREEZE_COMMIT,
+        _ADVANCED_PHYSICS_FREEZE_COMMIT,
+    ):
+        ancestry = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
+            [git, "merge-base", "--is-ancestor", freeze_commit, source_commit],
+            cwd=repository_root,
+            check=False,
+            capture_output=True,
+        )
+        if ancestry.returncode != 0:
+            raise ValueError(
+                f"source_commit does not contain freeze commit {freeze_commit}"
+            )
+
+
 def _safe_path(value: str, *, field: str) -> PurePosixPath:
     path = PurePosixPath(value)
     if path.is_absolute() or ".." in path.parts or not path.parts:
@@ -833,6 +864,7 @@ def build_technical_report_evidence_v10(
 
     source_commit = _require_commit(source_commit, field="source_commit")
     generated_at = _require_timestamp(generated_at, field="generated_at")
+    _verify_source_commit(repository_root, source_commit)
     base, base_records, verified_base_sources = _verify_base_v9(
         repository_root,
         paths,
