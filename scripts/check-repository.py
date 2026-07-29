@@ -17,6 +17,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
+GIT_TIMEOUT_SECONDS = 30
 IGNORED_PARTS = {
     ".git",
     ".mypy_cache",
@@ -98,6 +99,7 @@ def project_files() -> list[Path]:
         cwd=ROOT,
         check=True,
         capture_output=True,
+        timeout=GIT_TIMEOUT_SECONDS,
     )
     paths = [Path(raw.decode("utf-8")) for raw in result.stdout.split(b"\0") if raw]
     return [

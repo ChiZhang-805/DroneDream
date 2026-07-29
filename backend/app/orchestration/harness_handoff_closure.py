@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 SCHEMA_VERSION = "dronedream.harness-handoff-closure/v1"
+_GIT_TIMEOUT_SECONDS = 30
 HANDOFF_DOCUMENT_SHA256 = "fdf033defe208e99ddb4af20d8334f6d5708851b4c2a09c73da3e627d90aaffe"
 HANDOFF_DOCUMENT_NAME = "DRONEDREAM_AURORA_HARNESS_HANDOFF_2026-07-28.md"
 
@@ -122,12 +123,18 @@ def _git(
     git = shutil.which("git")
     if git is None:
         raise ValueError("git is required to read frozen evidence snapshots")
-    result = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
-        [git, *args],
-        cwd=repository_root,
-        check=False,
-        capture_output=True,
-    )
+    try:
+        result = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
+            [git, *args],
+            cwd=repository_root,
+            check=False,
+            capture_output=True,
+            timeout=_GIT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError(
+            f"git {' '.join(args)} timed out after {_GIT_TIMEOUT_SECONDS} seconds"
+        ) from exc
     if check and result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError(f"git {' '.join(args)} failed: {detail}")

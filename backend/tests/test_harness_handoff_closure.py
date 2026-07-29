@@ -27,6 +27,16 @@ def _head() -> str:
     ).stdout.strip()
 
 
+def test_git_reader_fails_closed_on_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    def timeout(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise subprocess.TimeoutExpired(cmd=["git", "rev-parse"], timeout=30)
+
+    monkeypatch.setattr(closure_module.subprocess, "run", timeout)
+    with pytest.raises(ValueError, match="timed out after 30 seconds"):
+        closure_module._git(REPOSITORY_ROOT, "rev-parse", "HEAD")
+
+
 def test_closure_indexes_all_gaps_without_upgrading_claims() -> None:
     closure = build_harness_handoff_closure(
         repository_root=REPOSITORY_ROOT,

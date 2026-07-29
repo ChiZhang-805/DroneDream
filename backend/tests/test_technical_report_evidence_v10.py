@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app.orchestration import technical_report_evidence_v10 as evidence_v10_module
 from app.orchestration.technical_report_evidence_v10 import (
     MANIFEST_SCHEMA_VERSION,
     SCHEMA_VERSION,
@@ -40,6 +41,21 @@ def _export(tmp_path: Path) -> tuple[dict[str, object], tuple[Path, Path, Path, 
         generated_at=GENERATED_AT,
     )
     return bundle, (output, manifest, checksums, csv_directory)
+
+
+def test_source_verification_fails_closed_on_git_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def timeout(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise evidence_v10_module.subprocess.TimeoutExpired(
+            cmd=["git", "rev-parse"],
+            timeout=30,
+        )
+
+    monkeypatch.setattr(evidence_v10_module.subprocess, "run", timeout)
+    with pytest.raises(ValueError, match="timed out after 30 seconds"):
+        evidence_v10_module._verify_source_commit(REPOSITORY_ROOT, SOURCE_COMMIT)
 
 
 def test_v10_recomputes_all_evidence_classes_without_upgrading_claims() -> None:

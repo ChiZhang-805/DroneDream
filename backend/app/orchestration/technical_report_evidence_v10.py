@@ -58,6 +58,7 @@ CLAIM_BOUNDARY = (
 
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_GIT_TIMEOUT_SECONDS = 30
 _ONLINE_EVIDENCE_VERSION = "2.8"
 _ONLINE_PROMPT_VERSION = "1.7"
 _ONLINE_PROMPT_SHA256 = "81b3cae64b16f6b8294ef05acd9792f5d86c36e6d9e2afecf2f60d4d4db41903"
@@ -176,13 +177,19 @@ def _verify_source_commit(repository_root: Path, source_commit: str) -> None:
     git = shutil.which("git")
     if git is None:
         raise ValueError("git is required to verify evidence provenance")
-    resolved = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
-        [git, "rev-parse", "--verify", f"{source_commit}^{{commit}}"],
-        cwd=repository_root,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        resolved = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
+            [git, "rev-parse", "--verify", f"{source_commit}^{{commit}}"],
+            cwd=repository_root,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_GIT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError(
+            f"git provenance verification timed out after {_GIT_TIMEOUT_SECONDS} seconds"
+        ) from exc
     if resolved.returncode != 0 or resolved.stdout.strip() != source_commit:
         raise ValueError("source_commit does not resolve to the exact requested commit")
     for freeze_commit in (
@@ -191,16 +198,20 @@ def _verify_source_commit(repository_root: Path, source_commit: str) -> None:
         _MULTI_TOOL_FREEZE_COMMIT,
         _ADVANCED_PHYSICS_FREEZE_COMMIT,
     ):
-        ancestry = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
-            [git, "merge-base", "--is-ancestor", freeze_commit, source_commit],
-            cwd=repository_root,
-            check=False,
-            capture_output=True,
-        )
-        if ancestry.returncode != 0:
-            raise ValueError(
-                f"source_commit does not contain freeze commit {freeze_commit}"
+        try:
+            ancestry = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
+                [git, "merge-base", "--is-ancestor", freeze_commit, source_commit],
+                cwd=repository_root,
+                check=False,
+                capture_output=True,
+                timeout=_GIT_TIMEOUT_SECONDS,
             )
+        except subprocess.TimeoutExpired as exc:
+            raise ValueError(
+                f"git ancestry verification timed out after {_GIT_TIMEOUT_SECONDS} seconds"
+            ) from exc
+        if ancestry.returncode != 0:
+            raise ValueError(f"source_commit does not contain freeze commit {freeze_commit}")
 
 
 def _safe_path(value: str, *, field: str) -> PurePosixPath:
@@ -252,8 +263,9 @@ def _git_snapshot_record(
             cwd=repository_root,
             check=True,
             capture_output=True,
+            timeout=_GIT_TIMEOUT_SECONDS,
         )
-    except (OSError, subprocess.CalledProcessError) as exc:
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
         raise ValueError(f"could not read source snapshot {source_commit}:{safe_relative}") from exc
     raw = completed.stdout
     return {

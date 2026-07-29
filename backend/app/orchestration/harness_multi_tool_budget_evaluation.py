@@ -46,9 +46,9 @@ from app.orchestration.harness_outcome_campaign import (
 from app.services import jobs as job_services
 from app.simulator.mock import MockSimulatorAdapter
 
-HARNESS_MULTI_TOOL_BUDGET_EVAL_SCHEMA_VERSION = (
-    "dronedream.harness-multi-tool-budget-evaluation/v1"
-)
+_GIT_TIMEOUT_SECONDS = 30
+
+HARNESS_MULTI_TOOL_BUDGET_EVAL_SCHEMA_VERSION = "dronedream.harness-multi-tool-budget-evaluation/v1"
 HARNESS_MULTI_TOOL_BUDGET_EVAL_MANIFEST_SCHEMA_VERSION = (
     "dronedream.harness-multi-tool-budget-evaluation-manifest/v1"
 )
@@ -84,9 +84,7 @@ def _sha256(value: object) -> str:
 
 
 def _verify_provenance(source_commit: str, generated_at: str) -> None:
-    if len(source_commit) != 40 or any(
-        char not in "0123456789abcdef" for char in source_commit
-    ):
+    if len(source_commit) != 40 or any(char not in "0123456789abcdef" for char in source_commit):
         raise ValueError("source_commit must be a lowercase 40-character Git SHA")
     if not isinstance(generated_at, str) or not generated_at.endswith("Z"):
         raise ValueError("generated_at must be an RFC3339 UTC timestamp")
@@ -98,13 +96,19 @@ def _verify_provenance(source_commit: str, generated_at: str) -> None:
     if git is None:
         raise ValueError("git is required to verify evaluation provenance")
     repository_root = Path(__file__).resolve().parents[3]
-    resolved = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
-        [git, "rev-parse", "--verify", f"{source_commit}^{{commit}}"],
-        cwd=repository_root,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        resolved = subprocess.run(  # noqa: S603 - trusted executable and closed arguments.
+            [git, "rev-parse", "--verify", f"{source_commit}^{{commit}}"],
+            cwd=repository_root,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_GIT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError(
+            f"git provenance verification timed out after {_GIT_TIMEOUT_SECONDS} seconds"
+        ) from exc
     if resolved.returncode != 0 or resolved.stdout.strip() != source_commit:
         raise ValueError("source_commit does not resolve to the exact requested commit")
 
@@ -129,9 +133,7 @@ class _ScriptedMultiToolClient:
             if not isinstance(tool_budgets, list) or not tool_budgets:
                 raise ValueError("scripted planner received no eligible tool budget")
             selected = (
-                tool_budgets[:2]
-                if len(tool_budgets) >= 2 and capacity >= 2
-                else tool_budgets[:1]
+                tool_budgets[:2] if len(tool_budgets) >= 2 and capacity >= 2 else tool_budgets[:1]
             )
             remaining = capacity
             calls: list[dict[str, object]] = []
@@ -173,12 +175,9 @@ class _ScriptedMultiToolClient:
             return {
                 "schema_version": "1.0",
                 "decision": "dispatch",
-                "selected_proposal_refs": [
-                    item["proposal_ref"] for item in proposals[:maximum]
-                ],
+                "selected_proposal_refs": [item["proposal_ref"] for item in proposals[:maximum]],
                 "rationale": (
-                    "Dispatch all locally validated proposals up to the immutable "
-                    "server capacity."
+                    "Dispatch all locally validated proposals up to the immutable server capacity."
                 ),
             }
         raise ValueError("scripted client received an unknown prompt contract")
@@ -226,17 +225,14 @@ def _plan_trace(db: Session, job: models.Job) -> dict[str, object]:
         current_generation=max(0, int(job.current_generation or 0)),
     )
     result_count = sum(
-        event.event_type == "harness_multi_tool_execution_result"
-        for event in events
+        event.event_type == "harness_multi_tool_execution_result" for event in events
     )
     if len(history) != result_count:
         raise ValueError("multi-tool evaluation contains an unverified result chain")
     rows = [item.model_dump(mode="json") for item in history]
     return {
         "verified_generation_count": len(rows),
-        "multi_tool_generation_count": sum(
-            len(row["tool_calls"]) >= 2 for row in rows
-        ),
+        "multi_tool_generation_count": sum(len(row["tool_calls"]) >= 2 for row in rows),
         "provider_visible_history": rows,
         "accounting": {
             "provider_call_count": sum(row["provider_call_count"] for row in rows),
@@ -257,9 +253,7 @@ def _plan_trace(db: Session, job: models.Job) -> dict[str, object]:
                 3,
             ),
             "planned_candidates": sum(row["planned_candidates"] for row in rows),
-            "dispatched_candidates": sum(
-                row["dispatched_candidates"] for row in rows
-            ),
+            "dispatched_candidates": sum(row["dispatched_candidates"] for row in rows),
             "dispatched_trials": sum(row["dispatched_trials"] for row in rows),
         },
     }
@@ -378,14 +372,9 @@ def build_harness_multi_tool_budget_evaluation(
                 "arms": arms,
             }
         )
-    scripted_rows = [
-        row["arms"][1]
-        for row in block_rows
-        if isinstance(row.get("arms"), list)
-    ]
+    scripted_rows = [row["arms"][1] for row in block_rows if isinstance(row.get("arms"), list)]
     multi_tool_generation_count = sum(
-        int(row["plan_trace"]["multi_tool_generation_count"])
-        for row in scripted_rows
+        int(row["plan_trace"]["multi_tool_generation_count"]) for row in scripted_rows
     )
     if multi_tool_generation_count < len(block_rows):
         raise ValueError("scripted arm did not exercise multi-tool execution in every block")
@@ -419,16 +408,14 @@ def build_harness_multi_tool_budget_evaluation(
                 row["configured_budget_equal"] is True for row in block_rows
             ),
             "scripted_verified_generation_count": sum(
-                int(row["plan_trace"]["verified_generation_count"])
-                for row in scripted_rows
+                int(row["plan_trace"]["verified_generation_count"]) for row in scripted_rows
             ),
             "scripted_multi_tool_generation_count": multi_tool_generation_count,
             "scripted_decision_call_count": sum(
                 int(row["scripted_decision_calls"]) for row in scripted_rows
             ),
             "scripted_accounted_provider_call_count": sum(
-                int(row["plan_trace"]["accounting"]["provider_call_count"])
-                for row in scripted_rows
+                int(row["plan_trace"]["accounting"]["provider_call_count"]) for row in scripted_rows
             ),
             "scripted_plan_decision_wall_ms": round(
                 sum(
@@ -477,9 +464,7 @@ def build_harness_multi_tool_budget_manifest(
     ):
         raise ValueError("multi-tool artifact provenance drifted")
     _verify_provenance(source_commit, generated_at)
-    artifact_unsigned = {
-        key: value for key, value in artifact.items() if key != "artifact_sha256"
-    }
+    artifact_unsigned = {key: value for key, value in artifact.items() if key != "artifact_sha256"}
     seed_blocks = artifact.get("seed_blocks")
     expected_budget = {
         "max_iterations": HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS,

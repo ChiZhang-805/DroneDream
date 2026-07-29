@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from app.orchestration import harness_multi_tool_budget_evaluation as evaluation_module
 from app.orchestration.harness_multi_tool_budget_evaluation import (
     HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY,
     build_harness_multi_tool_budget_evaluation,
@@ -43,6 +44,21 @@ def _sha256(payload: dict[str, object], field: str) -> str:
     ).hexdigest()
 
 
+def test_provenance_verification_fails_closed_on_git_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def timeout(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise subprocess.TimeoutExpired(cmd=["git", "rev-parse"], timeout=30)
+
+    monkeypatch.setattr(evaluation_module.subprocess, "run", timeout)
+    with pytest.raises(ValueError, match="timed out after 30 seconds"):
+        evaluation_module._verify_provenance(
+            "0" * 40,
+            "2026-07-29T00:00:00Z",
+        )
+
+
 def test_equal_budget_multi_tool_evaluation_exercises_verified_live_dispatch() -> None:
     source_commit = _head()
     generated_at = "2026-07-28T18:00:00Z"
@@ -66,18 +82,15 @@ def test_equal_budget_multi_tool_evaluation_exercises_verified_live_dispatch() -
     assert artifact["summary"]["block_count"] == 1
     assert artifact["summary"]["configured_budget_parity_count"] == 1
     assert artifact["summary"]["scripted_multi_tool_generation_count"] >= 1
-    assert artifact["summary"]["scripted_decision_call_count"] == artifact[
-        "summary"
-    ]["scripted_accounted_provider_call_count"]
+    assert (
+        artifact["summary"]["scripted_decision_call_count"]
+        == artifact["summary"]["scripted_accounted_provider_call_count"]
+    )
     block = artifact["block_rows"][0]
     assert block["configured_budget_equal"] is True
     direct, scripted = block["arms"]
-    assert direct["configured_max_total_trials"] == scripted[
-        "configured_max_total_trials"
-    ]
-    assert direct["configured_max_iterations"] == scripted[
-        "configured_max_iterations"
-    ]
+    assert direct["configured_max_total_trials"] == scripted["configured_max_total_trials"]
+    assert direct["configured_max_iterations"] == scripted["configured_max_iterations"]
     assert direct["real_provider_calls"] == scripted["real_provider_calls"] == 0
     assert direct["network_calls"] == scripted["network_calls"] == 0
     assert scripted["plan_trace"]["verified_generation_count"] >= 2
