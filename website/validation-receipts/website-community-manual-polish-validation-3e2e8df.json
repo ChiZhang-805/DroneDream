@@ -1,0 +1,165 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-community-manual-polish-validation",
+  "generatedAtUtc": "2026-07-29T11:26:04Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "3e2e8dfc9ebb13f1d194453bab507a3356acd9d8",
+    "sourceTree": "41ee1df7292a9d848da8c3a0cf08523f7d7f4418",
+    "sourceStateDuringValidation": "clean",
+    "attestationRule": "This receipt attests only the immutable source commit. The receipt-only commit that contains this file is not self-attested."
+  },
+  "scope": {
+    "implemented": [
+      "Recent Topics is a one-screen view with no document-owned vertical scroll.",
+      "Recent Topics renders up to five complete desktop cards and a horizontal snap shelf at 390px without clipping card content.",
+      "More Topics is aligned at the right edge of the tag row below the search field.",
+      "All Topics uses normal browser document scrolling and does not own a nested vertical scrollbar.",
+      "The topic detail cover fills its complete left pane and the signed-in comment composer retains the enlarged textarea and keyboard submission path.",
+      "The Manual header remains fixed-height while scrolling, removes the duplicate header PDF action and supporting edition copy, and aligns the first chapter with the sidebar download block.",
+      "The Manual sidebar uses compact one-line labels, removes duplicate section-number prefixes, groups the five wizard steps, and exposes keyboard-accessible two- and three-level disclosure controls.",
+      "The first Manual introduction renders as one combined web paragraph without changing either downloadable Markdown or PDF edition."
+    ],
+    "sourceFiles": [
+      "frontend/src/__tests__/PublicSite.test.tsx",
+      "frontend/src/site/CommunityPage.tsx",
+      "frontend/src/site/ManualDocument.tsx",
+      "frontend/src/site/ManualPage.tsx",
+      "frontend/src/site/site.css",
+      "website/scripts/audit-community-manual-ui.mjs"
+    ],
+    "excluded": "No Markdown/PDF manual download, installer, release metadata, backend, software evidence, technical report, DNS, TLS, Supabase production configuration, payment configuration, GitHub Pages deployment, or Alibaba Cloud server state was changed by this source validation.",
+    "deploymentPerformed": false
+  },
+  "validationEnvironment": {
+    "operatingSystem": "Windows",
+    "worktree": "Z:\\DroneDream-worktrees\\website-20260728",
+    "node": "v24.14.1",
+    "localSiteBaseUrl": "http://127.0.0.1:4188/",
+    "accountFlow": "Local visual-audit Supabase URL and publishable-key placeholders only; API routes and authenticated session were deterministic local audit fixtures. No production secret or account was used.",
+    "browsers": [
+      "Microsoft Edge",
+      "Google Chrome",
+      "Lenovo Browser",
+      "Firefox"
+    ],
+    "viewports": [
+      "1440x1000 at 100%",
+      "390x844 at 100%",
+      "2000x1080 Edge UI audit",
+      "2048x1280 and browser zoom profiles covered by the general matrix"
+    ],
+    "locales": [
+      "en",
+      "zh-CN"
+    ]
+  },
+  "validation": {
+    "focusedTests": {
+      "command": "npm test -- --run src/__tests__/PublicSite.test.tsx src/__tests__/CommunityPage.test.tsx",
+      "testFiles": 2,
+      "tests": 25,
+      "passed": 25,
+      "failed": 0,
+      "result": "pass"
+    },
+    "frontendTests": {
+      "command": "npm test -- --run",
+      "testFiles": 50,
+      "tests": 329,
+      "passed": 329,
+      "failed": 0,
+      "result": "pass"
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "pass"
+    },
+    "lint": {
+      "command": "npm run lint",
+      "result": "pass"
+    },
+    "applicationBuild": {
+      "command": "npm run build",
+      "result": "pass",
+      "note": "Vite emitted its existing non-failing application chunk-size advisory."
+    },
+    "sharedSiteAndConsoleBuild": {
+      "command": "website/scripts/build-pages-site.ps1 with GITHUB_SHA=3e2e8dfc9ebb13f1d194453bab507a3356acd9d8",
+      "result": "pass",
+      "artifactKind": "dronedream-shared-static-site",
+      "sourceCommit": "3e2e8dfc9ebb13f1d194453bab507a3356acd9d8",
+      "fileCount": 123,
+      "sha256SumsEntries": 122,
+      "sha256SumsSha256": "6d4a0823dcb4be34e34d82b688a189aad0069eb748543ca5a8b88ee3e3e81995",
+      "buildManifestSha256": "12293ef7f4cc0beadc5ece88acd955fb481aab87f1abca7a650c5ca3c46d653e",
+      "latestJsonSha256": "7d0844cafd94147adee993914f41b913213f11ba5696af92da61680b0b6bfd59",
+      "totalBytesIncludingSha256Sums": 31862009,
+      "integrityResult": "All 122 listed files were independently rehashed with zero missing, extra-listed, or mismatched entries."
+    },
+    "deploymentContract": {
+      "command": "python -m unittest -v runtime.tests.test_website_deployment",
+      "tests": 11,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass"
+    },
+    "performance": {
+      "command": "node website/scripts/audit-site-performance.mjs http://127.0.0.1:4188/ <output>",
+      "routes": 5,
+      "passed": 5,
+      "failed": 0,
+      "reportSha256": "121f142e683b13968db9efe4e4c500a995843d4f1fcd501016423ba392d28d91",
+      "result": "pass"
+    },
+    "browserMatrix": {
+      "command": "node website/scripts/audit-browser-matrix.mjs http://127.0.0.1:4188/ <output> edge,chrome,lenovo,firefox",
+      "checks": 100,
+      "passed": 100,
+      "failed": 0,
+      "unavailableBrowsers": [],
+      "externalWarnings": 36,
+      "externalWarningDisposition": "Recorded external network warnings; none was a browser, layout, console, unsafe-API, reachability, or horizontal-overflow failure.",
+      "reportSha256": "f52ad9fd5ed127cfe260caf8b9ffdf179ab5127d2abe8f723e91d100278f4a3e",
+      "result": "pass"
+    },
+    "communityManualUiAudit": {
+      "command": "node website/scripts/audit-community-manual-ui.mjs http://127.0.0.1:4188/ <output-directory>",
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "reportSha256": "efb5aca4aad623b80067e7382b82057c7dd15d8060a7c23320d80381de6a8c60",
+      "screenshots": 48,
+      "screenshotBytes": 18811348,
+      "screenshotManifestSha256": "accb45ff92de9fad13fbe3a3ad97f716726dbd2ee425f9f4ff565a2d385df012",
+      "assertedRecentDocumentScroll": "documentHeight <= viewportHeight + 2px for every locale/profile",
+      "assertedAllTopicsScroll": "browser document extends when content requires scrolling and neither page nor feed owns nested vertical scrolling",
+      "assertedDesktopCards": "five visible, complete, fully contained cards at 1440x1000 and 2000x1080",
+      "assertedManual": "fixed header height, collapsed navigation, one compact five-step group, no duplicate numeric prefixes, one merged introduction paragraph, no duplicate PDF action, no faint header separator",
+      "result": "pass"
+    },
+    "visualInspection": {
+      "performedBy": "Codex",
+      "inspected": [
+        "English and Chinese Recent Topics at 1440x1000",
+        "English and Chinese Recent Topics at 390x844",
+        "English All Topics full document",
+        "English signed-in topic detail",
+        "English and Chinese Manual accordion views",
+        "English and Chinese Manual scrolled views"
+      ],
+      "result": "pass"
+    },
+    "gitDiffCheck": "pass",
+    "ownershipScopeCheck": "pass"
+  },
+  "releaseContract": {
+    "version": "1.0.0",
+    "installerFileName": "DroneDream_1.0.0_x64-setup.exe",
+    "installerBytes": 10387042,
+    "installerSha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+    "authenticode": "NotSigned",
+    "disposition": "Unchanged owner-approved unsigned internal preview metadata; this UI source did not rebuild or replace installer bytes."
+  },
+  "canonicalValidationSummarySha256": "ec588138c441144ad6ffcc15b0ee3ebaef3e84e686f457487af9218cdef8b14a"
+}
