@@ -151,6 +151,38 @@ def test_summary_text_covers_baseline_and_optimized(ctx):
     assert "No failure or instability flags" in text or "Watch-outs" in text
 
 
+def test_summary_text_handles_incomplete_diagnostic_metrics(ctx):
+    models = ctx["models"]
+    report_generator = ctx["report_generator"]
+    baseline = models.CandidateParameterSet(
+        id="cand_partial_baseline",
+        job_id="job_partial",
+        generation_index=0,
+        source_type="baseline",
+        label="baseline",
+        parameter_json={},
+        is_baseline=True,
+    )
+    partial_aggregate = {
+        "aggregated_score": 1.25,
+        "rmse": None,
+        "completion_time": None,
+    }
+
+    text = report_generator.generate_summary_text(
+        best=baseline,
+        baseline_agg=partial_aggregate,
+        best_agg=partial_aggregate,
+        baseline_trials=[],
+        best_trials=[],
+    )
+
+    assert "aggregated score 1.2500" in text
+    assert "RMSE unavailable" in text
+    assert "completion unavailable" in text
+    assert "no best-candidate trial rows were available" in text
+
+
 def test_bound_report_projection_seals_compatibility_and_evidence_fields(
     ctx,
 ):

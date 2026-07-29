@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 from pathlib import Path
 from typing import Any
@@ -143,7 +144,26 @@ def _report_metrics(agg: dict[str, Any]) -> dict[str, Any]:
 # --- Summary text ----------------------------------------------------------
 
 
-def _pct_delta(baseline: float, optimized: float) -> float | None:
+def _summary_number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) else None
+
+
+def _format_summary_number(
+    value: object,
+    *,
+    decimals: int,
+    unit: str = "",
+) -> str:
+    number = _summary_number(value)
+    if number is None:
+        return "unavailable"
+    return f"{number:.{decimals}f}{unit}"
+
+
+def _pct_delta(baseline: object, optimized: object) -> float | None:
     """Return optimized-vs-baseline improvement as a percent (lower is better).
 
     Positive means "optimized is lower than baseline" (improvement on
@@ -151,9 +171,11 @@ def _pct_delta(baseline: float, optimized: float) -> float | None:
     percent is not meaningful.
     """
 
-    if baseline == 0:
+    baseline_number = _summary_number(baseline)
+    optimized_number = _summary_number(optimized)
+    if baseline_number is None or optimized_number is None or baseline_number == 0:
         return None
-    return ((baseline - optimized) / baseline) * 100.0
+    return ((baseline_number - optimized_number) / baseline_number) * 100.0
 
 
 def _pass_rate(trials: list[models.Trial]) -> float | None:
@@ -208,8 +230,11 @@ def generate_summary_text(
 
     # (1) Baseline
     lines.append(
-        f"Baseline achieved aggregated score {b_score:.4f} "
-        f"(RMSE {b_rmse:.3f} m, completion {b_completion:.2f} s) "
+        "Baseline achieved aggregated score "
+        f"{_format_summary_number(b_score, decimals=4)} "
+        f"(RMSE {_format_summary_number(b_rmse, decimals=3, unit=' m')}, "
+        "completion "
+        f"{_format_summary_number(b_completion, decimals=2, unit=' s')}) "
         f"over {len(baseline_trials)} trials."
     )
 
@@ -222,8 +247,11 @@ def generate_summary_text(
     else:
         lines.append(
             f"Optimizer candidate '{best.label}' (generation "
-            f"{best.generation_index}) achieved aggregated score {o_score:.4f} "
-            f"(RMSE {o_rmse:.3f} m, completion {o_completion:.2f} s) "
+            f"{best.generation_index}) achieved aggregated score "
+            f"{_format_summary_number(o_score, decimals=4)} "
+            f"(RMSE {_format_summary_number(o_rmse, decimals=3, unit=' m')}, "
+            "completion "
+            f"{_format_summary_number(o_completion, decimals=2, unit=' s')}) "
             f"over {len(best_trials)} trials."
         )
 
@@ -243,7 +271,11 @@ def generate_summary_text(
             # Optimized is SLOWER than baseline.
             tradeoff_bit = (
                 f"completion time increased by {-completion_delta_pct:.1f}% "
-                f"(now {o_completion:.2f} s vs {b_completion:.2f} s baseline)"
+                "(now "
+                f"{_format_summary_number(o_completion, decimals=2, unit=' s')} "
+                "vs "
+                f"{_format_summary_number(b_completion, decimals=2, unit=' s')} "
+                "baseline)"
             )
 
         if improvement_bits:
