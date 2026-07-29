@@ -11,6 +11,7 @@ function LanguageProbe() {
       <span>{t("runtimeGate.previewTitle")}</span>
       <span>{t("runtimeGate.ece498PreviewBody")}</span>
       <span>{t("wizard.realAdvancedText")}</span>
+      <span>{t("settings.model.estimatedUsage", { count: 3 })}</span>
       <button type="button" onClick={() => setLocale(locale === "en" ? "zh-CN" : "en")}>
         Switch language
       </button>
@@ -40,12 +41,15 @@ describe("I18nProvider", () => {
     expect(screen.getByText(/review and edit the ECE498 configuration/i)).toBeInTheDocument();
     expect(screen.getByText(/physically creates verified obstacles through Gazebo Entity Factory/i)).toBeInTheDocument();
     expect(screen.getByText(/still fails closed for gusts, sensor degradation, battery effects/i)).toBeInTheDocument();
+    expect(screen.getByText("3 request(s) used conservative estimated accounting"))
+      .toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Switch language/i }));
     expect(screen.getByText("新建调优实验")).toBeInTheDocument();
     expect(screen.getByText("运行数据暂不可用")).toBeInTheDocument();
     expect(screen.getByText(/查看并编辑 ECE498 配置/)).toBeInTheDocument();
     expect(screen.getByText(/通过 Gazebo Entity Factory 真实生成并验证障碍物/)).toBeInTheDocument();
     expect(screen.getByText(/阵风、传感器退化、电池效应及非标称场景仍会默认拒绝运行/)).toBeInTheDocument();
+    expect(screen.getByText("3 次请求采用保守估算记账")).toBeInTheDocument();
     expect(window.localStorage.getItem("drone-dream:locale")).toBe("zh-CN");
     expect(document.documentElement.lang).toBe("zh-CN");
   });
