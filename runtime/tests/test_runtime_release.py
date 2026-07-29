@@ -29,7 +29,31 @@ runtime_manifest = importlib.util.module_from_spec(MANIFEST_SPEC)
 MANIFEST_SPEC.loader.exec_module(runtime_manifest)
 
 
+def _exact_requirements(path: Path) -> dict[str, str]:
+    requirements: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        value = line.strip()
+        if not value or value.startswith("#"):
+            continue
+        name, separator, version = value.partition("==")
+        if not separator or not name or not version:
+            raise AssertionError(f"{path} contains a non-exact requirement: {value}")
+        requirements[name.casefold()] = version
+    return requirements
+
+
 class RuntimeReleaseTests(unittest.TestCase):
+    def test_release_tools_share_the_audited_runtime_versions(self) -> None:
+        runtime_requirements = _exact_requirements(RUNTIME / "locks" / "python-requirements.lock")
+        release_requirements = _exact_requirements(
+            RUNTIME / "locks" / "release-tools-requirements.lock"
+        )
+
+        self.assertEqual(
+            release_requirements,
+            {name: runtime_requirements[name] for name in release_requirements},
+        )
+
     def _inputs(self, directory: Path) -> tuple[Path, Path, Path]:
         checks = [
             {"name": name, "passed": True, "durationSeconds": 1}
