@@ -4251,6 +4251,11 @@ html[lang="zh-CN"] .community-cover-art > strong {
     flex: 0 0 auto;
   }
 
+  .dd-site[data-page="community"][data-community-view="recent"] .community-feed {
+    flex: 0 0 auto;
+    padding-bottom: 1rem;
+  }
+
   .community-page:not(.is-all-topics) .community-topic-card-body {
     padding: 0.68rem 0.75rem;
   }

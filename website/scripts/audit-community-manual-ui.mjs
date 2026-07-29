@@ -338,6 +338,24 @@ try {
       ) {
         failures.push("desktop recent More topics link overlaps or leaves its feed");
       }
+      if (profile.desktop) {
+        const visibleCardBottoms = recent.cardRects
+          .filter((card) => card.display !== "none")
+          .map((card) => card.bottom);
+        const maxCardBottom = Math.max(...visibleCardBottoms);
+        const cardToFeedGap = recent.feedBottom - maxCardBottom;
+        const moreToFeedGap = recent.feedBottom - recent.moreBottom;
+        if (cardToFeedGap < 32 || cardToFeedGap > 72) {
+          failures.push(
+            `desktop recent card-to-feed gap ${cardToFeedGap}px outside 32-72px`,
+          );
+        }
+        if (moreToFeedGap < 8 || moreToFeedGap > 32) {
+          failures.push(
+            `desktop recent More topics-to-feed gap ${moreToFeedGap}px outside 8-32px`,
+          );
+        }
+      }
       if (
         profile.desktop
         && recent.cardRects.some((card) =>
