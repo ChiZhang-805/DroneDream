@@ -370,12 +370,12 @@ fn terminate_process_tree(child: &mut std::process::Child, job: Option<KillOnClo
             Ok(Some(_)) => {}
             _ => {
                 let _ = killer.kill();
-                let _ = killer.wait();
+                let _ = killer.wait_timeout(TERMINATION_TIMEOUT);
             }
         }
     }
     let _ = child.kill();
-    let _ = child.wait();
+    let _ = child.wait_timeout(TERMINATION_TIMEOUT);
 }
 
 #[cfg(test)]
