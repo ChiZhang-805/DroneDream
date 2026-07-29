@@ -101,6 +101,71 @@ function Icon({ name }: { name: "add" | "undo" | "trash" | "left" | "right" | "c
   );
 }
 
+function CoordinateInput({
+  id,
+  value,
+  onCommit,
+}: {
+  id: string;
+  value: number;
+  onCommit: (value: number) => void;
+}) {
+  const editing = useRef(false);
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    if (!editing.current) setDraft(String(value));
+  }, [value]);
+
+  function finishEditing(): void {
+    if (!editing.current) return;
+    editing.current = false;
+    const normalized = draft.trim();
+    const parsed = Number(normalized);
+    if (normalized !== "" && Number.isFinite(parsed)) {
+      if (!Object.is(parsed, value)) onCommit(parsed);
+      setDraft(String(parsed));
+      return;
+    }
+    setDraft(String(value));
+  }
+
+  return (
+    <input
+      id={id}
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      onFocus={() => {
+        editing.current = true;
+      }}
+      onChange={(event) => {
+        const nextDraft = event.target.value;
+        setDraft(nextDraft);
+        const parsed = Number(nextDraft.trim());
+        if (
+          nextDraft.trim() !== ""
+          && Number.isFinite(parsed)
+          && !Object.is(parsed, value)
+        ) {
+          onCommit(parsed);
+        }
+      }}
+      onBlur={finishEditing}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        } else if (event.key === "Escape") {
+          editing.current = false;
+          setDraft(String(value));
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 export function TrackEditor2D({
   points,
   defaultAltitude,
@@ -734,14 +799,10 @@ export function TrackEditor2D({
                     <label className="sr-only" htmlFor={`waypoint-${index}-${axis}`}>
                       {t("track.waypointInput", { index: index + 1, axis: axis.toUpperCase() })}
                     </label>
-                    <input
+                    <CoordinateInput
                       id={`waypoint-${index}-${axis}`}
-                      type="number"
-                      step="0.1"
                       value={axisValue(point, axis, defaultAltitude)}
-                      onChange={(event) =>
-                        updatePoint(index, { [axis]: Number(event.target.value) })
-                      }
+                      onCommit={(value) => updatePoint(index, { [axis]: value })}
                     />
                   </td>
                 ))}

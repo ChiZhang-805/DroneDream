@@ -216,6 +216,33 @@ describe("TrackEditor2D", () => {
     expect(screen.getByTestId("track-waypoint-3")).not.toHaveClass("track-waypoint-selected");
   });
 
+  it("preserves partial negative coordinate input until a finite value is committed", () => {
+    renderEditor();
+    const xInput = screen.getByLabelText("Waypoint 1 X");
+
+    fireEvent.focus(xInput);
+    fireEvent.change(xInput, { target: { value: "-" } });
+    expect(xInput).toHaveValue("-");
+    expect(screen.getByTestId("track-state")).toHaveTextContent('"x":0');
+
+    fireEvent.change(xInput, { target: { value: "-4.5" } });
+    fireEvent.blur(xInput);
+
+    const updated = JSON.parse(
+      screen.getByTestId("track-state").textContent ?? "[]",
+    ) as TrackPoint[];
+    expect(updated[0].x).toBe(-4.5);
+    expect(xInput).toHaveValue("-4.5");
+
+    fireEvent.focus(xInput);
+    fireEvent.change(xInput, { target: { value: "not-a-number" } });
+    fireEvent.keyDown(xInput, { key: "Escape" });
+    expect(xInput).toHaveValue("-4.5");
+    expect(JSON.parse(
+      screen.getByTestId("track-state").textContent ?? "[]",
+    )[0].x).toBe(-4.5);
+  });
+
   it("keeps the editor controls and view labels fully localized in Chinese", () => {
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
     renderEditor();
