@@ -405,6 +405,18 @@ receipt. V10 therefore marks both current-source full regression and the
 Windows Rust desktop gate as not included. No final software or report
 release-readiness claim follows from this focused receipt.
 
+Later software receipts remain separate from the immutable v10 report input.
+The hosted quality-gate run `30448014655` binds exact software subject
+`bb1677a12175a51ce5c7d3bb8824d25365a50545`. Its software-owned gates pass:
+Python 3.11 records 1,292/1,292 backend tests, the frontend core records 51
+files and 322/322 tests plus both builds, the hardened frontend Docker image
+builds from its repository context, Windows Rust records 101 passes and one
+environment-dependent ignored test, and the Runtime static contract records 47
+passes and one supported-platform skip. The aggregate workflow is still
+`failure` because the separate website-owned bilingual typography/layout step
+retains 19 failures. The receipt preserves that result and the npm, Docker,
+and React warnings; it does not relabel the aggregate workflow as green.
+
 ## Reproduction
 
 From the repository root:
@@ -457,6 +469,10 @@ backend\.venv\Scripts\python.exe `
 python `
   backend\scripts\export_technical_report_evidence_v10.py `
   --check
+
+python `
+  backend\scripts\export_harness_handoff_closure.py `
+  --check
 ```
 
 The v10 verifier rereads the frozen output metadata, rebuilds every current
@@ -481,10 +497,14 @@ zero, and the provider projection contains no source or owner identifiers.
 This result is software-contract evidence, not an optimizer-quality result. The
 554-Trial component outcome ablation remains an Evidence 2.7 / Prompt 1.6
 historical freeze. The latest online provider freeze is Evidence 2.8 / Prompt
-1.7 and also cannot validate cross-Job memory or Evidence 2.9 planning.
-Equal-configured-budget dispatcher evidence now exists, but a new real Evidence
-2.9 provider run and any causal outcome-benefit comparison remain separate
-gates.
+1.7 for the historical v10 bundle and cannot validate cross-Job memory or
+Evidence 2.9 planning. A later, separately authorized Evidence 2.9 / Prompt 1.7
+campaign is frozen outside v10: 23/24 current-contract development cases pass
+with zero retries at exact subject
+`d36ef166f985f761ab9e733753f61237950049da`. It qualifies routing
+discrimination on that corpus only. Equal-configured-budget dispatcher
+evidence also exists, but neither freeze establishes cross-Job memory benefit
+or a general causal outcome advantage.
 
 ### Current Evidence 2.9 multi-tool dispatcher contract
 
@@ -511,9 +531,14 @@ superiority, PX4/Gazebo fidelity, physical-flight improvement, safety, or causal
 Harness benefit. The frozen run contains three budget-parity blocks, six arm
 runs, six verified scripted generations, three multi-tool generations, and
 zero real provider/network calls. The Evidence 2.8 online routing artifact and
-prior component ablations remain immutable historical freezes. A real Evidence
-2.9 provider campaign requires a new, single-use user approval for its stated
-call count and possible cost.
+prior component ablations remain immutable historical freezes. The separately
+approved Evidence 2.9 online batch made exactly 24 calls with zero automatic
+retries and qualified 23/24 cases. Its Artifact SHA-256 is
+`11c5de7e208cb9b3e1263943ff8086bd919a57753948a9fd0db0ffd48e621ed1`;
+the single `tight_budget_expensive_matrix` failure remains frozen. That batch's
+authorization is consumed and closed. Every future real provider campaign
+requires a new purpose-, scale-, and cost-specific approval before any API-key
+access.
 
 ### Bundled advanced-physics closure
 
@@ -533,3 +558,23 @@ healthy-rotor motion read-back but no trusted scoring window. The report may
 claim these enumerated application/read-back facts; it may not turn them into
 universal controller robustness, optimizer benefit, real-aircraft transfer, or
 safety.
+
+### Harness handoff 6.1–6.6 closure index
+
+`backend/scripts/export_harness_handoff_closure.py` builds one exact-subject
+index over the six gaps in the 2026-07-28 Harness handoff. It never rewrites the
+older freezes. Instead, it reads each source through `git show`, requires every
+declared freeze commit to be an ancestor, and rejects any byte changed after
+its owning freeze. The index validates the online 23/24 result, the named
+reflection interventions and mixed outcome result, bounded multi-tool
+execution/accounting, the 10/10 cross-Job isolation contract, the nine-category
+advanced-physics closure, the signed local Runtime handoff, the unsigned
+owner-approved internal installer identity, v10's explicit
+`release_ready=false`, and the latest aggregate quality-gate failure.
+
+This wrapper supplies a uniform `subject_commit` and `generated_at` without
+mutating legacy manifests that predated those fields. Its own exact-byte
+verifier rejects output or checksum tampering. It is a software closure and
+handoff aid, not a new technical-report bundle: the frozen v10 sources/PDF are
+not updated, the 19 website visual failures remain cross-line, and negative or
+inconclusive research results stay negative or inconclusive.
