@@ -860,6 +860,21 @@ def _validate_patches(
                 )
             )
             continue
+        if (
+            patch.field_id in request.explicit_field_ids
+            and patch.provenance != "explicit"
+        ):
+            rejected.append(
+                schemas.ExperimentAssistantRejectedPatch(
+                    field_id=patch.field_id,
+                    code="EXPLICIT_VALUE_PRESERVED",
+                    message=(
+                        "A model-derived or default patch cannot replace an "
+                        "explicit user value."
+                    ),
+                )
+            )
+            continue
         try:
             normalized = _normalize_field_value(spec, patch.value)
         except ValueError as exc:
@@ -943,6 +958,21 @@ def _validate_parameter_patches(
                     field_id=patch.name,
                     code="INVALID_PROVENANCE",
                     message="A proposed default cannot claim a user message as its source.",
+                )
+            )
+            continue
+        if (
+            "parameters" in request.explicit_field_ids
+            and patch.provenance != "explicit"
+        ):
+            rejected.append(
+                schemas.ExperimentAssistantRejectedPatch(
+                    field_id=patch.name,
+                    code="EXPLICIT_VALUE_PRESERVED",
+                    message=(
+                        "A model-derived or default parameter patch cannot "
+                        "replace an explicit user selection."
+                    ),
                 )
             )
             continue

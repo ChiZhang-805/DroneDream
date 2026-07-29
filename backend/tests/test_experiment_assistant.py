@@ -404,6 +404,68 @@ def test_parameter_defaults_cannot_override_explicit_parameter_facts(
     assert "parameters" not in result.review_field_ids
 
 
+def test_rejects_non_explicit_patches_for_explicit_draft_facts(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        assistant,
+        "_provider_generate",
+        lambda *_args, **_kwargs: _provider_result(
+            patches=[
+                {
+                    "field_id": "altitude_m",
+                    "value": 3.0,
+                    "provenance": "proposed_default",
+                    "source_message_id": None,
+                }
+            ],
+            parameter_patches=[
+                {
+                    "name": "MPC_Z_P",
+                    "selected": True,
+                    "baseline": 1.0,
+                    "search_min": 0.6,
+                    "search_max": 1.3,
+                    "scale": "linear",
+                    "provenance": "derived",
+                    "source_message_id": "turn-1",
+                }
+            ],
+        ),
+    )
+
+    result = assistant.compile_experiment_turn(
+        _request(
+            explicit_field_ids=["altitude_m", "parameters"],
+            current_values={
+                "px4_version": "v1.16",
+                "vehicle_type": "multicopter",
+                "airframe": "x500",
+                "altitude_m": 5.0,
+            },
+            current_parameters=[
+                {
+                    "name": "MPC_XY_P",
+                    "selected": True,
+                    "baseline": 0.95,
+                    "search_min": 0.6,
+                    "search_max": 1.3,
+                    "scale": "linear",
+                }
+            ],
+        )
+    )
+
+    assert result.accepted_patches == []
+    assert result.accepted_parameter_patches == []
+    assert [item.code for item in result.rejected_patches] == [
+        "EXPLICIT_VALUE_PRESERVED"
+    ]
+    assert [item.code for item in result.rejected_parameter_patches] == [
+        "EXPLICIT_VALUE_PRESERVED"
+    ]
+
+
 def test_rejects_proposed_default_with_forged_message_source(monkeypatch) -> None:
     monkeypatch.setattr(
         assistant,
