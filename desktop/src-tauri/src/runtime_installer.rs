@@ -2383,6 +2383,16 @@ fn diagnostic_line_is_sensitive(line: &str) -> bool {
         "api_key",
         "apikey",
         "access_key",
+        "anon_key",
+        "service_role",
+        "private_key",
+        "private key",
+        "database_url",
+        "redis_url",
+        "connection_string",
+        "set-cookie",
+        "cookie:",
+        "dsn=",
     ]
     .iter()
     .any(|needle| lowercase.contains(needle))
@@ -5380,7 +5390,17 @@ mod tests {
     #[test]
     fn diagnostic_sanitizer_redacts_secrets_controls_and_caps_output() {
         let raw = format!(
-            "safe line\nAuthorization: Bearer abc\nurl=https://user:pass@example.test/path\ncontrol=\u{0}\n{}",
+            concat!(
+                "safe line\n",
+                "Authorization: Bearer abc\n",
+                "url=https://user:pass@example.test/path\n",
+                "SUPABASE_ANON_KEY=public-looking-but-sensitive\n",
+                "DATABASE_URL=postgresql://database.example.test/name\n",
+                "Set-Cookie: session=private\n",
+                "-----BEGIN PRIVATE KEY-----\n",
+                "control=\u{0}\n",
+                "{}"
+            ),
             "x".repeat(MAX_DIAGNOSTIC_BYTES * 2)
         );
         let sanitized = sanitize_and_bound_diagnostics(&raw);
@@ -5388,6 +5408,10 @@ mod tests {
         assert!(sanitized.len() <= MAX_DIAGNOSTIC_BYTES);
         assert!(!text.contains("Bearer abc"));
         assert!(!text.contains("user:pass"));
+        assert!(!text.contains("public-looking-but-sensitive"));
+        assert!(!text.contains("postgresql://database.example.test"));
+        assert!(!text.contains("session=private"));
+        assert!(!text.contains("BEGIN PRIVATE KEY"));
         assert!(!text.contains('\0'));
         assert!(text.contains("[REDACTED sensitive diagnostic line]"));
         assert!(text.contains("diagnostic output truncated"));
