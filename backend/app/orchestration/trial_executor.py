@@ -792,13 +792,11 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
             persisted_size = local_path.stat().st_size
             digest_source = local_path
             if settings.artifact_storage_backend != "local":
-                stored_content = storage.read_bytes(storage_path)
-                stored_sha256, stored_size = artifact_content_digest(stored_content)
+                stored_sha256, stored_size = storage.content_digest(storage_path)
                 if stored_sha256 != source_sha256 or stored_size != source_size:
                     raise ArtifactIntegrityError(
                         "artifact storage did not preserve simulator bytes"
                     )
-                digest_source = stored_content
         artifact = models.Artifact(
             owner_type="trial",
             owner_id=trial.id,
