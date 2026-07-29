@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -738,8 +739,12 @@ def _atomic_write_new(path: Path, payload: bytes) -> None:
         temporary = Path(handle.name)
         handle.write(payload)
         handle.flush()
+        os.fsync(handle.fileno())
     try:
-        temporary.replace(path)
+        try:
+            os.link(temporary, path)
+        except FileExistsError as exc:
+            raise FileExistsError(f"refusing to overwrite frozen output: {path}") from exc
     finally:
         temporary.unlink(missing_ok=True)
 

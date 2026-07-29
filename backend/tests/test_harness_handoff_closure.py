@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app.orchestration import harness_handoff_closure as closure_module
 from app.orchestration.harness_handoff_closure import (
     build_harness_handoff_closure,
     export_harness_handoff_closure,
@@ -125,6 +126,29 @@ def test_export_refuses_to_replace_an_existing_freeze(tmp_path: Path) -> None:
 
     assert output.read_bytes() == frozen_output
     assert checksum.read_bytes() == frozen_checksum
+
+
+def test_atomic_writer_refuses_a_target_created_during_export(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "handoff-closure.json"
+    original_named_temporary_file = closure_module.tempfile.NamedTemporaryFile
+
+    def racing_named_temporary_file(*args: object, **kwargs: object):
+        output.write_bytes(b"racer-owned-freeze")
+        return original_named_temporary_file(*args, **kwargs)
+
+    monkeypatch.setattr(
+        closure_module.tempfile,
+        "NamedTemporaryFile",
+        racing_named_temporary_file,
+    )
+
+    with pytest.raises(FileExistsError):
+        closure_module._atomic_write_new(output, b"new-payload")
+
+    assert output.read_bytes() == b"racer-owned-freeze"
 
 
 def test_verifier_rejects_checksum_tamper(tmp_path: Path) -> None:
