@@ -69,6 +69,11 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    experience_preferences: Mapped[UserExperiencePreferences | None] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class DesktopBridgeNonce(Base):
@@ -831,6 +836,46 @@ class HarnessExperienceMemory(Base):
 
     user: Mapped[User] = relationship(back_populates="harness_experiences")
     source_job: Mapped[Job] = relationship(back_populates="harness_experiences")
+
+
+class UserExperiencePreferences(Base):
+    """Minimal, explicit per-user defaults and cross-Job memory consent."""
+
+    __tablename__ = "user_experience_preferences"
+
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    memory_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+    locale: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    default_template_key: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+    default_track_type: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+    )
+    default_altitude_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_now,
+        onupdate=_now,
+        nullable=False,
+    )
+
+    user: Mapped[User] = relationship(back_populates="experience_preferences")
 
 
 class JobEvent(Base):

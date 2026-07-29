@@ -46,6 +46,11 @@ _REVOCATION_REASONS = frozenset(
 )
 
 
+def _memory_is_enabled(db: Session, *, user_id: str) -> bool:
+    preferences = db.get(models.UserExperiencePreferences, user_id)
+    return bool(preferences is not None and preferences.memory_enabled)
+
+
 def _utc(value: datetime | None = None) -> datetime:
     resolved = value or datetime.now(timezone.utc)
     return resolved if resolved.tzinfo is not None else resolved.replace(tzinfo=timezone.utc)
@@ -215,6 +220,7 @@ def materialize_verified_terminal_job_experiences(
     if (
         not isinstance(source_job.user_id, str)
         or not source_job.user_id
+        or not _memory_is_enabled(db, user_id=source_job.user_id)
         or source_job.status not in _TERMINAL_JOB_STATUSES
         or snapshot.schema_version != HARNESS_EVIDENCE_SCHEMA_VERSION
     ):
@@ -384,6 +390,8 @@ def retrieve_cross_job_memory(
 
     if not isinstance(current_job.user_id, str) or not current_job.user_id:
         return HarnessCrossJobMemory()
+    if not _memory_is_enabled(db, user_id=current_job.user_id):
+        return HarnessCrossJobMemory()
     current_time = _utc(now)
     family_hash = task_family_sha256(current_snapshot, job=current_job)
     current_profile = _scenario_profile(current_snapshot)
@@ -499,10 +507,28 @@ def purge_expired_cross_job_experiences(
     return int(getattr(result, "rowcount", 0) or 0)
 
 
+def delete_cross_job_experiences(
+    db: Session,
+    *,
+    user_id: str,
+    source_job_id: str | None = None,
+) -> int:
+    """Physically erase one user's structured memories on explicit request."""
+
+    predicates = [models.HarnessExperienceMemory.user_id == user_id]
+    if source_job_id is not None:
+        predicates.append(
+            models.HarnessExperienceMemory.source_job_id == source_job_id
+        )
+    result = db.execute(delete(models.HarnessExperienceMemory).where(*predicates))
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 __all__ = [
     "HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION",
     "HARNESS_EXPERIENCE_RETENTION_DAYS",
     "HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION",
+    "delete_cross_job_experiences",
     "materialize_verified_terminal_job_experiences",
     "purge_expired_cross_job_experiences",
     "retrieve_cross_job_memory",

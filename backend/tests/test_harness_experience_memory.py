@@ -68,6 +68,49 @@ def _snapshot(harness_context, job, *, memory=()):
     return snapshot.model_copy(update={"decision_memory": tuple(memory)})
 
 
+def test_cross_job_memory_requires_explicit_user_opt_in(client) -> None:
+    from app import models
+    from app.db import SessionLocal
+    from app.orchestration import experience_memory, harness_context
+
+    with SessionLocal() as db:
+        owner = models.User(id="usr_memory_default_off")
+        source = _job(
+            models,
+            user_id=owner.id,
+            job_id="job_memory_default_off_source",
+            status="COMPLETED",
+        )
+        target = _job(
+            models,
+            user_id=owner.id,
+            job_id="job_memory_default_off_target",
+            status="RUNNING",
+        )
+        db.add_all([owner, source, target])
+        db.flush()
+        source_snapshot = _snapshot(
+            harness_context,
+            source,
+            memory=(_verified_memory(harness_context),),
+        )
+
+        assert (
+            experience_memory.materialize_verified_terminal_job_experiences(
+                db,
+                source_job=source,
+                snapshot=source_snapshot,
+            )
+            == 0
+        )
+        assert not experience_memory.retrieve_cross_job_memory(
+            db,
+            current_job=target,
+            current_snapshot=_snapshot(harness_context, target),
+        ).experiences
+        assert db.query(models.HarnessExperienceMemory).count() == 0
+
+
 def test_cross_job_memory_is_user_isolated_closed_and_revocable(client) -> None:
     from app import models
     from app.db import SessionLocal
@@ -76,7 +119,13 @@ def test_cross_job_memory_is_user_isolated_closed_and_revocable(client) -> None:
 
     now = datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)
     with SessionLocal() as db:
-        owner = models.User(id="usr_owner_sentinel", email="owner@example.test")
+        owner = models.User(
+            id="usr_owner_sentinel",
+            email="owner@example.test",
+            experience_preferences=models.UserExperiencePreferences(
+                memory_enabled=True
+            ),
+        )
         other = models.User(id="usr_other_sentinel", email="other@example.test")
         source = _job(
             models,
@@ -211,7 +260,12 @@ def test_cross_job_memory_fails_closed_on_expiry_version_or_receipt_drift(client
 
     now = datetime(2026, 7, 28, 12, 0, tzinfo=timezone.utc)
     with SessionLocal() as db:
-        owner = models.User(id="usr_memory_owner")
+        owner = models.User(
+            id="usr_memory_owner",
+            experience_preferences=models.UserExperiencePreferences(
+                memory_enabled=True
+            ),
+        )
         source = _job(
             models,
             user_id=owner.id,
@@ -292,7 +346,12 @@ def test_cross_job_memory_rejects_nonterminal_or_incomplete_sources(client) -> N
     from app.orchestration import experience_memory, harness_context
 
     with SessionLocal() as db:
-        owner = models.User(id="usr_incomplete_owner")
+        owner = models.User(
+            id="usr_incomplete_owner",
+            experience_preferences=models.UserExperiencePreferences(
+                memory_enabled=True
+            ),
+        )
         running = _job(
             models,
             user_id=owner.id,
@@ -372,7 +431,12 @@ def test_live_harness_trace_binds_provider_safe_cross_job_memory(client) -> None
 
     now = datetime.now(timezone.utc)
     with SessionLocal() as db:
-        owner = models.User(id="usr_live_memory_owner")
+        owner = models.User(
+            id="usr_live_memory_owner",
+            experience_preferences=models.UserExperiencePreferences(
+                memory_enabled=True
+            ),
+        )
         source = _job(
             models,
             user_id=owner.id,

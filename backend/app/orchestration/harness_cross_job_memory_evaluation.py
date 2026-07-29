@@ -149,7 +149,12 @@ def _database() -> tuple[Session, models.User, models.User, Engine]:
     )
     Base.metadata.create_all(engine)
     db = Session(engine)
-    owner = models.User(id="usr_eval_owner")
+    owner = models.User(
+        id="usr_eval_owner",
+        experience_preferences=models.UserExperiencePreferences(
+            memory_enabled=True
+        ),
+    )
     other = models.User(id="usr_eval_other")
     db.add_all([owner, other])
     db.flush()

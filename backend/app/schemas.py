@@ -80,6 +80,11 @@ BatchStatus = Literal[
     "FAILED",
     "CANCELLED",
 ]
+StarterExperienceTemplateKey = Literal[
+    "hover-basics@1",
+    "first-circle@1",
+    "light-wind-circle@1",
+]
 
 
 JOB_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
@@ -99,6 +104,35 @@ class _Strict(BaseModel):
         str_strip_whitespace=True,
         strict=True,
     )
+
+
+class UserExperiencePreferencesUpdate(_Strict):
+    memory_enabled: bool = False
+    locale: Literal["en", "zh-CN"] | None = None
+    default_template_key: StarterExperienceTemplateKey | None = None
+    default_track_type: TrackType | None = None
+    default_altitude_m: Annotated[float, Field(ge=1, le=20)] | None = None
+
+    @model_validator(mode="after")
+    def require_at_least_one_field(self) -> UserExperiencePreferencesUpdate:
+        if not self.model_fields_set:
+            raise ValueError("At least one preference field is required.")
+        return self
+
+
+class UserExperiencePreferences(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
+    saved: bool
+    memory_enabled: bool
+    locale: Literal["en", "zh-CN"] | None = None
+    default_template_key: StarterExperienceTemplateKey | None = None
+    default_track_type: TrackType | None = None
+    default_altitude_m: float | None = None
+    retention_days: int
+    stored_content: Literal[
+        "allowlisted_preferences_and_verified_structured_job_outcomes_only"
+    ] = "allowlisted_preferences_and_verified_structured_job_outcomes_only"
+    updated_at: datetime | None = None
 
 
 class StartPoint(_Strict):
