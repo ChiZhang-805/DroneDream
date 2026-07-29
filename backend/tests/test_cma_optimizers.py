@@ -785,6 +785,34 @@ def test_cma_seed_metadata_is_js_safe_and_fidelity_sensitive() -> None:
     assert full_seed != reduced_seed
 
 
+def test_cma_replay_rejects_nominal_full_fidelity_with_partial_effective_coverage() -> None:
+    space = _space()
+    observations = tuple(
+        replace(
+            _observation(
+                space,
+                candidate_id=f"nominal-full-partial-{index}",
+                generation=1,
+                vector=(value, 1.0 - value, 0.5, 0.5),
+                loss=(value - 0.35) ** 2,
+                strategy="surrogate_cma_es",
+            ),
+            fidelity=0.25,
+            requested_fidelity=1.0,
+        )
+        for index, value in enumerate((0.05, 0.15, 0.25, 0.35, 0.45, 0.55))
+    )
+
+    state = reconstruct_cma_state(
+        space,
+        observations,
+        strategy="surrogate_cma_es",
+        population_size=6,
+    )
+
+    assert state.updates == 0
+
+
 def test_cma_replay_is_independent_of_database_candidate_ids() -> None:
     space = _space()
     observations = tuple(

@@ -282,7 +282,9 @@ def _full_fidelity_request(request: OptimizerRequest) -> OptimizerRequest:
     return replace(
         request,
         observations=tuple(
-            item for item in request.observations if item.requested_fidelity >= 1.0 - 1e-9
+            item
+            for item in request.observations
+            if item.requested_fidelity >= 1.0 - 1e-9 and item.fidelity >= 1.0 - 1e-9
         ),
     )
 
@@ -680,7 +682,11 @@ def _joint_scalarized_incumbents(
         # must never become the incumbent against which a full-target
         # prediction computes EI.  With no complete full-fidelity row, return
         # no incumbent and let scalar loss or uncertainty drive acquisition.
-        rows = [row for row in rows if row[0].requested_fidelity >= 1.0 - 1e-9]
+        rows = [
+            row
+            for row in rows
+            if row[0].requested_fidelity >= 1.0 - 1e-9 and row[0].fidelity >= 1.0 - 1e-9
+        ]
     if not rows:
         # Independent per-metric minima can belong to different candidates and
         # therefore form an unattainable utopia point.  With no complete joint
