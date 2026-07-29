@@ -1386,7 +1386,7 @@ fn try_parse_http_framing(response: &[u8]) -> Result<Option<HttpFraming>, String
     }
 
     let mut content_length = None;
-    let mut chunked = false;
+    let mut transfer_codings = Vec::new();
     for line in header.lines().skip(1) {
         let Some((name, value)) = line.split_once(':') else {
             return Err("backend returned a malformed HTTP header".to_string());
@@ -1403,11 +1403,27 @@ fn try_parse_http_framing(response: &[u8]) -> Result<Option<HttpFraming>, String
                 return Err("backend returned conflicting Content-Length headers".to_string());
             }
         } else if name.eq_ignore_ascii_case("transfer-encoding") {
-            chunked |= value
-                .split(',')
-                .any(|encoding| encoding.trim().eq_ignore_ascii_case("chunked"));
+            for encoding in value.split(',') {
+                let encoding = encoding.trim();
+                if encoding.is_empty() {
+                    return Err("backend returned an invalid Transfer-Encoding header".to_string());
+                }
+                transfer_codings.push(encoding.to_ascii_lowercase());
+            }
         }
     }
+    if content_length.is_some() && !transfer_codings.is_empty() {
+        return Err(
+            "backend returned ambiguous Content-Length and Transfer-Encoding headers".to_string(),
+        );
+    }
+    let chunked = match transfer_codings.as_slice() {
+        [] => false,
+        [encoding] if encoding == "chunked" => true,
+        _ => {
+            return Err("backend returned an unsupported Transfer-Encoding".to_string());
+        }
+    };
     Ok(Some(HttpFraming {
         header_end,
         content_length,
@@ -2982,6 +2998,31 @@ mod tests {
 
         let truncated = b"HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n{}";
         assert!(validate_backend_ready_response(truncated, "0.1.0", TEST_RUNTIME_ID).is_err());
+    }
+
+    #[test]
+    fn rejects_ambiguous_or_unsupported_health_response_framing() {
+        let body = br#"{"data":{"service":"drone-dream-backend","status":"ready","version":"0.1.0","runtime_id":"123e4567-e89b-12d3-a456-426614174000"}}"#;
+        let ambiguous = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nTransfer-Encoding: chunked\r\n\r\n{:X}\r\n{}\r\n0\r\n\r\n",
+            body.len(),
+            body.len(),
+            std::str::from_utf8(body).unwrap()
+        );
+        assert!(
+            validate_backend_ready_response(ambiguous.as_bytes(), "0.1.0", TEST_RUNTIME_ID)
+                .is_err()
+        );
+
+        let unsupported = format!(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip, chunked\r\n\r\n{:X}\r\n{}\r\n0\r\n\r\n",
+            body.len(),
+            std::str::from_utf8(body).unwrap()
+        );
+        assert!(
+            validate_backend_ready_response(unsupported.as_bytes(), "0.1.0", TEST_RUNTIME_ID)
+                .is_err()
+        );
     }
 
     #[test]
