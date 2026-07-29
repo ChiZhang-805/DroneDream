@@ -123,19 +123,19 @@ export function TrajectoryReplay({
     if (!isPlaying || !actualPoints || actualPoints.length <= 1) {
       return;
     }
-    const timer = window.setInterval(() => {
-      setPosition((prev) => {
-        const next = prev + 1;
-        if (next >= actualPoints.length - 1) {
-          setIsPlaying(false);
-          return actualPoints.length - 1;
-        }
-        return next;
-      });
-    }, Math.max(40, 220 / speed));
+    if (position >= actualPoints.length - 1) {
+      setIsPlaying(false);
+      return;
+    }
+    const currentTime = actualPoints[position].t;
+    const nextTime = actualPoints[position + 1].t;
+    const delayMs = Math.max(1, ((nextTime - currentTime) * 1000) / speed);
+    const timer = window.setTimeout(() => {
+      setPosition((previous) => Math.min(previous + 1, actualPoints.length - 1));
+    }, delayMs);
 
-    return () => window.clearInterval(timer);
-  }, [actualPoints, isPlaying, speed]);
+    return () => window.clearTimeout(timer);
+  }, [actualPoints, isPlaying, position, speed]);
 
   const primaryLabel = primaryArtifact?.display_name ?? primaryArtifact?.artifact_type;
 
@@ -247,7 +247,12 @@ export function TrajectoryReplay({
             <button
               type="button"
               className="btn"
-              onClick={() => setIsPlaying((p) => !p)}
+              onClick={() => {
+                if (!isPlaying && position >= actualPoints.length - 1) {
+                  setPosition(0);
+                }
+                setIsPlaying((playing) => !playing);
+              }}
               disabled={actualPoints.length <= 1}
             >
               {t(isPlaying ? "trajectory.pause" : "trajectory.play")}

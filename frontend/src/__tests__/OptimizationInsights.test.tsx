@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { OptimizationInsights } from "../components/OptimizationInsights";
-import type { OptimizationHistory } from "../types/api";
+import type { OptimizationHistory, TrialSummary } from "../types/api";
 
 const history: OptimizationHistory = {
   pareto_candidate_ids: ["candidate-balanced", "candidate-robust"],
@@ -100,5 +100,41 @@ describe("OptimizationInsights", () => {
     expect(screen.getByTestId("optimization-insights-empty")).toHaveTextContent(
       /No completed candidate metrics/i,
     );
+  });
+
+  it("does not mark an equal-score lower-pass candidate as Pareto optimal", () => {
+    const trial = (
+      candidateId: string,
+      label: string,
+      seed: number,
+      pass: boolean,
+    ): TrialSummary => ({
+      id: `trial-${candidateId}-${seed}`,
+      candidate_id: candidateId,
+      seed,
+      scenario_type: "nominal",
+      status: "COMPLETED",
+      score: 1,
+      pass_flag: pass,
+      candidate_label: label,
+      candidate_source_type: "optimizer",
+      candidate_is_baseline: false,
+      candidate_is_best: candidateId === "qualified",
+      candidate_generation_index: 1,
+    });
+    const trials = [
+      trial("dominated", "Dominated", 1, false),
+      trial("qualified", "Qualified", 1, true),
+    ];
+
+    render(<OptimizationInsights trials={trials} />);
+
+    const rows = screen.getAllByRole("row");
+    const dominatedRow = rows.find((row) => within(row).queryByText("Dominated"));
+    const qualifiedRow = rows.find((row) => within(row).queryByText("Qualified"));
+    expect(dominatedRow).not.toBeNull();
+    expect(qualifiedRow).not.toBeNull();
+    expect(within(dominatedRow!).queryByText("Pareto")).not.toBeInTheDocument();
+    expect(within(qualifiedRow!).getByText("Pareto")).toBeInTheDocument();
   });
 });

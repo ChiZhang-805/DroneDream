@@ -26,13 +26,31 @@ const VIEWBOX_PADDING = 8;
 export function normalizePoint(raw: unknown, idx: number): ReplayPoint | null {
   if (!raw || typeof raw !== "object") return null;
   const sample = raw as Record<string, unknown>;
-  const x = Number(sample.x);
-  const y = Number(sample.y);
-  const z = Number(sample.z ?? 0);
-  const t = Number(sample.t ?? idx);
+  const x = sample.x;
+  const y = sample.y;
+  const z = sample.z === undefined ? 0 : sample.z;
+  const t = sample.t === undefined ? idx : sample.t;
 
-  if (![x, y, z, t].every(Number.isFinite)) return null;
+  if (
+    typeof x !== "number"
+    || typeof y !== "number"
+    || typeof z !== "number"
+    || typeof t !== "number"
+    || ![x, y, z, t].every(Number.isFinite)
+  ) {
+    return null;
+  }
   return { x, y, z, t };
+}
+
+function parsePointArray(candidate: unknown[]): ReplayPoint[] {
+  const parsed = candidate.map((item, idx) => normalizePoint(item, idx));
+  if (parsed.some((item) => item === null)) return [];
+  const points = parsed as ReplayPoint[];
+  if (points.some((point, index) => index > 0 && point.t <= points[index - 1].t)) {
+    return [];
+  }
+  return points;
 }
 
 export function extractPoints(payload: unknown): ReplayPoint[] {
@@ -49,10 +67,10 @@ export function extractPoints(payload: unknown): ReplayPoint[] {
 
   for (const candidate of candidates) {
     if (!Array.isArray(candidate)) continue;
-    const parsed = candidate
-      .map((item, idx) => normalizePoint(item, idx))
-      .filter((item): item is ReplayPoint => item !== null);
-    if (parsed.length > 0) return parsed;
+    // The first declared trajectory field is authoritative. If it is empty or
+    // corrupt, fail closed instead of silently drawing a lower-priority field
+    // (especially an embedded reference track) as the actual flight.
+    return parsePointArray(candidate);
   }
 
   return [];
@@ -64,24 +82,29 @@ export function extractReferencePoints(payload: unknown): ReplayPoint[] {
   const root = payload as Record<string, unknown>;
   if (!Array.isArray(root.reference_track)) return [];
 
-  return root.reference_track
-    .map((item, idx) => normalizePoint(item, idx))
-    .filter((item): item is ReplayPoint => item !== null);
+  return parsePointArray(root.reference_track);
 }
 
 function getProjectionBounds(points: ReplayPoint[]): ProjectionBounds {
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  const zs = points.map((point) => point.z);
-
-  return {
-    minX: Math.min(...xs),
-    maxX: Math.max(...xs),
-    minY: Math.min(...ys),
-    maxY: Math.max(...ys),
-    minZ: Math.min(...zs),
-    maxZ: Math.max(...zs),
-  };
+  const first = points[0];
+  return points.slice(1).reduce<ProjectionBounds>(
+    (bounds, point) => ({
+      minX: Math.min(bounds.minX, point.x),
+      maxX: Math.max(bounds.maxX, point.x),
+      minY: Math.min(bounds.minY, point.y),
+      maxY: Math.max(bounds.maxY, point.y),
+      minZ: Math.min(bounds.minZ, point.z),
+      maxZ: Math.max(bounds.maxZ, point.z),
+    }),
+    {
+      minX: first.x,
+      maxX: first.x,
+      minY: first.y,
+      maxY: first.y,
+      minZ: first.z,
+      maxZ: first.z,
+    },
+  );
 }
 
 function mapToViewBox(
@@ -96,13 +119,24 @@ function mapToViewBox(
     };
   }
 
-  const xs = projected.map((point) => point.x);
-  const ys = projected.map((point) => point.y);
-
-  const minX = bounds?.minX ?? Math.min(...xs);
-  const maxX = bounds?.maxX ?? Math.max(...xs);
-  const minY = bounds?.minY ?? Math.min(...ys);
-  const maxY = bounds?.maxY ?? Math.max(...ys);
+  const projectedBounds = projected.slice(1).reduce(
+    (current, point) => ({
+      minX: Math.min(current.minX, point.x),
+      maxX: Math.max(current.maxX, point.x),
+      minY: Math.min(current.minY, point.y),
+      maxY: Math.max(current.maxY, point.y),
+    }),
+    {
+      minX: projected[0].x,
+      maxX: projected[0].x,
+      minY: projected[0].y,
+      maxY: projected[0].y,
+    },
+  );
+  const minX = bounds?.minX ?? projectedBounds.minX;
+  const maxX = bounds?.maxX ?? projectedBounds.maxX;
+  const minY = bounds?.minY ?? projectedBounds.minY;
+  const maxY = bounds?.maxY ?? projectedBounds.maxY;
 
   const width = maxX - minX || 1;
   const height = maxY - minY || 1;
@@ -175,7 +209,20 @@ export function to3DProjectedCoordinates(
 }
 
 export function getCombinedBounds(tracks: ReplayPoint[][]): ProjectionBounds | null {
-  const allPoints = tracks.flat();
-  if (allPoints.length === 0) return null;
-  return getProjectionBounds(allPoints);
+  const populatedTracks = tracks.filter((track) => track.length > 0);
+  if (populatedTracks.length === 0) return null;
+  return populatedTracks
+    .map(getProjectionBounds)
+    .slice(1)
+    .reduce<ProjectionBounds>(
+      (combined, bounds) => ({
+        minX: Math.min(combined.minX, bounds.minX),
+        maxX: Math.max(combined.maxX, bounds.maxX),
+        minY: Math.min(combined.minY, bounds.minY),
+        maxY: Math.max(combined.maxY, bounds.maxY),
+        minZ: Math.min(combined.minZ, bounds.minZ),
+        maxZ: Math.max(combined.maxZ, bounds.maxZ),
+      }),
+      getProjectionBounds(populatedTracks[0]),
+    );
 }

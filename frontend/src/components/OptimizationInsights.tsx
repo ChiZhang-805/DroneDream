@@ -57,13 +57,19 @@ function aggregateCandidates(trials: TrialSummary[]): CandidateAggregate[] {
     }];
   });
 
-  let bestPassRate = -1;
-  for (const candidate of [...rows].sort((a, b) => a.meanScore - b.meanScore)) {
-    const rate = candidate.passRate ?? 0;
-    if (rate > bestPassRate) {
-      candidate.frontier = true;
-      bestPassRate = rate;
-    }
+  for (const candidate of rows) {
+    const candidatePassRate = candidate.passRate;
+    if (candidatePassRate === null) continue;
+    candidate.frontier = !rows.some((other) =>
+      other.id !== candidate.id
+      && other.passRate !== null
+      && other.meanScore <= candidate.meanScore
+      && other.passRate >= candidatePassRate
+      && (
+        other.meanScore < candidate.meanScore
+        || other.passRate > candidatePassRate
+      )
+    );
   }
   return rows.sort((a, b) => a.meanScore - b.meanScore);
 }
