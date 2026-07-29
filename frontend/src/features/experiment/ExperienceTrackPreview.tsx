@@ -15,12 +15,11 @@ const VIEWBOX_WIDTH = 320;
 const VIEWBOX_HEIGHT = 150;
 const PADDING = 22;
 
-function finitePoints(points: TrackPoint[]): TrackPoint[] {
+function finitePlanarPoints(points: TrackPoint[]): TrackPoint[] {
   return points.filter(
     (point) =>
       Number.isFinite(point.x) &&
-      Number.isFinite(point.y) &&
-      Number.isFinite(point.z),
+      Number.isFinite(point.y),
   );
 }
 
@@ -59,7 +58,10 @@ export function ExperienceTrackPreview({
   pointCountLabel,
   localOnlyLabel,
 }: ExperienceTrackPreviewProps) {
-  const safePoints = finitePoints(points);
+  // The backend contract allows custom waypoints to omit z and substitutes
+  // altitude_m during execution. This top-down preview only consumes x/y, so
+  // a missing z must not hide an otherwise valid route.
+  const safePoints = finitePlanarPoints(points);
   const polyline = projectedPolyline(safePoints);
   const isHover = trackType === "hover";
 

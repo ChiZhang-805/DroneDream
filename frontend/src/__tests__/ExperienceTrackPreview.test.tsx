@@ -27,16 +27,16 @@ describe("ExperienceTrackPreview", () => {
     expect(screen.getByText(/no Job created/i)).toBeVisible();
   });
 
-  it("renders a finite route without a hover marker", () => {
+  it("renders a finite planar route when waypoint altitude is inherited", () => {
     render(
       <ExperienceTrackPreview
         {...labels}
-        trackType="circle"
+        trackType="custom"
         altitudeM={3}
         points={[
-          { x: 0, y: 0, z: 3 },
-          { x: 5, y: 0, z: 3 },
-          { x: 5, y: 5, z: 3 },
+          { x: 0, y: 0, z: null },
+          { x: 5, y: 0, z: null },
+          { x: 5, y: 5, z: null },
         ]}
       />,
     );
