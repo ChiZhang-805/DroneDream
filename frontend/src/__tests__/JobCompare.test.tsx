@@ -18,7 +18,12 @@ describe("JobCompare page", () => {
           optimizer_strategy: "heuristic",
           optimization_outcome: "success",
           baseline_metrics: { rmse: 1.2, max_error: 2.1 },
-          optimized_metrics: { rmse: 0.9, max_error: 1.8 },
+          optimized_metrics: {
+            rmse: 0.9,
+            max_error: 1.8,
+            pass_rate: 0.9,
+            mystery_signal: 1,
+          },
           best_candidate_id: "cand_1",
           best_parameters: {},
           trial_count: 10,
@@ -29,13 +34,23 @@ describe("JobCompare page", () => {
         },
         {
           job_id: "job_2",
-          status: "RUNNING",
+          status: "COMPLETED",
           track_type: "circle",
           simulator_backend: "real_cli",
           optimizer_strategy: "gpt",
           optimization_outcome: null,
-          baseline_metrics: null,
-          optimized_metrics: null,
+          baseline_metrics: {
+            rmse: 1.5,
+            max_error: 2.4,
+            pass_rate: 0.5,
+            mystery_signal: 0,
+          },
+          optimized_metrics: {
+            rmse: 1.1,
+            max_error: 2,
+            pass_rate: 0.4,
+            mystery_signal: 0,
+          },
           best_candidate_id: null,
           best_parameters: {},
           trial_count: 2,
@@ -54,7 +69,11 @@ describe("JobCompare page", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(await screen.findByText("job_1")).toBeInTheDocument();
+    const jobOne = await screen.findByText("job_1");
     expect(screen.getByRole("button", { name: /Download CSV/i })).toBeInTheDocument();
+    const jobOneCells = jobOne.closest("tr")?.querySelectorAll("td");
+    expect(jobOneCells?.[6]).toHaveStyle({ fontWeight: 700 });
+    expect(jobOneCells?.[7]).toHaveStyle({ fontWeight: 400 });
+    expect(screen.getAllByText("Completed")).toHaveLength(2);
   });
 });
