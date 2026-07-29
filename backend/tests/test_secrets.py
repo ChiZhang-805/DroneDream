@@ -16,6 +16,7 @@ def test_development_passphrase_is_supported(monkeypatch: pytest.MonkeyPatch) ->
     assert decrypt_secret(token) == "api-key-value"
 
 
+@pytest.mark.parametrize("app_env", ["desktop", "production"])
 @pytest.mark.parametrize(
     "key",
     [
@@ -26,9 +27,10 @@ def test_development_passphrase_is_supported(monkeypatch: pytest.MonkeyPatch) ->
 )
 def test_production_rejects_weak_or_placeholder_secret_keys(
     monkeypatch: pytest.MonkeyPatch,
+    app_env: str,
     key: str,
 ) -> None:
-    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("APP_ENV", app_env)
     monkeypatch.setenv("APP_SECRET_KEY", key)
     monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
 

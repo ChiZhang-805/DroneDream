@@ -24,6 +24,7 @@ from app import models
 from app.config import Settings
 from app.db import SessionLocal
 from app.response import err
+from app.secrets import SecretStoreError, validate_secret_material
 
 _VERSION = "DD-BRIDGE-V2"
 _DERIVATION_LABEL = b"dronedream-desktop-bridge-v2"
@@ -53,6 +54,10 @@ def _bridge_key() -> bytes:
     )
     if app_secret is None or len(app_secret.encode("utf-8")) < 32:
         raise RuntimeError("desktop bridge secret material is unavailable")
+    try:
+        validate_secret_material(app_secret)
+    except SecretStoreError as exc:
+        raise RuntimeError("desktop bridge secret material is invalid") from exc
     return hmac.new(
         app_secret.encode("utf-8"),
         _DERIVATION_LABEL,

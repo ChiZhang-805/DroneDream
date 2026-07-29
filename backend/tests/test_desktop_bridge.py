@@ -115,6 +115,21 @@ def test_desktop_bridge_accepts_one_proof_and_rejects_replay(
     assert replay.json()["error"]["code"] == "DESKTOP_BRIDGE_REPLAY"
 
 
+def test_desktop_bridge_rejects_placeholder_secret_material(
+    client: TestClient,
+    monkeypatch: object,
+) -> None:
+    _configure(monkeypatch)
+    weak_secret = "replace-with-a-generated-desktop-secret-key"
+    monkeypatch.setenv("APP_SECRET_KEY", weak_secret)
+    headers = _proof("GET", "/api/v1/session")
+
+    response = client.get("/api/v1/session", headers=headers)
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "DESKTOP_BRIDGE_CONFIGURATION_ERROR"
+
+
 def test_desktop_bridge_rejects_missing_wrong_runtime_expired_and_body_tamper(
     client: TestClient,
     monkeypatch: object,
