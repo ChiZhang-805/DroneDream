@@ -332,12 +332,7 @@ fn send_signed_request(
     });
     let signature = hex::encode(hmac_sha256(&credential.key, canonical.as_bytes()));
 
-    let client = Client::builder()
-        .connect_timeout(Duration::from_secs(3))
-        .timeout(timeout)
-        .no_proxy()
-        .build()
-        .map_err(|_| "The desktop API bridge HTTP client could not start.".to_string())?;
+    let client = build_bridge_client(timeout)?;
     let url = format!("{API_ORIGIN}{}", request.path);
     let mut builder = client
         .request(
@@ -368,6 +363,16 @@ fn send_signed_request(
         .map_err(|_| "The signed Runtime API did not respond.".to_string())
 }
 
+fn build_bridge_client(timeout: Duration) -> Result<Client, String> {
+    Client::builder()
+        .connect_timeout(Duration::from_secs(3))
+        .timeout(timeout)
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|_| "The desktop API bridge HTTP client could not start.".to_string())
+}
+
 fn buffer_response(response: reqwest::blocking::Response) -> Result<DesktopApiResponse, String> {
     if response
         .headers()
@@ -376,7 +381,7 @@ fn buffer_response(response: reqwest::blocking::Response) -> Result<DesktopApiRe
         .and_then(|value| value.parse::<u64>().ok())
         .is_some_and(|length| length > MAX_RESPONSE_BODY_BYTES)
     {
-        return Err("The Runtime API response exceeds 64 MiB.".to_string());
+        return Err("The Runtime API response exceeds its configured size limit.".to_string());
     }
     let status = response.status().as_u16();
     let content_type = response
@@ -384,17 +389,24 @@ fn buffer_response(response: reqwest::blocking::Response) -> Result<DesktopApiRe
         .get(CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
         .map(|value| value.chars().take(256).collect::<String>());
-    let bytes = response
-        .bytes()
-        .map_err(|_| "The Runtime API response could not be read.".to_string())?;
-    if bytes.len() as u64 > MAX_RESPONSE_BODY_BYTES {
-        return Err("The Runtime API response exceeds 64 MiB.".to_string());
-    }
+    let bytes = read_bounded_response_body(response, MAX_RESPONSE_BODY_BYTES)?;
     Ok(DesktopApiResponse {
         status,
         content_type,
         body_base64: base64::engine::general_purpose::STANDARD.encode(bytes),
     })
+}
+
+fn read_bounded_response_body(reader: impl Read, maximum_bytes: u64) -> Result<Vec<u8>, String> {
+    let mut bounded = reader.take(maximum_bytes.saturating_add(1));
+    let mut bytes = Vec::new();
+    bounded
+        .read_to_end(&mut bytes)
+        .map_err(|_| "The Runtime API response could not be read.".to_string())?;
+    if bytes.len() as u64 > maximum_bytes {
+        return Err("The Runtime API response exceeds its configured size limit.".to_string());
+    }
+    Ok(bytes)
 }
 
 fn stream_artifact_download(
@@ -668,6 +680,7 @@ fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write as _;
 
     #[test]
     fn bridge_rejects_absolute_traversal_and_unsupported_methods() {
@@ -707,6 +720,55 @@ mod tests {
         assert!(response(500, "DESKTOP_BRIDGE_CONFIGURATION_ERROR").rejects_cached_credential());
         assert!(!response(401, "AUTH_INVALID_TOKEN").rejects_cached_credential());
         assert!(!response(409, "DESKTOP_BRIDGE_REPLAY").rejects_cached_credential());
+    }
+
+    #[test]
+    fn runtime_api_response_body_is_streamed_with_a_hard_limit() {
+        assert_eq!(
+            read_bounded_response_body(&b"four"[..], 4).unwrap(),
+            b"four"
+        );
+        let error = read_bounded_response_body(&b"five!"[..], 4).unwrap_err();
+        assert!(error.contains("configured size limit"));
+    }
+
+    #[test]
+    fn runtime_api_client_never_follows_redirects() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut chunk = [0_u8; 1024];
+            while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                let count = stream.read(&mut chunk).unwrap();
+                if count == 0 {
+                    break;
+                }
+                request.extend_from_slice(&chunk[..count]);
+            }
+            stream
+                .write_all(
+                    b"HTTP/1.1 302 Found\r\n\
+                      Location: http://127.0.0.1:1/should-not-be-followed\r\n\
+                      Content-Length: 0\r\n\
+                      Connection: close\r\n\r\n",
+                )
+                .unwrap();
+            stream.flush().unwrap();
+        });
+        let response = build_bridge_client(Duration::from_secs(2))
+            .unwrap()
+            .get(format!("http://{address}/api/v1/test"))
+            .send()
+            .unwrap();
+        server.join().unwrap();
+
+        assert_eq!(response.status(), reqwest::StatusCode::FOUND);
+        assert_eq!(
+            response.url().as_str(),
+            format!("http://{address}/api/v1/test")
+        );
     }
 
     #[test]
