@@ -102,6 +102,48 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     config_module.get_settings.cache_clear()
 
 
+def test_attempt_evidence_rejects_contradictory_terminal_outcomes() -> None:
+    from app.orchestration.attempt_evidence import (
+        TrialAcceptedAttemptEvidenceV1,
+        TrialAttemptOutcomeEvidenceV1,
+    )
+
+    with pytest.raises(ValueError, match="terminal status"):
+        TrialAttemptOutcomeEvidenceV1(
+            evidence_id="sha256:" + "a" * 64,
+            attempt_id="attempt-1",
+            claim_evidence_id="sha256:" + "b" * 64,
+            trial_id="trial-1",
+            job_id="job-1",
+            candidate_id="candidate-1",
+            attempt_count=1,
+            terminal_status="FAILED",
+            outcome_class="success",
+            accepted=True,
+            failure_code="SIMULATION_FAILED",
+            metric_sha256=None,
+            artifact_evidence_sha256="sha256:" + "c" * 64,
+            artifact_count=0,
+            sealed_artifact_count=0,
+            metadata_only_artifact_count=0,
+            superseded_by_attempt_count=None,
+            finished_at="2026-07-29T00:00:00Z",
+        )
+
+    with pytest.raises(ValueError, match="terminal status"):
+        TrialAcceptedAttemptEvidenceV1(
+            trial_id="trial-1",
+            attempt_id="attempt-1",
+            attempt_count=1,
+            claim_evidence_id="sha256:" + "b" * 64,
+            outcome_evidence_id="sha256:" + "d" * 64,
+            terminal_status="CANCELLED",
+            outcome_class="domain_failure",
+            metric_sha256=None,
+            artifact_evidence_sha256="sha256:" + "c" * 64,
+        )
+
+
 def _create_queued_job(ctx: dict[str, object]) -> str:
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]

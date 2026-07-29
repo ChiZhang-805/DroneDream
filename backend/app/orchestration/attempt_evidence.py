@@ -63,6 +63,21 @@ _OUTCOME_CLASSES = {
     "unknown_failure",
     "superseded",
 }
+_FAILED_OUTCOME_CLASSES = {
+    "domain_failure",
+    "infrastructure_failure",
+    "invalid_evidence",
+    "unknown_failure",
+}
+
+
+def _terminal_outcome_matches(terminal_status: str, outcome_class: str) -> bool:
+    return (
+        (terminal_status == "COMPLETED" and outcome_class == "success")
+        or (terminal_status == "FAILED" and outcome_class in _FAILED_OUTCOME_CLASSES)
+        or (terminal_status == "CANCELLED" and outcome_class == "cancelled")
+        or (terminal_status == "SUPERSEDED" and outcome_class == "superseded")
+    )
 
 
 class TrialAttemptEvidenceError(ValueError):
@@ -173,6 +188,11 @@ class TrialAttemptOutcomeEvidenceV1(_FrozenModel):
     ) -> TrialAttemptOutcomeEvidenceV1:
         if self.outcome_class not in _OUTCOME_CLASSES:
             raise ValueError("unknown physical-attempt outcome class")
+        if not _terminal_outcome_matches(
+            self.terminal_status,
+            self.outcome_class,
+        ):
+            raise ValueError("outcome class is inconsistent with terminal status")
         if self.accepted:
             if (
                 self.terminal_status not in _ACCEPTED_TERMINAL_STATUSES
@@ -231,6 +251,19 @@ class TrialAcceptedAttemptEvidenceV1(_FrozenModel):
     ]
     metric_sha256: Sha256Id | None
     artifact_evidence_sha256: Sha256Id
+
+    @model_validator(mode="after")
+    def _validate_terminal_semantics(
+        self,
+    ) -> TrialAcceptedAttemptEvidenceV1:
+        if not _terminal_outcome_matches(
+            self.terminal_status,
+            self.outcome_class,
+        ):
+            raise ValueError("outcome class is inconsistent with terminal status")
+        if (self.terminal_status == "COMPLETED") != (self.metric_sha256 is not None):
+            raise ValueError("accepted attempt metric is inconsistent with terminal status")
+        return self
 
 
 def _canonical_json(value: object) -> str:
