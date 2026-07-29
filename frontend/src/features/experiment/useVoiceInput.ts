@@ -67,6 +67,8 @@ export function useVoiceInput({
 }) {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const timeoutRef = useRef<number | null>(null);
+  const operationRef = useRef(0);
+  const phaseRef = useRef<VoiceInputState>("idle");
   const [state, setState] = useState<VoiceInputState>("idle");
   const [error, setError] = useState<string | null>(null);
   const supported =
@@ -83,6 +85,8 @@ export function useVoiceInput({
   }, []);
 
   const stop = useCallback(() => {
+    operationRef.current += 1;
+    phaseRef.current = "idle";
     clearRecognitionTimeout();
     recognitionRef.current?.stop();
     recognitionRef.current = null;
@@ -90,13 +94,21 @@ export function useVoiceInput({
   }, [clearRecognitionTimeout]);
 
   const start = useCallback(async () => {
-    if (state === "requesting" || state === "listening") return;
+    if (
+      phaseRef.current === "requesting" ||
+      phaseRef.current === "listening"
+    ) {
+      return;
+    }
     const Recognition = recognitionConstructor();
     if (!Recognition || !navigator.mediaDevices?.getUserMedia) {
+      phaseRef.current = "error";
       setError("voice_not_supported");
       setState("error");
       return;
     }
+    const operation = ++operationRef.current;
+    phaseRef.current = "requesting";
     setState("requesting");
     setError(null);
     try {
@@ -106,6 +118,10 @@ export function useVoiceInput({
         audio: true,
       });
       permissionStream.getTracks().forEach((track) => track.stop());
+      // Permission prompts can outlive the page or a user's Stop action. Once
+      // cancelled, consume only the permission result and never start a stale
+      // recognition session.
+      if (operationRef.current !== operation) return;
 
       const recognition = new Recognition();
       recognitionRef.current = recognition;
@@ -125,13 +141,17 @@ export function useVoiceInput({
         if (normalized) onTranscript(normalized);
       };
       recognition.onerror = (event) => {
+        if (operationRef.current !== operation) return;
         clearRecognitionTimeout();
+        phaseRef.current = "error";
         setError(recognitionErrorMessage(event.error));
         setState("error");
         recognitionRef.current = null;
       };
       recognition.onend = () => {
+        if (operationRef.current !== operation) return;
         clearRecognitionTimeout();
+        phaseRef.current = "idle";
         recognitionRef.current = null;
         setState((current) => (current === "error" ? current : "idle"));
       };
@@ -139,17 +159,22 @@ export function useVoiceInput({
       timeoutRef.current = window.setTimeout(() => {
         recognitionRef.current?.stop();
       }, MAX_RECOGNITION_DURATION_MS);
+      phaseRef.current = "listening";
       setState("listening");
     } catch (reason) {
+      if (operationRef.current !== operation) return;
       clearRecognitionTimeout();
+      phaseRef.current = "error";
       setError(voiceErrorMessage(reason));
       setState("error");
       recognitionRef.current = null;
     }
-  }, [clearRecognitionTimeout, locale, onTranscript, state]);
+  }, [clearRecognitionTimeout, locale, onTranscript]);
 
   useEffect(
     () => () => {
+      operationRef.current += 1;
+      phaseRef.current = "idle";
       clearRecognitionTimeout();
       recognitionRef.current?.abort();
       recognitionRef.current = null;
@@ -164,6 +189,7 @@ export function useVoiceInput({
     start,
     stop,
     clearError: () => {
+      phaseRef.current = "idle";
       setError(null);
       setState("idle");
     },
