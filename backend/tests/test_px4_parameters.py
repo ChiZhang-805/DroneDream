@@ -301,6 +301,42 @@ def test_environment_transport_readback_does_not_set_again(tmp_path: Path) -> No
     assert _read(tmp_path / BEFORE_EVIDENCE_NAME)["kind"] == "before_environment_override"
 
 
+@pytest.mark.parametrize(
+    ("name", "requested", "unsafe_readback"),
+    (
+        ("MPC_XY_P", 1.0, float("nan")),
+        ("MPC_XY_P", 1.0, True),
+        ("MC_AIRMODE", 1, 1.5),
+    ),
+)
+def test_environment_transport_rejects_invalid_px4_readback_values(
+    tmp_path: Path,
+    name: str,
+    requested: int | float,
+    unsafe_readback: object,
+) -> None:
+    class UnsafeReadbackClient(FakeParameterClient):
+        async def get_parameter(self, name: str, value_type: str) -> int | float:
+            del name, value_type
+            return unsafe_readback  # type: ignore[return-value]
+
+    client = UnsafeReadbackClient({name: requested})
+
+    with pytest.raises(ParameterApplicationError, match="invalid PX4 parameter readback"):
+        asyncio.run(
+            verify_environment_parameters(
+                {name: requested},
+                client,
+                tmp_path,
+            )
+        )
+
+    applied = _read(tmp_path / APPLIED_EVIDENCE_NAME)
+    assert applied["status"] == "error"
+    assert applied["values"] == {}
+    assert applied["verification"]["verified"] is False
+
+
 def test_reboot_parameter_is_verified_after_startup_environment_injection(
     tmp_path: Path,
 ) -> None:

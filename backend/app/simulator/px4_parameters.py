@@ -201,8 +201,24 @@ async def _read_all(
     values: dict[str, Number] = {}
     for name in names:
         definition = _require_parameter_definition(name, px4_version=px4_version)
-        value = await client.get_parameter(name, definition.value_type)
-        values[name] = int(value) if definition.value_type == "int" else float(value)
+        raw_value = await client.get_parameter(name, definition.value_type)
+        if (
+            isinstance(raw_value, bool)
+            or not isinstance(raw_value, int | float)
+            or not math.isfinite(float(raw_value))
+        ):
+            raise ParameterApplicationError(
+                f"invalid PX4 parameter readback for {name}: expected a finite "
+                f"{definition.value_type} value"
+            )
+        if definition.value_type == "int":
+            if not float(raw_value).is_integer():
+                raise ParameterApplicationError(
+                    f"invalid PX4 parameter readback for {name}: expected an integer value"
+                )
+            values[name] = int(raw_value)
+        else:
+            values[name] = float(raw_value)
     return values
 
 
