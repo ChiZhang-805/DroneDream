@@ -23,7 +23,9 @@ const declaredPackages = {
   ...packageJson.devDependencies,
 };
 const configuredRscPackages = disallowedRscPackages.filter(
-  (name) => name in declaredPackages,
+  (name) =>
+    name in declaredPackages
+    || `node_modules/${name}` in (packageLock.packages ?? {}),
 );
 if (configuredRscPackages.length > 0) {
   throw new Error(
