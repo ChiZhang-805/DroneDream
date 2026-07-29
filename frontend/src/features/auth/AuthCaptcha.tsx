@@ -48,6 +48,9 @@ function loadTurnstile(): Promise<TurnstileApi> {
       document.head.append(script);
     }
   }).catch((error) => {
+    if (!window.turnstile) {
+      document.getElementById(SCRIPT_ID)?.remove();
+    }
     turnstilePromise = null;
     throw error;
   });
