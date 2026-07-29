@@ -391,9 +391,11 @@ def test_download_s3_artifact_via_storage_backend(client: TestClient, monkeypatc
             assert storage_uri.startswith("s3://")
             return True
 
-        def read_bytes(self, storage_uri: str) -> bytes:
+        def copy_to(self, storage_uri: str, destination) -> tuple[str, int]:
             assert storage_uri.startswith("s3://")
-            return b'{"ok":true}'
+            content = b'{"ok":true}'
+            destination.write(content)
+            return hashlib.sha256(content).hexdigest(), len(content)
 
     monkeypatch.setattr("app.routers.artifacts.get_artifact_storage", lambda: _FakeStorage())
 
@@ -482,6 +484,63 @@ def test_free_s3_pdf_report_never_uses_presigned_redirect(
     assert response.headers["x-dronedream-report-watermark"] == "applied"
     assert b"% DD-FREE-REPORT-WATERMARK-V1" in response.content
     assert b"canonical-unwatermarked-report" not in response.content
+    assert list(tmp_path.glob("dronedream-artifact-*.download")) == []
+
+
+def test_legacy_s3_pdf_download_is_streamed_with_a_hard_limit(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    job_id = _seed_job()
+    with db.SessionLocal() as session:
+        artifact = models.Artifact(
+            owner_type="job",
+            owner_id=job_id,
+            artifact_type="pdf_report",
+            display_name="legacy-report.pdf",
+            storage_path="s3://bucket/jobs/job/legacy-report.pdf",
+            mime_type="application/pdf",
+        )
+        session.add(artifact)
+        session.commit()
+        artifact_id = artifact.id
+
+    class _FakeStorage:
+        def exists(self, _storage_uri: str) -> bool:
+            return True
+
+        def copy_to(self, _storage_uri: str, destination) -> tuple[str, int]:
+            content = b"oversized"
+            destination.write(content)
+            return hashlib.sha256(content).hexdigest(), len(content)
+
+    real_mkstemp = tempfile.mkstemp
+
+    def scoped_mkstemp(*, prefix: str, suffix: str) -> tuple[int, str]:
+        return real_mkstemp(prefix=prefix, suffix=suffix, dir=tmp_path)
+
+    monkeypatch.setattr(
+        "app.routers.artifacts.get_artifact_storage",
+        lambda: _FakeStorage(),
+    )
+    monkeypatch.setattr(
+        "app.routers.artifacts.tempfile.mkstemp",
+        scoped_mkstemp,
+    )
+    monkeypatch.setattr(
+        "app.routers.artifacts.resolve_report_export_tier",
+        lambda **_kwargs: "plus",
+    )
+    monkeypatch.setattr(
+        "app.routers.artifacts._MAX_PDF_REPORT_BYTES",
+        4,
+    )
+
+    response = client.get(f"/api/v1/artifacts/{artifact_id}/download")
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "ARTIFACT_TOO_LARGE"
     assert list(tmp_path.glob("dronedream-artifact-*.download")) == []
 
 

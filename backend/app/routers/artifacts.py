@@ -6,7 +6,7 @@ import contextlib
 import os
 import tempfile
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, BinaryIO
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -31,6 +31,28 @@ from app.storage.integrity import (
 from app.storage.s3 import S3StorageConfigError
 
 router = APIRouter(tags=["artifacts"])
+_MAX_ARTIFACT_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024
+_MAX_PDF_REPORT_BYTES = 64 * 1024 * 1024
+
+
+class ArtifactDownloadTooLarge(ValueError):
+    """Raised before an object-store download can exhaust local disk."""
+
+
+class _BoundedWriter:
+    def __init__(self, destination: BinaryIO, maximum_bytes: int) -> None:
+        self._destination = destination
+        self._maximum_bytes = maximum_bytes
+        self.written = 0
+
+    def write(self, content: bytes) -> int:
+        if len(content) > self._maximum_bytes - self.written:
+            raise ArtifactDownloadTooLarge(
+                "artifact exceeds the configured application download limit"
+            )
+        count = self._destination.write(content)
+        self.written += count
+        return count
 
 
 def _delete_temporary_download(path: Path) -> None:
@@ -38,10 +60,12 @@ def _delete_temporary_download(path: Path) -> None:
         path.unlink()
 
 
-def _verified_temporary_download(
+def _temporary_download(
     *,
     storage: object,
     artifact: models.Artifact,
+    maximum_bytes: int,
+    verify_integrity: bool,
 ) -> Path:
     descriptor, raw_path = tempfile.mkstemp(prefix="dronedream-artifact-", suffix=".download")
     path = Path(raw_path)
@@ -51,10 +75,18 @@ def _verified_temporary_download(
             copy_to = getattr(storage, "copy_to", None)
             if not callable(copy_to):
                 raise RuntimeError("artifact storage does not support bounded downloads")
-            digest = copy_to(artifact.storage_path, destination)
+            bounded_destination = _BoundedWriter(destination, maximum_bytes)
+            digest = copy_to(artifact.storage_path, bounded_destination)
+            if (
+                not isinstance(digest, tuple)
+                or len(digest) != 2
+                or digest[1] != bounded_destination.written
+            ):
+                raise RuntimeError("artifact storage returned an invalid copy receipt")
             destination.flush()
             os.fsync(destination.fileno())
-        require_artifact_integrity(artifact, content_digest=digest)
+        if verify_integrity:
+            require_artifact_integrity(artifact, content_digest=digest)
         return path
     except Exception:
         if descriptor >= 0:
@@ -203,22 +235,50 @@ def download_artifact(
                 )
                 if signed_url:
                     return RedirectResponse(url=signed_url, status_code=307)
-            temporary_download = (
-                _verified_temporary_download(storage=storage, artifact=artifact)
-                if digest_receipt is not None
-                else None
-            )
-            content = (
-                storage.read_bytes(artifact.storage_path)
-                if temporary_download is None
-                else None
-            )
+            temporary_download = None
+            if digest_receipt is not None:
+                maximum_bytes = min(
+                    _MAX_ARTIFACT_DOWNLOAD_BYTES,
+                    _MAX_PDF_REPORT_BYTES
+                    if report_tier is not None
+                    else _MAX_ARTIFACT_DOWNLOAD_BYTES,
+                )
+                if digest_receipt.content_size_bytes > maximum_bytes:
+                    raise ArtifactDownloadTooLarge(
+                        "bound artifact exceeds the configured application download limit"
+                    )
+                temporary_download = _temporary_download(
+                    storage=storage,
+                    artifact=artifact,
+                    maximum_bytes=maximum_bytes,
+                    verify_integrity=True,
+                )
+            elif report_tier != "free":
+                temporary_download = _temporary_download(
+                    storage=storage,
+                    artifact=artifact,
+                    maximum_bytes=(
+                        _MAX_PDF_REPORT_BYTES
+                        if report_tier is not None
+                        else _MAX_ARTIFACT_DOWNLOAD_BYTES
+                    ),
+                    verify_integrity=False,
+                )
+            content = None
         except ArtifactIntegrityError as exc:
             raise HTTPException(
                 status_code=409,
                 detail={
                     "code": "ARTIFACT_INTEGRITY_INVALID",
                     "message": "Artifact bytes failed integrity verification.",
+                },
+            ) from exc
+        except ArtifactDownloadTooLarge as exc:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "code": "ARTIFACT_TOO_LARGE",
+                    "message": "Artifact exceeds the application download limit.",
                 },
             ) from exc
         except S3StorageConfigError as exc:
