@@ -1,0 +1,146 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-community-cover-visual-validation",
+  "generatedAtUtc": "2026-07-29T23:51:41Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "98cd47221471eec6a3a957fae713aec69a185a59",
+    "sourceTree": "343a5d701a4b3685db84dff46824cf80d1db7223",
+    "sourceStateDuringValidation": "clean",
+    "attestationRule": "This receipt attests only the immutable source commit. The receipt-only commit that contains this file is not self-attested."
+  },
+  "scope": {
+    "implemented": [
+      "Removed the long diagonal accent element from every generated Community topic cover, including Recent Topics, All Topics, and the topic-detail dialog.",
+      "Preserved the per-template gradients, circular line work, bottom translucent geometry, secondary outline shape, title hierarchy, tag treatment, and footer metadata.",
+      "Added component and browser-audit assertions that fail if the removed diagonal accent returns.",
+      "Made the visual audit continue through all screenshots when the local synthetic account does not expose a comment textarea, while preserving that condition as an explicit audit failure."
+    ],
+    "sourceFiles": [
+      "frontend/src/site/CommunityPage.tsx",
+      "frontend/src/site/site.css",
+      "frontend/src/__tests__/CommunityPage.test.tsx",
+      "website/scripts/audit-community-manual-ui.mjs"
+    ],
+    "excluded": "No software-owned console source, Supabase Function, production secret, CORS environment variable, DNS, TLS, server, GitHub Release, GitHub Pages, Alibaba Cloud site, installer, runtime, backend, or technical-report state was changed.",
+    "deploymentPerformed": false
+  },
+  "validation": {
+    "focusedTests": {
+      "command": "npm test -- --run src/__tests__/CommunityPage.test.tsx src/__tests__/PublicSite.test.tsx",
+      "testFiles": 2,
+      "tests": 28,
+      "passed": 28,
+      "failed": 0,
+      "result": "pass"
+    },
+    "frontendTests": {
+      "command": "npm test -- --run",
+      "testFiles": 51,
+      "tests": 336,
+      "passed": 336,
+      "failed": 0,
+      "result": "pass"
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "pass"
+    },
+    "lint": {
+      "command": "npm run lint",
+      "result": "pass"
+    },
+    "applicationBuild": {
+      "command": "npm run build with documented non-production placeholder environment",
+      "result": "pass",
+      "note": "Vite emitted its existing non-failing application chunk-size advisory."
+    },
+    "sharedSiteAndConsoleBuild": {
+      "command": "website/scripts/build-pages-site.ps1 with GITHUB_SHA=98cd47221471eec6a3a957fae713aec69a185a59 and the frozen 755c511 release staging directory",
+      "result": "pass",
+      "artifactKind": "dronedream-shared-static-site",
+      "sourceCommit": "98cd47221471eec6a3a957fae713aec69a185a59",
+      "fileCount": 123,
+      "sha256SumsEntries": 122,
+      "sha256SumsSha256": "c00cf343e2bfdb4627c473a4e68df14ed3599b65fc7cdbd08bf7f2712ed5df4f",
+      "buildManifestSha256": "247cd40b43c5f92a73c44ef6d9dcc42d297a34190a779a2e34c4afafadb1d9c7",
+      "latestJsonSha256": "7d0844cafd94147adee993914f41b913213f11ba5696af92da61680b0b6bfd59",
+      "totalBytesIncludingSha256Sums": 31866930
+    },
+    "deploymentContract": {
+      "command": "python -m pytest runtime/tests/test_website_deployment.py -q",
+      "tests": 11,
+      "subtests": 22,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass"
+    },
+    "visualAudit": {
+      "command": "node website/scripts/audit-community-manual-ui.mjs http://127.0.0.1:4195/ <output-directory>",
+      "reportBytes": 49013,
+      "reportSha256": "b532eacecd9df952d67047d1b86881b9e1e81048fb44d26fcb6cf8a4b7c7cc8a",
+      "cases": 8,
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "profiles": [
+        "1440x1000 desktop",
+        "2000x1080 wide desktop",
+        "2000x1080 three-topic desktop",
+        "390x844 mobile"
+      ],
+      "diagonalAccentCounts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "topicCoverVsVisualDimensionDeltaPx": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "focusedCoverResult": "pass",
+      "fullAuditResult": "fail-unrelated-local-fixture",
+      "fullAuditFailure": "The local synthetic account did not expose the signed-in comment form in any of the eight cases. The audit recorded the condition and continued generating all screenshots instead of timing out. No diagonal-accent, card-containment, document-overflow, footer, Manual, or Product failure was reported."
+    },
+    "visualInspection": {
+      "performedBy": "Codex",
+      "inspected": [
+        "Five-template Recent Topics row at desktop width",
+        "English Wind cover topic detail at 1440x1000 and 390x844",
+        "Simplified Chinese Wind cover topic detail at 1440x1000 and 390x844"
+      ],
+      "observation": "The removed yellow diagonal line no longer crosses any title. Blue, cyan, violet, magenta, and warm gradients remain visually distinct; circular line work and bottom geometry remain intact.",
+      "result": "pass"
+    },
+    "visualEvidence": {
+      "englishDesktopRecentSha256": "73fbbd76220c4f0d49f7a219831e5f2e1767c3dad5e092e630c77db6d3abb69f",
+      "chineseDesktopRecentSha256": "059d838994ceac79e574a5a9f2a2e46b5f3258c68aba5153d062bd1f51a859c7",
+      "englishDesktopWindDetailSha256": "790b10a39e845060b92fd9cce463261194a31466f93ee8c6642cb85b7bf948ae",
+      "chineseDesktopWindDetailSha256": "c191db51c62fe268dd00aab03bf3543aa155541c8a5b18c2bbb42b97d3e3dae5",
+      "englishMobileWindDetailSha256": "9c0608282eb05f7a8f79d98a5d8f0cf81718446bd4a1327418e734c70ca5e2e4",
+      "chineseMobileWindDetailSha256": "6d8b373236258d61a1c7d88512948f45b048d3e6d7d3c3227c07ab0ed4a0247a"
+    },
+    "gitDiffCheck": "pass",
+    "ownershipScopeCheck": "pass"
+  },
+  "releaseContract": {
+    "version": "1.0.0",
+    "installerFileName": "DroneDream_1.0.0_x64-setup.exe",
+    "installerBytes": 10387042,
+    "installerSha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+    "authenticode": "NotSigned",
+    "disposition": "Unchanged owner-approved unsigned internal preview metadata; this visual source did not rebuild or replace installer bytes."
+  }
+}
