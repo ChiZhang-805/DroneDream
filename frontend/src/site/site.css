@@ -4105,16 +4105,6 @@ html[lang="zh-CN"] .manual-markdown p {
   pointer-events: none;
 }
 
-.community-cover-shape.is-primary {
-  width: 48%;
-  height: 8px;
-  top: 42%;
-  right: -4%;
-  border-radius: 999px;
-  background: var(--cover-accent);
-  transform: rotate(-11deg);
-}
-
 .community-cover-shape.is-secondary {
   width: 52px;
   height: 52px;

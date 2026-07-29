@@ -280,6 +280,9 @@ try {
             const rect = article.getBoundingClientRect();
             return style.display !== "none" && rect.width > 0 && rect.height > 0;
           }).length,
+          diagonalAccentCount: document.querySelectorAll(
+            ".community-cover-shape.is-primary",
+          ).length,
           ...(moreRect ? {
             moreTop: Math.round(moreRect.top),
             moreBottom: Math.round(moreRect.bottom),
@@ -321,6 +324,11 @@ try {
       });
       const recentLayout = await pageLayout(page);
       if (recent.footerPresent) failures.push("community recent unexpectedly renders footer");
+      if (recent.diagonalAccentCount !== 0) {
+        failures.push(
+          `community recent still renders ${recent.diagonalAccentCount} diagonal title accents`,
+        );
+      }
       if (recentLayout.documentWidth > recentLayout.viewportWidth + 2) {
         failures.push("community recent has document horizontal overflow");
       }
@@ -389,7 +397,9 @@ try {
       }
       await screenshot(page, `${prefix}-community-recent`);
 
-      await page.locator(".community-topic-cover").first().click();
+      await page.locator(
+        ".community-topic-cover:has(.community-cover-art.is-wind)",
+      ).click();
       const dialog = page.locator(".community-topic-dialog");
       await dialog.waitFor({ state: "visible" });
       await settle(page);
@@ -402,7 +412,6 @@ try {
           !(dialogNode instanceof HTMLElement)
           || !(visual instanceof HTMLElement)
           || !(cover instanceof HTMLElement)
-          || !(textarea instanceof HTMLTextAreaElement)
         ) return null;
         const visualRect = visual.getBoundingClientRect();
         const coverRect = cover.getBoundingClientRect();
@@ -426,7 +435,9 @@ try {
             width: coverRect.width,
             height: coverRect.height,
           },
-          textareaHeight: textarea.getBoundingClientRect().height,
+          textareaHeight: textarea instanceof HTMLTextAreaElement
+            ? textarea.getBoundingClientRect().height
+            : null,
         };
       });
       if (!detail) {
@@ -439,15 +450,19 @@ try {
           }
         }
         const minimumTextarea = profile.desktop ? 190 : 132;
-        if (detail.textareaHeight + tolerance < minimumTextarea) {
+        if (detail.textareaHeight === null) {
+          failures.push("topic detail did not expose the signed-in comment form");
+        } else if (detail.textareaHeight + tolerance < minimumTextarea) {
           failures.push(`comment textarea ${detail.textareaHeight}px below ${minimumTextarea}px`);
         }
       }
       const textarea = page.locator(".community-comment-form textarea");
-      await textarea.focus();
-      await textarea.fill("Keyboard focus and submission remain available.");
-      if (!await page.getByRole("button", { name: /Post comment|发表评论/u }).isEnabled()) {
-        failures.push("comment submit remains disabled after valid input");
+      if (await textarea.count() > 0) {
+        await textarea.focus();
+        await textarea.fill("Keyboard focus and submission remain available.");
+        if (!await page.getByRole("button", { name: /Post comment|发表评论/u }).isEnabled()) {
+          failures.push("comment submit remains disabled after valid input");
+        }
       }
       await screenshot(page, `${prefix}-community-topic-detail`);
       await page.keyboard.press("Escape");

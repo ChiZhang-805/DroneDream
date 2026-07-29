@@ -296,6 +296,8 @@ describe("CommunityPage public data loading", () => {
 
     await screen.findByRole("heading", { name: "Stable hover evidence" });
     expect(container.querySelector('[data-template="evidence"]')).toBeVisible();
+    expect(container.querySelector(".community-cover-shape.is-primary")).toBeNull();
+    expect(container.querySelector(".community-cover-shape.is-secondary")).toBeVisible();
     const trigger = screen.getByRole("button", {
       name: "Open discussion: Stable hover evidence",
     });

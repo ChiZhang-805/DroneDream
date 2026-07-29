@@ -292,7 +292,6 @@ function TopicCoverArtwork({
       className={`community-cover-art is-${presentation.template}${dialog ? " is-dialog" : ""}`}
       data-template={presentation.template}
     >
-      <span className="community-cover-shape is-primary" aria-hidden="true" />
       <span className="community-cover-shape is-secondary" aria-hidden="true" />
       <header>
         <Icon aria-hidden="true" />
