@@ -59,6 +59,13 @@ export function TrialDetail() {
   const trial = trialQuery.data;
   const artifacts = artifactsQuery.data ?? [];
   const replayArtifacts = selectReplayArtifactsForTrial(artifacts, trial.id);
+  const artifactsError = artifactsQuery.isError
+    ? (
+        artifactsQuery.error instanceof ApiClientError
+          ? artifactsQuery.error.message
+          : t("artifacts.loadFailedDescription")
+      )
+    : null;
 
   return (
     <section className="stack-md">
@@ -71,12 +78,14 @@ export function TrialDetail() {
           scenario: trial.scenario_type,
           candidate_id: trial.candidate_id,
         }}
+        artifactLoadError={artifactsError}
       />
       <GazeboLivePanel />
       <TrialArtifactsSection
         trial={trial}
         artifacts={artifacts}
         isLoading={artifactsQuery.isLoading}
+        error={artifactsError}
       />
       <FailureDetails trial={trial} />
     </section>
@@ -198,10 +207,12 @@ function TrialArtifactsSection({
   trial,
   artifacts,
   isLoading,
+  error,
 }: {
   trial: Trial;
   artifacts: Artifact[];
   isLoading: boolean;
+  error: string | null;
 }) {
   const { t } = useI18n();
   // Phase 8 polish: the job artifacts endpoint returns both job-scoped and
@@ -220,6 +231,7 @@ function TrialArtifactsSection({
       title={t("artifacts.title")}
       description={t("trial.artifactsDescription", { scenario: trial.scenario_type, seed: trial.seed })}
       isLoading={isLoading}
+      error={error}
       emptyDescription={t("trial.artifactsEmpty")}
       sections={[
         {

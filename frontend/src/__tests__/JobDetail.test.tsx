@@ -255,6 +255,45 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     expect(screen.queryByText(/Baseline$/)).toBeNull();
   });
 
+  it("opens a completed passing trial for the best candidate before a failed one", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    const common = {
+      candidate_id: "cand_best",
+      seed: 1,
+      scenario_type: "nominal" as const,
+      candidate_label: "best",
+      candidate_source_type: "optimizer" as const,
+      candidate_is_baseline: false,
+      candidate_is_best: true,
+      candidate_generation_index: 1,
+    };
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([
+      {
+        ...common,
+        id: "trial_failed_first",
+        status: "FAILED",
+        score: null,
+        pass_flag: null,
+      },
+      {
+        ...common,
+        id: "trial_completed_pass",
+        status: "COMPLETED",
+        score: 0.2,
+        pass_flag: true,
+      },
+    ]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByRole("link", {
+      name: "Open best trial replay",
+    })).toHaveAttribute("href", "/trials/trial_completed_pass");
+  });
+
   it("labels cma_es optimizer rows as 'CMA-ES Gen N'", async () => {
     const job = makeJob({ status: "COMPLETED", optimizer_strategy: "cma_es" });
     const trials: TrialSummary[] = [

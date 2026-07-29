@@ -284,7 +284,21 @@ export function JobDetail() {
   const trials = trialsQuery.data ?? [];
   const report = reportQuery.data;
   const artifacts = artifactsQuery.data ?? [];
-  const bestTrial = trials.find((trial) => trial.candidate_is_best);
+  const bestCandidateTrials = trials.filter((trial) => trial.candidate_is_best);
+  const bestTrial = bestCandidateTrials.find(
+    (trial) => trial.status === "COMPLETED" && trial.pass_flag === true,
+  ) ?? bestCandidateTrials.find(
+    (trial) => trial.status === "COMPLETED" && trial.score !== null,
+  ) ?? bestCandidateTrials.find(
+    (trial) => trial.status === "COMPLETED",
+  ) ?? bestCandidateTrials[0];
+  const artifactsError = artifactsQuery.isError
+    ? (
+        artifactsQuery.error instanceof ApiClientError
+          ? artifactsQuery.error.message
+          : t("artifacts.loadFailedDescription")
+      )
+    : null;
   const pdfArtifact = artifacts.find(
     (a) => a.artifact_type === "pdf_report" || a.mime_type === "application/pdf",
   );
@@ -489,6 +503,7 @@ export function JobDetail() {
           title={t("artifacts.title")}
           description={t("jobDetail.artifactsDescription")}
           isLoading={artifactsQuery.isLoading}
+          error={artifactsError}
           emptyDescription={t("jobDetail.artifactsEmpty")}
           sections={[
             {

@@ -197,4 +197,22 @@ describe("TrialDetail artifacts — Phase 8 polish", () => {
     );
     expect(screen.getByText("Replay unavailable")).toBeInTheDocument();
   });
+
+  it("reports an artifact API failure instead of presenting it as an empty run", async () => {
+    const trial = makeTrial({ simulator_backend: "real_cli" });
+    vi.spyOn(apiClient, "getTrial").mockResolvedValue(trial);
+    vi.spyOn(apiClient, "listJobArtifacts").mockRejectedValue(
+      new Error("artifact service unavailable"),
+    );
+
+    renderTrial(trial.id);
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("Unable to load artifacts").length,
+      ).toBeGreaterThanOrEqual(2),
+    );
+    expect(screen.queryByText("Replay unavailable")).not.toBeInTheDocument();
+    expect(screen.queryByText("No artifacts yet")).not.toBeInTheDocument();
+  });
 });

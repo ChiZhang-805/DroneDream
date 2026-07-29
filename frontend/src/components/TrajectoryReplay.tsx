@@ -24,6 +24,7 @@ interface TrajectoryReplayProps {
   title?: string;
   artifacts: ReplayArtifacts;
   meta: ReplayMeta;
+  artifactLoadError?: string | null;
 }
 
 const SPEEDS = [0.5, 1, 2, 4] as const;
@@ -42,6 +43,7 @@ export function TrajectoryReplay({
   title,
   artifacts,
   meta,
+  artifactLoadError,
 }: TrajectoryReplayProps) {
   const { t } = useI18n();
   const [actualPoints, setActualPoints] = useState<ReplayPoint[] | null>(null);
@@ -171,7 +173,11 @@ export function TrajectoryReplay({
           : t("trajectory.description")
       }
     >
-      {!primaryArtifact ? (
+      {artifactLoadError ? (
+        <Alert tone="danger" title={t("artifacts.loadFailed")}>
+          {artifactLoadError}
+        </Alert>
+      ) : !primaryArtifact ? (
         <Empty
           title={t("trajectory.unavailable")}
           description={t("trajectory.unavailableDescription")}
