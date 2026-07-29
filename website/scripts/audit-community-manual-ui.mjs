@@ -508,6 +508,11 @@ try {
         const groupToggles = [...document.querySelectorAll(".manual-nav-group-row")];
         const readerHeader = document.querySelector(".manual-reader-header");
         const introductionHeading = document.querySelector(".manual-markdown > h1:first-child");
+        const firstChapterRow = document.querySelector(
+          ".manual-nav-chapter:not(.is-step-group) .manual-nav-chapter-row",
+        );
+        const readerEyebrow = document.querySelector(".manual-reader-header p");
+        const readerTitle = document.querySelector(".manual-reader-header h1");
         const introductionParagraphs = [];
         let introductionSibling = introductionHeading?.nextElementSibling;
         while (introductionSibling && introductionSibling.tagName !== "H2") {
@@ -517,6 +522,11 @@ try {
         const headerRect = header?.getBoundingClientRect();
         const sidebarRect = sidebar?.getBoundingClientRect();
         const brandRect = document.querySelector(".site-brand")?.getBoundingClientRect();
+        const readerHeaderRect = readerHeader?.getBoundingClientRect();
+        const firstChapterRowRect = firstChapterRow?.getBoundingClientRect();
+        const introductionHeadingRect = introductionHeading?.getBoundingClientRect();
+        const readerEyebrowRect = readerEyebrow?.getBoundingClientRect();
+        const readerTitleRect = readerTitle?.getBoundingClientRect();
         const isWithinViewport = (selector) => {
           const element = document.querySelector(selector);
           if (!(element instanceof HTMLElement)) return false;
@@ -551,6 +561,14 @@ try {
           readerHeaderBorderBottom: readerHeader instanceof HTMLElement
             ? getComputedStyle(readerHeader).borderBottomWidth
             : null,
+          firstChapterTop: firstChapterRowRect?.top ?? null,
+          introductionHeadingTop: introductionHeadingRect?.top ?? null,
+          readerTopBreathing: readerHeaderRect && readerEyebrowRect
+            ? readerEyebrowRect.top - readerHeaderRect.top
+            : null,
+          readerBottomBreathing: introductionHeadingRect && readerTitleRect
+            ? introductionHeadingRect.top - readerTitleRect.bottom
+            : null,
           introductionParagraphCount: introductionParagraphs.length,
           editionSubtitlePresent: Boolean(
             document.querySelector(".manual-sidebar-title span"),
@@ -584,6 +602,32 @@ try {
       }
       if (
         profile.desktop
+        && initialManual.firstChapterTop !== null
+        && initialManual.introductionHeadingTop !== null
+        && Math.abs(
+          initialManual.firstChapterTop - initialManual.introductionHeadingTop,
+        ) > 2
+      ) {
+        failures.push(
+          "manual introduction heading no longer aligns with the first sidebar chapter",
+        );
+      }
+      if (
+        profile.desktop
+        && (initialManual.readerTopBreathing === null
+          || initialManual.readerTopBreathing < 24)
+      ) {
+        failures.push("manual reader eyebrow lacks top breathing room");
+      }
+      if (
+        profile.desktop
+        && (initialManual.readerBottomBreathing === null
+          || initialManual.readerBottomBreathing < 40)
+      ) {
+        failures.push("manual reader title lacks bottom breathing room");
+      }
+      if (
+        profile.desktop
         && initialManual.sidebarScrollHeight > initialManual.sidebarClientHeight + 2
       ) {
         failures.push("collapsed manual navigation does not fit its initial sidebar viewport");
@@ -597,6 +641,23 @@ try {
       await firstToggle.press("Enter");
       if (await firstToggle.getAttribute("aria-expanded") !== "true") {
         failures.push("manual chapter did not expand from keyboard");
+      }
+      const firstSubsectionIndent = await page.evaluate(() => {
+        const chapter = document.querySelector(".manual-nav-chapter:not(.is-step-group)");
+        const chapterRow = chapter?.querySelector(".manual-nav-chapter-row");
+        const subsection = chapter?.querySelector(".manual-nav-subsections .is-subsection");
+        const chapterRowRect = chapterRow?.getBoundingClientRect();
+        const subsectionRect = subsection?.getBoundingClientRect();
+        return chapterRowRect && subsectionRect
+          ? subsectionRect.left - chapterRowRect.left
+          : null;
+      });
+      initialManual.firstSubsectionIndent = firstSubsectionIndent;
+      if (
+        profile.desktop
+        && (firstSubsectionIndent === null || firstSubsectionIndent < 16)
+      ) {
+        failures.push("manual chapter subsection lacks a clear nested indent");
       }
       await firstToggle.press("Enter");
       const chapterToggleLabels = await page.locator(".manual-nav-toggle").evaluateAll(

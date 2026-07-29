@@ -3182,6 +3182,12 @@ html[lang="zh-CN"] .site-hero h1 {
   gap: 0.1rem;
 }
 
+.manual-nav-chapter:not(.is-step-group) > .manual-nav-subsections {
+  margin: 0.12rem 0 0.2rem 0.72rem;
+  padding-left: 0.4rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.24);
+}
+
 .manual-nav-subsections[hidden] {
   display: none;
 }
@@ -3359,12 +3365,14 @@ html[lang="zh-CN"] .site-hero h1 {
 .manual-reader-header {
   display: grid;
   width: min(100% - clamp(36px, 4vw, 72px), 1420px);
-  align-items: end;
+  height: 11.4375rem;
+  align-items: start;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
   margin: 0 auto;
-  padding: 1rem 0 0.75rem;
+  padding: 2rem 0 0;
   border-bottom: 0;
+  box-sizing: border-box;
 }
 
 .manual-reader-header p {
@@ -3858,7 +3866,8 @@ html[lang="zh-CN"] .manual-markdown p {
   }
 
   .manual-reader-header {
-    padding-top: 3rem;
+    height: auto;
+    padding: 3rem 0 2.25rem;
   }
 }
 
