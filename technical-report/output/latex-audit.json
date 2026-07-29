@@ -2,7 +2,7 @@
   "schema_version": "dronedream.latex-technical-report-audit.v2",
   "pdf": "technical-report/build/main.pdf",
   "source": "technical-report/body.tex",
-  "pages": 21,
+  "pages": 25,
   "paragraph_geometry": {
     "records": [
       {
@@ -10,15 +10,15 @@
         "page": 1,
         "style": "abstract",
         "policy_category": "explanatory_body",
-        "lines": 20,
-        "last_line_ratio": 0.9147,
+        "lines": 28,
+        "last_line_ratio": 0.8673,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "Windows Rust was not run; its toolchain gate therefore remains explicitly open for publication.",
+        "last_line_text": "assertions, or substitute for the separately frozen simulator, deployment, and release gates.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": true,
+        "last_line_pass_90": false,
         "line_policy_passed": true,
-        "text": "UAV controller tuning is an iterative experiment: every Candidate must remain bound to its scenario, budget, constraints, Runtime, and retained evidence. AURORA—AGENTIC UAV REFINEMENT THROUGH OPTIMIZATION, REFLECTION, AND ASSURANCE—is the evidence-gated Harness inside DroneDream 1.0. Foundation models interpret intent and rank eligible methods, while deterministic contracts authorize execution, evidence admission, holdout isolation, and final selection. The frozen Evidence 2.8 / Prompt 1.7 online routing campaign qualifies 23/24 responses from 24 calls to the gpt-4.1-2025-04-14 snapshot; its single failing case is retained, and archived prompt histories are not treated as causal comparisons. Separate contract evidence exercises cross-Job memory and fail-closed provenance. A pinned PX4/Gazebo campaign records 6/6 passing x500 Trials across two seeds and nominal, steady-wind, and static-obstacle scenarios, with RMSE 0.332254–0.444452 m and track coverage 0.949113–0.981456. Wind read-back and obstacle creation are retained for both affected scenarios. These results establish the exercised contracts, routes, and injections. A separate same-seed advanced-effects subset records three passing trajectories after five requested effects were applied and verified. Two GPS-noise boundary attempts verify six effect injections but end at a 30.0-second PX4 readiness timeout; they are failures, not successful GPS-noise flights. A later negative-control Trial completes deterministic GPS denial/recovery and battery-profile injection with all three effects verified, but fails the 25 m/s stability gate at 31.211302 m/s; it is excluded from both pass numerators. Neither campaign proves optimizer superiority, broad simulator quality, obstacle avoidance, real-aircraft safety, simulation-to-reality transfer, or statistical generalization. Claims bind to frozen commits and hashes; Windows Rust was not run; its toolchain gate therefore remains explicitly open for publication."
+        "text": "UAV controller tuning is an iterative experiment: every Candidate must remain bound to its scenario, budget, constraints, Runtime, and retained evidence. AURORA—AGENTIC UAV REFINEMENT THROUGH OPTIMIZATION, REFLECTION, AND ASSURANCE—is the evidence-gated Harness inside DroneDream 1.0. Foundation models interpret intent and rank eligible methods, while deterministic contracts authorize execution, evidence admission, holdout isolation, and final selection. A retained Evidence 2.8 / Prompt 1.7 online routing campaign qualifies 23/24 responses from 24 calls to the gpt-4.1-2025-04-14 snapshot; its single failing case is retained, and archived prompt histories are not treated as causal comparisons. Separate contract evidence exercises cross-Job memory and fail-closed provenance. A pinned PX4/Gazebo campaign records 6/6 passing x500 Trials across two seeds and nominal, steady-wind, and static-obstacle scenarios, with RMSE 0.332254–0.444452 m and track coverage 0.949113–0.981456. Wind read-back and obstacle creation are retained for both affected scenarios. These results establish the exercised contracts, routes, and injections. A separate same-seed advanced-effects subset records three passing trajectories after five requested effects were applied and verified. Two GPS-noise boundary attempts verify six effect injections but end at a 30.0-second PX4 readiness timeout; they are failures, not successful GPS-noise flights. A later negative-control Trial completes deterministic GPS denial/recovery and battery-profile injection with all three effects verified, but fails the 25 m/s stability gate at 31.211302 m/s; it is excluded from both pass numerators. A separate hard-actuator probe physically stops motor 2 and verifies the joint-state read-back, yet produces no trusted evaluation window and no successful flight result. Closure v2 exact-byte aggregates all four source classes: 9/9 bundled categories have real injection/read-back evidence, while only five categories have all retained Trials pass a performance gate. None of these evidence classes proves optimizer superiority, broad simulator fidelity, autonomous obstacle avoidance, real-aircraft safety, transfer from simulation to reality, or statistical generalization. Evidence v10 is the latest exact-byte provenance ledger, but it sets release_ready=false: the online route is not current for Evidence 2.9. A later exact-source backend receipt records 1,284/1,284 full tests and 73/73 focused tests with zero provider calls; it closes only the backend regression gate. Windows Rust and the report/PDF gate remain separate. The unresolved Windows toolchain check cannot inherit status from Python, rendered-report gates, or product-readiness assertions, or substitute for the separately frozen simulator, deployment, and release gates."
       },
       {
         "index": 2,
@@ -37,18 +37,18 @@
       },
       {
         "index": 3,
-        "page": 1,
+        "page": 2,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 8,
-        "last_line_ratio": 0.8418,
+        "lines": 10,
+        "last_line_ratio": 0.8068,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "enlarges the earlier matrix or supplies missing independent seeds for broader inference at release.",
+        "last_line_text": "release or erases retained failures from any later customer-facing denominator during review.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": false,
         "line_policy_passed": true,
-        "text": "This report therefore treats each frozen physical campaign as its own evidence unit. The two-seed scenario matrix varies nominal, steady-wind, and static-obstacle conditions; the later advanced-effects campaign instead repeats one seed under a fixed five-effect profile and records separate GPS readiness failures. A still later GPS/battery negative control completes its trajectory and effect checks but fails stability acceptance. All three numerators, failures, environments, and permissible claims remain distinct. That separation allows additional Runtime evidence to strengthen implementation coverage without converting heterogeneous Trials into a pooled reliability estimate or optimizer comparison. Reviewers can reproduce each denominator without inferring that a new disturbance profile enlarges the earlier matrix or supplies missing independent seeds for broader inference at release."
+        "text": "This report therefore treats each frozen physical campaign as its own evidence unit. The two-seed scenario matrix varies nominal, steady-wind, and static-obstacle conditions; the later advanced-effects campaign instead repeats one seed under a fixed five-effect profile and records separate GPS readiness failures. A still later GPS/battery negative control completes its trajectory and effect checks but fails stability acceptance. A separate hard-actuator probe verifies SDF injection and joint-state read-back but never establishes a trusted flight-evaluation window. All four evidence units, failures, environments, and permissible claims remain distinct. That separation allows additional Runtime evidence to strengthen implementation coverage without converting heterogeneous Trials into a pooled reliability estimate or optimizer comparison. Reviewers can reproduce each denominator without inferring that a new disturbance profile enlarges the earlier matrix or supplies missing independent seeds for broader inference at release or erases retained failures from any later customer-facing denominator during review."
       },
       {
         "index": 4,
@@ -97,7 +97,7 @@
       },
       {
         "index": 7,
-        "page": 2,
+        "page": 3,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 11,
@@ -142,6 +142,21 @@
       },
       {
         "index": 10,
+        "page": 3,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 7,
+        "last_line_ratio": 0.8184,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "merely a generic model-to-tool agent workflow for later review, replay, and independent audit.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": false,
+        "line_policy_passed": true,
+        "text": "AUTHORITY NARROWS MONOTONICALLY ACROSS THE CHAIN. A later stage may restrict an earlier proposal, but it may not broaden the scenario, budget, tool, or evidence eligibility without issuing a new bound claim. During retry, a worker may reacquire a lease and replay the same immutable input; a changed Runtime, scenario digest, or acceptance predicate instead creates a new evidence identity and preserves the prior attempt. Publication obeys the same rule: a summary may project admitted fields from retained receipts, but it cannot repair a failed gate, infer an absent metric, or pool denominators whose scenario and seed structures differ. Figure 1 is therefore a claim-authority map, not merely a generic model-to-tool agent workflow for later review, replay, and independent audit."
+      },
+      {
+        "index": 11,
         "page": 4,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -156,7 +171,7 @@
         "text": "Desktop boundary — entry appears only after every required launch check passes. Terminal UI state alone authorizes readiness and exit; active work or unsaved drafts trigger an attributable recovery path instead of silent process termination. The same readiness record supports later recovery, support, audit replay, and service use."
       },
       {
-        "index": 11,
+        "index": 12,
         "page": 4,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -171,7 +186,7 @@
         "text": "Backend boundary — drafts, Jobs, APIs, and artifacts cross only through validated transitions with stable failure codes. A rejection retains its reason, source identity, and replay receipt; it cannot become persisted, dispatched, or published work. The receipt remains independently replayable before any later release decision at scale."
       },
       {
-        "index": 12,
+        "index": 13,
         "page": 4,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -186,7 +201,7 @@
         "text": "AURORA authority — only provenance-complete, policy-eligible evidence enters context, routing, reflection, or memory. Holdout, infrastructure-fault, legacy, incomplete, and drifted records remain unavailable to routing, selection, and replay. No later narrative can reinterpret a rejected row as admissible learning evidence."
       },
       {
-        "index": 13,
+        "index": 14,
         "page": 4,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -201,7 +216,7 @@
         "text": "Runtime boundary — a physical claim must bind executable effect, expanded source, pinned dependency commits, the accepted customer Runtime, a published ledger, and an independently checked receipt. A launched process without that chain cannot support public release or customer-facing release qualification or review."
       },
       {
-        "index": 14,
+        "index": 15,
         "page": 4,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -216,7 +231,7 @@
         "text": "Cloud boundary — authentication, community data, quota ledger, and model gateway remain server-authoritative; provider secrets never enter desktop logs or artifacts, and each managed-model debit must retain an authenticated account, quota-ledger entry, provider disposition, and reconcilable service receipt under its frozen billing contract."
       },
       {
-        "index": 15,
+        "index": 16,
         "page": 4,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -231,7 +246,7 @@
         "text": "CLAIM-TIME INPUTS ARE IMMUTABLE BEFORE LAUNCH. Schema DRONEDREAM.TRIAL-EXECUTION-ATTEMPT-CLAIM/V3 and digest EXECUTION_INPUT_SHA256 bind Trial, Candidate, and Job inputs in an immutable snapshot. Outcome Contract 2.20 authorizes the scenario matrix and constructs TRIALCONTEXT without rereading mutable rows. Checks classify changed inputs as INPUT_EVIDENCE_DRIFT, coordinated rewrites as OUTCOME_CONTRACT_DRIFT, and unauthorized fields as SCENARIO_CONTRACT_DRIFT. Completion locks Job before Trial; historical receipts remain verifiable, new claims use v3, and the original projection stays available for audit replay under the same claim boundary across concurrent execution, replay, export, and release review or customer acceptance."
       },
       {
-        "index": 16,
+        "index": 17,
         "page": 4,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -246,7 +261,7 @@
         "text": "PHYSICAL CLAIMS ARE CONCURRENCY-SAFE AND FAIRLY SCHEDULED. Execution Claim Gate 1.1 combines PostgreSQL FOR UPDATE SKIP LOCKED, a conditional lease update, bounded retries, and an attempt-count fence. Concurrent workers converge on a unique physical execution and accepted outcome for each logical Trial, with no duplicate evidence across the exercised pool. Scheduling Gate 1.0 chooses the least-served eligible Job and preserves FIFO within it. A paired-Job regression alternates sequential claims, preventing desktop-lane monopoly; hosted priority and resource-cost scheduling remain outside the current local scheduling contract, audit replay, and evidence envelope for hosted work without weakening per-tenant fairness or ownership isolation at scale."
       },
       {
-        "index": 17,
+        "index": 18,
         "page": 4,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -261,8 +276,8 @@
         "text": "MODEL FEEDBACK IS CASE-SEPARATED. Prompt Schema 2.3 assigns provider-safe aliases in frozen order, keeping same-type cases with different weights or numeric configurations distinct. Each admitted case carries its weight, seed count, metrics, and closed failure counts; raw IDs, unsupported text, and holdout evidence stay outside the prompt. This removes feedback-grouping ambiguity without expanding model authority or claiming simulator fidelity, and preserves canonical order when matched Trials arrive in reverse. The separation is preserved in every provider request and retained routing receipt for later independent inspection and audit replay when cases are recomputed or revisited after release under the same frozen prompt schema and case order."
       },
       {
-        "index": 18,
-        "page": 4,
+        "index": 19,
+        "page": 5,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 10,
@@ -276,8 +291,8 @@
         "text": "REPRODUCIBILITY EXTENDS BELOW THE RANDOM SEED. A non-unique eigenvector factor can rotate an identical seeded normal sample when another BLAS kernel resolves repeated covariance eigenvalues differently. DroneDream instead uses the unique symmetric positive-definite covariance square root and canonical unit-vector spelling before discrete projection. The frozen optimizer transcript hashes executed candidates, losses, feasibility, route, fidelity, and cohort position, while non-causal GP/CMA diagnostic matrices remain outside that decision hash [. This boundary lets supported machines replay identical candidate sequences across machines before any provider decision receives credit. The transcript is compared at the executed-Candidate boundary rather than against optimizer diagnostics that may vary by library implementation. A replay mismatch therefore identifies a decision-relevant divergence before a provider route or reported observation is accepted, keeping numerical implementation drift separate from evidence drift during independent replay and release review on a different supported machine and BLAS stack."
       },
       {
-        "index": 19,
-        "page": 4,
+        "index": 20,
+        "page": 5,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 8,
@@ -291,7 +306,7 @@
         "text": "FEEDBACK IS VERIFIED AGAIN AT THE MODEL BOUNDARY. Optimizers, the closed-tool router, and direct proposer share a training-feedback compiler. It reconstructs canonical Trial rows and checks the content-addressed outcome against Candidate identity, generation, parameters, and Trial evidence before exposing a score. Sibling fields cannot override those values. Divergence is quarantined rather than turned into a bad-parameter penalty; migration-era rows remain explicitly unsealed and ineligible for learning, routing memory, or final selection [. The rule preserves auditability across both current and migration-era experiment histories and their later replay without retroactive reinterpretation or an unverifiable score entering routing or model-mediated recovery across release boundaries, including later evidence migrations, rollback reviews, and independently recomputed campaign exports after release."
       },
       {
-        "index": 20,
+        "index": 21,
         "page": 5,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -306,7 +321,7 @@
         "text": "COMPLETED is admitted as successful optimizer evidence only when a usable metric and modern receipt bind the exact Candidate, Trial, scenario, objective direction, and execution provenance; a terminal label without that complete chain remains unavailable for optimizer learning, final selection, export, or any later performance statement in release."
       },
       {
-        "index": 21,
+        "index": 22,
         "page": 5,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -321,7 +336,7 @@
         "text": "FAILED with a trusted domain failure code is admitted as a non-success because it may identify an infeasible or unsafe simulated parameter region without being mislabeled as infrastructure failure; the failed attempt stays in the optimization denominator with its scenario and Candidate identity intact through every later aggregate and arm comparison."
       },
       {
-        "index": 22,
+        "index": 23,
         "page": 5,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -336,7 +351,7 @@
         "text": "Infrastructure faults, cancellation, malformed evidence, and conflicting terminal states are quarantined and cannot update search or routing memory under any later decision path or replay; each rejected row retains a stable quarantine reason and remains visible to operational diagnostics and independent evidence accounting without later relabeling."
       },
       {
-        "index": 23,
+        "index": 24,
         "page": 5,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -351,8 +366,8 @@
         "text": "Holdout-only outcomes remain sealed for final evaluation, never return to training history or provider-visible reflection, and become selectable only through the frozen final gate under the predeclared metric and admissibility policy. That separation preserves an untouched comparator for the registered final decision or release."
       },
       {
-        "index": 24,
-        "page": 5,
+        "index": 25,
+        "page": 6,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
@@ -366,27 +381,27 @@
         "text": "This section keeps unlike evidence units separate. Development and policy-holdout corpora test tool eligibility; source ablations test named guards; the fallback campaign tests recovery equivalence under a fixed mock budget; and synthetic integration tests orchestration on a declared non-physical objective. Every result is recomputed from persisted records and paired with a claim boundary. PX4/Gazebo assertions remain isolated until the signed customer Runtime passes a provenance-bound acceptance campaign, preventing software checks and proxy outcomes from being pooled into one headline score or silently promoted beyond their declared evidence class in any publication-facing claim during external review, customer acceptance, or independent replay of the frozen release."
       },
       {
-        "index": 25,
-        "page": 5,
-        "style": "body",
-        "policy_category": "explanatory_body",
-        "lines": 7,
-        "last_line_ratio": 0.9211,
-        "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "set, snapshot, controls, corpus, and scoring rule used for that qualification decision and no broader release.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "last_line_pass_90": true,
-        "line_policy_passed": true,
-        "text": "The current online artifact binds Evidence 2.8, Prompt 1.7, Tool 2.1, the gpt-4.1-2025-04-14 model snapshot, JSON-schema responses, temperature 0, top-_p_ 1, seed 20260728, and the same 24-case development corpus. Its 24 provider calls completed in 77.8 seconds. The frozen response is independently regraded at 23/24 (95.83%), with a 37.5 percentage points advantage over the 14/24 best constant policy. It qualifies against minimums of 75% overall, 15 percentage points over the best constant, and 2/3 in every category; tight budget is the lowest category at exactly 2/3. The seed does not make provider output deterministic, and qualification applies only to this exact frozen call set, snapshot, controls, corpus, and scoring rule used for that qualification decision and no broader release."
-      },
-      {
         "index": 26,
         "page": 6,
         "style": "body",
         "policy_category": "explanatory_body",
+        "lines": 9,
+        "last_line_ratio": 0.8452,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "2.9 online campaign is claimed until a separate exact-contract online freeze is retained for review.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": false,
+        "line_policy_passed": true,
+        "text": "The retained online artifact binds Evidence 2.8, Prompt 1.7, Tool 2.1, the gpt-4.1-2025-04-14 model snapshot, JSON-schema responses, temperature 0, top-_p_ 1, seed 20260728, and the same 24-case development corpus. Its 24 provider calls completed in 77.8 seconds. The frozen response is independently regraded at 23/24 (95.83%), with a 37.5 percentage points advantage over the 14/24 best constant policy. It qualifies against minimums of 75% overall, 15 percentage points over the best constant, and 2/3 in every category; tight budget is the lowest category at exactly 2/3. The seed does not make provider output deterministic, and qualification applies only to this exact frozen call set, snapshot, controls, corpus, and scoring rule used for that qualification decision and no broader release. Evidence v10 marks this route contract_current=false because the current software contract is Evidence 2.9; no Evidence 2.9 online campaign is claimed until a separate exact-contract online freeze is retained for review."
+      },
+      {
+        "index": 27,
+        "page": 6,
+        "style": "body",
+        "policy_category": "explanatory_body",
         "lines": 6,
-        "last_line_ratio": 0.8942,
+        "last_line_ratio": 0.8941,
         "last_line_ratio_denominator": "widest_rendered_line",
         "last_line_text": "generalization across unseen tasks, vehicles, scenarios, or provider outputs after release or deployment.",
         "last_line_pass_50": true,
@@ -396,7 +411,7 @@
         "text": "The sole failure, tight_budget_expensive_matrix, selected TuRBO where the accepted set was multi-fidelity MOBO or the optimizer portfolio. The archived provider artifact remains separately regradable: the first Prompt 1.5 freeze scored 19/24 and was unqualified; a second freeze under the same Prompt 1.5 template scored 21/24 and qualified. Prompt 1.6 then recorded 24/24 acceptable selections. Evidence v9 marks that Evidence 2.7 / Prompt 1.6 row CONTRACT_CURRENT=FALSE. These archived calls identify neither causal prompt lift, lower simulator loss, nor generalization across unseen tasks, vehicles, scenarios, or provider outputs after release or deployment."
       },
       {
-        "index": 27,
+        "index": 28,
         "page": 6,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -408,10 +423,10 @@
         "last_line_pass_80": true,
         "last_line_pass_90": false,
         "line_policy_passed": false,
-        "text": "The current 23/24 current-contract qualification retains its one tight-budget miss instead of normalizing it away. The first Prompt 1.5 freeze missed five cases; the 21/24 repeat retained three of those errors, and the archived Prompt 1.6 freeze selected acceptable tools for all 24 cases. Because these provider calls were not paired across prompt versions, the sequence localizes observed routing disagreements but cannot attribute their changes to prompt wording. A controlled paired study remains necessary before any revision receives causal credit or publication."
+        "text": "The retained 23/24 qualification preserves its one tight-budget miss instead of normalizing it away. The first Prompt 1.5 freeze missed five cases; the 21/24 repeat retained three of those errors, and the archived Prompt 1.6 freeze selected acceptable tools for all 24 cases. Because these provider calls were not paired across prompt versions, the sequence localizes observed routing disagreements but cannot attribute their changes to prompt wording. A controlled paired study remains necessary before any revision receives causal credit or publication."
       },
       {
-        "index": 28,
+        "index": 29,
         "page": 7,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -426,7 +441,22 @@
         "text": "The ablation suite asks a narrow question: whether each named source guard changes an otherwise identical deterministic decision at the boundary it is designed to protect. For every guard, the production contract and one intentionally weakened comparator receive the same fixed probes, expected result, and scoring rule. Production satisfies 25/25 probes, whereas the matched weakened variants satisfy 6/25 after their designated protection is removed. This construction demonstrates enforceable behavior for fallback, provider trust, outcome isolation, and tool eligibility; it is not a statistical effect estimate and does not measure optimizer quality, simulated control performance, flight safety, or readiness. The comparison is diagnostic because each weakened arm changes one named admission rule while inputs and expected outputs stay fixed. A failed probe therefore localizes source-boundary enforcement; it estimates neither customer frequency nor optimizer benefit in physical controller campaigns or release decisions across independently retained seed blocks and later acceptance reviews."
       },
       {
-        "index": 29,
+        "index": 30,
+        "page": 7,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 6,
+        "last_line_ratio": 1.0,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "failures or an estimate of physical controller benefit across broader operational distributions or deployment settings.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": true,
+        "line_policy_passed": true,
+        "text": "ABLATION SCORING IS ROW-LEVEL BEFORE IT IS AGGREGATE. Every probe names one expected admission decision and one source guard, and the verifier compares the exact Boolean result before computing group totals. Partial credit cannot hide a leaked holdout row, an untrusted provider observation, an incompatible tool, or a missing scenario profile. The weakened arm changes only its named guard, so a discrepancy localizes contract enforcement while unchanged rows remain controls. This design supports a source-boundary diagnosis, not a frequency estimate for production failures or an estimate of physical controller benefit across broader operational distributions or deployment settings."
+      },
+      {
+        "index": 31,
         "page": 8,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -441,8 +471,8 @@
         "text": "Five fixed seed blocks compare three matched-budget arms: direct portfolio, provider-error fallback, and invalid-response fallback. The campaign runs 15 Jobs and persists 579 Trials under the frozen budget."
       },
       {
-        "index": 30,
-        "page": 8,
+        "index": 32,
+        "page": 9,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 13,
@@ -456,8 +486,8 @@
         "text": "ELIGIBILITY IS COMPUTED BEFORE ROUTING. CMA-ES and the deterministic portfolio remain general fallbacks. Constrained multi-objective BO is admitted only for constrained or multi-objective tasks; multi-fidelity BO requires reducible replicates; TuRBO and surrogate CMA-ES require scored feasible history; and SAASBO or BIPOP CMA-ES require their respective high-dimensional or restart preconditions. A missing precondition removes the tool rather than asking the model to reason around it. The current 24-case distribution therefore describes routing coverage under Evidence 2.8 and Prompt 1.7, not the relative optimization quality of those methods or a causal improvement over earlier prompt freezes [, , , . Its frozen selections are portfolio 9, TuRBO 5, constrained MOBO 3, BIPOP-CMA-ES 3, surrogate CMA-ES 2, SAASBO 1, and multi-fidelity MOBO 1. These are route frequencies, not tool-quality estimates; every response is checked against the phase-qualified manifest before dispatch, and no method-specific superiority follows without physical outcomes. Figure 4 is therefore a coverage diagnostic for the validated router surface, not an empirical ranking or outcome comparison among the seven selected method families; it does not measure how any method changes controller behavior under a shared scenario, seed, and execution budget, and it cannot establish repeatability beyond the frozen routing corpus itself."
       },
       {
-        "index": 31,
-        "page": 8,
+        "index": 33,
+        "page": 9,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 10,
@@ -471,7 +501,7 @@
         "text": "EVIDENCE 2.9 CLOSES AN OFFLINE BUDGET-AND-ACCOUNTING CONTRACT, NOT AN ONLINE PLANNING-QUALITY CLAIM. Three fixed seed blocks compare a direct portfolio arm with a scripted multi-tool arm under equal ceilings of two generations and 40 Trials. All 3/3 blocks preserve configured budget parity across six arm runs. The scripted arm records six verified generations, including three multi-tool generations, and accounts for 12/12 decision calls across plan and revision stages. The MockSimulator run makes zero provider and network calls and uses no real credential. Its first repository-root launch failed with ModuleNotFoundError(app) before starting a Job or contacting a provider, network, or simulator; the failure and the source-bound CLI fix remain in the receipt. This closure verifies closed-schema plan history, multi-tool dispatch, revision, provenance, and cost accounting. It does not measure real LLM planning quality, optimizer superiority, physical fidelity, real-flight performance, or causal AURORA benefit. No result authorizes a deployment qualification in any customer release decision."
       },
       {
-        "index": 32,
+        "index": 34,
         "page": 9,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -486,8 +516,8 @@
         "text": "Evidence 2.8 and Evidence 2.9 share the phase-qualified registry but not an evaluation unit. Figure 4 counts online tool selections for 24 routing cases; the offline closure measures plan-history and accounting behavior for six scripted/mock arm runs. Neither denominator may be substituted for the other, and neither licenses an optimizer-outcome or physical performance comparison under any deployment or customer setting."
       },
       {
-        "index": 33,
-        "page": 9,
+        "index": 35,
+        "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 18,
@@ -501,8 +531,8 @@
         "text": "Simulation-queue behavior is also an experimental-validity concern. Execution Claim Gate 1.1 binds each authorized Trial to a content-addressed snapshot, while Scheduling Gate 1.0 admits the least-served eligible Job’s next FIFO Trial. Regressions cover concurrent claimants, physical-attempt accounting, retry ownership, and alternating claims across paired Jobs. These checks do not improve the proxy objective; they prevent reported budgets and cohort comparisons from being distorted by duplicate execution, starvation, or shared-Runtime queue monopolization. The ledger retains every authorized claim and terminal disposition for independent replay after every failure, retry, recovery, and ownership transition. Queue correctness is assessed on the admitted denominator, not worker throughput alone. Every retry keeps its original Job, snapshot, and physical-attempt identity, so concurrency cannot create a second eligible observation or remove the failed attempt that preceded recovery from the retained denominator, evidence replay, or later aggregate value. Replay is evaluated as a state invariant rather than a throughput target. After every claim, the Job’s next-Trial cursor, attempt ordinal, Candidate snapshot, and terminal disposition must agree across database and worker views. A retry may re-enter execution only from its recorded failure state; it cannot acquire a new budget, seed, scenario, or Candidate identity. The receipt also binds the prior failure to the recovered attempt, so a worker restart cannot replace one authorized observation with another or drop an unavailable cell. These invariants expose concurrency faults before any recovered value enters selection and preserve every declared arm, scenario, and seed in later campaign tables; throughput remains separately reported and cannot relax claim eligibility, denominator preservation, or final evidence admission during replay, release review, or customer qualification under an independently accepted Runtime and frozen release receipt."
       },
       {
-        "index": 34,
-        "page": 9,
+        "index": 36,
+        "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 9,
@@ -516,7 +546,7 @@
         "text": "The concurrency fixtures and the synthetic objective remain separate even when they share one Job ledger. Scheduling evidence answers who may claim the next Trial and whether retries conserve identity; synthetic outcomes answer whether the persisted mock campaign recomputes under its frozen coefficients. A valid export must therefore reproduce both the state-transition history and the objective rows without using throughput as an outcome proxy. This separation also keeps a recovered infrastructure attempt from being counted as an additional optimizer observation or from silently replacing the failure that justified recovery. The same receipt must preserve the failed attempt, recovered attempt, and accounting identity so later reviewers can distinguish a valid retry from an extra Trial. It must also reconcile queue events with persisted outcome rows before either surface is summarized in a release table or customer review package for independent audit at the frozen source boundary."
       },
       {
-        "index": 35,
+        "index": 37,
         "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -531,7 +561,7 @@
         "text": "Across the frozen 61-candidate mock campaign, aggregate holdout loss fell from 0.82811 to 0.58525 (29.327% relative). All ten named scenarios improved; scenario-wise relative reductions ranged from 21.8% to 33.2%. The selected candidate matched the exhaustive mock oracle in every scenario under the frozen proxy objective, candidate grid, and deterministic tie-break rule. The exporter recomputes the aggregate and per-scenario values from all persisted Trials and confirms that the selected Candidate belongs to the evaluated set. These measurements verify the closed synthetic campaign only; they do not predict the size or direction of improvement in a physical simulator under any flight condition without matched physical execution and retained evidence from every matched seed."
       },
       {
-        "index": 36,
+        "index": 38,
         "page": 10,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -546,8 +576,8 @@
         "text": "The artifact declares physical_fidelity=false, simulator_backend=mock, and provider_network_access=false. Its scenario scores are generated by a frozen deterministic proxy objective rather than flight dynamics, sensors, actuator models, or environmental plugins. The claim is limited to orchestration, artifact completeness, and optimizer selection within that proxy. It is not PX4/Gazebo evidence, real-aircraft evidence, sim-to-real evidence, a safety claim, or a basis for physical deployment decisions; any later physical claim therefore requires independent, provenance-bound PX4/Gazebo measurements under the frozen release protocol with matched seeds and retained failures and independent recomputation under a signed, frozen release protocol and receipt set."
       },
       {
-        "index": 37,
-        "page": 10,
+        "index": 39,
+        "page": 11,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
@@ -561,8 +591,8 @@
         "text": "Scenario-wise reporting exposes heterogeneity that a single aggregate loss would conceal. The heat strip and the quantitative table use the same ten frozen mock scenarios, selected Candidate, deterministic objective, and persisted holdout records as the integration campaign above. Values are paired within scenario: baseline and selected losses are recomputed from the ledger before the relative reduction is calculated. The resulting range shows that every declared proxy scenario improved under this closed campaign, while preserving the same non-physical boundary. These rows do not estimate uncertainty across vehicles or simulators and cannot be interpreted as PX4/Gazebo, real-aircraft, safety, or sim-to-real evidence under any vehicle, Runtime, or customer setting."
       },
       {
-        "index": 38,
-        "page": 10,
+        "index": 40,
+        "page": 11,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
@@ -576,7 +606,7 @@
         "text": "The strip should be read as a paired descriptive view of the frozen proxy campaign, not as a confidence interval or cross-vehicle generalization result. Each cell recomputes the relative change from the baseline and selected loss stored for the same named scenario, so a row cannot borrow evidence from a different seed, scenario, or Candidate. The narrow range is useful because it exposes whether one scenario dominates the aggregate, yet it remains a property of this deterministic mock objective. Publication-grade claims still require independent seeds, physical simulator receipts, retained failures, and uncertainty computed from the frozen PX4/Gazebo campaign rather than synthetic proxy assumptions; the strip cannot establish variance, robustness, or safety beyond that proxy."
       },
       {
-        "index": 39,
+        "index": 41,
         "page": 11,
         "style": "body",
         "policy_category": "explanatory_body",
@@ -591,8 +621,8 @@
         "text": "The separately frozen advanced-physics campaign uses the same pinned PX4 SITL v1.16 commit, x500, the default Gazebo world, seed 42001, and Candidate baseline-mpc-xy-p-0.95. Its three repeated successful-flight attempts all apply and verify payload mass, first-order actuator delay, barometer noise, scaled IMU noise, and wind gust effects. All three pass: RMSE is 0.368624–0.374250 m, maximum error is 1.496421–1.499631 m, and track coverage is 0.952893–0.954955. The bundle does not claim a Gazebo version or WSL Runtime identifier, and three repeats of one seed do not establish a reliability distribution. They are a repetition check within one configured condition, not three independent campaign units or evidence for repeatability across accepted customer installations."
       },
       {
-        "index": 40,
-        "page": 11,
+        "index": 42,
+        "page": 12,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
@@ -606,8 +636,8 @@
         "text": "Two additional attempts add GPS position noise to those five effects. Both retain six requested, applied, and verified effect records, but PX4 readiness times out after 30.0 seconds; each has success=false, no pass flag, and no trajectory metrics. They prove injection and read-back before readiness failure, not successful GPS-noise flight. One earlier file-backed attempt failed on PX4 dubious ownership. Three still earlier operator-observed preflights have no raw files and remain explicitly non-machine-verified narrative history without invented hashes or timestamps."
       },
       {
-        "index": 41,
-        "page": 11,
+        "index": 43,
+        "page": 12,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 8,
@@ -621,64 +651,34 @@
         "text": "A later exact-commit negative control binds implementation fdf1250 to evidence head 2f1caae. Its runner and acceptance commands both exit zero, the 76-second Trial completes without crash, timeout, residual process, credential use, or evidence-generation failure, and all three requested effects are applied and verified. A deterministic 20% GPS-denial schedule drives SIM_GPS_USED from baseline 10 to 0 for 6 of 29 ticks, realizing 0.2068966 before exact recovery to 10. The bound ULog independently contains 7 NO_GPS/0-satellite and 49 FIX_3D/10-satellite samples. Battery read-back and flight telemetry move from 92% / 16.02 V to 80% / 15.825 V. This is a completed effect-injection Trial, but not a passing one: observed position speed reaches 31.211302 m/s against the 25 m/s policy limit, so pass_flag=false despite RMSE 0.345207 m, maximum error 1.498568 m, and coverage 0.983807."
       },
       {
-        "index": 42,
-        "page": 11,
-        "style": "bullet",
-        "policy_category": "exception_list",
-        "lines": 4,
-        "last_line_ratio": 0.21,
-        "last_line_ratio_denominator": "usable_list_width",
-        "last_line_text": "installations and audits.",
-        "last_line_pass_50": false,
-        "last_line_pass_80": false,
-        "last_line_pass_90": false,
-        "line_policy_passed": false,
-        "text": "Execution boundary — the dedicated Runtime records 6/6 successful, passing Trials for exactly two seeds and three x500 scenarios; this verifies the retained matrix, not a wider reliability distribution, optimizer advantage, released customer-performance claim, or cross-scenario reliability estimate across independently repeated installations and audits."
-      },
-      {
-        "index": 43,
-        "page": 11,
-        "style": "bullet",
-        "policy_category": "exception_list",
-        "lines": 3,
-        "last_line_ratio": 0.9032,
-        "last_line_ratio_denominator": "usable_list_width",
-        "last_line_text": "comparison, or support a broad stability, safety, customer-Runtime, real-aircraft, or sim-to-real claim.",
-        "last_line_pass_50": true,
-        "last_line_pass_80": true,
-        "last_line_pass_90": true,
-        "line_policy_passed": true,
-        "text": "Advanced-effects boundary — the three passing same-seed trajectories authorize only the five exercised effect applications and their retained metrics; they do not enlarge the two-seed scenario matrix, establish an optimizer comparison, or support a broad stability, safety, customer-Runtime, real-aircraft, or sim-to-real claim."
-      },
-      {
         "index": 44,
-        "page": 11,
-        "style": "bullet",
-        "policy_category": "exception_list",
-        "lines": 3,
-        "last_line_ratio": 0.9562,
-        "last_line_ratio_denominator": "usable_list_width",
-        "last_line_text": "because neither produced a successful GPS-noise flight, admissible trajectory outcome, or frozen pass flag.",
+        "page": 12,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 9,
+        "last_line_ratio": 0.9281,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "performance, stable control, fault recovery, or another passing campaign record under this dedicated probe.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "GPS boundary — the two failed readiness attempts preserve their timeout denominator and prove only six-effect injection/read-back. They are excluded from the three successful trajectories and from every performance statistic because neither produced a successful GPS-noise flight, admissible trajectory outcome, or frozen pass flag."
+        "text": "A still later exact-commit probe binds implementation 793f020 to software head 2da6a4f. In an 82-second WSL DroneDreamRuntime/PX4 v1.16/Gazebo 8.14 x500 run, the generated SDF sets motor 2 maximum rotational velocity to zero while the other three motors remain at 1,000 rad/s. Joint-state read-back records 641 target samples with maximum absolute velocity 8.93786 × 10−7 rad/s, below the 0.05 rad/s hard-stop limit; each healthy rotor contributes 653 samples and reaches approximately 100 rad/s, above the 1.0 rad/s motion threshold. Runner and acceptance commands exit zero and leave no residual process, but trial_success=false: no trusted evaluation window is established. The evidence therefore verifies actuator-failure injection and read-back only, not flight performance, stable control, fault recovery, or another passing campaign record under this dedicated probe."
       },
       {
         "index": 45,
         "page": 12,
-        "style": "bullet",
-        "policy_category": "exception_list",
-        "lines": 4,
-        "last_line_ratio": 0.3893,
-        "last_line_ratio_denominator": "usable_list_width",
-        "last_line_text": "endurance, safety, or broad-stability claims.",
-        "last_line_pass_50": false,
-        "last_line_pass_80": false,
-        "last_line_pass_90": false,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 5,
+        "last_line_ratio": 0.921,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "passes. The ledger retains each readiness, policy-failure, and no-window boundary from its source receipt.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": true,
         "line_policy_passed": false,
-        "text": "GPS/battery negative-control boundary — the later Trial proves deterministic denial/recovery, battery initial-state and voltage-sag injection/read-back, and completed trajectory execution. Its failed stability gate remains the outcome: it cannot enter the earlier 3/3 or 6/6 pass numerator, qualify the capability as a whole, or support endurance, safety, or broad-stability claims."
+        "text": "The closure-v2 ledger exact-byte aggregates four source classes while preserving their individual receipts, outcomes, and denominators. All 9/9 bundled physical-effect categories now have real PX4/Gazebo injection and read-back evidence, and none requires a further Runtime implementation extension. Only five categories have every retained Trial pass its performance gate, so the coverage count denotes exercised mechanisms rather than nine performance passes. The ledger retains each readiness, policy-failure, and no-window boundary from its source receipt."
       },
       {
         "index": 46,
@@ -742,7 +742,7 @@
       },
       {
         "index": 50,
-        "page": 12,
+        "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 9,
@@ -757,7 +757,7 @@
       },
       {
         "index": 51,
-        "page": 12,
+        "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 2,
@@ -772,7 +772,7 @@
       },
       {
         "index": 52,
-        "page": 12,
+        "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
@@ -787,7 +787,7 @@
       },
       {
         "index": 53,
-        "page": 12,
+        "page": 13,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -802,7 +802,7 @@
       },
       {
         "index": 54,
-        "page": 12,
+        "page": 13,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -817,7 +817,7 @@
       },
       {
         "index": 55,
-        "page": 12,
+        "page": 13,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -832,7 +832,7 @@
       },
       {
         "index": 56,
-        "page": 12,
+        "page": 13,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -847,7 +847,7 @@
       },
       {
         "index": 57,
-        "page": 12,
+        "page": 13,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 3,
@@ -895,6 +895,21 @@
         "page": 13,
         "style": "body",
         "policy_category": "explanatory_body",
+        "lines": 8,
+        "last_line_ratio": 0.8771,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "become unrecorded researcher degrees of freedom in the final comparison after outcomes are known.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": false,
+        "line_policy_passed": true,
+        "text": "The analysis receipt must also freeze the statistic implementation, units, pairing key, interval method, multiplicity treatment, and minimum evidence required for each claim. A reviewer should be able to rebuild the primary table from Trial-level rows without consulting a dashboard cache or manually transcribed spreadsheet. If a planned metric cannot be computed, its cell remains unavailable with a declared reason; a correlated diagnostic cannot silently replace it after outcomes are visible. Any exploratory post-hoc analysis is labeled separately, retains the same failure denominator, and cannot satisfy the preregistered publication gate. This keeps analysis-code changes, missing measurements, and selective metric substitution visible as protocol events rather than allowing them to become unrecorded researcher degrees of freedom in the final comparison after outcomes are known."
+      },
+      {
+        "index": 61,
+        "page": 14,
+        "style": "body",
+        "policy_category": "explanatory_body",
         "lines": 12,
         "last_line_ratio": 0.8315,
         "last_line_ratio_denominator": "widest_rendered_line",
@@ -906,8 +921,8 @@
         "text": "The desktop readiness gate is part of the product’s technical contract. The progress bar may report completion only after every check that DroneDream can perform at launch has reached a terminal pass state. The entry action must not become visible while a required check is pending or failed. After entry, runtime failures still need explicit diagnostics because network loss, disk damage, permission changes, and external service changes cannot be permanently prevented. The gate therefore certifies a timestamped launch snapshot rather than promising an error-free future session, and post-entry faults must remain recoverable, attributable, and visible without silently invalidating prior work for every affected run. Its receipt should preserve probe timestamps, dependency versions, the service endpoint, account disposition, and the first failing stage. Recovery verification should replay install, upgrade, repair, offline, and damaged-cache paths without allowing stale success to satisfy a fresh launch or conceal the newly failing dependency under the same receipted probe sequence. The receipt must also retain the exact recovery action and the first post-recovery probe so a green launcher state remains attributable to one tested environment rather than becoming a generic assertion of platform health after repair or upgrade."
       },
       {
-        "index": 61,
-        "page": 13,
+        "index": 62,
+        "page": 14,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
@@ -921,8 +936,8 @@
         "text": "READINESS IS A CONJUNCTION, NOT A PROGRESS ANIMATION. The launcher requires a fresh supported-system probe, one owned and compatible Runtime, a healthy local service, no mandatory update, and an account accepted by the local API. Missing, stale, mismatched, unreachable, or still-checking states remain blocking. Only the current gate may mark readiness complete, change the environment badge to CHECKED, and reveal the entry action. Quantitative release evidence still needs time-to-ready p50/p95, false-ready rate, and a clean Windows/upgrade matrix across fresh install, upgrade, repair, and duplicate-download paths before any release is accepted for public distribution on a supported Windows architecture or the entry action is exposed across the declared release matrix."
       },
       {
-        "index": 62,
-        "page": 13,
+        "index": 63,
+        "page": 14,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
@@ -936,8 +951,8 @@
         "text": "EXIT AND ACCOUNT OPERATIONS USE THE SAME RECOVERABILITY PRINCIPLE. Closing warns about an active simulation or unsaved draft, stops work that cannot survive process termination, and preserves a recoverable draft whenever possible without trapping the user in the application. Managed-model usage consumes the included quota through a server-side ledger before BYOK is required; provider receipts must later be reconciled against that ledger. Remaining evidence therefore concerns draft-recovery and exit success rates plus quota-receipt consistency, not a new product capability claim, across every managed-provider transaction, recovery path, and audit replay retained by the service ledger, with a reconciliation receipt preserved for later independent audit of account state and quota events."
       },
       {
-        "index": 63,
-        "page": 13,
+        "index": 64,
+        "page": 14,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 10,
@@ -951,8 +966,8 @@
         "text": "AURORA’s present evidence establishes enforceable software boundaries, reproducible mock-campaign behavior, one dedicated 6-Trial PX4/Gazebo scenario matrix, and a separate same-seed advanced-effects campaign. It does not establish broad optimization superiority or accepted customer-Runtime physical-simulator performance. The distinctions below are active claim constraints, not generic future-work disclaimers: each identifies a missing evidence unit, uncontrolled confounder, or unaccepted environment. Keeping them explicit prevents development routing accuracy, deterministic guard probes, synthetic proxy gains, and the two-seed physical matrix from being pooled into a stronger conclusion than their separate protocols support. The next experiments therefore prioritize frozen matched budgets, independent recomputation, signed Runtime acceptance, and scenario-level uncertainty over time under independently rebuilt deployments with retained failure histories and audit replay before any result advances toward customer acceptance or publication without a separately bound deployment receipt."
       },
       {
-        "index": 64,
-        "page": 13,
+        "index": 65,
+        "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -966,22 +981,22 @@
         "text": "No result in this report establishes real-aircraft safety, certification, or direct simulation-to-reality transfer; those claims require separately governed hardware evidence, operational risk controls, and accepted flight testing outside the present software-contract scope and do not inherit assurance from the mock, WSL, or policy-only artifacts reported here."
       },
       {
-        "index": 65,
-        "page": 13,
+        "index": 66,
+        "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
-        "lines": 2,
-        "last_line_ratio": 0.9507,
+        "lines": 3,
+        "last_line_ratio": 0.9717,
         "last_line_ratio_denominator": "usable_list_width",
-        "last_line_text": "establishes neither broad model generalization nor optimizer, simulator, flight-performance, or safety gain.",
+        "last_line_text": "optimizer, simulator, flight-performance, or safety gain for the current or any broader operational population.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "The current Evidence 2.8 / Prompt 1.7 online freeze qualifies at 23/24 for one model snapshot and 24 calls; it establishes neither broad model generalization nor optimizer, simulator, flight-performance, or safety gain."
+        "text": "The retained Evidence 2.8 / Prompt 1.7 online freeze qualifies at 23/24 for one model snapshot and 24 calls, but Evidence v10 marks it not current for Evidence 2.9. It establishes neither broad model generalization nor optimizer, simulator, flight-performance, or safety gain for the current or any broader operational population."
       },
       {
-        "index": 66,
+        "index": 67,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -996,7 +1011,7 @@
         "text": "Evidence 2.9 exercises equal-budget scripted multi-tool planning and accounting over three seed blocks, six arm runs, and 12/12 accounted calls on a mock backend with zero provider or network calls. It cannot establish real LLM planning quality, optimizer superiority, physical fidelity, real flight, or causal Harness benefit under any release."
       },
       {
-        "index": 67,
+        "index": 68,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1011,7 +1026,7 @@
         "text": "Archived Prompt 1.5 and Prompt 1.6 freezes record 19/24, 21/24, and 24/24. The unpaired histories establish neither causal prompt lift nor deterministic provider behavior under the reported seed and controls after release."
       },
       {
-        "index": 68,
+        "index": 69,
         "page": 14,
         "style": "bullet",
         "policy_category": "exception_list",
@@ -1026,8 +1041,8 @@
         "text": "The 10/10 cross-Job memory fixtures exercise retrieval, isolation, and lifecycle gates without measuring online provider effect, optimization gain, physical fidelity, real-aircraft performance, safety, or certification in review."
       },
       {
-        "index": 69,
-        "page": 14,
+        "index": 70,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -1041,8 +1056,8 @@
         "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels, preregistered scoring, independent custody, and a frozen separation between development examples and final evaluation cases under external final-test custody and audit."
       },
       {
-        "index": 70,
-        "page": 14,
+        "index": 71,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -1056,8 +1071,8 @@
         "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift; each weakened comparator changes a software protection under constructed probes and therefore cannot estimate controller performance, simulator fidelity, or benefit under real execution noise across matched scenario and seed blocks with uncertainty."
       },
       {
-        "index": 71,
-        "page": 14,
+        "index": 72,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -1071,8 +1086,8 @@
         "text": "The frozen four-arm mock ablation changes protocol behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive; the scripted policy does not authorize a causal performance claim outside a physical, matched-budget, multi-seed intervention with independent outcome recomputation and retained failures."
       },
       {
-        "index": 72,
-        "page": 14,
+        "index": 73,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -1086,8 +1101,8 @@
         "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution; all arms converge on the same deterministic portfolio, so the retained comparison isolates dispatch recovery rather than optimization quality or causal lift."
       },
       {
-        "index": 73,
-        "page": 14,
+        "index": 74,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -1101,8 +1116,8 @@
         "text": "The ten-scenario campaign is synthetic mock evidence used to exercise orchestration and evidence flow; it is not physical scenario coverage, vehicle-dynamics validation, disturbance fidelity, or a substitute for signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics, disturbance realism, or control quality in the signed Runtime."
       },
       {
-        "index": 74,
-        "page": 14,
+        "index": 75,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -1116,8 +1131,8 @@
         "text": "The dedicated Runtime matrix has only two seeds per nominal, wind, and static-obstacle scenario. The obstacle is outside the nominal track, so creation proves injection rather than avoidance; signed customer Runtime repetition and wider seed blocks remain necessary before reliability, customer acceptance, or statistical generalization across installations."
       },
       {
-        "index": 75,
-        "page": 14,
+        "index": 76,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -1131,23 +1146,23 @@
         "text": "The advanced-effects success subset contains three repeats of seed 42001, not independent seed blocks. Two GPS-noise attempts end at the 30.0-second readiness boundary, one file-backed attempt fails on PX4 ownership, and three earlier preflights lack machine artifacts. These records cannot be pooled with the six-Trial scenario matrix or recast as a larger success rate, and the bundle claims no Gazebo version."
       },
       {
-        "index": 76,
-        "page": 14,
+        "index": 77,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
-        "lines": 4,
-        "last_line_ratio": 0.6998,
+        "lines": 6,
+        "last_line_ratio": 0.3629,
         "last_line_ratio_denominator": "usable_list_width",
-        "last_line_text": "actuator failure beyond the bounded first-order delay profile remain unproved.",
-        "last_line_pass_50": true,
+        "last_line_text": "fault-tolerant recovery remain unproved.",
+        "last_line_pass_50": false,
         "last_line_pass_80": false,
         "last_line_pass_90": false,
         "line_policy_passed": false,
-        "text": "Deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection are now verified in one completed Trial, but its 31.211302 m/s speed violates the 25 m/s stability gate. Probability-law behavior across seeds, probabilistic GPS dropout endurance, depleted-battery stability, combined-fault qualification, and hard actuator failure beyond the bounded first-order delay profile remain unproved."
+        "text": "Closure v2 records no remaining Runtime extension for any of the nine bundled effect categories, yet only five categories have all retained Trials pass their performance gate. Deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection are now verified in one completed Trial, but its 31.211302 m/s speed violates the 25 m/s stability gate. Probability-law behavior across seeds, probabilistic GPS dropout endurance, depleted-battery stability, combined-fault qualification, trusted flight evaluation under the verified motor-2 hard stop, and fault-tolerant recovery remain unproved."
       },
       {
-        "index": 77,
-        "page": 14,
+        "index": 78,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 3,
@@ -1161,8 +1176,8 @@
         "text": "Optimizer comparison, physical component ablation, confidence intervals, cost/latency measurement, and UX telemetry remain pending. Each requires matched budgets, retained failures, frozen manifests, and independently recomputed outputs under its declared evidence class for external release review and recomputation at scale."
       },
       {
-        "index": 78,
-        "page": 14,
+        "index": 79,
+        "page": 15,
         "style": "bullet",
         "policy_category": "exception_list",
         "lines": 4,
@@ -1176,8 +1191,23 @@
         "text": "External baselines such as expert manual tuning or PX4 AutoTune must be included only when controller, vehicle, track, budget, metrics, and failure accounting are genuinely aligned; unmatched access to resets, prior knowledge, simulator time, or terminal exclusions must be reported as a protocol difference rather than hidden inside a pooled ranking."
       },
       {
-        "index": 79,
-        "page": 14,
+        "index": 80,
+        "page": 15,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 5,
+        "last_line_ratio": 0.8106,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "new result a denominator that can be audited before any superiority claim or release decision.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": false,
+        "line_policy_passed": false,
+        "text": "Experiment priority follows the claim gap, not implementation novelty. First, repeat the retained physical matrices with wider preregistered seed blocks and an independently rebuilt signed Runtime; second, establish trusted scoring windows for the GPS/battery and hard-actuator mechanisms; only then compare matched optimizer arms. This order prevents a larger software feature surface from being mistaken for stronger physical qualification and gives every new result a denominator that can be audited before any superiority claim or release decision."
+      },
+      {
+        "index": 81,
+        "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 4,
@@ -1191,8 +1221,8 @@
         "text": "The report’s evidence units answer different questions and cannot be pooled into one score. Routing cases measure tool eligibility, source probes exercise named guards, fallback arms measure recovery equivalence, and synthetic scenarios measure a deterministic proxy. Substituting one unit for another remains a construct-validity error even when every recorded value is correct and the units remain explicitly separate in every release."
       },
       {
-        "index": 80,
-        "page": 14,
+        "index": 82,
+        "page": 15,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 4,
@@ -1206,8 +1236,8 @@
         "text": "The same implementation sometimes generates, executes, and verifies an artifact. A comparative campaign therefore still requires independent recomputation, immutable manifests, negative controls, and failure injection before any optimization-quality difference is described as causal. The physical receipt remains first-party frozen evidence rather than third-party validation, audit, or certification under the present campaign or any later deployment decision."
       },
       {
-        "index": 81,
-        "page": 15,
+        "index": 83,
+        "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
@@ -1221,8 +1251,8 @@
         "text": "Statistical validity requires the scenario, not an optimizer Trial, to remain the primary comparison unit. Trials in one trajectory share initialization, history, stopping conditions, and candidate ancestry, so treating them as independent understates uncertainty. A publication result must freeze seed blocks, report paired scenario-wise differences, retain terminal failures in the denominator, and present effect sizes with intervals rather than one aggregate percentage. Hyperparameters, method choice, and stopping rules must be fixed before the final partition opens; exploratory findings remain useful but cannot replace the frozen confirmatory comparison across every arm or its reported causal estimate for any registered arm, scenario family, customer deployment, or release decision under review."
       },
       {
-        "index": 82,
-        "page": 15,
+        "index": 84,
+        "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 10,
@@ -1236,23 +1266,23 @@
         "text": "Operational reproducibility requires more than code and a controller vector. A repeatable run must bind the owned Runtime image, PX4/Gazebo commits, vehicle and world assets, controller schema, scenario manifest, optimizer settings, seeds, environment, and evidence verifier. It must retain cancellations, timeouts, rejected callbacks, and post-launch changes rather than successful Trials alone. The ledger already supplies the source commit, test totals, digests, and reproduction command; the remaining gap is a signed customer-Runtime campaign executable on another machine without repository-specific state, hidden assumptions, operator interpretation, or independent auditability during replay across machines, maintainers, and independently provisioned environments. The rerun must reproduce the same planned and realized registry, unavailable cells, and terminal dispositions before any metric is compared across installations, external benchmarks, or customer qualification reviews. The replay receipt must preserve that registry digest and the complete unavailable-cell disposition map for audit."
       },
       {
-        "index": 83,
-        "page": 15,
+        "index": 85,
+        "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 8,
-        "last_line_ratio": 0.8648,
+        "lines": 10,
+        "last_line_ratio": 0.8581,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "published across all preregistered vehicle, disturbance, energy, and fault families in external review.",
+        "last_line_text": "rules. These limits remain explicit in every vehicle-family table and customer-facing release claim.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": false,
         "line_policy_passed": true,
-        "text": "External validity is bounded by controller, vehicle, world, and disturbance combinations actually executed. Many Trials in one x500 setup do not cover fixed-wing vehicles, broader payload geometries, actuator saturation or hard failure, estimator dropout, battery voltage sag, or other controller structures. A broader benchmark therefore needs a declared scenario matrix with held-out combinations, not a convenient collection of worlds. Every cell must explain its distinct operating condition, mutable parameters, and invariant feasibility constraints. Results must be aggregated within and across vehicle families so a strong mean cannot conceal a systematic failure in one operationally important subgroup or declared scenario family under final evaluation before a broader cross-platform claim is admitted or published across all preregistered vehicle, disturbance, energy, and fault families in external review."
+        "text": "External validity is bounded by controller, vehicle, world, and disturbance combinations actually executed. Many Trials in one x500 setup do not cover fixed-wing vehicles, broader payload geometries, actuator saturation or evaluated recovery from hard failure, estimator dropout, battery voltage sag, or other controller structures. A broader benchmark therefore needs a declared scenario matrix with held-out combinations, not a convenient collection of worlds. Every cell must explain its distinct operating condition, mutable parameters, and invariant feasibility constraints. Results must be aggregated within and across vehicle families so a strong mean cannot conceal a systematic failure in one operationally important subgroup or declared scenario family under final evaluation before a broader cross-platform claim is admitted or published across all preregistered vehicle, disturbance, energy, and fault families in external review, together with their frozen acceptance predicates, denominators, and failure rules. These limits remain explicit in every vehicle-family table and customer-facing release claim."
       },
       {
-        "index": 84,
-        "page": 15,
+        "index": 86,
+        "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 2,
@@ -1266,8 +1296,8 @@
         "text": "Measurement validity requires more than scalar holdout loss: retain trajectory error, settling time, overshoot, control effort, saturation, constraint violations, termination cause, wall-clock cost, energy use, and units."
       },
       {
-        "index": 85,
-        "page": 15,
+        "index": 87,
+        "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 2,
@@ -1281,8 +1311,8 @@
         "text": "Each metric needs frozen units, sampling rules, preprocessing, and direction. Feasibility remains a gate because a lower aggregate can hide oscillation or excessive actuator demand within one feasible trajectory."
       },
       {
-        "index": 86,
-        "page": 15,
+        "index": 88,
+        "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 3,
@@ -1296,38 +1326,68 @@
         "text": "Primary metrics and admissibility rules must be registered before optimization, while diagnostics remain visible for failure analysis; post-hoc metric choice cannot redefine a failed campaign as successful after execution once final outcomes become visible or a customer-facing ranking has already been produced or released."
       },
       {
-        "index": 87,
-        "page": 15,
+        "index": 89,
+        "page": 16,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 16,
-        "last_line_ratio": 0.8928,
+        "lines": 20,
+        "last_line_ratio": 0.8275,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "subset after observing outcomes during publication preparation, customer review, or independent audit.",
+        "last_line_text": "same digest also binds every table label and summary heading to the published claim inventory.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": false,
         "line_policy_passed": true,
-        "text": "The next comparative campaign prioritizes matched-budget PX4/Gazebo optimizer arms, physical component-level AURORA ablations, failure injection, and the readiness/exit matrix. It freezes the Runtime, controller catalog, scenario manifests, larger seed blocks, budgets, eligibility policy, and terminal taxonomy before any final arm runs. Matched baselines include fixed CMA-ES, a preselected specialist, the deterministic portfolio, and isolated AURORA variants. Signed JSON and CSV artifacts must retain failures and preserve the physical and statistical boundaries already exposed by the six-Trial matrix. The ledger must also show which planned comparisons never executed and why in the retained receipt. A causal provider-prompt study must pair Prompt 1.5, Prompt 1.6, and Prompt 1.7 calls on identical cases, model snapshot, call order, budget, and scoring rule; retain every raw response; and report paired category changes with uncertainty instead of selecting the best freeze. That design separates both current and archived routing qualifications from any future causal prompt-lift claim. The causal estimator must use paired case-level contrasts and retain category-specific disagreements, refusals, and parse failures in the denominator. The released audit artifact must preserve every paired case, call order, and response disposition for independent recomputation across every arm without selective exclusion and every published table. For external recomputation, the registry must enumerate the planned and realized seed block for every arm and preserve unavailable cells. A verifier should reproduce each table from that registry without querying application state or choosing a favorable subset after observing outcomes during publication preparation, customer review, or independent audit."
+        "text": "The next comparative campaign prioritizes matched-budget PX4/Gazebo optimizer arms, physical component-level AURORA ablations, failure injection, and the readiness/exit matrix. It freezes the Runtime, controller catalog, scenario manifests, larger seed blocks, budgets, eligibility policy, and terminal taxonomy before any final arm runs. Matched baselines include fixed CMA-ES, a preselected specialist, the deterministic portfolio, and isolated AURORA variants. Signed JSON and CSV artifacts must retain failures and preserve the physical and statistical boundaries already exposed by the six-Trial matrix. The ledger must also show which planned comparisons never executed and why in the retained receipt. A causal provider-prompt study must pair Prompt 1.5, Prompt 1.6, and Prompt 1.7 calls on identical cases, model snapshot, call order, budget, and scoring rule; retain every raw response; and report paired category changes with uncertainty instead of selecting the best freeze. That design separates both current and archived routing qualifications from any future causal prompt-lift claim. The causal estimator must use paired case-level contrasts and retain category-specific disagreements, refusals, and parse failures in the denominator. The released audit artifact must preserve every paired case, call order, and response disposition for independent recomputation across every arm without selective exclusion and every published table. For external recomputation, the registry must enumerate the planned and realized seed block for every arm and preserve unavailable cells. A verifier should reproduce each table from that registry without querying application state or choosing a favorable subset after observing outcomes during publication preparation, customer review, or independent audit. The registry must also bind the scoring implementation, exclusion taxonomy, and interval procedure to a versioned digest. Independent reviewers can then distinguish an unavailable measurement from a removed failure and can test the registered estimator without selecting a more favorable analysis after the matched outcomes become visible. The same digest also binds every table label and summary heading to the published claim inventory."
       },
       {
-        "index": 88,
-        "page": 15,
+        "index": 90,
+        "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
-        "last_line_ratio": 0.9497,
+        "last_line_ratio": 0.8099,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "independently regraded without rerunning the campaign, contacting the provider again, or mutating evidence.",
+        "last_line_text": "7/7 focused tamper checks bind receipt file/internal prefixes 5284eca94d2d/b9407556588e.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": true,
+        "last_line_pass_90": false,
         "line_policy_passed": false,
-        "text": "Figures 3, 5, and 6 trace to evidence bundle v9, canonical SHA-256 prefix d33c308ce3b47138; Figure 1 is a schematic. Figures 2 and 4 also consume the current online-routing artifact at software head ef00362, file SHA-256 prefix d2359e0540aa. Its manifest file and canonical prefixes are 6b625b8c0a6a and 3ab3830ecf79; implementation source is aeffaae01a81. The exact 24 provider calls completed in 77.8 seconds and were independently regraded without rerunning the campaign, contacting the provider again, or mutating evidence."
+        "text": "Evidence v10 is the latest software provenance navigation ledger. Exporter source 9749244 is frozen at a1f091f; its bundle file and canonical SHA-256 prefixes are 27b6b1c96524/ df6ef5e89851, and its manifest file prefix is 134d1ae0f0a9. The export exact-byte revalidates 39 sources, including the 1,651,339-byte, 554-Trial component ablation, and publishes three CSV projections without replacing any upstream receipt. Its 70/70 compatibility and 7/7 focused tamper checks bind receipt file/internal prefixes 5284eca94d2d/b9407556588e."
       },
       {
-        "index": 89,
-        "page": 16,
+        "index": 91,
+        "page": 17,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 9,
+        "last_line_ratio": 0.8628,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "experiment nor override the v10 bundle, manifest, and receipt as the authoritative evidence sources.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": false,
+        "line_policy_passed": true,
+        "text": "The v10 ledger preserves four distinct lineages: the v9 cross-Job base at c1222c9/8102ffe; the retained 24-call online route at aeffaae/ef00362; offline Evidence 2.9 multi-tool evidence at 136a1e3/15603c6; and advanced physics at f1e8fa8/83982f3. The online 23/24 result remains qualified for Evidence 2.8 / Prompt 1.7 but is not current for Evidence 2.9. Evidence 2.9 remains scripted/mock with 3/3 budget-parity blocks and zero network, provider, or credential use; physics remains 9/9 mechanism coverage with only five performance-successful categories. The ledger explicitly sets release_ready=false; it is not a current-source regression, Windows Rust, report/PDF, deployment, or final release receipt. Later documentation-alignment head 755c511 changes only engineering documents 17, 19, and 20. Their hashes are secondary narrative references; they neither add an experiment nor override the v10 bundle, manifest, and receipt as the authoritative evidence sources."
+      },
+      {
+        "index": 92,
+        "page": 17,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 6,
+        "last_line_ratio": 0.8438,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "evidence. The retained bytes remain the sole authority for every plotted selection and score alike.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": false,
+        "line_policy_passed": true,
+        "text": "Figures 3, 5, and 6 trace to the v9 base bundle retained inside v10, canonical SHA-256 prefix d33c308ce3b47138; Figure 1 is a schematic. Figures 2 and 4 also consume the retained online-routing artifact at software head ef00362, file SHA-256 prefix d2359e0540aa. Its manifest file and canonical prefixes are 6b625b8c0a6a and 3ab3830ecf79; implementation source is aeffaae01a81. The exact 24 provider calls completed in 77.8 seconds and were independently regraded without rerunning the campaign, contacting the provider again, or mutating evidence. The retained bytes remain the sole authority for every plotted selection and score alike."
+      },
+      {
+        "index": 93,
+        "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
@@ -1341,23 +1401,38 @@
         "text": "Evidence 2.9 is separately bound to source 136a1e3 and evidence head 15603c6. Its artifact file and internal SHA-256 prefixes are b20060eb76bf and e5c27308a9be; manifest file and internal prefixes are db78d1c8c999 and 3c49e2b96b3f. The CSV file prefix is 3911632e6dfe, and the retained generation/failure receipt prefix is 611783c9388b. These bytes authorize only the offline equal-budget, scripted/mock plan-history and accounting contract under the frozen mock Runtime; they authorize no online planning-quality or optimizer-outcome claim."
       },
       {
-        "index": 90,
-        "page": 16,
+        "index": 94,
+        "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 5,
-        "last_line_ratio": 0.9301,
+        "lines": 6,
+        "last_line_ratio": 0.8033,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "rather than an online provider or simulator study, physical-performance result, or deployment qualification.",
+        "last_line_text": "desktop, Rust, release, physical performance, customer environments, or deployment targets.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": false,
+        "line_policy_passed": true,
+        "text": "The current backend regression receipt binds subject 755c511 to receipt head 1e542b7. Its exact-final full suite records 1,284/1,284 tests in 831.79 seconds, and its focused supplement records 73/73 in 29.73 seconds. OPENAI_API_KEY was removed before both runs and real provider calls remain zero. Receipt file/internal prefixes are 113307a8ee6c/15e2c97e62f9; attestation-manifest and checksum-sidecar prefixes are 0e0e0df70087 and 52f73accc5f5. This receipt proves the enumerated backend software regression only; it does not qualify frontend, desktop, Rust, release, physical performance, customer environments, or deployment targets."
+      },
+      {
+        "index": 95,
+        "page": 17,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 6,
+        "last_line_ratio": 0.9616,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "deployment qualification. Its result remains bounded to those ten named contract fixtures and lifecycle checks.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": true,
-        "line_policy_passed": false,
-        "text": "The v9 bundle separately binds c1222c9 to receipt head 8102ffe. Its exact-source logs record 1,204/1,204 tests in 854.71 seconds plus 28/28 focused checks in 6.98 seconds; receipt wall intervals are 864.488 and 8.451 seconds. Ruff and mypy remain unreceipted, and Windows Rust was not run. Cross-Job artifact and manifest canonical prefixes are e1abf46c2aa44e9b and b8d55e358d5642cb; the ten-case evaluation is deterministic in-memory SQLite evidence rather than an online provider or simulator study, physical-performance result, or deployment qualification."
+        "line_policy_passed": true,
+        "text": "The historical upstream v9 base separately binds c1222c9 to receipt head 8102ffe. Its exact-source logs record 1,204/1,204 tests in 854.71 seconds plus 28/28 focused checks in 6.98 seconds; receipt wall intervals are 864.488 and 8.451 seconds. Ruff and mypy remain unreceipted, and Windows Rust was not run. Cross-Job artifact and manifest canonical prefixes are e1abf46c2aa44e9b and b8d55e358d5642cb; the ten-case evaluation is deterministic in-memory SQLite evidence rather than an online provider or simulator study, physical-performance result, or deployment qualification. Its result remains bounded to those ten named contract fixtures and lifecycle checks."
       },
       {
-        "index": 91,
-        "page": 16,
+        "index": 96,
+        "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
@@ -1371,38 +1446,68 @@
         "text": "The physical campaign independently binds 86273db to 3b09951. Manifest file and canonical prefixes are 4ac760428ead1506 and 9440bb24f25dbf07; receipt file and internal prefixes are 8f7e1c953338ae87 and 4746dd220583d64b. Its 159-file tree and 598-source-file / 154-retained-file inventories reverify without mismatch. Embedded identifier 5f0f62c789680e5e and handoff identifier c373dc9e4964301a do not resolve as Git commits; the reachable chain is c373dc992d43ff92 to 5f0f62c707c541ae to 3b09951bbea2e5f1. The report therefore verifies frozen bytes and reachable source while retaining the source-binding defect as an explicit provenance limitation for external reviewers, customer acceptance, and downstream release claims during independent replay."
       },
       {
-        "index": 92,
-        "page": 16,
+        "index": 97,
+        "page": 17,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 7,
-        "last_line_ratio": 0.8661,
+        "lines": 8,
+        "last_line_ratio": 0.8293,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "and denominators. This separation prevents a failed readiness probe from becoming flight evidence.",
+        "last_line_text": "the sampled environment and same-seed boundary for later comparison and independent replay.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": false,
         "line_policy_passed": true,
-        "text": "The advanced-physics campaign is independently bound to subject 26b957e, exporter 06cfdeb, and evidence head d14bf9c. Its 114 committed files total 9,442,999 bytes. Manifest prefixes are file 599c2b8b89bedb52 and canonical 0cae86ded8d92c6c. Receipt prefixes are file 99e257fb56d46d92 and canonical 0e83d002587590f3. The manifest inventories 1,205 source files and 305,040,238 bytes, retains 111 files and 8,994,710 bytes, and binds the full inventory with prefix 125463206a7965b3. Its three successful trajectories, two GPS readiness boundaries, one file-backed preflight failure, and three non-machine-verified terminal preflights remain separate evidence classes and denominators. This separation prevents a failed readiness probe from becoming flight evidence."
+        "text": "The advanced-physics campaign is independently bound to subject 26b957e, exporter 06cfdeb, and evidence head d14bf9c. Its 114 committed files total 9,442,999 bytes. Manifest prefixes are file 599c2b8b89bedb52 and canonical 0cae86ded8d92c6c. Receipt prefixes are file 99e257fb56d46d92 and canonical 0e83d002587590f3. The manifest inventories 1,205 source files and 305,040,238 bytes, retains 111 files and 8,994,710 bytes, and binds the full inventory with prefix 125463206a7965b3. Its three successful trajectories, two GPS readiness boundaries, one file-backed preflight failure, and three non-machine-verified terminal preflights remain separate evidence classes and denominators. This separation prevents a failed readiness probe from becoming flight evidence and preserves the sampled environment and same-seed boundary for later comparison and independent replay."
       },
       {
-        "index": 93,
-        "page": 16,
+        "index": 98,
+        "page": 18,
         "style": "body",
         "policy_category": "explanatory_body",
-        "lines": 6,
-        "last_line_ratio": 0.976,
+        "lines": 7,
+        "last_line_ratio": 0.9415,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "mechanism replaced the unavailable SimulatorMavlink failure-handler path in the exact frozen Runtime lineage.",
+        "last_line_text": "That sequence remains failure lineage rather than a successful alternative transport path in retained evidence.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "The later GPS/battery negative control binds evidence head 2f1caae; its implementation commit is fdf1250. The receipt prefix is 2d6470fb085e638c; failure lineage is 882acd480bfca395; ULog is dc3b156e6ae61442; the applied scenario is 7973680f267b2643; and the 159-test JUnit is 67d614764b213408. The receipt distinguishes successful Trial completion and three verified effects from failed stability acceptance. Its attempt-16 lineage also retains two MAVLink command-420 arrivals with zero acknowledgments before the supported SIM_GPS_USED mechanism replaced the unavailable SimulatorMavlink failure-handler path in the exact frozen Runtime lineage."
+        "text": "The later GPS/battery negative control binds evidence head 2f1caae; its implementation commit is fdf1250. The receipt prefix is 2d6470fb085e638c; failure lineage is 882acd480bfca395; ULog is dc3b156e6ae61442; the applied scenario is 7973680f267b2643; and the 159-test JUnit is 67d614764b213408. The receipt distinguishes successful Trial completion and three verified effects from failed stability acceptance. Its attempt-16 lineage also retains two MAVLink command-420 arrivals with zero acknowledgments before the supported SIM_GPS_USED mechanism replaced the unavailable SimulatorMavlink failure-handler path in the exact frozen Runtime lineage. That sequence remains failure lineage rather than a successful alternative transport path in retained evidence."
       },
       {
-        "index": 94,
-        "page": 16,
+        "index": 99,
+        "page": 18,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 6,
+        "last_line_ratio": 0.9041,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "or campaign-pass claim under any customer, publication, or cross-installation performance denominator.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": true,
+        "line_policy_passed": true,
+        "text": "The hard-actuator probe separately binds implementation 793f020 to evidence head 2da6a4f. Receipt, ULog, and joint-state prefixes are 5cc93ee5bfb7, fd01f02f7a97, and f927dbb6561e; the 138-test JUnit prefix is 65e027756f66, and attempt-0 preflight lineage is 72471490aa92. The receipt preserves runner and acceptance exit zero, 82 seconds, zero residual processes, physical-effect verification, and trial_success=false because the trusted evaluation window is absent. It authorizes an injection/read-back claim, not a flight, stability, recovery, or campaign-pass claim under any customer, publication, or cross-installation performance denominator."
+      },
+      {
+        "index": 100,
+        "page": 18,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 6,
+        "last_line_ratio": 0.9039,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "gates preserved by those source receipts and their non-exchangeable denominators in every later release.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": true,
+        "line_policy_passed": true,
+        "text": "Closure v2 binds aggregator source f1e8fa8 to frozen head 83982f3. Its manifest file/canonical prefixes are 5345cd6b7fa7/7193e21ff826; receipt file/canonical prefixes are 1ee74f3b207d/6f195b2908aa; and the 52/52 exact-subject test receipt prefix is 50994da3b338. The aggregator verifies the exact bytes of all four source classes, reports 9/9 mechanism categories covered, and reports only five categories with all retained Trials performance-successful. Its empty Runtime-extension list closes implementation coverage, not the failed or absent performance gates preserved by those source receipts and their non-exchangeable denominators in every later release."
+      },
+      {
+        "index": 101,
+        "page": 18,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 19,
@@ -1413,11 +1518,11 @@
         "last_line_pass_80": true,
         "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "Execution Claim Gate 1.1 and Outcome Contract 2.20 bind each Trial/Candidate/Job snapshot and scenario matrix before evidence admission. Evidence 2.8 / Prompt 1.7 / Decision Trace 1.4 binds the cross-Job memory contract and its OBSERVATIONAL_NOT_CAUSAL projection. The current online freeze qualifies at 23/24 for its exact model snapshot and controls, while the archived Prompt 1.6 freeze records 24/24 and Prompt 1.5 histories remain visible at 19/24 and 21/24. These unpaired observations are not causal prompt evidence. Policy holdout passes 16/16, and the fallback campaign matches the direct arm in 10/10 comparisons across 15 Jobs and 579 Trials. The non-comparative physical matrix records 6/6 passing Trials across two seeds and three scenarios and retains four failure probes. The advanced-physics subset separately records three same-seed passing trajectories under five verified effects; its two GPS-noise attempts terminate at readiness and are not performance runs. Latest website source 8710553 to receipt-only head 96aba5d records 13/13 focused checks, 325/325 frontend tests, typecheck, lint, application and shared builds, 11/11 deployment tests with 22/22 subtests, and 5/5 performance routes. Its desktop English and Chinese download copy each occupies two lines with final-line fills 0.895 and 0.835; the mobile layout-only audit reports zero violations. The receipt binds release-truth ancestor fd7e770 to 87e049c, which separately records 100/100 browser checks and 118 checksum entries across 119 files. No deployment occurred; TLS, dual-target publication, production Supabase/payment, and two differing unsigned public installers remain external gates. Git-object replay rejects missing bytes, and the two-commit pattern authenticates only bytes present at the source freeze; a receipt never widens the associated claim boundary across later audits, releases, publications, customer communications, acceptance decisions, or independently repeated qualification reviews under the frozen source ledger, and never authorizes an absent claim, substituted artifact, later source, or unrecorded execution in any downstream release [."
+        "text": "Execution Claim Gate 1.1 and Outcome Contract 2.20 bind each Trial/Candidate/Job snapshot and scenario matrix before evidence admission. Evidence 2.8 / Prompt 1.7 / Decision Trace 1.4 binds the cross-Job memory contract and its OBSERVATIONAL_NOT_CAUSAL projection. The retained online freeze qualifies at 23/24 for its exact model snapshot and controls, while the archived Prompt 1.6 freeze records 24/24 and Prompt 1.5 histories remain visible at 19/24 and 21/24. These unpaired observations are not causal prompt evidence. Policy holdout passes 16/16, and the fallback campaign matches the direct arm in 10/10 comparisons across 15 Jobs and 579 Trials. The non-comparative physical matrix records 6/6 passing Trials across two seeds and three scenarios and retains four failure probes. The advanced-physics subset separately records three same-seed passing trajectories under five verified effects; its two GPS-noise attempts terminate at readiness and are not performance runs. Latest website source 8710553 to receipt-only head 96aba5d records 13/13 focused checks, 325/325 frontend tests, typecheck, lint, application and shared builds, 11/11 deployment tests with 22/22 subtests, and 5/5 performance routes. Its desktop English and Chinese download copy each occupies two lines with final-line fills 0.895 and 0.835; the mobile layout-only audit reports zero violations. The receipt binds release-truth ancestor fd7e770 to 87e049c, which separately records 100/100 browser checks and 118 checksum entries across 119 files. No deployment occurred; TLS, dual-target publication, production Supabase/payment, and two differing unsigned public installers remain external gates. Git-object replay rejects missing bytes, and the two-commit pattern authenticates only bytes present at the source freeze; a receipt never widens the associated claim boundary across later audits, releases, publications, customer communications, acceptance decisions, or independently repeated qualification reviews under the frozen source ledger, and never authorizes an absent claim, substituted artifact, later source, or unrecorded execution in any downstream release [."
       },
       {
-        "index": 95,
-        "page": 16,
+        "index": 102,
+        "page": 18,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
@@ -1431,23 +1536,23 @@
         "text": "For this negative control, evidence admission is intentionally asymmetric: zero exit codes and a true Trial-success flag establish that the orchestrated run completed and yielded reviewable artifacts, whereas the policy outcome independently remains failed. Keeping both state vectors prevents operational completion, verified effect application, or retained metrics from being silently substituted for a passing stability decision in later reports, dashboards, release receipts, or customer reviews across independently reviewed release and qualification cycles."
       },
       {
-        "index": 96,
-        "page": 17,
+        "index": 103,
+        "page": 18,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 7,
-        "last_line_ratio": 0.8912,
+        "last_line_ratio": 0.9681,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "bounded to 24 calls, one frozen model snapshot, and the exact development corpus retained for review.",
+        "last_line_text": "likewise bounded to 24 calls, one frozen model snapshot, and the exact development corpus retained for review.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
-        "last_line_pass_90": false,
+        "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "DroneDream 1.0 positions AURORA as an evidence-gated Harness for UAV controller optimization in simulation: model reasoning interprets intent and coordinates eligible methods, while deterministic contracts retain authority over inputs, execution, evidence admission, and completion. The frozen release demonstrates exercised software boundaries through routing, holdout-policy, guard-ablation, fallback-equivalence, claim-receipt, case-separated feedback, and a 10/10 cross-Job memory contract evaluation. That memory result is observational and non-causal; it establishes only the enumerated software fixtures. The current 23/24 online routing qualification is likewise bounded to 24 calls, one frozen model snapshot, and the exact development corpus retained for review."
+        "text": "DroneDream 1.0 positions AURORA as an evidence-gated Harness for UAV controller optimization in simulation: model reasoning interprets intent and coordinates eligible methods, while deterministic contracts retain authority over inputs, execution, evidence admission, and completion. The frozen evidence set demonstrates exercised software boundaries through routing, holdout-policy, guard-ablation, fallback-equivalence, claim-receipt, case-separated feedback, and a 10/10 cross-Job memory contract evaluation. That memory result is observational and non-causal; it establishes only the enumerated software fixtures. The retained 23/24 online routing qualification is likewise bounded to 24 calls, one frozen model snapshot, and the exact development corpus retained for review."
       },
       {
-        "index": 97,
-        "page": 17,
+        "index": 104,
+        "page": 18,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 3,
@@ -1461,8 +1566,8 @@
         "text": "Evidence 2.9 separately demonstrates equal configured budgets and complete plan-history accounting for three scripted/mock seed blocks. Its zero-provider, zero-network closure is not evidence of online LLM planning quality, optimizer benefit, simulator fidelity, or flight performance or customer acceptance at release."
       },
       {
-        "index": 98,
-        "page": 17,
+        "index": 105,
+        "page": 18,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 2,
@@ -1476,8 +1581,8 @@
         "text": "A dedicated Runtime also records a fixed two-seed, three-scenario PX4/Gazebo matrix with 6/6 passing Trials and verified wind and obstacle injection under its fixed campaign, environment, and retained receipts."
       },
       {
-        "index": 99,
-        "page": 17,
+        "index": 106,
+        "page": 19,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 5,
@@ -1491,8 +1596,8 @@
         "text": "The separately frozen advanced-physics evidence adds three passing same-seed trajectories with verified payload, actuator-delay, barometer, IMU, and gust effects. Its two GPS-noise injections terminate at the 30.0-second readiness boundary and remain failed non-performance attempts. One file-backed ownership failure and three non-machine-verified preflights remain visible rather than being removed from the history. This retained history constrains every later success-rate calculation across every subsequent release, acceptance record, and audit cycle."
       },
       {
-        "index": 100,
-        "page": 17,
+        "index": 107,
+        "page": 19,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 4,
@@ -1506,8 +1611,53 @@
         "text": "A later negative control separately completes deterministic GPS denial/recovery and battery-profile injection, yet fails stability because position speed reaches 31.211302 m/s above a 25 m/s limit. It verifies the exercised mechanisms and read-backs, not an additional passing flight, capability-wide qualification, or a larger campaign success rate under any release or customer-qualification denominator or evidence class in a signed Runtime."
       },
       {
-        "index": 101,
-        "page": 17,
+        "index": 108,
+        "page": 19,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 3,
+        "last_line_ratio": 0.86,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "not evidence of stable flight, fault-tolerant recovery, or an additional passing Trial under this probe.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": false,
+        "line_policy_passed": false,
+        "text": "A subsequent hard-actuator probe separately verifies a motor-2 SDF hard stop and joint-state response while retaining trial_success=false because no trusted evaluation window is established. It is mechanism evidence, not evidence of stable flight, fault-tolerant recovery, or an additional passing Trial under this probe."
+      },
+      {
+        "index": 109,
+        "page": 19,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 3,
+        "last_line_ratio": 1.0,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "failure, and no-window records remain distinct rather than being converted into a nine-category performance result.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": true,
+        "line_policy_passed": false,
+        "text": "Closure v2 unifies these exact-byte sources as a navigation ledger: 9/9 bundled categories have real injection/read-back evidence, while only five categories have all retained Trials pass their performance gate. The readiness, policy-failure, and no-window records remain distinct rather than being converted into a nine-category performance result."
+      },
+      {
+        "index": 110,
+        "page": 19,
+        "style": "body",
+        "policy_category": "explanatory_body",
+        "lines": 7,
+        "last_line_ratio": 0.9225,
+        "last_line_ratio_denominator": "widest_rendered_line",
+        "last_line_text": "Rust, report/PDF, frontend, desktop, customer-facing deployment, or physical qualification independently.",
+        "last_line_pass_50": true,
+        "last_line_pass_80": true,
+        "last_line_pass_90": true,
+        "line_policy_passed": true,
+        "text": "Evidence v10 binds these lineages into the latest 39-source provenance ledger, not a new pooled experiment. It preserves the online route as a qualified Evidence 2.8 / Prompt 1.7 record while marking it not current for Evidence 2.9; it also keeps the Evidence 2.9 budget closure offline and scripted. At the v10 freeze, current-source full regression, Windows Rust, and the report/PDF gates remained outside that software export, so its authoritative release_ready=false field prevents provenance closure from being misreported as final product or publication readiness. The later 1,284-test backend receipt closes one external gate without mutating v10 or supplying Windows Rust, report/PDF, frontend, desktop, customer-facing deployment, or physical qualification independently."
+      },
+      {
+        "index": 111,
+        "page": 19,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 4,
@@ -1518,33 +1668,31 @@
         "last_line_pass_80": true,
         "last_line_pass_90": false,
         "line_policy_passed": false,
-        "text": "Neither evidence class establishes optimizer superiority, broad stability, collision avoidance, signed customer-Runtime acceptance, real-aircraft safety, or simulation-to-reality transfer. The next decisive step is therefore a larger matched-arm campaign plus signed-Runtime repetition and independent recomputation, without weakening AURORA’s provenance and leakage boundaries during later evidence campaigns or releases."
+        "text": "None of these evidence class establishes optimizer superiority, broad stability, collision avoidance, signed customer-Runtime acceptance, real-aircraft safety, or simulation-to-reality transfer. The next decisive step is therefore a larger matched-arm campaign plus signed-Runtime repetition and independent recomputation, without weakening AURORA’s provenance and leakage boundaries during later evidence campaigns or releases."
       },
       {
-        "index": 102,
-        "page": 17,
+        "index": 112,
+        "page": 19,
         "style": "body",
         "policy_category": "explanatory_body",
         "lines": 9,
-        "last_line_ratio": 0.909,
+        "last_line_ratio": 0.9902,
         "last_line_ratio_denominator": "widest_rendered_line",
-        "last_line_text": "with preregistered uncertainty across every retained arm, failure, and scenario family in the final registry.",
+        "last_line_text": "establish with preregistered uncertainty across every retained arm, failure, and scenario family in the final registry.",
         "last_line_pass_50": true,
         "last_line_pass_80": true,
         "last_line_pass_90": true,
         "line_policy_passed": true,
-        "text": "The current release therefore changes what future experiments can safely assert before it changes the empirical flight result itself. Claim v3, Outcome Contract 2.20, input/outcome/scenario drift rejection, and cross-Job fair scheduling make concurrent attempt counts, parameter provenance, and scenario eligibility independently auditable. The retained four-probe failure history shows why post-fix diagnostics must remain separate from successful Trials. A decisive external campaign must still freeze PX4/Gazebo versions, manifests, larger seed blocks, budgets, metrics, and baseline arms before execution; retain every timeout and failed Trial; and recompute signed outcomes outside the application process. This separation keeps AURORA’s demonstrated software assurances and narrow execution evidence distinct from optimization-quality claims that only a matched comparative study can establish with preregistered uncertainty across every retained arm, failure, and scenario family in the final registry."
+        "text": "The current evidence closure therefore changes what future experiments can safely assert before it changes the empirical flight result itself. Claim v3, Outcome Contract 2.20, input/outcome/scenario drift rejection, and cross-Job fair scheduling make concurrent attempt counts, parameter provenance, and scenario eligibility independently auditable. The retained four-probe failure history shows why post-fix diagnostics must remain separate from successful Trials. A decisive external campaign must still freeze PX4/Gazebo versions, manifests, larger seed blocks, budgets, metrics, and baseline arms before execution; retain every timeout and failed Trial; and recompute signed outcomes outside the application process. This separation keeps AURORA’s demonstrated software assurances and narrow execution evidence distinct from optimization-quality claims that only a matched comparative study can establish with preregistered uncertainty across every retained arm, failure, and scenario family in the final registry."
       }
     ],
-    "audited": 102,
+    "audited": 112,
     "unlocated": [],
     "cross_page_splits": [],
     "last_line_below_50": [
-      20,
       21,
       22,
-      42,
-      45,
+      23,
       46,
       48,
       49,
@@ -1552,22 +1700,21 @@
       54,
       55,
       56,
-      64,
-      66,
-      69,
+      65,
+      67,
       70,
       71,
       72,
       73,
       74,
-      78
+      75,
+      77,
+      79
     ],
     "last_line_below_80": [
-      20,
       21,
       22,
-      42,
-      45,
+      23,
       46,
       48,
       49,
@@ -1575,9 +1722,8 @@
       54,
       55,
       56,
-      64,
-      66,
-      69,
+      65,
+      67,
       70,
       71,
       72,
@@ -1585,49 +1731,38 @@
       74,
       75,
       76,
-      78
+      77,
+      79
     ],
     "explanatory_body": {
-      "total": 65,
-      "passed_80": 65,
+      "total": 79,
+      "passed_80": 79,
       "failed_80": 0,
       "failures": []
     },
     "short_list_items": {
-      "total": 14,
-      "passed_90": 14,
+      "total": 12,
+      "passed_90": 12,
       "failed_90": 0,
       "failures": [],
       "above_3_lines": [
         {
-          "index": 20,
+          "index": 21,
           "page": 5,
           "lines": 4,
           "text": "COMPLETED is admitted as successful optimizer evidence only when a usable metric and modern receipt bind the exact Candidate, Trial, scenario, objective direction, and execution provenance; a terminal label without that complete chain remains unavailable for optimizer learning, final selection, export, or any later performance statement in release."
         },
         {
-          "index": 21,
+          "index": 22,
           "page": 5,
           "lines": 4,
           "text": "FAILED with a trusted domain failure code is admitted as a non-success because it may identify an infeasible or unsafe simulated parameter region without being mislabeled as infrastructure failure; the failed attempt stays in the optimization denominator with its scenario and Candidate identity intact through every later aggregate and arm comparison."
         },
         {
-          "index": 22,
+          "index": 23,
           "page": 5,
           "lines": 4,
           "text": "Infrastructure faults, cancellation, malformed evidence, and conflicting terminal states are quarantined and cannot update search or routing memory under any later decision path or replay; each rejected row retains a stable quarantine reason and remains visible to operational diagnostics and independent evidence accounting without later relabeling."
-        },
-        {
-          "index": 42,
-          "page": 11,
-          "lines": 4,
-          "text": "Execution boundary — the dedicated Runtime records 6/6 successful, passing Trials for exactly two seeds and three x500 scenarios; this verifies the retained matrix, not a wider reliability distribution, optimizer advantage, released customer-performance claim, or cross-scenario reliability estimate across independently repeated installations and audits."
-        },
-        {
-          "index": 45,
-          "page": 12,
-          "lines": 4,
-          "text": "GPS/battery negative-control boundary — the later Trial proves deterministic denial/recovery, battery initial-state and voltage-sag injection/read-back, and completed trajectory execution. Its failed stability gate remains the outcome: it cannot enter the earlier 3/3 or 6/6 pass numerator, qualify the capability as a whole, or support endurance, safety, or broad-stability claims."
         },
         {
           "index": 46,
@@ -1649,91 +1784,91 @@
         },
         {
           "index": 53,
-          "page": 12,
+          "page": 13,
           "lines": 4,
           "text": "Primary outcomes bind frozen holdout loss, feasible-campaign rate, baseline improvement, time-to-target, and terminal failure rate to every reported arm and seed block, with paired uncertainty and effect size computed from the retained scenario-level comparison units. These units govern preregistered acceptance and arm-to-arm inference at release."
         },
         {
           "index": 54,
-          "page": 12,
+          "page": 13,
           "lines": 4,
           "text": "Secondary outcomes: wall time, model tokens and cost, router latency, recovery success, scenario-wise regret, and artifact completeness for every frozen comparison arm and seed block, reported alongside termination cause and evidence eligibility so efficiency cannot hide a higher failure burden or incomplete audit surface at publication time or review."
         },
         {
           "index": 55,
-          "page": 12,
+          "page": 13,
           "lines": 4,
           "text": "Use at least five independent seeds for engineering diagnostics and preferably ten for report-level comparisons across every reported arm; freeze seed blocks before final execution and publish paired scenario-level uncertainty before making any superiority or repeatability claim across the preregistered final-test matrix and all baseline arms in scope."
         },
         {
           "index": 56,
-          "page": 12,
+          "page": 13,
           "lines": 4,
           "text": "Keep timeouts, crashes, infeasible terminations, and failed Trials in the denominator under their predeclared terminal categories; never impute a successful loss, discard a difficult seed, or replace a missing receipt with an optimistic outcome, and never reclassify an unavailable execution after completed-arm results or rankings become visible during audit."
         },
         {
-          "index": 64,
-          "page": 13,
+          "index": 65,
+          "page": 14,
           "lines": 4,
           "text": "No result in this report establishes real-aircraft safety, certification, or direct simulation-to-reality transfer; those claims require separately governed hardware evidence, operational risk controls, and accepted flight testing outside the present software-contract scope and do not inherit assurance from the mock, WSL, or policy-only artifacts reported here."
         },
         {
-          "index": 66,
+          "index": 67,
           "page": 14,
           "lines": 4,
           "text": "Evidence 2.9 exercises equal-budget scripted multi-tool planning and accounting over three seed blocks, six arm runs, and 12/12 accounted calls on a mock backend with zero provider or network calls. It cannot establish real LLM planning quality, optimizer superiority, physical fidelity, real flight, or causal Harness benefit under any release."
         },
         {
-          "index": 69,
-          "page": 14,
+          "index": 70,
+          "page": 15,
           "lines": 4,
           "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels, preregistered scoring, independent custody, and a frozen separation between development examples and final evaluation cases under external final-test custody and audit."
         },
         {
-          "index": 70,
-          "page": 14,
+          "index": 71,
+          "page": 15,
           "lines": 4,
           "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift; each weakened comparator changes a software protection under constructed probes and therefore cannot estimate controller performance, simulator fidelity, or benefit under real execution noise across matched scenario and seed blocks with uncertainty."
         },
         {
-          "index": 71,
-          "page": 14,
+          "index": 72,
+          "page": 15,
           "lines": 4,
           "text": "The frozen four-arm mock ablation changes protocol behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive; the scripted policy does not authorize a causal performance claim outside a physical, matched-budget, multi-seed intervention with independent outcome recomputation and retained failures."
         },
         {
-          "index": 72,
-          "page": 14,
+          "index": 73,
+          "page": 15,
           "lines": 4,
           "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution; all arms converge on the same deterministic portfolio, so the retained comparison isolates dispatch recovery rather than optimization quality or causal lift."
         },
         {
-          "index": 73,
-          "page": 14,
+          "index": 74,
+          "page": 15,
           "lines": 4,
           "text": "The ten-scenario campaign is synthetic mock evidence used to exercise orchestration and evidence flow; it is not physical scenario coverage, vehicle-dynamics validation, disturbance fidelity, or a substitute for signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics, disturbance realism, or control quality in the signed Runtime."
         },
         {
-          "index": 74,
-          "page": 14,
+          "index": 75,
+          "page": 15,
           "lines": 4,
           "text": "The dedicated Runtime matrix has only two seeds per nominal, wind, and static-obstacle scenario. The obstacle is outside the nominal track, so creation proves injection rather than avoidance; signed customer Runtime repetition and wider seed blocks remain necessary before reliability, customer acceptance, or statistical generalization across installations."
         },
         {
-          "index": 75,
-          "page": 14,
+          "index": 76,
+          "page": 15,
           "lines": 4,
           "text": "The advanced-effects success subset contains three repeats of seed 42001, not independent seed blocks. Two GPS-noise attempts end at the 30.0-second readiness boundary, one file-backed attempt fails on PX4 ownership, and three earlier preflights lack machine artifacts. These records cannot be pooled with the six-Trial scenario matrix or recast as a larger success rate, and the bundle claims no Gazebo version."
         },
         {
-          "index": 76,
-          "page": 14,
-          "lines": 4,
-          "text": "Deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection are now verified in one completed Trial, but its 31.211302 m/s speed violates the 25 m/s stability gate. Probability-law behavior across seeds, probabilistic GPS dropout endurance, depleted-battery stability, combined-fault qualification, and hard actuator failure beyond the bounded first-order delay profile remain unproved."
+          "index": 77,
+          "page": 15,
+          "lines": 6,
+          "text": "Closure v2 records no remaining Runtime extension for any of the nine bundled effect categories, yet only five categories have all retained Trials pass their performance gate. Deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection are now verified in one completed Trial, but its 31.211302 m/s speed violates the 25 m/s stability gate. Probability-law behavior across seeds, probabilistic GPS dropout endurance, depleted-battery stability, combined-fault qualification, trusted flight evaluation under the verified motor-2 hard stop, and fault-tolerant recovery remain unproved."
         },
         {
-          "index": 78,
-          "page": 14,
+          "index": 79,
+          "page": 15,
           "lines": 4,
           "text": "External baselines such as expert manual tuning or PX4 AutoTune must be included only when controller, vehicle, track, budget, metrics, and failure accounting are genuinely aligned; unmatched access to resets, prior knowledge, simulator time, or terminal exclusions must be reported as a protocol difference rather than hidden inside a pooled ranking."
         }
@@ -1741,7 +1876,7 @@
     },
     "exceptions": {
       "categories": {
-        "exception_list": 37,
+        "exception_list": 33,
         "exception_caption": 0,
         "exception_other": 0
       },
@@ -1752,35 +1887,36 @@
       }
     },
     "body_below_6_lines": [
-      27,
-      29,
-      32,
-      40,
+      28,
+      31,
+      34,
+      42,
+      45,
       51,
       52,
       58,
       59,
-      79,
       80,
-      84,
-      85,
+      81,
+      82,
       86,
+      87,
       88,
-      89,
       90,
-      95,
-      97,
-      98,
-      99,
-      100,
-      101
+      93,
+      102,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      111
     ],
     "bullets_above_3_lines": [
-      20,
       21,
       22,
-      42,
-      45,
+      23,
       46,
       48,
       49,
@@ -1788,9 +1924,8 @@
       54,
       55,
       56,
-      64,
-      66,
-      69,
+      65,
+      67,
       70,
       71,
       72,
@@ -1798,15 +1933,16 @@
       74,
       75,
       76,
-      78
+      77,
+      79
     ]
   },
   "paragraph_policy": {
     "explanatory_body": {
       "definition": "Abstract and prose paragraphs that explain a claim, method, result, limitation, or evidence boundary.",
       "last_line_target_ratio": 0.8,
-      "total": 65,
-      "passed": 65,
+      "total": 79,
+      "passed": 79,
       "failed": 0,
       "failure_locations": []
     },
@@ -1814,40 +1950,28 @@
       "definition": "Rendered list items of one to three lines; the final line is measured against the usable list width to the body right margin.",
       "last_line_target_ratio": 0.9,
       "maximum_lines": 3,
-      "total": 14,
-      "passed": 14,
+      "total": 12,
+      "passed": 12,
       "failed": 0,
       "failure_locations": [],
       "above_3_lines": [
         {
-          "index": 20,
+          "index": 21,
           "page": 5,
           "lines": 4,
           "text": "COMPLETED is admitted as successful optimizer evidence only when a usable metric and modern receipt bind the exact Candidate, Trial, scenario, objective direction, and execution provenance; a terminal label without that complete chain remains unavailable for optimizer learning, final selection, export, or any later performance statement in release."
         },
         {
-          "index": 21,
+          "index": 22,
           "page": 5,
           "lines": 4,
           "text": "FAILED with a trusted domain failure code is admitted as a non-success because it may identify an infeasible or unsafe simulated parameter region without being mislabeled as infrastructure failure; the failed attempt stays in the optimization denominator with its scenario and Candidate identity intact through every later aggregate and arm comparison."
         },
         {
-          "index": 22,
+          "index": 23,
           "page": 5,
           "lines": 4,
           "text": "Infrastructure faults, cancellation, malformed evidence, and conflicting terminal states are quarantined and cannot update search or routing memory under any later decision path or replay; each rejected row retains a stable quarantine reason and remains visible to operational diagnostics and independent evidence accounting without later relabeling."
-        },
-        {
-          "index": 42,
-          "page": 11,
-          "lines": 4,
-          "text": "Execution boundary — the dedicated Runtime records 6/6 successful, passing Trials for exactly two seeds and three x500 scenarios; this verifies the retained matrix, not a wider reliability distribution, optimizer advantage, released customer-performance claim, or cross-scenario reliability estimate across independently repeated installations and audits."
-        },
-        {
-          "index": 45,
-          "page": 12,
-          "lines": 4,
-          "text": "GPS/battery negative-control boundary — the later Trial proves deterministic denial/recovery, battery initial-state and voltage-sag injection/read-back, and completed trajectory execution. Its failed stability gate remains the outcome: it cannot enter the earlier 3/3 or 6/6 pass numerator, qualify the capability as a whole, or support endurance, safety, or broad-stability claims."
         },
         {
           "index": 46,
@@ -1869,91 +1993,91 @@
         },
         {
           "index": 53,
-          "page": 12,
+          "page": 13,
           "lines": 4,
           "text": "Primary outcomes bind frozen holdout loss, feasible-campaign rate, baseline improvement, time-to-target, and terminal failure rate to every reported arm and seed block, with paired uncertainty and effect size computed from the retained scenario-level comparison units. These units govern preregistered acceptance and arm-to-arm inference at release."
         },
         {
           "index": 54,
-          "page": 12,
+          "page": 13,
           "lines": 4,
           "text": "Secondary outcomes: wall time, model tokens and cost, router latency, recovery success, scenario-wise regret, and artifact completeness for every frozen comparison arm and seed block, reported alongside termination cause and evidence eligibility so efficiency cannot hide a higher failure burden or incomplete audit surface at publication time or review."
         },
         {
           "index": 55,
-          "page": 12,
+          "page": 13,
           "lines": 4,
           "text": "Use at least five independent seeds for engineering diagnostics and preferably ten for report-level comparisons across every reported arm; freeze seed blocks before final execution and publish paired scenario-level uncertainty before making any superiority or repeatability claim across the preregistered final-test matrix and all baseline arms in scope."
         },
         {
           "index": 56,
-          "page": 12,
+          "page": 13,
           "lines": 4,
           "text": "Keep timeouts, crashes, infeasible terminations, and failed Trials in the denominator under their predeclared terminal categories; never impute a successful loss, discard a difficult seed, or replace a missing receipt with an optimistic outcome, and never reclassify an unavailable execution after completed-arm results or rankings become visible during audit."
         },
         {
-          "index": 64,
-          "page": 13,
+          "index": 65,
+          "page": 14,
           "lines": 4,
           "text": "No result in this report establishes real-aircraft safety, certification, or direct simulation-to-reality transfer; those claims require separately governed hardware evidence, operational risk controls, and accepted flight testing outside the present software-contract scope and do not inherit assurance from the mock, WSL, or policy-only artifacts reported here."
         },
         {
-          "index": 66,
+          "index": 67,
           "page": 14,
           "lines": 4,
           "text": "Evidence 2.9 exercises equal-budget scripted multi-tool planning and accounting over three seed blocks, six arm runs, and 12/12 accounted calls on a mock backend with zero provider or network calls. It cannot establish real LLM planning quality, optimizer superiority, physical fidelity, real flight, or causal Harness benefit under any release."
         },
         {
-          "index": 69,
-          "page": 14,
+          "index": 70,
+          "page": 15,
           "lines": 4,
           "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels, preregistered scoring, independent custody, and a frozen separation between development examples and final evaluation cases under external final-test custody and audit."
         },
         {
-          "index": 70,
-          "page": 14,
+          "index": 71,
+          "page": 15,
           "lines": 4,
           "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift; each weakened comparator changes a software protection under constructed probes and therefore cannot estimate controller performance, simulator fidelity, or benefit under real execution noise across matched scenario and seed blocks with uncertainty."
         },
         {
-          "index": 71,
-          "page": 14,
+          "index": 72,
+          "page": 15,
           "lines": 4,
           "text": "The frozen four-arm mock ablation changes protocol behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive; the scripted policy does not authorize a causal performance claim outside a physical, matched-budget, multi-seed intervention with independent outcome recomputation and retained failures."
         },
         {
-          "index": 72,
-          "page": 14,
+          "index": 73,
+          "page": 15,
           "lines": 4,
           "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution; all arms converge on the same deterministic portfolio, so the retained comparison isolates dispatch recovery rather than optimization quality or causal lift."
         },
         {
-          "index": 73,
-          "page": 14,
+          "index": 74,
+          "page": 15,
           "lines": 4,
           "text": "The ten-scenario campaign is synthetic mock evidence used to exercise orchestration and evidence flow; it is not physical scenario coverage, vehicle-dynamics validation, disturbance fidelity, or a substitute for signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics, disturbance realism, or control quality in the signed Runtime."
         },
         {
-          "index": 74,
-          "page": 14,
+          "index": 75,
+          "page": 15,
           "lines": 4,
           "text": "The dedicated Runtime matrix has only two seeds per nominal, wind, and static-obstacle scenario. The obstacle is outside the nominal track, so creation proves injection rather than avoidance; signed customer Runtime repetition and wider seed blocks remain necessary before reliability, customer acceptance, or statistical generalization across installations."
         },
         {
-          "index": 75,
-          "page": 14,
+          "index": 76,
+          "page": 15,
           "lines": 4,
           "text": "The advanced-effects success subset contains three repeats of seed 42001, not independent seed blocks. Two GPS-noise attempts end at the 30.0-second readiness boundary, one file-backed attempt fails on PX4 ownership, and three earlier preflights lack machine artifacts. These records cannot be pooled with the six-Trial scenario matrix or recast as a larger success rate, and the bundle claims no Gazebo version."
         },
         {
-          "index": 76,
-          "page": 14,
-          "lines": 4,
-          "text": "Deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection are now verified in one completed Trial, but its 31.211302 m/s speed violates the 25 m/s stability gate. Probability-law behavior across seeds, probabilistic GPS dropout endurance, depleted-battery stability, combined-fault qualification, and hard actuator failure beyond the bounded first-order delay profile remain unproved."
+          "index": 77,
+          "page": 15,
+          "lines": 6,
+          "text": "Closure v2 records no remaining Runtime extension for any of the nine bundled effect categories, yet only five categories have all retained Trials pass their performance gate. Deterministic GPS denial/recovery and battery initial-state plus voltage-sag injection are now verified in one completed Trial, but its 31.211302 m/s speed violates the 25 m/s stability gate. Probability-law behavior across seeds, probabilistic GPS dropout endurance, depleted-battery stability, combined-fault qualification, trusted flight evaluation under the verified motor-2 hard stop, and fault-tolerant recovery remain unproved."
         },
         {
-          "index": 78,
-          "page": 14,
+          "index": 79,
+          "page": 15,
           "lines": 4,
           "text": "External baselines such as expert manual tuning or PX4 AutoTune must be included only when controller, vehicle, track, budget, metrics, and failure accounting are genuinely aligned; unmatched access to resets, prior knowledge, simulator time, or terminal exclusions must be reported as a protocol difference rather than hidden inside a pooled ranking."
         }
@@ -1962,8 +2086,8 @@
     "reasonable_exceptions": {
       "definition": "Headings, display formulas, code blocks, figure captions, table captions, and references do not use either rendered last-line gate; list items use the separate short-list policy.",
       "inventory": {
-        "headings": 34,
-        "list_items": 37,
+        "headings": 35,
+        "list_items": 33,
         "display_formulas": 0,
         "code_blocks": 0,
         "figure_captions": 6,
@@ -2000,7 +2124,7 @@
     {
       "page": 3,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 771.47,
+      "content_bottom_points": 764.37,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -2008,55 +2132,55 @@
     {
       "page": 4,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 749.88,
-      "gap_to_body_bottom_points": 6.97,
-      "gap_to_body_bottom_lines": 0.581,
+      "content_bottom_points": 746.07,
+      "gap_to_body_bottom_points": 10.78,
+      "gap_to_body_bottom_lines": 0.898,
       "passed_bottom_line": true
     },
     {
       "page": 5,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 745.44,
-      "gap_to_body_bottom_points": 11.41,
-      "gap_to_body_bottom_lines": 0.951,
+      "content_bottom_points": 745.5,
+      "gap_to_body_bottom_points": 11.35,
+      "gap_to_body_bottom_lines": 0.946,
       "passed_bottom_line": true
     },
     {
       "page": 6,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 745.37,
-      "gap_to_body_bottom_points": 11.48,
-      "gap_to_body_bottom_lines": 0.957,
-      "passed_bottom_line": true
-    },
-    {
-      "page": 7,
-      "body_bottom_target_points": 756.85,
-      "content_bottom_points": 754.45,
-      "gap_to_body_bottom_points": 2.4,
-      "gap_to_body_bottom_lines": 0.2,
-      "passed_bottom_line": true
-    },
-    {
-      "page": 8,
-      "body_bottom_target_points": 756.85,
-      "content_bottom_points": 770.56,
+      "content_bottom_points": 762.19,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
     },
     {
+      "page": 7,
+      "body_bottom_target_points": 756.85,
+      "content_bottom_points": 769.08,
+      "gap_to_body_bottom_points": 0.0,
+      "gap_to_body_bottom_lines": 0.0,
+      "passed_bottom_line": true
+    },
+    {
+      "page": 8,
+      "body_bottom_target_points": 756.85,
+      "content_bottom_points": 753.92,
+      "gap_to_body_bottom_points": 2.93,
+      "gap_to_body_bottom_lines": 0.244,
+      "passed_bottom_line": true
+    },
+    {
       "page": 9,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 753.07,
-      "gap_to_body_bottom_points": 3.78,
-      "gap_to_body_bottom_lines": 0.315,
+      "content_bottom_points": 749.2,
+      "gap_to_body_bottom_points": 7.65,
+      "gap_to_body_bottom_lines": 0.638,
       "passed_bottom_line": true
     },
     {
       "page": 10,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 771.89,
+      "content_bottom_points": 763.44,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -2064,7 +2188,7 @@
     {
       "page": 11,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 759.56,
+      "content_bottom_points": 763.44,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -2072,7 +2196,7 @@
     {
       "page": 12,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 760.88,
+      "content_bottom_points": 763.39,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -2080,7 +2204,7 @@
     {
       "page": 13,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 761.64,
+      "content_bottom_points": 767.16,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -2088,7 +2212,7 @@
     {
       "page": 14,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 762.93,
+      "content_bottom_points": 764.01,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -2096,7 +2220,7 @@
     {
       "page": 15,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 770.64,
+      "content_bottom_points": 764.52,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -2112,15 +2236,15 @@
     {
       "page": 17,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 756.67,
-      "gap_to_body_bottom_points": 0.18,
-      "gap_to_body_bottom_lines": 0.015,
+      "content_bottom_points": 748.43,
+      "gap_to_body_bottom_points": 8.42,
+      "gap_to_body_bottom_lines": 0.702,
       "passed_bottom_line": true
     },
     {
       "page": 18,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 766.39,
+      "content_bottom_points": 759.47,
       "gap_to_body_bottom_points": 0.0,
       "gap_to_body_bottom_lines": 0.0,
       "passed_bottom_line": true
@@ -2128,25 +2252,57 @@
     {
       "page": 19,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 743.53,
-      "gap_to_body_bottom_points": 13.32,
-      "gap_to_body_bottom_lines": 1.11,
+      "content_bottom_points": 746.36,
+      "gap_to_body_bottom_points": 10.49,
+      "gap_to_body_bottom_lines": 0.874,
       "passed_bottom_line": true
     },
     {
       "page": 20,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 743.81,
-      "gap_to_body_bottom_points": 13.04,
-      "gap_to_body_bottom_lines": 1.087,
+      "content_bottom_points": 752.39,
+      "gap_to_body_bottom_points": 4.47,
+      "gap_to_body_bottom_lines": 0.372,
       "passed_bottom_line": true
     },
     {
       "page": 21,
       "body_bottom_target_points": 756.85,
-      "content_bottom_points": 745.56,
-      "gap_to_body_bottom_points": 11.29,
-      "gap_to_body_bottom_lines": 0.941,
+      "content_bottom_points": 752.18,
+      "gap_to_body_bottom_points": 4.67,
+      "gap_to_body_bottom_lines": 0.389,
+      "passed_bottom_line": true
+    },
+    {
+      "page": 22,
+      "body_bottom_target_points": 756.85,
+      "content_bottom_points": 765.62,
+      "gap_to_body_bottom_points": 0.0,
+      "gap_to_body_bottom_lines": 0.0,
+      "passed_bottom_line": true
+    },
+    {
+      "page": 23,
+      "body_bottom_target_points": 756.85,
+      "content_bottom_points": 767.86,
+      "gap_to_body_bottom_points": 0.0,
+      "gap_to_body_bottom_lines": 0.0,
+      "passed_bottom_line": true
+    },
+    {
+      "page": 24,
+      "body_bottom_target_points": 756.85,
+      "content_bottom_points": 753.42,
+      "gap_to_body_bottom_points": 3.43,
+      "gap_to_body_bottom_lines": 0.286,
+      "passed_bottom_line": true
+    },
+    {
+      "page": 25,
+      "body_bottom_target_points": 756.85,
+      "content_bottom_points": 756.12,
+      "gap_to_body_bottom_points": 0.73,
+      "gap_to_body_bottom_lines": 0.061,
       "passed_bottom_line": true
     }
   ],

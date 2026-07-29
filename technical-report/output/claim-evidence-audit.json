@@ -3,22 +3,58 @@
   "status": "passed",
   "ledger": {
     "path": "technical-report/claim-evidence-ledger.json",
-    "sha256": "28a9d7e1a6ab4e8f46cb0c740f3412c00c6192bb43230cb2e023ae71c55d9bca"
+    "sha256": "520019577df8139c0f8c6384e19436a4db8ec08a119c39a01ef637c3ef23f8df"
   },
   "evidence_reference_manifest": {
     "path": "technical-report/evidence-reference-manifest.json",
-    "sha256": "6f0da0c9fd94c04cf5e7227f978597c56f96f6bef3417299857e1dd0a1d239c1"
+    "sha256": "4637e4e71cf5969bd0564aba5e5a4e30a6dfaff40bf113ed2a5a160f322ee2ef"
   },
   "report_source": {
     "path": "technical-report/body.tex",
-    "sha256": "5e5734af3f2b5f0333d14fa1bb6c0d0b86a6bf1fe1150072e306d7d44d6c0aa7"
+    "sha256": "089b5108abdabe7d2e0e57a1e1abc7bcab5d5b96d3dc44abeea5827631753597"
   },
-  "claim_total": 40,
-  "claim_passed": 40,
+  "claim_total": 55,
+  "claim_passed": 55,
   "claim_failed": 0,
-  "assertion_total": 319,
-  "prohibited_literal_checks": 15,
+  "assertion_total": 458,
+  "prohibited_literal_checks": 23,
   "verified_sources": [
+    {
+      "id": "advanced_physics_actuator_failure_focused_junit",
+      "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+      "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/focused-tests.xml",
+      "sha256": "65e027756f66e7fe7df4ccdc2e172bf821be9fbd104b71ac5199eee939a924d5"
+    },
+    {
+      "id": "advanced_physics_actuator_failure_preflight_attempt_0",
+      "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+      "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/preflight-failure-attempt-0.json",
+      "sha256": "72471490aa92fb132ea01fb941557c2c8dbd3f4cb77d480fa9fc14c00a97df2d"
+    },
+    {
+      "id": "advanced_physics_actuator_failure_receipt",
+      "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+      "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/receipt.json",
+      "sha256": "5cc93ee5bfb75c53f95bdd925bb3121658d9ae93d6742d2b677d489112252cc6"
+    },
+    {
+      "id": "advanced_physics_closure_manifest",
+      "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+      "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.manifest.json",
+      "sha256": "5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3"
+    },
+    {
+      "id": "advanced_physics_closure_receipt",
+      "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+      "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.receipt.json",
+      "sha256": "1ee74f3b207d7c69e1d2cb6601bffa7d8a92f34181313c51ad22474c73995eda"
+    },
+    {
+      "id": "advanced_physics_closure_test_receipt",
+      "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+      "path": "artifacts/test-runs/advanced-physics-closure-f1e8fa8/test-receipt.json",
+      "sha256": "50994da3b3385fb81411499349ee02123a26cebfa0af39a8a464588ad29eeb79"
+    },
     {
       "id": "advanced_physics_gps_boundary_stderr",
       "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
@@ -98,6 +134,30 @@
       "sha256": "95d36063f94b8c9280d84db028a97d0b0da03687d67465da5979917f06b5efa7"
     },
     {
+      "id": "current_backend_regression_focused_log",
+      "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "path": "artifacts/test-runs/aurora-software-755c511/focused-suite.log",
+      "sha256": "6cf663090b5d649976072aeecb31508e252b9a02affe5a0155329521025efad0"
+    },
+    {
+      "id": "current_backend_regression_full_log",
+      "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "path": "artifacts/test-runs/aurora-software-755c511/full-suite.log",
+      "sha256": "a6b7d84a14fdb8f1dfb98591acdaca45230a15b3a60e52bf7104489d6e067958"
+    },
+    {
+      "id": "current_backend_regression_manifest",
+      "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "path": "artifacts/test-runs/aurora-software-755c511/attestation-manifest.json",
+      "sha256": "0e0e0df70087e2240aba7f76cfa72a8d17acc55a674033ec4475258e2ec13267"
+    },
+    {
+      "id": "current_backend_regression_receipt",
+      "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "path": "artifacts/test-runs/aurora-software-755c511/test-receipt.json",
+      "sha256": "113307a8ee6c722d0cd4e16e245373a5637dd0ec00ba8dbee274f6a57a897f10"
+    },
+    {
       "id": "current_online_routing_artifact",
       "ref_commit": "ef00362927475b2fc411a4d82084bbbae8846582",
       "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.json",
@@ -123,9 +183,9 @@
     },
     {
       "id": "harness_contract_design",
-      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "ref_commit": "755c511539fe561207ca38ff5079f471a4110896",
       "path": "docs/19-llm-tool-orchestration-harness.md",
-      "sha256": "129676c4e6d58bb8f61fdd335da31d4c55c04cf89e4c27dcc21bce8adbe5c267"
+      "sha256": "8b433a7662fa73f6ecf8f458a66d2e5df56c25616c43dbe949bac3fa33fc87ea"
     },
     {
       "id": "harness_fallback_outcome_campaign_raw",
@@ -224,6 +284,36 @@
       "sha256": "a2bed29533b321fa00086bf901f7c5ebbf35ab503e50cde4de568b3420e0a08a"
     },
     {
+      "id": "technical_report_evidence_v10_bundle",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/technical-report/evidence-v10.json",
+      "sha256": "27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89"
+    },
+    {
+      "id": "technical_report_evidence_v10_compatibility_junit",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/compatibility-tests.xml",
+      "sha256": "ec375b944d0203441cdc7d4af1b3f01b6c648bba19165b98c128bdb58ba795e6"
+    },
+    {
+      "id": "technical_report_evidence_v10_focused_junit",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/focused-tests.xml",
+      "sha256": "fc0a5b0a7fb9e0560643c9a18eefb22f852c225808f4d99b4d52ec3983e20a04"
+    },
+    {
+      "id": "technical_report_evidence_v10_manifest",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/technical-report/evidence-v10.manifest.json",
+      "sha256": "134d1ae0f0a96b7999755b0b2e4352c0ce1388bddc4f5f0adc9eb744cc302d4a"
+    },
+    {
+      "id": "technical_report_evidence_v10_test_receipt",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/test-receipt.json",
+      "sha256": "5284eca94d2d9bac657f696b4b6899720c4623caf75cbaf39eda09fb4738ae72"
+    },
+    {
       "id": "website_release_truth_validation_receipt",
       "ref_commit": "87e049cc426bec0f16ace8130bac672dbb778f22",
       "path": "website/validation-receipts/website-release-truth-manual-validation-fd7e770.json",
@@ -238,15 +328,63 @@
   ],
   "claims": [
     {
-      "id": "backend-validation-boundary",
+      "id": "current-backend-regression-receipt",
       "report_locations": [
         "Abstract",
         "Section 8",
-        "Table 6"
+        "Table 6",
+        "Conclusion",
+        "Appendix A.12"
+      ],
+      "source_id": "current_backend_regression_receipt",
+      "assertions": 9,
+      "body_literals": 5,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "current-backend-regression-attestation",
+      "report_locations": [
+        "Abstract",
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "current_backend_regression_manifest",
+      "assertions": 11,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "current-backend-full-pytest-result",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "current_backend_regression_full_log",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "current-backend-focused-pytest-result",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "current_backend_regression_focused_log",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "historical-v9-backend-validation-boundary",
+      "report_locations": [
+        "Section 8"
       ],
       "source_id": "backend_1204_test_receipt",
       "assertions": 9,
-      "body_literals": 5,
+      "body_literals": 4,
       "status": "passed",
       "failures": []
     },
@@ -264,9 +402,7 @@
     {
       "id": "backend-focused-pytest-result",
       "report_locations": [
-        "Abstract",
-        "Section 8",
-        "Table 6"
+        "Section 8"
       ],
       "source_id": "backend_28_focused_log",
       "assertions": 1,
@@ -765,6 +901,150 @@
       "source_id": "multi_tool_budget_generation_receipt",
       "assertions": 9,
       "body_literals": 5,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-actuator-failure-probe",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_actuator_failure_receipt",
+      "assertions": 26,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-actuator-failure-focused-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_actuator_failure_focused_junit",
+      "assertions": 3,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-actuator-failure-preflight-lineage",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_actuator_failure_preflight_attempt_0",
+      "assertions": 5,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-closure-manifest",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_closure_manifest",
+      "assertions": 19,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-closure-receipt",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_closure_receipt",
+      "assertions": 8,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-closure-test-receipt",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_closure_test_receipt",
+      "assertions": 9,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-provenance-closure",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Section 8",
+        "Section 9",
+        "Reference 1",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "technical_report_evidence_v10_bundle",
+      "assertions": 27,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-manifest",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "technical_report_evidence_v10_manifest",
+      "assertions": 7,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-test-receipt",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "technical_report_evidence_v10_test_receipt",
+      "assertions": 7,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-compatibility-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "technical_report_evidence_v10_compatibility_junit",
+      "assertions": 3,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-focused-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "technical_report_evidence_v10_focused_junit",
+      "assertions": 3,
+      "body_literals": 1,
       "status": "passed",
       "failures": []
     }
