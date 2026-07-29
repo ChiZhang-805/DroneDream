@@ -694,7 +694,33 @@ The snapshot builder has a fixed token-independent byte budget. It uses:
 The trace records omitted sections so a small prompt cannot masquerade as complete
 evidence.
 
-### 8.3 Current Trial-to-evidence audit
+### 8.3 Product assistant context and retention boundary
+
+The conversational experiment assistant uses a separate, lower-authority context
+contract from the autonomous Harness snapshot. Imported reference content is not
+concatenated into the user's instruction. It enters one authenticated draft-only
+request as at most four typed chunks, with a 4,000-byte frontend limit per file,
+an 8,000-byte aggregate limit, and an exact SHA-256 for every chunk. The backend
+recomputes every hash, rejects duplicate chunk identities and excess context, and
+labels the context `request_only`. The response contains only a content-bound
+receipt with byte and chunk counts; it does not echo the imported text.
+
+This boundary is deliberately not a document database or a persistent vector
+index. DroneDream does not store imported content in the experiment draft,
+cross-Job memory, or server database. The selected model provider still receives
+the content for that request and remains subject to its own data policy; the
+application must not describe local non-persistence as a provider-side deletion
+guarantee.
+
+Raw assistant messages remain available in `sessionStorage` for same-tab recovery
+only. Persistent browser drafts retain the form, bounded cumulative summary, and
+field provenance, but replace the message list with an empty list. Saving, explicit
+exit persistence, workspace rename, and restoration all enforce the same
+transformation, and loading a legacy v3 draft scrubs any previously persisted raw
+messages. The API rejects an added `raw_chat_history` field rather than accepting a
+second, unbounded history channel.
+
+### 8.4 Current Trial-to-evidence audit
 
 The current repository is materially stronger than a thin “simulator returned a
 number” prototype:

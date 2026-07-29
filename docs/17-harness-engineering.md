@@ -1260,3 +1260,38 @@ not a current-source full-suite receipt. The bundle deliberately reports
 full regression remain separate software freezes and are not injected into v10
 while the technical-report line is frozen; exact Windows MSVC and report/PDF
 gates remain outside.
+
+### Product flight-entry and onboarding closures
+
+The product flight path now separates command dispatch from verified arrival. The
+PX4 offboard executor requires healthy telemetry, position and altitude
+convergence, bounded velocity, and a continuous stable-hover window before it
+allows a trajectory to begin. Missing, stale, divergent, or unstable telemetry
+times out through an observable abort/land path; a successful takeoff command by
+itself is never reported as safe track entry.
+
+`hover` is also a first-class track rather than a zero-length trajectory special
+case. It owns its own reference geometry, duration/completion boundary, and metric
+checks, so a stationary test cannot inherit a circle or polyline success rule.
+This supports the beginner sequence “vertical takeoff, hold position, then enter
+the requested track” while preserving explicit negative outcomes when the hold
+never stabilizes.
+
+Three immutable starter templates (`hover-basics@1`, `first-circle@1`, and
+`light-wind-circle@1`) provide local previews and apply only to the New Job draft.
+Applying or loading a template never creates a Job. Personal defaults are
+account-scoped, disabled by default, limited to allowlisted templates/generated
+tracks and a 1–20 m altitude, and loaded only after an explicit user action.
+Turning cross-Job learning off erases its structured memory; permanent deletion
+removes both defaults and memory. Cross-Job rows remain user/source-Job isolated,
+90-day bounded, and exclude raw chat, credentials, simulator logs, parameter
+values, provider identifiers, and model rationale.
+
+The assistant's imported-document path implements only the request boundary, not
+a persistent RAG service. Chunks are byte-bounded and SHA-256 verified, prompt
+instructions inside them remain untrusted, the response returns a non-content
+receipt, and imported text is not stored in drafts or experience memory. Raw chat
+is kept only in same-tab session storage; persistent drafts retain the compressed
+summary and provenance with an empty message list. The model provider still
+receives the current request, so provider retention remains an external policy
+boundary rather than a DroneDream deletion claim.
