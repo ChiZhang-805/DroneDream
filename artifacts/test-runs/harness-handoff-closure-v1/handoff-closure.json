@@ -1,0 +1,438 @@
+{
+  "branch": "codex/software",
+  "claim_boundary": "This index binds the software-owned implementation and evidence bytes that address handoff gaps 6.1 through 6.6 at one exact Git subject. It preserves negative and inconclusive results. It does not turn synthetic contracts into a general causal benefit, claim universal physical performance, or declare the frozen technical report/PDF ready.",
+  "closures": [
+    {
+      "claim_boundary": "This receipt establishes current-contract Evidence 2.9 routing discrimination on the 24-case frozen development corpus. It does not establish optimizer outcome benefit, causal multi-tool benefit, PX4/Gazebo performance, real-aircraft transfer, flight safety, or production reliability.",
+      "evidence": [
+        {
+          "bytes": 4288,
+          "path": "artifacts/test-runs/harness-routing-evidence-2.9-d36ef16/campaign-receipt.json",
+          "sha256": "f855be4b3e2ec89364dc20d2551602c44609c048e01b531997c844df93cdbd43",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 88,
+          "path": "artifacts/test-runs/harness-routing-evidence-2.9-d36ef16/campaign-receipt.json.sha256",
+          "sha256": "7e61cddd74975c5060af58a7777e94e6e58b13147e62ac42d563354cd9e070eb",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 12812,
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.9-prompt-1.7-20260729.json",
+          "sha256": "11c5de7e208cb9b3e1263943ff8086bd919a57753948a9fd0db0ffd48e621ed1",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 3802,
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.9-prompt-1.7-20260729.manifest.json",
+          "sha256": "a771b5a0b9bb825bb92eb5cbf44b2abf19b0ebb9bbcf95a1424eed5f3094a7f2",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        }
+      ],
+      "facts": {
+        "actual_billed_cost_available": false,
+        "automatic_retries": 0,
+        "logical_calls": 24,
+        "model_snapshot": "gpt-4.1-2025-04-14",
+        "passed": 23,
+        "qualified": true,
+        "total": 24
+      },
+      "freeze_commit": "d49353925ce074e3cb71508ee21cd2abfcee79cf",
+      "gap_id": "6.1",
+      "status": "complete_for_current_contract_development_routing"
+    },
+    {
+      "claim_boundary": "The frozen interventions prove named software-contract and synthetic protocol effects. They do not prove a general optimizer-quality, cost, LLM, PX4/Gazebo, physical, or real-flight benefit.",
+      "evidence": [
+        {
+          "bytes": 5736,
+          "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.csv",
+          "sha256": "f2f34b4ccfd9fa21ca14d71db72de36f7489608e834d53dfbdd56357ea0d1c2f",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 1651339,
+          "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+          "sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 4497,
+          "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.manifest.json",
+          "sha256": "a490e9c69e3b2b1b092341d215b1afe9cdd567373709eba24396f3cb0004e77a",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 335,
+          "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.sha256",
+          "sha256": "5f6a40c61f3ec4b750e9e0a89fa512dbaa0d0939e7b585c95ba22e7ab56a58bd",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 6220,
+          "path": "backend/evaluation_artifacts/harness-reflection-outcome-stress-v1.csv",
+          "sha256": "1e6e7c5116572ff08b87628470993c1a6cb0ec25eaea758a2e16fff69284828f",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 4552945,
+          "path": "backend/evaluation_artifacts/harness-reflection-outcome-stress-v1.json",
+          "sha256": "621285b6e79d366b48077887955d5ed10398ca1c0182569334817604fd4b14c7",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 5220,
+          "path": "backend/evaluation_artifacts/harness-reflection-outcome-stress-v1.manifest.json",
+          "sha256": "4a68893883fd887a67d11098ff83a893c1b2c725e4a064dec272858fb452084a",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 332,
+          "path": "backend/evaluation_artifacts/harness-reflection-outcome-stress-v1.sha256",
+          "sha256": "4cffb73135e1be5cd6fc7af1f0ae15ee87a1115112fab36a4b0180c2f1c6135f",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 6525,
+          "path": "backend/evaluation_artifacts/harness-reflection-trigger-ablation-v1.csv",
+          "sha256": "3e9650bf4cc6a147cc3e6292f5aca10073ff0f1ae210c628cb5a5faf41fd05ea",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 21780,
+          "path": "backend/evaluation_artifacts/harness-reflection-trigger-ablation-v1.json",
+          "sha256": "d1c7c752fbc8d3f4f4f662662c8279bdbdf46f1e9ec767e4e41df40a6311e6f9",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 19279,
+          "path": "backend/evaluation_artifacts/harness-reflection-trigger-ablation-v1.manifest.json",
+          "sha256": "72f6ae19b3bfcea19e0351e3fbd4cbd0b83ae82793ea175823f2afdbe514933c",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 338,
+          "path": "backend/evaluation_artifacts/harness-reflection-trigger-ablation-v1.sha256",
+          "sha256": "8b62b9ef894344100b37f1d47bdc7490023d2d39481ca703ae87f011ae4ac019",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        }
+      ],
+      "facts": {
+        "component_isolations_inconclusive": 5,
+        "component_persisted_trials": 554,
+        "general_causal_benefit_claim_permitted": false,
+        "required_trigger_cases_covered": 6,
+        "stress_consistent_holdout_benefit_observed": false,
+        "stress_protocol_effect_observed": true,
+        "stress_seed_blocks": 5
+      },
+      "freeze_commits": [
+        "77ebc65854b7dc705552a6487810b98b896637ba",
+        "db2d54de0ea67fdd2e49eab86fc015511d908b79"
+      ],
+      "gap_id": "6.2",
+      "status": "complete_for_enumerated_contract_and_synthetic_protocol_effects"
+    },
+    {
+      "claim_boundary": "Equal configured Trial and generation ceilings on MockSimulatorAdapter. The scripted local planner exercises production closed schemas, multi-tool execution, revision, provenance, and cost accounting with zero provider and network calls. Results do not establish LLM quality, optimizer superiority, physical fidelity, real-flight performance, or causal Harness benefit.",
+      "evidence": [
+        {
+          "bytes": 2469,
+          "path": "artifacts/test-runs/harness-multi-tool-budget-evaluation-v1-generation-receipt.json",
+          "sha256": "611783c9388bfda9b21a47e02ab3e8147eec96a7219202859cdc97b63198b6da",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 864,
+          "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.csv",
+          "sha256": "3911632e6dfe61056dae58852f1e9723a4beb3b953468c9ecf70263610a206a3",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 21751,
+          "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.json",
+          "sha256": "b20060eb76bfe4b0e5fbbbbcfe6484126a469bcc552b47c0a51cfc76a436ea5d",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 1284,
+          "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.manifest.json",
+          "sha256": "db78d1c8c99938608dc27116138d3eef15788cd6da4461d0f530db7f9369226d",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 341,
+          "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.sha256",
+          "sha256": "127fd33e78489c58ee20a936a63e38c4c8dc18e235bb97a66fcd8332d0faf350",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        }
+      ],
+      "facts": {
+        "budget_parity_blocks": 3,
+        "multi_tool_generations": 3,
+        "network_calls": 0,
+        "real_provider_calls": 0,
+        "schema_valid_local_decisions": 12
+      },
+      "freeze_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+      "gap_id": "6.3",
+      "status": "complete_for_bounded_execution_revision_and_cost_accounting"
+    },
+    {
+      "claim_boundary": "This deterministic in-memory SQLite evaluation proves the current software retrieval, isolation, retention, revocation, contract-drift, receipt-binding, provider-projection, and prompt-binding behavior for the enumerated fixtures. It makes no claim of optimizer-quality benefit, LLM superiority, physical fidelity, transfer to other tasks, real-aircraft performance, or flight safety.",
+      "evidence": [
+        {
+          "bytes": 622,
+          "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.csv",
+          "sha256": "db8083e3da4dec61f01062689b445d1f2dc02ed1d333e1258c92a435a45660c3",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 6253,
+          "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.json",
+          "sha256": "26602ee7fe7b42edf9b3f3a46a80ac11b13d12576e9471307960663c26782c59",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 1445,
+          "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.manifest.json",
+          "sha256": "c665538587cb7d82a14e23960e1596482b259a7750aab416cca150daf47eae85",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 332,
+          "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.sha256",
+          "sha256": "ab21122f64716dc3758fbe1a41e24cb491e3072a91cd477e1d215ce52b2058b8",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        }
+      ],
+      "facts": {
+        "cases_passed": 10,
+        "cases_total": 10,
+        "closure_subject_supplies_exact_snapshot_binding": true,
+        "legacy_manifest_has_source_commit": false,
+        "negative_isolation_or_lifecycle_cases": 8,
+        "network_calls": 0,
+        "positive_retrievals": 2,
+        "provider_calls": 0,
+        "provider_identifier_leaks": 0
+      },
+      "freeze_commit": "b3d36f5f4d8e9a080d7184bfc4ea5798791284a2",
+      "gap_id": "6.4",
+      "status": "complete_for_retrieval_isolation_lifecycle_and_drift_contracts"
+    },
+    {
+      "claim_boundary": "The retained evidence proves request-bound application and read-back for all bundled physical-effect categories plus a signed local Runtime handoff. It does not claim universal perturbed-flight success, real-aircraft transfer, safety, or software-line publication.",
+      "evidence": [
+        {
+          "bytes": 7069,
+          "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.manifest.json",
+          "sha256": "5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 1314,
+          "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.receipt.json",
+          "sha256": "1ee74f3b207d7c69e1d2cb6601bffa7d8a92f34181313c51ad22474c73995eda",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 215,
+          "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.sha256",
+          "sha256": "096aed94fe18253cc9c9ac45acb10b478cf3b38bc58930dddafc8e5909715a3f",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 2386,
+          "path": "artifacts/test-runs/advanced-physics-closure-f1e8fa8/test-receipt.json",
+          "sha256": "50994da3b3385fb81411499349ee02123a26cebfa0af39a8a464588ad29eeb79",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 4819,
+          "path": "artifacts/test-runs/runtime-v0.1.0-beta.2-755c511/fresh-import-receipt.json",
+          "sha256": "66a5968b69cb72bd5495ff1aa8a2943fccbff6c6acb5c9b45f096c1f84d3940b",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 6815,
+          "path": "artifacts/test-runs/runtime-v0.1.0-beta.2-755c511/handoff-manifest.json",
+          "sha256": "34f5738101217ce92adfdfe8a2a932e6f4ecb73ecb41ba601c851ad217dfa33a",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 88,
+          "path": "artifacts/test-runs/runtime-v0.1.0-beta.2-755c511/handoff-manifest.json.sha256",
+          "sha256": "d64d9a0e5978c9127edd077b3d6877a45c96ce99d0d7b0889eebff974c030539",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 4413,
+          "path": "artifacts/test-runs/runtime-v0.1.0-beta.2-755c511/payload/THIRD_PARTY_NOTICES.md",
+          "sha256": "fb41ce98b2e12e8b45918b547dd358f5178bf9e0a8fffc2932418a41882829b7",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 2207,
+          "path": "artifacts/test-runs/runtime-v0.1.0-beta.2-755c511/payload/runtime-release.json",
+          "sha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 311,
+          "path": "artifacts/test-runs/runtime-v0.1.0-beta.2-755c511/payload/runtime-release.json.sig",
+          "sha256": "db2465888c4b2dcb694c4503c6b995a6c534c2f040ddd886f601438d69c02c90",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 7070,
+          "path": "artifacts/test-runs/runtime-v0.1.0-beta.2-755c511/release-receipt.json",
+          "sha256": "a98276eae3da686fa552086dc19ac7009b0a75f82c3c3ca3192075e51abd41f6",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 87,
+          "path": "artifacts/test-runs/runtime-v0.1.0-beta.2-755c511/release-receipt.json.sha256",
+          "sha256": "3556005948968d8172ba7463efc3c59315b10c798ff0679b84f8a25a7cb53a39",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        }
+      ],
+      "facts": {
+        "all_effects_performance_successful": false,
+        "remaining_runtime_extensions": 0,
+        "runtime_handoff_ready": true,
+        "runtime_image_smoke": "passed",
+        "runtime_manifest_signature_valid": true,
+        "software_line_uploads": 0,
+        "verified_effect_categories": 9
+      },
+      "freeze_commits": [
+        "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "3ec21e5600d19ae67bc080d21c8ed702e58e208a",
+        "1b180e8f1d1ad5a8d4ac87d7e95081df06e73aae"
+      ],
+      "gap_id": "6.5",
+      "status": "complete_for_bundled_effect_contract_and_local_runtime_handoff"
+    },
+    {
+      "claim_boundary": "Software source, test, installer, Runtime, and evidence receipts are frozen separately. The immutable v10 bundle remains release_ready=false and intentionally excludes the later Evidence 2.9 online freeze and current-head regression. Technical-report source/PDF and the remaining website visual gate are cross-line work and are not rewritten here.",
+      "evidence": [
+        {
+          "bytes": 121221,
+          "path": "artifacts/technical-report/evidence-v10.json",
+          "sha256": "27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 16243,
+          "path": "artifacts/technical-report/evidence-v10.manifest.json",
+          "sha256": "134d1ae0f0a96b7999755b0b2e4352c0ce1388bddc4f5f0adc9eb744cc302d4a",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 483,
+          "path": "artifacts/technical-report/evidence-v10.sha256",
+          "sha256": "898c472934cc30fc2b26aa99b63095c273e49b348430b0aedaff983c8b26666c",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 98,
+          "path": "artifacts/test-runs/internal-installer-1.0.0-755c511/DroneDream_1.0.0_x64-setup.exe.sha256",
+          "sha256": "400d33119bcea1447262904bf718b96b4aed2dd4395e8a4e5e120f89faf0d40d",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 420,
+          "path": "artifacts/test-runs/internal-installer-1.0.0-755c511/DroneDream_1.0.0_x64-setup.exe.sig",
+          "sha256": "0406f72c46f44da494e29621b815b190d43698f1f700c63df14e95d66431230a",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 7960,
+          "path": "artifacts/test-runs/internal-installer-1.0.0-755c511/handoff-manifest.json",
+          "sha256": "3a2dcb7eda0032d856cc8c3b2de4f91d7f9582671929d49629694151993c97d0",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 89,
+          "path": "artifacts/test-runs/internal-installer-1.0.0-755c511/handoff-manifest.json.sha256",
+          "sha256": "02128b4459be7367962d22cdd8d22e06b50ba0aa14cd1a6ac972d5c93ce4cbad",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 13616,
+          "path": "artifacts/test-runs/internal-installer-1.0.0-755c511/release-receipt.json",
+          "sha256": "b36835493d42eba6a20867ae8804e0ee8731b9cab3fa5e99d1a853a01ea08442",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 88,
+          "path": "artifacts/test-runs/internal-installer-1.0.0-755c511/release-receipt.json.sha256",
+          "sha256": "e30344f8ac7b1c855ba0869bf0b54fadfeca1f4fb9d7155c0917135a481244bc",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 10111,
+          "path": "artifacts/test-runs/quality-gate-bb1677a-30448014655/quality-gate-receipt.json",
+          "sha256": "6e2d3815687c208e9de4509867dee88a01703bebb99b099ef676c4c8e6b9964d",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        },
+        {
+          "bytes": 92,
+          "path": "artifacts/test-runs/quality-gate-bb1677a-30448014655/quality-gate-receipt.sha256",
+          "sha256": "22feb7bd3e5128915846eb452e571b58c8a8d4b6a4bcc7c0bda13137f58f3e91",
+          "snapshot_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4"
+        }
+      ],
+      "facts": {
+        "evidence_2_9_online_injected_into_frozen_v10": false,
+        "installer_authenticode_status": "NotSigned",
+        "installer_sha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+        "installer_subject_commit": "755c511539fe561207ca38ff5079f471a4110896",
+        "installer_version": "1.0.0",
+        "quality_aggregate_workflow_conclusion": "failure",
+        "quality_backend_tests_passed": 1292,
+        "quality_remaining_website_failures": 19,
+        "quality_subject_commit": "bb1677a12175a51ce5c7d3bb8824d25365a50545",
+        "technical_report_source_or_pdf_modified": false,
+        "v10_release_ready": false,
+        "v10_source_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae"
+      },
+      "freeze_commits": [
+        "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "01998909bfcf0fc059da7e9859d7676a339270c6",
+        "d2d0454970e38a9c3c280b41cd4224e504a43782"
+      ],
+      "gap_id": "6.6",
+      "status": "software_receipts_complete_cross_line_report_gate_explicit"
+    }
+  ],
+  "generated_at": "2026-07-29T12:17:11.354Z",
+  "handoff_document": {
+    "name": "DRONEDREAM_AURORA_HARNESS_HANDOFF_2026-07-28.md",
+    "ownership": "external user-supplied handoff; not copied into the repository",
+    "sha256": "fdf033defe208e99ddb4af20d8334f6d5708851b4c2a09c73da3e627d90aaffe"
+  },
+  "manifest_sha256": "89719b75dd3d74492c6c995e2d5679b021864eafe5c7952df8441967ac25a3d3",
+  "online_policy": {
+    "authorization_state": "closed",
+    "harness_routing_api_key_read": false,
+    "openai_api_key_read": false,
+    "real_provider_calls_during_closure_export": 0
+  },
+  "schema_version": "dronedream.harness-handoff-closure/v1",
+  "subject_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4",
+  "summary": {
+    "gap_count": 6,
+    "general_causal_harness_benefit_claim_permitted": false,
+    "remaining_cross_line_gates": [
+      "website-owned bilingual typography/layout audit: 19 failures",
+      "technical-report source/PDF update remains frozen and separate"
+    ],
+    "software_local_closures": 6,
+    "technical_report_release_ready": false,
+    "universal_advanced_physics_performance_claim_permitted": false
+  }
+}
