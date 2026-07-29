@@ -223,6 +223,38 @@ describe("apiClient envelope handling", () => {
     );
   });
 
+  it("maps an oversized API response to a bounded client error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("{}", {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": String(64 * 1024 * 1024 + 1),
+          },
+        }),
+      ),
+    );
+
+    await expect(
+      apiClient.createJob({
+        track_type: "circle",
+        start_point: { x: 0, y: 0 },
+        altitude_m: 3,
+        wind: { north: 0, east: 0, south: 0, west: 0 },
+        sensor_noise_level: "medium",
+        objective_profile: "robust",
+      }),
+    ).rejects.toMatchObject({
+      name: "ApiClientError",
+      code: "RESPONSE_TOO_LARGE",
+      httpStatus: 200,
+      message: "Response exceeded the 64 MiB safety limit.",
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
   it("fails a browser request when response headers arrive but the body stalls", async () => {
     vi.useFakeTimers();
     vi.stubGlobal(

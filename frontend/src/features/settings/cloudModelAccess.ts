@@ -1,6 +1,7 @@
 import { getAuthAccessToken } from "../auth/authTokenStore";
 import {
   FetchDeadlineError,
+  FetchResponseSizeError,
   fetchWithDeadline,
 } from "../../api/fetchWithDeadline";
 
@@ -100,6 +101,7 @@ export class CloudModelAccessError extends Error {
 }
 
 const CLOUD_REQUEST_TIMEOUT_MS = 30_000;
+const CLOUD_RESPONSE_MAX_BYTES = 1024 * 1024;
 
 function deriveFunctionUrl(functionName: string, explicitUrl: string | undefined): string {
   const explicit = explicitUrl?.trim().replace(/\/+$/u, "");
@@ -166,8 +168,16 @@ async function cloudRequest<T>(
         },
       },
       CLOUD_REQUEST_TIMEOUT_MS,
+      CLOUD_RESPONSE_MAX_BYTES,
     );
   } catch (error) {
+    if (error instanceof FetchResponseSizeError) {
+      throw new CloudModelAccessError(
+        "RESPONSE_TOO_LARGE",
+        error.message,
+        error.httpStatus,
+      );
+    }
     throw new CloudModelAccessError(
       "NETWORK_ERROR",
       error instanceof Error ? error.message : "The cloud service could not be reached.",
@@ -180,6 +190,13 @@ async function cloudRequest<T>(
   } catch (error) {
     if (error instanceof FetchDeadlineError) {
       throw new CloudModelAccessError("NETWORK_ERROR", error.message, 0);
+    }
+    if (error instanceof FetchResponseSizeError) {
+      throw new CloudModelAccessError(
+        "RESPONSE_TOO_LARGE",
+        error.message,
+        response.status,
+      );
     }
     throw new CloudModelAccessError(
       "INVALID_RESPONSE",

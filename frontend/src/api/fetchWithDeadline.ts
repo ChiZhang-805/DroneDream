@@ -8,9 +8,28 @@ export class FetchDeadlineError extends Error {
   }
 }
 
+export class FetchResponseSizeError extends Error {
+  readonly maxResponseBytes: number;
+  readonly httpStatus: number;
+
+  constructor(maxResponseBytes: number, httpStatus = 0) {
+    const mebibyte = 1024 * 1024;
+    const readableLimit =
+      maxResponseBytes >= mebibyte && maxResponseBytes % mebibyte === 0
+        ? `${maxResponseBytes / mebibyte} MiB`
+        : `${maxResponseBytes} bytes`;
+    super(
+      `Response exceeded the ${readableLimit} safety limit.`,
+    );
+    this.name = "FetchResponseSizeError";
+    this.maxResponseBytes = maxResponseBytes;
+    this.httpStatus = httpStatus;
+  }
+}
+
 /**
- * Apply a hard deadline through both response headers and response body while
- * preserving a caller-provided abort signal.
+ * Apply a hard deadline and optional byte limit through both response headers
+ * and response body while preserving a caller-provided abort signal.
  *
  * The explicit race is intentional: native fetch rejects when aborted, but a
  * test double, embedded transport, or future fetch shim may ignore the signal.
@@ -20,9 +39,16 @@ export async function fetchWithDeadline(
   input: RequestInfo | URL,
   init: RequestInit | undefined,
   timeoutMs: number,
+  maxResponseBytes?: number,
 ): Promise<Response> {
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new TypeError("Fetch deadline must be a positive finite duration.");
+  }
+  if (
+    maxResponseBytes !== undefined &&
+    (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes <= 0)
+  ) {
+    throw new TypeError("Fetch response limit must be a positive safe integer.");
   }
 
   const controller = new AbortController();
@@ -33,6 +59,7 @@ export async function fetchWithDeadline(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let rejectDeadline: ((reason: unknown) => void) | null = null;
   let settled = false;
+  let receivedBytes = 0;
 
   const cleanup = () => {
     if (timer !== undefined) clearTimeout(timer);
@@ -80,6 +107,18 @@ export async function fetchWithDeadline(
     }
     throw error;
   }
+  const declaredLength = response.headers.get("Content-Length");
+  if (
+    maxResponseBytes !== undefined &&
+    declaredLength !== null &&
+    /^\d+$/.test(declaredLength.trim()) &&
+    Number(declaredLength) > maxResponseBytes
+  ) {
+    const error = new FetchResponseSizeError(maxResponseBytes, response.status);
+    fail(error);
+    void response.body?.cancel(error).catch(() => undefined);
+    throw error;
+  }
   if (response.body === null) {
     settled = true;
     cleanup();
@@ -102,6 +141,14 @@ export async function fetchWithDeadline(
           }
           return;
         }
+        if (
+          maxResponseBytes !== undefined &&
+          receivedBytes + chunk.value.byteLength > maxResponseBytes
+        ) {
+          fail(new FetchResponseSizeError(maxResponseBytes, response.status));
+          return;
+        }
+        receivedBytes += chunk.value.byteLength;
         streamController.enqueue(chunk.value);
       } catch (error) {
         if (!settled) {

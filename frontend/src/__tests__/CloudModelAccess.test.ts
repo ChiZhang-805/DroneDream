@@ -154,6 +154,30 @@ describe("cloud model access client", () => {
     await assertion;
   });
 
+  it("reports an oversized cloud response without attempting JSON parsing", async () => {
+    const { cloud, auth } = await loadCloudAccess();
+    auth.setAuthAccessToken("signed-user-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("{}", {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": String(1024 * 1024 + 1),
+          },
+        }),
+      ),
+    );
+
+    await expect(cloud.getManagedModelUsage()).rejects.toMatchObject({
+      name: "CloudModelAccessError",
+      code: "RESPONSE_TOO_LARGE",
+      status: 200,
+      message: "Response exceeded the 1 MiB safety limit.",
+    });
+  });
+
   it("loads public plan availability and creates an authenticated checkout", async () => {
     const { cloud, auth } = await loadCloudAccess();
     auth.setAuthAccessToken("signed-user-token");

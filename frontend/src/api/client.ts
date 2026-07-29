@@ -8,6 +8,7 @@ import {
 } from "../desktop/bridge";
 import {
   FetchDeadlineError,
+  FetchResponseSizeError,
   fetchWithDeadline,
 } from "./fetchWithDeadline";
 import {
@@ -73,6 +74,8 @@ const API_BASE_URL: string =
 const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
 const BROWSER_REQUEST_TIMEOUT_MS = 120_000;
+const BROWSER_API_RESPONSE_MAX_BYTES = 64 * 1024 * 1024;
+const BROWSER_ARTIFACT_RESPONSE_MAX_BYTES = 256 * 1024 * 1024;
 
 function authHeaders(): Record<string, string> {
   const accessToken = currentAccessToken();
@@ -266,6 +269,14 @@ async function request<T>(
   try {
     response = await send();
   } catch (networkError) {
+    if (networkError instanceof FetchResponseSizeError) {
+      throw new ApiClientError(
+        "RESPONSE_TOO_LARGE",
+        networkError.message,
+        null,
+        networkError.httpStatus,
+      );
+    }
     // A transport failure can occur after the Runtime committed the action but
     // before its response reached the WebView. Retrying once is safe only for
     // endpoints whose durable backend receipt binds this exact key and body.
@@ -300,6 +311,14 @@ async function request<T>(
   } catch (error) {
     if (error instanceof FetchDeadlineError) {
       throw new ApiClientError("NETWORK_ERROR", error.message, null, 0);
+    }
+    if (error instanceof FetchResponseSizeError) {
+      throw new ApiClientError(
+        "RESPONSE_TOO_LARGE",
+        error.message,
+        null,
+        response.status,
+      );
     }
     throw new ApiClientError(
       "INTERNAL_ERROR",
@@ -360,6 +379,9 @@ async function transportRequest(
         },
       },
       BROWSER_REQUEST_TIMEOUT_MS,
+      accept === "application/octet-stream"
+        ? BROWSER_ARTIFACT_RESPONSE_MAX_BYTES
+        : BROWSER_API_RESPONSE_MAX_BYTES,
     );
   }
 
@@ -579,6 +601,14 @@ export const apiClient = {
         "application/octet-stream",
       );
     } catch (networkError) {
+      if (networkError instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "ARTIFACT_TOO_LARGE",
+          networkError.message,
+          null,
+          networkError.httpStatus,
+        );
+      }
       throw new ApiClientError(
         "NETWORK_ERROR",
         networkError instanceof Error
@@ -598,10 +628,22 @@ export const apiClient = {
       );
     }
 
-    await triggerBrowserDownload(
-      await response.blob(),
-      filename ?? `artifact-${artifactId}`,
-    );
+    try {
+      await triggerBrowserDownload(
+        await response.blob(),
+        filename ?? `artifact-${artifactId}`,
+      );
+    } catch (error) {
+      if (error instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "ARTIFACT_TOO_LARGE",
+          error.message,
+          null,
+          response.status,
+        );
+      }
+      throw error;
+    }
   },
 
   async fetchArtifactJson<T>(artifactId: string): Promise<T> {
@@ -613,6 +655,14 @@ export const apiClient = {
         "application/json",
       );
     } catch (networkError) {
+      if (networkError instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "ARTIFACT_TOO_LARGE",
+          networkError.message,
+          null,
+          networkError.httpStatus,
+        );
+      }
       throw new ApiClientError(
         "NETWORK_ERROR",
         networkError instanceof Error
@@ -632,7 +682,20 @@ export const apiClient = {
       );
     }
 
-    const payloadText = await response.text();
+    let payloadText: string;
+    try {
+      payloadText = await response.text();
+    } catch (error) {
+      if (error instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "ARTIFACT_TOO_LARGE",
+          error.message,
+          null,
+          response.status,
+        );
+      }
+      throw error;
+    }
     try {
       return JSON.parse(payloadText) as T;
     } catch {
@@ -684,6 +747,14 @@ export const apiClient = {
         "text/csv",
       );
     } catch (networkError) {
+      if (networkError instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "COMPARE_CSV_TOO_LARGE",
+          networkError.message,
+          null,
+          networkError.httpStatus,
+        );
+      }
       throw new ApiClientError(
         "NETWORK_ERROR",
         networkError instanceof Error
@@ -701,10 +772,22 @@ export const apiClient = {
         response.status,
       );
     }
-    await triggerBrowserDownload(
-      await response.blob(),
-      `job-compare-${jobIds.join("_")}.csv`,
-    );
+    try {
+      await triggerBrowserDownload(
+        await response.blob(),
+        `job-compare-${jobIds.join("_")}.csv`,
+      );
+    } catch (error) {
+      if (error instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "COMPARE_CSV_TOO_LARGE",
+          error.message,
+          null,
+          response.status,
+        );
+      }
+      throw error;
+    }
   },
 
   async createBatch(req: BatchCreateRequest): Promise<BatchJob> {
