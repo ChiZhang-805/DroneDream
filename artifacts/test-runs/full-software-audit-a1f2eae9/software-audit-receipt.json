@@ -1,0 +1,654 @@
+{
+  "audit_baseline_commit": "b8a5328a320a3d35d947c6b27f617f246599c1fa",
+  "audit_commits": [
+    {
+      "commit": "a1f2eae9e6d4aef63d4065cf5f4a59100f8cf89d",
+      "committed_at": "2026-07-30T05:48:40+08:00",
+      "subject": "perf(frontend): lazy load console routes"
+    },
+    {
+      "commit": "7609ecc6b8792c29ffabe0b776d8c3034d4148f2",
+      "committed_at": "2026-07-30T05:47:01+08:00",
+      "subject": "fix(runtime): bound worker heartbeat reads"
+    },
+    {
+      "commit": "bd7406ea4271af9c0a03704d6a554666b24a1d31",
+      "committed_at": "2026-07-30T05:46:11+08:00",
+      "subject": "fix(artifacts): bound legacy S3 downloads"
+    },
+    {
+      "commit": "05103c231a41a957ca7862453d5c8c0ce2f091c9",
+      "committed_at": "2026-07-30T05:42:16+08:00",
+      "subject": "fix(storage): stream artifact verification"
+    },
+    {
+      "commit": "1121527d9bc71173421d6d8bebd2b2251505dcf7",
+      "committed_at": "2026-07-30T05:38:23+08:00",
+      "subject": "fix(backend): contain dependency failures"
+    },
+    {
+      "commit": "e6dc9f097dd0f2cf7a2a1492ef6e5d8048e72e3f",
+      "committed_at": "2026-07-30T05:34:43+08:00",
+      "subject": "fix(desktop): bound bridge responses"
+    },
+    {
+      "commit": "9dbaf2208f0a444bcaa5b921361c625cdd9a3f07",
+      "committed_at": "2026-07-30T05:28:32+08:00",
+      "subject": "fix(auth): bound JWKS network responses"
+    },
+    {
+      "commit": "ab840ce363dc102561974117eb7656efe8b54a87",
+      "committed_at": "2026-07-30T05:19:55+08:00",
+      "subject": "fix(frontend): bound browser response bodies"
+    },
+    {
+      "commit": "1d9c5fd63be544ab5a66807cd955fc0908ebb949",
+      "committed_at": "2026-07-30T05:15:08+08:00",
+      "subject": "fix(desktop): bound process cleanup and locale probe"
+    },
+    {
+      "commit": "d0732539f0c8dec8d6a46c4408f1cefca3e85863",
+      "committed_at": "2026-07-30T05:11:51+08:00",
+      "subject": "fix(storage): bound verified S3 downloads"
+    },
+    {
+      "commit": "8b3c76e6a19559ac0cba67f8699f250d903ccc2d",
+      "committed_at": "2026-07-30T05:05:44+08:00",
+      "subject": "fix(artifacts): preserve immutable job outputs"
+    },
+    {
+      "commit": "0a3090eb903bc67946f2b78e6d3966bf16b035fa",
+      "committed_at": "2026-07-30T04:59:18+08:00",
+      "subject": "fix(evidence): preserve v10 report freeze"
+    },
+    {
+      "commit": "c5d9178fd2cc7b4cbf3b8256555bae1b8b62f9d8",
+      "committed_at": "2026-07-30T04:55:09+08:00",
+      "subject": "fix(runtime): publish manifests atomically"
+    },
+    {
+      "commit": "0bd630d4d5acd9a729dd20c6d43f75d2f8c7c7d6",
+      "committed_at": "2026-07-30T04:44:20+08:00",
+      "subject": "test(frontend): preserve history layout evidence"
+    },
+    {
+      "commit": "3ff16345da200a99fe2147e5e962085cd1c24e9d",
+      "committed_at": "2026-07-30T04:41:24+08:00",
+      "subject": "fix(evidence): reject linked campaign sources"
+    },
+    {
+      "commit": "d036024b5fbe0508b4808c7a1bb7becc24034479",
+      "committed_at": "2026-07-30T04:39:31+08:00",
+      "subject": "fix(release): preserve public audit freezes"
+    },
+    {
+      "commit": "9e25dd439a03016f198aa1cfc01837f6e05e5a75",
+      "committed_at": "2026-07-30T04:36:28+08:00",
+      "subject": "fix(evidence): preserve frozen observation outputs"
+    },
+    {
+      "commit": "a8808121f70683233d5f07de5106ce8400f579a7",
+      "committed_at": "2026-07-30T04:33:21+08:00",
+      "subject": "fix(evidence): reexecute multi-tool checks semantically"
+    },
+    {
+      "commit": "b5fdb2dc6e36e497fd853ba3db5926c981ebbfb8",
+      "committed_at": "2026-07-30T04:25:13+08:00",
+      "subject": "fix(evidence): validate receipt timing and trace source"
+    },
+    {
+      "commit": "f57b7d5eb12639a024e5e450cbbe7d5ad5ddeca7",
+      "committed_at": "2026-07-30T04:23:23+08:00",
+      "subject": "fix(evidence): bind campaign entrypoints to local source"
+    },
+    {
+      "commit": "f5d0f4c2c659a48d62b1077e6f92baecadf72f65",
+      "committed_at": "2026-07-30T04:20:18+08:00",
+      "subject": "fix(evidence): reject explicit invalid campaign inputs"
+    },
+    {
+      "commit": "d574dfd8f47bf24002e28d1330295498f39b6f35",
+      "committed_at": "2026-07-30T04:06:57+08:00",
+      "subject": "fix(desktop): keep updater passwords out of process arguments"
+    },
+    {
+      "commit": "578a0aa5459fc10661a892c62c84b82f5d031388",
+      "committed_at": "2026-07-30T04:05:15+08:00",
+      "subject": "test(tooling): cover worker and runtime in local gates"
+    },
+    {
+      "commit": "77eee05a90461d351d1abe0b6d56bbe318d4affc",
+      "committed_at": "2026-07-30T04:03:17+08:00",
+      "subject": "style(runtime): restore enforced Python formatting"
+    },
+    {
+      "commit": "d000770dca5a9f7c31650b8514046527aa5b1a03",
+      "committed_at": "2026-07-30T03:57:50+08:00",
+      "subject": "fix(desktop): stream large artifact downloads"
+    },
+    {
+      "commit": "473e2e4ec63d3db2e7730f7f5eea854b37dddfb8",
+      "committed_at": "2026-07-30T03:49:19+08:00",
+      "subject": "fix(frontend): extend request deadlines through response bodies"
+    },
+    {
+      "commit": "7e2238ee35faeec2e96bd749a9b6f64501c5d181",
+      "committed_at": "2026-07-30T03:46:08+08:00",
+      "subject": "fix(evidence): bound provenance git calls"
+    },
+    {
+      "commit": "3e55f2e2cd269755e471ceee1d4c7e386a3f6e25",
+      "committed_at": "2026-07-30T03:40:45+08:00",
+      "subject": "fix(frontend): bound stalled network requests"
+    },
+    {
+      "commit": "a61ab1f471536282e4613047d5b787fd3d56b75c",
+      "committed_at": "2026-07-30T03:35:35+08:00",
+      "subject": "fix(runtime): update vulnerable release cryptography"
+    },
+    {
+      "commit": "c31cb3204349482e6849dfcb82292e83a6262bc4",
+      "committed_at": "2026-07-30T03:24:52+08:00",
+      "subject": "fix(security): inspect transitive RSC dependencies"
+    },
+    {
+      "commit": "e45de411d0285c7d070699e2649d5771e6e7de28",
+      "committed_at": "2026-07-30T03:01:25+08:00",
+      "subject": "fix(frontend): align workspace actions with effects"
+    },
+    {
+      "commit": "2041a8cfe11adc1b15151825c6368d40b20aa69a",
+      "committed_at": "2026-07-30T02:57:45+08:00",
+      "subject": "fix(desktop): serialize updater operations"
+    },
+    {
+      "commit": "3d2f4937920c86daa3ddaf1db3491cbd98bcb10c",
+      "committed_at": "2026-07-30T02:55:16+08:00",
+      "subject": "fix(auth): recover captcha after script failure"
+    },
+    {
+      "commit": "b84418d20f5768175a23820284b563d7750e267a",
+      "committed_at": "2026-07-30T02:52:34+08:00",
+      "subject": "fix(security): distinguish PEM markers from key material"
+    },
+    {
+      "commit": "0f15b8768ab9bf756204112d8635b00f4745a55d",
+      "committed_at": "2026-07-30T02:49:27+08:00",
+      "subject": "test(frontend): reset shared test state"
+    },
+    {
+      "commit": "3d137e83e03b0487d171d89ed33d712eb11aea1a",
+      "committed_at": "2026-07-30T02:45:39+08:00",
+      "subject": "fix(assets): fail closed on gradient channels"
+    },
+    {
+      "commit": "84b4abb49eef08b38970a57e949db19145c8bac3",
+      "committed_at": "2026-07-30T02:41:15+08:00",
+      "subject": "build(frontend): typecheck console configs"
+    },
+    {
+      "commit": "9ba1ed2a622263b90d0915e0e7e9e06a10025600",
+      "committed_at": "2026-07-30T02:38:17+08:00",
+      "subject": "fix(frontend): define settings theme variables"
+    },
+    {
+      "commit": "06a3ffb0410c81697b23923031b0517ad09cece0",
+      "committed_at": "2026-07-30T02:36:11+08:00",
+      "subject": "fix(i18n): interpolate estimated usage count"
+    },
+    {
+      "commit": "9976af7e387558f8009ee8690ed2811304b56343",
+      "committed_at": "2026-07-30T02:33:48+08:00",
+      "subject": "perf(frontend): measure fitted text by line"
+    },
+    {
+      "commit": "ad56e3817563d6db33366b886699df5125b95c20",
+      "committed_at": "2026-07-30T02:25:58+08:00",
+      "subject": "fix(frontend): retain drafts when sign-out fails"
+    },
+    {
+      "commit": "c30031d230c33e4e5b1a0d307d76c25d46457f9c",
+      "committed_at": "2026-07-30T02:23:32+08:00",
+      "subject": "fix(frontend): reject unsafe Gazebo viewer URLs"
+    },
+    {
+      "commit": "c23a8f05f521ccc5eb1c9be2664d9a28f5f84f8c",
+      "committed_at": "2026-07-30T02:21:49+08:00",
+      "subject": "fix(frontend): distinguish artifact failures from empty runs"
+    },
+    {
+      "commit": "03d4493a6f9528870e689cde3d6c27ab0f33d9b7",
+      "committed_at": "2026-07-30T02:19:15+08:00",
+      "subject": "fix(frontend): fail closed on corrupt replay data"
+    },
+    {
+      "commit": "61daf2ae239aeef3d126993cdc78bb1d7afdfefa",
+      "committed_at": "2026-07-30T02:15:33+08:00",
+      "subject": "fix(frontend): bound artifact metadata downloads"
+    },
+    {
+      "commit": "ede6bc0d2f5652be99c73a1447143d89ff5ad036",
+      "committed_at": "2026-07-30T02:13:57+08:00",
+      "subject": "fix(jobs): preserve model access on rerun"
+    },
+    {
+      "commit": "93d4976a62e320fbb218e4d78394c8f40bf623af",
+      "committed_at": "2026-07-30T02:05:40+08:00",
+      "subject": "fix(frontend): avoid guessing metric winners"
+    },
+    {
+      "commit": "f4f7b127c9cd5b04aceba384f5d5348367fdfa08",
+      "committed_at": "2026-07-30T02:03:15+08:00",
+      "subject": "fix(frontend): preserve partial track coordinates"
+    },
+    {
+      "commit": "9f754e78953449990caa4e79b2241bb0cb319617",
+      "committed_at": "2026-07-30T02:00:20+08:00",
+      "subject": "fix(frontend): reject ambiguous catalog rows"
+    },
+    {
+      "commit": "bf3d23f07ff40ec6e5b42a1bec3d7572d0044842",
+      "committed_at": "2026-07-30T01:57:42+08:00",
+      "subject": "fix(frontend): preview inherited track altitude"
+    },
+    {
+      "commit": "361404bed684e957e50b8bf7502d29ac76a13098",
+      "committed_at": "2026-07-30T01:54:33+08:00",
+      "subject": "fix(frontend): coalesce assistant submissions"
+    },
+    {
+      "commit": "76bfdb41cbf82d34eae16432cc946a025ef6f81b",
+      "committed_at": "2026-07-30T01:52:37+08:00",
+      "subject": "fix(frontend): cancel stale voice sessions"
+    },
+    {
+      "commit": "0d2db02f9699c95f165f36e5c6232637812fc9b1",
+      "committed_at": "2026-07-30T01:48:42+08:00",
+      "subject": "fix(frontend): reject corrupted workspace navigation state"
+    },
+    {
+      "commit": "0e4d1416b9335376dc3d7f28cde0bbeb805b8228",
+      "committed_at": "2026-07-30T01:44:31+08:00",
+      "subject": "fix(frontend): gate preference loading on runtime readiness"
+    },
+    {
+      "commit": "c5cb774fb2d8bcab6867cac467dfbc81e00b5c8c",
+      "committed_at": "2026-07-30T01:40:10+08:00",
+      "subject": "docs(desktop): align runtime install guidance"
+    },
+    {
+      "commit": "a334ecdc014ff87d0791e6fa24bce0ba2727f913",
+      "committed_at": "2026-07-30T01:36:12+08:00",
+      "subject": "fix(desktop): redact runtime diagnostic credentials"
+    },
+    {
+      "commit": "0c8b488fd7fea34c6b7661cf98f73ae10a88b7a1",
+      "committed_at": "2026-07-30T01:33:46+08:00",
+      "subject": "fix(desktop): reject ambiguous health framing"
+    },
+    {
+      "commit": "c90d09bc951ec88eed0bdfed406060ceec11f386",
+      "committed_at": "2026-07-30T01:30:50+08:00",
+      "subject": "fix(desktop): refresh rotated bridge credentials"
+    },
+    {
+      "commit": "8e3b18f4aa2141d8aa034d7a243e939195a11aac",
+      "committed_at": "2026-07-30T01:26:08+08:00",
+      "subject": "fix(runtime): bind release payload to embedded manifest"
+    },
+    {
+      "commit": "cd8f08447a09e8e1f328d2098fe506f9f2847ae9",
+      "committed_at": "2026-07-30T01:22:17+08:00",
+      "subject": "fix(runtime): bind manifest identity to contents"
+    },
+    {
+      "commit": "267d83644798b9f84da0b38d59e9a3d57015222f",
+      "committed_at": "2026-07-30T01:18:59+08:00",
+      "subject": "fix(worker): redact database credentials in logs"
+    },
+    {
+      "commit": "8c5128af6dbb0569951f1355f73c82fe48094485",
+      "committed_at": "2026-07-30T01:17:02+08:00",
+      "subject": "fix(evidence): recompute advanced physics request hashes"
+    },
+    {
+      "commit": "e6fffe9c45a92ce2cd011714896ab8ec8b822e18",
+      "committed_at": "2026-07-30T01:09:31+08:00",
+      "subject": "fix(simulator): bind runtime scenario evidence"
+    },
+    {
+      "commit": "53b2f065f5595e7b02df748247fdca84e5bae578",
+      "committed_at": "2026-07-30T01:02:52+08:00",
+      "subject": "fix(simulator): reject invalid PX4 stability windows"
+    },
+    {
+      "commit": "8311ce60630c33bba3bd3f501c4c4d04bdad4beb",
+      "committed_at": "2026-07-30T01:00:02+08:00",
+      "subject": "fix(simulator): time-weight stationary hover coverage"
+    },
+    {
+      "commit": "150a46d8a1a283a8dafd0c73e131ff65182d3cd2",
+      "committed_at": "2026-07-30T00:50:56+08:00",
+      "subject": "fix(evidence): validate PX4 core metric identity"
+    },
+    {
+      "commit": "2331fa21ef486e8a1999b0412fe728b83220f2ae",
+      "committed_at": "2026-07-30T00:45:08+08:00",
+      "subject": "fix(simulator): reject invalid PX4 readbacks"
+    },
+    {
+      "commit": "8c9fa88b039e8d3a3b8768fed63d622b9b8c1bd5",
+      "committed_at": "2026-07-30T00:40:05+08:00",
+      "subject": "fix(reporting): redact common credential fields"
+    },
+    {
+      "commit": "b1eb15574dba3b62067dd80b78508139a177bce1",
+      "committed_at": "2026-07-30T00:36:46+08:00",
+      "subject": "fix(evaluation): bind multi-tool manifest provenance"
+    },
+    {
+      "commit": "678cb385f316188bbfac814205ae047764328dc1",
+      "committed_at": "2026-07-30T00:30:32+08:00",
+      "subject": "fix(evidence): verify fallback tool execution"
+    },
+    {
+      "commit": "0c8dd33d91c82bd6183985b759359af084a38e90",
+      "committed_at": "2026-07-30T00:23:40+08:00",
+      "subject": "fix(evaluation): preserve cold-start routing evidence"
+    },
+    {
+      "commit": "58d347c52505a1bd9ddb523c869e8e32e06e3e4c",
+      "committed_at": "2026-07-30T00:21:01+08:00",
+      "subject": "fix(evidence): verify v10 source ancestry"
+    },
+    {
+      "commit": "352d7d531753399c1a0a18ac32194092c916aaf3",
+      "committed_at": "2026-07-30T00:18:07+08:00",
+      "subject": "fix(evidence): prevent raced freeze overwrite"
+    },
+    {
+      "commit": "37dfe2135f5d791036e04a36db9b0157139d4e55",
+      "committed_at": "2026-07-30T00:15:08+08:00",
+      "subject": "fix(evidence): lock fallback campaign claim boundary"
+    },
+    {
+      "commit": "da7016c147afbc26fef99d5b06037cadfa8ff41c",
+      "committed_at": "2026-07-30T00:12:09+08:00",
+      "subject": "fix(evaluation): honor preregistered ablation metrics"
+    },
+    {
+      "commit": "57e48cec15f09edee64dbc59e45c3fbb77768112",
+      "committed_at": "2026-07-30T00:04:36+08:00",
+      "subject": "fix(reporting): render incomplete diagnostic metrics"
+    },
+    {
+      "commit": "34476d87fb60ad51b80e2b4e3587c06c6bd3dd8a",
+      "committed_at": "2026-07-30T00:01:19+08:00",
+      "subject": "fix(storage): defer job artifact cleanup until commit"
+    },
+    {
+      "commit": "90f4006e9d92d09bf19fe310a5dceab260ab83bb",
+      "committed_at": "2026-07-29T23:54:39+08:00",
+      "subject": "fix(orchestration): record initialization failure time"
+    },
+    {
+      "commit": "cb52c06dc3138bcc4f2dddd08669eabe1fef0e87",
+      "committed_at": "2026-07-29T23:49:26+08:00",
+      "subject": "fix(orchestration): verify simulator result backend"
+    },
+    {
+      "commit": "37e917874ff14c951eab0ef628ec7aaf888bf448",
+      "committed_at": "2026-07-29T23:41:11+08:00",
+      "subject": "fix(evidence): align attempt outcomes with terminal status"
+    },
+    {
+      "commit": "9944bcc4b8b63af5a19c6cb03dfd9a545b191feb",
+      "committed_at": "2026-07-29T23:35:35+08:00",
+      "subject": "fix(harness): keep unsafe scores out of progress trends"
+    },
+    {
+      "commit": "51b8e24c806150640e13593b74fd2fc29288df5f",
+      "committed_at": "2026-07-29T23:26:00+08:00",
+      "subject": "fix(evaluation): prioritize feasible campaign candidates"
+    },
+    {
+      "commit": "ddddb57c267f84724c9f4ca0504607e8a88f529b",
+      "committed_at": "2026-07-29T23:15:38+08:00",
+      "subject": "fix(optimization): reject contradictory full-fidelity evidence"
+    },
+    {
+      "commit": "eee66f3169ab2b0303796f35514b3cf68c8355a0",
+      "committed_at": "2026-07-29T23:11:50+08:00",
+      "subject": "fix(optimization): permit full-fidelity portfolio upgrades"
+    },
+    {
+      "commit": "5a1471f4511dfc91231cef623b2b7cb0f9ace6fb",
+      "committed_at": "2026-07-29T23:09:56+08:00",
+      "subject": "fix(optimization): require effective full fidelity"
+    },
+    {
+      "commit": "f27aeb10e3cb5a7db79fcb08e29fd9ac96d42a4d",
+      "committed_at": "2026-07-29T22:58:05+08:00",
+      "subject": "fix(harness): enforce tool allocation bounds"
+    },
+    {
+      "commit": "8bbac924984fc392bd29d13e3e4f2ed7fc063907",
+      "committed_at": "2026-07-29T22:54:12+08:00",
+      "subject": "fix(assistant): preserve explicit draft facts"
+    },
+    {
+      "commit": "cc6e00488d4544c6ccab1732a4b5835ecf66b22b",
+      "committed_at": "2026-07-29T22:50:12+08:00",
+      "subject": "fix(orchestration): seal batch-cancelled attempts"
+    },
+    {
+      "commit": "e4541f19830c6156995f16168f1d79eff5f55f48",
+      "committed_at": "2026-07-29T22:34:23+08:00",
+      "subject": "fix(security): reject weak desktop bridge secrets"
+    }
+  ],
+  "audit_summary": {
+    "audit_commits": 89,
+    "claim_boundary": "Focused semantic review and repair of high-risk software paths plus automated/hash coverage of the full tracked tree. This is not a claim that every non-code byte has business semantics.",
+    "paths_changed_and_focused_during_audit": 186,
+    "tracked_blobs_inventoried": 1268
+  },
+  "evidence_notes": {
+    "ledger_file": "software-audit-ledger.json",
+    "raw_console_logs_retained": false,
+    "summary_capture": "Command results were observed in the Codex task and normalized into this receipt; no raw-log hash is claimed."
+  },
+  "generated_at": "2026-07-29T22:12:54Z",
+  "residual_risks": [
+    "A blocking synchronous DB/file transaction moved to asyncio.to_thread cannot be hard-cancelled safely at process shutdown; bounded graceful shutdown remains the honest boundary.",
+    "Runtime byte-for-byte reproducibility is constrained by mutable external apt/PyPI repositories even though pins, manifests, signatures, and source inventory are validated.",
+    "x11vnc password handling remains constrained by the external tool interface; diagnostics are redacted, but argv visibility cannot be eliminated without a supported file/stdin mode.",
+    "Transitive Tauri Linux GTK3 dependencies include allowed unmaintained/unsound RustSec warnings; replacement requires an upstream GUI-stack migration, not a safe local patch.",
+    "Fresh live PX4/Gazebo and WSL import behavior still depend on a compatible external host/runtime environment despite offline and contract coverage."
+  ],
+  "schema_id": "dronedream.software_full_audit_receipt/v1",
+  "sensitive_data_contract": {
+    "online_api_authorization_status": "closed_fail_closed",
+    "openai_api_keys_read_or_used": false,
+    "secret_values_persisted": false
+  },
+  "subject_commit": "a1f2eae9e6d4aef63d4065cf5f4a59100f8cf89d",
+  "subject_committed_at": "2026-07-30T05:48:40+08:00",
+  "subject_tree": "6a5fbfcc393ae984188435d70ba1581282fbf6ee",
+  "unavailable_or_not_run": [
+    {
+      "gate": "pip-audit",
+      "reason": "module and executable unavailable in current Python environment"
+    },
+    {
+      "gate": "actionlint",
+      "reason": "executable unavailable; all 5 workflow YAML files parsed successfully instead"
+    },
+    {
+      "gate": "docker",
+      "reason": "Docker executable unavailable on this host"
+    },
+    {
+      "gate": "deno",
+      "reason": "Deno executable unavailable on this host"
+    },
+    {
+      "gate": "MSVC_linker",
+      "reason": "link.exe unavailable; Rust gate passed with the repository LLVM toolchain"
+    },
+    {
+      "gate": "live_PX4_Gazebo_campaign",
+      "reason": "not run in this final audit; contracts, fixtures, evidence validators, and simulator tests were exercised"
+    },
+    {
+      "gate": "new_OpenAI_online_campaign",
+      "reason": "not authorized; no API key was read or used"
+    },
+    {
+      "gate": "website_PublicSite_suite",
+      "reason": "excluded because frontend/src/site and website presentation are website-line ownership"
+    }
+  ],
+  "verification": [
+    {
+      "command": "OPENAI_API_KEY= HARNESS_ROUTING_API_KEY= python -m pytest tests -q",
+      "counts": {
+        "failed": 0,
+        "passed": 1388
+      },
+      "cwd": "backend",
+      "duration_seconds": 975.16,
+      "name": "backend_full_pytest",
+      "raw_log_retained": false,
+      "result": "passed"
+    },
+    {
+      "command": "npm run test -- --run (software-owned suite; PublicSite.test.tsx excluded as website-line ownership)",
+      "counts": {
+        "failed": 0,
+        "files_passed": 59,
+        "tests_passed": 360
+      },
+      "cwd": "frontend",
+      "duration_seconds": 36.25,
+      "name": "frontend_software_owned_vitest",
+      "raw_log_retained": false,
+      "result": "passed"
+    },
+    {
+      "command": "python -m unittest discover -s runtime/tests -v",
+      "counts": {
+        "failed": 0,
+        "passed": 49,
+        "skipped": 4,
+        "total": 53
+      },
+      "name": "runtime_unittest",
+      "raw_log_retained": false,
+      "result": "passed_with_platform_skips",
+      "skip_reason": "Windows host skips POSIX/WSL dirfd and no-follow secure ULog deletion cases"
+    },
+    {
+      "command": "desktop LLVM Rust all-target test gate",
+      "counts": {
+        "failed": 0,
+        "ignored": 1,
+        "passed": 108,
+        "total": 109
+      },
+      "cwd": "desktop/src-tauri",
+      "name": "desktop_rust_all_targets_llvm",
+      "notes": [
+        "clang emitted the existing unused -no-pie linker warning"
+      ],
+      "raw_log_retained": false,
+      "result": "passed_with_ignored_long_duration_test"
+    },
+    {
+      "commands": [
+        "python -m ruff check app tests",
+        "python -m mypy app"
+      ],
+      "details": "Ruff passed; mypy reported no issues in 117 source files",
+      "name": "backend_static",
+      "result": "passed"
+    },
+    {
+      "bundle_observation": {
+        "main_business_js_after_kib": 509.86,
+        "main_business_js_before_kib": 805.87
+      },
+      "commands": [
+        "npm run audit:dependencies",
+        "npm run typecheck",
+        "npm run lint",
+        "npm run build"
+      ],
+      "details": "No applicable high/critical advisories; documented browser-SPA-only GHSA-qwww-vcr4-c8h2 react-router exception accepted; production build passed after route splitting",
+      "name": "frontend_static_and_dependencies",
+      "result": "passed_with_documented_exception"
+    },
+    {
+      "commands": [
+        "python -m ruff check runtime/tools runtime/tests runtime/scripts scripts/simulators",
+        "python -m ruff check runtime/tools runtime/scripts scripts/simulators --select S",
+        "python -m ruff format --check runtime/tools runtime/tests runtime/scripts scripts/simulators",
+        "python runtime/tools/runtime_manifest.py validate-config --pins runtime/pins.env --python-lock runtime/locks/python-requirements.lock"
+      ],
+      "details": "12 Python files formatting-checked; pinned Runtime configuration validated",
+      "name": "runtime_static_and_config",
+      "result": "passed"
+    },
+    {
+      "command": "python scripts/check-repository.py",
+      "counts": {
+        "json_files": 357,
+        "links": 62,
+        "markdown_files": 51,
+        "text_files": 936,
+        "toml_files": 5,
+        "tracked_files": 1268
+      },
+      "name": "repository_hygiene",
+      "result": "passed"
+    },
+    {
+      "details": {
+        "bash": {
+          "parse_errors": 0,
+          "scripts": 28
+        },
+        "github_workflow_yaml": {
+          "files": 5,
+          "parse_errors": 0
+        },
+        "powershell": {
+          "ast_parse_errors": 0,
+          "scripts": 13
+        },
+        "python_compileall": "backend/app backend/tests worker runtime scripts passed"
+      },
+      "name": "language_parse_sweep",
+      "result": "passed"
+    },
+    {
+      "command": "npm --prefix desktop run verify:release-source",
+      "counts": {
+        "npm_packages": 390,
+        "rust_external_packages": 532,
+        "source_files": 1268
+      },
+      "name": "desktop_release_source_inventory",
+      "result": "passed"
+    },
+    {
+      "command": "cargo audit --file desktop/src-tauri/Cargo.lock",
+      "counts": {
+        "allowed_warnings": 17
+      },
+      "details": "Warnings are transitive GTK3/unmaintained crates plus glib RUSTSEC-2024-0429; no failing advisory was reported.",
+      "name": "rust_dependency_audit",
+      "result": "passed_with_allowed_warnings"
+    }
+  ]
+}
