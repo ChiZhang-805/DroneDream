@@ -1,0 +1,159 @@
+{
+    "schema_version":  "dronedream.internal-test-installer-handoff-manifest.v3",
+    "generated_at":  "2026-07-29T01:05:47Z",
+    "source_commit":  "755c511539fe561207ca38ff5079f471a4110896",
+    "artifact_policy":  {
+                            "single_authoritative_exe":  "DroneDream_1.0.0_x64-setup.exe",
+                            "binary_is_local_handoff_only":  true,
+                            "binary_must_not_be_rebuilt_by_publication_lines":  true,
+                            "upload_performed":  false,
+                            "supersedes_internal_installer_1_0_0_15603c6":  true,
+                            "supersedes_internal_installer_1_0_0_8102ffe":  true,
+                            "desktop_installer_ready":  true,
+                            "full_stack_runtime_ready":  false,
+                            "separate_runtime_handoff_required":  true
+                        },
+    "release_receipt_sha256":  "b36835493d42eba6a20867ae8804e0ee8731b9cab3fa5e99d1a853a01ea08442",
+    "files":  [
+                  {
+                      "path":  "artifact-validation.json",
+                      "bytes":  1931,
+                      "sha256":  "218350158b05c47a8ea9a10b480f3b3f2145c12dc03cfad59cbd76bc88c7f1be"
+                  },
+                  {
+                      "path":  "backend-validation/attestation-manifest.json",
+                      "bytes":  2432,
+                      "sha256":  "0e0e0df70087e2240aba7f76cfa72a8d17acc55a674033ec4475258e2ec13267"
+                  },
+                  {
+                      "path":  "backend-validation/checksums.sha256",
+                      "bytes":  506,
+                      "sha256":  "52f73accc5f582ba0ceffb3d75f29fd948a8d1e06d801e885a19d72ec300d1ad"
+                  },
+                  {
+                      "path":  "backend-validation/focused-suite.log",
+                      "bytes":  368,
+                      "sha256":  "6cf663090b5d649976072aeecb31508e252b9a02affe5a0155329521025efad0"
+                  },
+                  {
+                      "path":  "backend-validation/focused-suite.xml",
+                      "bytes":  10496,
+                      "sha256":  "25f94a80a7b6efac04ea004a89f92e1e510af9540a063a8ced34bded917927a1"
+                  },
+                  {
+                      "path":  "backend-validation/full-suite.log",
+                      "bytes":  2986,
+                      "sha256":  "a6b7d84a14fdb8f1dfb98591acdaca45230a15b3a60e52bf7104489d6e067958"
+                  },
+                  {
+                      "path":  "backend-validation/full-suite.xml",
+                      "bytes":  176391,
+                      "sha256":  "4b356f314e23db202c791e5b50b946e7cfae2aa30561aa8bc1db83ef358adef9"
+                  },
+                  {
+                      "path":  "backend-validation/test-receipt.json",
+                      "bytes":  2944,
+                      "sha256":  "113307a8ee6c722d0cd4e16e245373a5637dd0ec00ba8dbee274f6a57a897f10"
+                  },
+                  {
+                      "path":  "build.log",
+                      "bytes":  15540,
+                      "sha256":  "5ce16a083a60e7e2af5eb37958efffdf6c78dd0eef9cc55d06a23fceb3fbb637"
+                  },
+                  {
+                      "path":  "download-smoke.json",
+                      "bytes":  377,
+                      "sha256":  "44b8de415b62e8c991cbb9fe3f090e1410f96b4300daffde063c8dd8e6f8e2a0"
+                  },
+                  {
+                      "path":  "DroneDream_1.0.0_x64-setup.exe",
+                      "bytes":  10387042,
+                      "sha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b"
+                  },
+                  {
+                      "path":  "DroneDream_1.0.0_x64-setup.exe.sha256",
+                      "bytes":  98,
+                      "sha256":  "400d33119bcea1447262904bf718b96b4aed2dd4395e8a4e5e120f89faf0d40d"
+                  },
+                  {
+                      "path":  "DroneDream_1.0.0_x64-setup.exe.sig",
+                      "bytes":  420,
+                      "sha256":  "0406f72c46f44da494e29621b815b190d43698f1f700c63df14e95d66431230a"
+                  },
+                  {
+                      "path":  "frontend-validation.log",
+                      "bytes":  10358,
+                      "sha256":  "4a0f89c2d54541512aa2706d1d65aa28ae948d7868273ac622e7caabe42c1225"
+                  },
+                  {
+                      "path":  "installer-ui-validation.log",
+                      "bytes":  1140,
+                      "sha256":  "39105ab03c94791129bb98c5ae76fccf57aa38f02de3baf84dc4d5e17960367f"
+                  },
+                  {
+                      "path":  "product-source-binding.json",
+                      "bytes":  20293,
+                      "sha256":  "0cd6374d501a425dafda08487b482c31788ada211bae6d416f9d506baf464360"
+                  },
+                  {
+                      "path":  "release-metadata-handoff.json",
+                      "bytes":  4710,
+                      "sha256":  "0f7404a4da3d92d945ac7e36ec662e2936d56bc847325ae45ae54cc8b8a7635a"
+                  },
+                  {
+                      "path":  "release-receipt.json",
+                      "bytes":  13616,
+                      "sha256":  "b36835493d42eba6a20867ae8804e0ee8731b9cab3fa5e99d1a853a01ea08442"
+                  },
+                  {
+                      "path":  "release-receipt.json.sha256",
+                      "bytes":  88,
+                      "sha256":  "e30344f8ac7b1c855ba0869bf0b54fadfeca1f4fb9d7155c0917135a481244bc"
+                  },
+                  {
+                      "path":  "release-source-inventory.json",
+                      "bytes":  179069,
+                      "sha256":  "aec2e51e4440271b92cc96d98ddf5a719d0b3fc91226767e9b7f97809b04c70d"
+                  },
+                  {
+                      "path":  "release-source-policy.log",
+                      "bytes":  375,
+                      "sha256":  "7fc8ad4b8714c21bf5025646cf9feeb8c38d2eb4cf6a2777d78869a9d8e247f0"
+                  },
+                  {
+                      "path":  "repository-hygiene.log",
+                      "bytes":  871,
+                      "sha256":  "9ab0e353d231cd820643e884402a57719c775e7b5649b104b838ac9cc2600359"
+                  },
+                  {
+                      "path":  "runtime-delivery-boundary.json",
+                      "bytes":  1274,
+                      "sha256":  "cf56cee98a9d891985b766883c47971f22e848328af146f2b6b20c295bbf1241"
+                  },
+                  {
+                      "path":  "rust-validation.log",
+                      "bytes":  28308,
+                      "sha256":  "08fd1cca2dbb4f0fa92a69076b43adb7f64ed7d2fc28feceed5eb9ae90575fb5"
+                  },
+                  {
+                      "path":  "tauri-latest.build.json",
+                      "bytes":  903,
+                      "sha256":  "a1bf256ceec6ff64afa9883248e92fbf624720bf3fc8e842b50b402bbf82d212"
+                  },
+                  {
+                      "path":  "tauri-latest.json",
+                      "bytes":  914,
+                      "sha256":  "96774c5f1db7ffd6ecb60b160044aaa21afaa771e67dd83cc0d9422072c410f0"
+                  },
+                  {
+                      "path":  "website-latest.json",
+                      "bytes":  522,
+                      "sha256":  "7d0844cafd94147adee993914f41b913213f11ba5696af92da61680b0b6bfd59"
+                  },
+                  {
+                      "path":  "website-pages-release.json",
+                      "bytes":  280,
+                      "sha256":  "8f847dbccf4228ea0930df95a90e7951cff7f06f55e7bcb48d540084fcf13511"
+                  }
+              ]
+}

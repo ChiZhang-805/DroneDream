@@ -1,0 +1,11 @@
+{
+    "version":  "1.0.0",
+    "notes":  "DroneDream 1.0.0 for Windows x64.",
+    "pub_date":  "2026-07-29T00:52:22Z",
+    "platforms":  {
+                      "windows-x86_64":  {
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUMUw4NXhyOXcvdWdyWFVTMVBXL3FlUFBwZEVWczdvNG5nSE9TVU44U01MdmZva1h2S3pwamE4VnYwV2hSZERSZ2JFOTlyKzFtVFRNVlBvMTNLTWN1NDZyNmRXLzFvRHdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1Mjg2MzQyCWZpbGU6RHJvbmVEcmVhbV8xLjAuMF94NjQtc2V0dXAuZXhlCmtlZmQybis1dndYWmwxNTRCN3UwSFMwY3Y0RzYwaFFOeHpCbVF2S0dFanZHV3hKNXloVzc4MTdHZ0dBQnBRYi85Z3RoWVVpWXVieXRvRm5VUi8zSkNRPT0K",
+                                             "url":  "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe"
+                                         }
+                  }
+}

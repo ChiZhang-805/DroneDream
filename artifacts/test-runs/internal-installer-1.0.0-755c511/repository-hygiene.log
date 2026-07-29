@@ -1,0 +1,10 @@
+COMMAND=python scripts/check-repository.py
+SOURCE_COMMIT=755c511539fe561207ca38ff5079f471a4110896
+OPENAI_API_KEY_READ_OR_USED=false
+EXIT_CODE=1
+RESULT=FAILED_EXISTING_SOURCE_FIXTURE_FALSE_POSITIVE
+ERROR=backend/tests/test_phase8_llm_proposer.py contains a probable OpenAI API key
+ISOLATION=The same failure reproduces in the detached exact 755c511 staging checkout. The source blob 815718653b38566c4924e25cc6c098c6e27723d8 is identical at subject and post-validation HEAD.
+MATCHED_TEST_LITERAL=sk-contract-persistence-test
+CLASSIFICATION=Repository hygiene regex treats an explicit fake persistence test fixture as a probable key because the suffix is at least 20 characters. No environment key or real credential was read.
+FOLLOW_UP=Fix the fixture or scanner contract in a separate post-release-source commit; do not mix it into this frozen installer source.

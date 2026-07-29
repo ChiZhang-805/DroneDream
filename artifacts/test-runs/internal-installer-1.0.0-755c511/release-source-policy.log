@@ -1,0 +1,9 @@
+START_UTC=2026-07-29T00:45:36.0099538Z
+
+> drone-dream-desktop@1.0.0 verify:release-source
+> node scripts/verify-release-source-policy.mjs --output .release-evidence/release-source-inventory.json
+
+Release-source policy verified: 1162 tracked files, 390 npm packages, 532 external Rust packages.
+END_UTC=2026-07-29T00:45:37.4057021Z
+DURATION_SECONDS=1.396
+EXIT_CODE=0

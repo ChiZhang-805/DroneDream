@@ -1,0 +1,254 @@
+{
+    "schema_version":  "dronedream.internal-installer-product-source-binding.v1",
+    "generated_at":  "2026-07-29T01:00:32Z",
+    "source_commit":  "755c511539fe561207ca38ff5079f471a4110896",
+    "source_checkout_clean_before_build":  true,
+    "selected_source_records":  [
+                                    {
+                                        "path":  "desktop/src-tauri/src/lib.rs",
+                                        "delivery":  "compiled_into_desktop_executable",
+                                        "bytes":  2597,
+                                        "sha256":  "94ce82b04aa7e49060c64e4545f7ac71b901c160fdd13d6ea0b6586bc35a774e",
+                                        "git_blob":  "5408f7d822653f44fed51c999d3558242f4eff9d",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "desktop/src-tauri/src/runtime_installer.rs",
+                                        "delivery":  "compiled_into_desktop_executable",
+                                        "bytes":  200044,
+                                        "sha256":  "9692902a4809c5f4b132ed4236390ca8f9765314a9489b08793d84cba181a292",
+                                        "git_blob":  "d1b592b20f8e92d0993a75ed4a7a3a1a1be5a1dd",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/AppShell.tsx",
+                                        "delivery":  "compiled_into_desktop_executable_as_frontend_asset",
+                                        "bytes":  73780,
+                                        "sha256":  "4da4792ef3f742b9ce94fedcedfeaf7969f7c034857a80e0aae16f01109e7f37",
+                                        "git_blob":  "741a8c43e8fa57bc9a65e93b85ffc3a92e35c7f6",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/types/api.ts",
+                                        "delivery":  "typescript_type_contract_compiled_type_erased",
+                                        "bytes":  24414,
+                                        "sha256":  "47fcddc2b0034c8a0d980bd74ea66f80bbf5f9e8773aa443be0dc72fde37acef",
+                                        "git_blob":  "9163898178a5a207303714f916e67c528dc9a7e0",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "backend/app/orchestration/experimental_optimizer.py",
+                                        "delivery":  "repository_source_only_requires_separate_wsl_runtime_release",
+                                        "bytes":  39154,
+                                        "sha256":  "ddee49676bef2135ad11d5f8347860466380e34f2f6ddcc27c6d237e78467259",
+                                        "git_blob":  "b13dda6839aa0e65783c912ce8ec8474d52ff8d9",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "backend/app/orchestration/harness_fallback_contract_campaign.py",
+                                        "delivery":  "offline_evaluation_source_not_installer_payload",
+                                        "bytes":  22281,
+                                        "sha256":  "c82fdf3a87644087c4a5304ca8579aeb29410eb0480c3e84351c1890f157a548",
+                                        "git_blob":  "00da323a28e27b7f2275eaeb0b9bb0adeac848b2",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "backend/app/simulator/scenario_effects.py",
+                                        "delivery":  "repository_source_only_requires_separate_wsl_runtime_release",
+                                        "bytes":  85686,
+                                        "sha256":  "5c8cec8634c90f5bf240841c4b4b947c4577b41ece0598709324577f21e8968e",
+                                        "git_blob":  "16de3a42e30b24ad3fde2db687251f9529121f81",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "scripts/simulators/local_px4_launch_wrapper.py",
+                                        "delivery":  "repository_source_only_requires_separate_wsl_runtime_release",
+                                        "bytes":  160397,
+                                        "sha256":  "5d0a14548acec0c7075ea0de31edfc468e8c4b9597d61d8b11e35a366f90f0c7",
+                                        "git_blob":  "9ae35b95525a93154f085ec0656bdd2feaccb900",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "scripts/simulators/px4_gazebo_runner.py",
+                                        "delivery":  "repository_source_only_requires_separate_wsl_runtime_release",
+                                        "bytes":  134794,
+                                        "sha256":  "8e4357b8831ceadb919d548285fc9a9ff101e2a218f4d24b51d79447cbe4e230",
+                                        "git_blob":  "c095cf669dfcdf9d7934c44ef4039b67faa5cfe2",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "scripts/simulators/px4_offboard_track_executor.py",
+                                        "delivery":  "repository_source_only_requires_separate_wsl_runtime_release",
+                                        "bytes":  46312,
+                                        "sha256":  "e6b4d3000597f0499465f0346124971735f95033991aa61d6cf15e416f81b104",
+                                        "git_blob":  "39c01565bfda6b8ebfbef60ad5129e91c0fa9035",
+                                        "working_bytes_match_commit_blob":  true
+                                    }
+                                ],
+    "compiled_payload":  {
+                             "desktop_executable":  {
+                                                        "bytes":  22804992,
+                                                        "sha256":  "c00681cf683132b9f459753b397535a88d71797a665b426ed4a106e3cd719f84"
+                                                    },
+                             "webview2_loader":  {
+                                                     "bytes":  160320,
+                                                     "sha256":  "8427b1fc58ec707813e5c0a51eb5d69397bb333250a7b891be4d3b123f1e0f1c"
+                                                 },
+                             "frontend_dist":  [
+                                                   {
+                                                       "path":  "assets/drone-dream-lockup-compact-CZrXD4We.png",
+                                                       "bytes":  96002,
+                                                       "sha256":  "3f2cb2badce89ab62ae4cf806c4ecef4ab7086cbf54cc36c479db57e206e27e3"
+                                                   },
+                                                   {
+                                                       "path":  "assets/drone-dream-mark-D8US7mN1.png",
+                                                       "bytes":  363573,
+                                                       "sha256":  "9555bd63683d21e42092feac8fe6eb4d0b1ef5bcc4aa1ce6d5655d0829501916"
+                                                   },
+                                                   {
+                                                       "path":  "assets/drone-dream-wordmark-primary-BWsoH_Cn.png",
+                                                       "bytes":  17140,
+                                                       "sha256":  "058859a5a427d46f407abda147b283be45632fb25fdd1b251f281d273b3b9409"
+                                                   },
+                                                   {
+                                                       "path":  "assets/DroneLaunchScene-CqnLMg8x.js",
+                                                       "bytes":  21710,
+                                                       "sha256":  "ab8030c12d6eca98fb94435cf6536cf4276ee45429d827350dde42e0a0fee19d"
+                                                   },
+                                                   {
+                                                       "path":  "assets/index-4fqrm-Ir.css",
+                                                       "bytes":  168705,
+                                                       "sha256":  "7da148cd89e4f513a96dd9bf0e5adab23da059e35dd63fdbac7c7df597bf6dfe"
+                                                   },
+                                                   {
+                                                       "path":  "assets/index-C53CNXfp.js",
+                                                       "bytes":  776372,
+                                                       "sha256":  "8791e84587bc197d6e0fa4065f95f17e00190e95629d147f9fb83d9eb28281f3"
+                                                   },
+                                                   {
+                                                       "path":  "assets/index-DFKer85G.js",
+                                                       "bytes":  203,
+                                                       "sha256":  "f17a836f66b586cff6ad012035ea3af7a19798db3edde7092c9c9f5c1e79cdb3"
+                                                   },
+                                                   {
+                                                       "path":  "assets/query-vendor-Q2xC94b5.js",
+                                                       "bytes":  43461,
+                                                       "sha256":  "ca6db3bd91429446ad70294a955feb15e505a502716144c54f58ee1ec90d1f2d"
+                                                   },
+                                                   {
+                                                       "path":  "assets/react-vendor-C_M8Ibxu.js",
+                                                       "bytes":  227164,
+                                                       "sha256":  "44faaf097867d73f1587bc19337a280c565974ffebc9221eb9cf2acdb4d54d95"
+                                                   },
+                                                   {
+                                                       "path":  "assets/three-CmEDHrYs.js",
+                                                       "bytes":  499591,
+                                                       "sha256":  "523a929c0d4b6606ab0f5edf103ec2731cfaf48ee1423f340d1c4de8d3a2f76b"
+                                                   },
+                                                   {
+                                                       "path":  "docs/dashboard.png",
+                                                       "bytes":  356661,
+                                                       "sha256":  "e1c3c7185ce1fa388e83dab3bcf2b1afa89b4e0d1f621cb84bffadb30eb0aba3"
+                                                   },
+                                                   {
+                                                       "path":  "docs/downloads/DroneDream-Manual-en.md",
+                                                       "bytes":  9872,
+                                                       "sha256":  "b60019b4ab7d9151702b95870dc53b6dffcfb9c9beb475b05c3b9e2265ee60fe"
+                                                   },
+                                                   {
+                                                       "path":  "docs/downloads/DroneDream-Manual-en.pdf",
+                                                       "bytes":  1255797,
+                                                       "sha256":  "94db2d7ddac73d7076b8d37eeaee26cb6344bf2dfad5de0622a022080fbd3ee8"
+                                                   },
+                                                   {
+                                                       "path":  "docs/downloads/DroneDream-Manual-zh-CN.md",
+                                                       "bytes":  8952,
+                                                       "sha256":  "2c46cc6698fb5184f1f371c0f342623a852ba7f4f1c9857a3da3876aad5210f1"
+                                                   },
+                                                   {
+                                                       "path":  "docs/downloads/DroneDream-Manual-zh-CN.pdf",
+                                                       "bytes":  872814,
+                                                       "sha256":  "c3e3df35fa81ef54676a266ed4d2398e831160b835b204f325ec499074fad0a0"
+                                                   },
+                                                   {
+                                                       "path":  "docs/en/dashboard.png",
+                                                       "bytes":  1013619,
+                                                       "sha256":  "c4b46a700b0e3d08233ce9c4a40d238c1bc2d2bf8c8c70ad86c68e7222067dd6"
+                                                   },
+                                                   {
+                                                       "path":  "docs/en/flight-setup.png",
+                                                       "bytes":  118206,
+                                                       "sha256":  "57e1ba0c16bbdbe5d3110baf997622c5f1fc6f741ccb929e148d2c2971578b67"
+                                                   },
+                                                   {
+                                                       "path":  "docs/en/tuning-chat.png",
+                                                       "bytes":  177409,
+                                                       "sha256":  "ba5fccfb753aa632555dcf10c8c5f6595669589f3f56a7ce88ff37f0f85307ae"
+                                                   },
+                                                   {
+                                                       "path":  "docs/flight-setup.png",
+                                                       "bytes":  122186,
+                                                       "sha256":  "e78f071986fb710a1f5aaf27797a5e8379b20c280545a4299dd9de3ee6010ecf"
+                                                   },
+                                                   {
+                                                       "path":  "docs/scenarios.png",
+                                                       "bytes":  140324,
+                                                       "sha256":  "423efa3df23c938c0e529aeff8453acd7144af891ce76a01e2831921050de5c1"
+                                                   },
+                                                   {
+                                                       "path":  "docs/tuning-chat.png",
+                                                       "bytes":  177428,
+                                                       "sha256":  "eb2dc178c467694fd834646ffac6bc1c7c5ce521c3f852934fa30f3fe60db393"
+                                                   },
+                                                   {
+                                                       "path":  "docs/zh-CN/dashboard.png",
+                                                       "bytes":  356661,
+                                                       "sha256":  "e1c3c7185ce1fa388e83dab3bcf2b1afa89b4e0d1f621cb84bffadb30eb0aba3"
+                                                   },
+                                                   {
+                                                       "path":  "docs/zh-CN/flight-setup.png",
+                                                       "bytes":  123671,
+                                                       "sha256":  "0c756a60fb8fcea310bd9a4236ff487d1c930eb98e5da60a65b895b6a41b78a5"
+                                                   },
+                                                   {
+                                                       "path":  "docs/zh-CN/tuning-chat.png",
+                                                       "bytes":  182940,
+                                                       "sha256":  "c7dab3f7663bea2c20f372fd0244b2848d075ace9e2da0f5bfe81acde59113db"
+                                                   },
+                                                   {
+                                                       "path":  "drone-favicon.png",
+                                                       "bytes":  6072,
+                                                       "sha256":  "39f1c9e1bec804cb5834b12514408c9673b3a954d5c75544a5f92802387f2ea7"
+                                                   },
+                                                   {
+                                                       "path":  "index.html",
+                                                       "bytes":  561,
+                                                       "sha256":  "45e7e45ce9a7c09b10e9a5589f2863c277650e20fd3924ddc8869481b551d198"
+                                                   },
+                                                   {
+                                                       "path":  "licenses/space-grotesk-OFL-1.1.txt",
+                                                       "bytes":  4490,
+                                                       "sha256":  "eedb5a89d8a84984a4923fe23b438fc654fe603657de7d335f67afdafb47a2a3"
+                                                   }
+                                               ],
+                             "generated_nsis":  {
+                                                    "bytes":  32519,
+                                                    "sha256":  "69128266278b3c04519a7c81a615a6d6353d98ed52da44ca9a15f4c9b433e0b6",
+                                                    "declared_embedded_files":  [
+                                                                                    "drone-dream-desktop.exe",
+                                                                                    "licenses/DroneDream-LICENSE.txt",
+                                                                                    "licenses/THIRD_PARTY_NOTICES.md",
+                                                                                    "licenses/Valkey-COPYING.txt",
+                                                                                    "WebView2Loader.dll"
+                                                                                ]
+                                                }
+                         },
+    "delivery_boundary":  {
+                              "backend_source_embedded_in_nsis":  false,
+                              "simulator_scripts_embedded_in_nsis":  false,
+                              "wsl_rootfs_embedded_in_nsis":  false,
+                              "production_frontend_embedded_in_desktop_executable":  true,
+                              "desktop_runtime_installer_client_embedded":  true,
+                              "separate_signed_runtime_release_required_for_backend_px4_gazebo":  true
+                          }
+}

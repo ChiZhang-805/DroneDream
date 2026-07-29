@@ -1,0 +1,58 @@
+{
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "pytest": "9.1.0",
+    "python": "3.13.0"
+  },
+  "focused_checks": [
+    {
+      "command": "C:\\Users\\zju20\\miniconda3\\python.exe -m pytest backend\\tests\\test_technical_report_evidence_v10.py backend\\tests\\test_technical_report_evidence.py backend\\tests\\test_harness_multi_tool_budget_evaluation.py backend\\tests\\test_harness_routing_campaign.py backend\\tests\\test_harness_routing_evaluation.py backend\\tests\\test_harness_routing_freezes.py backend\\tests\\test_harness_routing_holdout.py backend\\tests\\test_advanced_physics_closure_evidence.py backend\\tests\\test_advanced_physics_evidence.py backend\\tests\\test_physical_campaign_evidence.py backend\\tests\\test_test_run_receipt.py -q --junitxml=artifacts\\test-runs\\aurora-software-755c511\\focused-suite.xml",
+      "duration_seconds": 31.011,
+      "finished_at": "2026-07-29T00:27:51.1556236Z",
+      "log": {
+        "path": "artifacts/test-runs/aurora-software-755c511/focused-suite.log",
+        "sha256": "6cf663090b5d649976072aeecb31508e252b9a02affe5a0155329521025efad0",
+        "size_bytes": 368
+      },
+      "result": {
+        "failed": 0,
+        "passed": 73,
+        "status": "passed"
+      },
+      "started_at": "2026-07-29T00:27:20.1422597Z",
+      "working_directory": "Z:\\DroneDream-worktrees\\aurora-20260728"
+    }
+  ],
+  "full_suite": {
+    "command": "C:\\Users\\zju20\\miniconda3\\python.exe -m pytest backend\\tests -q --junitxml=artifacts\\test-runs\\aurora-software-755c511\\full-suite.xml",
+    "duration_seconds": 842.69,
+    "finished_at": "2026-07-29T00:27:00.9369745Z",
+    "log": {
+      "path": "artifacts/test-runs/aurora-software-755c511/full-suite.log",
+      "sha256": "a6b7d84a14fdb8f1dfb98591acdaca45230a15b3a60e52bf7104489d6e067958",
+      "size_bytes": 2986
+    },
+    "result": {
+      "failed": 0,
+      "passed": 1284,
+      "status": "passed"
+    },
+    "started_at": "2026-07-29T00:12:58.2435507Z",
+    "tested_state": {
+      "base_commit": "755c511539fe561207ca38ff5079f471a4110896",
+      "exact_final_commit_run": true,
+      "kind": "commit"
+    },
+    "working_directory": "Z:\\DroneDream-worktrees\\aurora-20260728"
+  },
+  "generated_at": "2026-07-29T00:28:51Z",
+  "receipt_sha256": "15e2c97e62f9d75b60a315fd62ec93a7a2f38db401e8c8817146e4e7f1fdaafe",
+  "schema_version": "dronedream.test-run-receipt.v2",
+  "source_commit": "755c511539fe561207ca38ff5079f471a4110896",
+  "validation_bridge": {
+    "focused_rerun_performed": true,
+    "focused_rerun_required": false,
+    "full_suite_rerun_performed": true,
+    "reason": "Full and focused suites ran from tracked-clean source_commit 755c511539fe561207ca38ff5079f471a4110896; ignored generated test artifacts were the only writes during validation. The focused suite supplements, and does not bridge from, the exact full run."
+  }
+}

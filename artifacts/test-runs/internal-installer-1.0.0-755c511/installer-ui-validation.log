@@ -1,0 +1,18 @@
+LANGUAGE=English START_UTC=2026-07-29T00:56:35.3041814Z
+UI verify: temporarily suspending DroneDream registration
+UI verify: waiting for localized entry page
+UI verify: waiting for welcome or location page
+UI verify: advancing welcome page
+UI verify: waiting for existing-installation or location page
+UI verify: waiting for application location page
+Real installer page flow verified: language=English app=C:\Users\zju20\AppData\Local\DroneDream target=E:\DroneDream
+RESULT=English EXIT_CODE=0 DURATION_SECONDS=8.103 END_UTC=2026-07-29T00:56:43.4074533Z
+LANGUAGE=SimpChinese START_UTC=2026-07-29T00:56:43.4116584Z
+UI verify: temporarily suspending DroneDream registration
+UI verify: waiting for localized entry page
+UI verify: waiting for welcome or location page
+UI verify: advancing welcome page
+UI verify: waiting for existing-installation or location page
+UI verify: waiting for application location page
+Real installer page flow verified: language=SimpChinese app=C:\Users\zju20\AppData\Local\DroneDream target=E:\DroneDream
+RESULT=SimpChinese EXIT_CODE=0 DURATION_SECONDS=8.127 END_UTC=2026-07-29T00:56:51.5388183Z
