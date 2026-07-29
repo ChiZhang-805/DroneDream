@@ -90,6 +90,46 @@ def test_opportunity_bounds_capacity_by_remaining_full_trial_budget() -> None:
     )
 
 
+def test_tool_execution_rejects_proposals_above_compiled_allocation(
+    monkeypatch,
+) -> None:
+    from app.orchestration import job_manager
+    from app.orchestration.harness_budget_planner import HarnessCompiledToolCall
+    from app.orchestration.optimizer import CandidateProposal
+
+    proposal = CandidateProposal(
+        generation_index=4,
+        label="overflow",
+        strategy="test",
+        parameters={"MPC_XY_P": 1.0},
+    )
+    monkeypatch.setattr(
+        job_manager,
+        "execute_prepared_experimental_generation",
+        lambda _prepared: [proposal, proposal],
+    )
+    prepared = job_manager._PreparedHarnessToolCall(
+        call=HarnessCompiledToolCall(
+            call_id="call_" + "a" * 24,
+            ordinal=0,
+            tool_id="turbo",
+            allocation=1,
+            fidelity_mode="auto",
+            parallel_safe=True,
+            latency_budget_ms=10_000,
+            cpu_budget_ms=10_000,
+            projected_trial_upper_bound=4,
+        ),
+        prepared=None,  # type: ignore[arg-type]
+    )
+
+    result = job_manager._run_harness_tool_call(prepared)
+
+    assert result.status == "tool_error"
+    assert result.proposals == ()
+    assert result.error_type == "ProposalCountExceeded"
+
+
 def test_valid_multi_tool_plan_is_costed_and_compiled_in_canonical_order() -> None:
     opportunity = _opportunity()
 

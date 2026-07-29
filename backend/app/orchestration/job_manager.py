@@ -1496,6 +1496,16 @@ def _run_harness_tool_call(
     proposals: tuple[CandidateProposal, ...] = ()
     try:
         proposals = tuple(execute_prepared_experimental_generation(prepared_call.prepared))
+        if len(proposals) > prepared_call.call.allocation:
+            error_type = "ProposalCountExceeded"
+            proposals = ()
+            logger.warning(
+                "Harness tool call exceeded its compiled allocation "
+                "(call_id=%s, tool_id=%s, allocation=%s)",
+                prepared_call.call.call_id,
+                prepared_call.call.tool_id,
+                prepared_call.call.allocation,
+            )
     except Exception as exc:
         error_type = type(exc).__name__[:128]
         logger.warning(
