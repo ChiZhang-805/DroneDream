@@ -1,0 +1,196 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-manual-hierarchy-spacing-validation",
+  "generatedAtUtc": "2026-07-29T13:16:49Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "4673271960c9f0765d3b62d1c1e012f06e60787a",
+    "sourceTree": "dfae56dd791b81fbdbcf8f6288774a73e12a658e",
+    "sourceStateDuringValidation": "clean",
+    "attestationRule": "This receipt attests only the immutable source commit. The receipt-only commit that contains this file is not self-attested."
+  },
+  "scope": {
+    "implemented": [
+      "Expanded second-level links in ordinary Manual chapters now use the same visible nested hierarchy as the five-step workflow group.",
+      "The first Manual chapter heading and icon align with the top edge of the first sidebar chapter row at desktop widths.",
+      "The online-edition eyebrow and the large manual title retain independent top and bottom breathing room instead of being forced onto the sidebar alignment line.",
+      "Tablet and mobile layouts reset the desktop alignment height so long bilingual titles can flow naturally without horizontal document overflow."
+    ],
+    "sourceFiles": [
+      "frontend/src/site/site.css",
+      "website/scripts/audit-community-manual-ui.mjs"
+    ],
+    "excluded": "No downloadable Markdown/PDF manual, installer, release metadata, backend, software evidence, technical report, DNS, TLS, Supabase production configuration, payment configuration, GitHub Pages deployment, or Alibaba Cloud server state was changed by this source commit.",
+    "deploymentPerformed": false
+  },
+  "validationEnvironment": {
+    "operatingSystem": "Windows",
+    "worktree": "Z:\\DroneDream-worktrees\\website-20260728",
+    "node": "v24.14.1",
+    "localCompiledBaseUrl": "http://127.0.0.1:4189/",
+    "accountFlow": "Documented local-preview Supabase placeholders and deterministic audit fixtures only; no production secret or account was used.",
+    "browsers": [
+      "Microsoft Edge",
+      "Google Chrome",
+      "Lenovo Browser",
+      "Firefox"
+    ],
+    "locales": [
+      "en",
+      "zh-CN"
+    ],
+    "viewports": [
+      "1440x1000",
+      "2000x1080",
+      "2048x1280",
+      "390x844"
+    ]
+  },
+  "validation": {
+    "focusedTests": {
+      "command": "npm test -- --run src/__tests__/PublicSite.test.tsx",
+      "testFiles": 1,
+      "tests": 16,
+      "passed": 16,
+      "failed": 0,
+      "result": "pass"
+    },
+    "frontendTests": {
+      "command": "npm test -- --run",
+      "testFiles": 50,
+      "tests": 329,
+      "passed": 329,
+      "failed": 0,
+      "result": "pass"
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "pass"
+    },
+    "lint": {
+      "command": "npm run lint",
+      "result": "pass"
+    },
+    "applicationBuild": {
+      "command": "npm run build",
+      "result": "pass",
+      "note": "Vite emitted its existing non-failing application chunk-size advisory."
+    },
+    "sharedSiteAndConsoleBuild": {
+      "command": "website/scripts/build-pages-site.ps1 with GITHUB_SHA=4673271960c9f0765d3b62d1c1e012f06e60787a",
+      "result": "pass",
+      "artifactKind": "dronedream-shared-static-site",
+      "sourceCommit": "4673271960c9f0765d3b62d1c1e012f06e60787a",
+      "fileCount": 123,
+      "sha256SumsEntries": 122,
+      "sha256SumsSha256": "2d548d1de81f3acca2f419ee795f5595c0b57bc282519f6ac628d0e21ebdde9e",
+      "buildManifestSha256": "463964a85eea405ee1b5b6eae9601b4c2760263e4a4c9f0bfcb0ab7a3ad03636",
+      "latestJsonSha256": "7d0844cafd94147adee993914f41b913213f11ba5696af92da61680b0b6bfd59",
+      "totalBytesIncludingSha256Sums": 31862180
+    },
+    "deploymentContract": {
+      "command": "python -m unittest -v runtime.tests.test_website_deployment",
+      "tests": 11,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass"
+    },
+    "performance": {
+      "command": "node website/scripts/audit-site-performance.mjs http://127.0.0.1:4189/ <output>",
+      "routes": 5,
+      "passed": 5,
+      "failed": 0,
+      "reportBytes": 17707,
+      "reportSha256": "f99cbe2819a7830984d862a08d62e66258dcb96bf3118f5d1dcdcd0f589ec827",
+      "result": "pass"
+    },
+    "typography": {
+      "desktop1440": {
+        "command": "node website/scripts/audit-site-typography.mjs http://127.0.0.1:4189/site.html 1440 1000 0.80 <output>",
+        "mode": "full",
+        "violations": 0,
+        "reportBytes": 267835,
+        "reportSha256": "41e0ad26889621bc2df0c27558b289c0606c6be8ce7bd413f07c3d9f7d691934",
+        "result": "pass"
+      },
+      "wide2048": {
+        "command": "node website/scripts/audit-site-typography.mjs http://127.0.0.1:4189/site.html 2048 1280 0.80 <output>",
+        "mode": "full",
+        "violations": 0,
+        "reportBytes": 267619,
+        "reportSha256": "89fbbf69036d67f7103ca8c4b7dd8637c1d7661db242107b6bea67eb80a32302",
+        "result": "pass"
+      },
+      "mobile390": {
+        "command": "node website/scripts/audit-site-typography.mjs http://127.0.0.1:4189/site.html 390 844 0.80 <output> layout-only",
+        "mode": "layout-only",
+        "layoutViolations": 0,
+        "reportBytes": 276959,
+        "reportSha256": "2b8bd5ffa324fec36b0b86b080fe16d425388b79f1a4109c87e14eaa4d863cec",
+        "result": "pass"
+      }
+    },
+    "browserMatrix": {
+      "command": "node website/scripts/audit-browser-matrix.mjs http://127.0.0.1:4189/ <output> edge,chrome,lenovo,firefox",
+      "checks": 100,
+      "passed": 100,
+      "failed": 0,
+      "unavailableBrowsers": [],
+      "externalWarnings": 32,
+      "externalWarningDisposition": "Recorded external network warnings; none was a browser, layout, console, unsafe-API, reachability, or horizontal-overflow failure.",
+      "reportBytes": 66688,
+      "reportSha256": "7ab714548f79d3f9a3c4de3da6076f71f3a90fba0ef03ccbf6228188a0e9fb96",
+      "result": "pass"
+    },
+    "communityManualUiAudit": {
+      "command": "node website/scripts/audit-community-manual-ui.mjs http://127.0.0.1:4189/ <output-directory>",
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "reportBytes": 47505,
+      "reportSha256": "612b4ece28885655a0f2fae2829356f1845b6ddde693de46ec4ef05416cd532b",
+      "screenshots": 48,
+      "screenshotBytes": 18781548,
+      "screenshotManifestSha256": "9c9fd70909a941ca7a917889b3cf7d423b0c740c08e696684ab673aca98501f9",
+      "desktopMeasurements": {
+        "firstChapterTopPx": 261.125,
+        "introductionHeadingTopPx": 261,
+        "alignmentDeltaPx": 0.125,
+        "subsectionIndentPx": 18.90625,
+        "readerTopBreathingPx": 32,
+        "readerBottomBreathingRangePx": [
+          46.53125,
+          69.5625
+        ]
+      },
+      "mobileDocumentWidthParity": "390px document width equals 390px viewport width in both locales.",
+      "result": "pass"
+    },
+    "visualInspection": {
+      "performedBy": "Codex",
+      "inspected": [
+        "English and Chinese Manual accordion views at 1440x1000",
+        "English and Chinese Manual accordion views at 2000x1080",
+        "English and Chinese Manual accordion views at 390x844",
+        "Expanded ordinary chapter subsections and the five-step workflow hierarchy",
+        "Reader eyebrow, large title, first chapter heading, and sidebar chapter-row alignment"
+      ],
+      "result": "pass"
+    },
+    "supersededDiagnostic": {
+      "command": "audit-site-performance against the Vite source-development server",
+      "result": "excluded",
+      "reason": "The source-development server intentionally serves unbundled modules and is not a production performance target. The exact compiled shared artifact subsequently passed all 5 production performance routes."
+    },
+    "gitDiffCheck": "pass",
+    "ownershipScopeCheck": "pass"
+  },
+  "releaseContract": {
+    "version": "1.0.0",
+    "installerFileName": "DroneDream_1.0.0_x64-setup.exe",
+    "installerBytes": 10387042,
+    "installerSha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+    "authenticode": "NotSigned",
+    "disposition": "Unchanged owner-approved unsigned internal preview metadata; this Manual UI source did not rebuild or replace installer bytes."
+  }
+}
