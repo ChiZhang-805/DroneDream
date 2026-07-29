@@ -681,6 +681,99 @@ def test_real_cli_artifact_regeneration_mismatch_preserves_verified_bytes(
         assert report_row.digest_receipt.evidence_id == sealed_evidence_id
 
 
+def test_unregistered_immutable_artifact_mismatch_is_not_overwritten(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from app.storage.integrity import ArtifactIntegrityError
+
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+    destination.parent.mkdir(parents=True)
+    original = b"unregistered bytes from an interrupted transaction"
+    destination.write_bytes(original)
+
+    with pytest.raises(
+        ArtifactIntegrityError,
+        match="unregistered immutable artifact bytes differ",
+    ):
+        rg._publish_immutable_artifact(destination, b'{"new":"content"}\n')
+
+    assert destination.read_bytes() == original
+
+
+def test_unregistered_exact_immutable_artifact_is_recovered_without_rewrite(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+    destination.parent.mkdir(parents=True)
+    content = b'{"recover":"exact bytes"}\n'
+    destination.write_bytes(content)
+    original_mtime = destination.stat().st_mtime_ns
+
+    rg._publish_immutable_artifact(destination, content)
+
+    assert destination.read_bytes() == content
+    assert destination.stat().st_mtime_ns == original_mtime
+
+
+def test_failed_immutable_artifact_write_removes_only_its_partial_file(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+
+    def fail_fsync(descriptor: int) -> None:
+        del descriptor
+        raise OSError("injected fsync failure")
+
+    monkeypatch.setattr(rg.os, "fsync", fail_fsync)
+    with pytest.raises(OSError, match="injected fsync failure"):
+        rg._publish_immutable_artifact(destination, b"partial bytes")
+
+    assert not destination.exists()
+
+
+def test_immutable_artifact_rejects_symlink_destination(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from app.storage.integrity import ArtifactIntegrityError
+
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"outside bytes")
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+    destination.parent.mkdir(parents=True)
+    try:
+        destination.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
+
+    with pytest.raises(
+        ArtifactIntegrityError,
+        match="not a regular file",
+    ):
+        rg._publish_immutable_artifact(destination, b"replacement")
+
+    assert outside.read_bytes() == b"outside bytes"
+
+
 def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
     rg = ctx["report_generator"]
     models = ctx["models"]

@@ -14,10 +14,12 @@ The module also registers job-level artifacts:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import math
 import os
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -477,6 +479,71 @@ def _text_bytes(text: str) -> bytes:
     return body.encode("utf-8")
 
 
+def _require_existing_artifact_bytes(path: Path, content: bytes) -> None:
+    try:
+        expected = path.lstat()
+    except FileNotFoundError:
+        raise
+    if not stat.S_ISREG(expected.st_mode):
+        raise ArtifactIntegrityError(
+            "immutable artifact destination is not a regular file"
+        )
+    with path.open("rb") as stream:
+        opened = os.fstat(stream.fileno())
+        if (opened.st_dev, opened.st_ino) != (expected.st_dev, expected.st_ino):
+            raise ArtifactIntegrityError(
+                "immutable artifact destination changed while opening"
+            )
+        stored = stream.read(len(content) + 1)
+        finished = os.fstat(stream.fileno())
+    if (
+        (finished.st_dev, finished.st_ino) != (opened.st_dev, opened.st_ino)
+        or finished.st_size != opened.st_size
+        or finished.st_mtime_ns != opened.st_mtime_ns
+    ):
+        raise ArtifactIntegrityError(
+            "immutable artifact destination changed while reading"
+        )
+    if stored != content:
+        raise ArtifactIntegrityError(
+            "unregistered immutable artifact bytes differ from regeneration"
+        )
+
+
+def _publish_immutable_artifact(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_parent = path.parent.resolve()
+    if not any(
+        resolved_parent.is_relative_to(root)
+        for root in get_settings().allowed_artifact_roots
+    ):
+        raise ArtifactIntegrityError(
+            "immutable artifact destination is outside allowed roots"
+        )
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    except FileExistsError:
+        _require_existing_artifact_bytes(path, content)
+        return
+    created = os.fstat(descriptor)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            descriptor = None
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except Exception:
+        with contextlib.suppress(OSError):
+            current = path.lstat()
+            if (current.st_dev, current.st_ino) == (created.st_dev, created.st_ino):
+                path.unlink()
+        raise
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
 def _ensure_immutable_file_artifact(
     db: Session,
     *,
@@ -520,8 +587,7 @@ def _ensure_immutable_file_artifact(
         bind_artifact_integrity(db, artifact=existing, content=content)
         return existing, False
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(content)
+    _publish_immutable_artifact(path, content)
     storage_path = storage.put_file(path, storage_key, mime_type)
     stored_content = storage.read_bytes(storage_path)
     if stored_content != content:
