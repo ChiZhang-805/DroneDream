@@ -1334,6 +1334,10 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
                 "wind_gusts": {"enabled": True},
                 "service_token": "should-not-appear",
                 "nested": {"db_password": "do-not-leak"},
+                "credential": "credential-do-not-leak",
+                "authorization": "Bearer authorization-do-not-leak",
+                "cookie": "session=cookie-do-not-leak",
+                "bearer": "bearer-do-not-leak",
             },
         )
         db.add(job)
@@ -1366,8 +1370,31 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
         assert "db-secret" not in text
         assert "should-not-appear" not in text
         assert "do-not-leak" not in text
+        assert "credential-do-not-leak" not in text
+        assert "authorization-do-not-leak" not in text
+        assert "cookie-do-not-leak" not in text
+        assert "bearer-do-not-leak" not in text
         assert "encrypted_api_key" not in text
         assert "APP_SECRET_KEY" not in text
+
+
+def test_repro_payload_sanitizer_rejects_common_credential_fields() -> None:
+    repro_manifest = __import__(
+        "app.orchestration.repro_manifest",
+        fromlist=["sanitize_payload"],
+    )
+
+    sanitized = repro_manifest.sanitize_payload(
+        {
+            "credential": "credential-value",
+            "authorization": "Bearer authorization-value",
+            "cookie": "session=cookie-value",
+            "bearer": "bearer-value",
+            "authoritative_evidence": "retain-normal-field",
+        }
+    )
+
+    assert sanitized == {"authoritative_evidence": "retain-normal-field"}
 
 
 def test_build_job_report_lines_includes_new_sections(ctx):
