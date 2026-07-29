@@ -1,0 +1,173 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-community-manual-browsing-validation",
+  "generatedAtUtc": "2026-07-29T23:19:03Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "32ff06436f4637f5a7e1a374688fdf470c796444",
+    "sourceTree": "1d4f003775e195575bec6acf5d92cfa85759f52c",
+    "sourceStateDuringValidation": "clean",
+    "attestationRule": "This receipt attests only the immutable source commit. The receipt-only commit that contains this file is not self-attested."
+  },
+  "scope": {
+    "implemented": [
+      "The desktop community landing page renders exactly five complete recent-topic cards in one row when at least five topics are available.",
+      "The recent-topic selection keeps the newest topic and samples four more topics per page visit while remaining stable for that visit.",
+      "All Topics uses document scrolling and bounded twenty-topic batches.",
+      "Rendered hashtag labels include a regular space after the hash character.",
+      "The public navigation download action is labeled Download in English and 下载 in Simplified Chinese.",
+      "The desktop Manual keeps its eyebrow and large title position while moving the document content upward by four pixels."
+    ],
+    "sourceFiles": [
+      "frontend/src/site/site.css",
+      "frontend/src/site/CommunityPage.tsx",
+      "frontend/src/site/SiteApp.tsx",
+      "frontend/src/__tests__/CommunityPage.test.tsx",
+      "frontend/src/__tests__/PublicSite.test.tsx",
+      "website/scripts/audit-community-manual-ui.mjs"
+    ],
+    "notPerformed": [
+      "No production deployment, GitHub Pages workflow dispatch, Alibaba Cloud upload, DNS, TLS, Supabase production configuration, payment configuration, installer, runtime, or release asset was changed.",
+      "Ten production community posts were not created because no reusable account password or authenticated trusted-HTTPS session was available to this task. Browser password stores were not inspected and credentials were not guessed.",
+      "Software-owned Settings, ECE498, and avatar-crop changes are handled on codex/software and are not included in this website source commit."
+    ],
+    "deploymentPerformed": false
+  },
+  "validationEnvironment": {
+    "operatingSystem": "Windows",
+    "worktree": "Z:\\DroneDream-worktrees\\website-20260728",
+    "node": "v24.14.1",
+    "localSupabaseConfiguration": "Non-production placeholder URL and publishable key used only for compilation and deterministic browser fixtures.",
+    "localReleaseStaging": "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\internal-installer-1.0.0-755c511",
+    "localReleaseStagingRule": "Exact frozen files were read and hashed; the installer was not rebuilt."
+  },
+  "validation": {
+    "focusedTests": {
+      "command": "npm test -- --run src/__tests__/CommunityPage.test.tsx src/__tests__/PublicSite.test.tsx",
+      "testFiles": 2,
+      "tests": 28,
+      "passed": 28,
+      "failed": 0,
+      "result": "pass"
+    },
+    "frontendTests": {
+      "command": "npm test -- --run",
+      "testFiles": 51,
+      "tests": 336,
+      "passed": 336,
+      "failed": 0,
+      "result": "pass"
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "result": "pass"
+    },
+    "lint": {
+      "command": "npm run lint",
+      "result": "pass"
+    },
+    "applicationBuild": {
+      "command": "npm run build with documented non-production placeholder environment",
+      "result": "pass",
+      "note": "Vite emitted its existing non-failing application chunk-size advisory."
+    },
+    "sharedSiteAndConsoleBuild": {
+      "command": "website/scripts/build-pages-site.ps1 with GITHUB_SHA=32ff06436f4637f5a7e1a374688fdf470c796444 and the frozen 755c511 release staging directory",
+      "result": "pass",
+      "artifactKind": "dronedream-shared-static-site",
+      "sourceCommit": "32ff06436f4637f5a7e1a374688fdf470c796444",
+      "fileCount": 123,
+      "sha256SumsEntries": 122,
+      "sha256SumsSha256": "3e1f3f35b0e14641213e15135f28ed5b12d5ecbcd1ad007d9edf8f0c0aa20c88",
+      "buildManifestSha256": "693013b199d4e39d8a2a2ade9fcba53335a4b32d0383fcada89bfe666606c689",
+      "latestJsonSha256": "7d0844cafd94147adee993914f41b913213f11ba5696af92da61680b0b6bfd59",
+      "totalBytesIncludingSha256Sums": 31867161,
+      "networkDiagnostic": "An initial build attempt completed both Vite builds but timed out while downloading GitHub release files. It was excluded from the pass claim. The successful run used the hash-verified frozen local release handoff as staging input."
+    },
+    "deploymentContract": {
+      "command": "python -m pytest runtime/tests/test_website_deployment.py -q",
+      "tests": 11,
+      "subtests": 22,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass"
+    },
+    "communityVisualValidation": {
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "desktop1440x1000": {
+        "recentCards": 5,
+        "oneRow": true,
+        "feedBottomGapPx": 18,
+        "documentWidthEqualsViewportWidth": true,
+        "documentHeightEqualsViewportHeight": true,
+        "result": "pass"
+      },
+      "desktop2048x1080": {
+        "recentCards": 5,
+        "recentFirstRowCards": 5,
+        "recentUsesOneScreen": true,
+        "allTopicsCardsInFixture": 13,
+        "allTopicsFirstRowCards": 4,
+        "allTopicsUsesDocumentScroll": true,
+        "documentWidthEqualsViewportWidth": true,
+        "tagSpacingValid": true,
+        "result": "pass"
+      },
+      "mobile390x844": {
+        "recentCards": 5,
+        "recentHorizontalShelf": true,
+        "recentUsesOneScreen": true,
+        "allTopicsCardsInFixture": 13,
+        "allTopicsFirstRowCards": 1,
+        "allTopicsUsesDocumentScroll": true,
+        "documentWidthEqualsViewportWidth": true,
+        "tagSpacingValid": true,
+        "result": "pass"
+      },
+      "visualInspectionPerformedBy": "Codex",
+      "result": "pass"
+    },
+    "manualVisualValidation": {
+      "viewports": [
+        "2048x1080"
+      ],
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "headerHeightPx": 179,
+      "titleTopPx": 135,
+      "titleBottomPx": 207.109375,
+      "firstDocumentHeadingTopPx": 257,
+      "documentHeadingVsFirstSidebarChapterPx": -4.125,
+      "documentWidthEqualsViewportWidth": true,
+      "visualInspectionPerformedBy": "Codex",
+      "result": "pass"
+    },
+    "visualEvidence": {
+      "community1440MetricsSha256": "fcc68b802242810de197d14e6d3993f792130df8fdfe84d8e6300e96dec3d65f",
+      "communityResponsiveFixtureMetricsSha256": "3de022243c5c130041677b2a10378414bc449a90d854116ad0b52a6702a2973d",
+      "manualSpacingMetricsSha256": "e09ffc2563d375f986bcf61d637c8fbf95bd0a927341826ffe2cf3256a1739e4",
+      "community1440EnglishScreenshotSha256": "51645e9f8c3f034b232a2e89e11bcb61b85dfd789e03e7764f32b2be1349bddb",
+      "community1440ChineseScreenshotSha256": "6d5980923c1240eb154add304c92ae97a865ab3266f4516625fd389db0c390a9",
+      "manual2048EnglishScreenshotSha256": "aaa4dfe6350e53212450edd294cd2a1172c942ec08bc2521b00a8432166807f4",
+      "manual2048ChineseScreenshotSha256": "a3621104daa25cb0f88277ac5b769cb26464e0ae4a67298c97c479699a860f1a"
+    },
+    "gitDiffCheck": "pass",
+    "ownershipScopeCheck": "pass"
+  },
+  "releaseContract": {
+    "version": "1.0.0",
+    "installerFileName": "DroneDream_1.0.0_x64-setup.exe",
+    "installerBytes": 10387042,
+    "installerSha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+    "checksumFileSha256": "400d33119bcea1447262904bf718b96b4aed2dd4395e8a4e5e120f89faf0d40d",
+    "updaterSignatureFileSha256": "0406f72c46f44da494e29621b815b190d43698f1f700c63df14e95d66431230a",
+    "updaterManifestSha256": "96774c5f1db7ffd6ecb60b160044aaa21afaa771e67dd83cc0d9422072c410f0",
+    "authenticode": "NotSigned",
+    "disposition": "Unchanged owner-approved unsigned internal preview metadata; this UI source did not rebuild or replace installer bytes."
+  }
+}
