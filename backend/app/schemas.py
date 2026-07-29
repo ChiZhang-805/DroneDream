@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # --- Enums / literals -------------------------------------------------------
 
 TrackType = Literal["hover", "circle", "u_turn", "lemniscate", "custom"]
+DefaultTrackType = Literal["hover", "circle", "u_turn", "lemniscate"]
 SensorNoiseLevel = Literal["low", "medium", "high"]
 ObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom"]
 JobStatus = Literal[
@@ -110,7 +111,7 @@ class UserExperiencePreferencesUpdate(_Strict):
     memory_enabled: bool = False
     locale: Literal["en", "zh-CN"] | None = None
     default_template_key: StarterExperienceTemplateKey | None = None
-    default_track_type: TrackType | None = None
+    default_track_type: DefaultTrackType | None = None
     default_altitude_m: Annotated[float, Field(ge=1, le=20)] | None = None
 
     @model_validator(mode="after")
@@ -126,7 +127,7 @@ class UserExperiencePreferences(BaseModel):
     memory_enabled: bool
     locale: Literal["en", "zh-CN"] | None = None
     default_template_key: StarterExperienceTemplateKey | None = None
-    default_track_type: TrackType | None = None
+    default_track_type: DefaultTrackType | None = None
     default_altitude_m: float | None = None
     retention_days: int
     stored_content: Literal[

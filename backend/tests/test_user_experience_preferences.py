@@ -137,5 +137,9 @@ def test_experience_preferences_reject_unknown_or_unbounded_values(client) -> No
     ).status_code == 422
     assert client.put(
         "/api/v1/preferences/experience",
+        json={"default_track_type": "custom"},
+    ).status_code == 422
+    assert client.put(
+        "/api/v1/preferences/experience",
         json={"memory_enabled": None},
     ).status_code == 422

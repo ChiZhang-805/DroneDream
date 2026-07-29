@@ -2198,6 +2198,14 @@ a {
   font-weight: 700;
 }
 
+.starter-experience-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
 .starter-experience-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(250px, 0.85fr);
@@ -2335,6 +2343,16 @@ a {
   font-size: 0.72rem;
 }
 
+.starter-experience-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.starter-experience-note[role="alert"] {
+  color: var(--danger);
+}
+
 @media (max-width: 1100px) {
   .starter-experience-layout {
     grid-template-columns: 1fr;
@@ -2357,6 +2375,11 @@ a {
 
   .starter-experience-version {
     align-self: flex-start;
+  }
+
+  .starter-experience-heading-actions {
+    align-items: flex-start;
+    justify-content: flex-start;
   }
 }
 
@@ -5178,6 +5201,162 @@ a {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(206, 174, 255, 0.14);
+}
+
+.settings-memory-panel {
+  display: grid;
+  gap: 0.72rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(206, 174, 255, 0.14);
+}
+
+.settings-memory-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-memory-heading h3,
+.settings-memory-heading p,
+.settings-memory-policy,
+.settings-memory-message {
+  margin: 0;
+}
+
+.settings-memory-heading h3 {
+  font-size: 1rem;
+}
+
+.settings-memory-heading p {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.settings-memory-heading > span {
+  flex: 0 0 auto;
+  padding: 0.28rem 0.52rem;
+  border: 1px solid rgba(255, 190, 92, 0.3);
+  border-radius: 999px;
+  color: #ffd77b;
+  background: rgba(245, 190, 71, 0.08);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.settings-memory-heading > span.configured {
+  border-color: rgba(64, 220, 148, 0.3);
+  color: #8ff5c3;
+  background: rgba(35, 180, 119, 0.08);
+}
+
+.settings-memory-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid rgba(206, 174, 255, 0.16);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.settings-memory-consent input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.12rem;
+  accent-color: #a855f7;
+}
+
+.settings-memory-consent span {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.settings-memory-consent strong {
+  color: #eee7f5;
+  font-size: 0.82rem;
+}
+
+.settings-memory-consent small,
+.settings-memory-policy {
+  color: #9f92ac;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.settings-memory-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.settings-memory-grid label {
+  display: grid;
+  min-width: 0;
+  gap: 0.28rem;
+}
+
+.settings-memory-grid label > span {
+  color: #cbbfd5;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.settings-memory-grid input,
+.settings-memory-grid select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0.45rem 0.58rem;
+  border: 1px solid rgba(206, 174, 255, 0.2);
+  border-radius: 9px;
+  color: #f7f2ff;
+  background: rgba(255, 255, 255, 0.04);
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.settings-memory-actions,
+.settings-memory-delete-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.settings-memory-delete-confirm {
+  padding: 0.45rem;
+  border: 1px solid rgba(255, 91, 124, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 91, 124, 0.06);
+}
+
+.settings-memory-delete-confirm > span {
+  flex: 1 1 220px;
+  color: #ffc2ce;
+  font-size: 0.74rem;
+}
+
+.settings-memory-message {
+  color: #8ff5c3;
+  font-size: 0.74rem;
+}
+
+.settings-memory-message[role="alert"] {
+  color: #ff9cb0;
+}
+
+@media (max-width: 720px) {
+  .settings-memory-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-memory-heading {
+    flex-direction: column;
+  }
 }
 
 .settings-model-heading {

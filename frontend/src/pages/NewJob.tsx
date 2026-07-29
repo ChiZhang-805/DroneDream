@@ -39,6 +39,7 @@ import type {
   TrackPoint,
   TrackType,
   TuningMode,
+  UserExperiencePreferences,
 } from "../types/api";
 import {
   BUILTIN_PARAMETER_CATALOG,
@@ -1285,6 +1286,8 @@ export function NewJob() {
   const [showTrackJson, setShowTrackJson] = useState(false);
   const [showParameterReview, setShowParameterReview] = useState(false);
   const [lastAppliedTemplateKey, setLastAppliedTemplateKey] = useState<string | null>(null);
+  const [savedDefaultsState, setSavedDefaultsState] =
+    useState<"idle" | "loading" | "applied" | "empty" | "error">("idle");
   const [capabilities, setCapabilities] = useState<BackendCapabilitiesResponse | null>(null);
   const [capabilitiesUnavailable, setCapabilitiesUnavailable] = useState(false);
   const submittingRef = useRef(false);
@@ -1537,6 +1540,61 @@ export function NewJob() {
       }
       return next;
     });
+  }
+
+  function applySavedDefaults(preferences: UserExperiencePreferences): void {
+    const template = STARTER_EXPERIENCE_TEMPLATES.find(
+      (candidate) => candidate.key === preferences.default_template_key,
+    );
+    setForm((previous) => {
+      const templated = template
+        ? applyStarterExperienceTemplate(previous, template)
+        : previous;
+      const trackType = preferences.default_track_type ?? templated.track_type;
+      return {
+        ...templated,
+        track_type: trackType,
+        start_x: trackType === "hover" ? "0" : templated.start_x,
+        start_y: trackType === "hover" ? "0" : templated.start_y,
+        altitude_m: preferences.default_altitude_m === null
+          ? templated.altitude_m
+          : String(preferences.default_altitude_m),
+      };
+    });
+    if (template) {
+      applyModePreset(template.patch.tuning_mode);
+      setLastAppliedTemplateKey(template.key);
+    }
+    setErrors((previous) => {
+      const next = { ...previous };
+      for (const key of ["track_type", "start_x", "start_y", "altitude_m"]) {
+        delete next[key];
+      }
+      if (template) {
+        for (const key of Object.keys(template.patch)) delete next[key];
+      }
+      return next;
+    });
+  }
+
+  async function loadSavedDefaults(): Promise<void> {
+    setSavedDefaultsState("loading");
+    try {
+      const preferences = await apiClient.getUserExperiencePreferences();
+      const hasDefaults = (
+        preferences.default_template_key !== null ||
+        preferences.default_track_type !== null ||
+        preferences.default_altitude_m !== null
+      );
+      if (!preferences.saved || !hasDefaults) {
+        setSavedDefaultsState("empty");
+        return;
+      }
+      applySavedDefaults(preferences);
+      setSavedDefaultsState("applied");
+    } catch {
+      setSavedDefaultsState("error");
+    }
   }
 
   function handleTextChange(key: keyof FormState) {
@@ -1998,11 +2056,23 @@ export function NewJob() {
                   <h3 id="starter-experience-title">{t("wizard.starter.title")}</h3>
                   <p>{t("wizard.starter.description")}</p>
                 </div>
-                <span className="starter-experience-version">
-                  {t("wizard.starter.catalogVersion", {
-                    version: STARTER_EXPERIENCE_CATALOG_VERSION,
-                  })}
-                </span>
+                <div className="starter-experience-heading-actions">
+                  <span className="starter-experience-version">
+                    {t("wizard.starter.catalogVersion", {
+                      version: STARTER_EXPERIENCE_CATALOG_VERSION,
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-small"
+                    disabled={savedDefaultsState === "loading"}
+                    onClick={() => void loadSavedDefaults()}
+                  >
+                    {savedDefaultsState === "loading"
+                      ? t("wizard.starter.loadingSaved")
+                      : t("wizard.starter.loadSaved")}
+                  </button>
+                </div>
               </div>
               <div className="starter-experience-layout">
                 <div className="starter-experience-grid">
@@ -2044,6 +2114,21 @@ export function NewJob() {
               {lastAppliedTemplateKey ? (
                 <p className="starter-experience-status" role="status">
                   {t("wizard.starter.applied", { key: lastAppliedTemplateKey })}
+                </p>
+              ) : null}
+              {savedDefaultsState === "applied" ? (
+                <p className="starter-experience-status" role="status">
+                  {t("wizard.starter.savedApplied")}
+                </p>
+              ) : null}
+              {savedDefaultsState === "empty" ? (
+                <p className="starter-experience-note" role="status">
+                  {t("wizard.starter.noSaved")}
+                </p>
+              ) : null}
+              {savedDefaultsState === "error" ? (
+                <p className="starter-experience-note" role="alert">
+                  {t("wizard.starter.loadFailed")}
                 </p>
               ) : null}
             </section>

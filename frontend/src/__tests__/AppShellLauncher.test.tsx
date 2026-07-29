@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../features/auth/AuthContext", async (importOriginal) => {
   const original =
@@ -28,6 +28,7 @@ vi.mock("../features/auth/AuthContext", async (importOriginal) => {
 });
 
 import { AppShell } from "../AppShell";
+import { apiClient } from "../api/client";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { resetDesktopReadinessSession } from "../desktop/readiness";
 
@@ -102,7 +103,24 @@ function renderLauncher() {
   return { ...page, router };
 }
 
+beforeEach(() => {
+  vi.spyOn(apiClient, "getUserExperiencePreferences").mockResolvedValue({
+    schema_version: "1.0",
+    saved: false,
+    memory_enabled: false,
+    locale: null,
+    default_template_key: null,
+    default_track_type: null,
+    default_altitude_m: null,
+    retention_days: 90,
+    stored_content:
+      "allowlisted_preferences_and_verified_structured_job_outcomes_only",
+    updated_at: null,
+  });
+});
+
 afterEach(() => {
+  vi.restoreAllMocks();
   resetDesktopReadinessSession();
   delete window.__TAURI__;
   window.localStorage.clear();
@@ -110,8 +128,90 @@ afterEach(() => {
 });
 
 describe("desktop launcher chrome", () => {
+  it("saves opt-in defaults and confirms permanent memory deletion", async () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    installDesktopBridge();
+    const update = vi.spyOn(apiClient, "updateUserExperiencePreferences").mockResolvedValue({
+      schema_version: "1.0",
+      saved: true,
+      memory_enabled: true,
+      locale: "en",
+      default_template_key: "hover-basics@1",
+      default_track_type: "hover",
+      default_altitude_m: 4,
+      retention_days: 90,
+      stored_content:
+        "allowlisted_preferences_and_verified_structured_job_outcomes_only",
+      updated_at: "2026-07-29T12:00:00Z",
+      deleted_memory_count: 0,
+    });
+    const erase = vi.spyOn(apiClient, "deleteUserExperiencePreferences").mockResolvedValue({
+      deleted_preferences: true,
+      deleted_memory_count: 2,
+      memory_enabled: false,
+    });
+    const { router } = renderLauncher();
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const dialog = screen.getByRole("dialog", { name: "Settings" });
+    const memory = await within(dialog).findByLabelText(
+      /Learn from my verified experiment outcomes/,
+    );
+    expect(memory).not.toBeChecked();
+    fireEvent.click(memory);
+    fireEvent.change(within(dialog).getByLabelText("Default starter template"), {
+      target: { value: "hover-basics@1" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Default track"), {
+      target: { value: "hover" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Default altitude (m)"), {
+      target: { value: "4" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save personal defaults" }));
+
+    await waitFor(() => expect(update).toHaveBeenCalledWith({
+      memory_enabled: true,
+      locale: "en",
+      default_template_key: "hover-basics@1",
+      default_track_type: "hover",
+      default_altitude_m: 4,
+    }));
+    expect(within(dialog).getByText("Personal defaults saved.")).toBeVisible();
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Delete defaults & memory" }),
+    );
+    expect(within(dialog).getByRole("group", {
+      name: "Delete all saved defaults and structured memory?",
+    })).toBeVisible();
+    expect(erase).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete permanently" }));
+
+    await waitFor(() => expect(erase).toHaveBeenCalledTimes(1));
+    expect(
+      within(dialog).getByText("Personal defaults deleted; 2 memory rows erased."),
+    ).toBeVisible();
+    expect(memory).not.toBeChecked();
+
+    router.dispose();
+  });
+
   it("moves language selection into an accessible settings dialog", async () => {
     window.localStorage.setItem("drone-dream:locale", "en");
+    vi.mocked(apiClient.getUserExperiencePreferences).mockResolvedValue({
+      schema_version: "1.0",
+      saved: true,
+      memory_enabled: false,
+      locale: "zh-CN",
+      default_template_key: null,
+      default_track_type: null,
+      default_altitude_m: null,
+      retention_days: 90,
+      stored_content:
+        "allowlisted_preferences_and_verified_structured_job_outcomes_only",
+      updated_at: "2026-07-29T12:00:00Z",
+    });
     installDesktopBridge();
     const { router } = renderLauncher();
 
@@ -191,6 +291,7 @@ describe("desktop launcher chrome", () => {
     expect(within(chineseDialog).queryByText(
       "全面检查 Windows、WSL、本地后端、PX4 与 Gazebo。检查结果会在本次软件运行期间复用，除非你手动重检或真实运行发现异常。",
     )).not.toBeInTheDocument();
+    expect(apiClient.getUserExperiencePreferences).toHaveBeenCalledTimes(1);
 
     fireEvent.click(within(chineseDialog).getByRole("button", { name: "关闭设置" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

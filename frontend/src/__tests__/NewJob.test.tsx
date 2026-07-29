@@ -907,6 +907,37 @@ describe("NewJob experiment wizard", () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
 
+  it("loads user-owned defaults only on request and still does not create a Job", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "unused" } as Job);
+    const preferencesSpy = vi
+      .spyOn(apiClient, "getUserExperiencePreferences")
+      .mockResolvedValue({
+        schema_version: "1.0",
+        saved: true,
+        memory_enabled: false,
+        locale: "en",
+        default_template_key: "hover-basics@1",
+        default_track_type: "hover",
+        default_altitude_m: 4,
+        retention_days: 90,
+        stored_content:
+          "allowlisted_preferences_and_verified_structured_job_outcomes_only",
+        updated_at: "2026-07-29T12:00:00Z",
+      });
+    renderPage();
+
+    expect(preferencesSpy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Use my saved defaults/i }));
+
+    await waitFor(() => expect(preferencesSpy).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText(/Track type/i)).toHaveValue("hover");
+    expect(screen.getByLabelText(/Altitude/i)).toHaveValue(4);
+    expect(screen.getByText(/Saved defaults applied.*No experiment was created/i)).toBeVisible();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
   it("blocks a hover draft whose origin has a lateral offset", () => {
     const createSpy = vi
       .spyOn(apiClient, "createJob")

@@ -79,7 +79,13 @@ import {
 } from "./features/experiment/draftStorage";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
-import type { Job, JobStatus } from "./types/api";
+import type {
+  Job,
+  JobStatus,
+  StarterExperienceTemplateKey,
+  UserDefaultTrackType,
+  UserExperiencePreferences,
+} from "./types/api";
 
 const NAV_ITEMS: {
   to: string;
@@ -119,6 +125,21 @@ const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
 const ACTIVE_JOB_PAGE_SIZE = 100;
 const MAX_ACTIVE_JOB_PAGES_PER_STATUS = 10;
+
+interface ExperiencePreferenceDraft {
+  memory_enabled: boolean;
+  default_template_key: StarterExperienceTemplateKey | null;
+  default_track_type: UserDefaultTrackType | null;
+  default_altitude_m: number | null;
+}
+
+const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
+  memory_enabled: false,
+  default_template_key: null,
+  default_track_type: null,
+  default_altitude_m: null,
+};
+const EXPERIENCE_PREFERENCE_LOAD_FAILED = "experience-preference-load-failed";
 
 interface ExitPromptState {
   hasDraft: boolean;
@@ -311,6 +332,16 @@ function SettingsDialog({
   const [managedUsageError, setManagedUsageError] = useState<string | null>(null);
   const [subscriptionOpenError, setSubscriptionOpenError] =
     useState<string | null>(null);
+  const [experiencePreferences, setExperiencePreferences] =
+    useState<UserExperiencePreferences | null>(null);
+  const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
+    useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
+  const [experiencePreferenceState, setExperiencePreferenceState] =
+    useState<"loading" | "ready" | "saving" | "saved" | "error">("loading");
+  const [experiencePreferenceMessage, setExperiencePreferenceMessage] =
+    useState<string | null>(null);
+  const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
+    useState(false);
   const openSubscriptionPage = useCallback((
     event: MouseEvent<HTMLAnchorElement>,
   ) => {
@@ -344,6 +375,70 @@ function SettingsDialog({
   useEffect(() => {
     void refreshManagedUsage();
   }, [refreshManagedUsage]);
+  useEffect(() => {
+    let active = true;
+    void apiClient.getUserExperiencePreferences()
+      .then((preferences) => {
+        if (!active) return;
+        setExperiencePreferences(preferences);
+        setExperiencePreferenceDraft({
+          memory_enabled: preferences.memory_enabled,
+          default_template_key: preferences.default_template_key,
+          default_track_type: preferences.default_track_type,
+          default_altitude_m: preferences.default_altitude_m,
+        });
+        setExperiencePreferenceState("ready");
+      })
+      .catch(() => {
+        if (!active) return;
+        setExperiencePreferenceState("error");
+        setExperiencePreferenceMessage(EXPERIENCE_PREFERENCE_LOAD_FAILED);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const saveExperiencePreferences = async () => {
+    setExperiencePreferenceState("saving");
+    setExperiencePreferenceMessage(null);
+    try {
+      const saved = await apiClient.updateUserExperiencePreferences({
+        ...experiencePreferenceDraft,
+        locale,
+      });
+      setExperiencePreferences(saved);
+      setExperiencePreferenceState("saved");
+      setExperiencePreferenceMessage(
+        saved.deleted_memory_count > 0
+          ? t("settings.memory.savedAndDeleted", {
+              count: saved.deleted_memory_count,
+            })
+          : t("settings.memory.saved"),
+      );
+    } catch {
+      setExperiencePreferenceState("error");
+      setExperiencePreferenceMessage(t("settings.memory.saveFailed"));
+    }
+  };
+  const deleteExperiencePreferences = async () => {
+    setExperiencePreferenceState("saving");
+    setExperiencePreferenceMessage(null);
+    try {
+      const deleted = await apiClient.deleteUserExperiencePreferences();
+      setExperiencePreferences(null);
+      setExperiencePreferenceDraft(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
+      setConfirmExperiencePreferenceDelete(false);
+      setExperiencePreferenceState("ready");
+      setExperiencePreferenceMessage(
+        t("settings.memory.deleted", {
+          count: deleted.deleted_memory_count,
+        }),
+      );
+    } catch {
+      setExperiencePreferenceState("error");
+      setExperiencePreferenceMessage(t("settings.memory.deleteFailed"));
+    }
+  };
   const numberFormatter = new Intl.NumberFormat(locale === "zh-CN" ? "zh-CN" : "en");
   const creditRatio = managedUsage
     ? Math.min(
@@ -452,6 +547,154 @@ function SettingsDialog({
           <i aria-hidden="true">✓</i>
         </button>
       </fieldset>
+      <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
+        <div className="settings-memory-heading">
+          <div>
+            <h3 id="settings-memory-title">{t("settings.memory.title")}</h3>
+            <p>{t("settings.memory.description")}</p>
+          </div>
+          <span className={experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
+            {t(
+              experiencePreferenceDraft.memory_enabled
+                ? "settings.memory.enabled"
+                : "settings.memory.disabled",
+            )}
+          </span>
+        </div>
+        <label className="settings-memory-consent" htmlFor="settings_memory_enabled">
+          <input
+            id="settings_memory_enabled"
+            type="checkbox"
+            checked={experiencePreferenceDraft.memory_enabled}
+            disabled={experiencePreferenceState === "loading"}
+            onChange={(event) => setExperiencePreferenceDraft((current) => ({
+              ...current,
+              memory_enabled: event.target.checked,
+            }))}
+          />
+          <span>
+            <strong>{t("settings.memory.consent")}</strong>
+            <small>{t("settings.memory.consentDetail")}</small>
+          </span>
+        </label>
+        <div className="settings-memory-grid">
+          <label htmlFor="settings_default_template">
+            <span>{t("settings.memory.defaultTemplate")}</span>
+            <select
+              id="settings_default_template"
+              value={experiencePreferenceDraft.default_template_key ?? ""}
+              disabled={experiencePreferenceState === "loading"}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_template_key: (
+                  event.target.value || null
+                ) as StarterExperienceTemplateKey | null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              <option value="hover-basics@1">{t("wizard.starter.hover.title")} · v1</option>
+              <option value="first-circle@1">{t("wizard.starter.circle.title")} · v1</option>
+              <option value="light-wind-circle@1">{t("wizard.starter.wind.title")} · v1</option>
+            </select>
+          </label>
+          <label htmlFor="settings_default_track">
+            <span>{t("settings.memory.defaultTrack")}</span>
+            <select
+              id="settings_default_track"
+              value={experiencePreferenceDraft.default_track_type ?? ""}
+              disabled={experiencePreferenceState === "loading"}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_track_type: (
+                  event.target.value || null
+                ) as UserDefaultTrackType | null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              <option value="hover">{t("wizard.track.hover")}</option>
+              <option value="circle">{t("wizard.track.circle")}</option>
+              <option value="u_turn">{t("wizard.track.uTurn")}</option>
+              <option value="lemniscate">{t("wizard.track.lemniscate")}</option>
+            </select>
+          </label>
+          <label htmlFor="settings_default_altitude">
+            <span>{t("settings.memory.defaultAltitude")}</span>
+            <input
+              id="settings_default_altitude"
+              type="number"
+              min="1"
+              max="20"
+              step="0.1"
+              value={experiencePreferenceDraft.default_altitude_m ?? ""}
+              disabled={experiencePreferenceState === "loading"}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_altitude_m: event.target.value === ""
+                  ? null
+                  : Number(event.target.value),
+              }))}
+            />
+          </label>
+        </div>
+        <p className="settings-memory-policy">
+          {t("settings.memory.policy", {
+            days: experiencePreferences?.retention_days ?? 90,
+          })}
+        </p>
+        <div className="settings-memory-actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={
+              experiencePreferenceState === "loading" ||
+              experiencePreferenceState === "saving"
+            }
+            onClick={() => void saveExperiencePreferences()}
+          >
+            {experiencePreferenceState === "saving"
+              ? t("settings.memory.saving")
+              : t("settings.memory.save")}
+          </button>
+          {!confirmExperiencePreferenceDelete ? (
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={experiencePreferenceState === "saving"}
+              onClick={() => setConfirmExperiencePreferenceDelete(true)}
+            >
+              {t("settings.memory.delete")}
+            </button>
+          ) : (
+            <div className="settings-memory-delete-confirm" role="group" aria-label={t("settings.memory.confirmDelete")}>
+              <span>{t("settings.memory.confirmDelete")}</span>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => void deleteExperiencePreferences()}
+              >
+                {t("settings.memory.confirm")}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setConfirmExperiencePreferenceDelete(false)}
+              >
+                {t("settings.memory.cancel")}
+              </button>
+            </div>
+          )}
+        </div>
+        {experiencePreferenceMessage ? (
+          <p
+            className="settings-memory-message"
+            role={experiencePreferenceState === "error" ? "alert" : "status"}
+          >
+            {experiencePreferenceMessage === EXPERIENCE_PREFERENCE_LOAD_FAILED
+              ? t("settings.memory.loadFailed")
+              : experiencePreferenceMessage}
+          </p>
+        ) : null}
+      </section>
       <section className="settings-model-panel" aria-labelledby="settings-model-title">
         <div className="settings-model-heading">
           <h3 id="settings-model-title">{t("settings.model.title")}</h3>
