@@ -667,6 +667,45 @@ def test_claim_and_run_one_pending_trial_completes(orchestration_ctx):
         assert event_types.count("trial_completed") == 1
 
 
+def test_trial_executor_rejects_mismatched_adapter_backend(orchestration_ctx):
+    """A result cannot be attributed to a different backend than the adapter."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+
+    class MismatchedBackendAdapter(MockSimulatorAdapter):
+        backend_name = "expected-backend"
+
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            valid_result = super().run_trial(trial_ctx)
+            return TrialResult(
+                success=True,
+                backend="different-backend",
+                metrics=valid_result.metrics,
+                artifacts=valid_result.artifacts,
+                log_excerpt=valid_result.log_excerpt,
+            )
+
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-backend-mismatch",
+            adapter=MismatchedBackendAdapter(),
+        )
+    assert claimed == trial_id
+
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(ctx["models"].Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "FAILED"
+        assert trial.simulator_backend == "expected-backend"
+        assert trial.failure_code == "INVALID_SIMULATOR_RESULT"
+        assert trial.metric is None
+        assert trial.accepted_attempt is not None
+        assert trial.accepted_attempt.outcome is not None
+        assert trial.accepted_attempt.outcome.accepted is True
+
+
 def test_claim_time_input_snapshot_fails_closed_before_simulator_on_drift(
     orchestration_ctx,
     monkeypatch,

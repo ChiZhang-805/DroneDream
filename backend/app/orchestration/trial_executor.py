@@ -64,6 +64,7 @@ from app.simulator.base import (
     FAILURE_ARTIFACT_PERSISTENCE,
     FAILURE_INPUT_EVIDENCE_DRIFT,
     FAILURE_INVALID_PARAMETERS,
+    FAILURE_INVALID_RESULT,
     FAILURE_OUTCOME_CONTRACT_DRIFT,
     FAILURE_RESULT_PERSISTENCE,
     FAILURE_SCENARIO_CONTRACT_DRIFT,
@@ -159,8 +160,7 @@ def _attempt_for_token(
     return db.scalar(
         select(models.TrialExecutionAttempt).where(
             models.TrialExecutionAttempt.trial_id == token.trial_id,
-            models.TrialExecutionAttempt.attempt_count
-            == token.attempt_count,
+            models.TrialExecutionAttempt.attempt_count == token.attempt_count,
         )
     )
 
@@ -193,9 +193,7 @@ def _seal_accepted_attempt(
     db.flush()
     attempt = db.get(models.TrialExecutionAttempt, attempt_id)
     if attempt is None:
-        raise TrialAttemptEvidenceError(
-            "terminal Trial is missing its physical attempt claim"
-        )
+        raise TrialAttemptEvidenceError("terminal Trial is missing its physical attempt claim")
     outcome_class = classify_trial_outcome(
         status=trial.status,
         failure_code=trial.failure_code,
@@ -303,22 +301,14 @@ def _acquire_completion_fence(
 ) -> bool:
     """Fence result persistence using the global Job-before-Trial lock order."""
 
-    job_id = db.scalar(
-        select(models.Trial.job_id).where(
-            models.Trial.id == token.trial_id
-        )
-    )
+    job_id = db.scalar(select(models.Trial.job_id).where(models.Trial.id == token.trial_id))
     if not isinstance(job_id, str) or not job_id:
         db.rollback()
         return False
     # Cancellation acquires the Job row before it updates child Trials. Taking
     # the same first lock here prevents a PostgreSQL Job<->Trial deadlock when
     # cancellation races simulator completion.
-    locked_job = db.scalar(
-        select(models.Job)
-        .where(models.Job.id == job_id)
-        .with_for_update()
-    )
+    locked_job = db.scalar(select(models.Job).where(models.Job.id == job_id).with_for_update())
     if locked_job is None:
         db.rollback()
         return False
@@ -367,9 +357,7 @@ def _claim_inputs_still_match(
     db.expire_all()
     if lock_sources:
         locked_job = db.scalar(
-            select(models.Job)
-            .where(models.Job.id == trial.job_id)
-            .with_for_update()
+            select(models.Job).where(models.Job.id == trial.job_id).with_for_update()
         )
         locked_candidate = db.scalar(
             select(models.CandidateParameterSet)
@@ -385,12 +373,9 @@ def _claim_inputs_still_match(
         )
     else:
         current_attempt = db.get(models.TrialExecutionAttempt, attempt_id)
-    return (
-        current_attempt is not None
-        and trial_attempt_claim_matches_current_inputs(
-            trial,
-            attempt=current_attempt,
-        )
+    return current_attempt is not None and trial_attempt_claim_matches_current_inputs(
+        trial,
+        attempt=current_attempt,
     )
 
 
@@ -413,10 +398,7 @@ def _trial_execution_contract_failure(
     if candidate.job_id != job.id:
         return (FAILURE_SCENARIO_CONTRACT_DRIFT, "candidate_job_mismatch")
     if candidate.source_type == "baseline":
-        if (
-            not candidate.is_baseline
-            or job.baseline_candidate_id != candidate.id
-        ):
+        if not candidate.is_baseline or job.baseline_candidate_id != candidate.id:
             return (
                 FAILURE_SCENARIO_CONTRACT_DRIFT,
                 "baseline_candidate_identity_mismatch",
@@ -615,10 +597,7 @@ def _build_trial_context(
         raw_trial_value = input_snapshot.get("trial")
         parameters = input_snapshot.get("candidate_parameters")
         raw_job_config = input_snapshot.get("job_config")
-        if (
-            not isinstance(raw_trial_value, Mapping)
-            or not isinstance(raw_job_config, Mapping)
-        ):
+        if not isinstance(raw_trial_value, Mapping) or not isinstance(raw_job_config, Mapping):
             raise ValueError("trial execution input snapshot has an invalid shape")
         raw_trial = raw_trial_value
         scenario_config = raw_trial.get("scenario_config")
@@ -646,11 +625,7 @@ def _build_trial_context(
         or not scenario_type
     ):
         raise ValueError("trial execution input identity is invalid")
-    if (
-        isinstance(attempt_count, bool)
-        or not isinstance(attempt_count, int)
-        or attempt_count < 1
-    ):
+    if isinstance(attempt_count, bool) or not isinstance(attempt_count, int) or attempt_count < 1:
         raise ValueError("trial attempt_count must be a positive integer")
     return TrialContext(
         trial_id=trial_id,
@@ -660,11 +635,7 @@ def _build_trial_context(
         parameters=copy.deepcopy(parameters),
         seed=seed,
         scenario_type=scenario_type,
-        scenario_config=(
-            copy.deepcopy(scenario_config)
-            if scenario_config is not None
-            else None
-        ),
+        scenario_config=(copy.deepcopy(scenario_config) if scenario_config is not None else None),
         attempt_count=attempt_count,
         cancellation_event=cancellation_event,
     )
@@ -780,9 +751,7 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
                 f"{source_sha256}-{safe_name}"
             )
             if key in seen_storage_keys:
-                raise ArtifactIntegrityError(
-                    "trial returned duplicate artifact content metadata"
-                )
+                raise ArtifactIntegrityError("trial returned duplicate artifact content metadata")
             seen_storage_keys.add(key)
             if settings.artifact_storage_backend == "local":
                 # LocalArtifactStorage intentionally returns the source path.
@@ -795,20 +764,13 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if local_path.resolve() != target:
                     if target.is_file():
-                        target_sha256, target_size = artifact_content_digest(
-                            target
-                        )
-                        if (
-                            target_sha256 != source_sha256
-                            or target_size != source_size
-                        ):
+                        target_sha256, target_size = artifact_content_digest(target)
+                        if target_sha256 != source_sha256 or target_size != source_size:
                             raise ArtifactIntegrityError(
                                 "content-addressed artifact target was modified"
                             )
                     else:
-                        temporary = target.with_name(
-                            f".{target.name}.{os.getpid()}.tmp"
-                        )
+                        temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
                         try:
                             shutil.copy2(local_path, temporary)
                             temporary.replace(target)
@@ -831,13 +793,8 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
             digest_source = local_path
             if settings.artifact_storage_backend != "local":
                 stored_content = storage.read_bytes(storage_path)
-                stored_sha256, stored_size = artifact_content_digest(
-                    stored_content
-                )
-                if (
-                    stored_sha256 != source_sha256
-                    or stored_size != source_size
-                ):
+                stored_sha256, stored_size = artifact_content_digest(stored_content)
+                if stored_sha256 != source_sha256 or stored_size != source_size:
                     raise ArtifactIntegrityError(
                         "artifact storage did not preserve simulator bytes"
                     )
@@ -910,11 +867,7 @@ def _handle_artifact_persistence_failure(
             code=failure_code,
             reason=failure_reason,
             log_excerpt=log_excerpt,
-            attempt_id=(
-                current_attempt.id
-                if current_attempt is not None
-                else None
-            ),
+            attempt_id=(current_attempt.id if current_attempt is not None else None),
         )
     finally:
         _finalize_adapter_run(simulator, ctx, None)
@@ -961,12 +914,8 @@ def claim_and_run_one_pending_trial(
         # work), so newly arrived Jobs receive prompt service without erasing
         # the FIFO order inside any one Job.
         eligible_trial = aliased(models.Trial)
-        eligible_claimable = (
-            (eligible_trial.status == "PENDING")
-            & (
-                eligible_trial.lease_expires_at.is_(None)
-                | (eligible_trial.lease_expires_at <= now)
-            )
+        eligible_claimable = (eligible_trial.status == "PENDING") & (
+            eligible_trial.lease_expires_at.is_(None) | (eligible_trial.lease_expires_at <= now)
         )
         eligible_stale_running = (
             (eligible_trial.status == "RUNNING")
@@ -1122,13 +1071,10 @@ def claim_and_run_one_pending_trial(
                     .outerjoin(models.TrialExecutionAttemptOutcome)
                     .where(
                         models.TrialExecutionAttempt.trial_id == trial.id,
-                        models.TrialExecutionAttempt.attempt_count
-                        < trial.attempt_count,
+                        models.TrialExecutionAttempt.attempt_count < trial.attempt_count,
                         models.TrialExecutionAttemptOutcome.id.is_(None),
                     )
-                    .order_by(
-                        models.TrialExecutionAttempt.attempt_count.asc()
-                    )
+                    .order_by(models.TrialExecutionAttempt.attempt_count.asc())
                 )
             )
             for previous in previous_open_attempts:
@@ -1145,9 +1091,7 @@ def claim_and_run_one_pending_trial(
             candidate=candidate,
             worker_id=worker_id,
             simulator_backend=sim.backend_name,
-            claim_kind=(
-                "initial" if was_pending else "stale-reclaim"
-            ),
+            claim_kind=("initial" if was_pending else "stale-reclaim"),
             claimed_at=now,
             input_snapshot=input_snapshot,
         )
@@ -1250,9 +1194,7 @@ def claim_and_run_one_pending_trial(
         return trial_id
 
     if execution_contract_failure is not None:
-        contract_failure_code, contract_failure_reason = (
-            execution_contract_failure
-        )
+        contract_failure_code, contract_failure_reason = execution_contract_failure
         logger.warning(
             "rejected non-authoritative execution contract trial=%s: %s",
             trial_id,
@@ -1429,6 +1371,21 @@ def claim_and_run_one_pending_trial(
             trial,
             code=FAILURE_SIM_ERROR,
             reason="Adapter returned without a TrialResult.",
+            attempt_id=attempt_id,
+        )
+        _finalize_adapter_run(sim, ctx, result)
+        return trial_id
+
+    if result.backend != sim.backend_name:
+        _mark_trial_failed(
+            db,
+            trial,
+            code=FAILURE_INVALID_RESULT,
+            reason=(
+                "Simulator result backend does not match the claimed adapter "
+                f"({result.backend!r} != {sim.backend_name!r}); metrics and "
+                "artifacts were rejected."
+            )[:1000],
             attempt_id=attempt_id,
         )
         _finalize_adapter_run(sim, ctx, result)

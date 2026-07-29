@@ -159,9 +159,7 @@ def test_mock_adapter_catalog_parameters_have_explicit_synthetic_effect():
 
     assert low.metrics is not None and high.metrics is not None
     assert low.metrics.rmse != high.metrics.rmse
-    assert low.metrics.raw_metric_json["mock_landscape_schema"] == (
-        "dronedream.mock.synthetic.v2"
-    )
+    assert low.metrics.raw_metric_json["mock_landscape_schema"] == ("dronedream.mock.synthetic.v2")
     assert low.metrics.raw_metric_json["physical_fidelity"] is False
     assert low.metrics.raw_metric_json["catalog_parameter_count"] == 1
     # The score contract is consistent across adapters: lower error => lower score.
@@ -181,15 +179,9 @@ def test_mock_scenario_changes_controller_response_not_only_constant_difficulty(
     }
     robust = {**weak, "disturbance_rejection": 1.0}
 
-    nominal_weak = adapter.run_trial(
-        _make_ctx(scenario="nominal", seed=101, parameters=weak)
-    )
-    nominal_robust = adapter.run_trial(
-        _make_ctx(scenario="nominal", seed=101, parameters=robust)
-    )
-    wind_weak = adapter.run_trial(
-        _make_ctx(scenario="wind_perturbed", seed=101, parameters=weak)
-    )
+    nominal_weak = adapter.run_trial(_make_ctx(scenario="nominal", seed=101, parameters=weak))
+    nominal_robust = adapter.run_trial(_make_ctx(scenario="nominal", seed=101, parameters=robust))
+    wind_weak = adapter.run_trial(_make_ctx(scenario="wind_perturbed", seed=101, parameters=weak))
     wind_robust = adapter.run_trial(
         _make_ctx(scenario="wind_perturbed", seed=101, parameters=robust)
     )
@@ -527,7 +519,15 @@ class _RecordingAdapter(SimulatorAdapter):
     def run_trial(self, ctx: TrialContext) -> TrialResult:
         self.calls.append("run_trial")
         self.contexts.append(ctx)
-        return self.delegate.run_trial(ctx)
+        result = self.delegate.run_trial(ctx)
+        return TrialResult(
+            success=result.success,
+            backend=self.backend_name,
+            metrics=result.metrics,
+            artifacts=result.artifacts,
+            failure=result.failure,
+            log_excerpt=result.log_excerpt,
+        )
 
     def cleanup(self, ctx: TrialContext) -> None:
         self.calls.append("cleanup")
@@ -654,12 +654,7 @@ def test_resolve_backend_override_env_wins(monkeypatch):
 
     from app.orchestration.trial_executor import _resolve_backend_override
 
-    assert (
-        _resolve_backend_override(
-            env_backend="mock", job_backend_requested="real_cli"
-        )
-        == "mock"
-    )
+    assert _resolve_backend_override(env_backend="mock", job_backend_requested="real_cli") == "mock"
 
 
 def test_resolve_backend_override_falls_back_to_job_column():
@@ -668,10 +663,7 @@ def test_resolve_backend_override_falls_back_to_job_column():
     from app.orchestration.trial_executor import _resolve_backend_override
 
     assert (
-        _resolve_backend_override(
-            env_backend=None, job_backend_requested="real_cli"
-        )
-        == "real_cli"
+        _resolve_backend_override(env_backend=None, job_backend_requested="real_cli") == "real_cli"
     )
 
 
@@ -680,10 +672,7 @@ def test_resolve_backend_override_returns_none_when_neither_set():
 
     from app.orchestration.trial_executor import _resolve_backend_override
 
-    assert (
-        _resolve_backend_override(env_backend=None, job_backend_requested=None)
-        is None
-    )
+    assert _resolve_backend_override(env_backend=None, job_backend_requested=None) is None
 
 
 def test_env_simulator_backend_treats_blank_as_unset(monkeypatch):
