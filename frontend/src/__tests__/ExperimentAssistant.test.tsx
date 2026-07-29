@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -165,6 +165,44 @@ describe("conversational experiment drafting", () => {
       "Tune an x500 on a circular track at 3 metres and include MPC_XY_P.",
     );
     expect(JSON.parse(persistentRaw ?? "null").conversation.messages).toEqual([]);
+  });
+
+  it("coalesces duplicate submissions before React can disable the composer", async () => {
+    let resolveCompile:
+      | ((response: ExperimentAssistantTurnResponse) => void)
+      | null = null;
+    const compile = vi
+      .spyOn(apiClient, "compileExperimentAssistantTurn")
+      .mockImplementation(
+        () =>
+          new Promise<ExperimentAssistantTurnResponse>((resolve) => {
+            resolveCompile = resolve;
+          }),
+      );
+    const { container } = renderAssistant();
+    fireEvent.change(screen.getByLabelText("Describe your experiment…"), {
+      target: { value: "Tune one safe circular-track experiment." },
+    });
+    const form = container.querySelector<HTMLFormElement>(".assistant-composer");
+    expect(form).not.toBeNull();
+
+    act(() => {
+      form?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      form?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    });
+
+    expect(compile).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveCompile?.(assistantResponse());
+    });
+    expect(
+      await screen.findByText(/Tune an x500 on a five metre circular track/),
+    ).toBeVisible();
+    expect(compile).toHaveBeenCalledTimes(1);
   });
 
   it("does not request microphone permission until the user clicks the voice button", async () => {

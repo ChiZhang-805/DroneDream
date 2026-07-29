@@ -358,6 +358,7 @@ export function ExperimentAssistant() {
   const [latest, setLatest] = useState<ExperimentAssistantTurnResponse | null>(
     null,
   );
+  const pendingRef = useRef(false);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -440,7 +441,12 @@ export function ExperimentAssistant() {
   async function submitMessage(event: FormEvent): Promise<void> {
     event.preventDefault();
     const visibleMessage = composer.trim() || copy.attachmentOnlyPrompt;
-    if ((!composer.trim() && !referenceFiles.length) || pending) return;
+    if (
+      (!composer.trim() && !referenceFiles.length)
+      || pendingRef.current
+    ) {
+      return;
+    }
     if (visibleMessage.length > MAX_ASSISTANT_MESSAGE_LENGTH) {
       setError(copy.messageTooLong);
       return;
@@ -451,6 +457,7 @@ export function ExperimentAssistant() {
       return;
     }
     const id = messageId();
+    pendingRef.current = true;
     setPending(true);
     setError(null);
     try {
@@ -523,6 +530,7 @@ export function ExperimentAssistant() {
     } catch (reason) {
       setError(assistantErrorMessage(reason, copy));
     } finally {
+      pendingRef.current = false;
       setPending(false);
     }
   }
