@@ -777,7 +777,10 @@ def _comparison_status(
     provider_input_changed = bool(activation["provider_visible_intervention_activated"])
     if not provider_input_changed and not tool_changed:
         return "inconclusive_intervention_not_activated"
-    if comparison["result_metrics"] == reference["result_metrics"]:
+    if all(
+        comparison["result_metrics"].get(metric) == reference["result_metrics"].get(metric)
+        for metric in _RESULT_METRICS
+    ):
         return "no_observed_protocol_difference"
     return "observed_protocol_difference"
 

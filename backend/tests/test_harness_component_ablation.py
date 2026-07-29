@@ -12,6 +12,7 @@ import pytest
 from app.orchestration.harness_component_ablation import (
     HARNESS_COMPONENT_ABLATION_ARMS,
     HARNESS_COMPONENT_ABLATION_SEED_BLOCKS,
+    _comparison_status,
     build_harness_component_ablation_artifact,
     build_harness_component_ablation_manifest,
     verify_harness_component_ablation_artifact,
@@ -39,6 +40,43 @@ def _load_artifact() -> dict[str, object]:
     return verify_harness_component_ablation_artifact(
         json.loads(JSON_ARTIFACT.read_text(encoding="utf-8")),
         manifest=_load_manifest(),
+    )
+
+
+def test_comparison_status_uses_only_preregistered_result_metrics() -> None:
+    result_metrics = {
+        "holdout_loss": 0.5,
+        "optimizer_feasible_rate": 1.0,
+        "trials_to_target": 12,
+        "total_trials": 20,
+        "terminal_failure_trials": 0,
+        "recovered_trials": 0,
+        "evidence_completeness_rate": 1.0,
+    }
+    reference = {
+        "component_activation": {
+            "provider_visible_intervention_activated": False,
+        },
+        "tool_sequence": ["constrained_mobo"],
+        "result_metrics": {
+            **result_metrics,
+            "optimizer_candidate_count": 3,
+        },
+    }
+    comparison = {
+        "component_activation": {
+            "provider_visible_intervention_activated": True,
+        },
+        "tool_sequence": ["constrained_mobo"],
+        "result_metrics": {
+            **result_metrics,
+            "optimizer_candidate_count": 4,
+        },
+    }
+
+    assert (
+        _comparison_status(reference=reference, comparison=comparison)
+        == "no_observed_protocol_difference"
     )
 
 
