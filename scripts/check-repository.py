@@ -64,7 +64,10 @@ TEXT_NAMES = {
 }
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 SECRET_PATTERNS = {
-    "PEM private key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    "PEM private key": re.compile(
+        r"-----BEGIN (?:(?:RSA|EC|DSA|OPENSSH|ENCRYPTED) )?PRIVATE KEY-----"
+        r"\s*[A-Za-z0-9+/=]{32,}"
+    ),
     "Alibaba Cloud AccessKey": re.compile(r"\bLTAI[A-Za-z0-9]{12,}\b"),
     "AWS access key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "GitHub token": re.compile(r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}\b"),
