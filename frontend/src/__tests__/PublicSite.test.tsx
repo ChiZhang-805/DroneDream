@@ -469,9 +469,9 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(fallbackRelease).toMatchObject({
       version: "1.0.0",
       fileName: "DroneDream_1.0.0_x64-setup.exe",
-      sha256: "b913e328079a59a94ea69be51a1c9b6352bc891a5927ba49f62bfec69341a6df",
-      sizeBytes: 10_389_138,
-      publishedAt: "2026-07-28",
+      sha256: "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+      sizeBytes: 10_387_042,
+      publishedAt: "2026-07-29",
     });
     expect(isWebsiteRelease(fallbackRelease)).toBe(true);
     expect(isWebsiteRelease({ ...fallbackRelease, sha256: "unsafe" })).toBe(false);
