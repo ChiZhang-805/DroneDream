@@ -16,6 +16,10 @@ const authMock = vi.hoisted(() => {
     signInWithPassword: vi.fn(async () => ({ data: {}, error: null })),
     signInWithOtp: vi.fn(async () => ({ data: {}, error: null })),
     verifyOtp: vi.fn(async () => ({ data: {}, error: null })),
+    signOut: vi.fn(async (): Promise<{
+      data: Record<string, never>;
+      error: Error | null;
+    }> => ({ data: {}, error: null })),
     updateUser: vi.fn(async (
       payload: { data?: Record<string, unknown>; password?: string },
     ) => {
@@ -54,6 +58,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
       signInWithPassword: authMock.signInWithPassword,
       signInWithOtp: authMock.signInWithOtp,
       verifyOtp: authMock.verifyOtp,
+      signOut: authMock.signOut,
       updateUser: authMock.updateUser,
     },
   },
@@ -108,6 +113,12 @@ function AccountProbe() {
       >
         Finish registration
       </button>
+      <button
+        type="button"
+        onClick={() => void auth.signOut().catch(() => undefined)}
+      >
+        Sign out
+      </button>
     </>
   );
 }
@@ -123,6 +134,8 @@ describe("AuthContext account profile", () => {
     authMock.signInWithPassword.mockClear();
     authMock.signInWithOtp.mockClear();
     authMock.verifyOtp.mockClear();
+    authMock.signOut.mockReset();
+    authMock.signOut.mockResolvedValue({ data: {}, error: null });
     authMock.unsubscribe.mockClear();
     window.localStorage.clear();
     window.sessionStorage.clear();
@@ -200,6 +213,35 @@ describe("AuthContext account profile", () => {
       expect(authMock.updateUser).toHaveBeenCalledWith({
         password: "correct-horse",
       });
+    });
+  });
+
+  it("preserves drafts when sign-out fails and clears them only after success", async () => {
+    const draftKey = "drone-dream:experiment-workspace-draft:v1:workspace-1";
+    window.localStorage.setItem(draftKey, "local-draft");
+    window.sessionStorage.setItem(draftKey, "session-draft");
+    authMock.signOut.mockResolvedValueOnce({
+      data: {},
+      error: new Error("network unavailable"),
+    });
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await screen.findByLabelText("username");
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(authMock.signOut).toHaveBeenCalledTimes(1));
+    expect(window.localStorage.getItem(draftKey)).toBe("local-draft");
+    expect(window.sessionStorage.getItem(draftKey)).toBe("session-draft");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => {
+      expect(authMock.signOut).toHaveBeenCalledTimes(2);
+      expect(window.localStorage.getItem(draftKey)).toBeNull();
+      expect(window.sessionStorage.getItem(draftKey)).toBeNull();
     });
   });
 });

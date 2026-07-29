@@ -297,7 +297,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [account]);
 
   const signOut = useCallback(async () => {
-    clearAllExperimentDrafts();
     const { error } = await requireClient().auth.signOut();
     if (error) throw error;
     adoptUser(null, null);
