@@ -186,6 +186,17 @@ def test_production_oidc_auth_accepts_asymmetric_https_configuration() -> None:
     assert settings.oidc_algorithm_list == ["RS256", "ES256"]
 
 
+def test_oidc_jwks_network_limits_are_bounded() -> None:
+    settings = Settings()
+    assert settings.oidc_jwks_timeout_seconds == 5
+    assert settings.oidc_jwks_max_bytes == 1024 * 1024
+
+    with pytest.raises(ValidationError):
+        Settings(oidc_jwks_timeout_seconds=31)
+    with pytest.raises(ValidationError):
+        Settings(oidc_jwks_max_bytes=4095)
+
+
 def test_oidc_auth_rejects_symmetric_token_algorithms() -> None:
     with pytest.raises(ValidationError, match="asymmetric algorithms"):
         Settings(

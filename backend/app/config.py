@@ -114,6 +114,12 @@ class Settings(BaseSettings):
     oidc_issuer: str | None = Field(default=None)
     oidc_audience: str | None = Field(default=None)
     oidc_jwks_url: str | None = Field(default=None)
+    oidc_jwks_timeout_seconds: int = Field(default=5, ge=1, le=30)
+    oidc_jwks_max_bytes: int = Field(
+        default=1024 * 1024,
+        ge=4096,
+        le=16 * 1024 * 1024,
+    )
     oidc_algorithms: str = Field(default="RS256,ES256")
     oidc_email_claim: str = Field(default="email")
     oidc_name_claim: str = Field(default="name")

@@ -89,6 +89,8 @@ AUTH_MODE=oidc_jwt
 OIDC_ISSUER=https://PROJECT_REF.supabase.co/auth/v1
 OIDC_AUDIENCE=authenticated
 OIDC_JWKS_URL=https://PROJECT_REF.supabase.co/auth/v1/.well-known/jwks.json
+OIDC_JWKS_TIMEOUT_SECONDS=5
+OIDC_JWKS_MAX_BYTES=1048576
 OIDC_ALGORITHMS=RS256,ES256
 ```
 

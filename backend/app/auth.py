@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from typing import Annotated, Any
+from urllib import error as url_error
+from urllib import request as url_request
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
@@ -146,14 +149,59 @@ def _get_or_create_oidc_user(
 
 
 @lru_cache(maxsize=8)
-def _jwks_client(jwks_url: str) -> Any:
+def _jwks_client(jwks_url: str, timeout_seconds: int, maximum_bytes: int) -> Any:
     try:
         import jwt
     except ImportError as exc:  # pragma: no cover - deployment dependency guard
         raise OIDCConfigurationError(
             "PyJWT is not installed; install the backend authentication dependencies"
         ) from exc
-    return jwt.PyJWKClient(jwks_url, cache_keys=True)
+
+    class _BoundedPyJWKClient(jwt.PyJWKClient):
+        def fetch_data(self) -> Any:
+            jwk_set: Any = None
+            try:
+                request = url_request.Request(url=self.uri, headers=self.headers)
+                with url_request.urlopen(
+                    request,
+                    timeout=self.timeout,
+                    context=self.ssl_context,
+                ) as response:
+                    declared_length = response.headers.get("Content-Length")
+                    if declared_length is not None:
+                        try:
+                            parsed_length = int(declared_length)
+                        except ValueError as exc:
+                            raise jwt.exceptions.PyJWKClientConnectionError(
+                                "JWKS endpoint returned an invalid Content-Length"
+                            ) from exc
+                        if parsed_length < 0 or parsed_length > maximum_bytes:
+                            raise jwt.exceptions.PyJWKClientConnectionError(
+                                "JWKS endpoint response exceeds the configured size limit"
+                            )
+                    raw = response.read(maximum_bytes + 1)
+                    if len(raw) > maximum_bytes:
+                        raise jwt.exceptions.PyJWKClientConnectionError(
+                            "JWKS endpoint response exceeds the configured size limit"
+                        )
+                    jwk_set = json.loads(raw)
+            except jwt.exceptions.PyJWKClientConnectionError:
+                raise
+            except (url_error.URLError, TimeoutError) as exc:
+                raise jwt.exceptions.PyJWKClientConnectionError(
+                    f'Failed to fetch JWKS data: "{exc}"'
+                ) from exc
+            else:
+                return jwk_set
+            finally:
+                if self.jwk_set_cache is not None:
+                    self.jwk_set_cache.put(jwk_set)
+
+    return _BoundedPyJWKClient(
+        jwks_url,
+        cache_keys=True,
+        timeout=timeout_seconds,
+    )
 
 
 def _decode_oidc_token(token: str, settings: Settings) -> dict[str, Any]:
@@ -165,7 +213,11 @@ def _decode_oidc_token(token: str, settings: Settings) -> dict[str, Any]:
         ) from exc
     if not settings.oidc_jwks_url or not settings.oidc_issuer:
         raise OIDCConfigurationError("OIDC verifier settings are incomplete")
-    signing_key = _jwks_client(settings.oidc_jwks_url).get_signing_key_from_jwt(token)
+    signing_key = _jwks_client(
+        settings.oidc_jwks_url,
+        settings.oidc_jwks_timeout_seconds,
+        settings.oidc_jwks_max_bytes,
+    ).get_signing_key_from_jwt(token)
     audience: str | list[str]
     if len(settings.oidc_audience_list) == 1:
         audience = settings.oidc_audience_list[0]
@@ -241,9 +293,7 @@ def get_current_user(
             else None
         )
         display_name = (
-            name_claim.strip()[:255]
-            if isinstance(name_claim, str) and name_claim.strip()
-            else None
+            name_claim.strip()[:255] if isinstance(name_claim, str) and name_claim.strip() else None
         )
         return _get_or_create_oidc_user(
             db,
