@@ -1,0 +1,278 @@
+{
+  "schemaVersion": "dronedream.runtime-publication-receipt.v1",
+  "generatedAt": "2026-07-29T09:57:54.2512529Z",
+  "publication": {
+    "tag": "runtime-v0.1.0-beta.2",
+    "tagObjectSha": "0ea0bf96c6d8efcfec6fa0ce944cb975ccefc1f5",
+    "sourceCommit": "755c511539fe561207ca38ff5079f471a4110896",
+    "sourceTree": "26d97180dbc5d5db353bafee293181ae8299919a",
+    "releaseId": "RE_kwDOSJOgTs4VjFpO",
+    "releaseUrl": "https://github.com/ChiZhang-805/DroneDream/releases/tag/runtime-v0.1.0-beta.2",
+    "publishedAt": "2026-07-29T05:33:39Z",
+    "isDraft": false,
+    "isPrerelease": true,
+    "releaseTargetCommitishField": "main",
+    "effectiveSourceBinding": "The pre-existing annotated tag object resolves directly to sourceCommit; the release targetCommitish field does not replace that tag binding."
+  },
+  "handoff": {
+    "authoritativeDirectory": "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\runtime-v0.1.0-beta.2-755c511",
+    "authoritativeManifestSha256": "34f5738101217ce92adfdfe8a2a932e6f4ecb73ecb41ba601c851ad217dfa33a",
+    "authoritativeManifestSidecarMatches": true,
+    "authoritativeFilesChecked": 26,
+    "authoritativeFilesMatched": 26,
+    "authoritativeFilesFailed": 0,
+    "supersededManifestSha256": "623ade8a54052fed4f7bdb83925522863f109a7790bfb6ccd4badb26f4de67e8",
+    "supersededManifestUsedForFinalGate": false,
+    "correction": {
+      "tagAnnotationContainsSupersededPrePublicationHash": true,
+      "releaseBodyDeclaresSupersededAndAuthoritativeHashes": true,
+      "finalPublicationAndThisReceiptUseOnlyAuthoritativeManifest": true,
+      "thirdPartyNoticeOldAssetId": "493627020",
+      "thirdPartyNoticeOldBytes": 4410,
+      "thirdPartyNoticeOldAssetDeletedWhileDraft": true,
+      "thirdPartyNoticeAuthoritativeBytes": 4413,
+      "thirdPartyNoticeAuthoritativeSha256": "fb41ce98b2e12e8b45918b547dd358f5178bf9e0a8fffc2932418a41882829b7"
+    }
+  },
+  "rootfs": {
+    "filename": "DroneDreamRuntime-0.1.0-amd64.tar",
+    "bytes": 6141118464,
+    "sha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+    "parts": 4,
+    "compression": "none"
+  },
+  "signature": {
+    "manifest": "runtime-release.json",
+    "manifestBytes": 2207,
+    "manifestSha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+    "signature": "runtime-release.json.sig",
+    "signatureBytes": 311,
+    "signatureSha256": "db2465888c4b2dcb694c4503c6b995a6c534c2f040ddd886f601438d69c02c90",
+    "algorithm": "Ed25519",
+    "keyId": "ed25519:7839a33eb8451e26c0e03ec65857e0caef7af8df70e9ddde3430a681b3f0d8c1",
+    "trustedActiveRuntimeReleaseKeyMatched": true,
+    "verificationResult": "passed"
+  },
+  "assets": [
+    {
+      "name": "DroneDream-LICENSE.txt",
+      "assetId": "RA_kwDOSJOgTs4dbCaO",
+      "numericAssetId": 493627022,
+      "bytes": 1066,
+      "sha256": "b66d97d2d1a4bf9944cf2f1db961eb63596f131528063ae818a129c45baaf3fd",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/DroneDream-LICENSE.txt"
+    },
+    {
+      "name": "DroneDreamRuntime-0.1.0-amd64.tar.part0000",
+      "assetId": "RA_kwDOSJOgTs4dbCdZ",
+      "numericAssetId": 493627225,
+      "bytes": 1992294400,
+      "sha256": "dd0507b7296b61ab1a47261528845e69dd257039d3cefe6a85e0e8cd6cf4107c",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/DroneDreamRuntime-0.1.0-amd64.tar.part0000"
+    },
+    {
+      "name": "DroneDreamRuntime-0.1.0-amd64.tar.part0001",
+      "assetId": "RA_kwDOSJOgTs4dbDZt",
+      "numericAssetId": 493631085,
+      "bytes": 1992294400,
+      "sha256": "8404a19afc99a2e664c9635675893e23887dd07c2ee1bdf00afd92e356c6a49f",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/DroneDreamRuntime-0.1.0-amd64.tar.part0001"
+    },
+    {
+      "name": "DroneDreamRuntime-0.1.0-amd64.tar.part0002",
+      "assetId": "RA_kwDOSJOgTs4dbEkx",
+      "numericAssetId": 493635889,
+      "bytes": 1992294400,
+      "sha256": "6c788bed82db29d6d729c407f90b6f4ed28a45128926595e4c7b1a41ec132b59",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/DroneDreamRuntime-0.1.0-amd64.tar.part0002"
+    },
+    {
+      "name": "DroneDreamRuntime-0.1.0-amd64.tar.part0003",
+      "assetId": "RA_kwDOSJOgTs4dbFqq",
+      "numericAssetId": 493640362,
+      "bytes": 164235264,
+      "sha256": "2ad3fef1e2c1f52a092cd2a3daee4f76fdd929e426b8f399d8519e494b502a20",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/DroneDreamRuntime-0.1.0-amd64.tar.part0003"
+    },
+    {
+      "name": "runtime-release.json",
+      "assetId": "RA_kwDOSJOgTs4dbCaL",
+      "numericAssetId": 493627019,
+      "bytes": 2207,
+      "sha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/runtime-release.json"
+    },
+    {
+      "name": "runtime-release.json.sig",
+      "assetId": "RA_kwDOSJOgTs4dbCaN",
+      "numericAssetId": 493627021,
+      "bytes": 311,
+      "sha256": "db2465888c4b2dcb694c4503c6b995a6c534c2f040ddd886f601438d69c02c90",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/runtime-release.json.sig"
+    },
+    {
+      "name": "smoke-report.json",
+      "assetId": "RA_kwDOSJOgTs4dbCaK",
+      "numericAssetId": 493627018,
+      "bytes": 939,
+      "sha256": "62dec882ab976fefef4101ea8c7220e7a60c865865722b8042b57f0168c4c566",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/smoke-report.json"
+    },
+    {
+      "name": "THIRD_PARTY_NOTICES.md",
+      "assetId": "RA_kwDOSJOgTs4dbGJ_",
+      "numericAssetId": 493642367,
+      "bytes": 4413,
+      "sha256": "fb41ce98b2e12e8b45918b547dd358f5178bf9e0a8fffc2932418a41882829b7",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "name": "Valkey-COPYING.txt",
+      "assetId": "RA_kwDOSJOgTs4dbCag",
+      "numericAssetId": 493627040,
+      "bytes": 3091,
+      "sha256": "1a53dca3aab7ce048e91e77b03c0342f3075366f9dede8ec4d19d0cf229e12a0",
+      "url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/Valkey-COPYING.txt"
+    }
+  ],
+  "publicDownloadVerification": {
+    "unauthenticatedPublicUrlsUsed": true,
+    "publicHttpStatus": 200,
+    "expectedAssets": 10,
+    "downloadedAssets": 10,
+    "sizeMatches": 10,
+    "sha256Matches": 10,
+    "extras": 0,
+    "rangeDownload": {
+      "rangeSupportStatus": 206,
+      "rangeTestBytes": 1024,
+      "largePartsUsingValidatedRanges": [
+        "DroneDreamRuntime-0.1.0-amd64.tar.part0000",
+        "DroneDreamRuntime-0.1.0-amd64.tar.part0001",
+        "DroneDreamRuntime-0.1.0-amd64.tar.part0002"
+      ],
+      "directLargePart": "DroneDreamRuntime-0.1.0-amd64.tar.part0003",
+      "rangePairs": 24,
+      "rangePairsWithExactLength": 24
+    },
+    "wholeArtifact": {
+      "manualOrderedReassemblyBytes": 6141118464,
+      "manualOrderedReassemblySha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+      "repositoryVerifierCommand": "python runtime/tools/runtime_release.py verify --manifest <public>/runtime-release.json --signature <public>/runtime-release.json.sig --keyring runtime/release-public-keys.json --payload-directory <public>",
+      "repositoryVerifierResult": "release signature, smoke evidence, parts, and whole artifact verified",
+      "repositoryReassemblerCommand": "python runtime/tools/runtime_release.py reassemble --manifest <public>/runtime-release.json --signature <public>/runtime-release.json.sig --keyring runtime/release-public-keys.json --payload-directory <public> --output <public>/DroneDreamRuntime-0.1.0-amd64-tool-reassembled.tar",
+      "repositoryReassembledBytes": 6141118464,
+      "repositoryReassembledSha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9"
+    }
+  },
+  "freshPublicImport": {
+    "distributionName": "DroneDreamRuntimeBeta2PublicVerify755c511",
+    "existingDistributionName": "DroneDreamRuntime",
+    "nameAbsentBeforeImport": true,
+    "existingDistributionUntouched": true,
+    "installPath": "C:\\Users\\zju20\\AppData\\Local\\Temp\\DroneDreamRuntimeBeta2PublicVerify755c511",
+    "installPathAbsentBeforeImport": true,
+    "hostFreeBytesBeforeImport": 277327994880,
+    "manifestMinimumFreeBytes": 55834574848,
+    "sourceTarBytes": 6141118464,
+    "sourceTarSha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+    "wslVersion": 2,
+    "importExitCode": 0,
+    "importDurationSeconds": 30.8,
+    "importedVhdxBytes": 6723469312,
+    "defaultUser": "dronedream",
+    "defaultUid": 2000,
+    "defaultGid": 2000,
+    "embeddedSourceCommit": "755c511539fe561207ca38ff5079f471a4110896",
+    "embeddedRuntimeId": "c75ae324-c247-50b5-bd74-fa8325e9e616",
+    "requiredServices": {
+      "dronedream-runtime-init.service": "active",
+      "valkey.service": "active",
+      "dronedream-api.service": "active",
+      "dronedream-worker.service": "active",
+      "dronedream-px4-log-cleanup.timer": "active"
+    },
+    "healthReady": {
+      "windowsHostHttpStatus": 200,
+      "wslInternalStatus": "ready",
+      "runtimeId": "c75ae324-c247-50b5-bd74-fa8325e9e616",
+      "database": true,
+      "storage": true,
+      "worker": true,
+      "px4": true,
+      "gazebo": true
+    },
+    "runtimeChecks": {
+      "component_versions": "passed",
+      "python_imports": "passed",
+      "valkey_ping": "passed",
+      "api_worker_heartbeat": "passed",
+      "real_cli_dry_run": "passed",
+      "px4_gazebo_headless": "passed",
+      "parameter_readback": "passed",
+      "warning": "MAVSDK reported that udp:// is deprecated; the check passed."
+    },
+    "freshEvidenceSha256": {
+      "health-ready.json": "1ec3f0e3805d5308b0804d41e5d78c9b3613b526e9d52fb23252b84cb39bd938",
+      "dry-run-input.json": "9b5037d64d10c66d90126a91f15cef560f2132d84e812c98881ad45e293ec924",
+      "dry-run-output.json": "1482fce92c82850f763be5258d89342740e9fe5dd49bfd4e906c75ed79697088",
+      "parameter-readback.json": "744e9bb60c8d802753327ac60dd1c40152536d1c3ad3a23ec88e12f4605f998e"
+    },
+    "systemdResidual": {
+      "systemState": "degraded",
+      "onlyFailedUnit": "kmod-static-nodes.service",
+      "droneDreamUnitFailed": false,
+      "coreRuntimeHealthAffected": false
+    },
+    "diagnosticCorrection": {
+      "productFailure": false,
+      "event": "A post-check grep expression was misquoted across Windows and WSL, causing its pipe tokens to launch a temporary gz sim process tree.",
+      "temporaryProcessGroup": 141,
+      "temporaryProcessGroupTerminated": true,
+      "exactProcessNameRecheckLingeringMatches": 0,
+      "requiredServicesStillActiveAfterCorrection": true,
+      "healthReadyStillPassedAfterCorrection": true
+    },
+    "cleanup": {
+      "temporaryDistributionTerminated": true,
+      "temporaryDistributionUnregistered": true,
+      "temporaryInstallPathRemovedByWsl": true,
+      "existingDistributionPreserved": true,
+      "remainingDistributions": [
+        "Ubuntu-22.04",
+        "DroneDreamRuntime"
+      ]
+    }
+  },
+  "qualityGateReference": {
+    "role": "Later repository quality gate only; not Runtime or EXE byte provenance.",
+    "testedSubject": "1b180e8f1d1ad5a8d4ac87d7e95081df06e73aae",
+    "receiptCommit": "d36ef166f985f761ab9e733753f61237950049da",
+    "receiptSha256": "665e75516334b40a023de459ffb5b66247fb8f2735e4f0e97a427353b692a802",
+    "backend": "1291/1291 passed",
+    "frontend": "320/320 passed",
+    "honestResiduals": [
+      "MSVC link.exe unavailable; gnullvm alternative verification passed.",
+      "pip-audit isolated installation environment failed."
+    ],
+    "changesPublicationSource": false,
+    "causedAssetRebuildOrReplacement": false
+  },
+  "readiness": {
+    "localRuntimeHandoffReady": true,
+    "publicRuntimeReleaseReady": true,
+    "publicFullStackRuntimeReady": true,
+    "desktopInstallerReadyLocally": true,
+    "desktopExePublicationPerformedInThisStep": false,
+    "websiteDeploymentPerformedInThisStep": false,
+    "aliyunWebsiteOrRuntimeModifiedInThisStep": false,
+    "technicalReportModified": false,
+    "onlineProviderCalls": 0,
+    "openaiApiKeyReadOrUsed": false
+  },
+  "attestation": {
+    "websiteBranchBeforeReceipt": "42e686d72ce86afeed626f0c62cb1d342f4a2407",
+    "receiptOnlyCommitMayFollow": true,
+    "thisReceiptDoesNotClaimValidationOfItsOwnCommit": true
+  }
+}
