@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import cast
+from typing import BinaryIO
 from urllib.parse import urlparse
 
 from app.config import get_settings
@@ -73,28 +73,36 @@ class S3ArtifactStorage(ArtifactStorage):
         return bucket, key
 
     def read_bytes(self, storage_uri: str) -> bytes:
-        bucket, key = self._configured_location(storage_uri)
-        response = self._client.get_object(Bucket=bucket, Key=key)
-        return cast(bytes, response["Body"].read())
+        chunks: list[bytes] = []
+        with _S3Body(self._object_body(storage_uri)) as body:
+            while chunk := body.read(1024 * 1024):
+                chunks.append(chunk)
+        return b"".join(chunks)
 
     def content_digest(self, storage_uri: str) -> tuple[str, int]:
-        bucket, key = self._configured_location(storage_uri)
-        response = self._client.get_object(Bucket=bucket, Key=key)
-        body = response["Body"]
         digest = hashlib.sha256()
         size = 0
-        try:
-            while True:
-                chunk = body.read(1024 * 1024)
-                if not chunk:
-                    break
+        with _S3Body(self._object_body(storage_uri)) as body:
+            while chunk := body.read(1024 * 1024):
                 digest.update(chunk)
                 size += len(chunk)
-        finally:
-            close = getattr(body, "close", None)
-            if callable(close):
-                close()
         return digest.hexdigest(), size
+
+    def copy_to(self, storage_uri: str, destination: BinaryIO) -> tuple[str, int]:
+        digest = hashlib.sha256()
+        size = 0
+        with _S3Body(self._object_body(storage_uri)) as body:
+            while chunk := body.read(1024 * 1024):
+                if destination.write(chunk) != len(chunk):
+                    raise OSError("artifact destination accepted only a partial write")
+                digest.update(chunk)
+                size += len(chunk)
+        return digest.hexdigest(), size
+
+    def _object_body(self, storage_uri: str) -> object:
+        bucket, key = self._configured_location(storage_uri)
+        response = self._client.get_object(Bucket=bucket, Key=key)
+        return response["Body"]
 
     def exists(self, storage_uri: str) -> bool:
         bucket, key = self._configured_location(storage_uri)
@@ -146,3 +154,27 @@ def _parse_s3_uri(uri: str) -> tuple[str, str]:
     ):
         raise S3StorageConfigError(f"Invalid s3 uri: {uri}")
     return parsed.netloc, key
+
+
+class _S3Body:
+    """Close a botocore streaming body without depending on its concrete type."""
+
+    def __init__(self, body: object) -> None:
+        self._body = body
+
+    def __enter__(self) -> _S3Body:
+        return self
+
+    def read(self, size: int) -> bytes:
+        reader = getattr(self._body, "read", None)
+        if not callable(reader):
+            raise S3StorageConfigError("S3 get_object returned an unreadable body")
+        content = reader(size)
+        if not isinstance(content, bytes):
+            raise S3StorageConfigError("S3 get_object returned non-byte content")
+        return content
+
+    def __exit__(self, *_args: object) -> None:
+        close = getattr(self._body, "close", None)
+        if callable(close):
+            close()

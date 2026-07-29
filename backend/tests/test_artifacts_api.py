@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import re
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -403,8 +405,10 @@ def test_download_s3_artifact_via_storage_backend(client: TestClient, monkeypatc
 def test_free_s3_pdf_report_never_uses_presigned_redirect(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     job_id = _seed_job()
+    canonical_pdf = b"%PDF-1.4\n%canonical-unwatermarked-report\n"
     with db.SessionLocal() as session:
         artifact = models.Artifact(
             owner_type="job",
@@ -415,12 +419,17 @@ def test_free_s3_pdf_report_never_uses_presigned_redirect(
             mime_type="application/pdf",
         )
         session.add(artifact)
+        bind_artifact_integrity(
+            session,
+            artifact=artifact,
+            content=canonical_pdf,
+        )
         session.commit()
         artifact_id = artifact.id
 
     class _FakeStorage:
         presign_calls = 0
-        read_calls = 0
+        copy_calls = 0
 
         def exists(self, storage_uri: str) -> bool:
             assert storage_uri.startswith("s3://")
@@ -437,14 +446,27 @@ def test_free_s3_pdf_report_never_uses_presigned_redirect(
             return "https://example.invalid/unwatermarked-report"
 
         def read_bytes(self, storage_uri: str) -> bytes:
+            raise AssertionError(f"watermarked report unexpectedly buffered {storage_uri}")
+
+        def copy_to(self, storage_uri: str, destination) -> tuple[str, int]:
             assert storage_uri.startswith("s3://")
-            self.read_calls += 1
-            return b"%PDF-1.4\n%canonical-unwatermarked-report\n"
+            self.copy_calls += 1
+            destination.write(canonical_pdf)
+            return hashlib.sha256(canonical_pdf).hexdigest(), len(canonical_pdf)
 
     storage = _FakeStorage()
+    real_mkstemp = tempfile.mkstemp
+
+    def scoped_mkstemp(*, prefix: str, suffix: str) -> tuple[int, str]:
+        return real_mkstemp(prefix=prefix, suffix=suffix, dir=tmp_path)
+
     monkeypatch.setattr(
         "app.routers.artifacts.get_artifact_storage",
         lambda: storage,
+    )
+    monkeypatch.setattr(
+        "app.routers.artifacts.tempfile.mkstemp",
+        scoped_mkstemp,
     )
     monkeypatch.setattr(
         "app.routers.artifacts.resolve_report_export_tier",
@@ -455,16 +477,18 @@ def test_free_s3_pdf_report_never_uses_presigned_redirect(
 
     assert response.status_code == 200
     assert storage.presign_calls == 0
-    assert storage.read_calls == 1
+    assert storage.copy_calls == 1
     assert response.headers["x-dronedream-report-tier"] == "free"
     assert response.headers["x-dronedream-report-watermark"] == "applied"
     assert b"% DD-FREE-REPORT-WATERMARK-V1" in response.content
     assert b"canonical-unwatermarked-report" not in response.content
+    assert list(tmp_path.glob("dronedream-artifact-*.download")) == []
 
 
 def test_digest_bound_s3_download_never_redirects_and_rejects_tampering(
     client: TestClient,
     monkeypatch,
+    tmp_path: Path,
 ) -> None:
     job_id = _seed_job()
     verified_bytes = b'{"verified":true}'
@@ -489,6 +513,7 @@ def test_digest_bound_s3_download_never_redirects_and_rejects_tampering(
     class _FakeStorage:
         content = verified_bytes
         presign_calls = 0
+        copy_calls = 0
 
         def exists(self, storage_uri: str) -> bool:
             assert storage_uri.startswith("s3://")
@@ -505,25 +530,43 @@ def test_digest_bound_s3_download_never_redirects_and_rejects_tampering(
             return "https://example.invalid/unchecked"
 
         def read_bytes(self, storage_uri: str) -> bytes:
+            raise AssertionError(f"bounded download unexpectedly buffered {storage_uri}")
+
+        def copy_to(self, storage_uri: str, destination) -> tuple[str, int]:
             assert storage_uri.startswith("s3://")
-            return self.content
+            self.copy_calls += 1
+            destination.write(self.content)
+            return hashlib.sha256(self.content).hexdigest(), len(self.content)
 
     storage = _FakeStorage()
+    real_mkstemp = tempfile.mkstemp
+
+    def scoped_mkstemp(*, prefix: str, suffix: str) -> tuple[int, str]:
+        return real_mkstemp(prefix=prefix, suffix=suffix, dir=tmp_path)
+
     monkeypatch.setattr(
         "app.routers.artifacts.get_artifact_storage",
         lambda: storage,
+    )
+    monkeypatch.setattr(
+        "app.routers.artifacts.tempfile.mkstemp",
+        scoped_mkstemp,
     )
 
     response = client.get(f"/api/v1/artifacts/{artifact_id}/download")
     assert response.status_code == 200
     assert response.content == verified_bytes
     assert storage.presign_calls == 0
+    assert storage.copy_calls == 1
+    assert list(tmp_path.glob("dronedream-artifact-*.download")) == []
 
     storage.content = b'{"verified":false}'
     response = client.get(f"/api/v1/artifacts/{artifact_id}/download")
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "ARTIFACT_INTEGRITY_INVALID"
     assert storage.presign_calls == 0
+    assert storage.copy_calls == 2
+    assert list(tmp_path.glob("dronedream-artifact-*.download")) == []
 
 
 def test_s3_storage_config_missing_returns_explicit_error(

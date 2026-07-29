@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
+import os
+import tempfile
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
@@ -9,6 +12,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
 from app import models
 from app.auth import get_current_user
@@ -27,6 +31,36 @@ from app.storage.integrity import (
 from app.storage.s3 import S3StorageConfigError
 
 router = APIRouter(tags=["artifacts"])
+
+
+def _delete_temporary_download(path: Path) -> None:
+    with contextlib.suppress(OSError):
+        path.unlink()
+
+
+def _verified_temporary_download(
+    *,
+    storage: object,
+    artifact: models.Artifact,
+) -> Path:
+    descriptor, raw_path = tempfile.mkstemp(prefix="dronedream-artifact-", suffix=".download")
+    path = Path(raw_path)
+    try:
+        with os.fdopen(descriptor, "w+b") as destination:
+            descriptor = -1
+            copy_to = getattr(storage, "copy_to", None)
+            if not callable(copy_to):
+                raise RuntimeError("artifact storage does not support bounded downloads")
+            digest = copy_to(artifact.storage_path, destination)
+            destination.flush()
+            os.fsync(destination.fileno())
+        require_artifact_integrity(artifact, content_digest=digest)
+        return path
+    except Exception:
+        if descriptor >= 0:
+            os.close(descriptor)
+        _delete_temporary_download(path)
+        raise
 
 
 def _is_under_allowed_root(path: Path, allowed_roots: list[Path]) -> bool:
@@ -169,12 +203,16 @@ def download_artifact(
                 )
                 if signed_url:
                     return RedirectResponse(url=signed_url, status_code=307)
-            content = storage.read_bytes(artifact.storage_path)
-            if digest_receipt is not None:
-                require_artifact_integrity(
-                    artifact,
-                    content=content,
-                )
+            temporary_download = (
+                _verified_temporary_download(storage=storage, artifact=artifact)
+                if digest_receipt is not None
+                else None
+            )
+            content = (
+                storage.read_bytes(artifact.storage_path)
+                if temporary_download is None
+                else None
+            )
         except ArtifactIntegrityError as exc:
             raise HTTPException(
                 status_code=409,
@@ -198,11 +236,38 @@ def download_artifact(
                     job,
                     free_tier_watermark=True,
                 )
+                if temporary_download is not None:
+                    _delete_temporary_download(temporary_download)
+                temporary_download = None
+            elif temporary_download is not None:
+                return FileResponse(
+                    path=temporary_download,
+                    media_type="application/pdf",
+                    headers=_report_headers(artifact=artifact, tier=report_tier),
+                    background=BackgroundTask(
+                        _delete_temporary_download,
+                        temporary_download,
+                    ),
+                )
+            if content is None:
+                raise RuntimeError("report storage returned no download content")
             return Response(
                 content=content,
                 media_type="application/pdf",
                 headers=_report_headers(artifact=artifact, tier=report_tier),
             )
+        if temporary_download is not None:
+            return FileResponse(
+                path=temporary_download,
+                media_type=artifact.mime_type or "application/octet-stream",
+                filename=filename,
+                background=BackgroundTask(
+                    _delete_temporary_download,
+                    temporary_download,
+                ),
+            )
+        if content is None:
+            raise RuntimeError("artifact storage returned no download content")
         return Response(
             content=content,
             media_type=artifact.mime_type or "application/octet-stream",
