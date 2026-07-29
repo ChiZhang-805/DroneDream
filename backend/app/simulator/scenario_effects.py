@@ -567,9 +567,7 @@ def _compile_bundled_sdf_profile_unchecked(
             "mean_linear_velocity_mps": _wind_vector_from_bearing(mean_mps, direction_deg),
             "horizontal_magnitude_sine_amplitude_percent": 1.0,
             "range_mps": [0.0, peak_mps],
-            "effect_ids": sorted(
-                {"wind_gusts", "scenario_type.turbulence"} & set(by_id)
-            ),
+            "effect_ids": sorted({"wind_gusts", "scenario_type.turbulence"} & set(by_id)),
         }
 
     payload_effect = by_id.get("battery.mass_payload_kg")
@@ -672,12 +670,8 @@ def _compile_bundled_sdf_profile_unchecked(
             "max_rot_velocity_rad_s": 0.0,
             "joint_state_topic": ACTUATOR_FAILURE_JOINT_STATE_TOPIC,
             "joint_state_update_rate_hz": 20.0,
-            "max_failed_motor_abs_velocity_rad_s": (
-                MAX_FAILED_MOTOR_ABS_VELOCITY_RAD_S
-            ),
-            "min_healthy_motor_abs_velocity_rad_s": (
-                MIN_HEALTHY_MOTOR_ABS_VELOCITY_RAD_S
-            ),
+            "max_failed_motor_abs_velocity_rad_s": (MAX_FAILED_MOTOR_ABS_VELOCITY_RAD_S),
+            "min_healthy_motor_abs_velocity_rad_s": (MIN_HEALTHY_MOTOR_ABS_VELOCITY_RAD_S),
             "effect_ids": ["scenario_type.actuator_failure"],
         }
     return profile
@@ -819,9 +813,7 @@ def compile_bundled_gps_dropout_schedule(
     if not 1 <= tick_count <= 3600:
         raise ScenarioEffectContractError("tick_count must be in [1, 3600]")
     if not _SHA256.fullmatch(execution_identity_sha256):
-        raise ScenarioEffectContractError(
-            "execution_identity_sha256 must be a lowercase SHA-256"
-        )
+        raise ScenarioEffectContractError("execution_identity_sha256 must be a lowercase SHA-256")
     off_count = int(math.floor(requested_rate * tick_count + 0.5))
     if requested_rate > 0.0 and off_count == 0:
         off_count = 1
@@ -1280,6 +1272,7 @@ def validate_scenario_effect_request(payload: object) -> dict[str, Any]:
             )
     _compile_bundled_steady_wind_unchecked(payload)
     _compile_bundled_sdf_profile_unchecked(payload)
+    _compile_bundled_runtime_profile_unchecked(payload)
     return payload
 
 
@@ -1538,8 +1531,7 @@ def _validate_bundled_sdf_profile_evidence(
             "actuator_dynamics",
             "actuator_failure",
         )
-        if section in expected
-        and requested["effect_id"] in expected[section].get("effect_ids", [])
+        if section in expected and requested["effect_id"] in expected[section].get("effect_ids", [])
     }
     if (
         not isinstance(sdf_value, dict)
@@ -1584,15 +1576,12 @@ def _validate_bundled_sdf_profile_evidence(
         )
         if (
             not isinstance(joint_value, dict)
-            or joint_value.get("target_motor_number")
-            != expected_failure["target_motor_number"]
-            or joint_value.get("target_joint_name")
-            != expected_failure["target_joint_name"]
+            or joint_value.get("target_motor_number") != expected_failure["target_motor_number"]
+            or joint_value.get("target_joint_name") != expected_failure["target_joint_name"]
             or not isinstance(target_max, (int, float))
             or isinstance(target_max, bool)
             or not math.isfinite(float(target_max))
-            or float(target_max)
-            > float(expected_failure["max_failed_motor_abs_velocity_rad_s"])
+            or float(target_max) > float(expected_failure["max_failed_motor_abs_velocity_rad_s"])
             or not isinstance(healthy_maxima, dict)
             or set(healthy_maxima)
             != {
@@ -1604,8 +1593,7 @@ def _validate_bundled_sdf_profile_evidence(
                 isinstance(value, (int, float))
                 and not isinstance(value, bool)
                 and math.isfinite(float(value))
-                and float(value)
-                >= float(expected_failure["min_healthy_motor_abs_velocity_rad_s"])
+                and float(value) >= float(expected_failure["min_healthy_motor_abs_velocity_rad_s"])
                 for value in healthy_maxima.values()
             )
             or joint_value.get("hard_stop_verified") is not True
@@ -1644,8 +1632,7 @@ def _validate_bundled_runtime_evidence(
     if requested["effect_id"] in gps_ids:
         if (
             observation.get("kind") != "readback"
-            or observation.get("source")
-            != "mavsdk.param+telemetry/gps_info"
+            or observation.get("source") != "mavsdk.param+telemetry/gps_info"
             or value.get("schedule_algorithm") != "sha256-ranked-fixed-duty-v1"
             or value.get("reset_verified") is not True
         ):
@@ -1657,9 +1644,7 @@ def _validate_bundled_runtime_evidence(
         transitions = value.get("transitions")
         control = value.get("control_parameter")
         control_before = control.get("before") if isinstance(control, dict) else None
-        control_restore = (
-            control.get("restore") if isinstance(control, dict) else None
-        )
+        control_restore = control.get("restore") if isinstance(control, dict) else None
         if (
             not isinstance(schedule, list)
             or not schedule
@@ -1718,14 +1703,8 @@ def _validate_bundled_runtime_evidence(
                 or isinstance(num_satellites, bool)
                 or not isinstance(fix_type, int)
                 or isinstance(fix_type, bool)
-                or (
-                    failure_type == "off"
-                    and not (num_satellites < 4 and fix_type <= 1)
-                )
-                or (
-                    failure_type == "ok"
-                    and not (num_satellites >= 4 and fix_type >= 2)
-                )
+                or (failure_type == "off" and not (num_satellites < 4 and fix_type <= 1))
+                or (failure_type == "ok" and not (num_satellites >= 4 and fix_type >= 2))
             ):
                 raise ScenarioEffectContractError(
                     f"effect {requested['effect_id']} GPS telemetry state is invalid"
@@ -1771,14 +1750,34 @@ def _validate_bundled_runtime_evidence(
     start_sample = value.get("track_start_sample")
     end_sample = value.get("track_end_sample")
     tolerance = value.get("track_start_tolerance_percent")
+    pretrack_drain_seconds = value.get("pretrack_drain_seconds")
     if (
         not isinstance(start_sample, dict)
         or not isinstance(end_sample, dict)
         or not isinstance(tolerance, (int, float))
         or isinstance(tolerance, bool)
+        or not math.isfinite(float(tolerance))
+        or not isinstance(pretrack_drain_seconds, (int, float))
+        or isinstance(pretrack_drain_seconds, bool)
+        or not math.isfinite(float(pretrack_drain_seconds))
+        or not 1.0 <= float(pretrack_drain_seconds) <= 86400.0
     ):
         raise ScenarioEffectContractError(
             f"effect {requested['effect_id']} battery samples are incomplete"
+        )
+    expected_tolerance = max(
+        5.0,
+        100.0 * 0.1 / max(1.0, float(pretrack_drain_seconds)) + 2.0,
+    )
+    if not math.isclose(
+        float(tolerance),
+        expected_tolerance,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    ):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} battery tolerance is not bound "
+            "to the pre-track drain profile"
         )
     try:
         start_percent = float(start_sample["remaining_percent"])
@@ -1788,10 +1787,9 @@ def _validate_bundled_runtime_evidence(
         raise ScenarioEffectContractError(
             f"effect {requested['effect_id']} battery percentages are invalid"
         ) from exc
-    if (
-        not all(math.isfinite(item) for item in (start_percent, end_percent, target_percent))
-        or abs(start_percent - target_percent) > float(tolerance)
-    ):
+    if not all(math.isfinite(item) for item in (start_percent, end_percent, target_percent)) or abs(
+        start_percent - target_percent
+    ) > float(tolerance):
         raise ScenarioEffectContractError(
             f"effect {requested['effect_id']} did not verify its track-start battery state"
         )

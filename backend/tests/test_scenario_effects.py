@@ -270,19 +270,17 @@ def test_compile_bundled_runtime_profile_binds_dropout_and_battery() -> None:
 
 
 def test_runtime_profile_rejects_conflicting_dropout_sources() -> None:
-    request = build_scenario_effect_request(
-        execution_identity=_identity(),
-        scenario_type="gps_dropout",
-        scenario_config={"dropout_rate": 0.4},
-        job_config={
-            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
-            "sensor_noise_level": "medium",
-        },
-        advanced_config={"sensor_degradation": {"dropout_rate": 0.2}},
-    )
-
     with pytest.raises(ScenarioEffectContractError, match="conflicting dropout rates"):
-        compile_bundled_runtime_profile(request)
+        build_scenario_effect_request(
+            execution_identity=_identity(),
+            scenario_type="gps_dropout",
+            scenario_config={"dropout_rate": 0.4},
+            job_config={
+                "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+                "sensor_noise_level": "medium",
+            },
+            advanced_config={"sensor_degradation": {"dropout_rate": 0.2}},
+        )
 
 
 @pytest.mark.parametrize(

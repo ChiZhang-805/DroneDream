@@ -157,10 +157,9 @@ def test_hover_schedule_has_rate_independent_ten_second_stationary_window(
     assert (plan.track_end_index - plan.track_start_index) / 20.0 == pytest.approx(10.0)
     hover_window = plan.schedule[plan.track_start_index : plan.track_end_index + 1]
     assert len(hover_window) == 201
-    assert {
-        (setpoint.north_m, setpoint.east_m, setpoint.down_m)
-        for setpoint in hover_window
-    } == {(0.0, 0.0, -3.0)}
+    assert {(setpoint.north_m, setpoint.east_m, setpoint.down_m) for setpoint in hover_window} == {
+        (0.0, 0.0, -3.0)
+    }
 
 
 def test_hover_schedule_rejects_a_moving_or_non_origin_reference() -> None:
@@ -277,9 +276,7 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
         "battery.voltage_sag",
         "sensor_degradation.dropout_rate",
     ]
-    gps_value = artifact["records"][2]["evidence"]["verification"]["observations"][0][
-        "value"
-    ]
+    gps_value = artifact["records"][2]["evidence"]["verification"]["observations"][0]["value"]
     assert gps_value["reset_verified"] is True
     assert gps_value["off_tick_count"] == 1
     assert gps_value["control_parameter"]["parameter_name"] == "SIM_GPS_USED"
@@ -293,9 +290,7 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
         "fix_type_name": "FIX_3D",
     }
     assert client.int_params["SIM_GPS_USED"] == 10
-    battery_value = artifact["records"][0]["evidence"]["verification"]["observations"][0][
-        "value"
-    ]
+    battery_value = artifact["records"][0]["evidence"]["verification"]["observations"][0]["value"]
     assert battery_value["takeoff_gate_parameters"]["SIM_BAT_MIN_PCT"]["applied"] == 100.0
     assert battery_value["takeoff_gate_parameters"]["SIM_BAT_DRAIN"]["applied"] == 86400.0
     assert battery_value["track_start_sample"]["remaining_percent"] == 60.0
@@ -306,19 +301,20 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
         world="default",
         effects=artifact["records"],
     )
-    assert scenario_effects.validate_scenario_effect_evidence(
-        request,
-        final_payload,
-    )["verification_status"] == "verified_applied"
+    assert (
+        scenario_effects.validate_scenario_effect_evidence(
+            request,
+            final_payload,
+        )["verification_status"]
+        == "verified_applied"
+    )
     tampered_reset = json.loads(json.dumps(final_payload))
     gps_record = next(
         item
         for item in tampered_reset["effects"]
         if item["effect_id"] == "sensor_degradation.dropout_rate"
     )
-    gps_record["evidence"]["verification"]["observations"][0]["value"][
-        "reset_verified"
-    ] = False
+    gps_record["evidence"]["verification"]["observations"][0]["value"]["reset_verified"] = False
     gps_observation = gps_record["evidence"]["verification"]["observations"][0]
     gps_observation["sha256"] = scenario_effects.scenario_effect_value_sha256(
         gps_observation["value"]
@@ -352,9 +348,9 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
         for item in tampered_battery["effects"]
         if item["effect_id"] == "battery.initial_percent"
     )
-    battery_record["evidence"]["verification"]["observations"][0]["value"][
-        "track_start_sample"
-    ]["remaining_percent"] = 90.0
+    battery_record["evidence"]["verification"]["observations"][0]["value"]["track_start_sample"][
+        "remaining_percent"
+    ] = 90.0
     battery_observation = battery_record["evidence"]["verification"]["observations"][0]
     battery_observation["sha256"] = scenario_effects.scenario_effect_value_sha256(
         battery_observation["value"]
@@ -364,6 +360,26 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
         match="track-start battery state",
     ):
         scenario_effects.validate_scenario_effect_evidence(request, tampered_battery)
+
+    tampered_tolerance = json.loads(json.dumps(tampered_battery))
+    tolerance_record = next(
+        item
+        for item in tampered_tolerance["effects"]
+        if item["effect_id"] == "battery.initial_percent"
+    )
+    tolerance_observation = tolerance_record["evidence"]["verification"]["observations"][0]
+    tolerance_observation["value"]["track_start_tolerance_percent"] = 1_000_000.0
+    tolerance_observation["sha256"] = scenario_effects.scenario_effect_value_sha256(
+        tolerance_observation["value"]
+    )
+    with pytest.raises(
+        scenario_effects.ScenarioEffectContractError,
+        match="battery tolerance",
+    ):
+        scenario_effects.validate_scenario_effect_evidence(
+            request,
+            tampered_tolerance,
+        )
 
 
 def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
@@ -456,9 +472,7 @@ def test_executor_fails_closed_when_hover_velocity_never_stabilizes(
     tmp_path: Path,
 ) -> None:
     client = executor.FakeOffboardClient()
-    client.position_velocity_samples = [
-        executor.PositionVelocityNed(0.0, 0.0, -3.0, 1.0, 0.0, 0.0)
-    ]
+    client.position_velocity_samples = [executor.PositionVelocityNed(0.0, 0.0, -3.0, 1.0, 0.0, 0.0)]
     timing_path = tmp_path / "offboard_timing.json"
 
     with pytest.raises(TimeoutError, match="continuously stable hover"):
