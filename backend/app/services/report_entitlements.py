@@ -3,15 +3,29 @@
 from __future__ import annotations
 
 import json
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from app.config import Settings, get_settings
 
 ReportExportTier = Literal["free", "plus", "pro"]
 _MAX_SNAPSHOT_BYTES = 65_536
 _MAX_AUTHORIZATION_BYTES = 16_384
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Keep the authenticated entitlement request on its configured origin."""
+
+    def redirect_request(self, *_args: Any, **_kwargs: Any) -> None:
+        return None
+
+
+def urlopen(request: Request, *, timeout: float) -> Any:
+    """Open one request without forwarding its bearer token through a redirect."""
+
+    opener = build_opener(_NoRedirectHandler())
+    return opener.open(request, timeout=timeout)  # noqa: S310 - validated HTTPS request.
 
 
 def _verified_plan_id(payload: object) -> ReportExportTier | None:

@@ -50,9 +50,7 @@ def _validated_worker_id(worker_id: object) -> str:
         or len(normalized) > 128
         or any(ord(character) < 32 for character in normalized)
     ):
-        raise ValueError(
-            "worker_id must be 1-128 visible characters"
-        )
+        raise ValueError("worker_id must be 1-128 visible characters")
     return normalized
 
 
@@ -147,7 +145,15 @@ def worker_presence_health() -> dict[str, object]:
             "age_seconds": round(age, 3),
         }
     except Exception as exc:
-        return {"ok": False, "status": "unavailable", "detail": str(exc)[:200]}
+        logger.warning(
+            "worker presence health check failed exception_type=%s",
+            type(exc).__name__,
+        )
+        return {
+            "ok": False,
+            "status": "unavailable",
+            "detail": type(exc).__name__,
+        }
 
 
 class WorkerPresenceHeartbeat:

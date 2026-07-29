@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
+from urllib.request import Request
 
 import pytest
 
@@ -101,6 +102,20 @@ def test_report_export_tier_fails_closed_when_gateway_is_unavailable(
         )
         == "free"
     )
+
+
+def test_entitlement_transport_refuses_redirects() -> None:
+    handler = report_entitlements._NoRedirectHandler()
+    redirected = cast(Any, handler).redirect_request(
+        Request("https://identity.example.test/usage"),
+        None,
+        302,
+        "Found",
+        {},
+        "https://attacker.example.test/capture",
+    )
+
+    assert redirected is None
 
 
 @pytest.mark.parametrize(
