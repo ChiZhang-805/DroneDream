@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import subprocess
@@ -14,7 +15,11 @@ from app.orchestration.harness_multi_tool_budget_evaluation import (
     build_harness_multi_tool_budget_evaluation,
     build_harness_multi_tool_budget_manifest,
 )
-from scripts.evaluate_harness_multi_tool_budget import _payloads
+from scripts.evaluate_harness_multi_tool_budget import (
+    _payloads,
+    _semantic_projection,
+    _validate_timing_accounting,
+)
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = BACKEND_ROOT.parent
@@ -103,6 +108,35 @@ def test_equal_budget_multi_tool_evaluation_exercises_verified_live_dispatch() -
         for row in scripted["plan_trace"]["provider_visible_history"]
     )
     assert artifact["artifact_sha256"] == _sha256(artifact, "artifact_sha256")
+    _validate_timing_accounting(artifact)
+
+
+def test_semantic_reexecution_ignores_only_validated_clock_observations() -> None:
+    source_commit = _head()
+    generated_at = "2026-07-28T18:00:00Z"
+    first = build_harness_multi_tool_budget_evaluation(
+        source_commit=source_commit,
+        generated_at=generated_at,
+        seed_blocks=(7200,),
+    )
+    second = build_harness_multi_tool_budget_evaluation(
+        source_commit=source_commit,
+        generated_at=generated_at,
+        seed_blocks=(7200,),
+    )
+
+    _validate_timing_accounting(first)
+    _validate_timing_accounting(second)
+    assert _semantic_projection(first) == _semantic_projection(second)
+
+    tampered = copy.deepcopy(first)
+    tampered["block_rows"][0]["arms"][1]["holdout_loss"] += 1.0
+    assert _semantic_projection(first) != _semantic_projection(tampered)
+
+    invalid_accounting = copy.deepcopy(first)
+    invalid_accounting["summary"]["scripted_plan_decision_wall_ms"] += 1.0
+    with pytest.raises(ValueError, match="does not match block accounting"):
+        _validate_timing_accounting(invalid_accounting)
 
 
 def test_multi_tool_evaluation_manifest_and_rendered_files_bind_artifact() -> None:
