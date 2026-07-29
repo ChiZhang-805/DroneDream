@@ -14,6 +14,9 @@
   --text-dim: #b8c2d8;
   --primary: #5b8dff;
   --primary-strong: #2f6bff;
+  --accent: var(--primary);
+  --muted: var(--text-muted);
+  --panel: var(--bg-elev);
   --success: #3ecf8e;
   --warning: #f0b429;
   --danger: #ef5a5a;
