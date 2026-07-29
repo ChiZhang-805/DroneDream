@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger("drone_dream.orchestration.worker_presence")
+_MAX_HEARTBEAT_BYTES = 4096
 
 
 def _now() -> datetime:
@@ -97,9 +98,22 @@ def worker_presence_health() -> dict[str, object]:
     try:
         client = _client()
         client.ping()
-        raw = client.get(settings.worker_presence_key)
+        raw = client.getrange(
+            settings.worker_presence_key,
+            0,
+            _MAX_HEARTBEAT_BYTES,
+        )
         if not raw:
             return {"ok": False, "status": "missing", "detail": "no live worker signal"}
+        if (
+            not isinstance(raw, str)
+            or len(raw.encode("utf-8")) > _MAX_HEARTBEAT_BYTES
+        ):
+            return {
+                "ok": False,
+                "status": "invalid",
+                "detail": "worker signal exceeds the supported size",
+            }
         payload = json.loads(raw)
         if not isinstance(payload, dict):
             return {

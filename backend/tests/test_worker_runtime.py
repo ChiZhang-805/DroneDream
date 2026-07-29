@@ -48,7 +48,9 @@ def test_worker_presence_rejects_invalid_or_future_timestamps(
     )
     client = SimpleNamespace(
         ping=lambda: True,
-        get=lambda _key: json.dumps({"worker_id": "worker", "observed_at_epoch": observed_epoch}),
+        getrange=lambda _key, _start, _end: json.dumps(
+            {"worker_id": "worker", "observed_at_epoch": observed_epoch}
+        ),
     )
     monkeypatch.setattr(worker_presence, "_settings", lambda: settings)
     monkeypatch.setattr(worker_presence, "_client", lambda: client)
@@ -57,6 +59,31 @@ def test_worker_presence_rejects_invalid_or_future_timestamps(
 
     assert health["ok"] is False
     assert health["status"] == "invalid"
+
+
+def test_worker_presence_rejects_oversized_heartbeat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = SimpleNamespace(
+        redis_url="redis://example.invalid/0",
+        worker_presence_key="workers:test",
+        worker_presence_ttl_seconds=60,
+        require_worker_heartbeat=True,
+    )
+    client = SimpleNamespace(
+        ping=lambda: True,
+        getrange=lambda _key, _start, _end: "x" * 4097,
+    )
+    monkeypatch.setattr(worker_presence, "_settings", lambda: settings)
+    monkeypatch.setattr(worker_presence, "_client", lambda: client)
+
+    health = worker_presence.worker_presence_health()
+
+    assert health == {
+        "ok": False,
+        "status": "invalid",
+        "detail": "worker signal exceeds the supported size",
+    }
 
 
 @pytest.mark.parametrize("worker_id", ("", "   ", "bad\nworker", "x" * 129))
