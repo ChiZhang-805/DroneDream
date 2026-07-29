@@ -337,7 +337,9 @@ function SettingsDialog({
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
     useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
   const [experiencePreferenceState, setExperiencePreferenceState] =
-    useState<"loading" | "ready" | "saving" | "saved" | "error">("loading");
+    useState<"blocked" | "loading" | "ready" | "saving" | "saved" | "error">(
+      access.canUseRuntime ? "loading" : "blocked",
+    );
   const [experiencePreferenceMessage, setExperiencePreferenceMessage] =
     useState<string | null>(null);
   const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
@@ -376,7 +378,15 @@ function SettingsDialog({
     void refreshManagedUsage();
   }, [refreshManagedUsage]);
   useEffect(() => {
+    if (!access.canUseRuntime) {
+      setExperiencePreferenceState("blocked");
+      setExperiencePreferenceMessage(null);
+      setConfirmExperiencePreferenceDelete(false);
+      return undefined;
+    }
     let active = true;
+    setExperiencePreferenceState("loading");
+    setExperiencePreferenceMessage(null);
     void apiClient.getUserExperiencePreferences()
       .then((preferences) => {
         if (!active) return;
@@ -397,8 +407,16 @@ function SettingsDialog({
     return () => {
       active = false;
     };
-  }, []);
+  }, [access.canUseRuntime]);
   const saveExperiencePreferences = async () => {
+    if (
+      !access.canUseRuntime ||
+      experiencePreferenceState === "blocked" ||
+      experiencePreferenceState === "loading" ||
+      experiencePreferenceState === "saving"
+    ) {
+      return;
+    }
     setExperiencePreferenceState("saving");
     setExperiencePreferenceMessage(null);
     try {
@@ -421,6 +439,14 @@ function SettingsDialog({
     }
   };
   const deleteExperiencePreferences = async () => {
+    if (
+      !access.canUseRuntime ||
+      experiencePreferenceState === "blocked" ||
+      experiencePreferenceState === "loading" ||
+      experiencePreferenceState === "saving"
+    ) {
+      return;
+    }
     setExperiencePreferenceState("saving");
     setExperiencePreferenceMessage(null);
     try {
@@ -440,6 +466,10 @@ function SettingsDialog({
     }
   };
   const numberFormatter = new Intl.NumberFormat(locale === "zh-CN" ? "zh-CN" : "en");
+  const experiencePreferenceControlsDisabled =
+    experiencePreferenceState === "blocked" ||
+    experiencePreferenceState === "loading" ||
+    experiencePreferenceState === "saving";
   const creditRatio = managedUsage
     ? Math.min(
         100,
@@ -566,7 +596,7 @@ function SettingsDialog({
             id="settings_memory_enabled"
             type="checkbox"
             checked={experiencePreferenceDraft.memory_enabled}
-            disabled={experiencePreferenceState === "loading"}
+            disabled={experiencePreferenceControlsDisabled}
             onChange={(event) => setExperiencePreferenceDraft((current) => ({
               ...current,
               memory_enabled: event.target.checked,
@@ -583,7 +613,7 @@ function SettingsDialog({
             <select
               id="settings_default_template"
               value={experiencePreferenceDraft.default_template_key ?? ""}
-              disabled={experiencePreferenceState === "loading"}
+              disabled={experiencePreferenceControlsDisabled}
               onChange={(event) => setExperiencePreferenceDraft((current) => ({
                 ...current,
                 default_template_key: (
@@ -602,7 +632,7 @@ function SettingsDialog({
             <select
               id="settings_default_track"
               value={experiencePreferenceDraft.default_track_type ?? ""}
-              disabled={experiencePreferenceState === "loading"}
+              disabled={experiencePreferenceControlsDisabled}
               onChange={(event) => setExperiencePreferenceDraft((current) => ({
                 ...current,
                 default_track_type: (
@@ -626,7 +656,7 @@ function SettingsDialog({
               max="20"
               step="0.1"
               value={experiencePreferenceDraft.default_altitude_m ?? ""}
-              disabled={experiencePreferenceState === "loading"}
+              disabled={experiencePreferenceControlsDisabled}
               onChange={(event) => setExperiencePreferenceDraft((current) => ({
                 ...current,
                 default_altitude_m: event.target.value === ""
@@ -645,10 +675,7 @@ function SettingsDialog({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={
-              experiencePreferenceState === "loading" ||
-              experiencePreferenceState === "saving"
-            }
+            disabled={experiencePreferenceControlsDisabled}
             onClick={() => void saveExperiencePreferences()}
           >
             {experiencePreferenceState === "saving"
@@ -659,7 +686,7 @@ function SettingsDialog({
             <button
               type="button"
               className="btn btn-danger"
-              disabled={experiencePreferenceState === "saving"}
+              disabled={experiencePreferenceControlsDisabled}
               onClick={() => setConfirmExperiencePreferenceDelete(true)}
             >
               {t("settings.memory.delete")}
@@ -684,6 +711,11 @@ function SettingsDialog({
             </div>
           )}
         </div>
+        {experiencePreferenceState === "blocked" ? (
+          <p className="settings-memory-message" role="status">
+            {t("settings.memory.runtimeRequired")}
+          </p>
+        ) : null}
         {experiencePreferenceMessage ? (
           <p
             className="settings-memory-message"
