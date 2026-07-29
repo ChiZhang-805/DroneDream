@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -51,9 +52,34 @@ def _utc_timestamp(value: str, *, field: str) -> str:
 
 
 def _positive_duration(value: float, *, field: str) -> float:
-    if value <= 0.0:
-        raise ValueError(f"{field} must be positive")
+    if not math.isfinite(value) or value <= 0.0:
+        raise ValueError(f"{field} must be finite and positive")
     return value
+
+
+def _validate_time_window(
+    *,
+    started_at: str,
+    finished_at: str,
+    duration_seconds: float,
+    field: str,
+) -> float:
+    start = datetime.fromisoformat(started_at[:-1] + "+00:00")
+    finish = datetime.fromisoformat(finished_at[:-1] + "+00:00")
+    elapsed = (finish - start).total_seconds()
+    if elapsed <= 0.0:
+        raise ValueError(f"{field} finished_at must be later than started_at")
+    duration = _positive_duration(duration_seconds, field=f"{field}_duration_seconds")
+    # Command-native duration can exclude process startup and final log flush
+    # while the surrounding timestamps include both. Permit small overhead,
+    # but reject a materially different or invented duration.
+    tolerance = max(2.0, elapsed * 0.05)
+    if abs(duration - elapsed) > tolerance:
+        raise ValueError(
+            f"{field}_duration_seconds disagrees with its timestamps by more "
+            f"than {tolerance:.3f} seconds"
+        )
+    return duration
 
 
 def _repository_log(path: Path) -> dict[str, object]:
@@ -115,6 +141,18 @@ def build_test_run_receipt(
         focused_finished_at,
         field="focused_finished_at",
     )
+    full_suite_duration_seconds = _validate_time_window(
+        started_at=full_suite_started_at,
+        finished_at=full_suite_finished_at,
+        duration_seconds=full_suite_duration_seconds,
+        field="full_suite",
+    )
+    focused_duration_seconds = _validate_time_window(
+        started_at=focused_started_at,
+        finished_at=focused_finished_at,
+        duration_seconds=focused_duration_seconds,
+        field="focused",
+    )
     if full_suite_passed <= 0 or focused_passed <= 0:
         raise ValueError("test receipts require positive passing-test counts")
     if any(
@@ -146,10 +184,7 @@ def build_test_run_receipt(
             "working_directory": full_suite_working_directory,
             "started_at": full_suite_started_at,
             "finished_at": full_suite_finished_at,
-            "duration_seconds": _positive_duration(
-                full_suite_duration_seconds,
-                field="full_suite_duration_seconds",
-            ),
+            "duration_seconds": full_suite_duration_seconds,
             "result": {
                 "status": "passed",
                 "passed": full_suite_passed,
@@ -168,10 +203,7 @@ def build_test_run_receipt(
                 "working_directory": focused_working_directory,
                 "started_at": focused_started_at,
                 "finished_at": focused_finished_at,
-                "duration_seconds": _positive_duration(
-                    focused_duration_seconds,
-                    field="focused_duration_seconds",
-                ),
+                "duration_seconds": focused_duration_seconds,
                 "result": {
                     "status": "passed",
                     "passed": focused_passed,

@@ -16,6 +16,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
         "backend/scripts/run_locked_harness_routing_policy_holdout.py",
         "backend/scripts/run_scenario_generalization_campaign.py",
         "backend/scripts/run_simulation_coverage_campaign.py",
+        "backend/scripts/verify_harness_decision_traces.py",
     ),
 )
 def test_campaign_help_imports_current_backend_from_repository_root(script: str) -> None:

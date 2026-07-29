@@ -14,7 +14,16 @@ _TIMESTAMP = "2026-07-28T00:00:00Z"
 _LOG = Path(__file__).resolve().parent / "fixtures" / "test_run_receipt_v1.log"
 
 
-def _build_receipt(*, exact_final_commit_run: bool = False) -> dict[str, object]:
+def _build_receipt(
+    *,
+    exact_final_commit_run: bool = False,
+    full_suite_started_at: str = _TIMESTAMP,
+    full_suite_finished_at: str = "2026-07-28T00:12:39Z",
+    full_suite_duration_seconds: float = 759.17,
+    focused_started_at: str = "2026-07-28T00:13:00Z",
+    focused_finished_at: str = "2026-07-28T00:13:01Z",
+    focused_duration_seconds: float = 1.0,
+) -> dict[str, object]:
     return build_test_run_receipt(
         source_commit=_SOURCE_COMMIT,
         base_commit=_BASE_COMMIT,
@@ -25,16 +34,16 @@ def _build_receipt(*, exact_final_commit_run: bool = False) -> dict[str, object]
         full_suite_log_path=_LOG,
         full_suite_command="python -m pytest -q",
         full_suite_working_directory="backend",
-        full_suite_started_at=_TIMESTAMP,
-        full_suite_finished_at="2026-07-28T00:12:39Z",
-        full_suite_duration_seconds=759.17,
+        full_suite_started_at=full_suite_started_at,
+        full_suite_finished_at=full_suite_finished_at,
+        full_suite_duration_seconds=full_suite_duration_seconds,
         full_suite_passed=1139,
         focused_log_path=_LOG,
         focused_command="python -m pytest -q focused",
         focused_working_directory="backend",
-        focused_started_at="2026-07-28T00:13:00Z",
-        focused_finished_at="2026-07-28T00:13:01Z",
-        focused_duration_seconds=1.0,
+        focused_started_at=focused_started_at,
+        focused_finished_at=focused_finished_at,
+        focused_duration_seconds=focused_duration_seconds,
         focused_passed=1,
         bridge_reason="Fixture verifies deterministic receipt binding.",
         exact_final_commit_run=exact_final_commit_run,
@@ -111,3 +120,16 @@ def test_test_run_receipt_rejects_noncanonical_commit() -> None:
             focused_passed=1,
             bridge_reason="Fixture verifies deterministic receipt binding.",
         )
+
+
+def test_test_run_receipt_rejects_reversed_time_window() -> None:
+    with pytest.raises(ValueError, match="later than started_at"):
+        _build_receipt(
+            full_suite_started_at="2026-07-28T00:12:39Z",
+            full_suite_finished_at=_TIMESTAMP,
+        )
+
+
+def test_test_run_receipt_rejects_duration_that_disagrees_with_timestamps() -> None:
+    with pytest.raises(ValueError, match="disagrees with its timestamps"):
+        _build_receipt(focused_duration_seconds=20.0)

@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from app.orchestration.decision_harness import verify_harness_decision_trace
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+while str(BACKEND_ROOT) in sys.path:
+    sys.path.remove(str(BACKEND_ROOT))
+sys.path.insert(0, str(BACKEND_ROOT))
+
+import app  # noqa: E402
+from app.orchestration.decision_harness import verify_harness_decision_trace  # noqa: E402
 
 REPORT_SCHEMA_VERSION = "1.0"
 MAX_INPUT_BYTES = 64 * 1024 * 1024
@@ -16,6 +23,12 @@ _TRACE_EVENT_TYPE = "harness_decision_started"
 
 class TraceInputError(ValueError):
     """Raised when an exported trace file cannot be safely decoded."""
+
+
+def _assert_local_backend_import() -> None:
+    app_path = Path(app.__file__).resolve()
+    if not app_path.is_relative_to(BACKEND_ROOT):
+        raise RuntimeError(f"imported app from {app_path}, expected it under {BACKEND_ROOT}")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -134,6 +147,7 @@ def verify_trace_records(records: list[object]) -> dict[str, object]:
 
 
 def main() -> int:
+    _assert_local_backend_import()
     args = _parser().parse_args()
     try:
         records = load_trace_records(args.input)
