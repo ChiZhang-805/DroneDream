@@ -1,0 +1,67 @@
+{
+  "claim_boundary": "Exact-source offline software regression evidence for the backend and the focused Harness, routing, evidence-export, advanced-physics, and receipt contracts enumerated by the retained commands. It does not establish current Evidence 2.9 online-provider quality, causal Harness benefit, Windows Rust release readiness, report/PDF readiness, real-aircraft behavior, or flight safety.",
+  "environment": {
+    "openai_api_key_removed_before_run": true,
+    "platform": "Windows-11-10.0.26200-SP0",
+    "pytest": "9.1.0",
+    "python": "3.13.0",
+    "real_credentials_used": false,
+    "real_provider_calls": 0
+  },
+  "focused_suite": {
+    "duration_seconds": 31.011,
+    "junit": {
+      "bytes": 10496,
+      "errors": 0,
+      "failures": 0,
+      "junit_time_seconds": 29.712,
+      "path": "focused-suite.xml",
+      "sha256": "25f94a80a7b6efac04ea004a89f92e1e510af9540a063a8ced34bded917927a1",
+      "skipped": 0,
+      "tests": 73
+    },
+    "log": {
+      "bytes": 368,
+      "path": "focused-suite.log",
+      "sha256": "6cf663090b5d649976072aeecb31508e252b9a02affe5a0155329521025efad0"
+    },
+    "pytest_reported_duration_seconds": 29.73,
+    "result": "passed"
+  },
+  "full_suite": {
+    "duration_seconds": 842.69,
+    "junit": {
+      "bytes": 176391,
+      "errors": 0,
+      "failures": 0,
+      "junit_time_seconds": 831.497,
+      "path": "full-suite.xml",
+      "sha256": "4b356f314e23db202c791e5b50b946e7cfae2aa30561aa8bc1db83ef358adef9",
+      "skipped": 0,
+      "tests": 1284
+    },
+    "log": {
+      "bytes": 2986,
+      "path": "full-suite.log",
+      "sha256": "a6b7d84a14fdb8f1dfb98591acdaca45230a15b3a60e52bf7104489d6e067958"
+    },
+    "pytest_reported_duration_seconds": 831.79,
+    "result": "passed"
+  },
+  "generated_at": "2026-07-29T00:28:51Z",
+  "receipt": {
+    "bytes": 2944,
+    "file_sha256": "113307a8ee6c722d0cd4e16e245373a5637dd0ec00ba8dbee274f6a57a897f10",
+    "internal_sha256": "15e2c97e62f9d75b60a315fd62ec93a7a2f38db401e8c8817146e4e7f1fdaafe",
+    "path": "test-receipt.json",
+    "schema_version": "dronedream.test-run-receipt.v2"
+  },
+  "schema_version": "dronedream.software-regression-attestation.v1",
+  "source_commit": "755c511539fe561207ca38ff5079f471a4110896",
+  "tested_state": {
+    "branch": "codex/software",
+    "exact_final_commit_run": true,
+    "generated_test_artifacts_ignored_during_run": true,
+    "tracked_source_clean_before_run": true
+  }
+}
