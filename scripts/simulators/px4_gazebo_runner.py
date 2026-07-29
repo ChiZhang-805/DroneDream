@@ -534,6 +534,14 @@ def _load_env() -> RunnerEnv:
     timeout_seconds = _parse_int(os.environ.get("PX4_GAZEBO_TIMEOUT_SECONDS"), default=300)
     if timeout_seconds <= 0:
         raise ConfigurationRunnerError("PX4_GAZEBO_TIMEOUT_SECONDS must be greater than zero")
+    eval_consecutive_samples = _parse_int(
+        os.environ.get("PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES"),
+        default=5,
+    )
+    if eval_consecutive_samples <= 0:
+        raise ConfigurationRunnerError(
+            "PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES must be greater than zero"
+        )
     telemetry_format = (
         os.environ.get("PX4_GAZEBO_TELEMETRY_FORMAT", "json").strip().lower() or "json"
     )
@@ -563,10 +571,7 @@ def _load_env() -> RunnerEnv:
         eval_near_track_threshold_m=_parse_float(
             os.environ.get("PX4_GAZEBO_EVAL_NEAR_TRACK_THRESHOLD_M"), default=1.5
         ),
-        eval_consecutive_samples=max(
-            1,
-            _parse_int(os.environ.get("PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES"), default=5),
-        ),
+        eval_consecutive_samples=eval_consecutive_samples,
         eval_collapse_altitude_fraction=_parse_float(
             os.environ.get("PX4_GAZEBO_EVAL_COLLAPSE_ALTITUDE_FRACTION"), default=0.5
         ),

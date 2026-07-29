@@ -1317,6 +1317,14 @@ def test_stationary_hover_coverage_is_weighted_by_elapsed_time() -> None:
     assert outcome.pass_flag is False
 
 
+@pytest.mark.parametrize("configured", ("0", "-3"))
+def test_px4_evaluation_policy_rejects_nonpositive_consecutive_samples(
+    configured: str,
+) -> None:
+    with pytest.raises(ValueError, match="must be positive"):
+        px4_evaluation_policy_from_environment({"PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES": configured})
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

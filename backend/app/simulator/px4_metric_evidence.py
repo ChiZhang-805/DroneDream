@@ -547,9 +547,12 @@ def _environment_int(
     if raw is None or not raw.strip():
         return default
     try:
-        return max(1, int(raw))
+        value = int(raw)
     except ValueError as exc:
         raise Px4CoreMetricEvidenceError(f"{name} must be an integer") from exc
+    if value < 1:
+        raise Px4CoreMetricEvidenceError(f"{name} must be positive")
+    return value
 
 
 def px4_evaluation_policy_from_environment(

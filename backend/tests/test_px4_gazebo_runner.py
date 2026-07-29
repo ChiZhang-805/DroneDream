@@ -962,6 +962,26 @@ def test_px4_runner_rejects_nonpositive_timeout(tmp_path: Path, timeout: str) ->
     assert "must be greater than zero" in result["failure"]["reason"]
 
 
+@pytest.mark.parametrize("configured", ["0", "-1"])
+def test_px4_runner_rejects_nonpositive_evaluation_stability_window(
+    tmp_path: Path,
+    configured: str,
+) -> None:
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "true",
+            "PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES": configured,
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert (
+        "PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES must be greater than zero"
+        in (result["failure"]["reason"])
+    )
+
+
 def test_px4_runner_rejects_speed_factor_below_timeout_scaling_contract(
     tmp_path: Path,
 ) -> None:
