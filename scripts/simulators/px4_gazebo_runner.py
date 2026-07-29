@@ -818,9 +818,7 @@ def _validate_trial_input(
     reference_track_raw = _cfg_value("reference_track")
 
     if track_type not in {"hover", "circle", "u_turn", "lemniscate", "custom"}:
-        raise RunnerError(
-            "track_type must be one of: hover, circle, u_turn, lemniscate, custom"
-        )
+        raise RunnerError("track_type must be one of: hover, circle, u_turn, lemniscate, custom")
     if not isinstance(start_point, dict):
         raise RunnerError("start_point must be an object with x/y")
 
@@ -901,15 +899,11 @@ def _validate_trial_input(
         track_type == "hover"
         and normalized_job_cfg["reference_track"]
         and any(
-            abs(point["x"]) > 1e-9
-            or abs(point["y"]) > 1e-9
-            or abs(point["z"] - altitude) > 1e-9
+            abs(point["x"]) > 1e-9 or abs(point["y"]) > 1e-9 or abs(point["z"] - altitude) > 1e-9
             for point in normalized_job_cfg["reference_track"]
         )
     ):
-        raise RunnerError(
-            "hover reference_track must remain at x=0, y=0 and altitude_m"
-        )
+        raise RunnerError("hover reference_track must remain at x=0, y=0 and altitude_m")
 
     params_value = payload.get("parameters")
     if params_value is not None and not isinstance(params_value, dict):
@@ -1691,13 +1685,9 @@ def _evaluate_track_progress(
     """Evaluate directed, continuous progress independent of waypoint density."""
 
     if geometry.stationary:
-        in_tolerance = [
-            projection.error <= max_track_error for projection in projections
-        ]
+        in_tolerance = [projection.error <= max_track_error for projection in projections]
         duration_seconds = (
-            max(0.0, float(samples[-1]["t"]) - float(samples[0]["t"]))
-            if len(samples) >= 2
-            else 0.0
+            max(0.0, float(samples[-1]["t"]) - float(samples[0]["t"])) if len(samples) >= 2 else 0.0
         )
         duration_fraction = min(
             1.0,
@@ -1705,19 +1695,12 @@ def _evaluate_track_progress(
         )
         in_tolerance_duration = 0.0
         for index in range(1, len(samples)):
-            interval_seconds = float(samples[index]["t"]) - float(
-                samples[index - 1]["t"]
-            )
+            interval_seconds = float(samples[index]["t"]) - float(samples[index - 1]["t"])
             if interval_seconds <= 0:
-                raise RunnerError(
-                    "stationary hover coverage requires increasing timestamps"
-                )
+                raise RunnerError("stationary hover coverage requires increasing timestamps")
             in_tolerance_duration += (
                 0.5
-                * (
-                    float(in_tolerance[index - 1])
-                    + float(in_tolerance[index])
-                )
+                * (float(in_tolerance[index - 1]) + float(in_tolerance[index]))
                 * interval_seconds
             )
         in_tolerance_fraction = (
@@ -2384,9 +2367,7 @@ def _compute_metrics(
             ),
             "track_mode": "stationary_hover" if track_geometry.stationary else "trajectory",
             "hover_minimum_evaluation_duration_s": (
-                _HOVER_MIN_EVALUATION_DURATION_SECONDS
-                if track_geometry.stationary
-                else None
+                _HOVER_MIN_EVALUATION_DURATION_SECONDS if track_geometry.stationary else None
             ),
             "full_log_rmse": round(
                 _time_weighted_rms(errors, samples),

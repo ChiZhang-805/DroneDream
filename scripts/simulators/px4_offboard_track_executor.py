@@ -180,15 +180,9 @@ class MavsdkOffboardClient:
                 async for health in system.telemetry.health():
                     sample = TelemetryHealth(
                         connected=True,
-                        global_position_ok=bool(
-                            getattr(health, "is_global_position_ok", False)
-                        ),
-                        home_position_ok=bool(
-                            getattr(health, "is_home_position_ok", False)
-                        ),
-                        local_position_ok=bool(
-                            getattr(health, "is_local_position_ok", False)
-                        ),
+                        global_position_ok=bool(getattr(health, "is_global_position_ok", False)),
+                        home_position_ok=bool(getattr(health, "is_home_position_ok", False)),
+                        local_position_ok=bool(getattr(health, "is_local_position_ok", False)),
                         armable=bool(getattr(health, "is_armable", False)),
                     )
                     if (
@@ -301,8 +295,7 @@ class MavsdkOffboardClient:
             return await asyncio.wait_for(_sample(), timeout=timeout_seconds)
         except TimeoutError:
             raise TimeoutError(
-                "PX4 position/velocity telemetry timeout after "
-                f"{timeout_seconds:g}s"
+                f"PX4 position/velocity telemetry timeout after {timeout_seconds:g}s"
             ) from None
 
     async def close(self) -> None:
@@ -1030,8 +1023,7 @@ async def _wait_for_takeoff_stability(
         within_limits = bool(
             float(payload["horizontal_error_m"]) <= horizontal_tolerance_m
             and float(payload["vertical_error_m"]) <= vertical_tolerance_m
-            and float(payload["horizontal_speed_m_s"])
-            <= horizontal_speed_tolerance_m_s
+            and float(payload["horizontal_speed_m_s"]) <= horizontal_speed_tolerance_m_s
             and float(payload["vertical_speed_m_s"]) <= vertical_speed_tolerance_m_s
         )
         payload["within_all_limits"] = within_limits
@@ -1330,9 +1322,7 @@ async def run_executor(
                 f"SIM_GPS_USED baseline recorded as {baseline_satellites}",
             )
         if isinstance(battery_profile, dict):
-            battery_takeoff_gate_parameters = await _hold_battery_during_takeoff_gate(
-                client
-            )
+            battery_takeoff_gate_parameters = await _hold_battery_during_takeoff_gate(client)
         await client.arm()
         armed = True
         _log(log_path, "armed")
@@ -1679,9 +1669,7 @@ def main(argv: list[str] | None = None) -> int:
                 takeoff_horizontal_speed_tolerance_m_s=(
                     args.takeoff_horizontal_speed_tolerance_m_s
                 ),
-                takeoff_vertical_speed_tolerance_m_s=(
-                    args.takeoff_vertical_speed_tolerance_m_s
-                ),
+                takeoff_vertical_speed_tolerance_m_s=(args.takeoff_vertical_speed_tolerance_m_s),
             )
         )
         _log(args.log, "executor completed successfully")

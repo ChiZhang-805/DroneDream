@@ -914,9 +914,7 @@ def verify_signature(
     raw_manifest = read_regular_bytes(manifest_path, "release manifest")
     if len(raw_manifest) > MAX_JSON_BYTES:
         raise ReleaseError(f"release manifest exceeds {MAX_JSON_BYTES} bytes")
-    manifest = validate_release_manifest(
-        load_json_bytes(raw_manifest, str(manifest_path))
-    )
+    manifest = validate_release_manifest(load_json_bytes(raw_manifest, str(manifest_path)))
     if raw_manifest != canonical_bytes(manifest):
         raise ReleaseError("release manifest is not canonical JSON")
     raw_envelope = read_regular_bytes(signature_path, "release signature")
