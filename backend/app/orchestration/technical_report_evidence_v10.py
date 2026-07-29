@@ -15,6 +15,7 @@ import hashlib
 import io
 import json
 import re
+import shutil
 import subprocess
 from collections import Counter
 from collections.abc import Mapping
@@ -211,9 +212,12 @@ def _git_snapshot_record(
     source_commit: str,
 ) -> dict[str, Any]:
     safe_relative = _safe_path(relative, field="snapshot source path").as_posix()
+    git = shutil.which("git")
+    if git is None:
+        raise ValueError("git is required to read frozen evidence snapshots")
     try:
-        completed = subprocess.run(
-            ["git", "show", f"{source_commit}:{safe_relative}"],
+        completed = subprocess.run(  # noqa: S603 - trusted executable and validated path.
+            [git, "show", f"{source_commit}:{safe_relative}"],
             cwd=repository_root,
             check=True,
             capture_output=True,

@@ -1034,24 +1034,16 @@ def _aggregate_candidate(
             training_trials,
             field_name="score",
         )
-        if any(
-            value is None
-            for value in (
-                training_rmse_decision,
-                training_max_error_decision,
-                training_overshoot_decision,
-                training_completion_time_decision,
-                training_score_decision,
-            )
+        if (
+            training_rmse_decision is None
+            or training_max_error_decision is None
+            or training_overshoot_decision is None
+            or training_completion_time_decision is None
+            or training_score_decision is None
         ):
             raise RuntimeError(
                 "aggregation invariant violated: evaluated case lost compatibility metrics"
             )
-        assert training_rmse_decision is not None
-        assert training_max_error_decision is not None
-        assert training_overshoot_decision is not None
-        assert training_completion_time_decision is not None
-        assert training_score_decision is not None
         training_max_error_worst_decision = max(training_max_errors)
         agg.update(
             {

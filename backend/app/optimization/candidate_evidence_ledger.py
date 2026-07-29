@@ -341,10 +341,13 @@ def candidate_evidence_receipt_required(
     if getattr(candidate, "evidence_ledger_required", False) is True:
         return True
     try:
-        if list(candidate.evidence_receipts):  # type: ignore[attr-defined]
-            return True
+        has_persisted_receipts = bool(
+            list(candidate.evidence_receipts)  # type: ignore[attr-defined]
+        )
     except Exception:
-        pass
+        has_persisted_receipts = False
+    if has_persisted_receipts:
+        return True
     aggregate = getattr(candidate, "aggregated_metric_json", None)
     if not isinstance(aggregate, Mapping):
         return False
@@ -386,7 +389,8 @@ def candidate_evidence_chain_matches_current(
                 return False
             previous_id = receipt.evidence_id
             latest = receipt
-        assert latest is not None
+        if latest is None:
+            return False
         if candidate_optimizer_metadata_receipt_required(candidate) and not isinstance(
             latest,
             CandidateEvidenceReceiptV2,

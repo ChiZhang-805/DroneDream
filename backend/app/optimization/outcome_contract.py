@@ -275,8 +275,9 @@ class OutcomePromotionPolicy(_FrozenModel):
         "within_case_mean_then_fixed_suite_mean"
     )
     max_error_estimator: Literal["worst_usable_seed"] = "worst_usable_seed"
+    # This is an estimator identifier, not a password or credential.
     pass_rate_estimator: Literal["case_weighted_dispatched_seed_rate"] = (
-        "case_weighted_dispatched_seed_rate"
+        "case_weighted_dispatched_seed_rate"  # noqa: S105
     )
     require_complete_training_matrix: Literal[True] = True
     require_hard_feasible: Literal[True] = True

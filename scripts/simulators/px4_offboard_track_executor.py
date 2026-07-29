@@ -34,6 +34,16 @@ MAX_SETPOINTS = 1_000_000
 RUNTIME_EFFECT_SCHEMA_VERSION = "dronedream.scenario_runtime_effects.v1"
 
 
+def _require_runtime_details(
+    value: dict[str, Any] | None,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    if value is None:
+        raise RuntimeError(f"runtime scenario invariant violated: missing {label}")
+    return value
+
+
 @dataclass(frozen=True)
 class TrackPoint:
     x: float
@@ -94,6 +104,7 @@ class OffboardClientProtocol(Protocol):
     async def sample_gps_info(self, timeout_seconds: float) -> dict[str, int | str]: ...
 
     async def close(self) -> None: ...
+
 
 class MavsdkOffboardClient:
     def __init__(self) -> None:
@@ -443,9 +454,11 @@ def _runtime_effect_records(
     records: list[dict[str, Any]] = []
     for effect_id in profile["requested_effect_ids"]:
         effect = requested_by_id[effect_id]
-        section = "gps_dropout" if effect_id in profile.get("gps_dropout", {}).get(
-            "effect_ids", []
-        ) else "battery"
+        section = (
+            "gps_dropout"
+            if effect_id in profile.get("gps_dropout", {}).get("effect_ids", [])
+            else "battery"
+        )
         if status != "complete":
             reason = error or "flight-timed scenario effect did not complete"
             records.append(
@@ -721,9 +734,7 @@ async def _set_gps_availability_verified(
     samples: list[dict[str, int | str]] = []
     deadline = time.monotonic() + 5.0
     while time.monotonic() < deadline:
-        sample = await client.sample_gps_info(
-            min(1.0, max(0.01, deadline - time.monotonic()))
-        )
+        sample = await client.sample_gps_info(min(1.0, max(0.01, deadline - time.monotonic())))
         samples.append(sample)
         num_satellites = int(sample["num_satellites"])
         fix_type = int(sample["fix_type"])
@@ -877,7 +888,10 @@ async def run_executor(
     gps_last_tick = -1
     gps_off = False
     if isinstance(gps_profile, dict):
-        assert runtime_profile is not None
+        runtime_profile_details = _require_runtime_details(
+            runtime_profile,
+            label="compiled runtime profile",
+        )
         track_sample_count = track_end - track_start + 1
         tick_period_s = float(gps_profile["tick_period_s"])
         tick_count = max(
@@ -887,7 +901,7 @@ async def run_executor(
         gps_schedule = compile_fixed_duty_schedule(
             requested_rate=float(gps_profile["requested_rate"]),
             tick_count=tick_count,
-            execution_identity_sha256=str(runtime_profile["execution_identity_sha256"]),
+            execution_identity_sha256=str(runtime_profile_details["execution_identity_sha256"]),
         )
     try:
         await client.connect(connection)
@@ -942,12 +956,15 @@ async def run_executor(
                     gps_last_tick = tick_index
                     desired_off = gps_schedule[tick_index]
                     if desired_off != gps_off:
-                        assert gps_control_details is not None
+                        gps_control = _require_runtime_details(
+                            gps_control_details,
+                            label="GPS control details",
+                        )
                         failure_type = "off" if desired_off else "ok"
                         target_satellites = (
-                            int(gps_control_details["dropout_value"])
+                            int(gps_control["dropout_value"])
                             if desired_off
-                            else int(gps_control_details["recovery_value"])
+                            else int(gps_control["recovery_value"])
                         )
                         verification = await _set_gps_availability_verified(
                             client,
@@ -969,19 +986,24 @@ async def run_executor(
             if idx == track_start:
                 timing["track_start_t"] = now_t
                 if isinstance(battery_profile, dict):
-                    assert battery_details is not None
                     battery_details = await _transition_battery_at_track_start(
                         client,
                         battery_profile,
-                        battery_details,
+                        _require_runtime_details(
+                            battery_details,
+                            label="battery control details",
+                        ),
                     )
             if idx == track_end:
                 timing["track_end_t"] = now_t
                 if isinstance(battery_profile, dict):
-                    assert battery_details is not None
+                    current_battery_details = _require_runtime_details(
+                        battery_details,
+                        label="battery control details",
+                    )
                     track_end_sample = await client.sample_battery(5.0)
                     start_percent = float(
-                        battery_details["track_start_sample"]["remaining_percent"]
+                        current_battery_details["track_start_sample"]["remaining_percent"]
                     )
                     end_percent = float(track_end_sample["remaining_percent"])
                     if bool(battery_profile["voltage_sag"]) and end_percent > start_percent + 0.5:
@@ -989,19 +1011,24 @@ async def run_executor(
                             "PX4 battery telemetry increased during requested voltage sag: "
                             f"start={start_percent:g}%, end={end_percent:g}%"
                         )
-                    battery_details["track_end_sample"] = track_end_sample
-                    battery_details["observed_nonincrease"] = end_percent <= start_percent + 0.5
+                    current_battery_details["track_end_sample"] = track_end_sample
+                    current_battery_details["observed_nonincrease"] = (
+                        end_percent <= start_percent + 0.5
+                    )
             await asyncio.sleep(dt)
 
         if isinstance(gps_profile, dict):
-            assert gps_control_details is not None
+            gps_control = _require_runtime_details(
+                gps_control_details,
+                label="GPS control details",
+            )
             verification = await _set_gps_availability_verified(
                 client,
-                satellites_used=int(gps_control_details["recovery_value"]),
+                satellites_used=int(gps_control["recovery_value"]),
                 unavailable=False,
             )
-            gps_control_details["restore"] = verification
-            gps_control_details["restore_verified"] = True
+            gps_control["restore"] = verification
+            gps_control["restore_verified"] = True
             gps_off = False
             gps_reset_verified = True
             gps_transitions.append(
@@ -1023,15 +1050,18 @@ async def run_executor(
                 "realized_rate": sum(gps_schedule) / len(gps_schedule),
                 "transitions": gps_transitions,
                 "reset_verified": gps_reset_verified,
-                "control_parameter": gps_control_details,
+                "control_parameter": gps_control,
             }
         if isinstance(battery_profile, dict):
-            assert battery_details is not None
+            current_battery_details = _require_runtime_details(
+                battery_details,
+                label="battery control details",
+            )
             runtime_observations["battery"] = {
                 "source": "mavsdk.param+telemetry/battery",
                 "kind": "readback",
-                "value": battery_details,
-                "sha256": _canonical_sha256(battery_details),
+                "value": current_battery_details,
+                "sha256": _canonical_sha256(current_battery_details),
             }
         await client.stop_offboard()
         offboard_stopped = True
@@ -1118,9 +1148,7 @@ async def run_executor(
             except Exception as exc:
                 _log(log_path, f"offboard client cleanup failed: {exc}")
         reset_failure_text = (
-            f"{type(reset_error).__name__}: {reset_error}"
-            if reset_error is not None
-            else None
+            f"{type(reset_error).__name__}: {reset_error}" if reset_error is not None else None
         )
         if reset_error is not None and runtime_failure == reset_failure_text:
             raise RuntimeError(

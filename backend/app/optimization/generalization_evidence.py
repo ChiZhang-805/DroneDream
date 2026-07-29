@@ -182,13 +182,17 @@ class CandidateGeneralizationEvidence(_FrozenModel):
             expected_assessment = "qualified_improved_or_equal"
         if self.assessment != expected_assessment:
             raise ValueError("generalization assessment is inconsistent")
-        if all(value is not None for value in scalar_fields):
-            assert self.training_scalar_loss is not None
-            assert self.validation_scalar_loss is not None
-            assert self.scalar_loss_degradation is not None
-            expected_scalar_gap = self.validation_scalar_loss - self.training_scalar_loss
+        training_scalar_loss = self.training_scalar_loss
+        validation_scalar_loss = self.validation_scalar_loss
+        scalar_loss_degradation = self.scalar_loss_degradation
+        if (
+            training_scalar_loss is not None
+            and validation_scalar_loss is not None
+            and scalar_loss_degradation is not None
+        ):
+            expected_scalar_gap = validation_scalar_loss - training_scalar_loss
             if not math.isclose(
-                self.scalar_loss_degradation,
+                scalar_loss_degradation,
                 expected_scalar_gap,
                 rel_tol=0.0,
                 abs_tol=_FLOAT_EPSILON,

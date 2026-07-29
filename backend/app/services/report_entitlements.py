@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Literal
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from app.config import Settings, get_settings
@@ -48,14 +49,21 @@ def resolve_report_export_tier(
     current = settings or get_settings()
     base_url = current.model_gateway_base_url.strip().rstrip("/")
     authorization = (authorization_header or "").strip()
+    parsed_base_url = urlsplit(base_url)
     if (
         not base_url
+        or parsed_base_url.scheme != "https"
+        or not parsed_base_url.hostname
+        or parsed_base_url.username is not None
+        or parsed_base_url.password is not None
+        or parsed_base_url.query
+        or parsed_base_url.fragment
         or not authorization.startswith("Bearer ")
         or len(authorization.encode("utf-8")) > _MAX_AUTHORIZATION_BYTES
     ):
         return "free"
 
-    request = Request(
+    request = Request(  # noqa: S310 - base URL is validated as credential-free HTTPS.
         f"{base_url}/usage",
         method="GET",
         headers={
@@ -65,7 +73,7 @@ def resolve_report_export_tier(
         },
     )
     try:
-        with urlopen(
+        with urlopen(  # noqa: S310 - request URL is constrained above.
             request,
             timeout=min(current.llm_request_timeout_seconds, 5.0),
         ) as response:

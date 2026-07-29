@@ -1399,9 +1399,7 @@ def _harness_budget_context(
 
     snapshot, _ = build_harness_evidence(job, execution_events=job.events)
     selectable = tuple(
-        tool_id
-        for tool_id in selectable_harness_tools(snapshot)
-        if tool_id != "cma_es"
+        tool_id for tool_id in selectable_harness_tools(snapshot) if tool_id != "cma_es"
     )
     if not selectable:
         raise RuntimeError("multi-tool Harness requires an experimental fallback")
@@ -1497,9 +1495,7 @@ def _run_harness_tool_call(
     error_type: str | None = None
     proposals: tuple[CandidateProposal, ...] = ()
     try:
-        proposals = tuple(
-            execute_prepared_experimental_generation(prepared_call.prepared)
-        )
+        proposals = tuple(execute_prepared_experimental_generation(prepared_call.prepared))
     except Exception as exc:
         error_type = type(exc).__name__[:128]
         logger.warning(
@@ -1544,8 +1540,7 @@ def _execute_harness_tool_calls(
             thread_name_prefix="harness-tool",
         ) as executor:
             future_calls = {
-                executor.submit(_run_harness_tool_call, item): item
-                for item in parallel_calls
+                executor.submit(_run_harness_tool_call, item): item for item in parallel_calls
             }
             for future in as_completed(future_calls):
                 item = future_calls[future]
@@ -1637,7 +1632,8 @@ def _summarize_harness_proposals(
                     },
                 )
                 continue
-            assert identity is not None
+            if identity is None:
+                raise RuntimeError("validated Harness proposal lost its identity")
             seen_batch_identities.add(identity)
             proposal_ref = f"proposal_{len(summaries)}"
             requested_fidelity = _optimizer_requested_fidelity(resolved.metadata)
@@ -1766,9 +1762,7 @@ def dispatch_next_harness_generation(
         opportunity=opportunity,
         client=client,
     )
-    plan_decision_wall_ms = (
-        time.perf_counter_ns() - plan_decision_started
-    ) / 1_000_000
+    plan_decision_wall_ms = (time.perf_counter_ns() - plan_decision_started) / 1_000_000
     if decision.generation != generation_index:
         raise RuntimeError("Harness budget decision generation drifted")
     if decision.compiled_plan is None:
@@ -1832,8 +1826,7 @@ def dispatch_next_harness_generation(
     revision_wall_ms = (time.perf_counter_ns() - revision_started) / 1_000_000
     selected_refs = revision.selected_proposal_refs
     provider_call_count = int(
-        decision.source == "model"
-        or decision.fallback_reason in {"client_error", "invalid_plan"}
+        decision.source == "model" or decision.fallback_reason in {"client_error", "invalid_plan"}
     ) + int(
         revision.source == "model"
         or revision.fallback_reason

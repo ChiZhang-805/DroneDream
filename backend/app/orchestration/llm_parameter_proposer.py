@@ -111,8 +111,7 @@ def _is_unsupported_response_format_error(exc: Exception) -> bool:
         return False
     message = str(exc).lower()
     return "response_format" in message and any(
-        marker in message
-        for marker in ("unsupported", "not supported", "unknown", "unrecognized")
+        marker in message for marker in ("unsupported", "not supported", "unknown", "unrecognized")
     )
 
 
@@ -191,8 +190,7 @@ class LlmProposerResult:
 class OpenAIClientLike(Protocol):
     """Narrow protocol satisfied by the real ``openai.OpenAI`` client and tests."""
 
-    def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
-        ...
+    def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]: ...
 
 
 class OpenAIJsonClient:
@@ -276,6 +274,7 @@ class OpenAIJsonClient:
                     "strict": True,
                 },
             }
+
         def create_completion(*, include_response_format: bool) -> Any:
             arguments: dict[str, Any] = {
                 "model": model,
@@ -308,9 +307,7 @@ class OpenAIJsonClient:
             chat = create_completion(include_response_format=False)
         content = chat.choices[0].message.content or "{}"
         if len(content.encode("utf-8")) > self._max_response_bytes:
-            raise RuntimeError(
-                f"LLM response exceeds {self._max_response_bytes} byte limit"
-            )
+            raise RuntimeError(f"LLM response exceeds {self._max_response_bytes} byte limit")
         try:
             return json.loads(  # type: ignore[no-any-return]
                 content,
@@ -321,6 +318,7 @@ class OpenAIJsonClient:
 
 
 # --- JSON schema used for structured outputs ---------------------------
+
 
 def _proposal_schema(search_space: SearchSpace) -> dict[str, Any]:
     parameter_properties: dict[str, Any] = {}
@@ -395,9 +393,7 @@ def _search_space_for_job(job: models.Job) -> SearchSpace:
     )
 
 
-def _sanitize(
-    parameters: dict[str, Any], search_space: SearchSpace
-) -> dict[str, float] | None:
+def _sanitize(parameters: dict[str, Any], search_space: SearchSpace) -> dict[str, float] | None:
     parameter_keys = {domain.name for domain in search_space.domains}
     if set(parameters) != parameter_keys:
         return None
@@ -429,8 +425,7 @@ def _is_safe_response_tree(value: Any) -> bool:
             return all(visit(item, depth + 1) for item in node)
         if isinstance(node, dict):
             return all(
-                isinstance(key, str) and visit(item, depth + 1)
-                for key, item in node.items()
+                isinstance(key, str) and visit(item, depth + 1) for key, item in node.items()
             )
         return False
 
@@ -462,9 +457,7 @@ def load_job_api_key(db: Session, job: models.Job) -> str | None:
         # cannot accidentally reuse an expired credential.
         db.flush()
     expected_secret_provider = (
-        "dronedream_gateway"
-        if job.llm_provider == "dronedream"
-        else "openai"
+        "dronedream_gateway" if job.llm_provider == "dronedream" else "openai"
     )
     secret = next(
         (
@@ -568,8 +561,7 @@ def _compile_scenario_contract(
     training_cases = [case for case in suite.cases if case.enabled and not case.holdout]
     holdout_cases = [case for case in suite.cases if case.enabled and case.holdout]
     training_aliases = {
-        case.id: f"training_case_{index + 1}"
-        for index, case in enumerate(training_cases)
+        case.id: f"training_case_{index + 1}" for index, case in enumerate(training_cases)
     }
     training_type_counts: dict[str, int] = {}
     for case in training_cases:
@@ -611,14 +603,9 @@ def _build_prompt(
     search_space: SearchSpace,
 ) -> tuple[str, str, dict[str, Any]]:
     scenario_suite = schemas.ScenarioSuiteConfig(**(job.scenario_suite_json or {}))
-    training_cases = [
-        case
-        for case in scenario_suite.cases
-        if case.enabled and not case.holdout
-    ]
+    training_cases = [case for case in scenario_suite.cases if case.enabled and not case.holdout]
     training_case_aliases = {
-        case.id: f"training_case_{index + 1}"
-        for index, case in enumerate(training_cases)
+        case.id: f"training_case_{index + 1}" for index, case in enumerate(training_cases)
     }
     system = (
         "You are an expert drone-control tuning assistant. Your job is to "
@@ -655,11 +642,7 @@ def _build_prompt(
         if candidate.is_baseline:
             selected_history[candidate.id] = candidate
     for candidate in sorted(
-        (
-            item
-            for item in candidates
-            if feedback_by_id[item.id].score is not None
-        ),
+        (item for item in candidates if feedback_by_id[item.id].score is not None),
         key=lambda item: (
             (
                 feedback_by_id[item.id].score
@@ -711,11 +694,7 @@ def _build_prompt(
                 scenario_config=trial.scenario_config_json,
                 seed=trial.seed,
             )
-            if (
-                not resolution.matched
-                or resolution.case is None
-                or resolution.case.holdout
-            ):
+            if not resolution.matched or resolution.case is None or resolution.case.holdout:
                 continue
             scenario_case = resolution.case
             case_alias = training_case_aliases.get(scenario_case.id)
@@ -724,11 +703,7 @@ def _build_prompt(
             metric = trial.metric
             rmse = _finite_number(metric.rmse) if metric is not None else None
             max_error = _finite_number(metric.max_error) if metric is not None else None
-            completion_time = (
-                _finite_number(metric.completion_time)
-                if metric is not None
-                else None
-            )
+            completion_time = _finite_number(metric.completion_time) if metric is not None else None
             usable_metric = (
                 trial.status == "COMPLETED"
                 and metric is not None
@@ -754,12 +729,7 @@ def _build_prompt(
                     "config": {
                         key: numeric
                         for key in sorted(_SAFE_SCENARIO_CONFIG_KEYS)
-                        if (
-                            numeric := _finite_number(
-                                scenario_case.config.get(key)
-                            )
-                        )
-                        is not None
+                        if (numeric := _finite_number(scenario_case.config.get(key))) is not None
                     },
                     "trial_count": 0,
                     "completed_count": 0,
@@ -772,13 +742,14 @@ def _build_prompt(
             )
             bucket["trial_count"] += 1
             if outcome_class == "success" and metric is not None:
+                if rmse is None or max_error is None or completion_time is None:
+                    raise RuntimeError(
+                        "successful optimizer-learning outcome lost its usable metrics"
+                    )
                 completed_trial_count += 1
                 passing_trial_count += int(metric.pass_flag)
                 bucket["completed_count"] += 1
                 bucket["passing_count"] += int(metric.pass_flag)
-                assert rmse is not None
-                assert max_error is not None
-                assert completion_time is not None
                 bucket["rmse_sum"] += rmse
                 bucket["max_error_sum"] += max_error
                 bucket["completion_time_sum"] += completion_time
@@ -799,30 +770,20 @@ def _build_prompt(
             completed_count = int(case_bucket.pop("completed_count"))
             rmse_sum = float(case_bucket.pop("rmse_sum"))
             max_error_sum = float(case_bucket.pop("max_error_sum"))
-            completion_sum = float(
-                case_bucket.pop("completion_time_sum")
-            )
-            case_bucket["failure_codes"] = dict(
-                sorted(case_bucket["failure_codes"].items())
-            )
+            completion_sum = float(case_bucket.pop("completion_time_sum"))
+            case_bucket["failure_codes"] = dict(sorted(case_bucket["failure_codes"].items()))
             case_bucket["completed_count"] = completed_count
             case_bucket["mean_rmse"] = (
                 round(rmse_sum / completed_count, 6) if completed_count else None
             )
             case_bucket["mean_max_error"] = (
-                round(max_error_sum / completed_count, 6)
-                if completed_count
-                else None
+                round(max_error_sum / completed_count, 6) if completed_count else None
             )
             case_bucket["mean_completion_time"] = (
-                round(completion_sum / completed_count, 6)
-                if completed_count
-                else None
+                round(completion_sum / completed_count, 6) if completed_count else None
             )
             compact_feedback.append(case_bucket)
-        completion_rate = (
-            completed_trial_count / trial_count if trial_count > 0 else 0.0
-        )
+        completion_rate = completed_trial_count / trial_count if trial_count > 0 else 0.0
         prompt_aggregate: dict[str, Any] = {}
         for key in _PROMPT_AGGREGATE_KEYS:
             if key not in agg:
@@ -837,9 +798,7 @@ def _build_prompt(
                 "failed_trial_count": failed_trial_count,
                 "passing_trial_count": passing_trial_count,
                 "optimizer_learning_failure_rate": (
-                    round(failed_trial_count / trial_count, 8)
-                    if trial_count > 0
-                    else 0.0
+                    round(failed_trial_count / trial_count, 8) if trial_count > 0 else 0.0
                 ),
             }
         )
@@ -860,9 +819,7 @@ def _build_prompt(
                 "aggregated_metrics": prompt_aggregate,
                 "aggregated_score": feedback.score,
                 "pass_rate": (
-                    round((passing_trial_count / trial_count), 4)
-                    if trial_count > 0
-                    else 0.0
+                    round((passing_trial_count / trial_count), 4) if trial_count > 0 else 0.0
                 ),
                 "completion_rate": round(completion_rate, 4),
                 "passing_trial_count": passing_trial_count,
@@ -921,11 +878,7 @@ def _build_prompt(
     encoded = serialize()
     while len(encoded.encode("utf-8")) > settings.llm_max_prompt_bytes:
         removable_index = next(
-            (
-                index
-                for index, item in enumerate(prior)
-                if not bool(item.get("is_baseline"))
-            ),
+            (index for index, item in enumerate(prior) if not bool(item.get("is_baseline"))),
             None,
         )
         if removable_index is None:
@@ -942,8 +895,7 @@ def _build_prompt(
     prompt_bytes = len(encoded.encode("utf-8"))
     if prompt_bytes > settings.llm_max_prompt_bytes:
         raise RuntimeError(
-            f"LLM prompt exceeds {settings.llm_max_prompt_bytes} byte limit "
-            "after safe compaction"
+            f"LLM prompt exceeds {settings.llm_max_prompt_bytes} byte limit after safe compaction"
         )
     prompt_metadata = {
         "history_total": len(candidates),
@@ -1027,10 +979,7 @@ def propose_candidates(
         system, user, prompt_metadata = _build_prompt(
             job, criteria, list(job.candidates), search_space
         )
-        if (
-            prompt_metadata["history_omitted"]
-            or prompt_metadata["scenario_suite_compacted"]
-        ):
+        if prompt_metadata["history_omitted"] or prompt_metadata["scenario_suite_compacted"]:
             record_event(db, job.id, "llm_prompt_compacted", prompt_metadata)
         raw = effective_client.generate(model=chosen_model, system=system, user=user)
     except Exception as exc:  # OpenAI client failure, network, etc.
@@ -1089,14 +1038,8 @@ def propose_candidates(
     )
 
 
-def _validate_response(
-    raw: dict[str, Any] | None, search_space: SearchSpace
-) -> list[LlmProposal]:
-    if (
-        not isinstance(raw, dict)
-        or set(raw) != {"proposals"}
-        or not _is_safe_response_tree(raw)
-    ):
+def _validate_response(raw: dict[str, Any] | None, search_space: SearchSpace) -> list[LlmProposal]:
+    if not isinstance(raw, dict) or set(raw) != {"proposals"} or not _is_safe_response_tree(raw):
         return []
     proposals_raw = raw.get("proposals")
     if (

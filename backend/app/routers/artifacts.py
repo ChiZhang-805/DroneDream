@@ -38,9 +38,9 @@ def _safe_download_name(display_name: str | None, storage_path: str) -> str:
     """Return a header-safe leaf name for worker-supplied artifact metadata."""
 
     raw = (display_name or Path(storage_path).name or "artifact").strip()
-    cleaned = "".join(
-        "_" if ord(char) < 32 or char in {"/", "\\"} else char for char in raw
-    ).strip(". ")
+    cleaned = "".join("_" if ord(char) < 32 or char in {"/", "\\"} else char for char in raw).strip(
+        ". "
+    )
     return (cleaned or "artifact")[:255]
 
 
@@ -95,9 +95,7 @@ def download_artifact(
     if artifact.owner_type == "job":
         job = db.get(models.Job, artifact.owner_id)
         auth_disabled_owned_null = (
-            get_settings().auth_mode == "disabled"
-            and job is not None
-            and job.user_id is None
+            get_settings().auth_mode == "disabled" and job is not None and job.user_id is None
         )
         if job is None or (job.user_id != user.id and not auth_disabled_owned_null):
             raise HTTPException(
@@ -106,9 +104,13 @@ def download_artifact(
             )
     elif artifact.owner_type == "trial":
         trial = db.get(models.Trial, artifact.owner_id)
-        if trial is None or trial.job is None or (
-            trial.job.user_id != user.id
-            and not (get_settings().auth_mode == "disabled" and trial.job.user_id is None)
+        if (
+            trial is None
+            or trial.job is None
+            or (
+                trial.job.user_id != user.id
+                and not (get_settings().auth_mode == "disabled" and trial.job.user_id is None)
+            )
         ):
             raise HTTPException(
                 status_code=404,
@@ -160,11 +162,7 @@ def download_artifact(
             # trusted entitlement decision and Free watermark cannot be
             # bypassed by a direct object-store URL. Non-report artifacts may
             # retain the presigned-download fast path.
-            if (
-                report_tier is None
-                and digest_receipt is None
-                and callable(presign)
-            ):
+            if report_tier is None and digest_receipt is None and callable(presign):
                 signed_url = presign(
                     artifact.storage_path,
                     expires_seconds=get_settings().artifact_presign_expiry_seconds,
@@ -194,7 +192,8 @@ def download_artifact(
         filename = _safe_download_name(artifact.display_name, artifact.storage_path)
         if report_tier is not None:
             if report_tier == "free":
-                assert job is not None
+                if job is None:
+                    raise RuntimeError("report export tier resolved without an owning job")
                 content = render_job_pdf_report(
                     job,
                     free_tier_watermark=True,
@@ -250,7 +249,8 @@ def download_artifact(
         ) from exc
 
     if report_tier == "free":
-        assert job is not None
+        if job is None:
+            raise RuntimeError("report export tier resolved without an owning job")
         return Response(
             content=render_job_pdf_report(
                 job,

@@ -406,9 +406,7 @@ def _load_runtime_effect_records(
         by_id[effect_id] = record
     expected = set(profile["requested_effect_ids"])
     if set(by_id) != expected:
-        raise RuntimeError(
-            "flight-timed scenario-effect records do not cover the compiled profile"
-        )
+        raise RuntimeError("flight-timed scenario-effect records do not cover the compiled profile")
     return by_id
 
 
@@ -617,15 +615,9 @@ def _apply_sensor_noise_sdf(
     for group in ("angular_velocity", "linear_acceleration"):
         for axis in ("x", "y", "z"):
             axis_element = imu.find(f"./imu/{group}/{axis}")
-            noise = (
-                axis_element.find("noise")
-                if axis_element is not None
-                else None
-            )
+            noise = axis_element.find("noise") if axis_element is not None else None
             if axis_element is None or noise is None:
-                raise RuntimeError(
-                    f"pinned x500_base IMU is missing {group}/{axis}/noise"
-                )
+                raise RuntimeError(f"pinned x500_base IMU is missing {group}/{axis}/noise")
             raw_stddev = noise.findtext("stddev")
             try:
                 base_stddev = float(raw_stddev or "")
@@ -716,10 +708,7 @@ def _apply_actuator_dynamics_sdf(
     return {
         "model": profile["model"],
         "requested_delay_ms": float(profile["requested_delay_ms"]),
-        "motors": [
-            {"motor_number": number, **observed[number]}
-            for number in sorted(observed)
-        ],
+        "motors": [{"motor_number": number, **observed[number]} for number in sorted(observed)],
     }
 
 
@@ -781,9 +770,9 @@ def _apply_actuator_failure_sdf(
         },
     )
     _ensure_xml_path(publisher, "topic").text = str(profile["joint_state_topic"])
-    _ensure_xml_path(publisher, "update_rate").text = (
-        f"{float(profile['joint_state_update_rate_hz']):.17g}"
-    )
+    _ensure_xml_path(
+        publisher, "update_rate"
+    ).text = f"{float(profile['joint_state_update_rate_hz']):.17g}"
     for motor_number in range(4):
         joint_name = str(observed[motor_number]["joint_name"])
         if not re.fullmatch(r"rotor_[0-3]_joint", joint_name):
@@ -806,14 +795,9 @@ def _apply_actuator_failure_sdf(
             "name": JOINT_STATE_PUBLISHER_PLUGIN_NAME,
             "topic": profile["joint_state_topic"],
             "update_rate_hz": float(profile["joint_state_update_rate_hz"]),
-            "joint_names": [
-                str(observed[number]["joint_name"]) for number in range(4)
-            ],
+            "joint_names": [str(observed[number]["joint_name"]) for number in range(4)],
         },
-        "motors": [
-            {"motor_number": number, **observed[number]}
-            for number in sorted(observed)
-        ],
+        "motors": [{"motor_number": number, **observed[number]} for number in sorted(observed)],
     }
 
 
@@ -830,20 +814,16 @@ def _configure_wind_effects_plugin(
         raise RuntimeError("WindEffects gust time_for_rise must be finite and greater than zero")
     _ensure_xml_path(magnitude, "time_for_rise").text = f"{rise_time:.17g}"
     magnitude_sin = _ensure_xml_path(magnitude, "sin")
-    _ensure_xml_path(magnitude_sin, "amplitude_percent").text = (
-        f"{float(gust_profile['horizontal_magnitude_sine_amplitude_percent']):.17g}"
-    )
-    _ensure_xml_path(magnitude_sin, "period").text = (
-        f"{float(gust_profile['period_s']):.17g}"
-    )
+    _ensure_xml_path(
+        magnitude_sin, "amplitude_percent"
+    ).text = f"{float(gust_profile['horizontal_magnitude_sine_amplitude_percent']):.17g}"
+    _ensure_xml_path(magnitude_sin, "period").text = f"{float(gust_profile['period_s']):.17g}"
     _set_gaussian_stddev(magnitude, 0.0)
     direction = _ensure_xml_path(plugin, "horizontal", "direction")
     _ensure_xml_path(direction, "time_for_rise").text = f"{rise_time:.17g}"
     direction_sin = _ensure_xml_path(direction, "sin")
     _ensure_xml_path(direction_sin, "amplitude").text = "0"
-    _ensure_xml_path(direction_sin, "period").text = (
-        f"{float(gust_profile['period_s']):.17g}"
-    )
+    _ensure_xml_path(direction_sin, "period").text = f"{float(gust_profile['period_s']):.17g}"
     _set_gaussian_stddev(direction, 0.0)
     _set_gaussian_stddev(_ensure_xml_path(plugin, "vertical"), 0.0)
     return {
@@ -851,9 +831,7 @@ def _configure_wind_effects_plugin(
         "peak_magnitude_mps": float(gust_profile["peak_magnitude_mps"]),
         "period_s": float(gust_profile["period_s"]),
         "time_for_rise_s": rise_time,
-        "amplitude_percent": float(
-            gust_profile["horizontal_magnitude_sine_amplitude_percent"]
-        ),
+        "amplitude_percent": float(gust_profile["horizontal_magnitude_sine_amplitude_percent"]),
         "range_mps": gust_profile["range_mps"],
     }
 
@@ -965,9 +943,7 @@ def _prepare_steady_wind_overlay(
     if base_link is None:
         raise RuntimeError("pinned x500_base model has no base_link")
     gust_profile = (
-        compiled_sdf_profile.get("wind_gust")
-        if isinstance(compiled_sdf_profile, dict)
-        else None
+        compiled_sdf_profile.get("wind_gust") if isinstance(compiled_sdf_profile, dict) else None
     )
     wind_requested = compiled is not None or gust_profile is not None
     if compiled is not None and gust_profile is not None and compiled["speed_mps"] > 1e-9:
@@ -1083,8 +1059,7 @@ def _prepare_steady_wind_overlay(
     vector: dict[str, float] | None = None
     if wind_requested:
         plugin_keys = {
-            (plugin.get("filename"), plugin.get("name"))
-            for plugin in world_xml.findall("plugin")
+            (plugin.get("filename"), plugin.get("name")) for plugin in world_xml.findall("plugin")
         }
         for configured_plugin in configured_plugins:
             plugin_key = (
@@ -1092,9 +1067,7 @@ def _prepare_steady_wind_overlay(
                 configured_plugin.get("name"),
             )
             if not all(plugin_key):
-                raise RuntimeError(
-                    "pinned PX4 Gazebo server config has an invalid system plugin"
-                )
+                raise RuntimeError("pinned PX4 Gazebo server config has an invalid system plugin")
             if plugin_key in plugin_keys:
                 continue
             materialized_plugin = copy.deepcopy(configured_plugin)
@@ -1115,9 +1088,7 @@ def _prepare_steady_wind_overlay(
             if gust_profile is not None
             else compiled["linear_velocity_mps"]
         )
-        linear_velocity.text = (
-            f"{vector['x']:.17g} {vector['y']:.17g} {vector['z']:.17g}"
-        )
+        linear_velocity.text = f"{vector['x']:.17g} {vector['y']:.17g} {vector['z']:.17g}"
 
         plugins = [
             plugin
@@ -1126,9 +1097,7 @@ def _prepare_steady_wind_overlay(
             or plugin.get("filename") == WIND_EFFECTS_PLUGIN_FILENAME
         ]
         if len(plugins) > 1:
-            raise RuntimeError(
-                "world SDF contains multiple conflicting WindEffects plugins"
-            )
+            raise RuntimeError("world SDF contains multiple conflicting WindEffects plugins")
         if plugins:
             plugin = plugins[0]
             plugin.set("filename", WIND_EFFECTS_PLUGIN_FILENAME)
@@ -1394,9 +1363,7 @@ def _runtime_sdf_profile_observation(
     model = matching_models[0]
     base_link = model.find("./link[@name='base_link']")
     if base_link is None:
-        raise RuntimeError(
-            f"generated runtime SDF has no {expected_vehicle_model}/base_link"
-        )
+        raise RuntimeError(f"generated runtime SDF has no {expected_vehicle_model}/base_link")
     enabled = (base_link.findtext("enable_wind") or "").strip().lower() == "true"
     if require_wind_mode and not enabled:
         raise RuntimeError(
@@ -1481,13 +1448,9 @@ def _runtime_sdf_profile_observation(
             try:
                 motor_number = int(plugin.findtext("motorNumber", default=""))
             except ValueError as exc:
-                raise RuntimeError(
-                    "generated runtime SDF has invalid motorNumber"
-                ) from exc
+                raise RuntimeError("generated runtime SDF has invalid motorNumber") from exc
             if motor_number in observed_motors:
-                raise RuntimeError(
-                    "generated runtime SDF has duplicate motorNumber"
-                )
+                raise RuntimeError("generated runtime SDF has duplicate motorNumber")
             observed_motors.add(motor_number)
             expected_motor = next(
                 (
@@ -1498,9 +1461,7 @@ def _runtime_sdf_profile_observation(
                 None,
             )
             if expected_motor is None:
-                raise RuntimeError(
-                    "generated runtime SDF exposes an unexpected motor plugin"
-                )
+                raise RuntimeError("generated runtime SDF exposes an unexpected motor plugin")
             for tag, key in (
                 ("timeConstantUp", "time_constant_up_s"),
                 ("timeConstantDown", "time_constant_down_s"),
@@ -1515,9 +1476,7 @@ def _runtime_sdf_profile_observation(
                     float(expected_motor[key]),
                     context=f"motor {motor_number} {tag}",
                 )
-        expected_numbers = {
-            int(item["motor_number"]) for item in expected_actuator["motors"]
-        }
+        expected_numbers = {int(item["motor_number"]) for item in expected_actuator["motors"]}
         if observed_motors != expected_numbers:
             raise RuntimeError(
                 "generated runtime SDF motor plugin coverage does not match the profile"
@@ -1526,9 +1485,7 @@ def _runtime_sdf_profile_observation(
 
     expected_failure = applied_sdf_profile.get("actuator_failure")
     if isinstance(expected_failure, dict):
-        expected_motors = {
-            int(item["motor_number"]): item for item in expected_failure["motors"]
-        }
+        expected_motors = {int(item["motor_number"]): item for item in expected_failure["motors"]}
         observed_motors: set[int] = set()
         for plugin in model.findall("plugin"):
             if plugin.get("name") != "gz::sim::systems::MulticopterMotorModel":
@@ -1536,13 +1493,9 @@ def _runtime_sdf_profile_observation(
             try:
                 motor_number = int(plugin.findtext("motorNumber", default=""))
             except ValueError as exc:
-                raise RuntimeError(
-                    "generated runtime SDF has invalid motorNumber"
-                ) from exc
+                raise RuntimeError("generated runtime SDF has invalid motorNumber") from exc
             if motor_number in observed_motors or motor_number not in expected_motors:
-                raise RuntimeError(
-                    "generated runtime SDF has invalid hard-stop motor coverage"
-                )
+                raise RuntimeError("generated runtime SDF has invalid hard-stop motor coverage")
             observed_motors.add(motor_number)
             expected_motor = expected_motors[motor_number]
             actual_max = _required_float_text(
@@ -1556,9 +1509,7 @@ def _runtime_sdf_profile_observation(
                 context=f"motor {motor_number} maxRotVelocity",
             )
             if plugin.findtext("jointName", default="") != expected_motor["joint_name"]:
-                raise RuntimeError(
-                    f"generated runtime SDF motor {motor_number} jointName mismatch"
-                )
+                raise RuntimeError(f"generated runtime SDF motor {motor_number} jointName mismatch")
         if observed_motors != set(expected_motors):
             raise RuntimeError(
                 "generated runtime SDF hard-stop motor coverage does not match the profile"
@@ -1710,9 +1661,7 @@ def _apply_steady_wind_effects(
         or overlay.get("compiled_wind") != compiled
         or overlay.get("compiled_sdf_profile") != compiled_sdf_profile
     ):
-        raise RuntimeError(
-            "Trial-local physical scenario overlay is missing or request-mismatched"
-        )
+        raise RuntimeError("Trial-local physical scenario overlay is missing or request-mismatched")
     gz_cli = _gazebo_cli()
     if not gz_cli:
         raise ScenarioEffectUnsupportedError(
@@ -1724,9 +1673,7 @@ def _apply_steady_wind_effects(
     wind_info_service = f"/world/{world_name}/wind_info"
     generated_sdf_service = f"/world/{world_name}/generate_world_sdf"
     gust_profile = (
-        compiled_sdf_profile.get("wind_gust")
-        if isinstance(compiled_sdf_profile, dict)
-        else None
+        compiled_sdf_profile.get("wind_gust") if isinstance(compiled_sdf_profile, dict) else None
     )
     wind_requested = compiled is not None or gust_profile is not None
     services_text = _run_gazebo_command(
@@ -1738,9 +1685,7 @@ def _apply_steady_wind_effects(
     required_services = {generated_sdf_service}
     if wind_requested:
         required_services.add(wind_info_service)
-    missing_services = sorted(
-        service for service in required_services if service not in services
-    )
+    missing_services = sorted(service for service in required_services if service not in services)
     if missing_services:
         raise ScenarioEffectUnsupportedError(
             "Gazebo physical-profile verification services are unavailable: "
@@ -1836,8 +1781,7 @@ def _apply_steady_wind_effects(
                 time.sleep(0.1)
         if readback is None:
             raise RuntimeError(
-                "Gazebo wind_info never matched the requested wind profile: "
-                + readback_error
+                "Gazebo wind_info never matched the requested wind profile: " + readback_error
             )
 
     runtime_sdf: dict[str, Any] | None = None
@@ -1896,8 +1840,7 @@ def _apply_steady_wind_effects(
             time.sleep(0.25)
     if runtime_sdf is None:
         raise RuntimeError(
-            "Gazebo runtime SDF never proved the requested physical profile: "
-            + runtime_sdf_error
+            "Gazebo runtime SDF never proved the requested physical profile: " + runtime_sdf_error
         )
     observations: list[dict[str, Any]] = []
     if readback is not None:
@@ -1925,9 +1868,7 @@ def _apply_steady_wind_effects(
                     "sha256": overlay["world_sdf_sha256"],
                     "linear_velocity_mps": vector,
                     "wind_effects_plugin": overlay["wind_effects_plugin"],
-                    "materialized_px4_system_plugins": overlay[
-                        "materialized_px4_system_plugins"
-                    ],
+                    "materialized_px4_system_plugins": overlay["materialized_px4_system_plugins"],
                     "px4_server_config": {
                         "path": overlay["px4_server_config_path"],
                         "sha256": overlay["px4_server_config_sha256"],
@@ -1961,9 +1902,7 @@ def _apply_steady_wind_effects(
                     "path": overlay["px4_trial_gz_env_path"],
                     "sha256": overlay["px4_trial_gz_env_sha256"],
                     "rootfs_path": overlay["px4_trial_rootfs_path"],
-                    "state_policy": (
-                        "clean_copy_without_prior_params_dataman_logs_or_eeprom"
-                    ),
+                    "state_policy": ("clean_copy_without_prior_params_dataman_logs_or_eeprom"),
                 },
             },
         ]
@@ -3016,9 +2955,7 @@ def _parse_actuator_failure_joint_state(
     *,
     raw_path: Path,
 ) -> dict[str, Any]:
-    velocities: dict[str, list[float]] = {
-        f"rotor_{number}_joint": [] for number in range(4)
-    }
+    velocities: dict[str, list[float]] = {f"rotor_{number}_joint": [] for number in range(4)}
     for joint_block in _protobuf_field_blocks(raw, "joint"):
         name_match = re.search(r'\bname\s*:\s*"([^"]+)"', joint_block)
         if name_match is None or name_match.group(1) not in velocities:
@@ -3040,24 +2977,16 @@ def _parse_actuator_failure_joint_state(
     missing = sorted(name for name, values in velocities.items() if not values)
     if missing:
         raise RuntimeError(
-            "Gazebo joint-state readback omitted rotor velocity samples: "
-            + ", ".join(missing)
+            "Gazebo joint-state readback omitted rotor velocity samples: " + ", ".join(missing)
         )
-    maxima = {
-        name: max(abs(value) for value in values)
-        for name, values in velocities.items()
-    }
+    maxima = {name: max(abs(value) for value in values) for name, values in velocities.items()}
     target_joint = str(profile["target_joint_name"])
     target_max = maxima[target_joint]
-    healthy_maxima = {
-        name: value for name, value in maxima.items() if name != target_joint
-    }
+    healthy_maxima = {name: value for name, value in maxima.items() if name != target_joint}
     failed_limit = float(profile["max_failed_motor_abs_velocity_rad_s"])
     healthy_minimum = float(profile["min_healthy_motor_abs_velocity_rad_s"])
     hard_stop_verified = target_max <= failed_limit
-    healthy_motion_verified = all(
-        value >= healthy_minimum for value in healthy_maxima.values()
-    )
+    healthy_motion_verified = all(value >= healthy_minimum for value in healthy_maxima.values())
     if not hard_stop_verified:
         raise RuntimeError(
             "failed rotor exceeded the hard-stop velocity boundary: "
@@ -3075,9 +3004,7 @@ def _parse_actuator_failure_joint_state(
         "target_joint_name": target_joint,
         "target_sample_count": len(velocities[target_joint]),
         "target_max_abs_velocity_rad_s": round(target_max, 12),
-        "healthy_sample_counts": {
-            name: len(velocities[name]) for name in sorted(healthy_maxima)
-        },
+        "healthy_sample_counts": {name: len(velocities[name]) for name in sorted(healthy_maxima)},
         "healthy_joint_max_abs_velocity_rad_s": {
             name: round(healthy_maxima[name], 12) for name in sorted(healthy_maxima)
         },
@@ -3098,18 +3025,13 @@ def _start_actuator_failure_observer(
     run_dir: Path,
 ) -> dict[str, Any] | None:
     compiled = engine.compile_bundled_sdf_profile(request)
-    profile = (
-        compiled.get("actuator_failure")
-        if isinstance(compiled, dict)
-        else None
-    )
+    profile = compiled.get("actuator_failure") if isinstance(compiled, dict) else None
     if not isinstance(profile, dict):
         return None
     if (
         overlay is None
         or overlay.get("compiled_sdf_profile") != compiled
-        or overlay.get("applied_sdf_profile", {}).get("actuator_failure")
-        is None
+        or overlay.get("applied_sdf_profile", {}).get("actuator_failure") is None
     ):
         raise RuntimeError("actuator-failure observer is missing its exact SDF overlay")
     gz_cli = _gazebo_cli()
@@ -3209,11 +3131,7 @@ def _augment_actuator_failure_record(
 ) -> None:
     evidence = record.get("evidence")
     verification = evidence.get("verification") if isinstance(evidence, dict) else None
-    observations = (
-        verification.get("observations")
-        if isinstance(verification, dict)
-        else None
-    )
+    observations = verification.get("observations") if isinstance(verification, dict) else None
     if not isinstance(observations, list):
         raise RuntimeError("actuator-failure SDF evidence is missing verification observations")
     observations.append(
@@ -3224,9 +3142,7 @@ def _augment_actuator_failure_record(
             "sha256": engine.scenario_effect_value_sha256(observation),
         }
     )
-    verification["method"] = (
-        "trial_local_sdf_generated_world_plus_gazebo_joint_state"
-    )
+    verification["method"] = "trial_local_sdf_generated_world_plus_gazebo_joint_state"
 
 
 def _resolve_real_launch_command(args: argparse.Namespace) -> tuple[str, str | None]:
@@ -3752,10 +3668,7 @@ def main() -> int:
                 if effect["effect_id"] == "scenario_type.actuator_failure"
             }
             if runtime_effect_ids and not enable_offboard_executor:
-                reason = (
-                    "flight-timed scenario effects require "
-                    "PX4_ENABLE_OFFBOARD_EXECUTOR=true"
-                )
+                reason = "flight-timed scenario effects require PX4_ENABLE_OFFBOARD_EXECUTOR=true"
                 _write_scenario_effect_evidence(
                     scenario_engine,
                     scenario_effect_request,
@@ -3869,9 +3782,7 @@ def main() -> int:
                 if effect["effect_id"] not in runtime_effect_ids
             }
             if set(applied_by_id) != expected_preflight_ids:
-                missing = sorted(
-                    expected_preflight_ids - set(applied_by_id)
-                )
+                missing = sorted(expected_preflight_ids - set(applied_by_id))
                 raise RuntimeError(
                     "scenario-effect dispatcher omitted available effects: " + ", ".join(missing)
                 )

@@ -78,20 +78,14 @@ def require_artifact_integrity(
     """Verify receipt identity and optionally the currently stored bytes."""
 
     if content is not None and content_digest is not None:
-        raise ArtifactIntegrityError(
-            "artifact integrity accepts bytes or a digest, not both"
-        )
+        raise ArtifactIntegrityError("artifact integrity accepts bytes or a digest, not both")
     receipt = artifact.digest_receipt
     if receipt is None:
         if artifact.integrity_policy is not None:
-            raise ArtifactIntegrityError(
-                "artifact requires a missing digest receipt"
-            )
+            raise ArtifactIntegrityError("artifact requires a missing digest receipt")
         return None
     if artifact.integrity_policy != ARTIFACT_INTEGRITY_POLICY:
-        raise ArtifactIntegrityError(
-            "artifact integrity policy does not match its receipt"
-        )
+        raise ArtifactIntegrityError("artifact integrity policy does not match its receipt")
     payload = _receipt_payload(
         artifact=artifact,
         content_sha256=receipt.content_sha256,
@@ -102,27 +96,18 @@ def require_artifact_integrity(
         or receipt.owner_type != artifact.owner_type
         or receipt.owner_id != artifact.owner_id
         or receipt.artifact_type != artifact.artifact_type
-        or receipt.storage_path_sha256
-        != payload["storage_path_sha256"]
+        or receipt.storage_path_sha256 != payload["storage_path_sha256"]
         or receipt.evidence_id != _evidence_id(payload)
         or artifact.file_size_bytes != receipt.content_size_bytes
     ):
-        raise ArtifactIntegrityError(
-            "artifact digest receipt no longer matches metadata"
-        )
+        raise ArtifactIntegrityError("artifact digest receipt no longer matches metadata")
     if content is not None or content_digest is not None:
         if content is not None:
             content_sha256, content_size = artifact_content_digest(content)
-        else:
-            assert content_digest is not None
+        elif content_digest is not None:
             content_sha256, content_size = content_digest
-        if (
-            content_sha256 != receipt.content_sha256
-            or content_size != receipt.content_size_bytes
-        ):
-            raise ArtifactIntegrityError(
-                "artifact bytes no longer match digest receipt"
-            )
+        if content_sha256 != receipt.content_sha256 or content_size != receipt.content_size_bytes:
+            raise ArtifactIntegrityError("artifact bytes no longer match digest receipt")
     return receipt
 
 
@@ -140,9 +125,7 @@ def bind_artifact_integrity(
         None,
         ARTIFACT_INTEGRITY_POLICY,
     }:
-        raise ArtifactIntegrityError(
-            "artifact already declares a different integrity policy"
-        )
+        raise ArtifactIntegrityError("artifact already declares a different integrity policy")
     content_sha256, content_size = artifact_content_digest(content)
     payload = _receipt_payload(
         artifact=artifact,
@@ -163,9 +146,7 @@ def bind_artifact_integrity(
                 "existing artifact digest receipt is not an exact match"
             ) from exc
         if existing.evidence_id != expected_evidence_id:
-            raise ArtifactIntegrityError(
-                "existing artifact digest receipt evidence ID diverged"
-            )
+            raise ArtifactIntegrityError("existing artifact digest receipt evidence ID diverged")
         return existing
 
     artifact.integrity_policy = ARTIFACT_INTEGRITY_POLICY
@@ -203,18 +184,14 @@ def authorize_artifact_integrity_deletion(
         return
     normalized_reason = reason.strip()
     if not normalized_reason or len(normalized_reason) > 64:
-        raise ArtifactIntegrityError(
-            "artifact digest deletion requires a bounded reason"
-        )
+        raise ArtifactIntegrityError("artifact digest deletion requires a bounded reason")
     existing = db.get(
         models.ArtifactDigestDeleteAuthorization,
         artifact.id,
     )
     if existing is not None:
         if existing.reason != normalized_reason:
-            raise ArtifactIntegrityError(
-                "artifact digest deletion authorization reason diverged"
-            )
+            raise ArtifactIntegrityError("artifact digest deletion authorization reason diverged")
         return
     db.add(
         models.ArtifactDigestDeleteAuthorization(
