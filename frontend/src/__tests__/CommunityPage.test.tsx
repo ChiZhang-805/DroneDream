@@ -78,7 +78,7 @@ describe("CommunityPage public data loading", () => {
     })).toBeVisible();
     expect(supabaseMock.rpc).toHaveBeenCalledWith(
       "community_list_topics",
-      expect.objectContaining({ p_offset: 0, p_limit: 25 }),
+      expect.objectContaining({ p_offset: 0, p_limit: 21 }),
     );
     expect(screen.getByText("7")).toBeVisible();
     expect(screen.getByText("4")).toBeVisible();
@@ -86,7 +86,7 @@ describe("CommunityPage public data loading", () => {
       "aria-pressed",
       "false",
     );
-    const tagFilter = screen.getByRole("button", { name: "#Simulation" });
+    const tagFilter = screen.getByRole("button", { name: "# Simulation" });
     expect(tagFilter).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(tagFilter);
     expect(tagFilter).toHaveAttribute("aria-pressed", "true");
@@ -108,7 +108,7 @@ describe("CommunityPage public data loading", () => {
     expect(screen.queryByRole("link", { name: "More topics" })).toBeNull();
   });
 
-  it("offers up to five recent topics for the responsive four-or-five-column shelf", async () => {
+  it("offers exactly five recent topics when at least five are available", async () => {
     window.history.replaceState(null, "", "/community/");
     const topics = Array.from({ length: 6 }, (_, index) => ({
       ...topicFixture,
@@ -126,8 +126,30 @@ describe("CommunityPage public data loading", () => {
 
     expect(await screen.findByRole("heading", { name: "Recent topic 1" })).toBeVisible();
     expect(container.querySelectorAll(".community-topic-grid > article")).toHaveLength(5);
-    expect(screen.queryByRole("heading", { name: "Recent topic 6" })).toBeNull();
     expect(screen.getByRole("link", { name: "More topics" })).toBeVisible();
+  });
+
+  it("bounds each all-topics batch to twenty entries", async () => {
+    const topics = Array.from({ length: 21 }, (_, index) => ({
+      ...topicFixture,
+      id: `00000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`,
+      title: `All topic ${index + 1}`,
+    }));
+    supabaseMock.rpc.mockImplementation((name: string) => {
+      if (name === "community_list_comments") return rpcResult([]);
+      return rpcResult(topics);
+    });
+
+    const { container } = render(
+      <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "All topic 1" })).toBeVisible();
+    expect(container.querySelectorAll(".community-topic-grid > article")).toHaveLength(20);
+    expect(screen.queryByRole("heading", { name: "All topic 21" })).toBeNull();
+    expect(screen.getByRole("button", {
+      name: "Load the next 20 topics",
+    })).toBeVisible();
   });
 
   it("keeps the HTTP mirror anonymous and prevents every community write entry", async () => {
@@ -213,8 +235,8 @@ describe("CommunityPage public data loading", () => {
     fireEvent.change(customTag, { target: { value: "Wind tunnel" } });
     fireEvent.keyDown(customTag, { key: "Enter" });
 
-    expect(screen.getByRole("button", { name: "#Wind tunnel" })).toHaveClass("is-active");
-    expect(screen.getByRole("button", { name: "#Wind tunnel" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "# Wind tunnel" })).toHaveClass("is-active");
+    expect(screen.getByRole("button", { name: "# Wind tunnel" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

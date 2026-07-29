@@ -47,7 +47,7 @@ const content = {
     languageLabel: "Switch to Simplified Chinese",
     menu: "Open navigation",
     closeMenu: "Close navigation",
-    downloadShort: "Preview EXE",
+    downloadShort: "Download",
     console: "Console",
     insecureMirror:
       "This HTTP mirror is read-only; secure account and console actions are disabled.",
@@ -237,7 +237,7 @@ const content = {
     languageLabel: "切换到英文",
     menu: "打开导航",
     closeMenu: "关闭导航",
-    downloadShort: "预览版 EXE",
+    downloadShort: "下载",
     console: "控制台",
     insecureMirror: "当前 HTTP 镜像仅供只读浏览与下载；账户和控制台操作已禁用。",
     signIn: "登录",

@@ -26,6 +26,7 @@ import {
   type KeyboardEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -75,7 +76,8 @@ interface CommunityComment {
   liked_by_viewer: boolean;
 }
 
-const TOPIC_PAGE_SIZE = 24;
+const TOPIC_PAGE_SIZE = 20;
+const RECENT_TOPIC_COUNT = 5;
 const COMMENT_PAGE_SIZE = 100;
 
 const tagOptions = {
@@ -136,7 +138,7 @@ const communityContent = {
     clearReply: "Cancel reply",
     sendComment: "Post comment",
     likes: "likes",
-    loadMore: "Load more topics",
+    loadMore: "Load the next 20 topics",
     loadMoreComments: "Load more comments",
     noComments: "No comments yet. Add the first evidence-based response.",
     signInAction: "Sign in to join the discussion",
@@ -189,7 +191,7 @@ const communityContent = {
     clearReply: "取消回复",
     sendComment: "发表评论",
     likes: "次点赞",
-    loadMore: "加载更多话题",
+    loadMore: "加载接下来的 20 个话题",
     loadMoreComments: "加载更多评论",
     noComments: "还没有评论；你可以补充第一条基于证据的回复。",
     signInAction: "登录后参与讨论",
@@ -297,13 +299,30 @@ function TopicCoverArtwork({
         <span>{presentation.kicker}</span>
       </header>
       <strong>{topic.title}</strong>
-      <p><span>#{presentation.emphasis}</span></p>
+      <p><span># {presentation.emphasis}</span></p>
       <footer>
         <time dateTime={topic.created_at}>{presentation.issue}</time>
         <span>DRONEDREAM · 1.0</span>
       </footer>
     </div>
   );
+}
+
+function selectRecentTopics(topics: CommunityTopic[], seed: number): CommunityTopic[] {
+  if (topics.length <= RECENT_TOPIC_COUNT) return topics;
+
+  const [newest, ...remaining] = topics;
+  const ranked = remaining
+    .map((topic) => {
+      let rank = 2166136261 ^ seed;
+      for (const character of topic.id) {
+        rank ^= character.charCodeAt(0);
+        rank = Math.imul(rank, 16777619);
+      }
+      return { rank: rank >>> 0, topic };
+    })
+    .sort((left, right) => left.rank - right.rank);
+  return [newest, ...ranked.slice(0, RECENT_TOPIC_COUNT - 1).map(({ topic }) => topic)];
 }
 
 export function CommunityPage({
@@ -328,6 +347,11 @@ export function CommunityPage({
   const [query, setQuery] = useState("");
   const [settledQuery, setSettledQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [recentSampleSeed] = useState(() => {
+    const value = new Uint32Array(1);
+    globalThis.crypto?.getRandomValues(value);
+    return value[0];
+  });
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<CommunityTopic | null>(null);
   const [title, setTitle] = useState("");
@@ -440,7 +464,10 @@ export function CommunityPage({
     }
   }, [copy.unavailable]);
 
-  const visibleTopics = allTopicsView ? topics : topics.slice(0, 5);
+  const visibleTopics = useMemo(
+    () => allTopicsView ? topics : selectRecentTopics(topics, recentSampleSeed),
+    [allTopicsView, recentSampleSeed, topics],
+  );
 
   const openTopic = (topic: CommunityTopic) => {
     captureTopicTrigger();
@@ -813,7 +840,7 @@ export function CommunityPage({
                 aria-pressed={activeTag === tagName}
                 onClick={() => setActiveTag(activeTag === tagName ? null : tagName)}
               >
-                #{tagName}
+                # {tagName}
               </button>
             ))}
           </div>
@@ -870,7 +897,7 @@ export function CommunityPage({
                   <p>{topic.body}</p>
                   <div className="community-topic-tags">
                     {topic.tags.slice(0, 3).map((tagName) => (
-                      <span key={tagName}>#{tagName}</span>
+                      <span key={tagName}># {tagName}</span>
                     ))}
                   </div>
                   <footer>
@@ -1008,7 +1035,7 @@ export function CommunityPage({
                       )
                     }
                   >
-                    #{tagName}
+                    # {tagName}
                   </button>
                 ))}
                 {tags
@@ -1027,7 +1054,7 @@ export function CommunityPage({
                         )
                       }
                     >
-                      #{tagName}
+                      # {tagName}
                     </button>
                   ))}
                 <input
@@ -1156,7 +1183,7 @@ export function CommunityPage({
                 <p>{selectedTopic.body}</p>
                 <div className="community-topic-tags">
                   {selectedTopic.tags.map((tagName) => (
-                    <span key={tagName}>#{tagName}</span>
+                    <span key={tagName}># {tagName}</span>
                   ))}
                 </div>
                 <div className="community-topic-dialog-actions">

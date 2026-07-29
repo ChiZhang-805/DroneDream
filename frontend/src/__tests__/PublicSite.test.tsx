@@ -48,7 +48,7 @@ describe("DroneDream public website", () => {
     expect(screen.getByText(/This preview candidate is not Authenticode-signed/i)).toBeVisible();
     expect(screen.getByText(/Verify its SHA-256 before installation/i)).toBeVisible();
     expect(screen.getByRole("link", { name: "Download Windows preview" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Download preview" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Download" })).toBeVisible();
     expect(screen.queryByText("LAB")).toBeNull();
     const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
     expect(starflightButton).not.toHaveTextContent("+");
@@ -117,7 +117,7 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
     expect(screen.getByRole("link", { name: "Download Windows preview" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
-    expect(screen.getByRole("link", { name: "Download preview" }))
+    expect(screen.getByRole("link", { name: "Download" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
   });
 
@@ -490,7 +490,7 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(screen.getByText(/Windows 可能显示“未知发布者”警告/)).toBeVisible();
     expect(screen.getByText(/请务必确认下载文件与本页记录一致后再安装/)).toBeVisible();
     expect(screen.getByRole("link", { name: "下载 Windows 预览版" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "下载预览版" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "下载" })).toBeVisible();
     expect(screen.getByRole("link", { name: "代码签名政策" })).toBeVisible();
     expect(screen.getByRole("link", { name: "隐私政策" })).toBeVisible();
     expect(workflowBefore).toHaveClass("is-visible");

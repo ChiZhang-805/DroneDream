@@ -3382,7 +3382,7 @@ html[lang="zh-CN"] .site-hero h1 {
 .manual-reader-header {
   display: grid;
   width: min(100% - clamp(36px, 4vw, 72px), 1420px);
-  height: 11.4375rem;
+  height: 11.1875rem;
   align-items: start;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;

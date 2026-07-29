@@ -605,11 +605,11 @@ try {
         && initialManual.firstChapterTop !== null
         && initialManual.introductionHeadingTop !== null
         && Math.abs(
-          initialManual.firstChapterTop - initialManual.introductionHeadingTop,
+          initialManual.firstChapterTop - initialManual.introductionHeadingTop - 4,
         ) > 2
       ) {
         failures.push(
-          "manual introduction heading no longer aligns with the first sidebar chapter",
+          "manual introduction heading is not 4px above the first sidebar chapter",
         );
       }
       if (
