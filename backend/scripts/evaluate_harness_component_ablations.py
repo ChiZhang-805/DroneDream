@@ -164,8 +164,8 @@ def write_harness_component_ablation_files(
 ) -> dict[str, Any]:
     """Write files or rerun and require exact byte-for-byte equality."""
 
-    current_manifest = manifest or build_harness_component_ablation_manifest()
-    current_artifact = artifact or build_harness_component_ablation_artifact()
+    current_manifest = build_harness_component_ablation_manifest() if manifest is None else manifest
+    current_artifact = build_harness_component_ablation_artifact() if artifact is None else artifact
     payloads = render_harness_component_ablation_files(
         current_artifact,
         current_manifest,

@@ -62,10 +62,10 @@ def write_harness_cross_job_memory_files(
     manifest: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     resolved_manifest = verify_harness_cross_job_memory_manifest(
-        manifest or build_harness_cross_job_memory_manifest()
+        build_harness_cross_job_memory_manifest() if manifest is None else manifest
     )
     resolved_artifact = verify_harness_cross_job_memory_artifact(
-        artifact or build_harness_cross_job_memory_artifact(),
+        build_harness_cross_job_memory_artifact() if artifact is None else artifact,
         manifest=resolved_manifest,
     )
     payloads = {
@@ -74,8 +74,7 @@ def write_harness_cross_job_memory_files(
         manifest_path: _json_bytes(resolved_manifest),
     }
     checksum_lines = [
-        f"{hashlib.sha256(data).hexdigest()}  {path.name}"
-        for path, data in payloads.items()
+        f"{hashlib.sha256(data).hexdigest()}  {path.name}" for path, data in payloads.items()
     ]
     payloads[sha256_path] = ("\n".join(checksum_lines) + "\n").encode("ascii")
     if check:
@@ -85,9 +84,7 @@ def write_harness_cross_job_memory_files(
             if not path.exists() or path.read_bytes() != expected
         ]
         if mismatches:
-            raise ValueError(
-                "cross-Job memory evidence drifted: " + ", ".join(mismatches)
-            )
+            raise ValueError("cross-Job memory evidence drifted: " + ", ".join(mismatches))
     else:
         for path, data in payloads.items():
             path.parent.mkdir(parents=True, exist_ok=True)

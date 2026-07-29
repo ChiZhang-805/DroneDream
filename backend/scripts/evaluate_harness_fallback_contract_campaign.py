@@ -18,22 +18,17 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.orchestration.harness_fallback_contract_campaign import (  # noqa: E402
     HARNESS_FALLBACK_CONTRACT_REFERENCE_ARM,
     build_harness_fallback_contract_campaign,
+    verify_harness_fallback_contract_campaign,
 )
 
 DEFAULT_JSON_OUTPUT = (
-    BACKEND_ROOT
-    / "evaluation_artifacts"
-    / "harness-fallback-contract-campaign-v3.json"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-fallback-contract-campaign-v3.json"
 )
 DEFAULT_CSV_OUTPUT = (
-    BACKEND_ROOT
-    / "evaluation_artifacts"
-    / "harness-fallback-contract-campaign-v3.csv"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-fallback-contract-campaign-v3.csv"
 )
 DEFAULT_SHA256_OUTPUT = (
-    BACKEND_ROOT
-    / "evaluation_artifacts"
-    / "harness-fallback-contract-campaign-v3.sha256"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-fallback-contract-campaign-v3.sha256"
 )
 
 CSV_FIELDS = (
@@ -98,9 +93,7 @@ def _csv_bytes(artifact: dict[str, Any]) -> bytes:
                     "optimization_outcome": outcome["optimization_outcome"],
                     "candidate_count": budget["candidate_count"],
                     "trial_count": budget["trial_count"],
-                    "configured_max_total_trials": budget[
-                        "configured_max_total_trials"
-                    ],
+                    "configured_max_total_trials": budget["configured_max_total_trials"],
                     "dispatched_trials": budget["dispatched_trials"],
                     "completed_trials": budget["completed_trials"],
                     "winner_candidate_key": (
@@ -108,9 +101,9 @@ def _csv_bytes(artifact: dict[str, Any]) -> bytes:
                     ),
                     "holdout_loss": outcome["holdout_loss"],
                     "failure_count": outcome["failure_count"],
-                    "evidence_completeness_rate": outcome[
-                        "evidence_completeness"
-                    ]["completeness_rate"],
+                    "evidence_completeness_rate": outcome["evidence_completeness"][
+                        "completeness_rate"
+                    ],
                     "outcome_sha256": arm["outcome_sha256"],
                     "exact_match_to_deterministic_baseline": (
                         arm["outcome_sha256"] == baseline_hash
@@ -134,11 +127,11 @@ def render_harness_fallback_contract_files(
     json_name: str,
     csv_name: str,
 ) -> tuple[bytes, bytes, bytes]:
+    artifact = verify_harness_fallback_contract_campaign(artifact)
     json_payload = _json_bytes(artifact)
     csv_payload = _csv_bytes(artifact)
     sha256_payload = (
-        f"{_sha256(json_payload)}  {json_name}\n"
-        f"{_sha256(csv_payload)}  {csv_name}\n"
+        f"{_sha256(json_payload)}  {json_name}\n{_sha256(csv_payload)}  {csv_name}\n"
     ).encode("ascii")
     return json_payload, csv_payload, sha256_payload
 
@@ -151,7 +144,7 @@ def write_harness_fallback_contract_files(
     check: bool = False,
     artifact: dict[str, Any] | None = None,
 ) -> dict[str, str]:
-    campaign = artifact or build_harness_fallback_contract_campaign()
+    campaign = build_harness_fallback_contract_campaign() if artifact is None else artifact
     payloads = render_harness_fallback_contract_files(
         campaign,
         json_name=json_path.name,
@@ -166,8 +159,7 @@ def write_harness_fallback_contract_files(
         ]
         if mismatches:
             raise ValueError(
-                "Harness fallback contract artifacts are stale: "
-                + ", ".join(mismatches)
+                "Harness fallback contract artifacts are stale: " + ", ".join(mismatches)
             )
     else:
         for path, payload in outputs:

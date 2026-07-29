@@ -86,13 +86,9 @@ def _csv_bytes(artifact: dict[str, Any]) -> bytes:
                         "selectable_tools": ">".join(arm["selectable_tools"]),
                         "selected_tool": arm["selected_tool"],
                         "decision_memory_count": arm["decision_memory_count"],
-                        "verified_reflection_count": arm[
-                            "verified_reflection_count"
-                        ],
+                        "verified_reflection_count": arm["verified_reflection_count"],
                         "observed_outcome_count": arm["observed_outcome_count"],
-                        "removed_reflection_count": arm[
-                            "removed_reflection_count"
-                        ],
+                        "removed_reflection_count": arm["removed_reflection_count"],
                         "snapshot_sha256": arm["snapshot_sha256"],
                     }
                 )
@@ -138,8 +134,12 @@ def write_harness_reflection_trigger_files(
     artifact: dict[str, Any] | None = None,
     manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    resolved_manifest = manifest or build_harness_reflection_trigger_manifest()
-    resolved_artifact = artifact or build_harness_reflection_trigger_artifact()
+    resolved_manifest = (
+        build_harness_reflection_trigger_manifest() if manifest is None else manifest
+    )
+    resolved_artifact = (
+        build_harness_reflection_trigger_artifact() if artifact is None else artifact
+    )
     payloads = render_harness_reflection_trigger_files(
         resolved_artifact,
         resolved_manifest,
@@ -161,8 +161,7 @@ def write_harness_reflection_trigger_files(
         ]
         if mismatches:
             raise ValueError(
-                "Harness reflection-trigger artifacts are stale: "
-                + ", ".join(mismatches)
+                "Harness reflection-trigger artifacts are stale: " + ", ".join(mismatches)
             )
     else:
         for path, payload in outputs:
@@ -215,12 +214,8 @@ def main() -> int:
     if args.allow_archived_evidence_2_7_prompt_1_6:
         if not args.check:
             raise ValueError("archived reflection-trigger evidence is check-only")
-        archived_artifact = json.loads(
-            args.json_output.resolve().read_text(encoding="utf-8")
-        )
-        archived_manifest = json.loads(
-            args.manifest_output.resolve().read_text(encoding="utf-8")
-        )
+        archived_artifact = json.loads(args.json_output.resolve().read_text(encoding="utf-8"))
+        archived_manifest = json.loads(args.manifest_output.resolve().read_text(encoding="utf-8"))
     result = write_harness_reflection_trigger_files(
         json_path=args.json_output.resolve(),
         csv_path=args.csv_output.resolve(),

@@ -86,9 +86,7 @@ def _csv_bytes(artifact: dict[str, Any]) -> bytes:
                     "provider_calls": arm["provider_calls"],
                     "network_calls": arm["network_calls"],
                     "intervention_component": activation["component"],
-                    "intervention_activated": activation[
-                        "provider_visible_intervention_activated"
-                    ],
+                    "intervention_activated": activation["provider_visible_intervention_activated"],
                     "holdout_loss": metrics["holdout_loss"],
                     "target_reached": metrics["target_reached"],
                     "target_generation": metrics["target_generation"],
@@ -100,9 +98,7 @@ def _csv_bytes(artifact: dict[str, Any]) -> bytes:
                     "recovered_trials": metrics["recovered_trials"],
                     "failure_rate": metrics["failure_rate"],
                     "recovery_rate": metrics["recovery_rate"],
-                    "evidence_completeness_rate": metrics[
-                        "evidence_completeness_rate"
-                    ],
+                    "evidence_completeness_rate": metrics["evidence_completeness_rate"],
                     "result_metrics_sha256": arm["result_metrics_sha256"],
                     "outcome_sha256": arm["outcome_sha256"],
                 }
@@ -153,10 +149,10 @@ def write_harness_reflection_outcome_stress_files(
     manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     current_manifest = (
-        manifest or build_harness_reflection_outcome_stress_manifest()
+        build_harness_reflection_outcome_stress_manifest() if manifest is None else manifest
     )
     current_artifact = (
-        artifact or build_harness_reflection_outcome_stress_artifact()
+        build_harness_reflection_outcome_stress_artifact() if artifact is None else artifact
     )
     payloads = render_harness_reflection_outcome_stress_files(
         current_artifact,
@@ -179,8 +175,7 @@ def write_harness_reflection_outcome_stress_files(
         ]
         if mismatches:
             raise ValueError(
-                "Harness reflection outcome-stress artifacts are stale: "
-                + ", ".join(mismatches)
+                "Harness reflection outcome-stress artifacts are stale: " + ", ".join(mismatches)
             )
     else:
         for path, payload in outputs:
