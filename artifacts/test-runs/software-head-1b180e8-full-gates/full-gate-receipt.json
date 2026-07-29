@@ -1,0 +1,193 @@
+{
+  "schema_version": "dronedream.software-full-gate-receipt.v1",
+  "generated_at": "2026-07-29T05:47:16.872Z",
+  "subject_commit": "1b180e8f1d1ad5a8d4ac87d7e95081df06e73aae",
+  "branch": "codex/software",
+  "subject_state": {
+    "remote": "origin/codex/software",
+    "remote_commit": "1b180e8f1d1ad5a8d4ac87d7e95081df06e73aae",
+    "tracked_and_untracked_status": "clean_before_receipt_generation"
+  },
+  "environment": {
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "python": "3.13.0",
+    "pytest": "9.1.0",
+    "ruff": "0.15.21",
+    "mypy": "2.3.0",
+    "node": "24.14.1",
+    "npm": "11.11.0",
+    "rustc_gnullvm": "1.97.0 (2d8144b78 2026-07-07)",
+    "cargo_gnullvm": "1.97.0 (c980f4866 2026-06-30)"
+  },
+  "online_policy": {
+    "openai_api_key_read": false,
+    "openai_api_calls": 0,
+    "openai_api_key_removed_before_test_commands": true,
+    "uploads_or_deployments": 0
+  },
+  "summary_log": {
+    "path": "full-gate-summary.log",
+    "bytes": 4649,
+    "sha256": "fb31003f6436794661d07173c5a65047ad5fd5de7ed4ec048d89d7ebae525f8b"
+  },
+  "gates": [
+    {
+      "id": "repository-static-quality",
+      "status": "passed",
+      "commands": [
+        "python scripts/check-repository.py",
+        "python -m ruff check app tests alembic scripts ../worker ../scripts/check-repository.py ../scripts/simulators",
+        "python -m ruff check app ../worker/drone_dream_worker ../scripts/simulators --select S",
+        "python -m ruff format --check ../scripts/check-repository.py ../scripts/simulators",
+        "python -m mypy app",
+        "python -m mypy ../worker/drone_dream_worker",
+        "python -m compileall -q app tests alembic scripts ../worker ../scripts/check-repository.py ../scripts/simulators"
+      ],
+      "result": {
+        "repository_files": 1224,
+        "text_files": 900,
+        "json_files": 349,
+        "toml_files": 5,
+        "markdown_files": 51,
+        "local_links": 62,
+        "mypy_backend_source_files": 114,
+        "mypy_worker_source_files": 3
+      }
+    },
+    {
+      "id": "focused-regression-initial",
+      "status": "failed_then_corrected",
+      "result": {
+        "passed": 477,
+        "failed": 5,
+        "duration_seconds": 415.03,
+        "failure_class": "test-design",
+        "failure_detail": "Unsafe URLs were correctly rejected by Settings before the new service-layer test assertion."
+      },
+      "correction": "The final test proves Settings rejection and uses model_construct only to prove the service layer independently fails closed."
+    },
+    {
+      "id": "focused-regression-final",
+      "status": "passed",
+      "command": "python -m pytest -q backend/tests/test_report_entitlements.py backend/tests/test_repository_hygiene.py",
+      "result": {
+        "passed": 15,
+        "failed": 0,
+        "duration_seconds": 0.08
+      }
+    },
+    {
+      "id": "backend-full",
+      "status": "passed",
+      "working_directory": "backend",
+      "command": "python -m pytest -q",
+      "result": {
+        "passed": 1291,
+        "failed": 0,
+        "duration_seconds": 835.36,
+        "executor_wall_seconds": 848.7
+      }
+    },
+    {
+      "id": "frontend-core",
+      "status": "passed_with_warning",
+      "commands": [
+        "npm --prefix frontend run audit:dependencies",
+        "npm --prefix desktop audit --audit-level=high",
+        "npm --prefix frontend run lint",
+        "npm --prefix frontend run typecheck",
+        "npm --prefix frontend run test -- --testTimeout 15000",
+        "npm --prefix frontend run build",
+        "npm --prefix frontend run test:history-layout"
+      ],
+      "result": {
+        "test_files_passed": 50,
+        "tests_passed": 320,
+        "tests_failed": 0,
+        "test_duration_seconds": 32.2,
+        "transformed_modules": 1968,
+        "history_layout_matrix_passed": 4,
+        "desktop_npm_vulnerabilities": 0,
+        "build_warning": "The largest minified application chunk was 776.55 kB, above the configured warning threshold."
+      },
+      "history_measurements": {
+        "path": "artifacts/test-runs/history-responsive-overflow/after/measurements.json",
+        "bytes": 28459,
+        "sha256": "ab535a5f16677a53a5baa74d598b39b90f1e8e65b15cc948ec04a312e743e515"
+      },
+      "scope_exclusion": "Website-owned site build and visual audit were not run by the software line."
+    },
+    {
+      "id": "runtime-static-contract",
+      "status": "passed_with_platform_skips",
+      "result": {
+        "tests_total": 48,
+        "tests_passed": 44,
+        "tests_skipped": 4,
+        "skip_reason": "Secure ULog deletion cases are intentionally POSIX/WSL-only on the Windows host."
+      }
+    },
+    {
+      "id": "desktop-rust-msvc",
+      "status": "environment_failed",
+      "commands": [
+        "cargo fmt --all --manifest-path desktop/src-tauri/Cargo.toml -- --check",
+        "cargo clippy --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets -- -D warnings"
+      ],
+      "result": {
+        "cargo_fmt": "passed",
+        "cargo_clippy": "not_completed",
+        "cargo_test": "not_started",
+        "failure": "The MSVC linker link.exe is not installed on this host."
+      }
+    },
+    {
+      "id": "desktop-rust-gnullvm",
+      "status": "passed_with_ignored_integration_test",
+      "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+      "rustflags": "-C target-feature=+crt-static",
+      "result": {
+        "clippy_all_targets_with_warnings_denied": "passed",
+        "tests_passed": 101,
+        "tests_failed": 0,
+        "tests_ignored": 1,
+        "ignored_reason": "The keepalive integration test requires an installed, owned DroneDreamRuntime.",
+        "non_failing_linker_warning": "clang-22 reported that -no-pie was unused during test linking."
+      }
+    },
+    {
+      "id": "desktop-contracts",
+      "status": "passed",
+      "result": {
+        "tauri_nsi_template": "2.11.4 pinned template and DroneDream anchors verified",
+        "desktop_version": "1.0.0",
+        "release_source_tracked_files": 1224,
+        "release_source_npm_packages": 390,
+        "release_source_external_rust_packages": 532
+      }
+    },
+    {
+      "id": "dependency-audits",
+      "status": "passed_with_warnings_and_one_environment_failure",
+      "result": {
+        "frontend_policy_audit": "passed",
+        "desktop_npm_vulnerabilities": 0,
+        "cargo_audit_vulnerabilities": 0,
+        "cargo_audit_allowed_warnings": 17,
+        "cargo_audit_warning_scope": "Cross-platform lock graph contains unmaintained GTK3 and UNIC crates plus the glib RUSTSEC-2024-0429 unsound warning.",
+        "pip_audit": "environment_failed",
+        "pip_audit_failure": "The base Python lacked pip_audit; an isolated pip-audit 2.10.1 installation produced no output and hung, so it was terminated and its temporary venv removed."
+      }
+    }
+  ],
+  "overall": {
+    "source_regression_status": "passed",
+    "environment_gate_status": "partial",
+    "remaining_environment_gates": [
+      "Run the exact MSVC clippy and test commands on a Windows host with Visual C++ link.exe.",
+      "Run the two pip-audit lock checks in the CI image or another environment with pip-audit 2.10.1 available."
+    ],
+    "release_artifacts_rebuilt": false,
+    "runtime_artifacts_rebuilt": false
+  }
+}
