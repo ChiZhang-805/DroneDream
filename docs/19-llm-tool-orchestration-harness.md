@@ -8661,70 +8661,55 @@ and remains explicitly `physical_fidelity=false`. A regression replaces the
 validation evaluator with a failure sentinel while running the training-only
 optimizer, proving that no validation call is available at selection time.
 
-Current frozen backend validation:
+Current frozen evidence validation:
 
 ```text
-cd backend
-.venv/Scripts/python.exe -m pytest -q
+python backend/scripts/export_technical_report_evidence_v10.py --check
 
-1164 passed in 996.68s
-
-.venv/Scripts/python.exe scripts/evaluate_harness_router.py
-
-24 cases; 8 categories; 8 registered tools
-uniform-random expectation: 5.625/24 (23.4375%)
-best constant tool: optimizer_portfolio, 14/24 (58.3333%)
-current provider freeze: Evidence 2.7, Tool Manifest 2.1,
-Prompt Template 1.6
-strict offline predictions: Prediction Artifact 1.0 bound to the printed
-corpus_sha256 and prompt_suite_sha256
-current corpus_sha256:
-98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89
-current prompt_suite_sha256:
-93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77
+schema: dronedream.technical-report-evidence.v10
+software subject: 97492448c36bef240e468a0cd53c3ba198cb6aae
+evidence freeze: a1f091f2edf1ae43233cd01e483bc3990c9aa279
+sources: 39
+online provider freeze: Evidence 2.8, Tool Manifest 2.1,
+Prompt Template 1.7, 23/24 qualified
+current runtime planning contract: Evidence 2.9
+multi-tool offline budget parity: 3/3 blocks; provider/network calls: 0/0
+advanced-physics bundled effects: 9/9 verified; all-performance-success: false
+focused compatibility: 70 passed
+focused tamper suite: 7 passed
+release_ready: false
 ```
 
-The content-addressed receipt at
-`artifacts/test-runs/aurora-software-65a33bb-receipt.json` binds the command,
-Windows/Python/pytest environment, start and finish times, result, full log
-SHA-256, and software source commit
-`65a33bbd70f999962afd1bea1e374dcd5e9de460`. The full 1,164-test suite ran
-from that clean commit and is marked `exact_final_commit_run=true`; 27 directly
-affected checks also passed in 4.58 seconds as a supplement, not a bridge
-from a different source state. The raw full-suite log SHA-256 is
-`4802a482e51173f6d9b03908f673d897e6a718d730006a7882de0b97ce4cf35e`.
-The earlier clean `533500f...` attempt is retained separately with 1,161
-passes and two load-sensitive failures. Its raw log SHA-256 is
-`59b1f8994177259103af6fb5fc3371374c5e3c2a19e1667d60f22746bf477f5d`;
-it is diagnostic failure evidence, not a passing receipt. The final clean run
-followed the Windows process-tree cleanup and Harness heartbeat timing repair.
-The Windows Rust desktop gate was not run on this host because Visual Studio
-C++ Build Tools and `link.exe` were unavailable, so the backend receipt does
-not satisfy that separate release gate.
+The v10 focused receipt at
+`artifacts/test-runs/technical-report-evidence-v10-9749244/test-receipt.json`
+binds both JUnit logs to software subject
+`97492448c36bef240e468a0cd53c3ba198cb6aae`. It records 70/70 compatibility
+checks and 7/7 focused tamper checks, with internal receipt SHA-256
+`b9407556588e5c0a65d3e93f22e29d0fdd8fd4bb57f1b5cb1c890f94c7b9d98d`.
+It deliberately does not claim to replace a current-head full-suite receipt.
+The latest exact-commit full-suite receipt carried through the immutable v9
+base is 1,204/1,204 plus a 28-test supplement at
+`c1222c9215e01a56351f6588af0d2b8694bca831`; it is historical-source evidence
+only. Current-source full regression, Windows Rust, and report/PDF gates remain
+not included, so no release-readiness claim follows.
 
 The archived Evidence 2.4 / Prompt Template 1.1 freeze remains a historical
-24/24 result, but current loaders reject it. The Evidence 2.7 campaign preserves
-all three subsequent `gpt-4.1-2025-04-14` outcomes rather than selecting only
-the best run. The first Prompt Template 1.5 run scored 19/24 and failed the
-local-progress category threshold; its SHA-256 is
-`fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf`.
-A second 1.5 run scored 21/24 and passed the declared qualification thresholds;
-its SHA-256 is
-`9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571`.
-The spread under an unchanged template demonstrates provider stochasticity.
+24/24 result, but current loaders reject it. Evidence 2.7 preserves subsequent
+`gpt-4.1-2025-04-14` results of 19/24 and 21/24 under Prompt 1.5 plus 24/24
+under Prompt 1.6 rather than selecting only the best. The spread demonstrates
+provider stochasticity.
 
-Prompt Template 1.6 explicitly defines every provider-visible aggregate score
-as lower-is-better loss. The current 12,819-byte freeze used native strict JSON
-Schema with no requested temperature, top-p, or seed override. Independent
-reload and grading produced 24/24 acceptable decisions, 3/3 in every category,
-a 41.67-point lift over the best constant policy, and `qualified=true`. Its
-SHA-256 is
-`2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`.
-This qualifies the current development routing contract. Because the 1.5 and
-1.6 calls are unpaired stochastic runs, it is not a causal prompt-lift estimate
-and still does not prove lower final simulator loss. Campaign and evaluator
-CLIs now pin the selected worktree's `backend/` import root and fail closed
-against neighbouring checkout contamination.
+The latest retained online Artifact is Evidence 2.8 / Prompt Template 1.7. It
+uses the same 24-case development corpus, passes 23/24 and all declared
+qualification thresholds, and preserves
+`tight_budget_expensive_matrix` as the single failure. Its file SHA-256 is
+`d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4`.
+Production planning has since moved to Evidence 2.9, so the Artifact is not
+current-contract Evidence 2.9 validation. A new real campaign requires the
+separate per-batch API approval gate. None of the unpaired online runs is a
+causal prompt-lift estimate or proof of lower simulator loss. Campaign and
+evaluator CLIs pin the selected worktree's `backend/` import root and fail
+closed against neighbouring checkout contamination.
 
 ### 30.15 Evidence 2.5 observed-outcome reflection
 
@@ -8835,6 +8820,40 @@ Both protocols are deterministic Mock evidence. The long-horizon design is
 pilot-informed and non-confirmatory. Neither protocol permits a generalized
 quality or cost claim, LLM superiority, PX4/Gazebo or physical performance,
 sim-to-real transfer, flight safety, or user benefit.
+
+### 30.19 Bundled advanced-physics and v10 evidence closures
+
+The bundled launcher now has a verified request/evidence path for nine physical
+effect categories: steady wind, obstacles, gust/turbulence, bounded sensor
+noise, payload mass/inertia, actuator first-order delay, deterministic GPS
+dropout, battery initial state/voltage sag, and hard actuator failure.
+`advanced-physics-closure-v2` exact-byte verifies four retained real
+PX4/Gazebo evidence roles and recompiles the live capability contract to
+`requires_runtime_extension=[]`.
+
+This closes the **effect-application** gap, not the comparative-performance
+gap. Five categories have every retained performance trial passing. GPS noise
+retains a readiness boundary; dropout/battery retains verified transitions but
+a false policy verdict; hard actuator failure retains failed- and healthy-rotor
+joint-state evidence but no trusted scoring window. The closure therefore
+permits only the enumerated application/read-back statements. It does not prove
+universal controller robustness, Harness benefit, sim-to-real transfer,
+real-aircraft behavior, or safety. The manifest file SHA-256 is
+`5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3`.
+
+The software-owned `dronedream.technical-report-evidence.v10` bundle then
+re-verifies the immutable v9 lineage and adds three separate evidence classes:
+the qualified 23/24 Evidence 2.8 online development routing freeze, the
+Evidence 2.9 offline multi-tool budget/accounting freeze, and the nine-category
+advanced-physics closure. Its 39-source inventory explicitly retains the
+554-Trial component ablation. Bundle subject, freeze, file SHA-256, and internal
+SHA-256 are respectively
+`97492448c36bef240e468a0cd53c3ba198cb6aae`,
+`a1f091f2edf1ae43233cd01e483bc3990c9aa279`,
+`27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89`,
+and
+`df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b`.
+It explicitly reports `release_ready=false`.
 
 ## 31. Reference index
 
@@ -8962,7 +8981,7 @@ Primary and official references used for this design:
 - [NumPy: `SeedSequence` reproducible entropy and spawn contract](https://numpy.org/doc/stable/reference/random/bit_generators/generated/numpy.random.SeedSequence.html)
 - [NIST/SEMATECH: Blocking of factorial experiments](https://www.itl.nist.gov/div898/handbook/pri/section3/pri3333.htm)
 
-## 31. Evidence 2.8 cross-Job experience boundary
+## 32. Evidence 2.8 cross-Job experience boundary
 
 The production Harness now retrieves prior experience only as versioned,
 structured, revocable evidence. It never concatenates historical Job text into
@@ -8985,13 +9004,14 @@ The deterministic `harness-cross-job-memory-contract-v1` evaluation is 10/10
 over two positive retrieval fixtures and eight isolation/lifecycle negatives,
 with zero provider, network, or simulator calls and zero provider-identifier
 leaks. It establishes the enumerated software-contract behavior only. The
-existing Evidence 2.7 / Prompt 1.6 online provider and 554-Trial component
-freezes remain historical evidence; they are not evidence for the new memory
-channel. A new current-version provider campaign is still required before any
-claim about routing behavior, and an equal-budget outcome study is required
-before any optimization-benefit claim.
+554-Trial Evidence 2.7 component freeze remains historical evidence; it is not
+evidence for the new memory channel. The later Evidence 2.8 / Prompt 1.7
+provider freeze is likewise not a cross-Job-memory evaluation. A real current
+Evidence 2.9 provider campaign is still required before a current-contract
+online-routing claim. The offline equal-budget dispatcher study is now complete,
+but it does not replace a causal optimization-benefit study.
 
-## 32. Evidence 2.9 multi-tool plan and accounting boundary
+## 33. Evidence 2.9 multi-tool plan and accounting boundary
 
 The production `llm_harness` dispatcher now accepts one closed generation plan
 instead of reducing every turn to one optimizer name. The immutable opportunity
@@ -9029,3 +9049,10 @@ Consequently this evaluation can support dispatcher, provenance, concurrency,
 and accounting claims only. It cannot support LLM-quality, optimizer-superiority,
 PX4/Gazebo, real-flight, or causal-benefit claims. Any real Evidence 2.9 model
 campaign remains subject to the separate per-run API approval gate.
+
+The frozen offline result contains three seed blocks, six arm runs, configured
+budget parity in 3/3 blocks, six verified scripted generations, multi-tool
+execution in 3/3 blocks, 12 schema-valid local decision calls, and zero real
+provider/network calls or credentials. It is consumed by v10 from software
+subject `136a1e3293efa6e53f3648e21fa8f7c6b5158d6f` and evidence freeze
+`15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8`.

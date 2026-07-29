@@ -53,33 +53,37 @@ weakening the result semantics.
 
 | Effect | Current bundled Runtime status | Required proof |
 | --- | --- | --- |
-| Static box/cylinder obstacles | Implemented in bundled runner source; released-Runtime acceptance pending | Gazebo EntityFactory returns `data: true`; evidence stores entity name, service, source index, and generated SDF hash |
-| Constant horizontal wind (`x500` family) | Verified in pinned dedicated WSL Runtime; signed installer Runtime acceptance pending | Trial-local model/world/rootfs hashes, exact `/wind_info` vector read-back, and expanded runtime SDF proving the exact spawned instance (for example `x500_0/base_link`) has WindMode |
-| Periodic gusts and turbulence | Runtime extension required | Versioned stochastic plugin configuration, seed binding, and bounded observed wind-state evidence |
-| GPS, barometer, and IMU noise | Runtime extension required | Generated sensor SDF plus model/sensor identity and effective noise configuration |
-| GPS dropout/failure schedule | Runtime extension required | PX4 failure command/event timeline plus observed estimator/sensor state |
-| Battery degradation | Runtime extension required | Applied PX4 battery simulation settings and read-back telemetry |
-| Payload mass/inertia | Runtime extension required | Generated model/inertial definition and Gazebo entity read-back |
-| Actuator delay/failure | Runtime extension required | Supported PX4/Gazebo injection mechanism and timestamped response evidence |
+| Static box/cylinder obstacles | Effect applied and read back in the frozen two-seed real PX4/Gazebo campaign | Gazebo EntityFactory returns `data: true`; evidence stores entity name, service, source index, and generated SDF hash |
+| Constant horizontal wind (`x500` family) | Effect applied and read back in the frozen two-seed real PX4/Gazebo campaign | Trial-local model/world/rootfs hashes, exact `/wind_info` vector read-back, and expanded Runtime SDF proving the spawned instance has WindMode |
+| Periodic gusts and turbulence | Generated SDF and three successful real PX4/Gazebo flights retained | Seeded gust/plugin configuration, generated-SDF hash, Runtime identity, and flight evidence |
+| GPS, barometer, and IMU noise | Barometer and IMU effects have successful flights; GPS noise reaches the explicit readiness boundary but not a successful scored flight | Generated sensor SDF, model/sensor identity, effective configuration, and the retained readiness failure |
+| GPS dropout/failure schedule | Deterministic schedule, failure/restore transition, telemetry, and ULog transition verified; retained flight policy result is false | PX4 failure command/event timeline, parameter read-back, observed GPS state, restoration, and exact ULog |
+| Battery initial state and voltage sag | Applied and observed in the same completed physical trial; retained flight policy result is false | Applied PX4 battery settings, parameter read-back, and non-increasing battery telemetry |
+| Payload mass/inertia | Generated model definition and three successful real PX4/Gazebo flights retained | Generated model/inertial bytes, hashes, Runtime identity, and flight evidence |
+| Actuator first-order delay | Generated motor time-constant definition and three successful real PX4/Gazebo flights retained | Generated SDF, requested delay binding, Runtime identity, and flight evidence |
+| Hard actuator failure | Failed rotor hard stop and healthy-rotor motion verified from Gazebo joint-state samples; no trusted scoring window was available and trial success is false | Per-motor max-rotation SDF, timestamped joint-state series, hard-stop threshold, healthy-motion threshold, and residual-process check |
 
-“Verified in pinned dedicated WSL Runtime” is not the same as “released to
-customers.” Static obstacles and constant wind still require a rebuilt,
-smoke-tested, signed installer `DroneDreamRuntime`. “Runtime extension required” is
-deliberate: the desktop UI can collect and validate the remaining scenarios,
-but the real runner refuses to label them as physically applied until the
-dedicated Runtime contains a verified adapter.
+The exact-byte closure at
+`artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/` verifies all
+nine bundled effect categories and reports `requires_runtime_extension=[]`.
+That is an application/read-back contract, not a statement that every perturbed
+flight passed its performance policy: five categories have all retained
+performance trials passing, while GPS noise, dropout/battery, and hard actuator
+failure retain explicit non-success boundaries. It is also not a customer
+release, real-aircraft, safety, or sim-to-real claim.
 
-## Expansion order
+## Remaining validation order
 
-1. Rebuild the Runtime and pass the constant-wind plus obstacle smoke matrix.
-2. Add versioned gust/turbulence generation with seed and interval read-back.
-3. Add per-trial sensor model generation for GPS, barometer, and IMU noise.
-4. Add PX4-supported failure injection with an explicit event scheduler.
-5. Add battery and payload model adapters with telemetry/read-back checks.
-6. Add actuator fault adapters only for mechanisms supported by the pinned PX4
-   and Gazebo versions.
-7. Rebuild, smoke-test, sign, and release `DroneDreamRuntime`; source changes do
-   not become customer capabilities until this release gate passes.
+1. Preserve the nine-category request/evidence contract and exact source hashes.
+2. Resolve the GPS-noise readiness boundary with a trusted, scored flight.
+3. Freeze trusted performance windows for dropout/battery and hard actuator
+   failure instead of inferring a score from effect read-back alone.
+4. Run the locked repeated PX4/Gazebo comparison matrix before making any
+   optimizer or Harness performance claim.
+5. Rebuild and smoke-test the dedicated Runtime and installer from the selected
+   clean source. During the current internal `1.0.0` stage, Authenticode is not
+   required, but unsigned status and exact installer bytes must be reported
+   honestly and both download origins must receive the same byte sequence.
 
 ## Safety and reproducibility rules
 
@@ -848,7 +852,7 @@ discarded.
 The snapshot additionally reports minimum and maximum training replicates,
 maximum normalized case weight, and the effective number of weighted training
 cases. These are descriptive facts, not a fabricated scalar difficulty score.
-The current Prompt Template 1.6 requires the router to compare training-case
+Prompt Template 1.6 introduced the requirement to compare training-case
 heterogeneity, replicate cost, weight concentration, and safe perturbation
 magnitudes while treating validation counts as cost only. A paired regression
 changes holdout IDs, types, seeds, weights, and configuration while preserving
@@ -858,19 +862,21 @@ prompt.
 
 The prior 24/24 online-provider Artifact generated under Evidence 2.4 and
 Prompt Template 1.1 remains archived, and current loaders correctly reject it
-as stale. The current Evidence 2.7 campaign first retained a Prompt Template
-1.5 failure at 19/24 and a second 1.5 run at 21/24. That three-decision spread
-under the same template is direct evidence that provider reruns are stochastic,
-so it must not be hidden or used as a causal prompt comparison.
+as stale. The Evidence 2.7 campaign retained Prompt Template 1.5 outcomes of
+19/24 and 21/24 plus a Prompt Template 1.6 outcome of 24/24. The spread is
+direct evidence that provider reruns are stochastic, so it must not be hidden
+or used as a causal prompt comparison.
 
-Prompt Template 1.6 makes the deterministic aggregate-loss direction explicit:
-smaller finite baseline, incumbent, cohort, candidate, and tool-history scores
-are better. Its frozen `gpt-4.1-2025-04-14` Artifact independently reloads and
-grades at 24/24, 3/3 in all eight categories, with SHA-256
-`2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`.
-This qualifies the current development routing contract only. It is not a
-paired causal estimate of the 1.6 wording and does not prove simulator outcome
-improvement.
+The latest retained online campaign is Evidence 2.8 / Prompt Template 1.7 on
+`gpt-4.1-2025-04-14`: 23/24 cases pass, all declared qualification thresholds
+pass, and `tight_budget_expensive_matrix` remains the single frozen failure.
+The Artifact file SHA-256 is
+`d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4`.
+Current production planning is Evidence 2.9, so this online Artifact is a
+qualified historical development-corpus result, not current-contract Evidence
+2.9 validation. A new real provider campaign requires separate, batch-specific
+user approval before any API-key access. None of these routing campaigns proves
+simulator outcome improvement.
 
 `backend/scripts/run_harness_routing_campaign.py` runs the entire corpus through
 an online provider using the exact production prompt and per-case response
@@ -1200,3 +1206,52 @@ credential or provider. It is dispatcher/provenance/accounting evidence only;
 it does not establish LLM quality, optimizer superiority, physical fidelity, or
 causal Harness benefit. The previous 554-Trial and Evidence 2.8 provider/memory
 artifacts remain historical freezes and are not relabeled as Evidence 2.9.
+
+### Complete bundled advanced-physics effect closure
+
+`advanced-physics-closure-v2` re-verifies the exact bytes and semantic
+boundaries of four retained real PX4/Gazebo evidence roles: constant
+wind/obstacles, gust/noise/payload/actuator delay, deterministic GPS
+dropout/battery, and hard actuator failure. It also recompiles the current
+launcher capability contract. The result is nine of nine bundled effect
+categories verified with no remaining Runtime extension:
+
+- steady wind and static obstacles;
+- gust/turbulence and bounded sensor noise;
+- payload mass/inertia and actuator first-order delay;
+- deterministic GPS dropout plus battery initial state/voltage sag;
+- hard actuator failure with failed- and healthy-rotor joint-state read-back.
+
+The frozen manifest subject is
+`f1e8fa855ebe95bf5ce208d62da7a3a46bba6228`, the evidence freeze is
+`83982f37899f8054e24a749af8e6469fedf48e8d`, and the manifest file SHA-256 is
+`5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3`.
+The associated 52-test receipt passes 52/52. Five categories have every
+retained performance trial passing; the other four preserve explicit
+readiness, policy-failure, or unavailable-scoring boundaries. Therefore the
+closure permits a bundled effect-application claim only, not universal
+perturbed-flight success, optimizer superiority, real-aircraft transfer, or
+safety.
+
+### Technical-report evidence v10 software handoff
+
+`backend/scripts/export_technical_report_evidence_v10.py` treats v9 as an
+immutable base and exact-byte verifies every historical source from its
+evidence-freeze commit. It then adds the latest Evidence 2.8 online routing
+freeze, the Evidence 2.9 offline equal-budget multi-tool evaluation, and the
+complete advanced-physics closure without merging their evidence classes.
+
+The frozen bundle is `artifacts/technical-report/evidence-v10.json`. Its
+software subject commit is
+`97492448c36bef240e468a0cd53c3ba198cb6aae`, evidence freeze commit is
+`a1f091f2edf1ae43233cd01e483bc3990c9aa279`, file SHA-256 is
+`27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89`,
+and internal bundle SHA-256 is
+`df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b`.
+The 39-entry source inventory explicitly includes the 554-Trial component
+ablation and records separate subject/freeze commits for every historical
+layer. Its focused compatibility receipt records 70/70 plus 7/7 tests; it is
+not a current-source full-suite receipt. The bundle deliberately reports
+`release_ready=false`, because a newly approved Evidence 2.9 online campaign,
+current-source full regression, Windows Rust, and report/PDF gates remain
+separate.

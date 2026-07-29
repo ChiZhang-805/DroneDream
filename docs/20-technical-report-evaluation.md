@@ -45,10 +45,13 @@ Every result, table, and figure carries one of these labels:
 | `PX4_GAZEBO` | Repeated, provenance-complete results from the pinned Runtime | Real-aircraft safety or transfer |
 | `USER_STUDY` | Measured task/UX outcomes under a declared protocol | Algorithmic superiority without an algorithm experiment |
 
-`backend/scripts/export_technical_report_evidence.py` is the single exporter
-for chart-ready evidence already present in the repository. It validates
-provenance, recomputes headline metrics, emits hashes, and refuses to relabel a
-mock campaign as physical evidence.
+`backend/scripts/export_technical_report_evidence.py` remains the historical
+v9 metric exporter. The current
+`backend/scripts/export_technical_report_evidence_v10.py` exact-byte verifies
+that immutable base and adds newer evidence classes without rewriting them. It
+recomputes online routing grades, multi-tool budget/accounting summaries, and
+the advanced-physics capability closure while refusing to relabel mock evidence,
+effect application, or focused tests as broader performance/release evidence.
 
 The historical report-line handoff is
 `dronedream.technical-report-evidence.v6`, with
@@ -65,11 +68,11 @@ The canonical bundle SHA-256 is
 the manifest and `evidence.sha256` bind the generated files without changing
 the software source commit.
 
-The current software handoff is the non-overwriting
+The historical non-overwriting
 `dronedream.technical-report-evidence.v8` successor at
 `artifacts/technical-report/evidence-v8.json`. It binds
 `source_commit=65a33bbd70f999962afd1bea1e374dcd5e9de460`,
-`generated_at=2026-07-28T12:58:32Z`, the current Evidence 2.7 / Prompt 1.6
+`generated_at=2026-07-28T12:58:32Z`, the then-current Evidence 2.7 / Prompt 1.6
 24/24 provider freeze, both v2 Harness ablations, the reflection trigger and
 long-horizon stress sources, and the exact-commit 1,164-test receipt. Its
 canonical bundle SHA-256 is
@@ -79,10 +82,10 @@ the JSON file SHA-256 is
 and the manifest file SHA-256 is
 `6bd08f15b034dccf3922b4ccd95a5e1368dde79a49719dede1e628a002a3dafc`.
 
-The current non-overwriting handoff is
+The historical v9 handoff is
 `artifacts/technical-report/evidence-v9.json`. It binds
 `source_commit=c1222c9215e01a56351f6588af0d2b8694bca831`,
-`generated_at=2026-07-28T15:44:30Z`, the current Evidence 2.8 cross-Job
+`generated_at=2026-07-28T15:44:30Z`, the then-current Evidence 2.8 cross-Job
 memory contract, the explicitly archived Evidence 2.7 / Prompt 1.6 provider
 and component/stress freezes, and the exact-commit 1,204-test receipt plus its
 28-test focused supplement. Its canonical bundle SHA-256 is
@@ -91,7 +94,24 @@ the JSON file SHA-256 is
 `a2bed29533b321fa00086bf901f7c5ebbf35ab503e50cde4de568b3420e0a08a`,
 and the manifest file SHA-256 is
 `3bc7bd0eac65cf5e8f9ef7e05c0f5e62403a7cf23c5be4f0905ae4b503847fc9`.
-The v6, v7, and v8 bundles remain immutable historical freezes.
+The v6, v7, v8, and v9 bundles remain immutable historical freezes.
+
+The current non-overwriting software handoff is
+`dronedream.technical-report-evidence.v10` at
+`artifacts/technical-report/evidence-v10.json`. It binds software subject
+`97492448c36bef240e468a0cd53c3ba198cb6aae`, generation time
+`2026-07-28T23:54:28Z`, and evidence freeze
+`a1f091f2edf1ae43233cd01e483bc3990c9aa279`. Its 39-source inventory
+re-verifies the full v9 lineage, including the 1,651,339-byte 554-Trial
+component-ablation blob, then adds the Evidence 2.8 / Prompt 1.7 online routing
+freeze, Evidence 2.9 offline equal-budget multi-tool evidence, and nine-category
+advanced-physics closure. The internal bundle SHA-256 is
+`df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b`;
+the JSON file SHA-256 is
+`27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89`,
+and the manifest file SHA-256 is
+`134d1ae0f0a96b7999755b0b2e4352c0ce1388bddc4f5f0adc9eb744cc302d4a`.
+It explicitly reports `release_ready=false`.
 
 `backend/scripts/evaluate_harness_ablations.py` independently reproduces the
 source-contract ablation JSON, CSV, and file-hash manifest. Its comparator is
@@ -240,14 +260,29 @@ development corpus, or a hidden oracle diagnostic.
 
 The exporter currently produces:
 
-- 24/24 acceptable choices on eight three-case routing categories from the
-  current Evidence 2.7 / Prompt Template 1.6 provider freeze, compared with a
-  best constant policy of 14/24 and a uniform-random expectation of 5.625/24.
-  The Artifact SHA-256 is
-  `2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`.
-  Two preserved Prompt 1.5 runs scored 19/24 and 21/24, so the current result is
-  `DEV_ROUTING` qualification and not a causal prompt comparison or simulator
-  quality claim.
+- 23/24 acceptable choices on eight three-case routing categories from the
+  latest retained Evidence 2.8 / Prompt Template 1.7 provider freeze, compared
+  with a best constant policy of 14/24 and a uniform-random expectation of
+  5.625/24. `tight_budget_expensive_matrix` is the retained failure; all
+  qualification thresholds still pass. The Artifact file SHA-256 is
+  `d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4`.
+  Earlier Prompt 1.5/1.6 runs scored 19/24, 21/24, and 24/24. This is
+  `DEV_ROUTING` qualification for the frozen 2.8 contract, not current Evidence
+  2.9 validation, a causal prompt comparison, or a simulator-quality claim.
+- the offline Evidence 2.9 multi-tool budget protocol contains three matched
+  seed blocks and six complete arms. Configured two-generation/40-Trial budgets
+  match in 3/3 blocks; the scripted arm has six verified generations, exercises
+  multi-tool execution in 3/3 blocks, and records 12 schema-valid local decision
+  calls with zero provider/network calls or real credentials. This is
+  `SYNTHETIC_MOCK` dispatcher/provenance/accounting evidence, not an LLM-quality
+  or causal-benefit result.
+- the advanced-physics closure exact-byte verifies nine of nine bundled
+  PX4/Gazebo effect categories with no remaining Runtime extension. Five
+  categories have every retained performance trial passing. GPS noise retains a
+  readiness boundary; dropout/battery retains a false policy verdict despite
+  verified transitions; hard actuator failure retains verified rotor behavior
+  without a trusted scoring window. This is `PX4_GAZEBO` effect-application
+  evidence, not universal perturbed-flight success or real-aircraft evidence.
 - a 61-candidate synthetic campaign over ten named scenario types whose
   holdout loss changes from `0.82811` to `0.58525` (29.327%); all ten scenario
   losses improve. This is `SYNTHETIC_MOCK`, with
@@ -344,26 +379,31 @@ only and explicitly rejects general quality, cost, LLM, PX4/Gazebo, physical,
 or safety benefit. Its canonical SHA-256 is
 `6da3544651ee56428b6e78f1613fd520c46b789dc3e7f9d44fc8be153dd9f5b3`.
 
-The real PX4/Gazebo main table, broader physical component-level outcome ablations,
-multi-seed physical confidence intervals, latency/token/cost results, and UX
-measurements remain unfilled until their locked experiments run.
+The bundled PX4/Gazebo effect-application matrix is now filled, but the repeated
+comparative PX4/Gazebo **performance** main table, physical component-level
+outcome ablations, multi-seed performance confidence intervals,
+latency/token/cost results, and UX measurements remain unfilled until their
+locked experiments run.
 
 ## Software validation and remaining gate
 
-The current v8 bundle consumes only
-`artifacts/test-runs/aurora-software-65a33bb-receipt.json`. It records
-`1164 passed in 996.68s`, command and environment metadata, start and finish
-times, raw log SHA-256
-`4802a482e51173f6d9b03908f673d897e6a718d730006a7882de0b97ce4cf35e`,
-and source commit `65a33bbd70f999962afd1bea1e374dcd5e9de460`. The suite ran on
-that clean commit and is marked `exact_final_commit_run=true`; a separate
-27-test focused supplement passed in 4.58 seconds. The first clean
-`533500f...` attempt is preserved separately with 1,161 passes and two
-load-sensitive failures; it is not a passing receipt. The historical v6 and v7
-bundles remain immutable.
-The Windows Rust desktop gate was not run because Visual Studio C++ Build Tools
-and `link.exe` were unavailable on the validation host. No Rust
-release-readiness claim follows from the backend receipt.
+The latest exact-commit **full-suite** receipt included by the historical v9
+bundle is `artifacts/test-runs/aurora-software-c1222c9-receipt.json`: 1,204
+passes plus a 28-test focused supplement at software subject
+`c1222c9215e01a56351f6588af0d2b8694bca831`. It remains valid for that
+historical source only.
+
+The v10 software subject has a narrower post-commit receipt at
+`artifacts/test-runs/technical-report-evidence-v10-9749244/test-receipt.json`:
+70/70 evidence-compatibility tests and 7/7 focused tamper tests. Its internal
+receipt SHA-256 is
+`b9407556588e5c0a65d3e93f22e29d0fdd8fd4bb57f1b5cb1c890f94c7b9d98d`.
+The receipt honestly records `exact_final_commit_run=false`, because the
+worktree also contained only the generated v10 outputs and recursive
+exact-byte attribute rule. It is not a replacement current-head full-suite
+receipt. V10 therefore marks both current-source full regression and the
+Windows Rust desktop gate as not included. No final software or report
+release-readiness claim follows from this focused receipt.
 
 ## Reproduction
 
@@ -413,17 +453,20 @@ backend\.venv\Scripts\python.exe `
   --manifest-output artifacts\technical-report\evidence-v9.manifest.json `
   --sha256-output artifacts\technical-report\evidence-v9.sha256 `
   --csv-directory artifacts\technical-report\csv-v9
+
+python `
+  backend\scripts\export_technical_report_evidence_v10.py `
+  --check
 ```
 
-The resulting v9 report JSON and companion manifest repeat the explicit source
-commit and generation time, include SHA-256 hashes for every source artifact,
-and bind the normalized bundle digest. The 25-entry source list includes each
-reflection trigger/stress and cross-Job memory JSON, CSV, manifest, and
-`.sha256` sidecar. The
-versioned ablation JSON/CSV/hash under `backend/evaluation_artifacts/` are
-source-controlled software-contract evidence; generated files under
-`artifacts/technical-report/` are frozen report inputs and are not
-physical-performance evidence.
+The v10 verifier rereads the frozen output metadata, rebuilds every current
+summary, obtains historical v9 sources from their exact Git freeze blob, and
+requires the JSON, manifest, checksum inventory, and three CSV exports to match
+byte for byte. Versioned ablation JSON/CSV/hash files under
+`backend/evaluation_artifacts/` remain source-controlled software-contract
+evidence. Files under `artifacts/technical-report/` are frozen report inputs;
+their evidence class is determined by their verified source, not merely by that
+directory.
 
 ### Frozen Evidence 2.8 cross-Job memory contract
 
@@ -436,11 +479,12 @@ source-receipt drift. All 10 pass; provider, network, and simulator calls are
 zero, and the provider projection contains no source or owner identifiers.
 
 This result is software-contract evidence, not an optimizer-quality result. The
-latest online provider freeze and 554-Trial component outcome ablation remain
-Evidence 2.7 / Prompt 1.6 historical freezes. They must stay byte-identical and
-must not be cited as validation of the cross-Job memory channel. A new
-current-version provider run and an equal-budget outcome comparison remain
-separate gates.
+554-Trial component outcome ablation remains an Evidence 2.7 / Prompt 1.6
+historical freeze. The latest online provider freeze is Evidence 2.8 / Prompt
+1.7 and also cannot validate cross-Job memory or Evidence 2.9 planning.
+Equal-configured-budget dispatcher evidence now exists, but a new real Evidence
+2.9 provider run and any causal outcome-benefit comparison remain separate
+gates.
 
 ### Current Evidence 2.9 multi-tool dispatcher contract
 
@@ -464,7 +508,28 @@ This evidence is classified `SYNTHETIC_MOCK`. It can establish execution,
 provenance, fail-closed history, concurrency, and accounting behavior under the
 enumerated fixtures. It cannot establish LLM routing quality, optimizer
 superiority, PX4/Gazebo fidelity, physical-flight improvement, safety, or causal
-Harness benefit. The Evidence 2.8 online routing artifact and prior component
-ablations remain immutable historical freezes. A real Evidence 2.9 provider
-campaign requires a new, single-use user approval for its stated call count and
-possible cost.
+Harness benefit. The frozen run contains three budget-parity blocks, six arm
+runs, six verified scripted generations, three multi-tool generations, and
+zero real provider/network calls. The Evidence 2.8 online routing artifact and
+prior component ablations remain immutable historical freezes. A real Evidence
+2.9 provider campaign requires a new, single-use user approval for its stated
+call count and possible cost.
+
+### Bundled advanced-physics closure
+
+`artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/` aggregates
+four real PX4/Gazebo evidence roles and recompiles the current launcher
+capability contract. Its exact-byte manifest verifies all nine bundled effect
+categories and an empty Runtime-extension list. The manifest file SHA-256 is
+`5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3`;
+the 52-test compatibility receipt passes 52/52.
+
+The closure separates physical application from policy success. Constant
+wind/obstacles, gust/payload/actuator delay, and barometer/IMU noise have
+retained successful flights. GPS noise retains a readiness boundary.
+Dropout/battery has verified failure/restore and telemetry transitions but a
+false policy verdict. Hard actuator failure has failed-rotor hard-stop and
+healthy-rotor motion read-back but no trusted scoring window. The report may
+claim these enumerated application/read-back facts; it may not turn them into
+universal controller robustness, optimizer benefit, real-aircraft transfer, or
+safety.
