@@ -1,0 +1,302 @@
+{
+  "receiptSchemaVersion": 1,
+  "receiptKind": "website-production-deployment",
+  "generatedAtUtc": "2026-07-29T14:25:00Z",
+  "subject": {
+    "branch": "codex/website",
+    "sourceCommit": "4673271960c9f0765d3b62d1c1e012f06e60787a",
+    "sourceTree": "dfae56dd791b81fbdbcf8f6288774a73e12a658e",
+    "sourceAttestationCommit": "7aa85908f3d5eeee5a15eea771ffb4cb85c98cb3",
+    "sourceValidationReceipt": "website/validation-receipts/website-manual-hierarchy-spacing-validation-4673271.json",
+    "sourceValidationReceiptSha256": "06cee2afed2212def9e9363521616e4b6fd01cf00c77491bfc370252043e575d",
+    "deployTag": "website-deploy-1.0.0-20260729-4673271",
+    "deployTagObject": "f3b1c48ce72f44ec4a1d2b092b9e3d0c7f14d981",
+    "deployTagTarget": "4673271960c9f0765d3b62d1c1e012f06e60787a",
+    "attestationRule": "This receipt attests the immutable source commit and its production deployment. The receipt-only commit containing this file is not self-attested, and the immutable deploy tag remains on the source commit."
+  },
+  "scope": {
+    "deployed": "The exact commit-pinned GitHub Actions shared artifact was published to GitHub Pages and then atomically published unchanged to the approved Alibaba Cloud BaoTa mirror at 47.93.180.216.",
+    "manualChanges": [
+      "Expanded second-level links in ordinary Manual chapters now have a visible nested indent consistent with the five-step workflow hierarchy.",
+      "At desktop widths the first Manual chapter heading and icon align with the top edge of sidebar chapter 01.",
+      "The online-edition eyebrow and large Manual title retain independent top and bottom breathing room.",
+      "Tablet and mobile layouts reset the desktop alignment height so bilingual titles can flow without horizontal document overflow."
+    ],
+    "excluded": "No main, codex/software, codex/technical-report, backend, GitHub Release, Runtime release, installer bytes, DNS, TLS certificate, HTTPS enforcement, production Supabase, payment configuration, or RaceCar Lab server state was changed by this deployment."
+  },
+  "sourceValidation": {
+    "focusedTests": {
+      "testFiles": 1,
+      "tests": 16,
+      "passed": 16,
+      "failed": 0,
+      "result": "pass"
+    },
+    "frontendTests": {
+      "testFiles": 50,
+      "tests": 329,
+      "passed": 329,
+      "failed": 0,
+      "result": "pass"
+    },
+    "typecheck": "pass",
+    "lint": "pass",
+    "applicationBuild": "pass",
+    "sharedSiteAndConsoleBuild": "pass",
+    "deploymentContract": {
+      "tests": 11,
+      "passed": 11,
+      "failed": 0,
+      "result": "pass"
+    },
+    "performance": {
+      "routes": 5,
+      "passed": 5,
+      "failed": 0,
+      "result": "pass"
+    },
+    "typography": {
+      "desktop1440x1000": "pass",
+      "wide2048x1280": "pass",
+      "mobile390x844Layout": "pass",
+      "violations": 0
+    },
+    "localCommunityManualUiAudit": {
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "screenshots": 48,
+      "result": "pass"
+    },
+    "localFourBrowserMatrix": {
+      "checks": 100,
+      "passed": 100,
+      "failed": 0,
+      "result": "pass"
+    },
+    "gitDiffCheck": "pass",
+    "ownershipScopeCheck": "pass",
+    "details": "See the immutable source validation receipt referenced above."
+  },
+  "githubPages": {
+    "workflowRunId": 30455502422,
+    "workflowRunUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30455502422",
+    "workflowConclusion": "success",
+    "workflowHeadRef": "website-deploy-1.0.0-20260729-4673271",
+    "workflowHeadSha": "4673271960c9f0765d3b62d1c1e012f06e60787a",
+    "buildJobId": 90587926542,
+    "publishJobId": 90588196805,
+    "deploymentId": 5658160494,
+    "deploymentStatusId": 16089406652,
+    "deploymentStatus": "success",
+    "deploymentEnvironmentUrl": "http://getdronedream.com/",
+    "sharedArtifact": {
+      "id": 8725348188,
+      "name": "dronedream-site-4673271960c9f0765d3b62d1c1e012f06e60787a",
+      "archiveDigest": "sha256:a89248671bcb37e5ff615f46612531ba5692520d4d3a5fef7a6a47bf445ae54a",
+      "archiveBytes": 28535805,
+      "downloadedFiles": 123,
+      "downloadedTotalBytes": 31861062,
+      "verifiedSha256SumsEntries": 122,
+      "sha256SumsSha256": "64290337e1be8082631e9a5b0b4db1ffcdaec20f067cc128633dbab2c24fcf13",
+      "buildManifestSha256": "8b9854e7e21fae445de411ed24690123cf1d58a4ed04e4d1b1d2733a6c3b7ec2",
+      "latestJsonSha256": "98d1fb659c3121f4b1ae051e717bb9cc20fb6536ab48118f56b0483eb736ea9d",
+      "sourceCommit": "4673271960c9f0765d3b62d1c1e012f06e60787a",
+      "integrityResult": "All 122 listed files were independently rehashed with no missing, extra, or mismatched entries."
+    }
+  },
+  "alibabaCloud": {
+    "publicOrigin": "http://47.93.180.216/",
+    "approvedServerOnly": "47.93.180.216",
+    "forbiddenRaceCarServerWritten": false,
+    "previousReleaseDirectory": "/www/wwwroot/dronedream/releases/1.0.0-20260729T121125Z",
+    "previousReleaseRetained": true,
+    "currentReleaseDirectory": "/www/wwwroot/dronedream/releases/1.0.0-20260729T140151Z",
+    "currentSourceCommit": "4673271960c9f0765d3b62d1c1e012f06e60787a",
+    "transportArchiveBytes": 28509771,
+    "transportArchiveSha256": "0530c261d23d5fd8b725be1140a7a1d33c0d51f299c3ad8f8ced91a15460977a",
+    "sha256SumsSha256": "64290337e1be8082631e9a5b0b4db1ffcdaec20f067cc128633dbab2c24fcf13",
+    "buildManifestSha256": "8b9854e7e21fae445de411ed24690123cf1d58a4ed04e4d1b1d2733a6c3b7ec2",
+    "latestJsonSha256": "98d1fb659c3121f4b1ae051e717bb9cc20fb6536ab48118f56b0483eb736ea9d",
+    "atomicDeploymentResult": "pass",
+    "nginxConfigurationTest": "pass",
+    "remoteIntegrityCheck": "pass",
+    "candidateAbsentAfterDeployment": true,
+    "currentDeploymentTemporaryStagingCleaned": true,
+    "preExistingJuly25CacheDirectoriesLeftUntouched": true
+  },
+  "onlineParity": {
+    "actionsArtifactWasReusedForBothOrigins": true,
+    "criticalPathsCheckedPerOrigin": 19,
+    "originDownloads": 38,
+    "criticalPathMismatches": 0,
+    "coverage": "build-manifest, SHA256SUMS, latest metadata, entry HTML, and production website and console JavaScript and CSS files",
+    "githubPagesSha256SumsSha256": "64290337e1be8082631e9a5b0b4db1ffcdaec20f067cc128633dbab2c24fcf13",
+    "alibabaCloudSha256SumsSha256": "64290337e1be8082631e9a5b0b4db1ffcdaec20f067cc128633dbab2c24fcf13",
+    "installerRedownloads": [
+      {
+        "origin": "GitHub Release",
+        "bytes": 10387042,
+        "sha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b"
+      },
+      {
+        "origin": "GitHub Pages download path",
+        "bytes": 10387042,
+        "sha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b"
+      },
+      {
+        "origin": "Alibaba Cloud mirror download path",
+        "bytes": 10387042,
+        "sha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b"
+      }
+    ],
+    "installerByteParity": true
+  },
+  "onlineBrowserValidation": {
+    "githubPagesCommunityManualUiAudit": {
+      "baseUrl": "http://getdronedream.com/",
+      "generatedAtUtc": "2026-07-29T14:10:48.915Z",
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "screenshots": 48,
+      "screenshotBytes": 18782793,
+      "reportBytes": 47508,
+      "reportSha256": "b3109e1facf8a31793d34ae27a4d2954be0e8f965ead46231e0049f731d05902",
+      "screenshotManifestSha256": "2707fee608aee22994e2ad5bba9f69e10e04b26e9d00825ff1bc87e561916d94"
+    },
+    "alibabaCloudCommunityManualUiAudit": {
+      "baseUrl": "http://47.93.180.216/",
+      "generatedAtUtc": "2026-07-29T14:13:44.177Z",
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "screenshots": 48,
+      "screenshotBytes": 18773850,
+      "reportBytes": 47504,
+      "reportSha256": "4be1834813cce2fced2d341d1b6e644ad3be017055b76965904859a3f6333d8b",
+      "screenshotManifestSha256": "95fc7a387666f7505cf19e4aa2faee7eb0fb6c113e83d2bf2de243bfc62354ad"
+    },
+    "alibabaCloudFourBrowserMatrix": {
+      "baseUrl": "http://47.93.180.216/",
+      "generatedAtUtc": "2026-07-29T14:13:50.371Z",
+      "browsers": [
+        "Microsoft Edge",
+        "Google Chrome",
+        "Lenovo Browser",
+        "Firefox"
+      ],
+      "checks": 100,
+      "passed": 100,
+      "failed": 0,
+      "externalWarnings": 0,
+      "unavailableBrowsers": [],
+      "screenshots": 52,
+      "screenshotBytes": 15133916,
+      "reportBytes": 62850,
+      "reportSha256": "6f50c1dbe9d4ff07a9c69c24fec2b314f135f1265afc8c1223a1ac0c49a5b5a9",
+      "screenshotManifestSha256": "695e9e3ad9e6907e6a573306f56ae63543657876c3ce9421687733f837140f44"
+    },
+    "manualDesktopMeasurements": {
+      "firstChapterTopPx": 261.125,
+      "introductionHeadingTopPx": 261,
+      "alignmentDeltaPx": 0.125,
+      "ordinaryChapterSubsectionIndentPx": 18.90625,
+      "readerTopBreathingPx": 32,
+      "readerBottomBreathingRangePx": [
+        46.53125,
+        69.5625
+      ]
+    },
+    "visualInspection": {
+      "performedBy": "Codex",
+      "result": "pass",
+      "inspected": [
+        "English and Chinese Manual accordion views at 1440x1000 and 390x844",
+        "Expanded ordinary chapter subsections and five-step workflow hierarchy",
+        "Reader eyebrow, large title, first chapter heading, and sidebar alignment",
+        "Corresponding GitHub Pages and Alibaba Cloud captures"
+      ]
+    }
+  },
+  "pagesEnvironmentPolicy": {
+    "originalPolicyJsonSha256": "465003d92d12a488890d6dd03c5233ae8be255da94e7e4baf2c792a47f0a4cb6",
+    "originalRule": "main branch only",
+    "temporaryTagPolicyId": 55934148,
+    "temporaryTagPolicyDeleted": true,
+    "restoredPolicyJsonSha256": "465003d92d12a488890d6dd03c5233ae8be255da94e7e4baf2c792a47f0a4cb6",
+    "restoredRule": "main branch only",
+    "restorationResult": "pass"
+  },
+  "releaseContract": {
+    "version": "1.0.0",
+    "tag": "signpath-candidate-v1.0.0",
+    "releaseId": 357114097,
+    "isPrerelease": true,
+    "fileName": "DroneDream_1.0.0_x64-setup.exe",
+    "installerAssetId": 493897300,
+    "checksumAssetId": 493897431,
+    "updaterSignatureAssetId": 493897516,
+    "updaterManifestAssetId": 493897585,
+    "installerBytes": 10387042,
+    "installerSha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+    "checksumSha256": "400d33119bcea1447262904bf718b96b4aed2dd4395e8a4e5e120f89faf0d40d",
+    "updaterSignatureSha256": "0406f72c46f44da494e29621b815b190d43698f1f700c63df14e95d66431230a",
+    "updaterManifestSha256": "96774c5f1db7ffd6ecb60b160044aaa21afaa771e67dd83cc0d9422072c410f0",
+    "authenticode": "NotSigned",
+    "disposition": "Owner-approved unsigned internal preview; Windows may show an unknown-publisher warning.",
+    "installerOrReleaseModifiedByThisDeployment": false
+  },
+  "runtimePublicationReference": {
+    "tag": "runtime-v0.1.0-beta.2",
+    "sourceCommit": "755c511539fe561207ca38ff5079f471a4110896",
+    "assetCount": 10,
+    "authoritativeHandoffManifestSha256": "34f5738101217ce92adfdfe8a2a932e6f4ecb73ecb41ba601c851ad217dfa33a",
+    "wholeRuntimeTarBytes": 6141118464,
+    "wholeRuntimeTarSha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+    "publicFreshWslImport": "pass",
+    "publicFullStackRuntimeReady": true,
+    "publicationReceipt": "website/validation-receipts/runtime-v0.1.0-beta.2-publication-755c511.json",
+    "publicationReceiptSha256": "53afc416a669f47f50d3d777eb4f86ba5c948dad086081b30897f4f0c64fdb13",
+    "changedByThisDeployment": false
+  },
+  "tls": {
+    "customDomain": "getdronedream.com",
+    "pagesProtectedDomainState": "verified",
+    "pagesCertificateState": "authorization_created",
+    "pagesCertificateDomains": [
+      "getdronedream.com",
+      "www.getdronedream.com"
+    ],
+    "servedCertificateSubject": "CN=*.github.io",
+    "servedCertificateIssuer": "C=US,O=Let's Encrypt,CN=YR2",
+    "servedCertificateNotBefore": "2026-06-04T23:26:07Z",
+    "servedCertificateNotAfter": "2026-09-02T23:26:06Z",
+    "servedCertificateSansContainCustomDomain": false,
+    "ordinaryTrustAndHostnameValidation": "fail",
+    "opensslVerifyReturnCode": 62,
+    "httpsEnforced": false,
+    "dnsChanged": false,
+    "disposition": "Fail closed: HTTPS enforcement remains disabled until GitHub serves a normally trusted certificate whose SAN includes getdronedream.com. HTTP was used for browser validation."
+  },
+  "updaterDiscovery": {
+    "configuredEndpoint": "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/latest.json",
+    "configuredEndpointFinalHttpStatus": 404,
+    "configuredEndpointFinalUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/v0.1.0-alpha.1/latest.json",
+    "versionedReleaseManifestFinalHttpStatus": 200,
+    "reason": "The owner-approved 1.0.0 publication is a GitHub prerelease and prereleases do not populate the releases/latest route.",
+    "automaticUpdateClaimedComplete": false
+  },
+  "deploymentPerformed": true,
+  "actionsNotPerformed": [
+    "No merge or write to main, codex/software, codex/technical-report, backend, or the RaceCar Lab server was performed.",
+    "No DNS record, TLS certificate, HTTPS-enforcement setting, payment setting, or production Supabase configuration was changed.",
+    "No installer, GitHub Release, Runtime release, or Authenticode signature was changed or rebuilt."
+  ],
+  "remainingGates": [
+    "Wait for GitHub Pages to serve a normally trusted certificate whose SAN contains getdronedream.com; only then enable https_enforced and rerun native TLS validation.",
+    "Approve a supported internal update-discovery endpoint or non-prerelease publication policy before claiming automatic updater discovery.",
+    "Rerun the cross-branch aggregate quality gate if the controller requires a CI-level confirmation of the now locally green website typography suite.",
+    "Real multi-account production Supabase community/RLS testing and merchant/payment validation remain separate production gates."
+  ]
+}
