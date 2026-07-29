@@ -19,6 +19,7 @@ from app.orchestration.harness_fallback_contract_campaign import (
 )
 from app.orchestration.harness_outcome_campaign import (
     HARNESS_OUTCOME_CAMPAIGN_ARMS,
+    HARNESS_OUTCOME_CAMPAIGN_CLAIM_BOUNDARY,
     HARNESS_OUTCOME_CAMPAIGN_SEED_BLOCKS,
     SyntheticNetworkConnectBlocked,
     _drive_job,
@@ -38,16 +39,10 @@ ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "evaluation_artifacts"
 JSON_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-outcome-campaign-v1.json"
 CSV_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-outcome-campaign-v1.csv"
 SHA256_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-outcome-campaign-v1.sha256"
-LEGACY_JSON_ARTIFACT = (
-    ARTIFACT_ROOT / "harness-fallback-contract-campaign-v2.json"
-)
-CURRENT_JSON_ARTIFACT = (
-    ARTIFACT_ROOT / "harness-fallback-contract-campaign-v3.json"
-)
+LEGACY_JSON_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-contract-campaign-v2.json"
+CURRENT_JSON_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-contract-campaign-v3.json"
 CURRENT_CSV_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-contract-campaign-v3.csv"
-CURRENT_SHA256_ARTIFACT = (
-    ARTIFACT_ROOT / "harness-fallback-contract-campaign-v3.sha256"
-)
+CURRENT_SHA256_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-contract-campaign-v3.sha256"
 
 
 def test_committed_campaign_is_strictly_equivalent_and_claim_bounded() -> None:
@@ -75,9 +70,7 @@ def test_committed_campaign_is_strictly_equivalent_and_claim_bounded() -> None:
         HARNESS_OUTCOME_CAMPAIGN_SEED_BLOCKS
     )
     for block in artifact["block_rows"]:
-        assert [arm["arm"] for arm in block["arms"]] == list(
-            HARNESS_OUTCOME_CAMPAIGN_ARMS
-        )
+        assert [arm["arm"] for arm in block["arms"]] == list(HARNESS_OUTCOME_CAMPAIGN_ARMS)
         assert len({arm["outcome_sha256"] for arm in block["arms"]}) == 1
         assert all(
             arm["outcome"]["evidence_completeness"]["completeness_rate"] == 1.0
@@ -91,9 +84,7 @@ def test_current_fallback_campaign_matches_current_production_contracts() -> Non
     )
     assert current == build_harness_fallback_contract_campaign()
     assert current["claim_boundary"] == HARNESS_FALLBACK_CONTRACT_CLAIM_BOUNDARY
-    assert current["methodology"]["reference_arm"] == (
-        HARNESS_FALLBACK_CONTRACT_REFERENCE_ARM
-    )
+    assert current["methodology"]["reference_arm"] == (HARNESS_FALLBACK_CONTRACT_REFERENCE_ARM)
     assert tuple(current["methodology"]["arms"]) == HARNESS_FALLBACK_CONTRACT_ARMS
     assert current["summary"] == {
         "seed_block_count": 5,
@@ -172,9 +163,7 @@ def test_campaign_driver_rejects_invalid_explicit_step_limit(
 def test_campaign_rejects_claim_upgrade_or_outcome_tamper() -> None:
     artifact = json.loads(JSON_ARTIFACT.read_text(encoding="utf-8"))
     artifact["physical_fidelity"] = True
-    unsigned = {
-        key: value for key, value in artifact.items() if key != "artifact_sha256"
-    }
+    unsigned = {key: value for key, value in artifact.items() if key != "artifact_sha256"}
     artifact["artifact_sha256"] = hashlib.sha256(
         json.dumps(
             unsigned,
@@ -184,6 +173,22 @@ def test_campaign_rejects_claim_upgrade_or_outcome_tamper() -> None:
             sort_keys=True,
         ).encode("utf-8")
     ).hexdigest()
+    with pytest.raises(ValueError, match="claim boundary"):
+        verify_harness_outcome_campaign(artifact)
+
+    artifact = json.loads(JSON_ARTIFACT.read_text(encoding="utf-8"))
+    artifact["claim_boundary"] = "This proves general real-flight superiority."
+    unsigned = {key: value for key, value in artifact.items() if key != "artifact_sha256"}
+    artifact["artifact_sha256"] = hashlib.sha256(
+        json.dumps(
+            unsigned,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    assert artifact["claim_boundary"] != HARNESS_OUTCOME_CAMPAIGN_CLAIM_BOUNDARY
     with pytest.raises(ValueError, match="claim boundary"):
         verify_harness_outcome_campaign(artifact)
 
@@ -252,6 +257,4 @@ def test_current_campaign_files_and_check_mode_are_reproducible(
     with csv_path.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 15
-    assert all(
-        row["exact_match_to_deterministic_baseline"] == "True" for row in rows
-    )
+    assert all(row["exact_match_to_deterministic_baseline"] == "True" for row in rows)
