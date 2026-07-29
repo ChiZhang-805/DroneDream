@@ -10,10 +10,12 @@ claim.
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import hashlib
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -1034,6 +1036,22 @@ def _output_payloads(
     return bundle_bytes, csv_payloads, manifest, checksum_bytes
 
 
+def _write_new_bytes(path: Path, payload: bytes) -> None:
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        with os.fdopen(descriptor, "wb") as stream:
+            descriptor = None
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError as exc:
+        raise ValueError(f"refusing to overwrite frozen evidence: {path}") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
 def export_technical_report_evidence_v10(
     *,
     repository_root: Path,
@@ -1045,7 +1063,17 @@ def export_technical_report_evidence_v10(
     generated_at: str,
     paths: EvidencePaths = DEFAULT_PATHS,
 ) -> dict[str, Any]:
-    """Build and write an exact-byte v10 evidence bundle."""
+    """Build and exclusively publish a new exact-byte v10 evidence bundle."""
+
+    top_level_paths = (output_path, manifest_path, checksum_path)
+    resolved_top_level = [path.resolve() for path in top_level_paths]
+    if len(set(resolved_top_level)) != len(resolved_top_level):
+        raise ValueError("v10 bundle, manifest, and checksum paths must be distinct")
+    for path in top_level_paths:
+        if path.exists() or path.is_symlink():
+            raise ValueError(f"refusing to overwrite frozen evidence: {path}")
+    if csv_directory.exists() or csv_directory.is_symlink():
+        raise ValueError(f"refusing to overwrite frozen evidence directory: {csv_directory}")
 
     bundle, csv_rows = build_technical_report_evidence_v10(
         repository_root=repository_root,
@@ -1059,15 +1087,28 @@ def export_technical_report_evidence_v10(
         bundle_name=output_path.name,
         manifest_name=manifest_path.name,
     )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    checksum_path.parent.mkdir(parents=True, exist_ok=True)
-    csv_directory.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(bundle_bytes)
-    manifest_path.write_bytes(_pretty_bytes(manifest))
-    checksum_path.write_bytes(checksum_bytes)
-    for name, payload in csv_payloads.items():
-        (csv_directory / name).write_bytes(payload)
+    created: list[Path] = []
+    csv_directory_created = False
+    try:
+        for path in top_level_paths:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        csv_directory.mkdir(parents=True, exist_ok=False)
+        csv_directory_created = True
+        for path, payload in (
+            (output_path, bundle_bytes),
+            (manifest_path, _pretty_bytes(manifest)),
+            (checksum_path, checksum_bytes),
+            *((csv_directory / name, payload) for name, payload in csv_payloads.items()),
+        ):
+            _write_new_bytes(path, payload)
+            created.append(path)
+    except Exception:
+        for path in reversed(created):
+            path.unlink(missing_ok=True)
+        if csv_directory_created:
+            with contextlib.suppress(OSError):
+                csv_directory.rmdir()
+        raise
     return bundle
 
 

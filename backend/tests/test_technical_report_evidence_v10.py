@@ -149,6 +149,58 @@ def test_v10_export_and_exact_byte_verification(tmp_path: Path) -> None:
     ]
 
 
+def test_v10_export_refuses_to_overwrite_an_existing_freeze(tmp_path: Path) -> None:
+    _, paths = _export(tmp_path)
+    output, manifest, checksums, csv_directory = paths
+    originals = {
+        path: path.read_bytes()
+        for path in (
+            output,
+            manifest,
+            checksums,
+            *sorted(csv_directory.glob("*.csv")),
+        )
+    }
+
+    with pytest.raises(ValueError, match="refusing to overwrite frozen evidence"):
+        _export(tmp_path)
+
+    assert {path: path.read_bytes() for path in originals} == originals
+
+
+def test_v10_export_rolls_back_its_files_without_removing_a_raced_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output, manifest, checksums, csv_directory = _paths(tmp_path)
+    original_write = evidence_v10_module._write_new_bytes
+    calls = 0
+
+    def inject_race(path: Path, payload: bytes) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            path.write_bytes(b"concurrent publisher")
+        original_write(path, payload)
+
+    monkeypatch.setattr(evidence_v10_module, "_write_new_bytes", inject_race)
+    with pytest.raises(ValueError, match="refusing to overwrite frozen evidence"):
+        export_technical_report_evidence_v10(
+            repository_root=REPOSITORY_ROOT,
+            output_path=output,
+            manifest_path=manifest,
+            checksum_path=checksums,
+            csv_directory=csv_directory,
+            source_commit=SOURCE_COMMIT,
+            generated_at=GENERATED_AT,
+        )
+
+    assert not output.exists()
+    assert manifest.read_bytes() == b"concurrent publisher"
+    assert not checksums.exists()
+    assert not csv_directory.exists()
+
+
 @pytest.mark.parametrize(
     "target_name",
     [
